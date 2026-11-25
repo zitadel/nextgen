@@ -1,2 +1,6 @@
-api/generated/** linguist-generated=true
-internal/domain/mock/** linguist-generated=true
+# Check files out with LF on every platform, so a Windows checkout reads the same bytes as
+# Linux (generated files, golden hashes and section lookups all depend on it).
+* text=auto eol=lf
+
+apps/api/internal/api/generated/** linguist-generated=true
+apps/api/internal/domain/mock/** linguist-generated=true

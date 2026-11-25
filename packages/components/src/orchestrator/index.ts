@@ -20,6 +20,7 @@ export { ZitadelLogout } from "./zitadel-logout.js";
 export { ZitadelSession } from "./zitadel-session.js";
 export {
   applyBrandingTokens,
+  brandingDeclarations,
   buildBrandingStylesheet,
   resolveTheme,
 } from "./branding-to-tokens.js";
@@ -46,6 +47,7 @@ export { createSanitiser } from "./sanitiser.js";
 export const defaultTemplate: string = defaultTemplateSource;
 export const layoutChromeCss: string = layoutChromeCssSource;
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
+export { solveSignupPow } from "./signup-pow.js";
 export {
   validateBranding,
   type BrandingValidationContext,

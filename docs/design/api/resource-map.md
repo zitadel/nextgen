@@ -4,7 +4,7 @@
 
 ## How to read this page
 
-API paths are shown without their prefix: `/projects` is served at `/api/v1/projects` under [ADR 077](../../adrs/077-api-path-prefix.md) (Proposed), and at `/projects` until it lands. [Hosted protocol surfaces](#hosted-protocol-surfaces) and [Debug](#debug) paths are shown as served, at the root. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
+API paths are shown without their prefix: `/projects` is served at `/api/v1/projects` ([ADR 077](../../adrs/077-api-path-prefix.md)), and until 1.0.0, deprecated, at `/projects` too. [Hosted protocol surfaces](#hosted-protocol-surfaces) and [Debug](#debug) paths are shown as served, at the root. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
 
 Standard REST semantics apply: `POST` on the collection creates, `GET` on the collection lists (scope required — see [`url-architecture.md`](url-architecture.md#scope-resolution-as-a-first-class-invariant)), and `GET`/`PATCH` on the item reads/updates. `DELETE` on managed resources runs the resource's lifecycle semantics first (usually deactivate/tombstone); it is not a blind SQL hard-delete. Action verbs use slash form (`POST /users/{id}/verify_email`).
 
@@ -38,7 +38,7 @@ revision for the project.
 
 ```http
 /branding
-/branding/{id}
+/branding/{branding_id}
 ```
 
 Create/list are project-scoped (project id on the request, matching OpenAPI):
@@ -46,7 +46,7 @@ Create/list are project-scoped (project id on the request, matching OpenAPI):
 ```http
 POST /branding                  # publish a new revision
 GET  /branding                  # list revisions for the project, newest first
-GET  /branding/{id}
+GET  /branding/{branding_id}
 ```
 
 Permission names in
@@ -66,10 +66,11 @@ Teams live inside projects. A team in the platform project is a paying developer
 /teams/{id}/api_keys
 ```
 
-Create/list with explicit scope:
+Create takes an explicit `project_id`; the list takes an optional one,
+defaulting to the credential's project like `POST /users/query`:
 
 ```http
-POST /teams                     # body: { project_id, name, ... }
+POST /teams?project_id=…        # body: { name, ... }
 POST /teams/query               # structured filters + cursor pagination (ADR 031)
 GET  /users/{user_id}/teams     # the teams a user belongs to
 ```
@@ -140,7 +141,7 @@ records follow. Only user schemas exist today; the collection is project-scoped.
 
 ```http
 /schemas
-/schemas/{id}
+/schemas/{schema_id}
 ```
 
 Create/list with explicit scope:
@@ -148,10 +149,10 @@ Create/list with explicit scope:
 ```http
 POST /schemas                   # create a user schema
 GET  /schemas?project_id=…&object_type=…
-GET  /schemas/{id}
+GET  /schemas/{schema_id}
 ```
 
-`PATCH`/`DELETE /schemas/{id}` are **not yet exposed** — create, list, and get
+`PATCH`/`DELETE /schemas/{schema_id}` are **not yet exposed** — create, list, and get
 only. Permission names in
 [`system-permission-catalog.md`](system-permission-catalog.md#schemas-user-schemas).
 
@@ -179,9 +180,9 @@ was part of the same sketch. Detail in [`credentials.md`](credentials.md).
 ## Other identity resources
 
 ```http
-/apps/{id}                      # OIDC/SAML relying parties
-/idps/{id}
-/grants/{id}
+/applications/{application_id}              # registered applications with their OAuth clients
+/idps/{idp_id}
+/grants/{grant_id}
 /app_groups/{id}                # what used to be called "project" (the authz container)
 ```
 
@@ -212,8 +213,8 @@ POST   /sessions                         # optional anonymous pre-auth shell
 POST   /sessions/query                   # operator list — structured filters + cursor pagination
 GET    /sessions/{id}                    # operator get
 DELETE /sessions/{id}                    # operator revoke (not logout; idempotent 204)
-GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
-DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
+GET    /sessions/me                      # end-user get (`sessionCookie` scheme)
+DELETE /sessions/me                      # end-user logout (`sessionCookie` scheme)
 ```
 
 Sessions carry factors + `assurance_levels[]`. Clients read and revoke
@@ -227,19 +228,21 @@ sessions; factor changes flow through `auth_attempts`. Detail in
 The UI-orchestration layer that runs on top of auth_attempts. Detail in [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 
 ```http
-POST /flow                      # start a flow run
-GET  /flow/{id}                 # read the current step
-POST /flow/{id}/submit          # submit the current step
+POST /flows                      # start a flow run
+GET  /flows/{flow_id}                 # read the current step
+POST /flows/{flow_id}/submit          # submit the current step
 ```
+
+Until 1.0.0 the three also answer, deprecated, at `/flow`, the collection's name before it became plural ([ADR 077 §4](../../adrs/077-api-path-prefix.md#4-the-root-keeps-answering-through-0x)).
 
 Flow definition management:
 
 ```http
 POST /flow_definitions          # publish a new revision
 GET  /flow_definitions?project_id=…&name=…
-GET  /flow_definitions/{id}
-# planned: POST /flow_definitions/{id}/validate
-# planned: POST /flow_definitions/{id}/simulate
+GET  /flow_definitions/{flow_definition_id}
+# planned: POST /flow_definitions/{flow_definition_id}/validate
+# planned: POST /flow_definitions/{flow_definition_id}/simulate
 ```
 
 A flow definition is an immutable revision ([ADR 035](../../adrs/035-configuration-environments.md)):
@@ -257,7 +260,7 @@ Unified wide-event audit stream. See [ADR 048](../../adrs/048-wide-events-intern
 retention, export).
 
 ```http
-GET /events/{id}?project_id=… # project-scoped get (events not in resource_scope_index)
+GET /events/{event_id}?project_id=… # project-scoped get (events not in resource_scope_index)
 GET /events?project_id=…
          &category=…          # request | auth | session | admin | entity | signal
          &event_type=…
@@ -275,7 +278,7 @@ GET /events?project_id=…
          &page_token=…
 ```
 
-`GET /events/{id}` is **project-scoped**: resolve `project_id` from the
+`GET /events/{event_id}` is **project-scoped**: resolve `project_id` from the
 credential (or require it explicitly), authorize, then load
 `(project_id, id)`. Events are **not** registered in `resource_scope_index`
 (TTL audit volume). List/get authorization uses emit-time `team_id` stored on
@@ -363,7 +366,7 @@ Quick lookup for which project a given use case targets.
 
 | Area | Status |
 |---|---|
-| **Search** | **LOCKED.** Ship `?q=` (server-defined fuzzy match on common fields) plus typed filters for MVP. Defer the Stripe-style query DSL to post-MVP `POST /search` endpoints. |
+| **Search** | Typed filters on each resource's query endpoint ([ADR 031](../../adrs/031-openapi-querying.md)), and `search` (`POST /search`) for text across resource types in one project ([ADR 087](../../adrs/087-search.md)). A Stripe-style query DSL stays deferred. |
 | **Bulk** | **LOCKED.** No generic `/batch`. Async `POST /imports` for migration; resource-specific bulk endpoints only when demand is real. |
 | **Cross-project aggregation** | **LOCKED.** Drop at MVP. Aggregated endpoints are console-internal only until there's a clear customer-facing need. |
 

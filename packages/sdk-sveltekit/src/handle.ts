@@ -315,26 +315,26 @@ function withNoStore(response: Response): Response {
  * Creates a SvelteKit {@link NextgenHandle} hook that handles proxying, JWT
  * verification, and route protection in a single pass.
  *
- * Place it in `src/hooks.server.ts`:
+ * Place it in `src/hooks.server.ts`, reading its settings from
+ * `$app/env/private` (declared in `src/env.ts` with `defineEnvVars`):
  *
  * ```ts
+ * import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
  * import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
  *
- * // SvelteKit does not surface .env files on process.env; load it in dev.
- * try {
- *   process.loadEnvFile?.(".env.local");
- * } catch {}
- *
  * export const handle = createNextgenHandle({
+ *   url: ZITADEL_URL,
+ *   projectSecret: ZITADEL_PROJECT_SECRET,
+ *   projectId: ZITADEL_PROJECT_ID,
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
  * ```
  *
- * `url` and `projectSecret` default to `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET`
- * from `process.env` (version-independent, unlike SvelteKit's `$env` modules).
- * A session counts only in the app's own project: `projectId`, else
- * `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
+ * Left out, `url` and `projectSecret` default to `ZITADEL_URL` /
+ * `ZITADEL_PROJECT_SECRET` from `process.env`, which SvelteKit never fills from
+ * `.env` files. A session counts only in the app's own project: `projectId`,
+ * else `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
  * Compose it with other hooks via `sequence()` from `@sveltejs/kit/hooks`.
  *
  * @param options - Middleware configuration options. `projectSecret` is the

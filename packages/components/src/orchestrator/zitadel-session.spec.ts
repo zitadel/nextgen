@@ -44,7 +44,7 @@ let revokeStatus = 204;
 let csrfStatus = 200;
 const getLog: string[] = [];
 
-const getHandler = http.get(`${API_BASE}/sessions/me`, ({ request }) => {
+const getHandler = http.get(`${API_BASE}/api/v1/sessions/me`, ({ request }) => {
   getLog.push(request.url);
   if (sessionStatus === 403) {
     return HttpResponse.json(
@@ -58,7 +58,7 @@ const getHandler = http.get(`${API_BASE}/sessions/me`, ({ request }) => {
   return HttpResponse.json(sessionBody(currentEmail, currentUserId, currentProjectId));
 });
 
-const csrfHandler = http.get(`${API_BASE}/sessions/me/csrf`, () => {
+const csrfHandler = http.get(`${API_BASE}/api/v1/sessions/me/csrf`, () => {
   if (csrfStatus === 403) {
     return HttpResponse.json(
       { code: "sess.project_mismatch", message: "The session belongs to a different project." },
@@ -68,7 +68,7 @@ const csrfHandler = http.get(`${API_BASE}/sessions/me/csrf`, () => {
   return HttpResponse.json({ csrf_token: CSRF_TOKEN });
 });
 
-const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
+const deleteHandler = http.delete(`${API_BASE}/api/v1/sessions/me`, ({ request }) => {
   deleteLog.push({
     url: request.url,
     method: request.method,
@@ -256,7 +256,7 @@ describe("<zitadel-session>", () => {
 
     expect(deleteLog).toHaveLength(1);
     expect(deleteLog[0]?.method).toBe("DELETE");
-    expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
+    expect(deleteLog[0]?.url).toBe(`${API_BASE}/api/v1/sessions/me?project_id=test`);
     expect(deleteLog[0]?.credentials).toBe("include");
     expect(deleteLog[0]?.csrf).toBe(CSRF_TOKEN);
     expect(events).toHaveLength(1);
@@ -407,7 +407,7 @@ describe("<zitadel-session>", () => {
       await new Promise((resolve) => setTimeout(resolve, 32));
 
       expect(deleteLog).toHaveLength(1);
-      expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
+      expect(deleteLog[0]?.url).toBe(`${API_BASE}/api/v1/sessions/me?project_id=test`);
       expect(deleteLog[0]?.credentials).toBe("include");
     } finally {
       configureZitadel({ proxyPath: API_BASE, projectId: "test" });
@@ -419,7 +419,7 @@ describe("<zitadel-session>", () => {
     const element = mount();
     element.postSignOutUrl = "https://app.test/login";
     await flush(element);
-    server.use(http.delete(`${API_BASE}/sessions/me`, () => HttpResponse.error()));
+    server.use(http.delete(`${API_BASE}/api/v1/sessions/me`, () => HttpResponse.error()));
 
     activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
     await new Promise((resolve) => setTimeout(resolve, 32));

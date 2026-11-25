@@ -1,0 +1,13 @@
+title: CreateInvitationRequest
+description: |
+  Creates an invitation. Discriminate on `type`. Optional `metadata` labels who
+  the link is for. Optional `replaces_invitation_id` replaces an existing
+  invitation in the same create.
+oneOf:
+  - $ref: create-invitation-project-member-request.yaml
+  - $ref: create-invitation-team-member-request.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    project_member: create-invitation-project-member-request.yaml
+    team_member: create-invitation-team-member-request.yaml

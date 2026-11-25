@@ -1,5 +1,5 @@
-import { MANAGED_MARKER } from "../../../../../../paths";
-import type { RendererSpec } from "../types";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import type { RendererSpec } from "@/lib/orca/patchers/rule/next/renderers/types";
 
 /**
  * The Next.js App Router renderer scaffolds `/login`, `/register`, and
@@ -85,7 +85,9 @@ export const reactRenderer: RendererSpec = {
   // tokens).
   // If this page already carries its own heading, add suppressHeader to the
   // element to visually hide the widget's heading block — it stays in the
-  // accessibility tree, and the card keeps no blank header band.`
+  // accessibility tree, and the card keeps no blank header band. The login
+  // moves between sign-in and sign-up by itself, so that heading has to
+  // follow it, as AGENTS.md describes.`
         : `  // variant="page" makes the widget paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; switch to
   // variant="widget" to embed the sign-in card inside a layout you own.
@@ -96,7 +98,7 @@ ${PAGE_WRAPPER_COMMENT}`;
       const wrapperClose = widget ? `</div>` : `</main>`;
       return {
         mode,
-        contents: `${MANAGED_MARKER}
+        contents: `${ManagedFile.MARKER}
 "use client";
 
 import dynamic from "next/dynamic";
@@ -163,7 +165,7 @@ ${PAGE_WRAPPER_COMMENT}`;
         : PAGE_WRAPPER_OPEN;
       const wrapperClose = widget ? `</div>` : `</main>`;
       return {
-        contents: `${MANAGED_MARKER}
+        contents: `${ManagedFile.MARKER}
 "use client";
 
 import dynamic from "next/dynamic";
@@ -174,7 +176,7 @@ const ZitadelSession = dynamic(
       "@zitadel/sdk-next/components"
     );
     // Build the SDK project handle and pass it to the session card via the
-    // \`project\` prop. The card reads identity from "/__nextgen/sessions/me"
+    // \`project\` prop. The card reads identity from "/__nextgen/api/v1/sessions/me"
     // and exposes a Sign out action. Your own components (a header, an
     // account menu) can make the same read with getSession() from
     // "@zitadel/sdk-next/session" to swap sign-in CTAs for account chrome.
@@ -208,7 +210,7 @@ ${postureComment}
     },
     customElementsDts() {
       return {
-        contents: `${MANAGED_MARKER}
+        contents: `${ManagedFile.MARKER}
 // React JSX declarations for the <zitadel-*> custom elements ship with the
 // SDK, so the scaffold stays aligned with the real element surface instead
 // of carrying a hand-maintained copy that drifts.

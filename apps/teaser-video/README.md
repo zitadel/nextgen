@@ -12,9 +12,9 @@ on it. The rules an agent (or a careful human) must keep are in
 ## Run it
 
 ```sh
-corepack pnpm install
-moon run teaser-video:dev      # Remotion Studio: scrub, preview, tweak
-moon run teaser-video:render   # renders dist/teaser.mp4 (1920×1080, 30 fps)
+pnpm install
+turbo run dev --filter=@zitadel/teaser-video      # Remotion Studio: scrub, preview, tweak
+turbo run render --filter=@zitadel/teaser-video   # renders dist/teaser.mp4 (1920×1080, 30 fps)
 ```
 
 Both tasks build `@zitadel/components` first. The Studio lists one

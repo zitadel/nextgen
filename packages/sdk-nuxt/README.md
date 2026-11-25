@@ -14,7 +14,7 @@ for hand-rolled setups.
 
 ## Requirements
 
-Peer dependencies: `nuxt >=4` and `h3 >=1`.
+Peer dependencies: `nuxt >=4` and `h3 ^1.15.0`, the h3 line Nuxt 4 runs on. h3 2 is not supported.
 
 The Nitro middleware reads the request and writes the response only through h3's accessors (`getRequestHeaders`, `getRequestIP`, `setResponseHeader` and the like), never `event.node`, and reads a proxied request body through the web `Request`. It is tested on Node and inside the `edge-runtime` VM over a web-style h3 event. It has not been deployed to a Cloudflare, Vercel Edge or other edge Nitro preset, and h3 1.x still builds its event on a Node-shaped shim there. On a preset that reports no connection address, `X-Forwarded-For` is left as the proxy chain it received, with the address added only when the runtime provides it (`event.context.clientAddress` or the socket).
 
@@ -204,3 +204,7 @@ The verification pipeline is shared across SDKs and documented once in
 On top of it, the Nitro middleware refuses with a 400 any request that carries
 an `x-nextgen-auth-token` header: that header is an internal channel, so a
 client never sends it.
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

@@ -2,9 +2,19 @@ import { commands } from "vitest/browser";
 
 import type { ServerLoginProps } from "./server-markup";
 
-/** The HTML Qwik's server renderer sends for a login, as the other SDKs' specs get it. */
-export function serverMarkup(props: ServerLoginProps): Promise<string> {
-  return commands.renderServerLogin(props);
+/**
+ * Loads the login's server build in Node and returns its server render: the
+ * HTML Qwik's server renderer sends for a login, as the other SDKs' specs get
+ * it. Stop the build with {@link closeServerMarkup} once the spec is done.
+ */
+export async function loadServerMarkup(): Promise<(props: ServerLoginProps) => Promise<string>> {
+  await commands.loadServerLogin();
+  return (props) => commands.renderServerLogin(props);
+}
+
+/** Stops the server build {@link loadServerMarkup} loaded. */
+export function closeServerMarkup(): Promise<void> {
+  return commands.closeServerLogin();
 }
 
 /**

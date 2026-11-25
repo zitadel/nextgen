@@ -1,7 +1,0 @@
-type: object
-required:
-  - id
-properties:
-  id:
-    type: string
-    description: The ID of the created schema

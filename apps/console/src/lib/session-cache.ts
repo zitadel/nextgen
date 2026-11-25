@@ -19,6 +19,23 @@ export function clearSessionCaches(): void {
   for (const cache of caches) cache.clear();
 }
 
+/**
+ * A value kept in memory for the signed-in person: `initial()` on first use,
+ * and again after the session is dropped.
+ */
+export function sessionKept<T>(initial: () => T): () => T {
+  let entry: { value: T } | undefined;
+  caches.add({
+    clear: () => {
+      entry = undefined;
+    },
+  });
+  return () => {
+    entry ??= { value: initial() };
+    return entry.value;
+  };
+}
+
 /** A read shared by its callers for `ttlMs`. */
 export function sessionCached<T>(load: () => Promise<T>, ttlMs: number): () => Promise<T> {
   let entry: { at: number; value: Promise<T> } | undefined;

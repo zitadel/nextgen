@@ -1,25 +1,24 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import { ZitadelError } from "../../../../../../../src/lib/errors";
-import { scaffold } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/index";
-import type { ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
+import { it } from "@tests/fixtures";
 
-let dir: string;
-
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-scaffold-"));
-});
-
-afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
-});
+import { ZitadelError } from "@/lib/errors";
+import { FileWriter } from "@/lib/orca/patchers/rule/file-writer/index";
+import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 function plan(...ops: ScaffoldPlan["ops"]): ScaffoldPlan {
   return { ops, summary: [] };
+}
+
+function scaffold(
+  scaffoldPlan: ScaffoldPlan,
+  options: { cwd: string; dryRun: boolean; force: boolean },
+) {
+  return new FileWriter(options).scaffold(scaffoldPlan);
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -31,8 +30,16 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+/** A rule whose entry is its path, so the text a test finds is the rule it gave. */
+const ENV_LOCAL = { path: ".env.local", ignored: true, entry: ".env.local" } as const;
+
+/** A rule met by ignoring the directory its path lies in. */
+const ZITADEL_DIRECTORY = { path: ".zitadel/secret", ignored: true, entry: ".zitadel" } as const;
+
 describe("scaffold - mkdir", () => {
-  it("creates a directory recursively and reports it as a dir row, not a written file", async () => {
+  it("creates a directory recursively and reports it as a dir row, not a written file", async ({
+    dir,
+  }) => {
     const result = await scaffold(plan({ kind: "mkdir", path: "a/b/c" }), {
       cwd: dir,
       dryRun: false,
@@ -43,7 +50,7 @@ describe("scaffold - mkdir", () => {
     expect(await exists(join(dir, "a/b/c"))).toBe(false); // it's a dir, readFile fails
   });
 
-  it("does not touch disk on dry-run but still records the row", async () => {
+  it("does not touch disk on dry-run but still records the row", async ({ dir }) => {
     const result = await scaffold(plan({ kind: "mkdir", path: "made-up" }), {
       cwd: dir,
       dryRun: true,
@@ -53,7 +60,7 @@ describe("scaffold - mkdir", () => {
     expect(result.files).toEqual([{ path: join(dir, "made-up"), kind: "dir", action: "create" }]);
   });
 
-  it("reports an already-existing directory as skipped", async () => {
+  it("reports an already-existing directory as skipped", async ({ dir }) => {
     await scaffold(plan({ kind: "mkdir", path: "app" }), { cwd: dir, dryRun: false, force: false });
     const second = await scaffold(plan({ kind: "mkdir", path: "app" }), {
       cwd: dir,
@@ -64,28 +71,30 @@ describe("scaffold - mkdir", () => {
     expect(second.filesSkipped).toEqual([join(dir, "app")]);
   });
 
-  it("never reports mode healing on win32, where POSIX modes are not implemented", async () => {
+  it("never reports mode healing on win32, where POSIX modes are not implemented", async ({
+    dir,
+    terminal,
+  }) => {
     await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o755 }), {
       cwd: dir,
       dryRun: false,
       force: false,
     });
-    const descriptor = Object.getOwnPropertyDescriptor(process, "platform")!;
-    Object.defineProperty(process, "platform", { value: "win32" });
-    try {
-      const rerun = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
-        cwd: dir,
-        dryRun: false,
-        force: false,
-      });
-      expect(rerun.files).toEqual([]);
-      expect(rerun.filesSkipped).toEqual([join(dir, "vault")]);
-    } finally {
-      Object.defineProperty(process, "platform", descriptor);
-    }
+    terminal.platform("win32");
+
+    const rerun = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+
+    expect(rerun.files).toEqual([]);
+    expect(rerun.filesSkipped).toEqual([join(dir, "vault")]);
   });
 
-  it("reports a permission repair on an existing directory as an update, not a skip", async () => {
+  it("reports a permission repair on an existing directory as an update, not a skip", async ({
+    dir,
+  }) => {
     await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o755 }), {
       cwd: dir,
       dryRun: false,
@@ -111,7 +120,7 @@ describe("scaffold - mkdir", () => {
 });
 
 describe("scaffold - write", () => {
-  it("writes a new file with the given contents", async () => {
+  it("writes a new file with the given contents", async ({ dir }) => {
     const target = join(dir, "src/login/page.tsx");
     const result = await scaffold(
       plan({ kind: "write", path: "src/login/page.tsx", contents: "hello world" }),
@@ -122,7 +131,7 @@ describe("scaffold - write", () => {
     expect(await readFile(target, "utf8")).toBe("hello world");
   });
 
-  it("is idempotent: a second run skips the unchanged file", async () => {
+  it("is idempotent: a second run skips the unchanged file", async ({ dir }) => {
     const op: ScaffoldPlan["ops"][number] = {
       kind: "write",
       path: "page.tsx",
@@ -134,25 +143,36 @@ describe("scaffold - write", () => {
     expect(second.filesSkipped).toEqual([join(dir, "page.tsx")]);
   });
 
-  it("throws E_CONFLICT when overwriting a different existing file without force", async () => {
+  it("edits the first candidate that exists without reading the ones after it", async ({ dir }) => {
+    await writeFile(join(dir, "vite.config.ts"), "before");
+    await mkdir(join(dir, "vite.config.js"));
+
+    await scaffold(
+      plan({ kind: "edit", path: ["vite.config.ts", "vite.config.js"], edit: (s) => `${s}!` }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+
+    expect(await readFile(join(dir, "vite.config.ts"), "utf8")).toBe("before!");
+  });
+
+  it("throws E_CONFLICT when overwriting a different existing file without force", async ({
+    dir,
+  }) => {
     await writeFile(join(dir, "page.tsx"), "user-authored");
-    let caught: unknown;
-    try {
-      await scaffold(plan({ kind: "write", path: "page.tsx", contents: "managed" }), {
+    const caught = await rejectionOf(() =>
+      scaffold(plan({ kind: "write", path: "page.tsx", contents: "managed" }), {
         cwd: dir,
         dryRun: false,
         force: false,
-      });
-    } catch (error) {
-      caught = error;
-    }
+      }),
+    );
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_CONFLICT");
     // file left untouched
     expect(await readFile(join(dir, "page.tsx"), "utf8")).toBe("user-authored");
   });
 
-  it("overwrites an existing file when force is set", async () => {
+  it("overwrites an existing file when force is set", async ({ dir }) => {
     await writeFile(join(dir, "page.tsx"), "old");
     const result = await scaffold(plan({ kind: "write", path: "page.tsx", contents: "new" }), {
       cwd: dir,
@@ -163,7 +183,7 @@ describe("scaffold - write", () => {
     expect(await readFile(join(dir, "page.tsx"), "utf8")).toBe("new");
   });
 
-  it("does not write to disk on dry-run", async () => {
+  it("does not write to disk on dry-run", async ({ dir }) => {
     const result = await scaffold(plan({ kind: "write", path: "page.tsx", contents: "x" }), {
       cwd: dir,
       dryRun: true,
@@ -173,7 +193,7 @@ describe("scaffold - write", () => {
     expect(await exists(join(dir, "page.tsx"))).toBe(false);
   });
 
-  it("skips an identical file on dry-run rather than reporting a write", async () => {
+  it("skips an identical file on dry-run rather than reporting a write", async ({ dir }) => {
     await writeFile(join(dir, "page.tsx"), "same");
     const result = await scaffold(plan({ kind: "write", path: "page.tsx", contents: "same" }), {
       cwd: dir,
@@ -186,7 +206,7 @@ describe("scaffold - write", () => {
 });
 
 describe("scaffold - append", () => {
-  it("creates the file and appends contents when missing", async () => {
+  it("creates the file and appends contents when missing", async ({ dir }) => {
     const result = await scaffold(plan({ kind: "append", path: "notes.txt", contents: "line-1" }), {
       cwd: dir,
       dryRun: false,
@@ -196,7 +216,7 @@ describe("scaffold - append", () => {
     expect(await readFile(join(dir, "notes.txt"), "utf8")).toBe("line-1");
   });
 
-  it("appends to existing content with a separating newline", async () => {
+  it("appends to existing content with a separating newline", async ({ dir }) => {
     await writeFile(join(dir, "notes.txt"), "first");
     await scaffold(plan({ kind: "append", path: "notes.txt", contents: "second" }), {
       cwd: dir,
@@ -206,7 +226,7 @@ describe("scaffold - append", () => {
     expect(await readFile(join(dir, "notes.txt"), "utf8")).toBe("first\nsecond");
   });
 
-  it("skips when ifMissing marker is already present", async () => {
+  it("skips when ifMissing marker is already present", async ({ dir }) => {
     await writeFile(join(dir, "notes.txt"), "already has MARKER here");
     const result = await scaffold(
       plan({ kind: "append", path: "notes.txt", contents: "x", ifMissing: "MARKER" }),
@@ -218,7 +238,7 @@ describe("scaffold - append", () => {
 });
 
 describe("scaffold - merge-env", () => {
-  it("creates an env file with the given entries", async () => {
+  it("creates an env file with the given entries", async ({ dir }) => {
     await scaffold(
       plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "1", BAR: "2" } }),
       { cwd: dir, dryRun: false, force: false },
@@ -228,7 +248,7 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("BAR=2");
   });
 
-  it("creates the file with the requested mode", async () => {
+  it("creates the file with the requested mode", async ({ dir }) => {
     await scaffold(
       plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "1" }, mode: 0o600 }),
       { cwd: dir, dryRun: false, force: false },
@@ -236,7 +256,7 @@ describe("scaffold - merge-env", () => {
     expect((await stat(join(dir, ".env.local"))).mode & 0o777).toBe(0o600);
   });
 
-  it("only adds keys not already present", async () => {
+  it("only adds keys not already present", async ({ dir }) => {
     await writeFile(join(dir, ".env.local"), "FOO=existing\n");
     await scaffold(
       plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "new", BAZ: "3" } }),
@@ -248,7 +268,7 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("BAZ=3");
   });
 
-  it("replaces an existing value in place when told to overwrite", async () => {
+  it("replaces an existing value in place when told to overwrite", async ({ dir }) => {
     await writeFile(join(dir, ".env.local"), "# kept\nFOO=stale\nOTHER=1\n");
     await scaffold(
       plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "fresh" }, overwrite: true }),
@@ -257,7 +277,7 @@ describe("scaffold - merge-env", () => {
     expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("# kept\nFOO=fresh\nOTHER=1\n");
   });
 
-  it("quotes a value that would not read back bare", async () => {
+  it("quotes a value that would not read back bare", async ({ dir }) => {
     await scaffold(plan({ kind: "merge-env", path: ".env.local", entries: { SECRET: "a#b" } }), {
       cwd: dir,
       dryRun: false,
@@ -266,7 +286,7 @@ describe("scaffold - merge-env", () => {
     expect(await readFile(join(dir, ".env.local"), "utf8")).toContain("SECRET='a#b'");
   });
 
-  it("leaves the file alone under --dry-run even when told to overwrite", async () => {
+  it("leaves the file alone under --dry-run even when told to overwrite", async ({ dir }) => {
     await writeFile(join(dir, ".env.local"), "FOO=stale\n");
     await scaffold(
       plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "fresh" }, overwrite: true }),
@@ -275,7 +295,9 @@ describe("scaffold - merge-env", () => {
     expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("FOO=stale\n");
   });
 
-  it("writes the comment above the entries once, and not again on a later merge", async () => {
+  it("writes the comment above the entries once, and not again on a later merge", async ({
+    dir,
+  }) => {
     const op = {
       kind: "merge-env" as const,
       path: ".env.local",
@@ -297,7 +319,7 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("BAR=2");
   });
 
-  it("skips when every key is already present", async () => {
+  it("skips when every key is already present", async ({ dir }) => {
     await writeFile(join(dir, ".env.local"), "FOO=1\n");
     const result = await scaffold(
       plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "anything" } }),
@@ -306,7 +328,9 @@ describe("scaffold - merge-env", () => {
     expect(result.filesSkipped).toEqual([join(dir, ".env.local")]);
   });
 
-  it("re-asserts the mode when rewriting an existing secret-bearing file at a loose mode", async () => {
+  it("re-asserts the mode when rewriting an existing secret-bearing file at a loose mode", async ({
+    dir,
+  }) => {
     await writeFile(join(dir, ".env.development.local"), "FOO=1\n", { mode: 0o644 });
     await scaffold(
       plan({
@@ -320,7 +344,7 @@ describe("scaffold - merge-env", () => {
     expect((await stat(join(dir, ".env.development.local"))).mode & 0o777).toBe(0o600);
   });
 
-  it("re-asserts the mode even when there is nothing to add", async () => {
+  it("re-asserts the mode even when there is nothing to add", async ({ dir }) => {
     await writeFile(join(dir, ".env.development.local"), "FOO=1\n", { mode: 0o644 });
     const result = await scaffold(
       plan({
@@ -337,7 +361,7 @@ describe("scaffold - merge-env", () => {
 });
 
 describe("scaffold - merge-json", () => {
-  it("creates a JSON file from the patch when none exists", async () => {
+  it("creates a JSON file from the patch when none exists", async ({ dir }) => {
     await scaffold(
       plan({
         kind: "merge-json",
@@ -352,7 +376,7 @@ describe("scaffold - merge-json", () => {
     expect(parsed.compilerOptions.strict).toBe(true);
   });
 
-  it("deep-merges into existing JSON, preserving untouched keys", async () => {
+  it("deep-merges into existing JSON, preserving untouched keys", async ({ dir }) => {
     await writeFile(
       join(dir, "tsconfig.json"),
       JSON.stringify({ compilerOptions: { target: "es2020" }, include: ["src"] }),
@@ -374,7 +398,7 @@ describe("scaffold - merge-json", () => {
     expect(parsed.include).toEqual(["src"]);
   });
 
-  it("is idempotent: re-merging the same patch skips", async () => {
+  it("is idempotent: re-merging the same patch skips", async ({ dir }) => {
     const p = plan({
       kind: "merge-json",
       path: "tsconfig.json",
@@ -388,8 +412,8 @@ describe("scaffold - merge-json", () => {
 });
 
 describe("scaffold - append-gitignore", () => {
-  it("creates .gitignore with the entries", async () => {
-    await scaffold(plan({ kind: "append-gitignore", entries: [".env.local", ".zitadel"] }), {
+  it("creates .gitignore with the entries", async ({ dir }) => {
+    await scaffold(plan({ kind: "append-gitignore", rules: [ENV_LOCAL, ZITADEL_DIRECTORY] }), {
       cwd: dir,
       dryRun: false,
       force: false,
@@ -399,9 +423,9 @@ describe("scaffold - append-gitignore", () => {
     expect(text).toContain(".zitadel");
   });
 
-  it("only appends entries not already listed", async () => {
+  it("only appends entries not already listed", async ({ dir }) => {
     await writeFile(join(dir, ".gitignore"), ".env.local\nnode_modules\n");
-    await scaffold(plan({ kind: "append-gitignore", entries: [".env.local", ".zitadel"] }), {
+    await scaffold(plan({ kind: "append-gitignore", rules: [ENV_LOCAL, ZITADEL_DIRECTORY] }), {
       cwd: dir,
       dryRun: false,
       force: false,
@@ -411,9 +435,9 @@ describe("scaffold - append-gitignore", () => {
     expect(text).toContain(".zitadel");
   });
 
-  it("skips when all entries are present", async () => {
+  it("skips when all entries are present", async ({ dir }) => {
     await writeFile(join(dir, ".gitignore"), ".zitadel\n");
-    const result = await scaffold(plan({ kind: "append-gitignore", entries: [".zitadel"] }), {
+    const result = await scaffold(plan({ kind: "append-gitignore", rules: [ZITADEL_DIRECTORY] }), {
       cwd: dir,
       dryRun: false,
       force: false,
@@ -422,7 +446,7 @@ describe("scaffold - append-gitignore", () => {
   });
 });
 
-async function readPackageJson(): Promise<Record<string, Record<string, string>>> {
+async function readPackageJson(dir: string): Promise<Record<string, Record<string, string>>> {
   return JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as Record<
     string,
     Record<string, string>
@@ -430,7 +454,7 @@ async function readPackageJson(): Promise<Record<string, Record<string, string>>
 }
 
 describe("scaffold - add-dep", () => {
-  it("adds a dependency to package.json and records it in depsAdded", async () => {
+  it("adds a dependency to package.json and records it in depsAdded", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
     const result = await scaffold(
       plan({ kind: "add-dep", name: "@zitadel/sdk-next", version: "1.2.3" }),
@@ -443,7 +467,7 @@ describe("scaffold - add-dep", () => {
     expect(parsed.dependencies["@zitadel/sdk-next"]).toBe("1.2.3");
   });
 
-  it("adds to devDependencies when dev is set", async () => {
+  it("adds to devDependencies when dev is set", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
     await scaffold(plan({ kind: "add-dep", name: "typescript", version: "5.0.0", dev: true }), {
       cwd: dir,
@@ -458,7 +482,9 @@ describe("scaffold - add-dep", () => {
 
   // A package in both sections is never intended; Qwik's starter vite.config.ts
   // throws on start when it sees one.
-  it("moves a devDependencies entry into dependencies instead of duplicating it", async () => {
+  it("moves a devDependencies entry into dependencies instead of duplicating it", async ({
+    dir,
+  }) => {
     await writeFile(
       join(dir, "package.json"),
       JSON.stringify({
@@ -473,14 +499,14 @@ describe("scaffold - add-dep", () => {
       force: false,
     });
 
-    const parsed = await readPackageJson();
+    const parsed = await readPackageJson(dir);
     expect({ dependencies: parsed.dependencies, devDependencies: parsed.devDependencies }).toEqual({
       dependencies: { "@zitadel/sdk-qwik": "alpha" },
       devDependencies: { other: "1.0.0" },
     });
   });
 
-  it("moves an entry already at the requested version out of devDependencies", async () => {
+  it("moves an entry already at the requested version out of devDependencies", async ({ dir }) => {
     await writeFile(
       join(dir, "package.json"),
       JSON.stringify({
@@ -496,10 +522,10 @@ describe("scaffold - add-dep", () => {
       force: false,
     });
 
-    expect((await readPackageJson()).devDependencies).toEqual({});
+    expect((await readPackageJson(dir)).devDependencies).toEqual({});
   });
 
-  it("keeps a runtime dependency in dependencies when a dev add arrives", async () => {
+  it("keeps a runtime dependency in dependencies when a dev add arrives", async ({ dir }) => {
     const original = JSON.stringify({
       name: "demo",
       dependencies: { "@zitadel/sdk-qwik": "^1.0.0", other: "1.0.0" },
@@ -514,9 +540,9 @@ describe("scaffold - add-dep", () => {
     expect(await readFile(join(dir, "package.json"), "utf8")).toBe(original);
   });
 
-  it.each(["peerDependencies", "optionalDependencies"] as const)(
+  it.for(["peerDependencies", "optionalDependencies"] as const)(
     "leaves a %s entry alone when adding the dependency",
-    async (section) => {
+    async (section, { dir }) => {
       await writeFile(
         join(dir, "package.json"),
         JSON.stringify({ name: "demo", [section]: { "@zitadel/sdk-qwik": "^1.0.0" } }),
@@ -528,7 +554,7 @@ describe("scaffold - add-dep", () => {
         force: false,
       });
 
-      const parsed = await readPackageJson();
+      const parsed = await readPackageJson(dir);
       expect({ [section]: parsed[section], dependencies: parsed.dependencies }).toEqual({
         [section]: { "@zitadel/sdk-qwik": "^1.0.0" },
         dependencies: { "@zitadel/sdk-qwik": "alpha" },
@@ -536,7 +562,7 @@ describe("scaffold - add-dep", () => {
     },
   );
 
-  it("skips when the dependency is already at the requested version", async () => {
+  it("skips when the dependency is already at the requested version", async ({ dir }) => {
     await writeFile(
       join(dir, "package.json"),
       JSON.stringify({ name: "demo", dependencies: { foo: "1.0.0" } }),
@@ -550,22 +576,19 @@ describe("scaffold - add-dep", () => {
     expect(result.depsAdded).toEqual([]);
   });
 
-  it("throws E_VALIDATION when package.json is missing", async () => {
-    let caught: unknown;
-    try {
-      await scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
+  it("throws E_VALIDATION when package.json is missing", async ({ dir }) => {
+    const caught = await rejectionOf(() =>
+      scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
         cwd: dir,
         dryRun: false,
         force: false,
-      });
-    } catch (error) {
-      caught = error;
-    }
+      }),
+    );
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_VALIDATION");
   });
 
-  it("records the dep but does not write on dry-run", async () => {
+  it("records the dep but does not write on dry-run", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
     const result = await scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
       cwd: dir,
@@ -581,7 +604,7 @@ describe("scaffold - add-dep", () => {
 });
 
 describe("scaffold - edit", () => {
-  it("runs the transform on the file contents and writes the result", async () => {
+  it("runs the transform on the file contents and writes the result", async ({ dir }) => {
     const target = join(dir, "vite.config.ts");
     await writeFile(target, "export default {}");
     const result = await scaffold(
@@ -592,7 +615,7 @@ describe("scaffold - edit", () => {
     expect(await readFile(target, "utf8")).toBe("export default {}\n// edited");
   });
 
-  it("edits the first existing candidate from a priority list", async () => {
+  it("edits the first existing candidate from a priority list", async ({ dir }) => {
     await writeFile(join(dir, "vite.config.js"), "js");
     const result = await scaffold(
       plan({
@@ -607,7 +630,9 @@ describe("scaffold - edit", () => {
     expect(await exists(join(dir, "vite.config.ts"))).toBe(false);
   });
 
-  it("passes undefined to the transform and writes the first candidate when none exist", async () => {
+  it("passes undefined to the transform and writes the first candidate when none exist", async ({
+    dir,
+  }) => {
     const result = await scaffold(
       plan({
         kind: "edit",
@@ -620,7 +645,7 @@ describe("scaffold - edit", () => {
     expect(await readFile(join(dir, "vite.config.ts"), "utf8")).toBe("created");
   });
 
-  it("skips when the transform leaves the contents unchanged", async () => {
+  it("skips when the transform leaves the contents unchanged", async ({ dir }) => {
     const target = join(dir, "vite.config.ts");
     await writeFile(target, "untouched");
     const result = await scaffold(
@@ -631,7 +656,7 @@ describe("scaffold - edit", () => {
     expect(result.filesWritten).toEqual([]);
   });
 
-  it("does not write to disk on dry-run but reports the path", async () => {
+  it("does not write to disk on dry-run but reports the path", async ({ dir }) => {
     await writeFile(join(dir, "vite.config.ts"), "before");
     const result = await scaffold(
       plan({ kind: "edit", path: "vite.config.ts", edit: () => "after" }),
@@ -641,7 +666,7 @@ describe("scaffold - edit", () => {
     expect(await readFile(join(dir, "vite.config.ts"), "utf8")).toBe("before");
   });
 
-  it("preserves the existing file's mode across the temp-file swap", async () => {
+  it("preserves the existing file's mode across the temp-file swap", async ({ dir }) => {
     const target = join(dir, "hook.cjs");
     await writeFile(target, "old", { mode: 0o755 });
     await scaffold(plan({ kind: "edit", path: "hook.cjs", edit: () => "new" }), {
@@ -654,13 +679,13 @@ describe("scaffold - edit", () => {
 });
 
 describe("scaffold - multi-op plans", () => {
-  it("applies ops in order and aggregates the result", async () => {
+  it("applies ops in order and aggregates the result", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
     const result = await scaffold(
       plan(
         { kind: "mkdir", path: "app/login" },
         { kind: "write", path: "app/login/page.tsx", contents: "<page />" },
-        { kind: "append-gitignore", entries: [".zitadel"] },
+        { kind: "append-gitignore", rules: [ZITADEL_DIRECTORY] },
         { kind: "add-dep", name: "sdk", version: "1.0.0" },
       ),
       { cwd: dir, dryRun: false, force: false },
@@ -677,13 +702,13 @@ describe("scaffold - multi-op plans", () => {
     expect(await readFile(join(dir, "app/login/page.tsx"), "utf8")).toBe("<page />");
   });
 
-  it("is fully idempotent: re-running a complete plan writes nothing new", async () => {
+  it("is fully idempotent: re-running a complete plan writes nothing new", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
     const full = plan(
       { kind: "mkdir", path: "app" },
       { kind: "write", path: "app/page.tsx", contents: "<page />" },
       { kind: "merge-env", path: ".env.local", entries: { FOO: "1" } },
-      { kind: "append-gitignore", entries: [".zitadel"] },
+      { kind: "append-gitignore", rules: [ZITADEL_DIRECTORY] },
       { kind: "add-dep", name: "sdk", version: "1.0.0" },
     );
     await scaffold(full, { cwd: dir, dryRun: false, force: false });
@@ -699,7 +724,7 @@ describe("scaffold - multi-op plans", () => {
 });
 
 describe("scaffold - reporting", () => {
-  it("deduplicates a path touched by several ops, keeping the net action", async () => {
+  it("deduplicates a path touched by several ops, keeping the net action", async ({ dir }) => {
     // Mirrors the real plan shape: the base ops and the framework ops both
     // merge into the same env file on a fresh project.
     const result = await scaffold(
@@ -718,7 +743,9 @@ describe("scaffold - reporting", () => {
     expect(text).toContain("BAR=2");
   });
 
-  it("does not report a path as skipped when another op wrote it in the same run", async () => {
+  it("does not report a path as skipped when another op wrote it in the same run", async ({
+    dir,
+  }) => {
     const result = await scaffold(
       plan(
         { kind: "merge-env", path: ".env.local", entries: { FOO: "1" } },
@@ -731,12 +758,12 @@ describe("scaffold - reporting", () => {
     expect(result.filesSkipped).toEqual([]);
   });
 
-  it("distinguishes created files from updated ones", async () => {
+  it("distinguishes created files from updated ones", async ({ dir }) => {
     await writeFile(join(dir, ".gitignore"), "node_modules\n");
     const result = await scaffold(
       plan(
         { kind: "write", path: "app/page.tsx", contents: "<page />" },
-        { kind: "append-gitignore", entries: [".zitadel"] },
+        { kind: "append-gitignore", rules: [ZITADEL_DIRECTORY] },
       ),
       { cwd: dir, dryRun: false, force: false },
     );
@@ -754,7 +781,7 @@ describe("scaffold - reporting", () => {
 });
 
 describe("scaffold - add-dep formatting", () => {
-  it("changes only the dependency block, byte-for-byte", async () => {
+  it("changes only the dependency block, byte-for-byte", async ({ dir }) => {
     // Blank line + inline nested objects: the splice must not normalize them.
     const source = `{
   "name": "demo",
@@ -785,7 +812,7 @@ describe("scaffold - add-dep formatting", () => {
 `);
   });
 
-  it("preserves the user's key order, indentation, and trailing newline", async () => {
+  it("preserves the user's key order, indentation, and trailing newline", async ({ dir }) => {
     const source = `{
     "name": "demo",
     "version": "1.0.0",

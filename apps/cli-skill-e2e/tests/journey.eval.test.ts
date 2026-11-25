@@ -1,57 +1,57 @@
-import { readFileSync, existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, inject } from "vitest";
 
-// @ts-expect-error — plain JS helper, no types
-import { gradeConfig, listCells } from "../scripts/lib.mjs";
+import { gradeStage } from "../src/grading.ts";
+import { loadJourney } from "../src/journey.ts";
+import { parseStage } from "../src/transcript.ts";
+import { test } from "./fixtures.ts";
+import { cliSpecOf, hasProject, runStageChecks, snapshotSchema } from "./support/checks.ts";
+import { converse } from "./support/conversation.ts";
+import { settings } from "./support/settings.ts";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const OUT = process.env.OUT || join(root, "out");
-const cfg = JSON.parse(readFileSync(join(root, "journey.config.json"), "utf8"));
+const journey = loadJourney(inject("journey"));
+const allStages = journey.stages;
+const firstStage = allStages[0]?.id;
+const stages = allStages.filter((stage) => settings.stages?.has(stage.id) ?? true);
 
-// globalSetup has produced a model×repeat matrix under OUT. We assert on the
-// first with-skill cell as a representative signal (the report aggregates the
-// full matrix into success rates); these are eval signals, not CI gates.
-const cells: Array<{ dir: string }> = existsSync(OUT) ? listCells(OUT, ["with-skill"]) : [];
-const dir = cells[0]?.dir;
-type Row = {
-  stage: number;
-  status: string;
-  why: string;
-  parsed: { transcript: Array<{ role: string; kind: string }> };
-};
-const rows: Row[] = dir ? gradeConfig(dir, cfg.stages) : [];
+/**
+ * One scenario's journey: a developer's common questions asked of an agent
+ * that has (or, for a baseline, lacks) the zitadel-cli skill, run as one
+ * stateful conversation in a container. Each stage passes only when the live
+ * instance and the scaffolded app show the outcome, whatever the agent said.
+ * A baseline is recorded for the report's comparison and not asserted: it is
+ * expected to fail without the skill.
+ */
+describe(`zitadel-cli skill journey: ${journey.name}`, () => {
+  for (const stage of stages) {
+    test(`stage ${stage.id}: ${stage.title}`, async ({
+      agent,
+      workspace,
+      results,
+      scenario,
+      skip,
+      task,
+    }) => {
+      task.meta.resultsDir = results;
+      if (stage.id !== firstStage && !hasProject(workspace)) {
+        skip("stage 1 left no project, so there is nothing to act on");
+      }
+      const stageFile = join(results, `stage${stage.id}.jsonl`);
 
-// We assert the WITH-SKILL run only — that's the thing under test. The baseline
-// is captured for comparison in the HTML report, not asserted (it is expected to
-// fail without the skill). These are eval signals, not CI gates.
-describe("zitadel-cli skill — common-question journey (with skill)", () => {
-  for (const s of cfg.stages as Array<{ id: number; title: string }>) {
-    it(`stage ${s.id}: ${s.title}`, () => {
-      const r = rows.find((x) => x.stage === s.id);
-      expect(r, "no result captured for this stage").toBeTruthy();
-      expect(r!.status, r!.why).toBe("pass");
-    });
-  }
-});
+      if (stage.prepare !== undefined) {
+        const prepared = await agent.exec({ file: "bash", args: ["-lc", stage.prepare] });
+        expect(prepared.status, prepared.stderr).toBe(0);
+      }
 
-// A stage with a `user` persona is meant to be interactive: the agent should
-// prompt the developer rather than guess, and the simulated user answers. Assert
-// that conversation actually happened — a simulated-user answer in the
-// transcript proves the agent asked and got a reply (the elicitation path), not
-// that it silently picked defaults.
-describe("elicitation — the agent prompts, the user answers", () => {
-  const interactive = (cfg.stages as Array<{ id: number; user?: string }>).filter((s) => s.user);
-  for (const s of interactive) {
-    it(`stage ${s.id} is a real conversation`, () => {
-      const r = rows.find((x) => x.stage === s.id);
-      expect(r, "no result captured for this stage").toBeTruthy();
-      const answered = r!.parsed.transcript.some((e) => e.role === "user" && e.kind === "answer");
-      expect(answered, "no simulated-user answer captured — the agent didn't prompt the user").toBe(
-        true,
-      );
+      await converse(agent, stage, scenario, stageFile);
+      snapshotSchema(workspace, results, stage.id);
+      await runStageChecks(agent, stage, results, cliSpecOf(journey));
+
+      if (scenario.skill) {
+        const grade = gradeStage(stage, results, parseStage(stageFile), true);
+        expect(grade.status, grade.why).toBe("pass");
+      }
     });
   }
 });

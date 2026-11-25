@@ -13,10 +13,9 @@ import {
   ZITADEL_SESSION_EVENT_HANDLERS,
   type WidgetTag,
   type WidgetName,
-  widgetNames,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   LoginConfigHarness,
@@ -27,7 +26,8 @@ import {
   sessionConfig,
 } from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
-import { resume, serverMarkup } from "./__tests__/resume-server-markup";
+import { closeServerMarkup, loadServerMarkup, resume } from "./__tests__/resume-server-markup";
+import type { ServerLoginProps } from "./__tests__/server-markup";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import {
@@ -40,6 +40,12 @@ import {
   ZitadelSession,
   type ZitadelSessionProps,
 } from "./index";
+
+import {
+  type Attributes,
+  cssProperties,
+  describeStandardAttributes,
+} from "@zitadel/client-sdk-contract/standard-attributes";
 
 const waitFor = vi.waitFor;
 
@@ -76,12 +82,16 @@ async function renderWidget(jsx: Parameters<typeof render>[1]): Promise<HTMLElem
  * Qwik wires the widget's listeners in a `useVisibleTask$` that runs a turn
  * after `render` (eager `document-ready` strategy), so a single fixed delay
  * races the attachment. Instead, re-dispatch the event each turn until the
- * forwarded callback receives this exact `detail`, polling up to a generous
- * deadline. CustomEvents do not replay, so dispatching only after the listener
- * exists is essential — re-dispatching makes that deterministic without guessing
- * the timing. Matching by identity (not "something arrived") keeps the check
- * robust when the live widget emits its own event of the same name — e.g. the
- * `zitadel-flow-step` it fires when the mock API answers — alongside our probe.
+ * forwarded callback receives this exact `detail`. CustomEvents do not replay,
+ * so dispatching only after the listener exists is essential — re-dispatching
+ * makes that deterministic without guessing the timing. Matching by identity
+ * (not "something arrived") keeps the check robust when the live widget emits
+ * its own event of the same name — e.g. the `zitadel-flow-step` it fires when
+ * the mock API answers — alongside our probe.
+ *
+ * The deadline only bounds a hang: on a loaded CI runner that turn came more
+ * than a second after `render`. It stays under the 15 s test timeout, so a
+ * listener that never attaches fails with this error instead of a timeout.
  */
 async function dispatchUntilForwarded(
   el: Element,
@@ -89,14 +99,15 @@ async function dispatchUntilForwarded(
   detail: Record<string, unknown>,
   received: readonly Record<string, unknown>[],
 ): Promise<void> {
-  const deadline = Date.now() + 1000;
+  const budgetMs = 10_000;
+  const deadline = Date.now() + budgetMs;
   while (!received.includes(detail)) {
     el.dispatchEvent(new CustomEvent(eventName, { detail }));
     if (received.includes(detail)) {
       return;
     }
     if (Date.now() > deadline) {
-      throw new Error(`listener for "${eventName}" never forwarded within 1000ms`);
+      throw new Error(`listener for "${eventName}" never forwarded within ${budgetMs}ms`);
     }
     await macrotask();
   }
@@ -474,6 +485,17 @@ describe("resumed server markup", () => {
 });
 
 describe("resuming a server-rendered login", () => {
+  let serverMarkup: (props: ServerLoginProps) => Promise<string>;
+
+  // The server build loads once, here, so each test's 15 s budget covers only
+  // its render and the resume. On a loaded CI runner the load takes about 15 s;
+  // this hook's budget only bounds a hang.
+  beforeAll(async () => {
+    serverMarkup = await loadServerMarkup();
+  }, 60_000);
+
+  afterAll(() => closeServerMarkup());
+
   it("starts its first flow with the purpose the server rendered", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
@@ -539,7 +561,7 @@ describe("a resumed flow that is already terminal", () => {
   it("still reaches onFlowComplete$, which attaches after the widget has fetched", async () => {
     const original = globalThis.fetch;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      if (!String(input).includes("/__nextgen/flow/flow_done")) {
+      if (!String(input).includes("/__nextgen/api/v1/flows/flow_done")) {
         return original(input, init);
       }
       return Response.json({
@@ -848,10 +870,6 @@ type WidgetProps = {
 
 const staleOnRemoval: readonly string[] = [];
 
-type Attributes = {
-  readonly [name: string]: string | boolean | null | undefined;
-};
-
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref` signal, the way a consumer does. `update`
 // renders it again with other attributes.
@@ -889,151 +907,9 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
   };
 }
 
-// standard-attributes:begin
-type StandardProps = {
-  [W in WidgetName]: {
-    [K in keyof ForwardedAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
-  };
-};
-
-function cssProperties(style: string): Record<string, string> {
-  const [property = "", value = ""] = style.split(":").map((part) => part.trim());
-  return { [property]: value };
-}
-
-describe.each(widgetNames)("%s standard attributes", (widget) => {
-  const tag = widgetTags[widget];
-
-  it("forwards the class to the widget element", async () => {
-    const { container } = await mountWidget(widget, { class: "probe" });
-    expect(container.querySelector(tag)?.classList.contains("probe")).toBe(true);
-  });
-
-  it("forwards the style to the widget element", async () => {
-    const { container } = await mountWidget(widget, { style: "color: red" });
-    expect(container.querySelector(tag)?.style.color).toBe("red");
-  });
-
-  it("forwards the id to the widget element", async () => {
-    const { container } = await mountWidget(widget, { id: "probe" });
-    expect(container.querySelector(tag)?.id).toBe("probe");
-  });
-
-  it("forwards data attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, { "data-testid": "probe" });
-    expect(container.querySelector(tag)?.getAttribute("data-testid")).toBe("probe");
-  });
-
-  it("forwards aria attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, { "aria-label": "probe" });
-    expect(container.querySelector(tag)?.getAttribute("aria-label")).toBe("probe");
-  });
-
-  it("forwards the remaining standard attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, {
-      title: "probe",
-      role: "region",
-      tabindex: "3",
-      hidden: "",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.title).toBe("probe");
-    expect(element?.getAttribute("role")).toBe("region");
-    expect(element?.getAttribute("tabindex")).toBe("3");
-    expect(element?.hidden).toBe(true);
-  });
-
-  it("forwards the slot to the widget element", async () => {
-    const { container } = await mountWidget(widget, { slot: "probe" });
-    expect(container.querySelector(tag)?.getAttribute("slot")).toBe("probe");
-  });
-
-  it("renders a false aria or data attribute as the string false", async () => {
-    const { container } = await mountWidget(widget, { "aria-hidden": false, "data-open": false });
-    expect(container.querySelector(tag)?.getAttribute("aria-hidden")).toBe("false");
-    expect(container.querySelector(tag)?.getAttribute("data-open")).toBe("false");
-  });
-
-  it("updates a forwarded attribute when the prop changes", async () => {
-    const { container, update } = await mountWidget(widget, {
-      class: "before",
-      id: "before",
-      title: "before",
-      slot: "before",
-      tabindex: "1",
-      "aria-label": "before",
-      "data-testid": "before",
-    });
-    await update({
-      class: "after",
-      id: "after",
-      title: "after",
-      slot: "after",
-      tabindex: "2",
-      "aria-label": "after",
-      "data-testid": "after",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.classList.contains("before")).toBe(false);
-    expect(element?.classList.contains("after")).toBe(true);
-    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
-      expect(element?.getAttribute(name)).toBe("after");
-    }
-    expect(element?.getAttribute("tabindex")).toBe("2");
-  });
-
-  it("removes a forwarded attribute when the prop is removed", async () => {
-    const { container, update } = await mountWidget(widget, {
-      class: "before",
-      id: "before",
-      title: "before",
-      slot: "before",
-      tabindex: "1",
-      "aria-label": "before",
-      "data-testid": "before",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.classList.contains("before")).toBe(true);
-    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
-      expect(element?.getAttribute(name)).toBe("before");
-    }
-    expect(element?.getAttribute("tabindex")).toBe("1");
-    await update({});
-    expect(element?.classList.contains("before")).toBe(false);
-    for (const name of ["id", "title", "slot", "tabindex", "aria-label", "data-testid"]) {
-      if (!staleOnRemoval.includes(name)) expect(element?.hasAttribute(name)).toBe(false);
-    }
-  });
-
-  it("does not forward props outside the standard set", async () => {
-    const { container } = await mountWidget(widget, {
-      srcdoc: "probe",
-      onclick: "probe",
-      part: "probe",
-      dir: "probe",
-    });
-    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
-      expect(container.querySelector(tag)?.hasAttribute(name)).toBe(false);
-    }
-  });
-
-  it("gives access to the widget element through a ref", async () => {
-    const { container, ref } = await mountWidget(widget, {});
-    expect(ref()).toBe(container.querySelector(tag));
-    expect(ref()?.tagName.toLowerCase()).toBe(tag);
-  });
-
-  it("accepts the standard attributes in its props", () => {
-    const attributes: Partial<ForwardedAttributes> = {};
-    const accepted: StandardProps = { login: attributes, logout: attributes, session: attributes };
-    expect(accepted).toBeDefined();
-  });
-
-  it("rejects the attributes it does not forward in its props", () => {
-    type Rejected = {
-      [W in WidgetName]: Extract<"dir" | "classList" | "onClick", keyof WidgetProps[W]>;
-    };
-    expectTypeOf<Rejected>().toEqualTypeOf<Record<WidgetName, never>>();
-  });
+describeStandardAttributes<ForwardedAttributes, WidgetProps>({
+  mountWidget,
+  staleOnRemoval,
+  accepted: true,
+  rejected: true,
 });
-// standard-attributes:end

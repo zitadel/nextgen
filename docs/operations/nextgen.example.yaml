@@ -26,8 +26,17 @@ server:
   console_path: /ui/console
   # Public origin browsers reach this deployment at; feeds the claim and
   # dashboard URLs. Set to http://localhost:8080 when running the server
-  # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE).
+  # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE). With platform bootstrap
+  # on, it is the platform project's one primary origin, so servers sharing a
+  # database need the same value.
   public_base: https://nextgen.zitadel.cloud
+  # Other origins the console is reached at, beside public_base's, such as
+  # another hostname in front of this deployment. Like public_base's, they may
+  # open any project's flow to preview its login; signing in to the platform
+  # project works only at public_base
+  # (env: NEXTGEN_SERVER_CONSOLE_ORIGINS, comma separated).
+  # console_origins:
+  #   - https://console.example.com
 
 # Optional. When omitted, the server uses SQLite at <data_dir>/zitadel.db.
 # Configure exactly one dialect to override the default:
@@ -41,8 +50,8 @@ server:
 password_hasher:
   # Algorithm used to hash new passwords/secrets. Defaults to argon2id
   # (RFC 9106). Existing hashes made with any of the verifiers below still
-  # validate and are transparently rehashed to the hasher algorithm on the
-  # next successful verification.
+  # validate. The next successful sign-in rehashes them to the project's
+  # method, or to this one when the project chose none.
   hasher:
     algorithm: argon2id
     # RFC 9106 second recommended option.
@@ -52,6 +61,18 @@ password_hasher:
     # To keep bcrypt as the hashing algorithm instead:
     # algorithm: bcrypt
     # cost: 10
+  # How much hashing runs at once in each server process. A hash is the one
+  # request that is expensive by design, so a burst of sign-ins is bounded
+  # here instead of by the container's memory limit; every replica or
+  # serverless instance has a bound of its own. Every hash takes at least
+  # memory_budget / max_operations of the budget, so cheap algorithms are
+  # still capped in number; a memory-hard hash takes its own size. A hash
+  # that finds no room within max_wait is answered with HTTP 429 and
+  # `Retry-After`, and never counts as a failed sign-in.
+  concurrency:
+    max_operations: 0 # 0 = one per CPU the process may use, following runtime.GOMAXPROCS
+    memory_budget: 0 # bytes; 0 = half the Go memory limit (set from the container's limit) when there is one, else 512 MiB
+    max_wait: 0 # 0 = 1s; any other value needs a unit, such as 2s (a bare 2 is 2ns and refused)
   verifiers:
     - argon2
     - bcrypt
@@ -113,3 +134,10 @@ httpclient:
 session:
   default_ttl: 24h
   max_ttl: 720h # 30 days
+
+# The OAuth 2.0 authorization server of each project: RFC 8414 metadata at
+# /.well-known/oauth-authorization-server/oauth/<project_id> and the endpoints
+# under /oauth/<project_id>. A project's issuer answers only once the release
+# deployed to that origin enables OAuth. Env: NEXTGEN_OAUTH_ENABLED.
+oauth:
+  enabled: false

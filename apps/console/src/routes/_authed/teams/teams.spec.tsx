@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -13,7 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const TEAMS_URL = "http://localhost/api/teams/query";
+const TEAMS_URL = "http://localhost/api/v1/teams/query";
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {
@@ -36,10 +38,6 @@ function team(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderTeams(entry = "/teams") {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(entry)] }),
   });
@@ -71,11 +69,11 @@ describe("teams screen", () => {
     // Scoped to the table: the app shell's context switcher also renders a team
     // name.
     expect(table.getByRole("link", { name: "Acme Web" })).toBeInTheDocument();
-    expect(table.getByText("active")).toBeInTheDocument();
+    expect(table.getByText("Active")).toBeInTheDocument();
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
   });
 
-  it("shows the status the API returns rather than the mock's wording", async () => {
+  it("calls a deactivated team inactive", async () => {
     server.use(
       http.post(TEAMS_URL, () =>
         HttpResponse.json({
@@ -85,13 +83,9 @@ describe("teams screen", () => {
     );
     await renderTeams();
 
-    // The design writes this state as `Inactive`; `team-status` calls it
-    // `deactivated`, and the console does not invent a second vocabulary for one
-    // state. The pill is title-cased by CSS, so the accessible text is the
-    // API's own value.
     const table = within(await screen.findByRole("table"));
-    expect(table.getByText("deactivated")).toBeInTheDocument();
-    expect(table.queryByText("inactive")).not.toBeInTheDocument();
+    expect(table.getByText("Inactive")).toBeInTheDocument();
+    expect(table.queryByText("Deactivated")).not.toBeInTheDocument();
   });
 
   it("says so when there are no teams", async () => {
@@ -105,8 +99,8 @@ describe("teams screen", () => {
     server.use(
       http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })),
       // The click opens the team's page, whose loader reads the team and its members.
-      http.get(`http://localhost/api/teams/${team().id}`, () => HttpResponse.json(team())),
-      http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
+      http.get(`http://localhost/api/v1/teams/${team().id}`, () => HttpResponse.json(team())),
+      http.post("*/api/v1/users/query", () => HttpResponse.json({ users: [] })),
     );
     const router = await renderTeams();
 
@@ -135,14 +129,14 @@ describe("teams screen", () => {
     const created: unknown[] = [];
     server.use(
       http.post(TEAMS_URL, () => HttpResponse.json({ teams: [] })),
-      http.post("http://localhost/api/teams", async ({ request }) => {
+      http.post("http://localhost/api/v1/teams", async ({ request }) => {
         created.push(await request.json());
         return HttpResponse.json(team());
       }),
     );
     await renderTeams();
 
-    await userEvent.click(await screen.findByRole("button", { name: /Add/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add team" }));
 
     const name = await screen.findByLabelText("Team name");
     // `POST /teams` takes a single `name`, so the drawer is one field — not
@@ -178,7 +172,7 @@ describe("teams screen", () => {
     expect(bodies[1]).toMatchObject({ page_token: "page-2", filter: [ACTIVE_FILTER] });
   });
 
-  it("asks for active teams, and for deactivated ones when the tab changes", async () => {
+  it("asks for active teams, and for deactivated ones under the Inactive tab", async () => {
     const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
     await renderTeams();
 
@@ -187,7 +181,7 @@ describe("teams screen", () => {
     // fetched page — `status` is a `team-filter-field`.
     expect(bodies.at(-1)).toMatchObject({ filter: [ACTIVE_FILTER] });
 
-    await userEvent.click(screen.getByRole("tab", { name: "Deactivated" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Inactive" }));
 
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
@@ -204,9 +198,6 @@ describe("teams screen", () => {
     expect(bodies.at(-1)).toMatchObject({
       filter: [{ field: "status", operation: "equals", value: "deactivated" }],
     });
-    expect(screen.getByRole("tab", { name: "Deactivated" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.getByRole("tab", { name: "Inactive" })).toHaveAttribute("aria-selected", "true");
   });
 });

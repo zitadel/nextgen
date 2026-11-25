@@ -45,8 +45,9 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
   await expect(page.getByText("Session details")).toBeVisible();
 
   const sessionCookie = (await page.context().cookies()).find(
-    // The SDK keeps the session under the project's name (ADR 073).
-    (c) => c.name === `__nextgen_session_${DEMO_PROJECT_ID}`,
+    // The SDK keeps the session under the project's name (ADR 073), without
+    // the __Host- prefix on the demo's loopback http origin (ADR 083).
+    (c) => c.name === `zitadel_session_${DEMO_PROJECT_ID}`,
   );
   expect(sessionCookie?.value).toBeTruthy();
   expect(sessionCookie?.httpOnly).toBe(true);

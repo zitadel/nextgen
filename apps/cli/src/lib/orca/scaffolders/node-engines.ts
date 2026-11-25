@@ -1,6 +1,7 @@
-import { spawnSync } from "node:child_process";
-
+import { execaSync } from "execa";
 import semver from "semver";
+
+import { frameworkCliVersion } from "./framework-clis";
 
 /**
  * How a framework CLI treats a Node outside its `engines.node`, which decides
@@ -67,15 +68,18 @@ export function nodeSupport(
   const listed = range
     .replace(/[\^~<>=]/g, "")
     .split("||")
-    .map((part) => part.trim().split(".", 3).map(Number));
-  const supported = listed.some(
-    ([lMajor, lMinor = 0, lPatch = 0]) =>
-      lMajor === major && (minor > lMinor || (minor === lMinor && patch >= lPatch)),
-  );
+    .map((part) => {
+      return part.trim().split(".", 3).map(Number);
+    });
+  const supported = listed.some(([lMajor, lMinor = 0, lPatch = 0]) => {
+    return lMajor === major && (minor > lMinor || (minor === lMinor && patch >= lPatch));
+  });
   if (supported) {
     return "supported";
   }
-  const majors = listed.map(([lMajor = 0]) => lMajor);
+  const majors = listed.map(([lMajor = 0]) => {
+    return lMajor;
+  });
   const between = major > Math.min(...majors) && major < Math.max(...majors);
   return major % 2 === 1 && between ? "warned" : "refused";
 }
@@ -104,7 +108,7 @@ export function describeAcceptedNode(range: string): string {
 /**
  * The Node range the framework CLI that setup will run publishes, asked of
  * npm. Falls back to the declared range when npm is unavailable, takes longer
- * than {@link NODE_ENGINES_TIMEOUT_MS} (a killed spawn has no exit status), or
+ * than {@link NODE_ENGINES_TIMEOUT_MS} (a killed spawn has failed), or
  * answers with something that is not a range.
  *
  * On Windows npm is a `.cmd` shim, which `spawnSync` cannot start without a
@@ -119,24 +123,32 @@ export function nodeEnginesRange(
   cwd: string,
   platform: NodeJS.Platform,
 ): string {
-  const result = spawnSync("npm", ["view", engines.spec, "engines.node"], {
+  const result = execaSync("npm", ["view", engines.spec, "engines.node"], {
     cwd,
-    encoding: "utf8",
     timeout: NODE_ENGINES_TIMEOUT_MS,
     shell: platform === "win32",
+    reject: false,
   });
-  const range = result.status === 0 ? String(result.stdout ?? "").trim() : "";
+  const range = result.failed ? "" : String(result.stdout).trim();
   return range && semver.validRange(range) ? range : engines.fallback;
 }
 
 /**
- * What every scaffolder that runs `create-vite` (React, Vue, Solid, Svelte and
- * Qwik) declares. `create-vite` never checks the Node itself, so setup only
- * warns.
+ * The `create-vite` release every Vite scaffolder (React, Vue, Solid, Svelte
+ * and Qwik) runs ({@link frameworkCliVersion}). 9.3.2 was published without
+ * its templates: it fails to scaffold yet exits 0, so setup went on to report
+ * an empty directory as an undetectable framework. The templates write `^`
+ * ranges, so a fresh app still picks up framework and Vite patch releases.
+ */
+export const CREATE_VITE_VERSION = frameworkCliVersion("create-vite");
+
+/**
+ * What every scaffolder that runs `create-vite` declares. `create-vite` never
+ * checks the Node itself, so setup only warns.
  */
 export const CREATE_VITE_NODE_ENGINES: NodeEngines = {
   label: "create-vite",
-  spec: "create-vite@latest",
+  spec: `create-vite@${CREATE_VITE_VERSION}`,
   fallback: "^20.19.0 || >=22.12.0",
   enforcement: "warn",
 };

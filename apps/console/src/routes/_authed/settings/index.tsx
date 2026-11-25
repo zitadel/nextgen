@@ -1,15 +1,39 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { Navigate, createFileRoute } from "@tanstack/react-router";
+import { Settings } from "lucide-react";
+
+import { useSettingsListItems } from "@/app-shell/use-nav-items";
+import { Page } from "@/components/layout";
+import { PageHeader } from "@/components/resource-page";
 
 /**
- * Account settings: where the account dropdown leads, and the route that puts
- * the shell into its Settings view.
+ * Settings: the account sidebar's row beside Projects, and a route above
+ * every project. Everything beneath it is listed in the sidebar's Settings
+ * list instead of the account's (D29): the platform project's own Settings
+ * pages (General, Members) for someone who may act on it, since that project
+ * is the root (D42), then what the hosted cloud adds (Billing, Support,
+ * Email). The person's profile is the account menu's, at `/account`.
  *
- * It carries no `staticData.nav` entry and no page of its own: Settings (the
- * person's profile) is the only screen, so this forwards to it. Accounts are
- * not surfaced while the cloud does not use them (Console ADR 0005 §3).
+ * It has no page of its own: it forwards to the list's first page. With
+ * nothing in the list the sidebar leaves the row out, and a link that still
+ * lands here says so.
  */
 export const Route = createFileRoute("/_authed/settings/")({
-  beforeLoad: ({ search }) => {
-    throw redirect({ to: "/settings/profile", search });
+  staticData: {
+    nav: { label: "Settings", view: "account", order: 9, icon: Settings },
   },
+  component: SettingsLanding,
 });
+
+function SettingsLanding() {
+  const [first] = useSettingsListItems();
+  if (first) {
+    // A page of the platform project's selects it, as its row does.
+    const search = first.project ? { project: first.project } : undefined;
+    return <Navigate to={first.to} search={search} replace />;
+  }
+  return (
+    <Page>
+      <PageHeader title="Settings" description="Nothing here is yours to set." />
+    </Page>
+  );
+}

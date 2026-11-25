@@ -177,18 +177,18 @@ export class ZlButton extends LitElement {
       // delegate to the host <form> so its `submit` event is the single
       // submission signal. On a generic form this runs native constraint
       // validation; inside <zitadel-login> the form is `novalidate`, so the
-      // orchestrator's `missingRequiredFields` gate enforces instead. Emitting
+      // orchestrator's `fieldRuleErrors` gate enforces instead. Emitting
       // `zl-submit` too would bypass the form handler, so we don't (the
       // Enter-to-submit path in <zl-field> likewise relies on the form `submit`
       // event alone). Non-submit and form-less buttons still emit `zl-submit`
       // below for SPA/orchestrator listeners.
       event.preventDefault();
-      form.requestSubmit();
+      HTMLFormElement.prototype.requestSubmit.call(form);
       return;
     }
     if (type === "reset" && form) {
       event.preventDefault();
-      form.reset();
+      HTMLFormElement.prototype.reset.call(form);
     }
     emit<ZlSubmitDetail>(this, "zl-submit", { action: action ?? null });
   }

@@ -14,7 +14,7 @@ import type { SolidFetchEvent } from "../middleware";
 import { createNextgenMiddleware } from "../middleware";
 
 const PROJECT = "proj_app";
-const SESSION = `__nextgen_session_${PROJECT}`;
+const SESSION = `zitadel_session_${PROJECT}`;
 
 describe("session cookies on h3 v2's error headers", () => {
   beforeEach(() => {
@@ -32,7 +32,7 @@ describe("session cookies on h3 v2's error headers", () => {
     );
     const event: SolidFetchEvent = {
       request: new Request("http://localhost:3000/missing", {
-        headers: { cookie: "__nextgen_session=tok" },
+        headers: { cookie: "zitadel_session=tok" },
       }),
       locals: {},
       response: { headers: new Headers(), errHeaders: new Headers() },

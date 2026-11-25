@@ -1,0 +1,13 @@
+type: object
+description: |
+  The request body for creating a flow definition.
+required:
+  - project_id
+  - flow_definition
+properties:
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  schema_uri:
+    $ref: ../../components/schemas/schema-uri.yaml
+  flow_definition:
+    $ref: flow-definition.yaml

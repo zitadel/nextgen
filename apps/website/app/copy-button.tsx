@@ -1,21 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { type Placement, type Snippet, trackEvent } from "./analytics";
 import { BAR_BUTTON } from "./window";
 
 // Copies `text`, and says so for a moment. Where the browser offers no
 // clipboard (an insecure origin), it does nothing: the text stays selectable.
 // `label` names what it copies for screen readers; `withLabel` shows the word
-// beside the icon. Icons from zitadel/new-website's components/icons.
+// beside the icon; `event` reports a copy as `copied_command`
+// (analytics.ts), and a button without one reports nothing. Icons from
+// zitadel/new-website's components/icons.
 export function CopyButton({
   text,
   label,
   withLabel = false,
+  event,
   className = "",
 }: {
   text: string;
   label: string;
   withLabel?: boolean;
+  event?: { snippet: Snippet; placement: Placement };
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
@@ -30,7 +35,12 @@ export function CopyButton({
 
   const copy = () =>
     navigator.clipboard?.writeText(text).then(
-      () => setCopied(true),
+      () => {
+        setCopied(true);
+        if (event) {
+          trackEvent("copied_command", event);
+        }
+      },
       () => {},
     );
 

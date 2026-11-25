@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -14,15 +16,21 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 const PROJECT_ID = "proj_1";
-const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
-// The page also reads the project's grants for its admins section (#1238); an
-// empty list keeps these tests about the project itself. The person can act on
-// the project, so the context switcher names it from their list rather than by
-// its id while its own read is in flight.
+const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
+// The project's Settings also read its members and grants on their Members page
+// (#1238, #2857), its variables and its password policy; empty answers keep these tests
+// about the project itself. The person can act on the project, so the context
+// switcher names it from their list rather than by its id while its own read is
+// in flight.
 beforeEach(() =>
   server.use(
-    http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
-    http.get("http://localhost/api/users/me/projects", () =>
+    http.get(`${PROJECT_URL}/members`, () => HttpResponse.json({ members: [] })),
+    http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/v1/deployments", () =>
+      HttpResponse.json({ deployments: [], next_page_token: null }),
+    ),
+    http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
     ),
   ),
@@ -32,6 +40,7 @@ function project(overrides: Record<string, unknown> = {}) {
   return {
     id: PROJECT_ID,
     name: "River",
+    origins: [],
     created_at: "2026-07-08T09:00:00Z",
     updated_at: "2026-07-08T09:00:00Z",
     ...overrides,
@@ -39,10 +48,6 @@ function project(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderDetail(path = scopedPath("/project", PROJECT_ID)) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
   });
@@ -54,11 +59,12 @@ describe("project detail", () => {
   it("opens the page a project link names, with that project selected", async () => {
     // `/projects/{id}` is kept for links that name a project; the page lives at
     // the scoped `/project`, so the sidebar and switcher follow the one named.
+    // Its Settings open on their first page, General (D40).
     server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
     const router = await renderDetail(`/projects/${PROJECT_ID}`);
 
     expect(await screen.findByRole("heading", { name: "River" })).toBeInTheDocument();
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/general"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
   });
 

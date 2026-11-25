@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -36,11 +36,18 @@
       "target": "./dist/index.mjs",
       "identifier": "COMMANDS"
     },
-    "helpClass": "./dist/lib/oclif/help",
+    "helpClass": "./dist/cli/help",
+    "hooks": {
+      "command_not_found": "./dist/hooks/command-not-found",
+      "finally": "./dist/hooks/version-notice",
+      "init": "./dist/hooks/json-shortcuts"
+    },
+    "additionalHelpFlags": [
+      "-h"
+    ],
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",
-      "@oclif/plugin-not-found",
       "@oclif/plugin-which",
       "@oclif/plugin-commands",
       "@oclif/plugin-autocomplete",
@@ -48,32 +55,32 @@
       "@oclif/plugin-version"
     ],
     "topics": {
-      "users": {
-        "description": "Manage the users of the project."
+      "user": {
+        "description": "Create and manage users."
       },
-      "teams": {
-        "description": "Manage the teams of the project."
+      "team": {
+        "description": "Create and manage teams."
       },
-      "sessions": {
-        "description": "Inspect and revoke the sessions of the project."
+      "session": {
+        "description": "View and revoke sessions."
       },
-      "events": {
-        "description": "Read the audit event stream of the project."
+      "event": {
+        "description": "View events."
       },
-      "grants": {
-        "description": "Manage collaboration grants on the project."
+      "grant": {
+        "description": "Manage access grants."
       },
-      "projects": {
-        "description": "Inspect and update the projects visible to this credential."
+      "project": {
+        "description": "View and update projects."
       },
-      "schemas": {
-        "description": "Inspect user-schema revisions."
+      "schema": {
+        "description": "View user schemas."
       },
       "branding": {
-        "description": "Work with login branding revisions."
+        "description": "Manage the login branding."
       },
       "auth-method": {
-        "description": "Turn sign-in methods on or off for a user schema."
+        "description": "Configure how users sign in."
       },
       "auth-method:password": {
         "description": "Turn password sign-in on or off."
@@ -83,35 +90,57 @@
       },
       "auth-method:sso": {
         "description": "Add or remove identity providers."
-
       },
       "origin": {
-        "description": "Manage the origin patterns the project admits."
+        "description": "Manage the project's allowed origins."
+      },
+      "invitation": {
+        "description": "Invite people into the project with a link."
       },
       "release": {
-        "description": "Build and revoke the project's configuration releases."
+        "description": "Build and manage releases."
       },
       "deployment": {
-        "description": "Make releases live and read the deployment history."
+        "description": "Deploy releases and roll them back."
+      },
+      "preview": {
+        "description": "Deploy and manage pull-request preview URLs."
       },
       "variable": {
-        "description": "Manage the project's variables and their preview overrides."
+        "description": "Manage project variables."
+      },
+      "idp": {
+        "description": "Manage identity provider connections."
+      },
+      "flow-definition": {
+        "description": "View login flows."
+      },
+      "policy": {
+        "description": "View and test policies."
+      },
+      "env": {
+        "description": "Show and bind environments."
+      },
+      "api": {
+        "description": "Call any operation of the Zitadel API."
+      },
+      "skills": {
+        "description": "Give coding agents the Zitadel skills."
+      },
+      "tests": {
+        "description": "Add end-to-end tests of the sign-in."
       }
     }
   },
   "type": "module",
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && oclif manifest",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
-    "pretest": "pnpm run build",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "check-advisories": "vitest run --config vitest.advisories.config.ts",
     "readme": "oclif readme",
-    "prepack": "tsdown && oclif manifest && publint --strict",
-    "postpack": "rm -f oclif.manifest.json",
-    "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "prepack": "publint --strict",
+    "lint": "biome check ."
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
@@ -119,35 +148,53 @@
     "@oclif/plugin-autocomplete": "catalog:",
     "@oclif/plugin-commands": "catalog:",
     "@oclif/plugin-help": "catalog:",
-    "@oclif/plugin-not-found": "catalog:",
     "@oclif/plugin-search": "catalog:",
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",
+    "@oclif/table": "catalog:",
     "@zitadel/api": "workspace:*",
     "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
+    "agent-cli-detector": "^0.1.7",
     "ajv": "catalog:",
-    "consola": "^3.4.2",
-    "magicast": "^0.5.3",
-    "mixpanel": "^0.18.1",
+    "dot-prop": "catalog:",
+    "escape-string-regexp": "catalog:",
+    "execa": "catalog:",
+    "fastest-levenshtein": "catalog:",
+    "fs-extra": "catalog:",
+    "ignore": "^7.0.14",
+    "is-wsl": "catalog:",
+    "jsonc-parser": "catalog:",
+    "magicast": "^0.5.5",
+    "mixpanel": "^0.24.0",
+    "open": "catalog:",
+    "p-reduce": "catalog:",
+    "p-retry": "catalog:",
+    "p-timeout": "catalog:",
+    "p-wait-for": "catalog:",
     "picocolors": "^1.1.1",
     "rosie-skills": "catalog:",
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
-    "undici": "^7.29.1",
+    "sort-keys": "catalog:",
+    "undici": "^7.30.2",
     "wrap-ansi": "^7.0.0",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/fs-extra": "catalog:",
     "@types/node": "catalog:",
     "@types/semver": "catalog:",
     "@types/wrap-ansi": "^3.0.0",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
+    "memfs": "catalog:",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "catalog:",
+    "type-fest": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { envEnabled } from "../../../../../src/lib/telemetry/dimensions/env-flag";
+import { envEnabled } from "@/lib/telemetry/dimensions/env-flag";
 
 describe("envEnabled", () => {
   it("treats present, truthy values as enabled", () => {

@@ -1,5 +1,5 @@
-import { MANAGED_MARKER } from "../../../../../../paths";
-import type { RendererSpec } from "../types";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import type { RendererSpec } from "@/lib/orca/patchers/rule/next/renderers/types";
 
 /**
  * Placeholder renderer for the `<zitadel-flow>` Lit web component. Declared
@@ -20,7 +20,7 @@ export const litRenderer: RendererSpec = {
       const purpose = mode === "login" ? "login" : "register";
       return {
         mode,
-        contents: `${MANAGED_MARKER}
+        contents: `${ManagedFile.MARKER}
 // The web component renderer ships a <zitadel-flow> element. Until
 // @zitadel/ui-lit is published, this template only declares the
 // intended integration point. See docs/design/cli/bdui-renderer.md.

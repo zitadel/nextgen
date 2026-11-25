@@ -7,7 +7,9 @@
  * default. Tests and the dev playground opt in with `applyPasskey(true)`, which
  * adds a `passkey` action to the steps a passkey sign-in can start from, exactly
  * as the engine renders it once passkeys are enabled. Choosing it drives the
- * flow to the `passkey-login` step (see `flow-machine.ts`).
+ * flow to the `passkey-login` step (see `flow-machine.ts`). It also adds the
+ * passkey-first preset's `passkey_register` to `register`, a sign-up with a
+ * passkey that solves the sign-up gate before its attestation.
  *
  * Follows `sso-providers.ts` / `branding.ts`: an overlay rather than a fixture
  * edit, so the default mock keeps mirroring the shipped flow byte for byte.
@@ -29,6 +31,11 @@ const PASSKEY_STEP_TEXT_KEYS = new Map<string, string>([
   ["password", "password.action.passkey"],
 ]);
 
+/** The step a passkey sign-up starts from, with the preset's text key. */
+const PASSKEY_REGISTER_STEP_TEXT_KEYS = new Map<string, string>([
+  ["register", "register.action.passkey"],
+]);
+
 let enabled = false;
 
 export function applyPasskey(on: boolean): void {
@@ -45,14 +52,16 @@ export function clearPasskey(): void {
  * mutated.
  */
 export function withPasskey(base: CreateFlow201): CreateFlow201 {
-  const textKey = PASSKEY_STEP_TEXT_KEYS.get(base.step.name);
-  if (!enabled || textKey === undefined) return base;
+  if (!enabled) return base;
+  const signIn = PASSKEY_STEP_TEXT_KEYS.get(base.step.name);
+  const signUp = PASSKEY_REGISTER_STEP_TEXT_KEYS.get(base.step.name);
+  const offer: CreateFlow201StepActionsItem | undefined =
+    signIn !== undefined
+      ? { name: "passkey", kind: "passkey", text_key: signIn }
+      : signUp !== undefined
+        ? { name: "passkey_register", kind: "passkey_register", text_key: signUp }
+        : undefined;
   const actions = base.step.actions ?? [];
-  if (actions.some((a) => a.name === "passkey")) return base;
-  const action: CreateFlow201StepActionsItem = {
-    name: "passkey",
-    kind: "passkey",
-    text_key: textKey,
-  };
-  return { ...base, step: { ...base.step, actions: [...actions, action] } };
+  if (!offer || actions.some((a) => a.name === offer.name)) return base;
+  return { ...base, step: { ...base.step, actions: [...actions, offer] } };
 }

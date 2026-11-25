@@ -1,34 +1,16 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Box } from "lucide-react";
-import { useMemo } from "react";
-
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_STACK, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { RenameCard } from "@/components/rename-card";
-import {
-  LoadMore,
-  RESOURCE_CELL,
-  RESOURCE_TABLE_WRAP,
-  ResourceEmptyRow,
-  ResourceHeadCell,
-  ResourceHeaderRow,
-  ResourceRow,
-} from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
-import { UserIdCell, UserIdentityCell } from "@/components/user-cells";
-import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLoadMore } from "@/hooks/use-load-more";
 import { nullOnForbidden } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
-import {
-  projectScopeDeps,
-  requireProjectScope,
-  useRequiredProjectScope,
-} from "@/lib/project-scope";
-import { fetchTeamMembers, toUserRow } from "@/lib/user-list";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { Members, fetchMembers } from "@/features/teams/components/team-members";
+import { teamStatusLabel } from "@/features/teams/status";
 
 /**
  * Team detail: a resource inside Teams, not a scope of its own. The sidebar
@@ -36,11 +18,12 @@ import { fetchTeamMembers, toUserRow } from "@/lib/user-list";
  * as on user detail. A team becomes a sidebar scope once it owns configuration
  * (Console ADR 0005).
  *
- * The header card carries `TEAM ID` and `CREATED`. The design draws a third cell,
- * `PRIMARY DOMAIN`, which is deliberately not built: a domain that discovers and
- * claims a team is security-relevant, so it needs its own model — verification,
- * and more than one domain per team — rather than a string on `team-response`.
- * That model is not defined yet, so the cell is left out rather than shown empty.
+ * The header's identity line carries `Team ID` and `Created`. The design draws
+ * a third value, `Primary Domain`, which is deliberately not built: a domain
+ * that discovers and claims a team is security-relevant, so it needs its own model (verification,
+ * and more than one domain per team) rather than a string on `team-response`.
+ * That model is not defined yet, so the value is left out rather than shown
+ * empty.
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
   staticData: { scope: "project", resource: "team" },
@@ -59,21 +42,6 @@ export const Route = createFileRoute("/_authed/teams/$teamId")({
   component: TeamDetail,
 });
 
-interface MembersPage {
-  items: Record<string, unknown>[];
-  nextPageToken?: string;
-}
-
-/** One page of members. */
-async function fetchMembers(
-  projectId: string,
-  teamId: string,
-  pageToken?: string,
-): Promise<MembersPage> {
-  const page = await fetchTeamMembers(projectId, teamId, pageToken);
-  return { items: page.users, nextPageToken: page.next_page_token ?? undefined };
-}
-
 function TeamDetail() {
   const { team, members } = Route.useLoaderData();
   const router = useRouter();
@@ -83,29 +51,25 @@ function TeamDetail() {
       <DetailHeader
         icon={Box}
         title={team.name}
-        status={<StatusBadge status={team.status} />}
-        meta={
-          <>
-            <MetaValue label="Team ID" value={team.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(team.created_at)} />
-          </>
-        }
+        status={<StatusBadge status={team.status} label={teamStatusLabel(team.status)} />}
+        meta={[
+          { label: "Team ID", value: team.id, copyable: true },
+          { label: "Created", value: formatDate(team.created_at) },
+        ]}
       />
 
-      <Tabs defaultValue="overview" className={`${DETAIL_BODY} gap-6`}>
+      <Tabs defaultValue="overview" className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
         <TabsList aria-label="Team detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
-          {/* `Tenant name` is the design's label for the team's own `name`, the only
-              field `PATCH /teams/{team_id}` accepts. Relabelling it `Team name`
-              waits on the decisions log's open naming question. */}
+          {/* The team's own `name`, the only field `PATCH /teams/{team_id}` accepts. */}
           <RenameCard
-            id="team-tenant-name"
-            label="Tenant name"
+            id="team-detail-name"
+            title="Team details"
+            label="Team name"
             value={team.name}
             onSave={async (name) => {
               await api.updateTeam(team.id, { name });
@@ -126,56 +90,5 @@ function TeamDetail() {
         </TabsContent>
       </Tabs>
     </Page>
-  );
-}
-
-/**
- * The team's active members, by the identity the Users list leads with
- * (display → identifier → id, ADR 058), each opening their user. Read-only:
- * no endpoint adds or removes a membership yet.
- */
-function Members({ teamId, loaded }: { teamId: string; loaded: MembersPage }) {
-  const projectId = useRequiredProjectScope();
-  const paging = useLoadMore(
-    loaded,
-    // A later page refused shows as Load more's error rather than an empty list.
-    (pageToken) => fetchMembers(projectId, teamId, pageToken),
-    "Could not load more members.",
-  );
-  const rows = useMemo(
-    () => [...loaded.items, ...paging.extra].map((user, index) => toUserRow(user, index, [])),
-    [loaded.items, paging.extra],
-  );
-
-  return (
-    <>
-      <div className={RESOURCE_TABLE_WRAP}>
-        <Table className="text-xs">
-          <TableHeader>
-            <ResourceHeaderRow>
-              <ResourceHeadCell>User</ResourceHeadCell>
-              <ResourceHeadCell>Status</ResourceHeadCell>
-              <ResourceHeadCell>ID</ResourceHeadCell>
-            </ResourceHeaderRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={3}>No members yet.</ResourceEmptyRow>
-            ) : (
-              rows.map((user) => (
-                <ResourceRow key={user.id} className="group">
-                  <UserIdentityCell user={user} />
-                  <TableCell className={RESOURCE_CELL}>
-                    <StatusBadge status={user.status} />
-                  </TableCell>
-                  <UserIdCell user={user} />
-                </ResourceRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <LoadMore paging={paging} />
-    </>
   );
 }

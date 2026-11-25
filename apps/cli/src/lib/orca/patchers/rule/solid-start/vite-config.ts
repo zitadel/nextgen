@@ -1,4 +1,4 @@
-import { ZitadelError } from "../../../../errors";
+import { ZitadelError } from "@/lib/errors";
 
 const MIDDLEWARE_PATH = "./src/middleware.ts";
 
@@ -52,19 +52,7 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
     }
 
     const option = `middleware: ${JSON.stringify(MIDDLEWARE_PATH)}`;
-    let replacement: string;
-    if (inner === "") {
-      // solidStart()  ->  solidStart({ middleware: "./src/middleware.ts" })
-      replacement = `solidStart({ ${option} })`;
-    } else if (inner.startsWith("{")) {
-      // solidStart({ ...existing })  ->  inject the option after the opening
-      // brace. `args.text` is the whole argument list INCLUDING the parens
-      // (e.g. "({ ssr: true })"), so reuse it verbatim prefixed by `solidStart`
-      // — building from `solidStart(` + args.text would double the opening paren
-      // and produce an invalid config.
-      const braceIdx = args.text.indexOf("{");
-      replacement = `solidStart${args.text.slice(0, braceIdx + 1)} ${option},${args.text.slice(braceIdx + 1)}`;
-    } else {
+    if (inner !== "" && !inner.startsWith("{")) {
       // Unusual: a non-object argument (e.g. a variable). Don't guess — fail loud.
       throw new ZitadelError(
         "E_VALIDATION",
@@ -74,6 +62,17 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
         },
       );
     }
+    // solidStart()  ->  solidStart({ middleware: "./src/middleware.ts" })
+    // solidStart({ ...existing })  ->  inject the option after the opening
+    // brace. `args.text` is the whole argument list INCLUDING the parens
+    // (e.g. "({ ssr: true })"), so reuse it verbatim prefixed by `solidStart`
+    // — building from `solidStart(` + args.text would double the opening paren
+    // and produce an invalid config.
+    const braceIdx = args.text.indexOf("{");
+    const replacement =
+      inner === ""
+        ? `solidStart({ ${option} })`
+        : `solidStart${args.text.slice(0, braceIdx + 1)} ${option},${args.text.slice(braceIdx + 1)}`;
 
     return source.slice(0, callIndex) + replacement + source.slice(args.end);
   };

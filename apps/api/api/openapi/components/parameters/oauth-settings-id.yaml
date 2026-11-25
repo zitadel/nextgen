@@ -1,0 +1,10 @@
+name: oauth_settings_id
+in: path
+required: true
+description: |
+  The OAuth settings revision ID: the `revision_id` of the `kind: oauth`
+  pointer on the release that `buildRelease` (`POST /releases/build`) or
+  `getRelease` (`GET /releases/{release_id}`) returns.
+schema:
+  type: string
+example: oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM

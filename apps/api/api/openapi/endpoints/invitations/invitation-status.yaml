@@ -1,0 +1,11 @@
+title: InvitationStatus
+type: string
+enum:
+  - pending
+  - accepted
+  - rejected
+  - expired
+description: |
+  Lifecycle status of the invitation. `expired` is derived on read from
+  `expires_at`; `accepted` and `rejected` are final. Cancel and replace delete
+  the row rather than leaving a cancelled status.

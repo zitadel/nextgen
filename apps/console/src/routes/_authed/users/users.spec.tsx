@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { delay, http, HttpResponse } from "msw";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -13,15 +15,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const USERS_URL = "http://localhost/api/users";
+const USERS_URL = "http://localhost/api/v1/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
-const SCHEMAS_URL = "http://localhost/api/schemas";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
 
 async function renderUsers(path = scopedPath("/users")) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
   });
@@ -30,7 +28,7 @@ async function renderUsers(path = scopedPath("/users")) {
 }
 
 /** Records every `POST /users/query` body, so the expansion sent can be asserted. */
-function recordQueries(response: (body: Record<string, unknown>) => Response) {
+function recordQueries(response: (body: Record<string, unknown>) => Response | Promise<Response>) {
   const bodies: Record<string, unknown>[] = [];
   server.use(
     http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -100,7 +98,7 @@ describe("users screen", () => {
     // not the one selected here.
     const projects: (string | null)[] = [];
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -136,7 +134,7 @@ describe("users screen", () => {
     // ambiguous one in the caller's own project unless `project_id` names it.
     const schemaProjects: Record<string, string | null> = {};
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -203,23 +201,23 @@ describe("users screen", () => {
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     // The User column leads with the resolved display and carries the link;
-    // the designated identifier sits under it, its property as a chip beside
-    // it rather than in a tooltip (D23).
+    // the designated identifier sits under it, with no chip naming its property.
     const link = await screen.findByRole("link", { name: "Maya Patel" });
     const table = within(screen.getByRole("table"));
-    const identifier = table.getByText("maya.patel@acme.com").parentElement as HTMLElement;
-    expect(within(identifier).getByText("email")).toBeInTheDocument();
-    expect(within(link.parentElement as HTMLElement).queryByText("email")).not.toBeInTheDocument();
+    const cell = link.closest("td") as HTMLElement;
+    expect(within(cell).getByText("maya.patel@acme.com")).toBeInTheDocument();
+    expect(cell).toHaveTextContent(/^Maya Patelmaya\.patel@acme\.com$/);
     // Schema properties are not columns until the viewer pins one (D23): the
     // rest of the record reads in one Attributes cell, in the schema's field
     // order, without the email that would only repeat the line under the name.
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
+      "Revision",
       "Attributes",
       "Status",
       "Member of",
       "ID",
-      "",
+      "Actions",
     ]);
     expect(table.getByText("familyName: Patel · givenName: Maya")).toBeInTheDocument();
   });
@@ -259,17 +257,18 @@ describe("users screen", () => {
     const table = within(await screen.findByRole("table"));
     const link = table.getByRole("link", { name: "maya@acme.com" });
     expect(table.getAllByText("maya@acme.com")).toHaveLength(1);
-    // With no display name the identifier is the link, and the chip sits beside it.
-    expect(within(link.parentElement as HTMLElement).getByText("email")).toBeInTheDocument();
+    // With no display name the identifier is the link, alone in the cell.
+    expect(link.closest("td")).toHaveTextContent(/^maya@acme\.com$/);
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
+      "Revision",
       "Status",
       "Member of",
       "ID",
-      "",
+      "Actions",
     ]);
-    // The ID is the column that truncates to fit; the tooltip keeps it whole.
-    expect(table.getByText("user_1")).toHaveAttribute("title", "user_1");
+    // The ID is the column that is cut to fit; the tooltip keeps it whole.
+    expect(table.getByTitle("user_1")).toHaveTextContent("user_1");
   });
 
   it("pins the User column and the row menu to the card's edges", async () => {
@@ -348,8 +347,12 @@ describe("users screen", () => {
       "href",
       scopedPath("/schemas/sch_staff"),
     );
-    expect(card.getByText("username")).toBeInTheDocument();
+    expect(card.getByText("Signs in with").nextElementSibling).toHaveTextContent(
+      /^evelyn\.berezin$/,
+    );
     expect(card.getByText("None")).toBeInTheDocument();
+    // Schema mechanics belong to the schema's docs, not to this card.
+    expect(card.queryByText(/x-identifier|x-display/)).not.toBeInTheDocument();
     expect(card.getByText("Field Ops, Platform (pending)")).toBeInTheDocument();
     expect(card.getByText("Lifecycle owner").nextElementSibling).toHaveTextContent("Field Ops");
     expect(card.getByText("Created").nextElementSibling).toHaveTextContent(
@@ -459,7 +462,7 @@ describe("users screen", () => {
     expect(popover.getByRole("tab", { name: "YAML" })).toBeInTheDocument();
     // Data, not configuration: no CLI hint about applying it.
     expect(popover.queryByText(/deploy your changes/)).not.toBeInTheDocument();
-    expect(popover.getByRole("link", { name: "View details" })).toHaveAttribute(
+    expect(popover.getByRole("link", { name: "View user" })).toHaveAttribute(
       "href",
       scopedPath("/users/user_1"),
     );
@@ -648,7 +651,7 @@ describe("users screen", () => {
     await longPress(await screen.findByRole("link", { name: "maya@acme.com" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
-    await longPress(screen.getByText("active"));
+    await longPress(screen.getByText("Active"));
     expect(await screen.findByRole("menu")).toBeInTheDocument();
   });
 
@@ -662,7 +665,7 @@ describe("users screen", () => {
     );
     vi.stubGlobal("localStorage", storage);
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, () =>
@@ -863,7 +866,8 @@ describe("users screen", () => {
     expect(within(screen.getByRole("table")).getByText("Acme")).toBeInTheDocument();
     expect(within(minimal as HTMLElement).getByText("email: min@acme.com")).toBeInTheDocument();
     const cells = within(minimal as HTMLElement).getAllByRole("cell");
-    expect(cells[1]).toHaveTextContent("—");
+    // User, Revision, then the pinned column.
+    expect(cells[2]).toHaveTextContent("—");
   });
 
   it("renders the server-resolved identity chain, never deriving from attributes", async () => {
@@ -1030,9 +1034,9 @@ describe("users screen", () => {
     await renderUsers();
     const table = within(await screen.findByRole("table"));
 
-    expect(table.getByText("active")).toBeInTheDocument();
+    expect(table.getByText("Active")).toBeInTheDocument();
     // Underscores read as words; the value is not otherwise reinterpreted.
-    expect(table.getByText("pending purge")).toBeInTheDocument();
+    expect(table.getByText("Pending Purge")).toBeInTheDocument();
     expect(table.getAllByText("—").length).toBeGreaterThan(0);
   });
 
@@ -1193,7 +1197,9 @@ describe("users screen", () => {
     // leaving the row a column short.
     const soloRow = screen.getByRole("link", { name: "solo@acme.com" }).closest("tr");
     expect(soloRow).not.toBeNull();
-    expect(within(soloRow as HTMLElement).getByText("—")).toBeInTheDocument();
+    // The Member of cell: third from the end, before the ID and the row menu.
+    const soloCells = within(soloRow as HTMLElement).getAllByRole("cell");
+    expect(soloCells.at(-3)).toHaveTextContent("—");
   });
 
   it("says when a user is on more teams than the row carries", async () => {
@@ -1271,5 +1277,674 @@ describe("users screen", () => {
     expect(bodies).toHaveLength(3);
     expect(bodies.at(-1)).toMatchObject({ page_token: "page-2" });
     expect(bodies.at(-1)).not.toHaveProperty("expand");
+  });
+
+  /**
+   * One schema in two revisions, the newer one still in use: the latest-only
+   * read the filter's options come from, and the full history the revision
+   * menu reads for the chosen schema.
+   */
+  function serveLineage() {
+    const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+    const newer = {
+      id: "sch_business_2",
+      schema: business,
+      metadata: { created_at: "2026-08-01T09:30:00Z", in_use: true },
+    };
+    const older = {
+      id: "sch_business",
+      schema: business,
+      metadata: { created_at: "2026-07-01T00:00:00Z", in_use: false },
+    };
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        if (params.get("revisions") !== "all") return HttpResponse.json({ schemas: [newer] });
+        return HttpResponse.json({
+          schemas: params.get("object_type") === "business" ? [newer, older] : [],
+        });
+      }),
+      // A search a later term replaced keeps reading, and on a busy runner can land
+      // in the next test. Its answer is discarded either way.
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+  }
+
+  it("shows the revision each user is on, opening that schema", async () => {
+    // A revision is a schema of its own, so the column carries the user's
+    // `schema` id and opens it (#1669).
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              identifier_property: "email",
+              attributes: { email: "maya@acme.com" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByRole("columnheader", { name: "Revision" })).toBeInTheDocument();
+    expect(table.getByRole("link", { name: "sch_business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business"),
+    );
+  });
+
+  it("narrows the list to a schema, then to one of its revisions, on the server", async () => {
+    // Every revision of a schema shares its object type, so the schema filter
+    // sends that; a revision adds `schema equals` its id. The revision is
+    // listed but cannot be chosen until a schema is, and clearing the schema
+    // drops it.
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers();
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).not.toHaveProperty("filter");
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    expect(await screen.findByRole("option", { name: /^Revision/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await userEvent.click(screen.getByRole("option", { name: "User schema" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Business" }));
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ schema: "business" }),
+    );
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+      }),
+    );
+    expect(await screen.findByText("No users match this filter.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Revision" }));
+    // The chosen schema's history, newest first; what each option shows is
+    // `RevisionOption`'s to prove.
+    const options = within(await screen.findByRole("listbox")).getAllByRole("option");
+    expect(options.map((option) => option.getAttribute("title") ?? option.textContent)).toEqual([
+      "Older revisions",
+      "sch_business_2",
+      "sch_business",
+    ]);
+    await userEvent.click(options[2]!);
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [
+          { field: "schema_object_type", operation: "equals", value: "business" },
+          { field: "schema", operation: "equals", value: "sch_business" },
+        ],
+      }),
+    );
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent(
+      "Revisionsch_business",
+    );
+
+    // Clearing the revision keeps the schema, and hands focus to the button
+    // that stays.
+    await userEvent.click(screen.getByRole("button", { name: "Clear the revision filter" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toEqual(
+        expect.objectContaining({
+          filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+        }),
+      ),
+    );
+    expect(router.state.resolvedLocation?.search).toEqual({
+      project: "proj_test",
+      schema: "business",
+    });
+    expect(screen.getByRole("button", { name: "Add filter" })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear the schema filter" }));
+    await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
+    expect(screen.queryByRole("button", { name: /^User schema/ })).toBeNull();
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
+  });
+
+  it("drops the earlier `latest` revision value from a link", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=latest`);
+
+    await screen.findByRole("table");
+    expect(screen.queryByRole("button", { name: "Clear the revision filter" })).toBeNull();
+    expect(bodies.at(-1)).toEqual(
+      expect.objectContaining({
+        filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+      }),
+    );
+  });
+
+  it("narrows to the users not on the newest revision", async () => {
+    // `Older revisions` sends `schema not_equals` the newest revision's id:
+    // who is left to migrate. A link carrying `revision=older` opens it.
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&schema=business`);
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Revision" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Older revisions" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toEqual(
+        expect.objectContaining({
+          filter: [
+            { field: "schema_object_type", operation: "equals", value: "business" },
+            { field: "schema", operation: "not_equals", value: "sch_business_2" },
+          ],
+        }),
+      ),
+    );
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      schema: "business",
+      revision: "older",
+    });
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent(
+      "RevisionOlder revisions",
+    );
+  });
+
+  it("compares `older` with the latest of the type, not the first of a history it cannot all read", async () => {
+    // A grant that hides the newest revision leaves it out of the history;
+    // the latest-of-type read still names it.
+    const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+    const newest = {
+      id: "sch_business_3",
+      schema: business,
+      metadata: { created_at: "2026-09-01T00:00:00Z" },
+    };
+    const visible = [
+      { id: "sch_business_2", schema: business, metadata: { created_at: "2026-08-01T00:00:00Z" } },
+      { id: "sch_business", schema: business, metadata: { created_at: "2026-07-01T00:00:00Z" } },
+    ];
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) =>
+        HttpResponse.json({
+          schemas:
+            new URL(request.url).searchParams.get("revisions") === "all" ? visible : [newest],
+        }),
+      ),
+    );
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).toEqual(
+      expect.objectContaining({
+        filter: [
+          { field: "schema_object_type", operation: "equals", value: "business" },
+          { field: "schema", operation: "not_equals", value: "sch_business_3" },
+        ],
+      }),
+    );
+  });
+
+  it("drops `older` back to the schema when its history cannot be read", async () => {
+    // With no newest revision to compare with, the URL would claim a filter
+    // the list does not apply.
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) =>
+        new URL(request.url).searchParams.get("revisions") === "all"
+          ? HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 })
+          : HttpResponse.json({ schemas: [] }),
+      ),
+    );
+    const router = await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+
+    await screen.findByRole("table");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toEqual({
+        project: "proj_test",
+        schema: "business",
+      }),
+    );
+    expect(bodies.every((body) => (body.filter as unknown[]).length === 1)).toBe(true);
+  });
+
+  it("offers no older revisions on a schema with one revision", async () => {
+    const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+    const only = {
+      id: "sch_business",
+      schema: business,
+      metadata: { created_at: "2026-07-01T00:00:00Z" },
+    };
+    server.use(http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [only] })));
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business`);
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Revision" }));
+    const listbox = within(screen.getByRole("listbox"));
+    await waitFor(() => expect(listbox.getAllByRole("option")).toHaveLength(1));
+    expect(listbox.getByRole("option")).toHaveAttribute("title", "sch_business");
+    expect(listbox.queryByRole("option", { name: "Older revisions" })).toBeNull();
+  });
+
+  it("disables a filter with nothing to offer", async () => {
+    // The schemas cannot be read, so neither filter has values to choose.
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    await renderUsers();
+
+    await screen.findByRole("table");
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    for (const property of [/^User schema/, /^Revision/]) {
+      expect(await screen.findByRole("option", { name: property })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    }
+    // What needs no schema can still be chosen.
+    expect(screen.getByRole("option", { name: "Status" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("searches by identifier on the server, keeps the term in the URL, and pages with it", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      attributes: { email: `${id}@acme.com` },
+    });
+    const bodies = recordQueries((body) =>
+      HttpResponse.json(
+        body.filter && !body.page_token
+          ? { users: [user("user_match")], next_page_token: "next" }
+          : { users: [user(body.page_token ? "user_more" : "user_all")] },
+      ),
+    );
+    const router = await renderUsers(scopedPath("/users"));
+
+    await userEvent.type(
+      await screen.findByRole("searchbox", { name: "Search by identifier" }),
+      " alex ",
+    );
+    await waitFor(() => expect(router.state.resolvedLocation?.search).toMatchObject({ q: "alex" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /load more/i }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        page_token: "next",
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
+      }),
+    );
+  });
+
+  it("keeps the search field mounted and focused through a slow search", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      identifier: `${id}@acme.com`,
+      attributes: { email: `${id}@acme.com` },
+    });
+    // Past the router's pending delay, which a fast response never reaches.
+    const bodies = recordQueries(async (body) => {
+      if (body.filter) await delay(1600);
+      return HttpResponse.json({ users: [user(body.filter ? "user_match" : "user_all")] });
+    });
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "alex");
+    await waitFor(() => expect(bodies.at(-1)).toHaveProperty("filter"));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1200)));
+
+    // The same element, still focused, and what follows the pause is kept.
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveFocus();
+    await userEvent.keyboard("x");
+    expect(field).toHaveValue("alexx");
+
+    await screen.findByText("user_match@acme.com");
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveFocus();
+    // The search for what followed the pause, answered and drawn, so nothing it
+    // reads is still in flight when the next test starts.
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "alexx" }],
+      }),
+    );
+    await waitFor(
+      () => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"),
+      {
+        timeout: 4000,
+      },
+    );
+  }, 15000);
+
+  it("reads a new term once, and again after the list is invalidated", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&q=first`);
+    await screen.findByText("No users match this search.");
+    const field = screen.getByRole("searchbox", { name: "Search by identifier" });
+
+    await userEvent.clear(field);
+    await userEvent.type(field, "second");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ q: "second" }),
+    );
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "second" }],
+      }),
+    );
+    await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
+    const reads = (value: string) =>
+      bodies.filter(
+        (body) => (body.filter as { value: string }[] | undefined)?.[0]?.value === value,
+      ).length;
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(reads("second")).toBe(1);
+
+    await act(() => router.invalidate());
+    await waitFor(() => expect(reads("second")).toBe(2));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(reads("second")).toBe(2);
+  });
+
+  it("reads only the rows for a new term, keeping the older revisions filter", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    // What a search must not read again is the filter's own chrome: the
+    // options, the revisions and the newest revision, all reads of the schema
+    // list. A schema read by its id is a row's columns, and with no rows here
+    // it is an earlier test's replaced search finishing late (`serveLineage`).
+    const schemaReads: string[] = [];
+    const countSchemaReads = ({ request }: { request: Request }) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/v1/schemas") schemaReads.push(url.pathname + url.search);
+    };
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+    await screen.findByText("No users match this filter.");
+    server.events.on("request:start", countSchemaReads);
+    onTestFinished(() => server.events.removeListener("request:start", countSchemaReads));
+
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search by identifier" }), "ada");
+
+    await waitFor(() =>
+      expect(bodies.at(-1)).toEqual(
+        expect.objectContaining({
+          filter: [
+            { field: "identifier", operation: "starts_with", value: "ada" },
+            { field: "schema_object_type", operation: "equals", value: "business" },
+            { field: "schema", operation: "not_equals", value: "sch_business_2" },
+          ],
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
+    expect(schemaReads).toEqual([]);
+  });
+
+  it.each([
+    ["not text", "q=true"],
+    ["only spaces", "q=%20%20"],
+  ])("sends no identifier filter for a term that is %s", async (_name, query) => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&${query}`);
+
+    await waitFor(() => expect(bodies.length).toBeGreaterThan(0));
+    expect(bodies[0]).not.toHaveProperty("filter.0.field", "identifier");
+  });
+
+  it("trims a padded term from the URL before it searches", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=%20alex%20`);
+
+    await waitFor(() =>
+      expect(bodies[0]).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
+      }),
+    );
+  });
+
+  it("searches for a number someone typed into the URL", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=12345`);
+
+    await waitFor(() =>
+      expect(bodies[0]).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "12345" }],
+      }),
+    );
+  });
+
+  it("keeps the list and the field when a search fails, and says so", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    recordQueries((body) =>
+      body.filter
+        ? HttpResponse.json({ message: "The search is unavailable." }, { status: 503 })
+        : HttpResponse.json({
+            users: [
+              {
+                id: "user_all",
+                schema: "sch_business",
+                identifier: "user_all@acme.com",
+                attributes: { email: "user_all@acme.com" },
+              },
+            ],
+          }),
+    );
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "alex");
+
+    expect(await screen.findByText("The search is unavailable.")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toHaveValue("alex");
+    expect(screen.getByText("user_all@acme.com")).toBeInTheDocument();
+  });
+
+  it("still shows the pending state on a slow first load", async () => {
+    serveLineage();
+    recordQueries(async () => {
+      await delay(1600);
+      return HttpResponse.json({ users: [] });
+    });
+    await renderUsers(scopedPath("/users"));
+
+    expect(await screen.findByText("Loading…", undefined, { timeout: 1500 })).toBeInTheDocument();
+    expect(
+      await screen.findByText("No users yet.", undefined, { timeout: 3000 }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the answer to the latest term when an earlier search answers last", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      identifier: `${id}@acme.com`,
+      attributes: { email: `${id}@acme.com` },
+    });
+    recordQueries(async (body) => {
+      const value = (body.filter as { value: string }[] | undefined)?.[0]?.value;
+      if (value === "first") await delay(1200);
+      return HttpResponse.json({ users: [user(value ? `user_${value}` : "user_all")] });
+    });
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "first");
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    await userEvent.clear(field);
+    await userEvent.type(field, "second");
+
+    expect(
+      await screen.findByText("user_second@acme.com", undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    // Past the moment the earlier search answers.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1200)));
+    expect(screen.getByText("user_second@acme.com")).toBeInTheDocument();
+    expect(screen.queryByText("user_first@acme.com")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("offers no search on a project with no users, and keeps it once a search empties the list", async () => {
+    serveLineage();
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(scopedPath("/users"));
+
+    expect(await screen.findByText("No users yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("sends the search together with the schema filter", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=alex&schema=business`);
+
+    await screen.findByRole("table");
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toHaveValue("alex");
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [
+        { field: "identifier", operation: "starts_with", value: "alex" },
+        { field: "schema_object_type", operation: "equals", value: "business" },
+      ],
+    });
+  });
+
+  it("clears a search with no matches from inside the table, apart from an empty project", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&q=nobody`);
+
+    expect(await screen.findByText("No users match this search.")).toBeInTheDocument();
+    expect(screen.queryByText("No users yet.")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    const field = screen.getByRole("searchbox", { name: "Search by identifier" });
+    expect(field).toHaveFocus();
+    await waitFor(() => expect(router.state.resolvedLocation?.search).not.toHaveProperty("q"));
+    await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
+    expect(await screen.findByText("No users yet.")).toBeInTheDocument();
+    // The term the row was for is gone, and the field stays where focus went.
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveValue("");
+    expect(field).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+  });
+
+  it("narrows by status and by when the user was created, each chosen as its type is", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers();
+    await screen.findByRole("table");
+
+    // A status is one of a set.
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Status" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Suspended" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "status", operation: "equals", value: "suspended" }],
+      }),
+    );
+    expect(screen.getByRole("button", { name: /^Status/ })).toHaveTextContent("StatusSuspended");
+
+    // A date is a range that ends now.
+    const before = Date.now();
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Created" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Last 7 days" }));
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toEqual({
+        project: "proj_test",
+        status: "suspended",
+        created: "7d",
+      }),
+    );
+    const criteria = (bodies.at(-1) ?? {}).filter as { field: string; value: string }[];
+    const created = criteria[1];
+    expect(created).toMatchObject({ field: "created_at", operation: "greater_than_or_equal" });
+    const week = 7 * 24 * 60 * 60 * 1000;
+    expect(Date.parse(created!.value)).toBeGreaterThanOrEqual(before - week);
+    expect(Date.parse(created!.value)).toBeLessThanOrEqual(Date.now() - week);
+
+    // The empty list's button clears them all.
+    await userEvent.click(await screen.findByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
+  });
+
+  it("drops a status or a date the filter could not have sent", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&status=gone&created=yesterday`);
+
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).not.toHaveProperty("filter");
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
+  });
+
+  it("names an object type the URL carries that no schema has", async () => {
+    // A link kept after its schema was deleted still narrows the list; the
+    // chip says so rather than going blank for want of a matching option.
+    serveLineage();
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=ghost`);
+
+    await screen.findByRole("table");
+    expect(screen.getByRole("button", { name: /^User schema/ })).toHaveTextContent("ghost");
+    expect(screen.getByText("No users match this filter.")).toBeInTheDocument();
+  });
+
+  it("filters by one revision from the URL, and keeps the filter in view when the schemas cannot be read", async () => {
+    // The schema reads are chrome: unreadable, the list still narrows by what
+    // the URL carries, and the filter stays on the title row naming it, so
+    // it can be cleared from there rather than by editing the URL.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=sch_business`);
+
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [
+        { field: "schema_object_type", operation: "equals", value: "business" },
+        { field: "schema", operation: "equals", value: "sch_business" },
+      ],
+    });
+    expect(screen.getByRole("button", { name: /^User schema/ })).toHaveTextContent("business");
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent("sch_business");
   });
 });

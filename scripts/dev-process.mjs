@@ -1,3 +1,4 @@
+// Imports only Node built-ins: the artifacts workflow runs its importers without an install.
 import { spawn } from "node:child_process";
 import { accessSync, constants, realpathSync, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
@@ -8,11 +9,11 @@ const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
 /**
  * `env` with a PATH on which every process a contributor script starts finds
  * the workspace's tools. The checkout needs only corepack, but package scripts
- * (`pnpm run build`), the CLI's install in a generated app and moon's tasks
+ * (`pnpm run build`), the CLI's install in a generated app and turbo's tasks
  * call a bare `pnpm`: without one on PATH, scripts/shims/pnpm stands in and
- * runs `corepack pnpm`. The workspace's node_modules/.bin goes last, so moon
- * and turbo resolve when the script runs outside `pnpm run` and a global
- * install still wins.
+ * runs `corepack pnpm`. The workspace's node_modules/.bin goes last, so turbo
+ * resolves when the script runs outside `pnpm run` and a global install
+ * still wins.
  */
 export function withWorkspaceTools(env, options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
@@ -164,50 +165,14 @@ export function formatCommand(command, args = []) {
   return [command, ...args].map(shellQuote).join(" ");
 }
 
-// Maps items through an async worker with at most `limit` in flight,
-// preserving input order in the results. After a failure no new work starts,
-// but in-flight workers are awaited (their child processes cannot be
-// abandoned safely); the first error is rethrown once all lanes settle.
-export async function mapWithConcurrency(items, limit, worker) {
-  if (!Number.isInteger(limit) || limit < 1) {
-    throw new Error(`mapWithConcurrency requires a positive integer limit, got ${limit}`);
-  }
-  const entries = [...items];
-  if (entries.length === 0) {
-    return [];
-  }
-  const results = new Array(entries.length);
-  const errors = [];
-  const width = Math.min(limit, entries.length);
-  let next = 0;
-  let failed = false;
-
-  await Promise.all(
-    Array.from({ length: width }, async () => {
-      while (!failed) {
-        const index = next;
-        next += 1;
-        if (index >= entries.length) {
-          return;
-        }
-        try {
-          results[index] = await worker(entries[index], index);
-        } catch (error) {
-          errors.push(error);
-          failed = true;
-        }
-      }
-    }),
-  );
-
-  if (errors.length > 0) {
-    throw errors[0];
-  }
-  return results;
-}
-
 export function forwardedArgs(args = process.argv.slice(2)) {
   return args[0] === "--" ? args.slice(1) : args;
+}
+
+// The server commands that do one thing and exit. `pnpm run server` and
+// `pnpm run server-debug` build no console for them and add no --migrate.
+export function isOneShotServerCommand(args) {
+  return ["migrate", "seed", "completion"].includes(args[0]);
 }
 
 // Node loads the entry script from its real path: import.meta.url has every

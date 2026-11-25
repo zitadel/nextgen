@@ -15,15 +15,17 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.generate_master_key` | `NEXTGEN_SERVER_GENERATE_MASTER_KEY` | `true`                                                          | Mint a master key when none is configured and the master key directory is empty; `false` (or `--disable-master-key-generation`) fails the start instead |
 | `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                              | Serve embedded management console                                                                      |
 | `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                                       | Console URL prefix                                                                                     |
-| `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. |
+| `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. With platform bootstrap on, it is the platform project's one primary origin, so servers sharing a database need the same value. |
+| `server.console_origins` | `NEXTGEN_SERVER_CONSOLE_ORIGINS` | — (none) | Other origins the console is reached at, beside the origin of `server.public_base`, such as another hostname in front of the deployment. Like that origin, they may open any project's flow to preview its login; signing in to the platform project works only at `server.public_base`. A comma-separated list in the environment. |
 | `server.request_id_header` | `NEXTGEN_SERVER_REQUEST_ID_HEADER` | — (unset)                                                      | A header a proxy in front of the server sets to its own ID for each request, such as Vercel's `x-vercel-id`. The server then uses that ID in its logs, `X-Request-Id`, audit events and error pages. Set it only behind a proxy that overwrites the header, or a client chooses its own ID. |
+| `server.idle_timeout`    | `NEXTGEN_SERVER_IDLE_TIMEOUT`    | `60s`                                                               | How long the server keeps a connection open while it waits for the next request. Behind a proxy that reuses its connections, set it above the proxy's own idle timeout, or to `0` to never close one: a `POST` the proxy sends as the server closes the connection ends as the proxy's 502. |
 
 ## Platform
 
 | YAML key                     | Environment                          | Default | Description                                                                                                                                            |
 | ----------------------------- | ------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.bootstrap_project` | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`  | `false` | Provisions the well-known platform project (encryption/signing keys, default user schema, default login flow) at startup. Needed for `zitadel claim` and self-registration to work on this deployment. `zitadel start` turns it on itself; set it to `false` to opt out of the platform project and the local admin.   |
-| `platform.operators`         | `NEXTGEN_PLATFORM_OPERATORS`          | (empty) | User ids, comma-separated in the environment, of the platform-project users who administer every project of the deployment ([ADR 075](../adrs/075-platform-operators.md)). Reconciled at every start: listed users that exist are granted, and those an earlier list granted are revoked. Needs a platform project (`bootstrap_project` or `project_id`). |
+| `platform.bootstrap_project` | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`  | `false` | Provisions the well-known platform project (encryption/signing keys, default user schema, default login flow) when the server seeds: at startup, or in the `seed` command. Needed for `zitadel claim` and self-registration to work on this deployment. `zitadel start` turns it on itself; set it to `false` to opt out of the platform project and the local admin.   |
+| `platform.operators`         | `NEXTGEN_PLATFORM_OPERATORS`          | (empty) | User ids, comma-separated in the environment, of the platform-project users who administer every project of the deployment ([ADR 075](../adrs/075-platform-operators.md)). Reconciled at every seeding (a start, or the `seed` command): listed users that exist are granted, and those an earlier list granted are revoked. Needs a platform project (`bootstrap_project` or `project_id`). |
 | `platform.project_id`        | `NEXTGEN_PLATFORM_PROJECT_ID`         | (empty) | Pins an existing project as the standalone Console's sign-in target, overriding the first-created-project fallback. Does **not** provision the platform project or enable claiming, self-registration, or personal teams — only `bootstrap_project` does that. Mutually exclusive with `bootstrap_project` unless set to its built-in id. Transitional ([Console ADR 0004](../../apps/console/docs/adrs/0004-console-deployment-modes.md)); expect it to be removed once bootstrap always provisions the platform project. |
 
 On a server you start by hand (Docker Compose, or the Go binary), set both to
@@ -36,6 +38,32 @@ export NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:8080
 
 A runtime started by `zitadel start` needs neither: the CLI sets both values
 itself and creates a local admin you reach with `zitadel console`.
+
+The server seeds when it starts: it creates the platform project, deploys the
+configuration it ships for it, imports the `--user-file` users and reconciles
+`platform.operators`. A deployment with several replicas, or one whose
+instances start on demand, can seed once as it deploys instead, with the same
+configuration the servers read:
+
+```sh
+nextgen migrate
+nextgen seed --user-file admin.json
+nextgen server --seed=false
+```
+
+`seed` wraps the platform project's keys with the master key and never
+generates one: give it the key the servers are configured with
+([Encryption keys](#encryption-keys)). A server started with `--seed=false`
+writes nothing by starting and refuses to start on a database nothing seeded.
+It logs an error that starts `platform project:` when the console cannot sign
+anyone in at its public base, which the next `seed` repairs. Write the flag
+with `=`: `--seed false` is refused.
+
+## OAuth
+
+| YAML key        | Environment             | Default | Description |
+| --------------- | ----------------------- | ------- | ----------- |
+| `oauth.enabled` | `NEXTGEN_OAUTH_ENABLED` | `false` | Serves the OAuth 2.0 authorization server: a project's [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) metadata at `/.well-known/oauth-authorization-server/oauth/<project_id>` and its endpoints under `/oauth/<project_id>`. A project's issuer answers only once the release deployed to that origin carries `oauth: { "enabled": true }`; with the switch off, those paths answer like any other path nothing serves. |
 
 ## Database
 
@@ -109,15 +137,59 @@ session:
   max_ttl: 720h
 ```
 
+## Request audit events
+
+| YAML key                    | Environment                         | Default | Description                                                     |
+| --------------------------- | ----------------------------------- | ------- | --------------------------------------------------------------- |
+| `events.request.flush_wait` | `NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT` | `0s`    | How long a request waits for its audit event to be written      |
+
+The server writes a request's audit event up to a second after the response,
+many requests in one write. A server that runs only while it serves a request,
+such as a Vercel function, may not get to that write before it is paused. Set
+`flush_wait`, to `2s` for example, and a request ends once its event is
+written, or after that long when the database does not answer. Requests in
+flight together still share a write.
+
+## Audit event retention
+
+| YAML key                          | Environment                               | Default          | Description                                                    |
+| --------------------------------- | ----------------------------------------- | ---------------- | -------------------------------------------------------------- |
+| `events.retention.enabled`        | `NEXTGEN_EVENTS_RETENTION_ENABLED`        | `true`           | Delete audit events once they are older than the window        |
+| `events.retention.window`         | `NEXTGEN_EVENTS_RETENTION_WINDOW`         | `720h` (30 days) | How long an event is kept after it was stored                  |
+| `events.retention.interval`       | `NEXTGEN_EVENTS_RETENTION_INTERVAL`       | `1h`             | How often the server purges; the first purge runs as it starts |
+| `events.retention.trigger_secret` | `NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET` | (empty)          | Leaves the schedule to a scheduler outside the server (below)  |
+
+The server purges on its own timer. A server that runs only while it serves a
+request, such as a Vercel function, can't keep a timer. Set `trigger_secret`
+to at least 16 printable ASCII characters (`openssl rand -hex 32`), and the
+server stops its timer and purges once per `GET` or `POST` to
+`/cron/events-retention` that carries the secret as a bearer token:
+
+```sh
+curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" https://zitadel.example.com/cron/events-retention
+# {"deleted":42}
+```
+
+- A request without the secret gets `401`, and a purge that fails `500`; the
+  server's log says why.
+- A purge that takes longer than 4½ minutes is cancelled and deletes nothing,
+  so give the call that long.
+- A missed call leaves its events to the next. Two calls at once are safe: the
+  second deletes what the first left, or nothing.
+
+The hosted cloud calls it from a Vercel Cron Job
+([runbook](../runbooks/cloud.md#operating)).
+
 ## Logging
 
-| YAML key                                     | Environment                                          | Default                                       | Description                                    |
-| -------------------------------------------- | ---------------------------------------------------- | --------------------------------------------- | ---------------------------------------------- |
-| `instrumentation.log.level`                  | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`                  | `info`                                        | Minimum log level                              |
-| `instrumentation.log.format`                 | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`                 | `text`                                        | Log output encoding                            |
-| `instrumentation.log.streams`                | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS`                | `[runtime, ready, request, service, storage]` | Which log streams are enabled                  |
-| `instrumentation.log.errors.report_location` | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_REPORT_LOCATION` | `true`                                        | Record where each error was created            |
-| `instrumentation.log.errors.stack_trace`     | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_STACK_TRACE`     | `false`                                       | Capture a stack trace when an error is created |
+| YAML key                                     | Environment                                          | Default                                       | Description                                                 |
+| -------------------------------------------- | ---------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------- |
+| `instrumentation.log.level`                  | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`                  | `info`                                        | Minimum log level                                           |
+| `instrumentation.log.format`                 | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`                 | `text`                                        | Log output encoding                                         |
+| `instrumentation.log.streams`                | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS`                | `[runtime, ready, request, service, storage]` | Which log streams are enabled                               |
+| `instrumentation.log.add_source`             | `NEXTGEN_INSTRUMENTATION_LOG_ADD_SOURCE`             | `true`                                        | Record the file and line that wrote each log line on stderr |
+| `instrumentation.log.errors.report_location` | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_REPORT_LOCATION` | `true`                                        | Record where each error was created                         |
+| `instrumentation.log.errors.stack_trace`     | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_STACK_TRACE`     | `false`                                       | Capture a stack trace when an error is created              |
 
 `level`, `format`, and each entry of `streams` accept either their documented
 string name (below) or the underlying numeric value; string values are
@@ -174,7 +246,17 @@ instrumentation:
   it is zero, and the exporter keeps one CPU core busy even when the server
   is idle.
 - A traced request keeps all of its spans, including one span per database
-  statement.
+  statement. On PostgreSQL each query on the wire has a `pgx.query` span of
+  its own, with the first word of the statement (`SELECT`, `INSERT`, `BEGIN`,
+  `COMMIT`) as `db.operation.name`, and a wait of a millisecond or more for a
+  pooled connection has a `pgx.acquire` span. No span carries SQL text,
+  arguments or error messages.
+- Every request has one server span, with `http.request.method` and
+  `http.response.status_code`. It starts before any middleware runs and ends
+  when the response is written. The span of an API operation is named after
+  the operation (`GetMyUser`) and carries `http.route`. The span of any other
+  request, such as a `404`, a `405`, the OpenAPI document or a console file,
+  is named after its method and has no `http.route`.
 
 With `trust_remote_spans` off (the default), an incoming `traceparent`,
 `tracestate` or `baggage` header is ignored and every request starts a new
@@ -200,6 +282,96 @@ instrumentation:
       insecure: true
       batch_duration: 5s
 ```
+
+## Metrics
+
+| YAML key                                            | Environment                                                 | Default | Description                                     |
+| --------------------------------------------------- | ----------------------------------------------------------- | ------- | ----------------------------------------------- |
+| `instrumentation.metric.exporter.type`              | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE`              | unset   | Where metrics are sent                          |
+| `instrumentation.metric.exporter.endpoint`          | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT`          | unset   | Collector address for `grpc` and `http`         |
+| `instrumentation.metric.exporter.insecure`          | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE`          | `false` | Plain-text connection for `grpc` and `http`     |
+| `instrumentation.metric.exporter.batch_duration`    | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION`    | `60s`   | Interval between exports for push exporters     |
+| `instrumentation.metric.exporter.google_project_id` | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_GOOGLE_PROJECT_ID` | unset   | Google Cloud project for the `google` exporter  |
+
+- `exporter.type`: `none`, `stdout`, `stderr`, `grpc`, `http`, `google` (set
+  `exporter.google_project_id`), `prometheus`, `auto`.
+- Metrics are exported only when an exporter type is set and is not `none`.
+  Without one, nothing is recorded: every instrument reports itself disabled,
+  and the code that would measure a statement skips the work. With one, every
+  statement pays the stack walk that names it, a clock read and a histogram
+  record, on every request, whether tracing samples it or not.
+- `auto` reads the standard OpenTelemetry environment variables
+  (`OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and the others).
+  When none of them is set, no metrics are exported.
+- `prometheus` registers the exporter with the process's default Prometheus
+  registry and serves no endpoint by itself. For a scrape endpoint out of the
+  box, use `auto` with `OTEL_METRICS_EXPORTER=prometheus`: that serves
+  `/metrics` on `localhost:9464`, or on the host and port
+  `OTEL_EXPORTER_PROMETHEUS_HOST` and `OTEL_EXPORTER_PROMETHEUS_PORT` name.
+- `exporter.batch_duration` is how often a push exporter (`stdout`, `stderr`,
+  `grpc`, `http`, `google`) sends what it collected. Left unset, the
+  OpenTelemetry default applies: `OTEL_METRIC_EXPORT_INTERVAL`, or 60 seconds.
+  `prometheus` is scraped and ignores it. `auto` ignores it too: an OTLP
+  exporter it picks sends at `OTEL_METRIC_EXPORT_INTERVAL`, and its Prometheus
+  exporter is scraped.
+
+```yaml
+instrumentation:
+  metric:
+    exporter:
+      type: grpc
+      endpoint: otel-collector:4317
+      insecure: true
+      batch_duration: 30s
+```
+
+### What is measured
+
+Every instrument carries only what is listed here. No attribute identifies a
+user, project, session, token or request, and the attributes marked "fixed in
+code" take names from the code (a statement method, an event type, a cache),
+never from data. The API's request instruments (`ogen.server.request_count`,
+`ogen.server.errors_count` and `ogen.server.duration`, which records in
+milliseconds with the SDK's default buckets) carry
+the operation (`oas.operation`), the method (`http.request.method`), the
+route template (`http.route`, as in `/users/{user_id}`) and the status
+(`http.response.status_code`), never the request path. A request that
+reached its operation at the root path rather than under `/api/v1`, which the
+API answers until 1.0.0, also carries `zitadel.api.root_path` (`true`).
+Should an attribute ever follow the data anyway, each instrument holds at most 2000 series: past
+that, new attribute combinations land on one series marked
+`otel.metric.overflow=true` instead of becoming series of their own. The
+limit is the OpenTelemetry SDK's default; `OTEL_GO_X_CARDINALITY_LIMIT`
+changes it.
+
+The instruments below record durations in seconds, with buckets from 100µs
+to 60s. In
+Prometheus, a dot becomes an underscore, a duration gets a `_seconds` suffix
+and a counter a `_total` suffix: `db.client.operation.duration` is
+`db_client_operation_duration_seconds`, and `zitadel.auth.attempt.outcomes`
+is `zitadel_auth_attempt_outcomes_total`.
+
+| Instrument | Type | Unit | Attributes | What it measures |
+| --- | --- | --- | --- | --- |
+| `db.client.operation.duration` | histogram | `s` | `db.system.name`: `postgresql`, `sqlite`, `gcp.spanner`; `db.query.summary`: fixed in code | Duration of one storage statement call, including any wait for a pooled connection. PostgreSQL and SQLite time a query until it returns, before its rows are read, and PostgreSQL a single-row read until it is scanned; Spanner times a statement including the callback that reads its rows. With a metric exporter configured, every statement pays for this: the stack walk that names it, a clock read and a histogram record, on every request, whether tracing samples it or not. |
+| `db.client.connection.count` | updowncounter | `{connection}` | `db.client.connection.pool.name`: `postgres`, `sqlite`; `db.client.connection.state`: `idle`, `used` | Connections of a database pool, by state. |
+| `db.client.connection.max` | updowncounter | `{connection}` | `db.client.connection.pool.name`: `postgres`, `sqlite` | The most connections a database pool will open. |
+| `zitadel.auth.credential.validation.duration` | histogram | `s` | `result`: `valid`, `revoked`, `invalid`, `error` | Duration of validating a bearer credential: decrypting it, checking its claims and, for a revocable one, reading its token record. |
+| `zitadel.auth.token.revocation_checks` | counter | `{check}` | `result`: `active`, `revoked`, `error` | Token record lookups made to see whether a credential was revoked. Credentials that cannot be revoked, or that carry no token id, are not checked and not counted. |
+| `zitadel.auth.password.verification.duration` | histogram | `s` | `purpose`: `login`, `history`; `result`: `match`, `updated`, `mismatch`, `error`, `busy` | Duration of verifying a password against its stored hash. `updated` is a match on a hash outdated for the project's method, so the verify also computed (or attempted) a new hash: two hashes for one sign-in; it occurs for the `login` purpose only. |
+| `zitadel.auth.attempt.outcomes` | counter | `{proof}` | `check`: `user`, `password`, `passkey`, `passkey_registration`; `result`: `success`, `rejected`, `error`, `busy` | Authentication proofs verified through auth attempts, by kind of proof and outcome. SSO sign-ins are not counted. |
+| `zitadel.crypto.key_chain.resolution.duration` | histogram | `s` | `key.kind`: `master`, `project` | Duration of unwrapping an encryption key that was not in the crypter cache, including resolving any wrapping key that is not cached either. Only a resolution that produced a crypter is recorded; a failed unwrap is not. Reading the key row is a storage statement and is part of db.client.operation.duration. |
+| `zitadel.flow.step.transitions` | counter | `{transition}` | `operation`: `start`, `submit`, `render`; `result`: `step`, `complete`, `error` | Flow engine operations, by entry point and where they left the flow. Step names are defined per project and are deliberately not an attribute. |
+| `zitadel.audit.insert.duration` | histogram | `s` | `source`: `request`, `event` | Duration of one audit insert: a single event in its transaction, or one attempt to write a batch of buffered request events (a retried batch is timed per attempt). |
+| `zitadel.audit.events.written` | counter | `{event}` | `type`: fixed in code | Audit events handed to storage successfully, by event type. An event written inside a transaction that later rolls back is still counted. |
+| `zitadel.cache.lookups` | counter | - | `cache`: fixed in code; `result`: `hit`, `miss` | Cache lookups, split into hits and misses. |
+| `zitadel.cache.evictions` | counter | - | `cache`: fixed in code | Entries dropped from a cache because it was full. |
+| `zitadel.cache.entries` | gauge | - | `cache`: fixed in code | Entries currently held in a cache. |
+| `zitadel.password_hashing.in_flight` | gauge | - |  | Password hashes currently running. |
+| `zitadel.password_hashing.waiting` | gauge | - |  | Password hashes waiting for a slot. |
+| `zitadel.password_hashing.memory_reserved` | gauge | `By` |  | Memory the running password hashes are budgeted to use. |
+| `zitadel.password_hashing.rejected` | counter | - |  | Password hashes refused because no slot freed up within the configured wait. |
+| `zitadel.password_hashing.wait_duration` | histogram | `s` |  | Time a password hash waited for a slot, whether it got one or not; 0 when one was free. |
 
 ## Config file search paths
 

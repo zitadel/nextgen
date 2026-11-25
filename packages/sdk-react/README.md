@@ -44,6 +44,29 @@ export function ProfilePage() {
 The signed-in session card is `<ZitadelSession project={project} />` (exported
 as `ZitadelSession`).
 
+## Reading the session in your own UI
+
+`useSession()` tells your own components (header navigation, account menus, route guards) whether a user is signed in, and who. When the first component using it mounts, it asks the server with the same `GET /sessions/me` read the `ZitadelSession` card performs; every mounted component using the same project shares that read, and once the last one unmounts, the next mount reads again.
+
+```tsx
+import { useSession } from '@zitadel/sdk-react';
+
+export function AccountMenu() {
+  const { status, session } = useSession({ project });
+  if (status === 'loading') return null;
+  if (status === 'error') return <span role="alert">Session unavailable</span>;
+  return status === 'authenticated'
+    ? <a href="/profile">{session?.display ?? session?.identifier ?? 'Account'}</a>
+    : <a href="/login">Sign in</a>;
+}
+```
+
+`status` is `loading`, then the server's answer, `authenticated` or `unauthenticated`. `error` means there is no answer yet: `error.code` is `session.no_project` when no project id is known (a misconfiguration, not a signed-out visitor) or `session.read_failed` when the read failed, often a misrouted proxy. `session` holds `userId`, `identifier`, `identifierProperty` and `display`, never a token. The hook takes the widgets' `project`, `projectId` and `proxyPath`, and falls back to `configureZitadel(...)`.
+
+Sign-in and sign-out navigate, so the next page reads the session again. To update in place, call the hook's `refresh()` from `onFlowComplete` or `onSignout`: it resolves with the new snapshot and never rejects. While it runs, `isRefreshing` is `true` and the last answer stays; a refresh that fails keeps it too and sets `error` beside it.
+
+Outside components, `sessionStore({ project })` returns the same shared read: `settled()` resolves with the first answer, for a route guard or loader, and `refresh()` reads again. `getSession({ projectId, proxyPath })` makes a single read that resolves to `{ isAuthenticated, session }`.
+
 ## Widget props and events
 
 `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
@@ -118,3 +141,7 @@ CLI dev proxy covers local development.
 For local development you can also skip the proxy and point `proxyPath`
 straight at the backend (cross-origin), e.g. `proxyPath: "http://localhost:8080"`
 (the `zitadel start` local runtime default port).
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

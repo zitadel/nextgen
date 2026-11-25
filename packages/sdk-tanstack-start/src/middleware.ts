@@ -322,7 +322,7 @@ export interface RequestMiddlewareContext {
   readonly request: Request;
   readonly next: (opts?: {
     readonly context?: Record<string, unknown>;
-  }) => Promise<{ readonly response: Response }>;
+  }) => Promise<{ readonly response: Response }> | { readonly response: Response };
 }
 
 /** Key under which the auth result is placed on the router context. */

@@ -145,6 +145,22 @@ const PASSKEY_UPSELL_ERRORS: ReadonlyMap<string, string> = new Map([
 export class AuthnStore {
   readonly #byUser = new Map<string, StoredCredential[]>();
   readonly #byId = new Map<string, StoredCredential>();
+  readonly #seededAccounts: ReadonlySet<string>;
+  readonly #accounts: Set<string>;
+
+  /**
+   * @param accounts - Emails that already have an account, as
+   *   `setupMockHandlers({ accounts })` lists them. `clear()` restores this list.
+   */
+  constructor(accounts: readonly string[] = []) {
+    this.#seededAccounts = new Set(accounts.map((email) => email.toLowerCase()));
+    this.#accounts = new Set(this.#seededAccounts);
+  }
+
+  /** Record an account the mock just created, so a later flow finds it. */
+  addAccount(email: string): void {
+    this.#accounts.add(email.toLowerCase());
+  }
 
   /**
    * Return the i18n error key to surface on the **register** step for
@@ -160,15 +176,18 @@ export class AuthnStore {
   /**
    * Whether this email already has an account here.
    *
-   * Two signals, because the mock represents an account two ways: an enrolled
-   * WebAuthn credential, and the `email_exists` registration fixture that
-   * stands in for a password account. Reading only the credentials misses the
-   * password one, which is the fixture most callers reach for.
+   * Three signals, because the mock represents an account three ways: an
+   * enrolled WebAuthn credential, the `email_exists` registration fixture that
+   * stands in for a password account, and the accounts listed or created
+   * through {@link addAccount}. Reading only the credentials misses the
+   * password ones, which are the fixtures most callers reach for.
    */
   hasAccount(email: string): boolean {
+    const normalized = email.toLowerCase();
     return (
       this.getByUser(email).length > 0 ||
-      REGISTRATION_ERRORS.get(email.toLowerCase()) === "error.email_exists"
+      REGISTRATION_ERRORS.get(normalized) === "error.email_exists" ||
+      this.#accounts.has(normalized)
     );
   }
 
@@ -343,14 +362,16 @@ export class AuthnStore {
   }
 
   /**
-   * Wipe all stored credentials.
+   * Wipe all stored credentials and the accounts created since construction.
    *
    * Invoked by `MockHandle.reset()` so each test suite starts from a clean
-   * state. User-account fixture maps are module-level constants and are not
-   * affected by this call.
+   * state. User-account fixture maps are module-level constants, and the
+   * accounts passed to the constructor stay: they are the caller's setup.
    */
   clear(): void {
     this.#byUser.clear();
     this.#byId.clear();
+    this.#accounts.clear();
+    for (const email of this.#seededAccounts) this.#accounts.add(email);
   }
 }

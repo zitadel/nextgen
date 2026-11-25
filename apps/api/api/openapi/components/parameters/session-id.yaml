@@ -1,0 +1,9 @@
+name: session_id
+in: path
+required: true
+description: |
+  The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff` (`POST /sessions/exchange`) returns, or that
+  `querySessions` (`POST /sessions/query`) lists.
+schema:
+  $ref: '../schemas/session-id.yaml'
+example: sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C

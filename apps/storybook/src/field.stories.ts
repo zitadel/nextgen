@@ -64,7 +64,11 @@ const meta: Meta<TextFieldArgs> = {
     },
     value: { control: "text" },
     help: { control: "text", description: "Help text in the `help` slot." },
-    trailingIcon: { control: "boolean", description: "Show the default trailing icon." },
+    trailingIcon: {
+      control: "boolean",
+      description:
+        "Show the default trailing icon. In the default state it is the clear button, drawn once the field has a value.",
+    },
     previewState: {
       control: "inline-radio",
       options: ["", "hovered", "focused"],

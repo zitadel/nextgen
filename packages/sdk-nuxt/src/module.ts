@@ -5,6 +5,7 @@ import {
   addTypeTemplate,
   addImportsDir,
   createResolver,
+  extendViteConfig,
 } from "@nuxt/kit";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
@@ -82,8 +83,8 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       protectedRoutes: [],
       loginPath: "/login",
     },
-    setup(options, nuxt) {
-      const { resolve } = createResolver(import.meta.url);
+    async setup(options, nuxt) {
+      const { resolve, resolvePath: resolveFile } = createResolver(import.meta.url);
       const setting = settingsLookup(nuxt.options.rootDir);
       const proxyPath = options.proxyPath ?? DEFAULT_PROXY_PATH;
 
@@ -138,6 +139,21 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       // `@zitadel/components` itself. Client-only: registering custom elements
       // during SSR would break.
       addPlugin({ src: resolve("./runtime/components.client"), mode: "client" });
+      if (nuxt.options.dev) {
+        // `nuxt dev` pre-bundles the dependencies its startup scan finds from
+        // Nuxt's entry, but the scan stops at the virtual module that lists the
+        // plugins and never reaches the widgets' (lit, lucide and the rest).
+        // Vite then bundles those once a page asks for them, and never when
+        // this package is installed in node_modules: the browser fetches them
+        // file by file. Scanning the plugin too bundles them at startup. Vite
+        // drops an entry that names no file, so the path carries its extension.
+        const componentsPlugin = await resolveFile("./runtime/components.client");
+        extendViteConfig((config) => {
+          config.optimizeDeps ??= {};
+          const { entries = [] } = config.optimizeDeps;
+          config.optimizeDeps.entries = [entries, componentsPlugin].flat();
+        });
+      }
       // Types the value the plugin above provides. Written into the app's own
       // `.nuxt/types`, with the locale map spelled out, because the app does not
       // install `@zitadel/components`, so a type import from it would not resolve.

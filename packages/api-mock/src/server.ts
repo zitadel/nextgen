@@ -1,10 +1,15 @@
 /**
  * Standalone HTTP server for the api-mock.
  *
- * Flow routes (POST /flow, GET /flow/:id, POST /flow/:id/submit) and the
+ * Flow routes (POST /flows, GET /flows/:flow_id, POST /flows/:flow_id/submit) and the
  * platform CRUD routes (projects, schemas, flow_definitions) are served by
  * reusing the existing MSW handlers via @mswjs/http-middleware — zero
  * duplication of routing logic.
+ *
+ * Like the server until 1.0.0 (ADR 077), every API route answers at
+ * `/api/v1/<path>` and at its old root `<path>`; the paths below are the
+ * spec's. The JWKS, OIDC discovery, `/auth/*` and `/console/runtime.json`
+ * are not API operations and stay at the root.
  *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
@@ -24,20 +29,21 @@
  *   GET    /projects/:id/claim/status — poll a claim challenge
  *   POST   /schemas                   — create user schema
  *   GET    /schemas                   — list user schemas
- *   GET    /schemas/:id               — fetch user schema
- *   DELETE /schemas/:id               — delete user schema
+ *   GET    /schemas/:schema_id               — fetch user schema
  *   POST   /flow_definitions          — create flow definition
  *   GET    /flow_definitions          — list flow definitions
- *   GET    /flow_definitions/:id      — get flow definition
+ *   GET    /flow_definitions/:flow_definition_id      — get flow definition
  */
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 
 import { createMiddleware } from "@mswjs/http-middleware";
-import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { CompleteProjectClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import cookieParser from "cookie-parser";
 import express from "express";
+import type { RequestHandler } from "msw";
 
 import { applyBranding } from "./branding.js";
 import { JWK, verifyHandoffToken } from "./crypto.js";
@@ -47,6 +53,9 @@ import { buildOpenIdConfiguration } from "./openid-configuration.js";
 import { completeClaimChallenge, errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
+
+/** An API route's two spellings: under the API prefix and at the old root path. */
+const apiPaths = (path: string): string[] => [`${API_PREFIX}${path}`, path];
 
 // The claiming human's account lives in Zitadel's own platform project (ADR
 // 046 §2), so only a session belonging to it may complete a claim. Exported so
@@ -82,7 +91,22 @@ const DEMO_DISPLAY_NAMES = new Map<string, string>([
 ]);
 const sessionStore = new Map<string, StoredSession>();
 
-/** What the request's `__nextgen_session` cookie names, if anything. */
+/**
+ * The session cookie's names (ADR 083): the canonical one, which the SDK
+ * proxies send upstream and the server reads over any transport, and the one
+ * the server sets over plain http to a loopback host, where the mock runs. The
+ * names before ADR 083 are neither read nor written.
+ */
+const SESSION_COOKIE = "__Host-zitadel_session";
+const LOOPBACK_SESSION_COOKIE = "zitadel_session";
+
+/** The request's session token: the canonical cookie's first, as the server on loopback http reads them. */
+function sessionToken(req: express.Request): string | undefined {
+  const cookies = req.cookies as Record<string, string | undefined>;
+  return cookies[SESSION_COOKIE] || cookies[LOOPBACK_SESSION_COOKIE] || undefined;
+}
+
+/** What the request's session cookie names, if anything. */
 type SessionLookup =
   | { status: "missing" }
   | { status: "unknown"; token: string }
@@ -95,7 +119,7 @@ type SessionLookup =
  * the failures in its own words; this only says which one it was.
  */
 function lookupSession(req: express.Request): SessionLookup {
-  const token = (req.cookies as Record<string, string>).__nextgen_session;
+  const token = sessionToken(req);
   if (!token) return { status: "missing" };
   const session = sessionStore.get(token);
   if (!session) return { status: "unknown", token };
@@ -235,14 +259,14 @@ export function createMockApp(options: { issuer: string }): express.Express {
   const jsonBodyParser: express.RequestHandler = (req, res, next) => {
     express.json()(req, res, (err) => {
       if (err) {
-        res.status(400).json(errorBody("invalid_json", "request body must be valid JSON"));
+        res.status(400).json(errorBody("req.invalid", "request body must be valid JSON"));
         return;
       }
       next();
     });
   };
   app.post(
-    "/sessions/exchange",
+    apiPaths("/sessions/exchange"),
     jsonBodyParser,
     async (req: express.Request, res: express.Response) => {
       const projectId = req.query.project_id;
@@ -251,7 +275,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
           .status(400)
           .json(
             errorBody(
-              "sess.project_id_missing",
+              "req.invalid",
               "The session API currently requires the project_id query parameter to fulfill requests.",
             ),
           );
@@ -272,9 +296,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       if (!handoff_token || typeof handoff_token !== "string") {
         res
           .status(400)
-          .json(
-            errorBody("missing_handoff_token", "handoff_token is required and must be a string"),
-          );
+          .json(errorBody("req.invalid", "handoff_token is required and must be a string"));
         return;
       }
       // The server answers every token it will not exchange alike: it deletes
@@ -347,7 +369,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       sessionStore.set(opaqueToken, sessionData);
 
       const setCookie = [
-        `__nextgen_session=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
+        `${LOOPBACK_SESSION_COOKIE}=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
         `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       ];
       res.setHeader("Set-Cookie", setCookie);
@@ -388,17 +410,17 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // GET /sessions/me — validate opaque session cookie and return session data.
   // Mirrors the Go server's GetMySession handler.
-  app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+  app.get(apiPaths("/sessions/me"), (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
     switch (found.status) {
       case "missing":
-        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+        res.status(401).json(errorBody("auth.unauthorized", "no session cookie"));
         return;
       case "unknown":
-        res.status(401).json(errorBody("unauthenticated", "invalid or expired session"));
+        res.status(401).json(errorBody("auth.unauthorized", "invalid or expired session"));
         return;
       case "expired":
-        res.status(401).json(errorBody("unauthenticated", "session expired"));
+        res.status(401).json(errorBody("auth.unauthorized", "session expired"));
         return;
       case "active": {
         if (refuseForProject(req, res, found.session)) return;
@@ -409,7 +431,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
   // the Go server's GetMySessionCsrfToken handler.
-  app.get("/sessions/me/csrf", (req: express.Request, res: express.Response) => {
+  app.get(apiPaths("/sessions/me/csrf"), (req: express.Request, res: express.Response) => {
     // Both the token and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
     const found = lookupSession(req);
@@ -426,7 +448,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
   // Go server's revokeMySession handler and the SDK proxy's logout call.
-  app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
+  app.delete(apiPaths("/sessions/me"), (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
     // As on GET /sessions/me/csrf: the server's token gate answers these 401
     // before the handler, whatever project the request names.
@@ -451,7 +473,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     if (refuseForProject(req, res, found.session)) return;
     sessionStore.delete(found.token);
     res.setHeader("Set-Cookie", [
-      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `${LOOPBACK_SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
@@ -460,10 +482,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // POST /projects/:project_id/claim/complete — the browser leg of the claim
   // dance. A custom Express route (not an MSW handler) because it authenticates
-  // with the module-scoped __nextgen_session cookie, exactly like GET
+  // with the module-scoped session cookie, exactly like GET
   // /sessions/me. The challenge_id from the body is its browser-safe authorization.
   app.post(
-    "/projects/:project_id/claim/complete",
+    apiPaths("/projects/:project_id/claim/complete"),
     jsonBodyParser,
     (req: express.Request, res: express.Response) => {
       const found = lookupSession(req);
@@ -499,10 +521,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
           .json(errorBody("auth.unauthorized", "session is not eligible to claim a project"));
         return;
       }
-      const parsed = CompleteClaimBody.safeParse(req.body);
+      const parsed = CompleteProjectClaimBody.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json(
-          errorBody("invalid_request", "request does not conform to spec", {
+          errorBody("req.invalid", "request does not conform to spec", {
             issues: parsed.error.issues,
           }),
         );
@@ -515,21 +537,30 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   app.get("/auth/end-session", (req: express.Request, res: express.Response) => {
     // Clean up session from store when logging out
-    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    const token = sessionToken(req);
     if (token) {
       sessionStore.delete(token);
     }
     res.setHeader("Set-Cookie", [
-      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `${LOOPBACK_SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
     res.status(204).end();
   });
 
-  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
+  app.use(createMiddleware(...mountedHandlers({ iss })));
 
   return app;
+}
+
+/**
+ * The MSW handlers the app mounts behind its own routes: the flow and session
+ * handlers, then the platform handlers. The conformance spec reads its routes
+ * from this list, so a handler set mounted anywhere else goes unchecked.
+ */
+export function mountedHandlers(options: { iss: string }): RequestHandler[] {
+  return [...setupMockHandlers({ iss: options.iss }).handlers, ...setupPlatformHandlers()];
 }
 
 /**
@@ -541,6 +572,6 @@ export function startMockServer(port: number): Server {
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);
     console.log(`  JWKS: http://localhost:${port}/.well-known/jwks.json`);
-    console.log(`  Sessions exchange: http://localhost:${port}/sessions/exchange\n`);
+    console.log(`  Sessions exchange: http://localhost:${port}${API_PREFIX}/sessions/exchange\n`);
   });
 }

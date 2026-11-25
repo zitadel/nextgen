@@ -1,22 +1,13 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Box, MoreVertical, Plus, User } from "lucide-react";
-import {
-  Fragment,
-  type MouseEvent,
-  type PointerEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
-import { AddUserSheet } from "@/components/add-user-sheet";
-import { DeleteUserDialog } from "@/components/delete-user-dialog";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { Plus, User } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormError } from "@/components/form-error";
+import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_MENU_CELL_NARROW,
   RESOURCE_STICKY_BODY,
   RESOURCE_STICKY_END,
   RESOURCE_STICKY_START,
@@ -29,7 +20,6 @@ import {
   ResourceMenuHead,
   ResourceRow,
   ResourceTitle,
-  RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -37,58 +27,81 @@ import {
   UserAttributesCell,
   UserIdCell,
   UserIdentityCell,
-} from "@/components/user-cells";
-import { Badge } from "@/components/ui/badge";
+} from "@/features/users/components/user-cells";
+import { IdText } from "@/components/id-text";
+import { SearchField } from "@/components/search-field";
+import { ResourceFilter } from "@/components/resource-filter";
+import { usersFilters } from "@/features/users/filters";
+import { clearedFilters, isFiltered, parseDateFilter } from "@/lib/resource-filter";
 import { Button } from "@/components/ui/button";
-import {
-  ContextMenu,
-  ContextMenuCheckboxItem,
-  ContextMenuContent,
-  ContextMenuLabel,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
-import {
-  projectScopeDeps,
-  requireProjectScope,
-  useRequiredProjectScope,
-} from "@/lib/project-scope";
-import type { UserTeam } from "@/lib/user";
+import { useRequiredProjectScope } from "@/features/projects/project-scope";
+import { columnsForUsers, fetchUsers } from "@/features/users/api";
 import {
   type ColumnGroup,
-  type ColumnPins,
+  type UsersSearch,
   attributeSummary,
   columnsBeyondIdentity,
-  columnsForUsers,
-  fetchUsers,
+  parseUserStatus,
   pinnedColumns,
-  readColumnPins,
   toUserRow,
-  writeColumnPins,
-} from "@/lib/user-list";
+} from "@/features/users/list";
 import { Page } from "@/components/layout";
+import { searchTerm } from "@/lib/search-params";
 import { cn } from "@/lib/utils";
+import { useColumnPins } from "@/features/users/column-pins";
+import { latestDocuments, loadUsers, useUserSearch } from "@/features/users/load";
+import {
+  ColumnsContextMenu,
+  keepLinkMenu,
+  keepLinkPress,
+} from "@/features/users/components/columns-context-menu";
+import { TeamCell } from "@/features/users/components/team-cell";
+import { UserRowActions } from "@/features/users/components/user-row-actions";
+
+/** The filter's earlier `Latest only` choice; the newest revision is picked by its id now. */
+const LEGACY_LATEST = "latest";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
   // reads as a group.
   // Order 3: Teams sits at 2.
   staticData: { scope: "project", nav: { label: "Users", order: 3, icon: User } },
-  loaderDeps: projectScopeDeps,
-  loader: async ({ deps }) => {
-    const projectId = requireProjectScope(deps.project);
-    const page = await fetchUsers(projectId);
+  // The filter lives in the URL, as the Teams tabs do: it is a server-side
+  // filter, so it belongs to the request the loader makes, is linkable and
+  // survives a reload. Only what the filter can send is kept: a revision
+  // belongs to a schema, so it goes without one, and `latest`, which earlier
+  // links carry, names no revision.
+  validateSearch: (search: Record<string, unknown>): UsersSearch => {
+    const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
+    const revision =
+      schema &&
+      typeof search.revision === "string" &&
+      search.revision &&
+      search.revision !== LEGACY_LATEST
+        ? search.revision
+        : undefined;
+    // Every key, even unset: the router lays this over the raw search, so a
+    // key left out would keep the URL's value.
     return {
-      users: page.users,
-      teamsExpanded: page.teamsExpanded,
-      nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(projectId, page.users),
+      q: searchTerm(search.q),
+      schema,
+      revision,
+      status: parseUserStatus(search.status),
+      created: parseDateFilter(search.created),
     };
   },
+  // The search term is left out of the deps, so a new term is not a new match:
+  // past the router's pending delay a new match swaps the screen for the pending
+  // state, and the field being typed in goes with it. Staying on a match does not
+  // reload it, so the screen reads a term that comes after the load itself, once.
+  // A first load keeps the delay.
+  loaderDeps: ({ search: { q: _q, ...deps } }) => deps,
+  // `location.search` is the URL's, which `validateSearch` has not been over.
+  loader: ({ deps, location }) =>
+    loadUsers({ ...deps, q: searchTerm((location.search as { q?: unknown }).q) }),
   component: UsersScreen,
 });
 
@@ -102,8 +115,22 @@ interface UsersPage {
 
 function UsersScreen() {
   const projectId = useRequiredProjectScope();
-  const loaded = Route.useLoaderData();
+  const fromRoute = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const router = useRouter();
+
+  const { loaded, searching, searchError } = useUserSearch(search, fromRoute);
+  const searchField = useRef<HTMLInputElement>(null);
+  const onSearch = useCallback(
+    (q: string) =>
+      void navigate({
+        search: (prev) => ({ ...prev, q: q || undefined }),
+        // Each pause in typing is not a place to come back to.
+        replace: true,
+      }),
+    [navigate],
+  );
 
   const [columns, setColumns] = useState(loaded.columns);
   const [teamsExpanded, setTeamsExpanded] = useState(loaded.teamsExpanded);
@@ -115,13 +142,17 @@ function UsersScreen() {
   const paging = useLoadMore(
     loaded,
     async (pageToken): Promise<UsersPage> => {
-      const page = await fetchUsers(projectId, pageToken, teamsExpanded);
+      const page = await fetchUsers(projectId, pageToken, teamsExpanded, loaded.filter);
       return {
         items: page.users,
         nextPageToken: page.next_page_token ?? undefined,
         // A later page can carry a schema the first page never referenced, whose
         // properties the Columns menu would otherwise not offer.
-        columns: await columnsForUsers(projectId, [...users, ...page.users]),
+        columns: await columnsForUsers(
+          projectId,
+          [...users, ...page.users],
+          latestDocuments(loaded.options),
+        ),
         teamsExpanded: page.teamsExpanded,
       };
     },
@@ -168,6 +199,16 @@ function UsersScreen() {
   const showAttributes = summaries.some(
     ({ summary }) => summary.entries.length > 0 || summary.more > 0,
   );
+  const filters = useMemo(
+    () => usersFilters({ options: loaded.options, revisions: loaded.revisions, search }),
+    [loaded.options, loaded.revisions, search],
+  );
+  // Latched for the screen's lifetime, as on Projects: a cleared search drops
+  // `?q=` before the full list is back, and the field must not unmount in
+  // between. A project with no users has nothing to search.
+  const [searchable, setSearchable] = useState(false);
+  const filtered = isFiltered(filters, search);
+  if (!searchable && (rows.length > 0 || search.q || filtered)) setSearchable(true);
   const scroll = useScrollEdges();
   // Each row's schema, for the identity card's title and the attributes
   // popover's field labels.
@@ -178,16 +219,33 @@ function UsersScreen() {
 
   return (
     <Page>
-      {/* No search beside the title: it is out of the page headers until there
-          is a console-wide solution (D19). */}
       <ResourceTitle
+        filter={
+          searchable && (
+            <SearchField
+              inputRef={searchField}
+              query={search.q ?? ""}
+              onSearch={onSearch}
+              label="Search by identifier"
+              className="grow basis-48 @3xl/title-row:max-w-48"
+            />
+          )
+        }
+        below={
+          <ResourceFilter
+            filters={filters}
+            values={search}
+            onChange={(patch) => void navigate({ search: (prev) => ({ ...prev, ...patch }) })}
+          />
+        }
         action={
           <AddUserSheet onCreated={() => router.invalidate()}>
-            {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                `px-2.5`, which renders the 68px control at 72px. */}
+            {/* Named for what it adds, as its sheet is titled and as Projects'
+                and Deployments' buttons are. `px-2.5!` — `Button`'s
+                `has-[>svg]:px-3` out-specifies a plain `px-2.5`. */}
             <Button className="shrink-0 gap-1.5 px-2.5!">
               <Plus aria-hidden />
-              Add
+              Add user
             </Button>
           </AddUserSheet>
         }
@@ -201,17 +259,25 @@ function UsersScreen() {
           column) stays pinned to the card's edge while the rest scrolls under
           it, so the menu is reachable at any width. Right-clicking the table
           opens the Columns menu. */}
+      <FormError message={searchError} className="mb-3" />
       <ColumnsContextMenu groups={pickable} pins={pins} onToggle={togglePin}>
         <div
           ref={scroll.ref}
           data-scroll-start={scroll.edges.start || undefined}
           data-scroll-end={scroll.edges.end || undefined}
-          className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
+          aria-busy={searching || undefined}
+          className={cn(
+            `${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`,
+            searching && "opacity-60",
+          )}
         >
           <Table className="text-xs" onContextMenu={keepLinkMenu} onPointerDown={keepLinkPress}>
             <TableHeader>
               <ResourceHeaderRow>
                 <ResourceHeadCell className={RESOURCE_STICKY_START}>User</ResourceHeadCell>
+                {/* The revision the user is on (#1669): the schema id, since a
+                    revision is a schema of its own. It opens that schema. */}
+                <ResourceHeadCell>Revision</ResourceHeadCell>
                 {pinned.map((column) => (
                   <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
                 ))}
@@ -223,18 +289,41 @@ function UsersScreen() {
                     cell's hover card (D23). */}
                 {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
                 <ResourceHeadCell>ID</ResourceHeadCell>
-                {/* 52px: the 36px menu button and 8px either side. The cell
-                  inset the other columns take would make this pinned column
-                  84px wide for one icon. */}
-                <ResourceMenuHead className={`w-13 px-2 ${RESOURCE_STICKY_END}`} />
+                <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
               </ResourceHeaderRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <ResourceEmptyRow
-                  colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 5 : 4)}
+                  colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 6 : 5)}
                 >
-                  No users yet.
+                  {loaded.q || filtered ? (
+                    // On a phone the empty table still scrolls sideways, so the
+                    // message and its control hold to the visible edge rather
+                    // than center on a width that is partly out of view.
+                    <span className="sticky left-0 flex w-fit flex-wrap items-center gap-x-3 gap-y-2 sm:static sm:mx-auto">
+                      {loaded.q ? "No users match this search." : "No users match this filter."}
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => {
+                          // This button goes with the row, so focus goes first.
+                          searchField.current?.focus();
+                          void navigate({
+                            search: (prev) => ({
+                              ...prev,
+                              q: undefined,
+                              ...clearedFilters(filters),
+                            }),
+                          });
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    </span>
+                  ) : (
+                    "No users yet."
+                  )}
                 </ResourceEmptyRow>
               ) : (
                 summaries.map(({ row: user, summary }) => (
@@ -247,6 +336,20 @@ function UsersScreen() {
                         teamsKnown: teamsExpanded,
                       }}
                     />
+                    <TableCell className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
+                      {user.schemaId ? (
+                        <Link
+                          to="/schemas/$schemaId"
+                          params={{ schemaId: user.schemaId }}
+                          title={user.schemaId}
+                          className="hover:text-foreground flex min-w-0 underline-offset-2 hover:underline"
+                        >
+                          <IdText id={user.schemaId} />
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
                     {pinned.map((column) => (
                       <TableCell
                         key={column.key}
@@ -273,13 +376,12 @@ function UsersScreen() {
                     <UserIdCell user={user} />
                     <TableCell
                       className={cn(
-                        RESOURCE_CELL,
-                        "px-2",
+                        RESOURCE_MENU_CELL_NARROW,
                         RESOURCE_STICKY_END,
                         RESOURCE_STICKY_BODY,
                       )}
                     >
-                      <RowActions
+                      <UserRowActions
                         userId={user.id}
                         name={user.name}
                         onDeleted={() => router.invalidate()}
@@ -295,212 +397,5 @@ function UsersScreen() {
       {/* Full width and `secondary`, 24px under the table, not a centred pill. */}
       <LoadMore paging={paging} />
     </Page>
-  );
-}
-
-/**
- * The viewer's pinned columns for the selected project, kept in their browser
- * (`readColumnPins`). A toggle takes effect at once and is persisted when it
- * can be; without storage it lasts until the page is left.
- */
-function useColumnPins(projectId: string): [ColumnPins, (schemaId: string, key: string) => void] {
-  const [state, setState] = useState(() => ({ projectId, pins: readColumnPins(projectId) }));
-  // Switching project swaps in that project's pins rather than carrying over
-  // another project's: schema ids are unique per project only. Read once, as
-  // the render that sees the new project adjusts the state.
-  if (state.projectId !== projectId) {
-    setState({ projectId, pins: readColumnPins(projectId) });
-  }
-
-  const toggle = useCallback(
-    (schemaId: string, key: string) => {
-      const current = state.pins[schemaId] ?? [];
-      const pins = {
-        ...state.pins,
-        [schemaId]: current.includes(key)
-          ? current.filter((pinned) => pinned !== key)
-          : [...current, key],
-      };
-      writeColumnPins(state.projectId, pins);
-      setState({ projectId: state.projectId, pins });
-    },
-    [state],
-  );
-
-  return [state.pins, toggle];
-}
-
-/**
- * The Columns menu, opened by right-clicking the table (a long press on touch,
- * the context-menu key or Shift+F10 on a focused control in it): a checkbox
- * per schema property, pinning it as its own column. Grouped under each
- * schema's title when the loaded users mix schemas, since a pin belongs to one
- * schema's property.
- *
- * Selecting an item keeps the menu open, so several can be pinned in one go.
- * With nothing to offer, the table keeps the browser's own menu.
- */
-function ColumnsContextMenu({
-  groups,
-  pins,
-  onToggle,
-  children,
-}: {
-  groups: ColumnGroup[];
-  pins: ColumnPins;
-  onToggle: (schemaId: string, key: string) => void;
-  children: ReactNode;
-}) {
-  if (groups.length === 0) return children;
-  const grouped = groups.length > 1;
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className="max-h-[min(24rem,var(--radix-context-menu-content-available-height))] w-56">
-        <ContextMenuLabel>Columns</ContextMenuLabel>
-        {groups.map((group) => (
-          <Fragment key={group.schemaId}>
-            <ContextMenuSeparator />
-            {grouped && (
-              <ContextMenuLabel className="text-muted-foreground truncate text-xs font-normal">
-                {group.title}
-              </ContextMenuLabel>
-            )}
-            {group.fields.map((entry) => (
-              <ContextMenuCheckboxItem
-                key={entry.key}
-                checked={pins[group.schemaId]?.includes(entry.key) ?? false}
-                onCheckedChange={() => onToggle(group.schemaId, entry.key)}
-                onSelect={(event) => event.preventDefault()}
-              >
-                <span className="truncate">{entry.label}</span>
-              </ContextMenuCheckboxItem>
-            ))}
-          </Fragment>
-        ))}
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
-/**
- * A right-click on a link keeps the browser's own menu (open in a new tab,
- * copy the link) rather than the Columns menu: stopping the event here, under
- * the trigger, never prevents its default.
- */
-function keepLinkMenu(event: MouseEvent) {
-  if (event.target instanceof Element && event.target.closest("a")) event.stopPropagation();
-}
-
-/**
- * The same for a long press on touch or pen, which the trigger opens from its
- * own timer on `pointerdown` rather than from `contextmenu`: a press on a
- * link never starts it, so only the browser's link menu opens.
- */
-function keepLinkPress(event: PointerEvent) {
-  if (event.pointerType !== "mouse") keepLinkMenu(event);
-}
-
-/**
- * The teams a user belongs to, glyphed the way the design draws the cell and the
- * way the Teams directory draws a team row. A membership that is not active yet
- * (`pending`) or any more (`inactive`) says so: the roster returns them beside
- * the active ones, and an unmarked name would read as a full member.
- *
- * Each name opens its team, as the Teams directory's own rows do — the embedded
- * entry carries the id, so the link costs no extra read.
- *
- * `+more` is deliberately not a link. The response carries the capped list and a
- * boolean, not the names past the cap, so there is nothing to expand inline
- * without the per-row roster read that `expand` exists to avoid; and the user
- * detail screen does not render teams yet (decisions log D3), so there is no
- * screen to send the operator to. It becomes a link to that screen when the
- * screen lists them.
- */
-function TeamCell({ teams, truncated }: { teams: UserTeam[]; truncated: boolean }) {
-  if (teams.length === 0) return <>—</>;
-  return (
-    <span className="flex items-center gap-1.5">
-      <Box aria-hidden strokeWidth={1.5} className="size-3.5 shrink-0" />
-      {/* The names truncate; the marker does not. Inside the truncating span it
-          is the first thing CSS clips — and a roster long enough to overflow is
-          exactly the one that has more teams to report. */}
-      <span className="truncate">
-        {teams.map((team, index) => (
-          <span key={team.id}>
-            {/* The separator sits outside the anchor: it belongs to the list,
-                not to either team it divides. */}
-            {index > 0 && ", "}
-            <Link
-              to="/teams/$teamId"
-              params={{ teamId: team.id }}
-              className="hover:text-foreground underline-offset-2 hover:underline"
-            >
-              {team.name}
-            </Link>
-            {team.status && team.status !== "active" && (
-              <Badge
-                variant="outline"
-                className="text-muted-foreground ml-1 h-4 rounded-sm border-dashed px-1 align-middle text-[11px] font-normal"
-              >
-                {team.status}
-              </Badge>
-            )}
-          </span>
-        ))}
-      </span>
-      {truncated && <span className="shrink-0">+more</span>}
-    </span>
-  );
-}
-
-/**
- * The row menu carries only actions that reach the API.
- *
- * The design's fuller menu is not buildable yet:
- *
- *   - `Edit user` — no `PATCH`/`PUT /users/{user_id}` endpoint (#693)
- *   - `Deactivate` — no `status` field and no lifecycle endpoint (#553)
- *   - `Reset password` — `PUT /users/{user_id}/password` exists, but the screen
- *     that would collect the new password does not
- *
- * They are left out rather than disabled so the menu is a list of things that
- * work. Add each one back with the change that makes it real.
- */
-function RowActions({
-  userId,
-  name,
-  onDeleted,
-}: {
-  userId: string;
-  name: string;
-  onDeleted: () => void | Promise<void>;
-}) {
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
-  return (
-    <>
-      <RowMenu name={name} icon={MoreVertical}>
-        <DropdownMenuItem asChild>
-          <Link to="/users/$userId" params={{ userId }}>
-            View details
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
-          Delete
-        </DropdownMenuItem>
-      </RowMenu>
-      {/* Outside the menu, and opened by state rather than a trigger, so the
-          menu closes on select. Nested inside, the still-open menu keeps the
-          rest of the page `aria-hidden` after the dialog is dismissed. */}
-      <DeleteUserDialog
-        userId={userId}
-        name={name}
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        onDeleted={onDeleted}
-      />
-    </>
   );
 }

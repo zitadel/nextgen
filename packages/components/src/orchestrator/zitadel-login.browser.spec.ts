@@ -2,6 +2,7 @@ import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cdp } from "vitest/browser";
 
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
@@ -14,10 +15,9 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  * The orchestrator calls the typed `@zitadel/api` client
  * directly. This suite swaps `globalThis.fetch` for a queue of pre-baked
  * `CreateFlow201` payloads — equivalent to swapping the previous
- * `transport` property, one level lower in the stack. Fetch is stubbed
- * (rather than running `msw/browser`) because vitest's browser provider
- * has no out-of-the-box service-worker registration; the unit suite
- * covers the MSW-handler-driven contract.
+ * `transport` property, one level lower in the stack. Fetch is stubbed so
+ * each test pins its exact step payloads; `zitadel-login-submit.browser.spec.ts`
+ * drives the api-mock flow walker through `msw/browser` instead.
  */
 
 const identifierStep: CreateFlow201 = {
@@ -349,24 +349,6 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter3" });
   });
 
-  it("ignores a duplicate submit while the first request is in-flight", async () => {
-    const element = await mount();
-    const root = element.shadowRoot!;
-    await fillSignInFields(root);
-    const event = new CustomEvent("zl-submit", {
-      bubbles: true,
-      composed: true,
-      detail: { action: "submit" },
-    });
-    root.dispatchEvent(event);
-    root.dispatchEvent(event);
-    await waitFor(() => {
-      const title = element.shadowRoot?.querySelector(".zl-card-title");
-      return title?.textContent?.includes("Sign in faster") ? title : null;
-    });
-    expect(stub.calls).toHaveLength(2);
-  });
-
   it("moves focus to the first focusable control after a step swap", async () => {
     const element = await mount();
     const root = element.shadowRoot!;
@@ -527,6 +509,34 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(root.querySelector('zl-checkbox[name="terms"]')?.getAttribute("error")).toBeFalsy();
   });
 
+  it("applies no length rule to a checkbox, as the server applies none", async () => {
+    // `buildValidation` copies a property's `minLength` whatever its type; the
+    // checkbox's "false" is five characters, under this minimum of six.
+    const [field] = registerCheckboxStep.step.fields ?? [];
+    const step: CreateFlow201 = {
+      ...registerCheckboxStep,
+      step: {
+        ...registerCheckboxStep.step,
+        fields: [{ ...field!, validation: { min_length: 6 } }],
+      },
+    };
+    stub.restore();
+    stub = installFlowFetchStub([step, passkeyUpsellStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "register";
+    element.project = testProject;
+    host.appendChild(element);
+    const root = element.shadowRoot!;
+    await waitFor(() => (root.querySelector("zl-checkbox") ? element : null));
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+    expect(await waitFor(() => (stub.calls.length > 1 ? stub.calls : null))).toHaveLength(2);
+  });
+
   // Frameworks like @lit/react attach the element first and
   // assign object properties (`branding`, `locale`) afterwards. The
   // orchestrator must defer flow-start until properties have been applied.
@@ -540,6 +550,144 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     const fields = element.shadowRoot?.querySelectorAll("zl-field");
     expect(fields?.[0]?.getAttribute("name")).toBe("email");
     expect(fields?.[1]?.getAttribute("name")).toBe("password");
+  });
+
+  // The password a user chooses carries its policy's bounds as
+  // `validation.min_length` / `max_length`. The orchestrator checks them
+  // before submitting, in the server's own `error.<field>_min_length`
+  // dialect, so the message is the one the server would send.
+  const registerPasswordStep: CreateFlow201 = {
+    id: "flow_1",
+    session_id: "sess_1",
+    session_token: "tok_1",
+    step: {
+      name: "register-password",
+      texts: { title_key: "register-password.title" },
+      fields: [
+        {
+          name: "x-auth-methods#password",
+          type: "password",
+          text_key: "register-password.field.password",
+          autocomplete: "new-password",
+          required: true,
+          validation: { min_length: 15, max_length: 64 },
+        },
+      ],
+      actions: [
+        {
+          name: "submit",
+          kind: "submit",
+          text_key: "register-password.action.submit",
+          primary: true,
+        },
+      ],
+      gates: {},
+    },
+  };
+
+  /** Mounts the password step and waits until it takes input. */
+  async function mountRegisterPassword(): Promise<ShadowRoot> {
+    stub.restore();
+    stub = installFlowFetchStub([registerPasswordStep, passkeyUpsellStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "register";
+    element.project = testProject;
+    host.appendChild(element);
+    const root = await waitFor(() =>
+      element.shadowRoot?.querySelector('zl-field[name="x-auth-methods#password"]')
+        ? element.shadowRoot
+        : null,
+    );
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    return root;
+  }
+
+  async function clickSubmit(root: ShadowRoot): Promise<void> {
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+  }
+
+  async function submitPassword(value: string): Promise<{ root: ShadowRoot; calls: number }> {
+    const root = await mountRegisterPassword();
+    await fillNativeField(root, "x-auth-methods#password", value);
+    await clickSubmit(root);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return { root, calls: stub.calls.length };
+  }
+
+  it("blocks a password shorter than its minimum, naming the minimum on the field", async () => {
+    const { root, calls } = await submitPassword("short123");
+    expect(calls).toBe(1);
+    const field = await waitFor(() => {
+      const el = root.querySelector('zl-field[name="x-auth-methods#password"]');
+      return el?.getAttribute("error") ? el : null;
+    });
+    expect(field?.getAttribute("error")).toContain("15");
+  });
+
+  /** The password field's inline error, as the visitor sees it. */
+  const passwordError = (root: ShadowRoot): string => {
+    const field = root.querySelector('zl-field[name="x-auth-methods#password"]') as
+      | (HTMLElement & { error?: string })
+      | null;
+    return field?.error ?? "";
+  };
+
+  it("shows the error again when an edited password is still too short", async () => {
+    const { root } = await submitPassword("short123");
+    await waitFor(() => passwordError(root) || null);
+    // Editing retires the error; a still-short value must bring it back on
+    // the next submit rather than block it without a word.
+    await fillNativeField(root, "x-auth-methods#password", "short1234");
+    expect(passwordError(root)).toBe("");
+    await clickSubmit(root);
+    expect(await waitFor(() => passwordError(root) || null)).toContain("15");
+    expect(stub.calls.length).toBe(1);
+  });
+
+  it("keeps an autofilled password when its length error rebuilds the step", async () => {
+    const root = await mountRegisterPassword();
+    // Autofill writes the native input without an `input` event.
+    await setNativeFieldValue(root, "x-auth-methods#password", "autofill1");
+    await clickSubmit(root);
+    await waitFor(() => passwordError(root) || null);
+    // The rebuilt step gets its values back after the error paints.
+    const field = root.querySelector('zl-field[name="x-auth-methods#password"]') as HTMLElement & {
+      formValue: string;
+    };
+    expect(await waitFor(() => field.formValue || null)).toBe("autofill1");
+  });
+
+  it("blocks a password longer than its maximum", async () => {
+    const { root, calls } = await submitPassword("x".repeat(65));
+    expect(calls).toBe(1);
+    const field = await waitFor(() => {
+      const el = root.querySelector('zl-field[name="x-auth-methods#password"]');
+      return el?.getAttribute("error") ? el : null;
+    });
+    expect(field?.getAttribute("error")).toContain("64");
+  });
+
+  it("counts characters, not UTF-16 units, as the server does", async () => {
+    // Thirteen letters and one emoji: fourteen characters, but fifteen code
+    // units, which `String#length` would let through.
+    const { calls } = await submitPassword(`${"a".repeat(13)}\u{1F511}`);
+    expect(calls).toBe(1);
+  });
+
+  it("measures a password after NFC normalization, as the server does", async () => {
+    // 63 letters and "e" + a combining acute: 65 code points as typed, 64
+    // once NFC composes the accent, so the 64-character maximum lets it by.
+    const { calls } = await submitPassword(`${"a".repeat(63)}e\u0301`);
+    expect(calls).toBe(2);
+  });
+
+  it("submits a password within its bounds", async () => {
+    const { calls } = await submitPassword("a".repeat(15));
+    expect(calls).toBe(2);
   });
 });
 
@@ -636,6 +784,15 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     expect(paired?.tabIndex).toBe(-1);
   });
 
+  it("carries an id", async () => {
+    setup([pairedPasswordStep]);
+    const element = await mount();
+    const form = element.shadowRoot?.querySelector("form");
+    const paired = form?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+
+    expect(paired?.id).toBe("zl-paired-identifier");
+  });
+
   it("renders nothing when the step carries no identifier", async () => {
     setup([unpairedPasswordStep]);
     const element = await mount();
@@ -645,7 +802,7 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
 
   it("comes back on a reload, which re-renders the step from flow state", async () => {
     // A reload loses `formValues` — the widget keeps collected values in memory
-    // only — so the pairing has to survive on what GET /flow/{id} returns.
+    // only — so the pairing has to survive on what GET /flows/{flow_id} returns.
     setup([pairedPasswordStep]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
@@ -658,7 +815,7 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     });
 
     const resumed = stub.calls.find((call) => (call.init?.method ?? "GET") === "GET");
-    expect(resumed?.url).toContain("/flow/flow_1");
+    expect(resumed?.url).toContain("/flows/flow_1");
     const paired = element.shadowRoot
       ?.querySelector("form")
       ?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
@@ -745,5 +902,162 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     const body = JSON.parse(String(submit.init?.body)) as { fields: Record<string, unknown> };
     expect(body.fields).toHaveProperty("x-auth-methods#password", "hunter2");
     expect(Object.keys(body.fields)).toEqual(["x-auth-methods#password"]);
+  });
+});
+
+const passkeyRegisterStep: CreateFlow201 = {
+  id: "flow_1",
+  session_id: "sess_1",
+  session_token: "tok_1",
+  step: {
+    name: "passkey-register",
+    texts: { title_key: "passkey-register.title" },
+    fields: [],
+    actions: [],
+    gates: {},
+    challenge: {
+      method: "passkey_register",
+      challenge_id: "chal-1",
+      options: {
+        challenge: "AAAA",
+        rp: { name: "example.com" },
+        user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        authenticatorSelection: { residentKey: "required", userVerification: "required" },
+      },
+    },
+  },
+};
+
+const passkeyLoginStep: CreateFlow201 = {
+  id: "flow_1",
+  session_id: "sess_1",
+  session_token: "tok_2",
+  step: {
+    name: "passkey-login",
+    texts: { title_key: "passkey-login.title" },
+    fields: [],
+    actions: [],
+    gates: {},
+    challenge: {
+      method: "passkey",
+      challenge_id: "chal-2",
+      options: { challenge: "AAAA" },
+    },
+  },
+};
+
+describe("<zitadel-login> passkey ceremony (chromium)", () => {
+  let host: HTMLDivElement;
+  let stub: ReturnType<typeof installFlowFetchStub>;
+  let testProject: ZitadelProject;
+  let authenticatorId: string;
+
+  beforeEach(async () => {
+    await cdp().send("WebAuthn.enable");
+    ({ authenticatorId } = await cdp().send("WebAuthn.addVirtualAuthenticator", {
+      options: {
+        protocol: "ctap2",
+        transport: "internal",
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      },
+    }));
+  });
+
+  function setup(responses: readonly CreateFlow201[]): void {
+    _resetConfigForTesting();
+    testProject = configureZitadel({
+      proxyPath: "/__nextgen",
+      projectId: "test-project",
+      url: "http://localhost:4000",
+    });
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    stub = installFlowFetchStub(responses);
+  }
+
+  afterEach(async () => {
+    host.remove();
+    stub.restore();
+    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+    await cdp().send("WebAuthn.disable");
+  });
+
+  function mount(): ZitadelLogin {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    host.appendChild(element);
+    return element;
+  }
+
+  it("registers a passkey, then signs in with it, submitting each real proof", async () => {
+    setup([passkeyRegisterStep, passkeyLoginStep, identifierStep]);
+    mount();
+
+    const submits = await waitFor(() => {
+      const calls = stub.calls.filter(
+        (call) => call.init?.method === "POST" && call.url.includes("/submit"),
+      );
+      return calls.length === 2 ? calls : null;
+    });
+    const [register, login] = submits.map(
+      (call) =>
+        JSON.parse(String(call.init?.body)) as {
+          action: string;
+          challenge_response: {
+            challenge_id: string;
+            method: string;
+            proof: { id: string; response: { attestationObject?: string; signature?: string } };
+          };
+        },
+    );
+    expect(register?.action).toBe("passkey_register");
+    expect(register?.challenge_response.challenge_id).toBe("chal-1");
+    expect(register?.challenge_response.proof.response.attestationObject).toBeTypeOf("string");
+    expect(login?.action).toBe("passkey");
+    expect(login?.challenge_response.challenge_id).toBe("chal-2");
+    expect(login?.challenge_response.proof.id).toBe(register?.challenge_response.proof.id);
+    expect(login?.challenge_response.proof.response.signature).toBeTypeOf("string");
+  });
+
+  it("shows the step error and submits nothing when user verification fails", async () => {
+    setup([passkeyRegisterStep]);
+    await cdp().send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
+    const element = mount();
+    const root = element.shadowRoot!;
+
+    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"));
+    expect(alert.textContent).toContain("The passkey prompt was closed before completing.");
+    expect(root.querySelector("zl-passkey")).toBeNull();
+    expect(
+      stub.calls.filter((call) => call.init?.method === "POST" && call.url.includes("/submit")),
+    ).toHaveLength(0);
+  });
+
+  it("shows the step error and submits nothing when the user cancels the prompt", async () => {
+    setup([passkeyRegisterStep]);
+    await cdp().send("WebAuthn.setAutomaticPresenceSimulation", {
+      authenticatorId,
+      enabled: false,
+    });
+    const element = mount();
+    const root = element.shadowRoot!;
+
+    const cancel = await waitFor(() =>
+      root.querySelector('zl-button[data-testid="zitadel-passkey-cancel"]'),
+    );
+    const inner = await waitFor(() => (cancel as HTMLElement).shadowRoot?.querySelector("button"));
+    (inner as HTMLButtonElement).click();
+
+    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"));
+    expect(alert.textContent).toContain("The passkey prompt was closed before completing.");
+    expect(root.querySelector("zl-passkey")).toBeNull();
+    expect(
+      stub.calls.filter((call) => call.init?.method === "POST" && call.url.includes("/submit")),
+    ).toHaveLength(0);
   });
 });

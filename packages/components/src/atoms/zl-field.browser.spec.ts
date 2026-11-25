@@ -117,6 +117,28 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(submitted).toBe(1);
   });
 
+  it("submits on Enter when the field is named after a form method", async () => {
+    const { form, field } = mount(
+      `<form><zl-field name="requestSubmit" value="x"></zl-field></form>`,
+    );
+    await field.updateComplete;
+    let submitted = 0;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    input.focus();
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    expect(submitted).toBe(1);
+  });
+
   it("does not submit on Enter when modifier keys are held", async () => {
     const { form, field } = mount(
       `<form><zl-field name="email" value="alice@acme.com"></zl-field></form>`,
@@ -204,6 +226,36 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(hostInputEvent).toBeInstanceOf(InputEvent);
     expect((hostInputEvent as InputEvent).data).toBe("m");
     expect((hostInputEvent as InputEvent).inputType).toBe("insertText");
+  });
+});
+
+describe("<zl-field> help text (chromium)", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  it("gives an error the help text's place, and the help back once the error clears", async () => {
+    host.innerHTML = `<zl-field name="password" error="Too short"><span slot="help">At least 15 characters.</span></zl-field>`;
+    const field = host.querySelector("zl-field") as ZlField;
+    await field.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await field.updateComplete;
+    const help = field.shadowRoot?.querySelector('[part="help"]') as HTMLElement;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(help.hidden).toBe(true);
+    expect(input.getAttribute("aria-describedby")).not.toContain(help.id);
+
+    field.error = "";
+    await field.updateComplete;
+    expect(help.hidden).toBe(false);
+    expect(input.getAttribute("aria-describedby")).toBe(help.id);
   });
 });
 

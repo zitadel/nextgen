@@ -1,7 +1,7 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { baseTest, sourceConditions } from "@zitadel/vitest-config";
 
 /**
  * Two projects in one config, selected per lane (no separate config files):
@@ -13,7 +13,7 @@ import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
  *   against `msw/browser`. Local-only selector `test:browser` = `vitest run
  *   --project browser`.
  *
- * The CI gate is `test:all` = `vitest run`, which runs both projects in one
+ * The CI gate is `test` = `vitest run`, which runs both projects in one
  * process and emits one aggregated junit.xml.
  */
 export default defineConfig({

@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "@tests/fixtures";
 
 type Capture = (command: string, args: string[]) => Promise<{ stdout: string }>;
 
@@ -20,20 +21,9 @@ type ReleaseNpmPreflightModule = {
   readPublishedVersions: (name: string, options: { capture: Capture }) => Promise<string[]>;
 };
 
-let preflight: ReleaseNpmPreflightModule;
-const tempDirs: string[] = [];
-
-beforeAll(async () => {
-  preflight = (await import(
-    new URL("../../../../../scripts/release-npm-preflight.mjs", import.meta.url).href
-  )) as ReleaseNpmPreflightModule;
-});
-
-afterEach(async () => {
-  for (const dir of tempDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+const preflight = (await import(
+  new URL("../../../../../scripts/release-npm-preflight.mjs", import.meta.url).href
+)) as ReleaseNpmPreflightModule;
 
 /** A fake `npm view <name> versions --json`: versions per package, E404 when absent. */
 function npmView(registry: Record<string, string[] | string>): Capture {
@@ -115,9 +105,7 @@ describe("release npm preflight", () => {
     expect(message.trimEnd().endsWith("Then rerun this job.")).toBe(true);
   });
 
-  it("reads each package's name, version, and license", async () => {
-    const root = await mkdtemp(join(tmpdir(), "release-npm-preflight-"));
-    tempDirs.push(root);
+  it("reads each package's name, version, and license", async ({ dir: root }) => {
     await mkdir(join(root, "packages/sdk-solid"), { recursive: true });
     await writeFile(
       join(root, "packages/sdk-solid/package.json"),
@@ -137,9 +125,7 @@ describe("release npm preflight", () => {
     );
   });
 
-  it("skips a private package", async () => {
-    const root = await mkdtemp(join(tmpdir(), "release-npm-preflight-"));
-    tempDirs.push(root);
+  it("skips a private package", async ({ dir: root }) => {
     await mkdir(join(root, "packages/internal"), { recursive: true });
     await writeFile(
       join(root, "packages/internal/package.json"),

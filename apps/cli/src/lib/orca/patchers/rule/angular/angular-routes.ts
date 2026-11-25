@@ -1,7 +1,7 @@
-import { builders, generateCode } from "magicast";
+import { builders } from "magicast";
 
-import { ZitadelError } from "../../../../errors";
-import { parseConfigModule } from "../utils/magicast";
+import { ZitadelError } from "@/lib/errors";
+import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 const AUTH_ROUTE_PATHS = ["login", "register", "profile"] as const;
 
@@ -32,9 +32,9 @@ function isProxifiedArray(value: unknown): value is ProxifiedRouteArray {
 export function angularRoutesEdit(): (source: string | undefined) => string {
   return (source) => {
     const label = "src/app/app.routes.ts";
-    const mod = parseConfigModule(source, label);
+    const file = ConfigModule.open(source, label);
     // magicast types exports as an object with no declared members; reach `routes` as unknown.
-    const moduleExports: unknown = mod.exports;
+    const moduleExports: unknown = file.module.exports;
     const routes: unknown =
       typeof moduleExports === "object" && moduleExports !== null
         ? Reflect.get(moduleExports, "routes")
@@ -46,23 +46,19 @@ export function angularRoutesEdit(): (source: string | undefined) => string {
     }
 
     const present = new Set(
-      Array.from({ length: routes.length }, (_unused, index) => routes[index]?.path).filter(
-        (path): path is string => typeof path === "string",
-      ),
+      Array.from({ length: routes.length }, (_unused, index) => {
+        return routes[index]?.path;
+      }).filter((path): path is string => {
+        return typeof path === "string";
+      }),
     );
-    let changed = false;
-    for (const path of AUTH_ROUTE_PATHS) {
-      if (present.has(path)) {
-        continue;
-      }
+    const missing = AUTH_ROUTE_PATHS.filter((path) => {
+      return !present.has(path);
+    });
+    for (const path of missing) {
       routes.push(builders.raw(`{ path: ${JSON.stringify(path)}, children: [] }`));
-      changed = true;
     }
 
-    if (!changed && source !== undefined) {
-      return source;
-    }
-    const code = generateCode(mod).code;
-    return code.endsWith("\n") ? code : `${code}\n`;
+    return file.render(missing.length > 0);
   };
 }

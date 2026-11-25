@@ -1,17 +1,25 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // The login teaser video (Remotion). Mirrors apps/teaser-video/moon.yml.
+  // The login teaser video (Remotion). No build and no test: the video
+  // renders on demand (`render`), which is too slow for every CI run.
   "tasks": {
+    // Resolves @zitadel/components from source via the `@zitadel/source`
+    // condition; its build keeps the generated api client present. No
+    // Vitest here, so the shared Vitest config is no input.
     "typecheck": {
-      "dependsOn": ["@zitadel/components#build"]
+      "dependsOn": ["@zitadel/components#build"],
+      "inputs": ["$TURBO_EXTENDS$", "!$TURBO_ROOT$/packages/vitest-config/**"]
     },
+    // Remotion's bundler resolves the atoms to the package's dist/.
     "dev": {
       "dependsOn": ["@zitadel/components#build"]
     },
+    // Never cached: a render reads the git-ignored public/music/, which no
+    // hash sees.
     "render": {
       "dependsOn": ["@zitadel/components#build"],
-      "outputs": ["dist/**"]
+      "cache": false
     }
   }
 }

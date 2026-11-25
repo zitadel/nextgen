@@ -1,10 +1,10 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 import {
   apiMockServer,
-  chromiumProjects,
   e2eActionTimeouts,
   e2eTimeouts,
   e2eTrace,
+  reuseExistingServer,
   workspaceRoot,
 } from "../playwright.shared";
 
@@ -29,14 +29,17 @@ export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src",
   outputDir: "test-results/mock",
+  // The standalone api-mock drives one sign-in flow at a time, and every page
+  // that mounts `<zitadel-login>` starts it over: a spec on a parallel worker
+  // would restart or advance the flow of the spec signing in.
+  workers: 1,
   use: {
     ...e2eActionTimeouts,
     baseURL: "http://localhost:3001",
     trace: e2eTrace,
   },
   // Boot the mock auth server first so Nitro can proxy to it on the very
-  // first request. Direct pnpm filter commands keep these long-running
-  // processes outside Moon's task graph; Playwright owns their lifecycle.
+  // first request. Playwright owns both long-running processes.
   //
   // The api-mock listens on PORT 8081 here so this project can run in
   // parallel with `e2e/demo-next/` (which uses the default 8080).
@@ -45,18 +48,24 @@ export default defineConfig({
   // application code changes.
   webServer: [
     apiMockServer(8081),
+    // The demo's production build, `@zitadel/demo-nuxt#build`'s `.output/`,
+    // which the lane depends on. A `nuxt dev` here would be a second Nuxt
+    // process in the app beside that build, and the app's tsconfig needs
+    // the `.nuxt/` that Nuxt locks to one process. The SDK reads ZITADEL_URL
+    // at runtime, never from the build.
     {
-      command: "pnpm --filter @zitadel/demo-nuxt dev",
+      command: "node .output/server/index.mjs",
       url: "http://localhost:3001/login",
-      reuseExistingServer: true,
-      cwd: workspaceRoot,
+      reuseExistingServer,
+      cwd: `${workspaceRoot}/apps/demo-nuxt`,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 120_000,
       env: {
+        PORT: "3001",
         ZITADEL_URL: "http://localhost:8081",
       },
     },
   ],
-  projects: chromiumProjects,
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

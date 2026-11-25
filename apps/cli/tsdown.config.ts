@@ -1,17 +1,35 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "tsdown";
+
+import { bundleSkills } from "./src/lib/skills/bundle.ts";
 
 /**
  * Single-entry build for oclif's explicit command strategy: `src/index.ts`
  * exports the `COMMANDS` table (hand-written commands plus the ones built
  * from the resource registry) and oclif loads `dist/index.mjs` at runtime.
- * The root help class is built alongside it for `oclif.helpClass`.
+ * The root help class is built alongside it for `oclif.helpClass`, and the
+ * unknown-command and `--version` hooks for `oclif.hooks`.
  * `@oclif/*` (core + plugins) stays external — resolved from node_modules at
  * runtime, never bundled — which is what lets the plugin system work.
+ * Every public agent skill in the repository lands in `dist/skills/`, which
+ * `zitadel skills add` installs.
  */
 export default defineConfig({
+  hooks: {
+    "build:done": async () => {
+      await bundleSkills(
+        fileURLToPath(new URL("../..", import.meta.url)),
+        fileURLToPath(new URL("dist/skills", import.meta.url)),
+      );
+    },
+  },
   entry: {
     index: "src/index.ts",
-    "lib/oclif/help": "src/lib/oclif/help.ts",
+    "cli/help": "src/cli/help.ts",
+    "hooks/command-not-found": "src/cli/hooks/command-not-found.ts",
+    "hooks/version-notice": "src/cli/hooks/version-notice.ts",
+    "hooks/json-shortcuts": "src/cli/hooks/json-shortcuts.ts",
   },
   outDir: "dist",
   tsconfig: "tsconfig.app.json",

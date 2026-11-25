@@ -155,7 +155,9 @@ function DropdownMenuSeparator({
   return (
     <DropdownMenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      // `accent`, as the design draws it: `border` is the popover's own shade on
+      // the dark theme and the rule would not show.
+      className={cn("-mx-1 my-1 h-px bg-accent", className)}
       {...props}
     />
   );

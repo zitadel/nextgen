@@ -1,43 +1,31 @@
-import { MANAGED_MARKER } from "../../../../paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
-import type { PatchContext } from "../../types";
-import { PROXY_PATH } from "../proxy";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 // Enforce the dark surface the Zitadel widgets are designed for, so pages never
 // follow the OS light/dark setting.
-const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark";
+const WIDGET_WRAP =
+  "position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark";
 
 /**
  * `src/hooks.server.ts` — the SvelteKit server hook. `createNextgenHandle`
  * proxies `/__nextgen/*` to the auth backend (attaching the project service-key
  * from `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
- * unauthenticated requests away from protected routes.
- *
- * The server config is read from `process.env`, not SvelteKit's `$env` modules:
- * their import path moved between major versions (`$env/dynamic/private` in
- * SvelteKit 2 is deprecated for `$app/env/private` in SvelteKit 3, and returns
- * empty values there), so a single template cannot use them and support both.
- * SvelteKit/Vite do not surface `.env` on `process.env`, so Node loads
- * `.env.local` here. The backend URL is baked as the fallback (the known
- * server from setup); in production the platform provides `ZITADEL_URL`. The
- * managed marker sits in a JS comment.
+ * unauthenticated requests away from protected routes. The settings come from
+ * `$app/env/private`, declared in `src/env.ts` (see `envVarsEdit`), so the hook names no Node
+ * global an app without `@types/node` cannot type-check. The managed marker
+ * sits in a JS comment.
  */
-export function hooksServerTemplate(ctx: PatchContext): string {
-  return `${MANAGED_MARKER}
+export function hooksServerTemplate(): string {
+  return `${ManagedFile.MARKER}
+import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
 import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
 
-// Load .env.local into process.env (SvelteKit's $env modules differ across major
-// versions; process.env is version-independent). Absent in production, where the
-// platform provides the real environment.
-try {
-  process.loadEnvFile?.(".env.local");
-} catch {
-  // .env.local is optional — ignore when it does not exist.
-}
-
 export const handle = createNextgenHandle({
-  url: process.env.ZITADEL_URL ?? ${JSON.stringify(ctx.server)},
-  projectSecret: process.env.ZITADEL_PROJECT_SECRET,
+  url: ZITADEL_URL,
+  projectSecret: ZITADEL_PROJECT_SECRET,
+  projectId: ZITADEL_PROJECT_ID,
   protectedRoutes: ["/profile"],
   loginPath: "/login",
 });
@@ -52,7 +40,7 @@ export const handle = createNextgenHandle({
  */
 export function layoutTemplate(): string {
   return `<script lang="ts">
-  ${MANAGED_MARKER}
+  ${ManagedFile.MARKER}
   let { children } = $props();
 </script>
 
@@ -74,7 +62,7 @@ export function layoutTemplate(): string {
 
 /** `src/routes/+page.svelte` — the landing chooser linking to login/register/profile. */
 export function indexPageTemplate(): string {
-  return `<!-- ${MANAGED_MARKER} -->
+  return `<!-- ${ManagedFile.MARKER} -->
 <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
   <section style="width:100%;max-width:560px">
     <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
@@ -96,11 +84,8 @@ export function indexPageTemplate(): string {
  * project handle.
  *
  * The public project id comes from `VITE_ZITADEL_PROJECT_ID` through Vite's
- * `import.meta.env`, which SvelteKit 2 and 3 both expose to the browser, rather
- * than from an `$env` module: those moved between the majors
- * (`$env/static/public` is deprecated in SvelteKit 3 for `$app/env/public`), so a
- * single template could not import them on both. Setup seeds the variable in
- * `.env.local`, as it does for the other Vite-based frameworks.
+ * `import.meta.env`, which SvelteKit exposes to the browser. Setup seeds the
+ * variable in `.env.local`, as it does for the other Vite-based frameworks.
  *
  * Projects set up with the business use case additionally pass the SDK's
  * `businessLocales` overlay to the widget, restoring work-email copy on top of
@@ -119,7 +104,7 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
   return `<script lang="ts">
-  ${MANAGED_MARKER}
+  ${ManagedFile.MARKER}
   import { onMount } from "svelte";
   import { ${importNames} } from "@zitadel/sdk-svelte";${localesComment}
 
@@ -154,7 +139,7 @@ export function registerPageTemplate(ctx: PatchContext): string {
 /** `src/routes/profile/+page.svelte` — the signed-in view: the "signed in as" session card, with sign-out. */
 export function profilePageTemplate(): string {
   return `<script lang="ts">
-  ${MANAGED_MARKER}
+  ${ManagedFile.MARKER}
   import { onMount } from "svelte";
   import { ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
 

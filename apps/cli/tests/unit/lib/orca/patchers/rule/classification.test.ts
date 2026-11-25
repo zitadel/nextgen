@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import type { FrameworkFacts } from "../../../../../../src/lib/orca/detectors/types";
-import { AngularPatcher } from "../../../../../../src/lib/orca/patchers/rule/angular";
-import { NextPatcher } from "../../../../../../src/lib/orca/patchers/rule/next";
-import { NuxtPatcher } from "../../../../../../src/lib/orca/patchers/rule/nuxt";
-import { QwikPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik";
-import { QwikRouterPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik-router";
-import { ReactPatcher } from "../../../../../../src/lib/orca/patchers/rule/react";
-import { SolidPatcher } from "../../../../../../src/lib/orca/patchers/rule/solid";
-import { SolidStartPatcher } from "../../../../../../src/lib/orca/patchers/rule/solid-start";
-import { SveltePatcher } from "../../../../../../src/lib/orca/patchers/rule/svelte";
-import { SvelteKitPatcher } from "../../../../../../src/lib/orca/patchers/rule/sveltekit";
-import { TanStackStartPatcher } from "../../../../../../src/lib/orca/patchers/rule/tanstack-start";
-import { VuePatcher } from "../../../../../../src/lib/orca/patchers/rule/vue";
-import type { Patcher } from "../../../../../../src/lib/orca/patchers/types";
+import type { FrameworkFacts } from "@/lib/orca/detectors/types";
+import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
+import { NextPatcher } from "@/lib/orca/patchers/rule/next";
+import { NuxtPatcher } from "@/lib/orca/patchers/rule/nuxt";
+import { QwikPatcher } from "@/lib/orca/patchers/rule/qwik";
+import { QwikRouterPatcher } from "@/lib/orca/patchers/rule/qwik-router";
+import { ReactPatcher } from "@/lib/orca/patchers/rule/react";
+import { SolidPatcher } from "@/lib/orca/patchers/rule/solid";
+import { SolidStartPatcher } from "@/lib/orca/patchers/rule/solid-start";
+import { SveltePatcher } from "@/lib/orca/patchers/rule/svelte";
+import { SvelteKitPatcher } from "@/lib/orca/patchers/rule/sveltekit";
+import { TanStackStartPatcher } from "@/lib/orca/patchers/rule/tanstack-start";
+import { VuePatcher } from "@/lib/orca/patchers/rule/vue";
+import type { Patcher } from "@/lib/orca/patchers/types";
 
 function facts(id: string, appDir: string): FrameworkFacts {
   return { id, appDir, devPort: 3000, url: "http://localhost:3000", versionMajor: 16 };

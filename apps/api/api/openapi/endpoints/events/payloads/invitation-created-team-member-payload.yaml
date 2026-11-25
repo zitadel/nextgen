@@ -1,0 +1,16 @@
+title: InvitationCreatedTeamMemberPayload
+description: |
+  An `invitation.created` payload for a `team_member` invitation.
+allOf:
+  - $ref: invitation-created-common-payload.yaml
+  - type: object
+    required:
+      - type
+      - team_member
+    properties:
+      type:
+        type: string
+        enum:
+          - team_member
+      team_member:
+        $ref: ../../invitations/invitation-team-member-payload.yaml

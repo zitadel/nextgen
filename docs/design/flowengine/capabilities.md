@@ -11,9 +11,9 @@ to be a fast answer to "can I build flow X right now?"
 
 ### Flow lifecycle
 
-- `POST /flow` — mint a fresh flow handle, return the first step.
-- `POST /flow/{id}/submit` — advance the state machine; rotate the cookie.
-- `GET /flow/{id}` — re-render the current step without advancing.
+- `POST /flows` — mint a fresh flow handle, return the first step.
+- `POST /flows/{flow_id}/submit` — advance the state machine; rotate the cookie.
+- `GET /flows/{flow_id}` — re-render the current step without advancing.
 - Encrypted `_zflow` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, 600s max-age).
 - Cookie cleared on terminal step.
 - Step error mode: same step re-rendered with `Error` set; cookie rotates to prevent replay.
@@ -22,7 +22,7 @@ to be a fast answer to "can I build flow X right now?"
 ### Resolution
 
 - Direct lookup by `name` (with optional `schema_version`). Multiple matches resolve via `pickLatestFlowVersion` — a lexicographic compare over `schema_version` strings (see [Missing → Resolution](#resolution-1)).
-- Audience-based resolution by `purpose` plus active `status`:
+- Audience-based resolution by `purpose` over the revisions the release pins:
   `user_schema_id` is a hard filter, then candidates score app match > team
   match > project-wide > a definition scoped elsewhere. Equal scores prefer
   newer `created_at`, then the higher ID.
@@ -31,7 +31,6 @@ to be a fast answer to "can I build flow X right now?"
 ### Definitions
 
 - `FlowDefinitionStatements` over Postgres, Spanner, and SQLite (the storage layer).
-- API-exposed status values: `draft`, `active`.
 - Per-definition `user_schema` URL, captured into `FlowState` at `Start`.
 
 ### Steps & state machine
@@ -49,7 +48,7 @@ to be a fast answer to "can I build flow X right now?"
 
 ### SSO redirect
 
-- `{action: "sso", sso_provider_id, return_target}` on a step that offers `sso_providers` pins the connection at its newest revision, issues a single-use state record on the auth attempt and emits the `sso-redirect` step with the provider's authorize URL. The flow state stays on the step the provider was picked from; the response re-seals `_zflow` and adds the browser-binding cookie ([area 3](../idp/3-social-login-flow.md#the-binding-cookie)).
+- `{action: "sso", sso_provider_id, return_target}` on a step that offers `sso_providers` pins the connection at the revision the request's release pins, issues a single-use state record on the auth attempt and emits the `sso-redirect` step with the provider's authorize URL. The flow state stays on the step the provider was picked from; the response re-seals `_zflow` and adds the browser-binding cookie ([area 3](../idp/3-social-login-flow.md#the-binding-cookie)).
 - A provider the engine cannot start a sign-in with re-renders the step with `error.sso_unavailable`. So does a returned identity that would bind, create or link a user when the step cannot route the outcome: `sso_authenticated` for a linked or new user (a stored definition that was never validated), or `user_already_exists` on a collision (the validator does not require it). The check runs before the write, which cannot be undone, so nothing is written. A collision an earlier render bound re-renders the same way when the current step cannot route `user_already_exists`, and the user is not recorded. An unwired `sso_user_not_found` writes nothing and re-renders with `error.sso_user_not_found`. Any other unwired outcome re-renders the same way. `user_not_found` shows `error.user_not_found`, `user_already_exists` shows `error.user_already_exists`, and an outcome without a key of its own shows `error.outcome_unhandled`.
 
 ### Passkey ceremony (two-phase)

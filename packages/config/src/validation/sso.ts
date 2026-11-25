@@ -1,5 +1,5 @@
 /**
- * Cross-file SSO rules, for `plan` and `apply`.
+ * Cross-file SSO rules, for `deploy`.
  *
  * Single-file validation (`idp-connection.json`, the schema and flow
  * dialects) cannot see that a flow step offers a provider its user schema does

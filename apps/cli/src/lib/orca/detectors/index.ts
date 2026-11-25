@@ -9,8 +9,8 @@ import { SolidStartDetector } from "./solid-start";
 import { SvelteDetector } from "./svelte";
 import { SvelteKitDetector } from "./sveltekit";
 import { TanStackStartDetector } from "./tanstack-start";
-import { VueDetector } from "./vue";
 import type { Detector } from "./types";
+import { VueDetector } from "./vue";
 
 /**
  * Active detectors, in probe order. The orchestrator tries each until one

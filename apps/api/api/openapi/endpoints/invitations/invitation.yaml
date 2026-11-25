@@ -1,0 +1,13 @@
+title: Invitation
+description: |
+  An invitation is a link, valid for 72 hours, that grants a role to whoever
+  redeems it. Discriminate on `type`; the object named after the type holds
+  everything specific to that type.
+oneOf:
+  - $ref: invitation-project-member.yaml
+  - $ref: invitation-team-member.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    project_member: invitation-project-member.yaml
+    team_member: invitation-team-member.yaml

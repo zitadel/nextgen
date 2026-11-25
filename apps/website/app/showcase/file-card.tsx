@@ -203,6 +203,7 @@ export function FileCard({
             <div key={command} className="flex flex-col">
               <CommandLine
                 command={command}
+                placement="showcase"
                 end={
                   onRun &&
                   index === ran &&

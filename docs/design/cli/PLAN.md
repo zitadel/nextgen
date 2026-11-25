@@ -15,7 +15,7 @@ for the agent contract):
 | Local runtime | `start`, `stop`, `status`, `logs`, `reset`, `doctor` |
 | Scaffolding | `setup` (8 frameworks: next, nuxt, react, vue, angular, solid, svelte, qwik), `eject` |
 | Config reconciliation | `plan`, `apply` (terraform-shaped: diff → plan → apply) |
-| Resources | `users` (list, get, create, update, delete), `teams` (list, get, create, update, deactivate), `grants` (list, get, create, delete), `idps` (list, get, create), `projects` (list, get, update), `sessions` (list, get, revoke), `events` (list, get); read-only `schemas`, `releases`, `flow-definitions` and `branding`; plus `branding eject` — each resource exposes what its API supports ([resource-commands.md](resource-commands.md), [ADR 064](../../adrs/064-cli-resource-commands.md)) |
+| Resources | `user` (list, get, create, update, delete), `team` (list, get, create, update, deactivate), `grant` (list, get, create, delete), `idp` (list, get, create), `project` (list, get, update), `session` (list, get, revoke), `event` (list, get); read-only `schema`, `release`, `flow-definition` and `branding`; plus `branding eject` — each resource exposes what its API supports ([resource-commands.md](resource-commands.md), [ADR 064](../../adrs/064-cli-resource-commands.md)) |
 | Ownership | `claim` ([ADR 046](../../adrs/046-claim-lifecycle-v2.md)) — init/status/complete against the server's claim endpoints, team attachment reported in `setup`/`status`/`doctor` |
 
 Three resource kinds reconcile through `plan`/`apply`: **user schemas**
@@ -36,14 +36,14 @@ framework version floors are enforced per
 
 ## Design decisions (still standing)
 
-1. **Noun-first command grouping** — `zitadel schemas list`,
+1. **Noun-first command grouping** — `zitadel schema list`,
    `zitadel branding eject`.
 2. **Every reconciled server resource has a local directory under `.zitadel/`**,
    one file per resource; `zitadel apply` reconciles.
 3. **`zitadel apply` is terraform-shaped, not imperative** — diff, plan, apply;
    `--auto-approve` for agents.
 4. **Flow definitions are API resources** with the canonical spec under
-   [`api/openapi/components/flows/`](../../../api/openapi/components/flows/).
+   [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/).
    `fields` and `actions` are **ordered arrays** whose entries carry `name`
    ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md));
    every label is a `text_key` resolved client-side via the `| t` filter.
@@ -86,6 +86,6 @@ framework version floors are enforced per
 ## Verification
 
 The CLI's behavior contract is enforced by `apps/cli` unit tests
-(`moon run cli:test`), the journey e2e lanes (`e2e/journey`, four
+(`turbo run test --filter=@zitadel/cli`), the journey e2e lanes (`e2e/journey`, four
 CI-gated variants: fresh-app, passkey, pre-existing-app, testkit), and the
 doctor drift checks of ADR 042.

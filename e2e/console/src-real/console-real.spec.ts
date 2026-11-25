@@ -1,6 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../support/copy";
+import { grantProjectAdmin, withErrorBody } from "../support/api";
+import { ERROR_BOUNDARY_TITLE } from "../support/copy";
 import { expectNoErrorBoundary, openAddTeam, uniqueName } from "../support/screens";
 import { completeLogin, signIn } from "../support/sign-in";
 
@@ -9,6 +10,11 @@ test("shows the bootstrapped project in the list and detail views", async ({
   zitadel,
   seed,
 }) => {
+  // The dev server includes the router devtools, which unit tests and the
+  // production build omit. Catch incompatible router/devtools dependencies.
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
   // The list is the projects this person can act on (`GET /users/me/projects`),
   // so the operator needs a grant on the project before it shows up — being
   // able to sign in to it is not access to it.
@@ -22,20 +28,31 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
 
   // The directory lists name and creation date. A row opens the project —
-  // selects it and lands on its first screen — and the project's own page, where
-  // the id is, is `Project settings` in the sidebar that selection fills.
+  // selects it and lands on its Overview (D35) — and the project's Settings,
+  // in the sidebar that selection fills, open on General (D40).
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();
 
-  await expect(page).toHaveURL(new RegExp(`/users\\?.*project=${zitadel.handle.projectId}`));
+  await expect(page).toHaveURL(new RegExp(`/\\?project=${zitadel.handle.projectId}$`));
+  // Each card reads on its own, so a refused read would show in the card
+  // rather than as the error boundary: both cards are what proves the reads.
+  await expect(page.getByRole("region", { name: "Production" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Recent activity" })).toBeVisible();
+  // The header cuts a long id in the middle; its full value is the title.
+  await expect(page.getByTitle(zitadel.handle.projectId, { exact: true })).toBeVisible();
+  await expectNoErrorBoundary(page);
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name: "Project settings" })
+    .getByRole("link", { name: "Settings" })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
-  await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(
+    new RegExp(`/project/general\\?project=${zitadel.handle.projectId}$`),
+  );
+  // The header cuts a long id in the middle; its full value is the title.
+  await expect(page.getByTitle(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
+  expect(pageErrors).toEqual([]);
 });
 
 test("searches the projects on the server", async ({ page, zitadel, seed }) => {
@@ -50,7 +67,7 @@ test("searches the projects on the server", async ({ page, zitadel, seed }) => {
 
   const searched = page.waitForRequest((request) => {
     const url = new URL(request.url());
-    return url.pathname === "/api/users/me/projects" && url.searchParams.has("name_contains");
+    return url.pathname === "/api/v1/users/me/projects" && url.searchParams.has("name_contains");
   });
   await page.goto(`/projects?q=${encodeURIComponent(needle)}`);
   expect(new URL((await searched).url()).searchParams.get("name_contains")).toBe(needle);
@@ -79,7 +96,7 @@ test("shows a seeded user in the list and detail views", async ({ page, zitadel,
   // The selected project rides along on every link (`?project=`).
   await expect(page).toHaveURL(new RegExp(`/users/${user.id}\\?project=`));
   await expect(page.getByRole("heading", { name: user.email, exact: true })).toBeVisible();
-  await expect(page.getByText(user.id, { exact: true })).toBeVisible();
+  await expect(page.getByTitle(user.id, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
 
@@ -115,7 +132,7 @@ test("keeps the project credential out of browser requests and resources", async
   // request carries no bearer — and the proxy adding one on the way through
   // must not show up here either.
   const responsePromise = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/users/me/projects",
+    (response) => new URL(response.url()).pathname === "/api/v1/users/me/projects",
   );
 
   await page.goto("/projects");
@@ -141,30 +158,30 @@ test("shows the status the API stamped on a seeded user", async ({ page, zitadel
 
   await page.goto("/users");
   const row = page.getByRole("row").filter({ hasText: user.email });
-  await expect(row.getByText("active", { exact: true })).toBeVisible();
+  await expect(row.getByText("Active", { exact: true })).toBeVisible();
 });
 
-test("gives a colleague admin access to the project, and takes it away", async ({
+test("lists a colleague's admin grant, lets them in, and takes it away", async ({
   browser,
   baseURL,
   page,
   zitadel,
   seed,
 }) => {
-  // The whole journey of #769 against a live backend: the grant is created for
-  // somebody who already exists, shows up in the list with their resolved
-  // identity, and is revoked again. Asserted here rather than only over stubs
-  // because both writes and the `expand: ["principal"]` read are server
-  // behaviour, and the unit specs prove only what the console does with them.
+  // A colleague's grant against a live backend: it shows up in the list with
+  // their resolved identity, opens the project to them, and is revoked again
+  // from their row. Asserted here rather than only over stubs because the
+  // revoke and the read that resolves the person are server behaviour, and the
+  // unit specs prove only what the console does with them.
   //
   // The list alone would pass with a grant that opens nothing, so the
   // colleague's own session is what decides: refused before the grant, able to
-  // change the project with it, refused again once it is revoked. The journey's
-  // claim suite proves the hand-off with the platform project bootstrapped;
-  // this lane runs without it, where "Add admin" resolves the colleague in the
-  // project the console signs into (#1295).
+  // change the project with it, refused again once it is revoked. The console
+  // gives access by invitation (ADR 086), which needs a platform project; this
+  // lane runs without one, so the grant is written through the API, and the
+  // journey's claim suite proves the invitation itself.
   //
-  // Admins live on the project's page (#1238). The operator needs access to the
+  // Members live in the project's Settings (#1238). The operator needs access to the
   // project to open it — a seeded user can sign in but holds no grant.
   const operator = await seed.user();
   const colleague = await seed.user();
@@ -181,17 +198,22 @@ test("gives a colleague admin access to the project, and takes it away", async (
 
     await signIn(page, zitadel, operator);
     await page.goto(`/projects/${zitadel.handle.projectId}`);
-    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
+    await page
+      .getByRole("navigation", { name: "Project settings" })
+      .getByRole("link", { name: "Members" })
+      .click();
+    await expect(page.getByRole("region", { name: "Members" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Add admin", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: "Add admin" });
-    await dialog.getByRole("textbox", { name: "Email address" }).fill(colleague.email);
-    await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
-    await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
+    // The operator's own grant (the one `signIn` wrote) comes back as their
+    // row, marked as theirs.
+    const own = page.getByRole("row").filter({ hasText: operator.email });
+    await expect(own.getByText("You", { exact: true })).toBeVisible();
+    await expect(own.getByText("Admin", { exact: true })).toBeVisible();
 
-    // The row is what proves the write landed: it comes back from the list read,
-    // not from the form's own state. The message above says the same thing
-    // whether or not anything was created, which is the point of it.
+    await grantProjectAdmin(zitadel, colleague.id);
+    await page.reload();
+
+    // The grant comes back from the list read as the colleague's own row.
     const row = page.getByRole("row").filter({ hasText: colleague.email });
     await expect(row).toBeVisible();
     await expect(row.getByText("Admin", { exact: true })).toBeVisible();
@@ -209,9 +231,9 @@ test("gives a colleague admin access to the project, and takes it away", async (
     await expectNoErrorBoundary(colleaguePage);
 
     await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
-    await page.getByRole("menuitem", { name: "Remove admin" }).click();
+    await page.getByRole("menuitem", { name: "Remove access" }).click();
     const confirm = page.getByRole("alertdialog");
-    await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
+    await confirm.getByRole("button", { name: "Remove access", exact: true }).click();
 
     // Gone from the list, which leaves the instance as this test found it.
     await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
@@ -226,38 +248,60 @@ test("gives a colleague admin access to the project, and takes it away", async (
   }
 });
 
-test("answers the same way for an address that belongs to nobody", async ({
+test("lists a team's grant as the team's own row, and revokes it from there", async ({
   page,
   zitadel,
   seed,
 }) => {
-  // The neutrality of `POST /grants` by identifier (#1229) as the operator
-  // experiences it: an address nobody has registered gets the same sentence as
-  // one that worked, and the only honest difference — no row — is a fact about
-  // the project, not an answer about the address. Asserted against a real
-  // instance because it is the server that decides to say nothing, and a stub
-  // would be asserting the stub.
+  // A grant to a team is a row of its own, the team's (#2857). Asserted
+  // against a real instance because which read carries the team, and that
+  // `DELETE /grants/{grant_id}` takes the team's grant without touching the
+  // operator's own, are server behaviour.
   const operator = await seed.user();
-  const unknown = seed.identity().email;
-  await signIn(page, zitadel, operator);
-
-  await page.goto(`/projects/${zitadel.handle.projectId}`);
-  await page.getByRole("button", { name: "Add admin", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Add admin" });
-  await dialog.getByRole("textbox", { name: "Email address" }).fill(unknown);
-
-  // The list read the dialog triggers on its way out. Without waiting for it,
-  // "no row for this address" would be asserted against the list as it was
-  // before the submit, where there was no such row either — an assertion that
-  // cannot fail.
-  const refreshed = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/grants/query" && response.ok(),
+  const projectId = zitadel.handle.projectId;
+  const team = await withErrorBody(
+    zitadel.api.createTeam({ name: uniqueName("granted-team") }, { project_id: projectId }),
   );
-  await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
+  let grantId: string | undefined;
+  try {
+    const grant = await withErrorBody(
+      zitadel.api.createGrant(
+        { team: { team_id: team.id }, relation: "admin" },
+        { project_id: projectId },
+      ),
+    );
+    // The create answers 201 with the grant; its id is what the teardown revokes.
+    if (grant && typeof grant === "object" && "id" in grant) grantId = grant.id;
 
-  await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
-  await expect(dialog).toHaveCount(0);
-  await refreshed;
-  await expect(page.getByRole("row").filter({ hasText: unknown })).toHaveCount(0);
-  await expectNoErrorBoundary(page);
+    await signIn(page, zitadel, operator);
+    await page.goto(`/projects/${projectId}`);
+    await page
+      .getByRole("navigation", { name: "Project settings" })
+      .getByRole("link", { name: "Members" })
+      .click();
+    const row = page.getByRole("row").filter({ hasText: team.name });
+    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
+    await expect(row.getByText("Team", { exact: true })).toBeVisible();
+
+    await row.getByRole("button", { name: `Actions for ${team.name}` }).click();
+    await page.getByRole("menuitem", { name: "Remove access" }).click();
+    const confirm = page.getByRole("alertdialog");
+    // A team nobody is listed in, so the copy names the team alone.
+    await expect(confirm.getByText(`${team.name} will lose access to this project.`)).toBeVisible();
+    await confirm.getByRole("button", { name: "Remove access", exact: true }).click();
+
+    await expect(page.getByRole("row").filter({ hasText: team.name })).toHaveCount(0);
+    // The operator's own grant is untouched.
+    await expect(
+      page.getByRole("row").filter({ hasText: operator.email }).getByText("You", { exact: true }),
+    ).toBeVisible();
+    await expectNoErrorBoundary(page);
+  } finally {
+    // Leaves the instance as found: the Teams screens read the same project,
+    // and `DELETE /teams/{id}` leaves the team's grants behind, which would
+    // come back as an id-only team row on later runs.
+    if (grantId)
+      await zitadel.api.deleteGrant(grantId, { project_id: projectId }).catch(() => undefined);
+    await zitadel.api.deactivateTeam(team.id).catch(() => undefined);
+  }
 });

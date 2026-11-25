@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/zitadel/nextgen/api/generated"
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/metrics"
+	api "go.zitadel.com/zitadel/v5/api"
 
 	"github.com/zitadel/nextgen/tools/bench/harness"
 )
@@ -84,7 +84,7 @@ func (m *ModuleInstance) api() (*api.Client, error) {
 	if st == nil {
 		return nil, errors.New("k6/x/nextgen: not available in the init context")
 	}
-	c, err := api.NewClient(m.root.target.Base, m.root.creds, api.WithClient(&doer{
+	c, err := api.New(m.root.target.Base, m.root.creds, api.WithClient(&doer{
 		st:     st,
 		ctx:    m.vu.Context,
 		origin: m.root.target.Origin,
@@ -130,7 +130,7 @@ func (m *ModuleInstance) Submetrics() []string {
 	return harness.Submetrics()
 }
 
-// Login runs the whole login journey — POST /flow, submit identifier, submit
+// Login runs the whole login journey — POST /flows, submit identifier, submit
 // password — and returns the handoff token. One JavaScript call, three
 // requests, each tagged with its own operation id.
 func (m *ModuleInstance) Login() (harness.LoginResult, error) {

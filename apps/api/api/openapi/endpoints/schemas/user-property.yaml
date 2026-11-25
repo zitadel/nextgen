@@ -1,0 +1,51 @@
+x-meta-schema: json-schema
+"$schema": https://json-schema.org/draft/2020-12/schema
+title: UserProperty
+type: object
+# The generated `user-property.json` adds `allOf: [{$ref: draft-2020-12}]`
+# and `unevaluatedProperties: false`, which cannot live here because code
+# generators choke on the one and misread the other.
+description: |
+  The meta-schema that one property of a user schema is validated against.
+
+  Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
+  are accepted without being listed below. Any other key is refused, unless it
+  is one of the annotations listed below. `writeOnly: true` is reserved for a
+  value that may be written but is never returned by the read API; nothing
+  enforces it today, so responses still include write-only properties.
+
+  `format` is enforced on user writes for the standard JSON Schema names, such
+  as `email`, `uri`, `uuid`, `date` and `date-time`. Any other name, such as
+  `phone`, is only an annotation; use `pattern` to enforce one.
+additionalProperties: true
+properties:
+  x-unique:
+    oneOf:
+      - type: string
+        enum:
+          - unspecified
+          - project
+          - team
+      - type: 'null'
+    description: The scope in which this property's value must be unique, if applicable. `unspecified` enforces no uniqueness.
+  x-claim:
+    oneOf:
+      - type: string
+      - type: 'null'
+    description: The name of the claim this property supplies in a token, if applicable. A claim is a named piece of user data in a token.
+  x-audit:
+    type: boolean
+    default: false
+    description: |
+      Whether this property's value may appear in audit event payloads. Audit
+      payloads are deny-by-default: a property without this annotation
+      contributes its key but never its value.
+  properties:
+    type: object
+    description: |
+      The nested properties of this property, as a map. The key is the
+      property name and the value is that property's schema.
+    propertyNames:
+      "$ref": property-name.yaml
+    additionalProperties:
+      "$ref": user-property.yaml

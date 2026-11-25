@@ -6,8 +6,8 @@ import {
   readmeGuidanceSection,
   removeGuidanceSection,
   upsertGuidanceSection,
-} from "../../../../../../src/lib/orca/patchers/rule/guidance";
-import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
+} from "@/lib/orca/patchers/rule/guidance";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 
 const ctx: PatchContext = {
   framework: { id: "next", devPort: 3000, url: "http://localhost:3000" },
@@ -98,13 +98,13 @@ describe("removeGuidanceSection", () => {
 });
 
 describe("guidance content", () => {
-  it("opens /login on the exact origin and warns off 127.0.0.1", () => {
+  it("opens /register on the exact origin and warns off 127.0.0.1", () => {
     const agents = agentsGuidanceSection(ctx);
-    // /login, not the bare origin: only freshly scaffolded apps redirect /
-    // there — a pre-existing app keeps its homepage.
-    expect(agents).toContain("http://localhost:3000/login");
+    // A first run has no user yet, so it starts at sign-up; a named path, not
+    // the bare origin, because only freshly scaffolded apps redirect /.
+    expect(agents).toContain("http://localhost:3000/register");
     expect(agents).toContain("not 127.0.0.1");
-    expect(readmeGuidanceSection(ctx)).toContain("http://localhost:3000/login");
+    expect(readmeGuidanceSection(ctx)).toContain("http://localhost:3000/register");
   });
 
   it("points agents at the dialect meta-schemas and the deploy loop", () => {
@@ -142,10 +142,10 @@ describe("guidance content", () => {
 
   it("tells each framework how its own chrome reads session state", () => {
     // Next: the client helper (works on any page), plus the server-side
-    // auth() with its matcher precondition.
+    // auth(), which the every-route matcher lets read the session anywhere.
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain("@zitadel/sdk-next/session");
-    expect(agents).toContain("`matcher`");
+    expect(agents).toContain("`matcher` covers every route");
     expect(agents).toContain("no-store");
     expect(agents).toContain("401/auth.unauthorized");
     expect(agents).toContain("403/sess.project_mismatch");
@@ -164,21 +164,33 @@ describe("guidance content", () => {
     expect(nuxtAgents).toContain("useAuth()");
     expect(nuxtAgents).not.toContain("@zitadel/sdk-next/session");
 
-    // SPA frameworks: no framework helper exists yet, so the guidance names
-    // the raw proxy read instead of a package that would not resolve.
+    // React: the sdk-react hook, which reads the same proxy route.
     const reactCtx = {
       ...ctx,
       framework: { id: "react", devPort: 5173, url: "http://localhost:5173" },
     } as PatchContext;
     const reactAgents = agentsGuidanceSection(reactCtx);
-    expect(reactAgents).toContain("/__nextgen/sessions/me?project_id=");
-    expect(reactAgents).toContain('cache: "no-store"');
-    expect(reactAgents).toContain("401/auth.unauthorized");
-    expect(reactAgents).toContain("403/sess.project_mismatch");
-    expect(reactAgents).toContain("404/sess.not_found");
-    expect(reactAgents).toContain("unknown/error, never signed-out");
+    expect(reactAgents).toContain("`useSession({ project })` hook from `@zitadel/sdk-react`");
+    expect(reactAgents).toContain("/__nextgen/api/v1/sessions/me?project_id=");
+    expect(reactAgents).toContain("`error` is unknown, never signed-out");
     expect(reactAgents).not.toContain("@zitadel/sdk-next/session");
     expect(reactAgents).not.toContain("useAuth()");
+
+    // Other SPA frameworks: no framework helper exists yet, so the guidance
+    // names the raw proxy read instead of a package that would not resolve.
+    const vueCtx = {
+      ...ctx,
+      framework: { id: "vue", devPort: 5173, url: "http://localhost:5173" },
+    } as PatchContext;
+    const vueAgents = agentsGuidanceSection(vueCtx);
+    expect(vueAgents).toContain("/__nextgen/api/v1/sessions/me?project_id=");
+    expect(vueAgents).toContain('cache: "no-store"');
+    expect(vueAgents).toContain("401/auth.unauthorized");
+    expect(vueAgents).toContain("403/sess.project_mismatch");
+    expect(vueAgents).toContain("404/sess.not_found");
+    expect(vueAgents).toContain("unknown/error, never signed-out");
+    expect(vueAgents).not.toContain("@zitadel/sdk-next/session");
+    expect(vueAgents).not.toContain("useSession");
   });
 
   it("describes the emitted posture in the presentation paragraph (ADR 044)", () => {
@@ -216,6 +228,23 @@ describe("guidance content", () => {
     expect(agents).not.toContain("`--zl-font-family-heading`");
   });
 
+  it("has a heading that replaces the widget's follow the login's steps", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("moves between sign-in and sign-up by itself");
+    expect(agents).toContain("must follow its `zitadel-flow-step` event");
+    expect(agents).toContain("`step.purpose` is `login` while it signs in");
+  });
+
+  it("says sign-in returns to the page's next parameter ahead of post-sign-in-url", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain(
+      "the path in its page's `?next=` parameter, ahead of `post-sign-in-url`",
+    );
+    expect(agents).toContain("`force-post-sign-in-url` (SDK wrappers: `forcePostSignInUrl`)");
+  });
+
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain('variant="widget"');
@@ -240,6 +269,6 @@ describe("moving the dev port", () => {
   ])("the %s section names the command for a taken port", (_name, section) => {
     const out = section(ctx);
     expect(out).toContain("EADDRINUSE");
-    expect(out).toContain("npx @zitadel/cli@0.1.0-alpha.15 setup --dev-port <port>");
+    expect(out).toContain("npx @zitadel/cli@0.1.0-alpha.15 setup --dev-port '<port>'");
   });
 });

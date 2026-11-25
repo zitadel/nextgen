@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
 
 // Stub Nuxt's `#imports` virtual module so vitest can resolve sources that
 // pull from it (e.g. `useRuntimeConfig`) without bootstrapping Nuxt's module

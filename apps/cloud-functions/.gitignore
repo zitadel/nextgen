@@ -1,0 +1,3 @@
+# Workflow's Next integration writes this file with its SWC plugin cache;
+# its local runs keep their state in .next/workflow-data, ignored with .next.
+/.swc

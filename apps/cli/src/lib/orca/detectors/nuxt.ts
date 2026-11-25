@@ -24,7 +24,9 @@ export class NuxtDetector implements Detector {
   readonly versionFloor = "4";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => undefined);
+    const pkg = await readPackageJson(cwd).catch(() => {
+      return undefined;
+    });
     if (!pkg || !hasDependency(pkg, this.versionPackage)) {
       return null;
     }
@@ -51,7 +53,11 @@ async function detectSrcDir(cwd: string): Promise<string> {
 
 async function dirExists(path: string): Promise<boolean> {
   return stat(path).then(
-    (s) => s.isDirectory(),
-    () => false,
+    (s) => {
+      return s.isDirectory();
+    },
+    () => {
+      return false;
+    },
   );
 }

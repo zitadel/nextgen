@@ -6,7 +6,6 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_TOP,
@@ -27,9 +26,10 @@ import {
   projectScopeDeps,
   requireProjectScope,
   useRequiredProjectScope,
-} from "@/lib/project-scope";
-import { type UserSchema, schemaDisplayName, schemaSignInSummary } from "@/lib/schema";
+} from "@/features/projects/project-scope";
+import { type UserSchema, schemaDisplayName, schemaSignInSummary } from "@/features/schemas/model";
 import { Page } from "@/components/layout";
+import { LIST_PAGE_SIZE } from "@/lib/paging";
 
 export const Route = createFileRoute("/_authed/schemas/")({
   staticData: { scope: "project", nav: { label: "User schemas", order: 4, icon: Braces } },
@@ -47,7 +47,7 @@ export const Route = createFileRoute("/_authed/schemas/")({
       project_id: projectId,
       kind: "user-schema",
       revisions: "latest",
-      limit: PAGE_SIZE,
+      limit: LIST_PAGE_SIZE,
     });
     return {
       schemas: page.schemas.map(toSchemaRow),
@@ -56,14 +56,6 @@ export const Route = createFileRoute("/_authed/schemas/")({
   },
   component: SchemasScreen,
 });
-
-/**
- * One page of schemas. `GET /schemas` is cursor-paginated, so the size is a
- * page size rather than a cap on what the operator can reach — `Load more`
- * walks the rest (same D5 reading as the users screen: a button, not
- * pagination controls).
- */
-const PAGE_SIZE = 25;
 
 // Mapped rather than spread so the wire's `created_at` stops at the loader
 // and the row keeps the console's camelCase.
@@ -89,7 +81,7 @@ function SchemasScreen() {
         project_id: projectId,
         kind: "user-schema",
         revisions: "latest",
-        limit: PAGE_SIZE,
+        limit: LIST_PAGE_SIZE,
         page_token: pageToken,
       });
       return {
@@ -161,7 +153,6 @@ function SchemaRow({
     >
       <TableCell className={`${RESOURCE_CELL} truncate`}>
         <Link to="/schemas/$schemaId" params={{ schemaId: id }} className={RESOURCE_ROW_LINK}>
-          <Braces aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
       </TableCell>

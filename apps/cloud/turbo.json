@@ -1,0 +1,105 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The hosted cloud on Vercel: what the repo-root vercel.json's `server` and
+  // `schemas` services build. Its `dev` is the root's `pnpm run cloud`, and
+  // the launcher's Go tests run in @zitadel/server#test
+  // (`go -C apps/api test ./...`).
+  "tasks": {
+    // The binary the `server` service's function runs (build-launcher.sh),
+    // which `migrate` and `seed` run too and the function ships through
+    // includeFiles.
+    // Go's compiler cache persists in Vercel's branch build cache. Always
+    // link fresh commit/date metadata:
+    // the build date orders platform configuration deployments. Branch builds
+    // and CI can write the team's remote cache; a planted executable there
+    // could run in production with its secrets. Never cache this task.
+    //
+    // What it compiles still decides when it is affected: the production
+    // sources of the server module and of every module it requires, through
+    // `nextgen#go-sources` (the module graph), and the server's version,
+    // which it stamps in.
+    "build": {
+      "cache": false,
+      "dependsOn": ["nextgen#go-sources"],
+      "env": ["GOFLAGS", "GOEXPERIMENT", "GOOS", "GOARCH", "GOAMD64", "GOARM64"],
+      "inputs": ["package.json", "turbo.json", "build-launcher.sh", "$TURBO_ROOT$/apps/server/package.json", "$TURBO_ROOT$/go.work", "$TURBO_ROOT$/go.work.sum"],
+      "outputs": ["dist/nextgen-launcher"]
+    },
+    // The deployment's database: `launcher migrate` creates a preview's when
+    // it is missing (apps/api/cmd/cloud-launcher/database.go) and migrates it. Migrations run
+    // here, before the deployment goes live, never when a function starts,
+    // and never from the cache. A failed migration fails the build and the
+    // previous deployment keeps serving, so every migration must leave the
+    // schema readable by the deployment still serving (expand/contract).
+    //
+    // It sees the whole environment: the deployment's configuration is the
+    // environment, and the launcher also checks every variable the function
+    // needs to start (a missing one fails the build), which strict mode would
+    // hide unless listed here.
+    "migrate": {
+      "cache": false,
+      "dependsOn": ["build"],
+      "passThroughEnv": ["*"]
+    },
+    // What the function needs in its database before it can serve:
+    // `launcher seed` runs the server's seed command with the function's own
+    // configuration (the platform project and the release the server ships
+    // for it, the bootstrap admin, the platform operators). It runs here, once
+    // per deployment and never when a function starts, so a start writes
+    // nothing and a seeding that fails fails the build instead of every cold
+    // start. The previous deployment serves what this seeds until the new one
+    // is live, so the server's defaults must be expand/contract too. Never
+    // from the cache, and with the whole environment, as `migrate`.
+    "seed": {
+      "cache": false,
+      "dependsOn": ["migrate"],
+      "passThroughEnv": ["*"]
+    },
+    // The last step of the `server` service's build, whose command puts Go
+    // on PATH (install-go.sh) and then runs this task. The service is a
+    // Node.js function (server/index.mjs) that ships the launcher through its
+    // includeFiles once the database is migrated and seeded, so deploy.sh has
+    // nothing left to hand over.
+    "deploy": {
+      "cache": false,
+      "dependsOn": ["seed"]
+    },
+    // The `schemas` service's static files: the built-in schemas the server
+    // embeds, rendered as the documents their identifiers name
+    // (scripts/render-builtin-schemas.mjs). Node only: on Vercel the
+    // service has no Go toolchain, so it renders the committed copies and
+    // waits for no generation.
+    "schemas": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/render-builtin-schemas.mjs",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json"
+      ],
+      "outputs": ["dist/cloud-schemas/**"]
+    },
+    // The cloud on localhost: `vercel dev` over vercel.json's services
+    // (scripts/run-cloud.mjs). The dependencies are what the services' dev
+    // servers read from disk; the script builds the same targets itself for
+    // `pnpm run cloud`, which under turbo are cache hits.
+    // It sees the whole environment, as `pnpm run cloud` does: `vercel dev`
+    // hands it to every service (the server reads NEXTGEN_* and the
+    // OpenTelemetry SDK's OTEL_*, each dev server its own), and a list would
+    // quietly drop whatever it missed.
+    "dev": {
+      "dependsOn": [
+        "@zitadel/sdk-react#build",
+        "@zitadel/api#build",
+        "@zitadel/api-mock#build",
+        "@zitadel/components#build",
+        "@zitadel/docs#generate"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/run-cloud.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs"
+      ],
+      "passThroughEnv": ["*"]
+    }
+  }
+}

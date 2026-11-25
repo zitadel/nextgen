@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { QwikRouterPatcher } from "../../../../../../../src/lib/orca/patchers/rule/qwik-router";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { QwikRouterPatcher } from "@/lib/orca/patchers/rule/qwik-router";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import { CliPackage } from "@/lib/upgrade";
 
 function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
@@ -20,8 +18,10 @@ function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:5173",
-    server: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
     scaffoldedFramework,
   };
 }
@@ -38,13 +38,13 @@ describe("QwikRouterPatcher.plan", () => {
   it("writes the onRequest plugin and file-based routes under src/", () => {
     const plan = new QwikRouterPatcher().plan(ctx());
 
-    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(
       "@zitadel/sdk-qwik-router/server",
     );
     expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain("createNextgenOnRequest");
 
-    expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/index.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register/index.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("ZitadelSession");
@@ -60,7 +60,7 @@ describe("QwikRouterPatcher.plan", () => {
     // on it or overwrites it under --force.
     expect(writeContents(plan, "src/routes/index.tsx")).toBeUndefined();
     // The auth boundary and the auth routes are still written.
-    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register/index.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("ZitadelSession");

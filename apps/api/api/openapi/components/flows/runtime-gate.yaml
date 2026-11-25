@@ -1,0 +1,33 @@
+type: object
+additionalProperties: false
+required: [kind, provider]
+description: |
+  A runtime security challenge that must be satisfied before this step's submission
+  is accepted. The engine may also inject gates at runtime based on policy
+  or risk evaluation.
+properties:
+  kind:
+    type: string
+    enum: [captcha]
+    example: captcha
+    description: |
+      The gate category. Only `captcha` is currently defined. Authenticator
+      ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+      `x-credential` on a field, not as gates.
+  provider:
+    type: string
+    description: |
+      Implementation identifier. `zitadel_pow` protects sign-up with the
+      built-in proof-of-work solver: a step that creates its user on submit
+      (`create_user`), and a step carrying a passkey registration that creates
+      its user, whose attestation carries the proof. External providers are
+      not supported.
+    example: zitadel_pow
+  challenge:
+    $ref: pow-challenge.yaml
+  config:
+    type: object
+    description: |
+      Reserved provider-specific configuration. The built-in signup gate uses
+      `challenge` and does not accept caller-selected cost parameters.
+    additionalProperties: true

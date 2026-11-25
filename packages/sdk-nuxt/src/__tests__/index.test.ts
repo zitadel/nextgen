@@ -44,9 +44,12 @@ describe("package manifest", () => {
     expect(declared.filter((file) => !existsSync(resolve(packageRoot, file)))).toEqual([]);
   });
 
+  // npm installs the newest h3 the range admits, and h3 2 dropped helpers the
+  // middleware imports (`toWebRequest`, `getMethod`, …): a browser that loads
+  // the package entry then fails on them. So the h3 range stops before 2.
   it("declares its supported peer ranges", () => {
     expect(manifest.peerDependencies).toEqual({
-      h3: ">=1",
+      h3: "^1.15.0",
       nuxt: ">=4",
     });
   });

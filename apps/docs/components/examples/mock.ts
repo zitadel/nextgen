@@ -23,11 +23,24 @@ export function startMock(): Promise<void> {
 }
 
 async function start() {
-  const [{ setupWorker }, { setupMockHandlers }] = await Promise.all([
+  const [{ setupWorker }, { http, passthrough }, { setupMockHandlers }] = await Promise.all([
     import("msw/browser"),
+    import("msw"),
     import("@zitadel/api-mock"),
   ]);
-  const worker = setupWorker(...setupMockHandlers().handlers);
+  const worker = setupWorker(
+    // The worker's scope limits which pages it controls, not which URLs
+    // those pages fetch. The shared handlers match any API base, so keep
+    // the playground's real API calls out of them after client navigation.
+    http.all("*", ({ request }) => {
+      const url = new URL(request.url);
+      if (url.origin !== location.origin || !url.pathname.startsWith(`${MOCK_API}/`)) {
+        return passthrough();
+      }
+      return undefined;
+    }),
+    ...setupMockHandlers().handlers,
+  );
   await worker.start({
     onUnhandledRequest: "bypass",
     quiet: true,

@@ -20,13 +20,12 @@ import {
   type ZitadelSessionConfig,
   type WidgetTag,
   type WidgetName,
-  widgetNames,
   widgetTags,
 } from "@zitadel/sdk-core/types";
 import type { Component } from "svelte";
 import { hydrate, unmount } from "svelte";
 import { createServer } from "vite";
-import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
 import type {
@@ -37,6 +36,13 @@ import type {
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
+
+import { describeServerRenderCases } from "@zitadel/client-sdk-contract/server-render";
+import {
+  type Attributes,
+  cssProperties,
+  describeStandardAttributes,
+} from "@zitadel/client-sdk-contract/standard-attributes";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -407,13 +413,13 @@ describe("props that become unset restore the element's defaults", () => {
 });
 
 /**
- * The login's server markup. The server compile of the component cannot share
- * a module graph with this file's browser compile, so a throwaway Vite server
- * loads it, and `svelte/server`, with the plugin's server build. The widget's
- * own module is kept out of that load (it is already registered in this jsdom
- * window).
+ * Loads the login's server build and returns its server render. The server
+ * compile of the component cannot share a module graph with this file's
+ * browser compile, so a throwaway Vite server loads it, and `svelte/server`,
+ * with the plugin's server build. The widget's own module is kept out of that
+ * load (it is already registered in this jsdom window).
  */
-async function serverMarkup(props: Record<string, unknown>): Promise<string> {
+async function loadServerMarkup(): Promise<(props: Record<string, unknown>) => string> {
   const server = await createServer({
     configFile: false,
     logLevel: "silent",
@@ -430,15 +436,17 @@ async function serverMarkup(props: Record<string, unknown>): Promise<string> {
     const { default: Login } = (await server.ssrLoadModule("/src/lib/ZitadelLogin.svelte")) as {
       default: typeof ZitadelLogin;
     };
-    // A real server has no `document`, which `onClient` reads to leave the
-    // property-only `project` handle out of the markup.
-    const document = Object.getOwnPropertyDescriptor(globalThis, "document");
-    Reflect.deleteProperty(globalThis, "document");
-    try {
-      return renderOnServer(Login, { props }).body;
-    } finally {
-      if (document) Object.defineProperty(globalThis, "document", document);
-    }
+    return (props) => {
+      // A real server has no `document`, which `onClient` reads to leave the
+      // property-only `project` handle out of the markup.
+      const document = Object.getOwnPropertyDescriptor(globalThis, "document");
+      Reflect.deleteProperty(globalThis, "document");
+      try {
+        return renderOnServer(Login, { props }).body;
+      } finally {
+        if (document) Object.defineProperty(globalThis, "document", document);
+      }
+    };
   } finally {
     define.mockRestore();
     await server.close();
@@ -446,6 +454,15 @@ async function serverMarkup(props: Record<string, unknown>): Promise<string> {
 }
 
 describe("hydrating a server-rendered login", () => {
+  let serverMarkup: (props: Record<string, unknown>) => string;
+
+  // The server build loads once, here, so each test's 5 s budget covers only
+  // the hydration. On a cold, loaded CI runner the load takes 4 s or more (the
+  // Vite server pre-bundles Svelte first); this hook's budget only bounds a hang.
+  beforeAll(async () => {
+    serverMarkup = await loadServerMarkup();
+  }, 60_000);
+
   afterEach(() => {
     _resetConfigForTesting();
     vi.restoreAllMocks();
@@ -459,7 +476,7 @@ describe("hydrating a server-rendered login", () => {
     const fetched = vi.spyOn(globalThis, "fetch");
     const host = document.createElement("div");
     document.body.appendChild(host);
-    const markup = await serverMarkup({ project: globalProject, purpose: "register" });
+    const markup = serverMarkup({ project: globalProject, purpose: "register" });
     expect(markup).not.toContain("[object Object]");
     host.innerHTML = markup;
     const firstStep = new Promise((resolve) =>
@@ -496,7 +513,7 @@ describe("hydrating a server-rendered login", () => {
     const fetched = vi.spyOn(globalThis, "fetch");
     const host = document.createElement("div");
     document.body.appendChild(host);
-    host.innerHTML = await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
+    host.innerHTML = serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
     const rendered = host.querySelector(widgetTags.login);
     expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
     const firstStep = new Promise((resolve) =>
@@ -538,316 +555,7 @@ async function renderAttributes(
   return Object.fromEntries(el!.getAttributeNames().map((n) => [n, el!.getAttribute(n) ?? ""]));
 }
 
-// server-render-cases:begin
-// These cases are copied verbatim into every SDK spec that writes widget
-// attributes into markup (see the drift check in sdk-core's contract.spec.ts).
-// Each spec supplies its own `renderAttributes`; only that function differs.
-type ServerRenderCase = {
-  readonly title: string;
-  readonly widget: "login" | "session" | "logout";
-  readonly props: Readonly<Record<string, unknown>>;
-  readonly present: Readonly<Record<string, string>>;
-  readonly absent: readonly string[];
-  /** SDKs whose markup does not do this yet: not covered, so the row is not run there. */
-  readonly gaps?: readonly string[];
-};
-
-const SERVER_RENDER_HANDLE = {
-  projectId: "proj-handle",
-  proxyPath: "/__handle",
-  url: "https://auth.example.com",
-};
-
-const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
-  {
-    title: "puts the discrete project props into the login markup",
-    widget: "login",
-    props: { projectId: "p1", proxyPath: "/px" },
-    present: { "project-id": "p1", "proxy-path": "/px" },
-    absent: ["url"],
-  },
-  {
-    title: "puts the project handle into the login markup",
-    widget: "login",
-    props: { project: SERVER_RENDER_HANDLE },
-    present: {
-      "project-id": "proj-handle",
-      "proxy-path": "/__handle",
-      url: "https://auth.example.com",
-    },
-    absent: [],
-    gaps: ["svelte"],
-  },
-  {
-    title: "lets the project handle win over conflicting discrete props in the login markup",
-    widget: "login",
-    props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
-    present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
-    absent: [],
-    gaps: ["svelte"],
-  },
-  {
-    title: "writes nothing for no config in the login markup",
-    widget: "login",
-    props: {},
-    present: {},
-    absent: ["project-id", "proxy-path", "url", "flow-name", "resume-flow-id", "post-sign-in-url"],
-  },
-  {
-    title: "puts the purpose into the login markup",
-    widget: "login",
-    props: { projectId: "p1", purpose: "register" },
-    present: { purpose: "register" },
-    absent: [],
-    gaps: ["svelte"],
-  },
-  {
-    title: "puts the default purpose into the login markup",
-    widget: "login",
-    props: { projectId: "p1" },
-    present: { purpose: "login" },
-    absent: [],
-    gaps: ["svelte"],
-  },
-  {
-    title: "puts the flow name into the login markup",
-    widget: "login",
-    props: { projectId: "p1", flowName: "signup" },
-    present: { "flow-name": "signup" },
-    absent: [],
-  },
-  {
-    title: "puts the resume flow id into the login markup",
-    widget: "login",
-    props: { projectId: "p1", resumeFlowId: "flow_123" },
-    present: { "resume-flow-id": "flow_123" },
-    absent: [],
-  },
-  {
-    title: "leaves an unset resume flow id out of the login markup",
-    widget: "login",
-    props: { projectId: "p1" },
-    present: {},
-    absent: ["resume-flow-id"],
-  },
-  {
-    title: "leaves an empty resume flow id out of the login markup",
-    widget: "login",
-    props: { projectId: "p1", resumeFlowId: "" },
-    present: {},
-    absent: ["resume-flow-id"],
-    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
-  },
-  {
-    title: "puts the post-sign-in URL into the login markup",
-    widget: "login",
-    props: { projectId: "p1", postSignInUrl: "/home" },
-    present: { "post-sign-in-url": "/home" },
-    absent: [],
-  },
-  {
-    title: "leaves an unset post-sign-in URL out of the login markup",
-    widget: "login",
-    props: { projectId: "p1" },
-    present: {},
-    absent: ["post-sign-in-url"],
-  },
-  {
-    title: "puts the display options into the login markup",
-    widget: "login",
-    props: { projectId: "p1", variant: "page", theme: "dark" },
-    present: { variant: "page", theme: "dark" },
-    absent: [],
-    gaps: ["react", "svelte"],
-  },
-  {
-    title: "leaves unset display options out of the login markup",
-    widget: "login",
-    props: { projectId: "p1" },
-    present: {},
-    absent: [
-      "variant",
-      "theme",
-      "suppress-header",
-      "suppress-password-toggle",
-      "force-post-sign-in-url",
-    ],
-  },
-  {
-    title: "leaves a false boolean option out of the login markup",
-    widget: "login",
-    props: {
-      projectId: "p1",
-      suppressHeader: false,
-      suppressPasswordToggle: false,
-      forcePostSignInUrl: false,
-    },
-    present: {},
-    absent: ["suppress-header", "suppress-password-toggle", "force-post-sign-in-url"],
-  },
-  {
-    title: "puts the discrete project props into the session markup",
-    widget: "session",
-    props: { projectId: "p1", proxyPath: "/px" },
-    present: { "project-id": "p1", "proxy-path": "/px" },
-    absent: ["url"],
-  },
-  {
-    title: "puts the project handle into the session markup",
-    widget: "session",
-    props: { project: SERVER_RENDER_HANDLE },
-    present: {
-      "project-id": "proj-handle",
-      "proxy-path": "/__handle",
-      url: "https://auth.example.com",
-    },
-    absent: [],
-    gaps: ["svelte"],
-  },
-  {
-    title: "lets the project handle win over conflicting discrete props in the session markup",
-    widget: "session",
-    props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
-    present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
-    absent: [],
-    gaps: ["svelte"],
-  },
-  {
-    title: "writes nothing for no config in the session markup",
-    widget: "session",
-    props: {},
-    present: {},
-    absent: ["project-id", "proxy-path", "url", "post-sign-out-url"],
-  },
-  {
-    title: "puts the post-sign-out URL into the session markup",
-    widget: "session",
-    props: { projectId: "p1", postSignOutUrl: "/bye" },
-    present: { "post-sign-out-url": "/bye" },
-    absent: [],
-  },
-  {
-    title: "leaves a keyed project handle out of the session markup",
-    widget: "session",
-    props: {
-      project: { ...SERVER_RENDER_HANDLE, publishableKey: "pk_test_123" },
-      projectId: "proj-other",
-    },
-    present: {},
-    absent: ["project-id", "proxy-path", "url"],
-    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
-  },
-  {
-    title: "leaves a keyed project handle out of the logout markup",
-    widget: "logout",
-    props: {
-      project: { ...SERVER_RENDER_HANDLE, publishableKey: "pk_test_123" },
-      projectId: "proj-other",
-    },
-    present: {},
-    absent: ["project-id", "proxy-path", "url"],
-    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
-  },
-  {
-    title: "puts the discrete project props into the logout markup",
-    widget: "logout",
-    props: { projectId: "p1", proxyPath: "/px" },
-    present: { "project-id": "p1", "proxy-path": "/px" },
-    absent: ["url"],
-  },
-  {
-    title: "puts the project handle into the logout markup",
-    widget: "logout",
-    props: { project: SERVER_RENDER_HANDLE },
-    present: {
-      "project-id": "proj-handle",
-      "proxy-path": "/__handle",
-      url: "https://auth.example.com",
-    },
-    absent: [],
-    gaps: ["svelte"],
-  },
-  {
-    title: "lets the project handle win over conflicting discrete props in the logout markup",
-    widget: "logout",
-    props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
-    present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
-    absent: [],
-    gaps: ["svelte"],
-  },
-  {
-    title: "writes nothing for no config in the logout markup",
-    widget: "logout",
-    props: {},
-    present: {},
-    absent: ["project-id", "proxy-path", "url", "post-sign-out-url"],
-  },
-  {
-    title: "puts the post-sign-out URL into the logout markup",
-    widget: "logout",
-    props: { projectId: "p1", postSignOutUrl: "/bye" },
-    present: { "post-sign-out-url": "/bye" },
-    absent: [],
-  },
-  {
-    title: "normalizes an empty proxy path to the site root in the login markup",
-    widget: "login",
-    props: { projectId: "p1", proxyPath: "" },
-    present: { "proxy-path": "/" },
-    absent: [],
-    gaps: ["react", "vue", "angular"],
-  },
-  {
-    title: "normalizes an empty proxy path to the site root in the session markup",
-    widget: "session",
-    props: { projectId: "p1", proxyPath: "" },
-    present: { "proxy-path": "/" },
-    absent: [],
-    gaps: ["react", "vue", "angular"],
-  },
-  {
-    title: "normalizes an empty proxy path to the site root in the logout markup",
-    widget: "logout",
-    props: { projectId: "p1", proxyPath: "" },
-    present: { "proxy-path": "/" },
-    absent: [],
-    gaps: ["react", "vue", "angular"],
-  },
-  {
-    title: "puts the heading into the session markup",
-    widget: "session",
-    props: { projectId: "p1", heading: "Welcome" },
-    present: { heading: "Welcome" },
-    absent: [],
-    gaps: ["react", "svelte"],
-  },
-  {
-    title: "puts the logout label into the session markup",
-    widget: "session",
-    props: { projectId: "p1", logoutLabel: "Leave" },
-    present: { "logout-label": "Leave" },
-    absent: [],
-    gaps: ["react", "svelte"],
-  },
-  {
-    title: "leaves an unset heading and logout label out of the session markup",
-    widget: "session",
-    props: { projectId: "p1" },
-    present: {},
-    absent: ["heading", "logout-label"],
-  },
-];
-
-describe("server-rendered widget config", () => {
-  const covered = SERVER_RENDER_CASES.filter((c) => !c.gaps?.includes(SDK));
-
-  it.each(covered)("$title", async ({ widget, props, present, absent }) => {
-    const attributes = await renderAttributes(widget, props);
-    expect(attributes).toMatchObject(present);
-    for (const name of absent) expect(attributes).not.toHaveProperty(name);
-  });
-});
-// server-render-cases:end
+describeServerRenderCases(SDK, renderAttributes);
 
 type ForwardedAttributes = {
   class: string;
@@ -869,10 +577,6 @@ type WidgetProps = {
 
 // Svelte assigns `title` to the element as a property and leaves "null" there when it is removed.
 const staleOnRemoval: readonly string[] = ["title"];
-
-type Attributes = {
-  readonly [name: string]: string | boolean | null | undefined;
-};
 
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through the component's `getElement()`, the way a consumer
@@ -906,151 +610,9 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
   };
 }
 
-// standard-attributes:begin
-type StandardProps = {
-  [W in WidgetName]: {
-    [K in keyof ForwardedAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
-  };
-};
-
-function cssProperties(style: string): Record<string, string> {
-  const [property = "", value = ""] = style.split(":").map((part) => part.trim());
-  return { [property]: value };
-}
-
-describe.each(widgetNames)("%s standard attributes", (widget) => {
-  const tag = widgetTags[widget];
-
-  it("forwards the class to the widget element", async () => {
-    const { container } = await mountWidget(widget, { class: "probe" });
-    expect(container.querySelector(tag)?.classList.contains("probe")).toBe(true);
-  });
-
-  it("forwards the style to the widget element", async () => {
-    const { container } = await mountWidget(widget, { style: "color: red" });
-    expect(container.querySelector(tag)?.style.color).toBe("red");
-  });
-
-  it("forwards the id to the widget element", async () => {
-    const { container } = await mountWidget(widget, { id: "probe" });
-    expect(container.querySelector(tag)?.id).toBe("probe");
-  });
-
-  it("forwards data attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, { "data-testid": "probe" });
-    expect(container.querySelector(tag)?.getAttribute("data-testid")).toBe("probe");
-  });
-
-  it("forwards aria attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, { "aria-label": "probe" });
-    expect(container.querySelector(tag)?.getAttribute("aria-label")).toBe("probe");
-  });
-
-  it("forwards the remaining standard attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, {
-      title: "probe",
-      role: "region",
-      tabindex: "3",
-      hidden: "",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.title).toBe("probe");
-    expect(element?.getAttribute("role")).toBe("region");
-    expect(element?.getAttribute("tabindex")).toBe("3");
-    expect(element?.hidden).toBe(true);
-  });
-
-  it("forwards the slot to the widget element", async () => {
-    const { container } = await mountWidget(widget, { slot: "probe" });
-    expect(container.querySelector(tag)?.getAttribute("slot")).toBe("probe");
-  });
-
-  it("renders a false aria or data attribute as the string false", async () => {
-    const { container } = await mountWidget(widget, { "aria-hidden": false, "data-open": false });
-    expect(container.querySelector(tag)?.getAttribute("aria-hidden")).toBe("false");
-    expect(container.querySelector(tag)?.getAttribute("data-open")).toBe("false");
-  });
-
-  it("updates a forwarded attribute when the prop changes", async () => {
-    const { container, update } = await mountWidget(widget, {
-      class: "before",
-      id: "before",
-      title: "before",
-      slot: "before",
-      tabindex: "1",
-      "aria-label": "before",
-      "data-testid": "before",
-    });
-    await update({
-      class: "after",
-      id: "after",
-      title: "after",
-      slot: "after",
-      tabindex: "2",
-      "aria-label": "after",
-      "data-testid": "after",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.classList.contains("before")).toBe(false);
-    expect(element?.classList.contains("after")).toBe(true);
-    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
-      expect(element?.getAttribute(name)).toBe("after");
-    }
-    expect(element?.getAttribute("tabindex")).toBe("2");
-  });
-
-  it("removes a forwarded attribute when the prop is removed", async () => {
-    const { container, update } = await mountWidget(widget, {
-      class: "before",
-      id: "before",
-      title: "before",
-      slot: "before",
-      tabindex: "1",
-      "aria-label": "before",
-      "data-testid": "before",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.classList.contains("before")).toBe(true);
-    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
-      expect(element?.getAttribute(name)).toBe("before");
-    }
-    expect(element?.getAttribute("tabindex")).toBe("1");
-    await update({});
-    expect(element?.classList.contains("before")).toBe(false);
-    for (const name of ["id", "title", "slot", "tabindex", "aria-label", "data-testid"]) {
-      if (!staleOnRemoval.includes(name)) expect(element?.hasAttribute(name)).toBe(false);
-    }
-  });
-
-  it("does not forward props outside the standard set", async () => {
-    const { container } = await mountWidget(widget, {
-      srcdoc: "probe",
-      onclick: "probe",
-      part: "probe",
-      dir: "probe",
-    });
-    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
-      expect(container.querySelector(tag)?.hasAttribute(name)).toBe(false);
-    }
-  });
-
-  it("gives access to the widget element through a ref", async () => {
-    const { container, ref } = await mountWidget(widget, {});
-    expect(ref()).toBe(container.querySelector(tag));
-    expect(ref()?.tagName.toLowerCase()).toBe(tag);
-  });
-
-  it("accepts the standard attributes in its props", () => {
-    const attributes: Partial<ForwardedAttributes> = {};
-    const accepted: StandardProps = { login: attributes, logout: attributes, session: attributes };
-    expect(accepted).toBeDefined();
-  });
-
-  it("rejects the attributes it does not forward in its props", () => {
-    type Rejected = {
-      [W in WidgetName]: Extract<"dir" | "classList" | "onClick", keyof WidgetProps[W]>;
-    };
-    expectTypeOf<Rejected>().toEqualTypeOf<Record<WidgetName, never>>();
-  });
+describeStandardAttributes<ForwardedAttributes, WidgetProps>({
+  mountWidget,
+  staleOnRemoval,
+  accepted: true,
+  rejected: true,
 });
-// standard-attributes:end

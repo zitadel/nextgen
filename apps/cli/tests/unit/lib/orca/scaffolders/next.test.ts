@@ -1,21 +1,16 @@
-import { spawnSync } from "node:child_process";
+import { execaSync } from "execa";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { NextScaffolder } from "../../../../../src/lib/orca/scaffolders/next";
-import {
-  SUPPORTED_NODE,
-  describeNodeEngines,
-  scaffoldingCalls,
-} from "../../../../helpers/node-engines";
+import { frameworkCli } from "@/lib/orca/scaffolders/framework-clis";
+import { NextScaffolder } from "@/lib/orca/scaffolders/next";
+import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
-vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
-const mockSpawn = vi.mocked(spawnSync);
+vi.mock("execa", () => ({ execaSync: vi.fn() }));
+const mockSpawn = vi.mocked(execaSync);
 
-function spawnResult(status: number, stderr = "", stdout = ""): ReturnType<typeof spawnSync> {
-  return { status, stderr, stdout, pid: 1, output: [], signal: null } as ReturnType<
-    typeof spawnSync
-  >;
+function spawnResult(status: number, stderr = "", stdout = ""): ReturnType<typeof execaSync> {
+  return { exitCode: status, failed: status !== 0, stderr, stdout } as ReturnType<typeof execaSync>;
 }
 
 beforeEach(() => {
@@ -33,7 +28,7 @@ describe("NextScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "--yes",
-      "create-next-app@16.4.2",
+      frameworkCli("create-next-app"),
       ".",
       "--ts",
       "--app",
@@ -57,16 +52,14 @@ describe("NextScaffolder", () => {
   });
 
   it("surfaces 'Command not found' when the binary is not on PATH (ENOENT)", async () => {
-    const enoent = Object.assign(new Error("spawn npx ENOENT"), { code: "ENOENT" });
     mockSpawn.mockReturnValue({
-      status: null,
+      exitCode: undefined,
+      failed: true,
+      code: "ENOENT",
+      originalMessage: "spawn npx ENOENT",
       stderr: "",
       stdout: "",
-      pid: 0,
-      output: [],
-      signal: null,
-      error: enoent,
-    } as unknown as ReturnType<typeof spawnSync>);
+    } as unknown as ReturnType<typeof execaSync>);
 
     await expect(
       new NextScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "next"),
@@ -81,7 +74,7 @@ describe("NextScaffolder", () => {
     make: (node, platform) => new NextScaffolder(node, platform),
     framework: "next",
     label: "create-next-app",
-    spec: "create-next-app@16.4.2",
+    spec: frameworkCli("create-next-app"),
     fallback: ">=20.9.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.9.0"],

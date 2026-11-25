@@ -1,0 +1,80 @@
+package audit
+
+import (
+	"context"
+	"time"
+
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+)
+
+// EmitSpec is one Path B wide-event emission (ADR 048).
+type EmitSpec struct {
+	Type       domain.EventType
+	Category   domain.EventCategory
+	ProjectID  string
+	EntityType string
+	EntityID   string
+	// UserID is the user the event concerns, whoever acted
+	// (domain.Event.UserID). Empty when it concerns none.
+	UserID    string
+	Payload   any
+	SessionID *string
+	// FlowID, when set and not empty, is the event's login flow in place of
+	// the request's own. The handoff exchange sets it: a service call whose
+	// flow is the one of the attempt it consumed.
+	FlowID *string
+	// ActorID and ActorType, when set, name the event's actor in place of the
+	// request's. token_id has no override: it is always the credential the
+	// request presented.
+	ActorID   *string
+	ActorType *domain.EventActorType
+}
+
+// Emit builds and inserts a Path B event. Empty ProjectID skips the insert
+// (no actor/project scope yet).
+func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
+	ev := WithEntity(FromContext(ctx, spec.Type, spec.Category), spec.EntityType, spec.EntityID)
+	// The event belongs to the project the change happened in. For a session
+	// acting on another project that is not the actor's own (ADR 053 §8), so
+	// the spec's project wins over the actor context's.
+	if spec.ProjectID != "" {
+		ev.ProjectID = spec.ProjectID
+	}
+	if spec.UserID != "" {
+		userID := spec.UserID
+		ev.UserID = &userID
+	}
+	if spec.SessionID != nil {
+		ev.SessionID = spec.SessionID
+	}
+	if spec.FlowID != nil && *spec.FlowID != "" {
+		ev.FlowID = spec.FlowID
+	}
+	if spec.ActorID != nil {
+		ev.ActorID = spec.ActorID
+	}
+	if spec.ActorType != nil {
+		ev.ActorType = spec.ActorType
+	}
+	ev, err := WithPayload(ev, spec.Payload)
+	if err != nil {
+		return err
+	}
+	return Insert(ctx, stmts, ev)
+}
+
+// Insert persists a Path B event via stmts.InsertEvent.
+// When ProjectID is empty the insert is skipped (optional / no actor scope yet).
+func Insert(ctx context.Context, stmts EventInserter, ev *domain.Event) error {
+	if ev == nil || ev.ProjectID == "" {
+		return nil
+	}
+	start := time.Now()
+	err := stmts.InsertEvent(ctx, ev)
+	metrics.RecordAuditInsert(ctx, metrics.AuditEvent, time.Since(start))
+	if err == nil {
+		metrics.RecordAuditEvents(ctx, string(ev.EventType), 1)
+	}
+	return err
+}

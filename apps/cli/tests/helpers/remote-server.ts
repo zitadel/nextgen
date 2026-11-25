@@ -51,18 +51,21 @@ export interface RemoteServer {
  */
 export function useRemoteServer(): RemoteServer {
   const requests: ReceivedRequest[] = [];
-  let answerHeaders: OutgoingHttpHeaders = {};
-  let url = "";
-  let server: Server | undefined;
-  let dir = "";
-  let defaultCAs: string[] = [];
+  const answers: OutgoingHttpHeaders[] = [];
+  const urls: string[] = [];
+  const servers: Server[] = [];
+  const dirs: string[] = [];
+  const caStores: string[][] = [];
+  const dirOf = () => dirs[0] ?? "";
+  const defaultCAs = () => caStores[0] ?? [];
   const lookup = dns.lookup;
 
   beforeAll(async () => {
-    dir = await mkdtemp(join(tmpdir(), "zitadel-remote-"));
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-remote-"));
+    dirs.push(dir);
     const { cert, key } = await mintCertificate(dir);
-    defaultCAs = tls.getCACertificates("default");
-    tls.setDefaultCACertificates([...defaultCAs, cert]);
+    caStores.push(tls.getCACertificates("default"));
+    tls.setDefaultCACertificates([...defaultCAs(), cert]);
     dns.lookup = resolvingRemoteHost(lookup);
 
     const context = tls.createSecureContext({ cert, key });
@@ -82,33 +85,35 @@ export function useRemoteServer(): RemoteServer {
           headers: req.headers,
           servername: (req.socket as tls.TLSSocket).servername || undefined,
         });
-        const misdirected = req.headers.host !== new URL(url).host;
+        const misdirected = req.headers.host !== new URL(urls[0] ?? "").host;
         res.writeHead(misdirected ? 421 : 200, {
           "content-type": "text/plain",
-          ...(misdirected ? {} : answerHeaders),
+          ...(misdirected ? {} : (answers.at(-1) ?? {})),
         });
         res.end(misdirected ? "misdirected" : "ok");
       },
     );
     await new Promise<void>((resolve) => started.listen(0, "127.0.0.1", resolve));
-    server = started;
-    url = `https://${REMOTE_HOST}:${(started.address() as AddressInfo).port}`;
+    servers.push(started);
+    urls.push(`https://${REMOTE_HOST}:${(started.address() as AddressInfo).port}`);
   });
 
   afterAll(async () => {
-    await new Promise<void>((resolve) => (server ? server.close(() => resolve()) : resolve()));
+    await new Promise<void>((resolve) =>
+      servers[0] ? servers[0].close(() => resolve()) : resolve(),
+    );
     dns.lookup = lookup;
-    tls.setDefaultCACertificates(defaultCAs);
-    await rm(dir, { recursive: true, force: true });
+    tls.setDefaultCACertificates(defaultCAs());
+    await rm(dirOf(), { recursive: true, force: true });
   });
 
   return {
     get url() {
-      return url;
+      return urls[0] ?? "";
     },
     requests,
     answerWith(headers) {
-      answerHeaders = headers ?? {};
+      answers.push(headers ?? {});
     },
   };
 }

@@ -1,7 +1,6 @@
 {
   "$schema": "../meta/flow-definition.json",
   "name": "default-login",
-  "status": "active",
   "user_schema": "human-user",
   "purposes": {
     "login": "identifier",
@@ -38,7 +37,6 @@
           "target": "register"
         },
         "register": {
-          "target": "register",
           "purpose": "register"
         },
         "sso_authenticated": {
@@ -110,7 +108,6 @@
           "target": "register-password"
         },
         "sign_in": {
-          "target": "identifier",
           "purpose": "login"
         },
         "sso_authenticated": {

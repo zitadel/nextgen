@@ -1,0 +1,18 @@
+type: string
+description: |
+  The operation a filter applies to a field on a query endpoint.
+
+  On text fields, `contains` is a case-insensitive substring match. `equals`
+  compares the whole value and is case-sensitive unless the field documents
+  otherwise. `starts_with` is a case-insensitive match on the start of the
+  value, answered from an index; only the fields that name it accept it.
+enum:
+  - equals
+  - not_equals
+  - contains
+  - not_contains
+  - starts_with
+  - less_than
+  - less_than_or_equal
+  - greater_than
+  - greater_than_or_equal

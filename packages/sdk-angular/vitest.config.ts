@@ -4,13 +4,16 @@ import { transformAsync } from "@babel/core";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vitest/config";
 
-import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
 
 /**
  * Finishes the partially compiled Angular code in the edge project, the step
  * the Angular CLI performs in a consumer's build: the published package and
  * `@angular/*` ship declarations (`ɵɵngDeclare*`) that the linker turns into
  * code, because the edge VM disallows compiling them at run time.
+ *
+ * `@babel/core` is pinned exactly to the version `@angular/compiler-cli` pins,
+ * so the linker plugin is typed against the Babel that runs it.
  */
 function angularLinker(): Plugin {
   return {

@@ -1,0 +1,88 @@
+type: object
+description: |
+  The current state of an authentication attempt.
+
+  An authentication attempt is one sign-in round, and it expires 15 minutes
+  after creation. It accepts factor challenges, verifies proofs and completes
+  into a handoff token. Clients drive the attempt by:
+
+  1. Issuing challenges: `POST /auth_attempts/{attempt_id}/challenges`
+  2. Verifying proofs: `POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`
+  3. Completing: `POST /auth_attempts/{attempt_id}/handoff`
+required:
+  - attempt_id
+  - project_id
+  - state
+  - created_at
+properties:
+  attempt_id:
+    $ref: ../../components/schemas/attempt-id.yaml
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  state:
+    type: string
+    description: |
+      Overall state of the authentication attempt:
+      - `in_progress`: factors are still being collected; continue issuing challenges.
+      - `completed`: all required factors have been verified; the attempt is ready for handoff.
+      - `failed`: the attempt has failed, for example after too many failed proofs, and cannot be continued.
+      - `expired`: the attempt's 15-minute lifetime has passed.
+    enum:
+      - in_progress
+      - completed
+      - failed
+      - expired
+    example: in_progress
+  session_id:
+    description: |
+      The session being authenticated into. Either newly created or passed in on `POST`.
+      For step-up authentication, this is the existing `session_id` provided on creation.
+    oneOf:
+      - $ref: ../../components/schemas/session-id.yaml
+      - type: 'null'
+  user_id:
+    description: |
+      The user ID, if known at this point in the flow.
+      Null until an identifier challenge has been verified.
+    oneOf:
+      - $ref: ../../components/schemas/user-id.yaml
+      - type: 'null'
+  required_factors:
+    type: array
+    description: |
+      The authentication factor methods that the project policy requires to
+      complete this attempt. The server computes them from the project's
+      authentication policy. Use them to decide which challenges still need to be issued.
+    items:
+      $ref: ../../components/schemas/factor-method.yaml
+    example: [identifier, password]
+  completed_factors:
+    type: array
+    description: |
+      The factors verified in this attempt so far.
+      Each item includes method-specific metadata in the `payload` field.
+      
+      The server uses the `verified_at` timestamps to enforce time-based policies.
+      One example is requiring a password verified within the last 5 minutes for
+      step-up authentication to reach sensitive operations.
+      
+      A factor appears here once its challenge reaches `verified` state.
+    items:
+      $ref: ../../components/checks/completed-factor.yaml
+  challenges:
+    type: array
+    description: |
+      All challenges issued within this attempt, in creation order.
+      Use them to track the state of each factor challenge: pending, verified, failed or expired.
+    items:
+      $ref: by_id/challenges/challenge-response.yaml
+  expires_at:
+    type: string
+    format: date-time
+    description: When this attempt expires, 15 minutes after creation.
+    example: '2026-04-28T15:45:00Z'
+  created_at:
+    type: string
+    format: date-time
+    description: When this attempt was created.
+    example: '2026-04-28T15:30:00Z'

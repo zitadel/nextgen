@@ -6,11 +6,15 @@
 > **Relates to:** [ADR 004](004-agent-contract-and-agents-md.md), [ADR 027](027-cursor-based-pagination.md), [ADR 030](030-error-model-mapping-and-reporting.md), [ADR 031](031-openapi-querying.md), [ADR 035](035-configuration-environments.md), [ADR 036](036-api-credential-planes.md)
 >
 > **Amendment (2026-10-07):** §2's *plural* is superseded. Resources are
-> spelled singular (`zitadel user create`), and `deploy`, `preview` and
-> `rollback` stay top-level as the release loop. §3's `environments` question
-> is settled as `env`, which is singular under the same rule. Rationale and the
-> noun list: [`docs/design/glossary.md` §11](../design/glossary.md#11-cli-grammar).
-> The shipped commands are renamed without a deprecation window (alpha).
+> spelled singular (`zitadel user create`), and `deploy` and `preview` stay
+> top-level as the release loop; a rollback sits under its resource, as
+> `deployment rollback`. §3's `environments` question is settled as `env`,
+> which is singular under the same rule. Rationale and the noun list:
+> [`docs/design/glossary.md` §11](../design/glossary.md#11-cli-grammar).
+> The singular is the documented form. The plural of every noun stays
+> accepted and is never shown: `zitadel users list` runs `zitadel user list`
+> (changed 2026-11-13; the note first said the plural commands were renamed
+> without a deprecation window).
 >
 > **Amendment (2026-10-15):** §6 and §13 are extended by
 > [ADR 071](071-cli-resource-properties.md). Every leaf of a request body gets
@@ -230,8 +234,10 @@ re-run. Each command that honours `--force` declares its own, rather than
 inheriting one. What it permits differs: on `setup` it overwrites a managed
 file, on a destructive verb it destroys a resource. A single global flag would
 let a habit formed on the harmless one carry into the destructive one.
-`--dry-run` and `--non-interactive` / `-n` are global, since their meaning does
-not change per command.
+`--non-interactive` / `-n` is global, since its meaning does not change per
+command. `--dry-run` is not: only a command that changes something takes it,
+so a read refuses it as an unknown flag (amended when `Previewable` made it a
+flag of the commands that preview).
 
 Declining the prompt is `status: "skipped"`, not an error: the user did what
 the prompt asked, and a non-zero exit would make a cancelled confirmation
@@ -380,7 +386,7 @@ any other, and ADR 007's experimental note no longer covers it.
 
 The revision routes those connections carry
 ([ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)) are out of
-scope. `GET /idps/{id}/revisions` is a listing under one resource, and the
+scope. `GET /idps/{idp_id}/revisions` is a listing under one resource, and the
 grammar has no verb for that. Inventing one for a single resource is what §4
 rules out, so the shape needs deciding before any resource gets it.
 
@@ -428,9 +434,6 @@ Recorded here because §14 makes them the API's problem, not the CLI's:
   likely to force attribute search.
 - Grants have no update endpoint, so a grant is changed by deleting and
   recreating it.
-- `GET /branding` is the only list with no cursor at all, and answers with a
-  bare array rather than the `{ items, next_page_token }` envelope every other
-  list uses.
 - Sensitivity is not carried end to end. `writeOnly` is accepted and reserved
   on a user property but unenforced, `format: password` appears in the OpenAPI
   documents, and code generation drops both — so the CLI cannot derive what is

@@ -1,0 +1,11 @@
+type: object
+description: |
+  Proof for verifying a factor challenge.
+
+  The exact format depends on the challenge method. The proof object contains
+  only the credential, code or assertion for the challenge method being verified.
+
+oneOf:
+  - $ref: "identifier-proof.yaml"
+  - $ref: "password-proof.yaml"
+  - $ref: "passkey-proof.yaml"

@@ -11,27 +11,27 @@ concurrency:
 
 jobs:
   pr-status:
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
     outputs:
       comment-body: ${{ steps.pr-status.outputs.comment-body }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Generate Changesets status
         id: pr-status
-        uses: changesets/action/pr-status@v1
+        uses: changesets/action/pr-status@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
 
   pr-comment:
     needs: pr-status
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       pull-requests: write
     steps:
       - name: Comment on PR
-        uses: changesets/action/pr-comment@v1
+        uses: changesets/action/pr-comment@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           body: ${{ needs.pr-status.outputs.comment-body }}

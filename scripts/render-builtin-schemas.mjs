@@ -4,9 +4,10 @@
  * (`api/openapi/endpoints/schemas/*.json`) as the documents their identifiers
  * name, so that a URL such as https://zitadel.com/schemas/v1/user-schema.json
  * can answer with the document whose `$id` it is. The hosted cloud's `schemas`
- * service (repo-root vercel.json) runs it as its build and serves the files
- * under the same path; zitadel.com answers for the namespace by forwarding that
- * path to the cloud (docs/runbooks/cloud.md#built-in-schemas):
+ * service (repo-root vercel.json) builds it as @zitadel/cloud's `schemas` task
+ * and serves the files under the same path; zitadel.com answers for the
+ * namespace by forwarding that path to the cloud
+ * (docs/runbooks/cloud.md#built-in-schemas):
  *
  *   node scripts/render-builtin-schemas.mjs [--base URL] [--out DIR] [--serve]
  *
@@ -26,19 +27,12 @@
  * so the server's build cannot hand the files to a static service.
  *
  * Output: `<out>/<the base's path>/<name>.json`, by default
- * `dist/cloud-schemas/schemas/v1/`, the layout the service serves them under.
+ * `apps/cloud/dist/cloud-schemas/schemas/v1/`, the layout the service serves
+ * them under.
  * The build fails when a document refers to one under the base that is not a
  * built-in, so an editor following a `$ref` never meets a 404.
  */
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,16 +43,16 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 /**
  * The namespace the built-in schemas are published under: the server's default
  * `schema.builtin_public_base` (DEFAULT_BUILTIN_SCHEMA_BASE in
- * packages/config/src/defaults.ts, which the tests hold this to). The hosted
+ * packages/config/src/builtin-schema-base.ts, which the tests hold this to). The hosted
  * cloud serves the files at its path.
  */
 export const HOSTED_BASE = "https://zitadel.com/schemas/v1";
 
 /** The built-in schemas the server embeds, generated from the OpenAPI YAML. */
-export const SOURCE_DIR = join(ROOT, "api/openapi/endpoints/schemas");
+export const SOURCE_DIR = join(ROOT, "apps/api/api/openapi/endpoints/schemas");
 
-/** The `schemas` service's output directory (vercel.json). */
-export const DEFAULT_OUT_DIR = join(ROOT, "dist/cloud-schemas");
+/** The `schemas` service's output directory (vercel.json, apps/cloud/turbo.json). */
+export const DEFAULT_OUT_DIR = join(ROOT, "apps/cloud/dist/cloud-schemas");
 
 // What the server's isRelativeRef treats as absolute (absoluteScheme).
 const ABSOLUTE_HTTP = /^https?:\/\//;
@@ -213,11 +207,21 @@ export function serveBuiltinSchemas(outDir, port) {
     } catch {
       // A malformed escape names no file.
     }
-    if (!file.startsWith(`${root}${sep}`) || !existsSync(file) || !statSync(file).isFile()) {
+    let body;
+    if (file.startsWith(`${root}${sep}`)) {
+      try {
+        // Read without checking first: a directory (EISDIR) or a missing file
+        // (ENOENT) throws, and nothing can change between a check and the read.
+        body = readFileSync(file);
+      } catch {
+        // Not a readable file.
+      }
+    }
+    if (body === undefined) {
       response.writeHead(404, { "content-type": "text/plain" }).end("Not Found\n");
       return;
     }
-    response.writeHead(200, { "content-type": "application/json" }).end(readFileSync(file));
+    response.writeHead(200, { "content-type": "application/json" }).end(body);
   });
   server.listen(port);
   return server;

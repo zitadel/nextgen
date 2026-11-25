@@ -79,8 +79,10 @@ describe("passkey-first preset shape", () => {
     expect(entry?.transitions).toMatchObject({
       passkey: { target: "done" },
       email_fallback: { target: "identifier" },
-      user_not_found: { target: "register" },
+      register: { purpose: "register" },
     });
+    // The step looks up no identifier, so it can never raise user_not_found.
+    expect(entry?.transitions).not.toHaveProperty("user_not_found");
   });
 
   it("registers with the passkey as the primary action", () => {

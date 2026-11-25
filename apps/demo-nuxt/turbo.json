@@ -3,6 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "typecheck": {
+      "inputs": ["$TURBO_EXTENDS$", "!$TURBO_ROOT$/packages/vitest-config/**"],
       "dependsOn": ["@zitadel/sdk-nuxt#build"]
     },
     // Reads sdk-nuxt/dist while bundling; ordered after that build.

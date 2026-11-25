@@ -14,6 +14,7 @@ building your own middleware or need the types without a framework wrapper.
 | `@zitadel/sdk-core` | The middleware, JWT, and runtime-resolution exports in one namespace. The `/types` widget contract is **not** re-exported from the root — import it from `@zitadel/sdk-core/types` |
 | `@zitadel/sdk-core/types` | The SPA widget contract (`ZitadelFlowStepDetail` and the other widget event/config/handler/props types the SPA SDKs re-export) |
 | `@zitadel/sdk-core/jwt` | `verifyJwt`, `decodeJwt`, `isJwtShaped`, `JWKS_TTL_MS` |
+| `@zitadel/sdk-core/session` | The browser's view of the session: `getSession()`, one read of `GET /sessions/me` (which `@zitadel/sdk-next/session` wraps), and `sessionStore()`, the shared, subscribable read the SPA SDKs bind their hooks to |
 | `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), session judgement (`resolveSession`, the opaque session check `checkOpaqueSessionToken`), and the session cookie per project (`sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
@@ -45,7 +46,11 @@ middleware runs (`verifyJwt`):
 
 Opaque (non-JWT) session tokens are validated against the backend's
 `GET /sessions/me?project_id=…` instead, bounded by `opaqueTokenTimeoutMs`
-(`checkOpaqueSessionToken`).
+(`checkOpaqueSessionToken`). That is a call to the server, so a middleware
+whose render layer checks the session itself can skip it where it decides
+nothing: with `checkOpaqueSession: false`, `resolveSession` hands the token on
+unchecked and touches no cookie. The Next.js middleware does so off its
+protected routes, where `auth()` checks the session.
 
 A session belongs to one project, while a browser sends the session cookie
 to every app on the same host, including the Console of a local server. So a
@@ -71,32 +76,43 @@ middleware calls it.
 
 ## The session cookie
 
-The server sets and reads one session cookie, `__nextgen_session`. A browser
-shares a host's cookies across every port, so under that name alone the Console
-of a local server and every app on `localhost` would keep their sessions in one
-slot and sign each other out. An app with a server SDK therefore keeps its
-session in a cookie of its own, `sessionCookieName(projectId)`:
-`__nextgen_session_<projectId>` (ADR 073).
+The server sets and reads one session cookie: `__Host-zitadel_session`, or
+`zitadel_session` over plain http to a loopback host, where it has no `Secure`
+for Safari and so cannot carry the prefix (`serverSessionCookieName`, ADR 083).
+A browser shares a host's cookies across every port, so under that name alone
+the Console of a local server and every app on `localhost` would keep their
+sessions in one slot and sign each other out. An app with a server SDK therefore
+keeps its session in a cookie of its own, `sessionCookieName(projectId, secure)`:
+`__Host-zitadel_session_<projectId>`, or `zitadel_session_<projectId>` over
+plain http to a loopback host (ADR 073). The app reads only its scheme's names:
+over https it never reads an unprefixed cookie, which any sibling host can
+plant.
 
-- **The proxy** (`proxySessionCookies`) renames the server's `Set-Cookie` to the
-  app's name on the way to the browser, and on the way to the server sends the
-  app's cookie under the server's name. No other session cookie, the
+- **The proxy** (`proxySessionCookies`) turns the server's `Set-Cookie`, under
+  either name, into the app's on the way to the browser: the value and expiry
+  kept, with `Path=/`, `HttpOnly`, `SameSite=Lax`, no `Domain`, and `Secure` for
+  the app's scheme. On the way to the server it sends the app's cookie once,
+  under the canonical `__Host-zitadel_session` (`SERVER_SESSION_COOKIE`),
+  whichever transport it reaches the server over. No other session cookie, the
   Console's or another app's, goes up.
+- **Session cookies from before ADR 083** (`__nextgen_session` and
+  `__nextgen_session_<projectId>`) are never read, copied or passed on: the
+  proxy keeps them back and drops a `Set-Cookie` for them.
 - **The middleware** (`resolveSession`) reads the app's cookie, and clears only
   that cookie when the backend refuses its session.
-- **A session kept under the server's name** before the change, by this app or,
-  on `localhost`, by the Console, is read only where the server holds it to the
-  app's project: by the middleware, and by the proxy for the session probe
-  `GET /sessions/me?project_id=…`. A session that signs a user of this project
-  in is copied to the app's cookie, and the old cookie stays: the Console may
-  share the project. When the app next signs a user in (`POST /sessions/exchange`)
-  or out (`DELETE /sessions/me`), the proxy retires it: cleared when it holds a
-  session of this project (and on sign-out that session is ended), or a dead
-  one; left when it holds another project's.
+- **A session kept under the server's name**, on `localhost` by the Console, is
+  read only where the server holds it to the app's project: by the middleware,
+  and by the proxy for the session probe `GET /sessions/me?project_id=…`. A
+  session that signs a user of this project in is copied to the app's cookie,
+  and the server's cookie stays: the Console may share the project. When the
+  app next signs a user in (`POST /sessions/exchange`) or out
+  (`DELETE /sessions/me`), the proxy retires it: cleared when it holds a session
+  of this project (and on sign-out that session is ended), or a dead one; left
+  when it holds another project's.
 - **Every response that sets a session cookie** sends
   `Cache-Control: private, no-store` (`SESSION_COOKIE_CACHE_CONTROL`), and
-  `Secure` follows the server's rule on the scheme and host a proxy in front of
-  the app forwarded (`X-Forwarded-Proto`, `X-Forwarded-Host`).
+  `Secure` and the names follow the server's rule on the scheme and host a
+  proxy in front of the app forwarded (`X-Forwarded-Proto`, `X-Forwarded-Host`).
 - **Without a project**, the proxy passes the cookies through unchanged.
 
 Framework-specific steps (header tunnelling, `auth()` re-verification) are

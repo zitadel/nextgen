@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { mapWithConcurrency, runCapture } from "./dev-process.mjs";
+import { runCapture } from "./dev-process.mjs";
+import { mapAll } from "./map-all.mjs";
 
 // Releases publish through npm trusted publishing, which cannot create a
 // package: a maintainer publishes a placeholder once and adds the trusted
@@ -12,8 +13,9 @@ import { mapWithConcurrency, runCapture } from "./dev-process.mjs";
 // The preflight asks the npm registry before `release publish --dry-run`
 // returns, so an offline dry run fails closed instead of passing unchecked.
 //
-// ci.yml runs the same check on the version PR and its merge group
-// (`release.mjs check-npm`), so a version it would stop fails there, before
+// CI runs the same check whenever a public package's manifest changes
+// (@zitadel/release#check-npm, `release.mjs check-npm`): the version PR and
+// its merge group among them, so a version it would stop fails there, before
 // the version commit is on main.
 
 /**
@@ -60,9 +62,7 @@ export async function readPublishedVersions(name, { capture = runCapture } = {})
 
 /** The packages trusted publishing cannot publish: npm has never seen them. */
 export async function findPublishBlockers(packages, options = {}) {
-  const versions = await mapWithConcurrency(packages, 4, (pkg) =>
-    readPublishedVersions(pkg.name, options),
-  );
+  const versions = await mapAll(packages, (pkg) => readPublishedVersions(pkg.name, options), 4);
   return { unpublished: packages.filter((_, index) => versions[index].length === 0) };
 }
 

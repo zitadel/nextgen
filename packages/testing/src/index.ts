@@ -85,7 +85,7 @@ export async function startLocalZitadel(
   };
 }
 
-export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
+export { applyAppEnvTemplate, nextAppEnv, viteAppEnv } from "./app-env";
 export type { AppEnvTemplate } from "./app-env";
 export { bootstrapProject } from "./bootstrap";
 export type { BootstrapProjectOptions, BootstrappedProject } from "./bootstrap";
@@ -93,7 +93,7 @@ export { readHandshakeSync, waitForHandshake, writeHandshake } from "./handshake
 export { bootLocalServer } from "./lifecycle";
 export type { BootedServer, BootServerOptions } from "./lifecycle";
 export { identity } from "./seed";
-export { SESSION_COOKIE_NAME, sessionCookieName } from "./session";
+export { browserSessionCookieName, SESSION_COOKIE_NAME, sessionCookieName } from "./session";
 export type {
   ConnectedZitadel,
   Identity,

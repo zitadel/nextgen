@@ -1,67 +1,59 @@
 /**
  * Spec-conformance test for the api-mock.
  *
- * This test is independent of the hand-written response shapes in
- * `server.ts` / `platform-handlers.ts`. It boots the real Express mock
- * server, POSTs / GETs every mocked endpoint, and validates the response
- * against the corresponding **zod** schema orval generates from the OAS.
+ * It boots the real Express mock server and drives every route over HTTP.
+ * Every answer to an operation of the OpenAPI spec goes through
+ * `conformantFetch` (`src/__tests__/mock-routes.ts`), which fails the request
+ * when the answer breaks the contract (`src/__tests__/spec-contract.ts`): a
+ * status the operation does not declare, a success body orval's zod refuses,
+ * or an error body outside the operation's declared error set. That proves a
+ * code is one the operation declares, not that it is the right one, and every
+ * operation's `default` lets any error status through.
  *
- * The TypeScript types from `@zitadel/api/generated/model` give
- * compile-time guarantees about shape; zod validation gives **runtime**
- * guarantees about regex patterns, enum values, min/max constraints, and
- * required-vs-optional. Together they're the "golden" guarantee: if this
- * test passes, the mock's wire output is provably spec-compliant.
- *
- * Endpoints covered by zod here:
- *   - POST /sessions/exchange           → ExchangeHandoffResponse
- *   - GET  /projects/:id                → GetProjectResponse
- *   - GET  /flow_definitions            → ListFlowDefinitionsResponse
- *   - GET  /flow_definitions/:id        → GetFlowDefinitionResponse
- *
- * Endpoints covered structurally (orval emits no `*Response` zod for these
- * because they have no static response schema — POSTs that return only an
- * `id`, or out-of-spec routes):
- *   - POST /schemas                     → { id }
- *   - POST /flow_definitions            → flow-definition-response envelope
- *
- * Also covered by zod here:
- *   - POST /projects                    → CreateProjectResponse
- *   - POST /projects/:id/origins        → AddOriginResponse
- *
- * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
- * the user POSTed verbatim, so the response shape depends on the request
- * the caller made. The structural test below just exercises the 404 path
- * (clear contract: spec-compliant error envelope).
+ * The last describe reads the routes off the handlers themselves and fails a
+ * route that is neither a spec operation nor listed in
+ * `src/__tests__/spec-exceptions.ts`, a server route with no success answer,
+ * and an in-process route with no answer at all. Only answers through this
+ * file's `fetch` count, so a new handler needs its tests here.
  */
 import type { Server } from "node:http";
 
-import {
-  AddOriginResponse,
-  CompleteClaimResponse,
-  CreateIdpResponse,
-  CreateProjectResponse,
-  ExchangeHandoffResponse,
-  GetClaimStatusResponse,
-  GetFlowDefinitionResponse,
-  GetIdpByIdResponse,
-  GetMySessionResponse,
-  GetProjectResponse,
-  GetVariablesResponse,
-  ListFlowDefinitionsResponse,
-  QueryIdpsResponse,
-} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+import { setupServer } from "msw/node";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
-import { signHandoffToken } from "./crypto.js";
 import {
+  IN_PROCESS_ORIGIN,
+  conformantFetch,
+  mockRoutes,
+  observations,
+  routeKey,
+} from "./__tests__/mock-routes.js";
+import { OUT_OF_SPEC_ROUTES } from "./__tests__/spec-exceptions.js";
+import { specOperations } from "./__tests__/spec-contract.js";
+import { signHandoffToken } from "./crypto.js";
+import { PASSWORD_FIELD } from "./fixtures/login.js";
+import { setupMockHandlers } from "./handlers.js";
+import {
+  acceptInvitation,
+  expireInvitation,
   expireClaimChallenge,
   expireClaimWindow,
   snapshotPlatformStore,
 } from "./platform-handlers.js";
-import { PLATFORM_PROJECT_ID, csrfTokenFor, startMockServer } from "./server.js";
+import { PLATFORM_PROJECT_ID, createMockApp, csrfTokenFor, startMockServer } from "./server.js";
+
+/**
+ * Every request below goes through the contract: an answer to a spec
+ * operation that breaks it throws (`src/__tests__/spec-contract.ts`), and the
+ * last describe proves every route was exercised.
+ */
+const fetch = conformantFetch;
 
 const PORT = 4456;
 const BASE = `http://localhost:${PORT}`;
+/** Where the mock serves the API, as the server does: under `/api/v1` (ADR 077). */
+const API = `${BASE}/api/v1`;
 let server: Server;
 
 beforeAll(async () => {
@@ -83,17 +75,17 @@ afterAll(async () => {
 });
 
 /**
- * The `__nextgen_session` cookie of a session belonging to `project`, active
+ * The `zitadel_session` cookie of a session belonging to `project`, active
  * with a verified factor.
  */
 async function sessionCookie(project: string): Promise<string> {
   const handoff = await signHandoffToken({ sub: project, iss: BASE });
-  const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
+  const exchange = await fetch(`${API}/sessions/exchange?project_id=${project}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ handoff_token: handoff }),
   });
-  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("__nextgen_session="));
+  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("zitadel_session="));
   return setCookie?.split(";")[0] ?? "";
 }
 
@@ -105,9 +97,8 @@ async function sessionCookie(project: string): Promise<string> {
 function validFlowDefinitionBody(): Record<string, unknown> {
   return {
     name: "login-flow",
-    status: "active",
     user_schema:
-      "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml",
+      "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/apps/api/api/openapi/endpoints/schemas/user-schema.yaml",
     // Per `flow-definition.yaml`, `purposes` is an object mapping each
     // purpose name to its entry-point step (must match a `name` in `steps`).
     // The shape must satisfy the definition-time validator the mock now
@@ -126,22 +117,20 @@ function validFlowDefinitionBody(): Record<string, unknown> {
   };
 }
 
-describe("api-mock spec conformance — responses match orval-generated zod", () => {
-  test("POST /sessions/exchange returns body parseable by ExchangeHandoffResponse", async () => {
+describe("api-mock spec conformance — sessions, projects, schemas and flow definitions", () => {
+  test("POST /sessions/exchange exchanges a handoff token", async () => {
     const handoff = await signHandoffToken({ sub: "proj_test", iss: BASE });
-    const res = await fetch(`${BASE}/sessions/exchange?project_id=proj_test`, {
+    const res = await fetch(`${API}/sessions/exchange?project_id=proj_test`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(() => ExchangeHandoffResponse.parse(body)).not.toThrow();
   });
 
   test("GET /sessions/me resolves a display for the known demo identities", async () => {
     const handoff = await signHandoffToken({ sub: "ada@example.com", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_display`, {
+    const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_me_display`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -149,13 +138,12 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
 
-    const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
+    const res = await fetch(`${API}/sessions/me`, { headers: { cookie: cookie ?? "" } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(() => GetMySessionResponse.parse(body)).not.toThrow();
     expect(body.user).toMatchObject({
       identifier: "ada@example.com",
       identifier_property: "email",
@@ -163,11 +151,31 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
   });
 
+  // Mirrors the server on loopback http (ADR 083): it sets zitadel_session,
+  // reads it and the canonical name the SDK proxies send upstream, the
+  // canonical one first, and reads no session cookie from before ADR 083.
+  test("GET /sessions/me reads the session under both of its names, and no old one", async () => {
+    const pair = await sessionCookie("proj_me_names");
+    const token = pair.slice(pair.indexOf("=") + 1);
+    expect(pair).toBe(`zitadel_session=${token}`);
+
+    for (const [cookie, status] of [
+      [`zitadel_session=${token}`, 200],
+      [`__Host-zitadel_session=${token}`, 200],
+      [`zitadel_session=deadbeef; __Host-zitadel_session=${token}`, 200],
+      [`__nextgen_session=${token}`, 401],
+      [`__nextgen_session_proj_me_names=${token}`, 401],
+    ] as const) {
+      const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie } });
+      expect({ cookie, status: res.status }).toEqual({ cookie, status });
+    }
+  });
+
   // Mirrors the server: a read that names a project refuses a session of any
   // other project, and serves its own as before.
   test("GET /sessions/me with project_id refuses a session of another project", async () => {
     const handoff = await signHandoffToken({ sub: "app-user@example.com", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_app`, {
+    const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_me_app`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -175,16 +183,16 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
 
-    const refused = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+    const refused = await fetch(`${API}/sessions/me?project_id=proj_me_other`, {
       headers: { cookie: cookie ?? "" },
     });
     expect(refused.status).toBe(403);
     expect(await refused.json()).toMatchObject({ code: "sess.project_mismatch" });
 
-    const served = await fetch(`${BASE}/sessions/me?project_id=proj_me_app`, {
+    const served = await fetch(`${API}/sessions/me?project_id=proj_me_app`, {
       headers: { cookie: cookie ?? "" },
     });
     expect(served.status).toBe(200);
@@ -193,7 +201,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // Like the server, a project_id outside the project-id pattern is a bad
     // request, not a verdict on the session.
     for (const invalid of ["", "proj%20me"]) {
-      const rejected = await fetch(`${BASE}/sessions/me?project_id=${invalid}`, {
+      const rejected = await fetch(`${API}/sessions/me?project_id=${invalid}`, {
         headers: { cookie: cookie ?? "" },
       });
       expect(rejected.status).toBe(400);
@@ -210,14 +218,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // checked before the project hold and the parameter, as on the server.
     const signOutHeaders = { cookie, "x-zitadel-csrf": csrfTokenFor(cookie.split("=")[1] ?? "") };
 
-    const refusedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_other`, {
+    const refusedToken = await fetch(`${API}/sessions/me/csrf?project_id=proj_me_other`, {
       headers,
     });
     expect(refusedToken.status).toBe(403);
     expect(refusedToken.headers.get("cache-control")).toBe("private, no-store");
     expect(await refusedToken.json()).toMatchObject({ code: "sess.project_mismatch" });
 
-    const refusedSignOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+    const refusedSignOut = await fetch(`${API}/sessions/me?project_id=proj_me_other`, {
       method: "DELETE",
       headers: signOutHeaders,
     });
@@ -229,41 +237,41 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // object by the query parser too. The server authenticates first, so
     // without a cookie the answer is the 401.
     for (const query of ["project_id=", "project_id=proj%20me", "project_id[toString]=x"]) {
-      const rejectedToken = await fetch(`${BASE}/sessions/me/csrf?${query}`, { headers });
+      const rejectedToken = await fetch(`${API}/sessions/me/csrf?${query}`, { headers });
       expect(rejectedToken.status).toBe(400);
-      const rejectedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+      const rejectedSignOut = await fetch(`${API}/sessions/me?${query}`, {
         method: "DELETE",
         headers: signOutHeaders,
       });
       expect(rejectedSignOut.status).toBe(400);
-      const forgedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+      const forgedSignOut = await fetch(`${API}/sessions/me?${query}`, {
         method: "DELETE",
         headers,
       });
       expect(forgedSignOut.status).toBe(403);
-      expect((await fetch(`${BASE}/sessions/me/csrf?${query}`)).status).toBe(401);
-      expect((await fetch(`${BASE}/sessions/me?${query}`, { method: "DELETE" })).status).toBe(401);
+      expect((await fetch(`${API}/sessions/me/csrf?${query}`)).status).toBe(401);
+      expect((await fetch(`${API}/sessions/me?${query}`, { method: "DELETE" })).status).toBe(401);
     }
 
     // The refusals ended nothing: its own project still gets its token and
     // signs it out.
-    const token = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_signout`, {
+    const token = await fetch(`${API}/sessions/me/csrf?project_id=proj_me_signout`, {
       headers,
     });
     expect(token.status).toBe(200);
     expect(await token.json()).toEqual({ csrf_token: csrfTokenFor(cookie.split("=")[1] ?? "") });
 
-    const signedOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_signout`, {
+    const signedOut = await fetch(`${API}/sessions/me?project_id=proj_me_signout`, {
       method: "DELETE",
       headers: signOutHeaders,
     });
     expect(signedOut.status).toBe(204);
-    expect(signedOut.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+    expect(signedOut.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
   });
 
-  test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
+  test("GET /sessions/me answers the session with a user ref", async () => {
     const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {
+    const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_me`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -271,14 +279,13 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
     expect(cookie).toBeDefined();
 
-    const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
+    const res = await fetch(`${API}/sessions/me`, { headers: { cookie: cookie ?? "" } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(() => GetMySessionResponse.parse(body)).not.toThrow();
     // The identity contract (ADR 058): the ref carries the sign-in email as
     // the designated identifier; the mock, like the shipped default schema,
     // designates no display properties.
@@ -292,14 +299,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("POST /sessions/exchange without project_id returns 400", async () => {
     const handoff = await signHandoffToken({ sub: "proj_test", iss: BASE });
-    const res = await fetch(`${BASE}/sessions/exchange`, {
+    const res = await fetch(`${API}/sessions/exchange`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("sess.project_id_missing");
+    expect(body.code).toBe("req.invalid");
   });
 
   // The server cannot tell a replayed token from one it never issued (it
@@ -307,7 +314,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   // with the same 400 (internal/api/integration_test/session_exchange_test.go).
   describe("POST /sessions/exchange refuses a handoff token it will not exchange", () => {
     const exchange = (handoffToken: string) =>
-      fetch(`${BASE}/sessions/exchange?project_id=proj_refused`, {
+      fetch(`${API}/sessions/exchange?project_id=proj_refused`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ handoff_token: handoffToken }),
@@ -344,23 +351,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("DELETE /sessions/me revokes an active session and clears the cookie", async () => {
     const handoff = await signHandoffToken({ sub: "proj_revoke", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_revoke`, {
+    const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_revoke`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
     });
-    const setCookie = exchange.headers
-      .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="));
+    const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("zitadel_session="));
     expect(setCookie).toBeDefined();
     const sessionCookie = setCookie?.split(";")[0] ?? "";
 
     // Session is reachable before revocation.
-    const before = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
+    const before = await fetch(`${API}/sessions/me`, { headers: { cookie: sessionCookie } });
     expect(before.status).toBe(200);
 
     // Without the session's CSRF token, sign-out is refused and ends nothing.
-    const forged = await fetch(`${BASE}/sessions/me`, {
+    const forged = await fetch(`${API}/sessions/me`, {
       method: "DELETE",
       headers: { cookie: sessionCookie },
     });
@@ -368,7 +373,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(await forged.json()).toMatchObject({ code: "auth.csrf_invalid" });
     expect(forged.headers.getSetCookie()).toEqual([]);
 
-    const revoke = await fetch(`${BASE}/sessions/me`, {
+    const revoke = await fetch(`${API}/sessions/me`, {
       method: "DELETE",
       headers: {
         cookie: sessionCookie,
@@ -376,10 +381,10 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       },
     });
     expect(revoke.status).toBe(204);
-    expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+    expect(revoke.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
 
     // Session is gone after revocation.
-    const after = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
+    const after = await fetch(`${API}/sessions/me`, { headers: { cookie: sessionCookie } });
     expect(after.status).toBe(401);
   });
 
@@ -389,13 +394,13 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("GET /sessions/me/csrf without a session answers a 401 that is not stored", async () => {
-    const res = await fetch(`${BASE}/sessions/me/csrf`);
+    const res = await fetch(`${API}/sessions/me/csrf`);
     expect(res.status).toBe(401);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 
   test("a cross-origin preflight allows the X-Zitadel-CSRF header", async () => {
-    const res = await fetch(`${BASE}/users?project_id=proj_test`, {
+    const res = await fetch(`${API}/users?project_id=proj_test`, {
       method: "OPTIONS",
       headers: {
         origin: "http://localhost:4200",
@@ -409,7 +414,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("DELETE /sessions/me without a session cookie returns 401", async () => {
-    const res = await fetch(`${BASE}/sessions/me`, { method: "DELETE" });
+    const res = await fetch(`${API}/sessions/me`, { method: "DELETE" });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("auth.unauthorized");
@@ -419,9 +424,9 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   // issued, revoked) or expired before the handler runs, so it answers 401
   // whatever project the request names.
   test("DELETE /sessions/me with an unknown session token returns 401", async () => {
-    const res = await fetch(`${BASE}/sessions/me`, {
+    const res = await fetch(`${API}/sessions/me`, {
       method: "DELETE",
-      headers: { cookie: "__nextgen_session=deadbeefdeadbeef" },
+      headers: { cookie: "zitadel_session=deadbeefdeadbeef" },
     });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
@@ -438,7 +443,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
         { path: "/sessions/me", method: "DELETE" },
         { path: "/sessions/me/csrf", method: "GET" },
       ]) {
-        const res = await fetch(`${BASE}${route.path}?project_id=proj_me_other`, {
+        const res = await fetch(`${API}${route.path}?project_id=proj_me_other`, {
           method: route.method,
           headers: { cookie },
         });
@@ -448,6 +453,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // Like the server until 1.0.0 (ADR 077): an app on an older SDK still calls
+  // the root paths.
+  test.each([
+    ["POST", "/sessions/exchange?project_id=proj_root", 400],
+    ["GET", "/sessions/me", 401],
+    ["GET", "/sessions/me/csrf", 401],
+    ["DELETE", "/sessions/me", 401],
+  ])("answers %s %s at the old root path too", async (method, path, status) => {
+    const prefixed = await fetch(`${API}${path}`, { method });
+    const root = await fetch(`${BASE}${path}`, { method });
+
+    expect(prefixed.status).toBe(status);
+    expect(root.status).toBe(status);
   });
 
   test("GET /console/runtime.json names the project the console signs into", async () => {
@@ -464,7 +484,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /projects returns the spec-defined project shape", async () => {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -475,15 +495,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(() => CreateProjectResponse.parse(body)).not.toThrow();
     expect(body).toMatchObject({
       name: "conformance-app",
       origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
     });
   });
 
-  test("GET /projects/:id matches GetProjectResponse", async () => {
-    const create = await fetch(`${BASE}/projects`, {
+  test("GET /projects/:id reads a created project back", async () => {
+    const create = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -492,36 +511,34 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/projects/${id}`);
+    const res = await fetch(`${API}/projects/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(() => GetProjectResponse.parse(body)).not.toThrow();
     expect(body).toMatchObject({
       origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
     });
   });
 
   test("POST /projects/:id/origins adds a pattern and is idempotent for the same kind", async () => {
-    const create = await fetch(`${BASE}/projects`, {
+    const create = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "origins-app", seed_defaults: false }),
     });
     const { id } = (await create.json()) as { id: string };
 
-    const first = await fetch(`${BASE}/projects/${id}/origins`, {
+    const first = await fetch(`${API}/projects/${id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
     });
     expect(first.status).toBe(201);
     const firstBody = await first.json();
-    expect(() => AddOriginResponse.parse(firstBody)).not.toThrow();
     expect(firstBody).toEqual({ pattern: "https://app.example.com", kind: "primary" });
     expect(firstBody).not.toHaveProperty("check");
     expect(firstBody).not.toHaveProperty("warning");
 
-    const again = await fetch(`${BASE}/projects/${id}/origins`, {
+    const again = await fetch(`${API}/projects/${id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
@@ -529,7 +546,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(again.status).toBe(201);
     expect(await again.json()).toEqual({ pattern: "https://app.example.com", kind: "primary" });
 
-    const conflict = await fetch(`${BASE}/projects/${id}/origins`, {
+    const conflict = await fetch(`${API}/projects/${id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://app.example.com", kind: "preview" }),
@@ -540,7 +557,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /projects/:id/origins/remove is idempotent 204", async () => {
-    const create = await fetch(`${BASE}/projects`, {
+    const create = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -551,35 +568,35 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     const { id } = (await create.json()) as { id: string };
 
-    const remove = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+    const remove = await fetch(`${API}/projects/${id}/origins/remove`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://preview.example.com" }),
     });
     expect(remove.status).toBe(204);
 
-    const again = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+    const again = await fetch(`${API}/projects/${id}/origins/remove`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://preview.example.com" }),
     });
     expect(again.status).toBe(204);
 
-    const get = await fetch(`${BASE}/projects/${id}`);
+    const get = await fetch(`${API}/projects/${id}`);
     const body = await get.json();
     expect(body.origins).toEqual([]);
   });
 
   test("GET /projects/:id on unknown id returns spec-compliant error envelope", async () => {
-    const res = await fetch(`${BASE}/projects/proj-does-not-exist`);
+    const res = await fetch(`${API}/projects/proj-does-not-exist`);
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("not_found");
+    expect(body.code).toBe("proj.not_found");
     expect(typeof body.message).toBe("string");
   });
 
-  test("POST /schemas returns 201 with a schema id", async () => {
-    const res = await fetch(`${BASE}/schemas?project_id=proj_conformance`, {
+  test("POST /schemas returns 201 with the stored schema", async () => {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -597,10 +614,12 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const body = (await res.json()) as Record<string, unknown>;
     expect(typeof body.id).toBe("string");
     expect((body.id as string).startsWith("sch_")).toBe(true);
+    expect(body.schema).toMatchObject({ kind: "user-schema", objectType: "conformance" });
+    expect(typeof (body.metadata as Record<string, unknown>).created_at).toBe("string");
   });
 
-  test("GET and DELETE /schemas/:id look up by id without project_id", async () => {
-    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_owner`, {
+  test("GET /schemas/:schema_id looks up by id without project_id", async () => {
+    const create = await fetch(`${API}/schemas?project_id=proj_schema_owner`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -618,21 +637,17 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     // Flat-by-id: OpenAPI dropped the project_id query; ownership is an
     // authz concern on the real server (RSI + Check).
-    const missing = await fetch(`${BASE}/schemas/sch_does_not_exist`);
+    const missing = await fetch(`${API}/schemas/sch_does_not_exist`);
     expect(missing.status).toBe(404);
 
-    const ownerGet = await fetch(`${BASE}/schemas/${id}`);
+    const ownerGet = await fetch(`${API}/schemas/${id}`);
     expect(ownerGet.status).toBe(200);
-    const ownerDelete = await fetch(`${BASE}/schemas/${id}`, {
-      method: "DELETE",
-    });
-    expect(ownerDelete.status).toBe(204);
   });
 
-  test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
+  test("GET /schemas/:schema_id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
     // The real server persists the uploaded JSON Schema bytes verbatim, and
     // schema documents legitimately carry fields the request zod strips
-    // (title, description, custom x-* extensions). The mock must do the same,
+    // (title, description). The mock must do the same,
     // serving the document under `schema` in the {id, schema, metadata}
     // envelope.
     const doc = {
@@ -641,16 +656,16 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
-      "x-custom-extension": { keep: true },
+      description: "Kept verbatim",
     };
-    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_raw`, {
+    const create = await fetch(`${API}/schemas?project_id=proj_schema_raw`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(doc),
     });
     const { id } = (await create.json()) as { id: string };
 
-    const res = await fetch(`${BASE}/schemas/${id}`);
+    const res = await fetch(`${API}/schemas/${id}`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       id: string;
@@ -669,14 +684,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       objectType: "conformance-list",
       "x-auth-methods": { password: { enabled: true } },
     };
-    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_list`, {
+    const create = await fetch(`${API}/schemas?project_id=proj_schema_list`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(doc),
     });
     const { id } = (await create.json()) as { id: string };
 
-    const res = await fetch(`${BASE}/schemas?project_id=proj_schema_list`);
+    const res = await fetch(`${API}/schemas?project_id=proj_schema_list`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       schemas: Array<{ id: string; schema: unknown; metadata: { created_at: string } }>;
@@ -686,12 +701,38 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(typeof row?.metadata.created_at).toBe("string");
   });
 
+  test("GET /schemas adds metadata.in_use only when expanded", async () => {
+    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_in_use`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance-in-use",
+        "x-auth-methods": { password: { enabled: true } },
+      }),
+    });
+    const { id } = (await create.json()) as { id: string };
+    const metadataOf = async (query: string) => {
+      const res = await fetch(`${BASE}/schemas?project_id=proj_schema_in_use${query}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        schemas: Array<{ id: string; metadata: Record<string, unknown> }>;
+      };
+      return body.schemas.find((entry) => entry.id === id)?.metadata;
+    };
+
+    expect(await metadataOf("")).not.toHaveProperty("in_use");
+    // The mock keeps no users, so an expanded revision is never in use.
+    expect(await metadataOf("&expand=in_use")).toMatchObject({ in_use: false });
+  });
+
   test("GET /schemas pages with limit and next_page_token", async () => {
     // The consumer suites replace this handler with local MSW handlers, so
     // the mock's own slicing, token emission and continuation are only
     // proven here.
     for (let i = 0; i < 5; i += 1) {
-      const create = await fetch(`${BASE}/schemas?project_id=proj_schema_paging`, {
+      const create = await fetch(`${API}/schemas?project_id=proj_schema_paging`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -705,7 +746,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     }
 
     // The whole set fits in the default limit of 20: no token.
-    const full = await fetch(`${BASE}/schemas?project_id=proj_schema_paging`);
+    const full = await fetch(`${API}/schemas?project_id=proj_schema_paging`);
     expect(full.status).toBe(200);
     const fullBody = (await full.json()) as {
       schemas: Array<{ id: string }>;
@@ -720,7 +761,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const gotIds: string[] = [];
     let token: string | undefined;
     for (const wantSize of [2, 2, 1]) {
-      const url = new URL(`${BASE}/schemas`);
+      const url = new URL(`${API}/schemas`);
       url.searchParams.set("project_id", "proj_schema_paging");
       url.searchParams.set("limit", "2");
       if (token !== undefined) url.searchParams.set("page_token", token);
@@ -738,31 +779,49 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(gotIds).toEqual(wantIds);
 
     // A token the mock never minted is rejected, like the real server.
-    const bad = await fetch(
-      `${BASE}/schemas?project_id=proj_schema_paging&page_token=not-a-cursor`,
-    );
+    const bad = await fetch(`${API}/schemas?project_id=proj_schema_paging&page_token=not-a-cursor`);
     expect(bad.status).toBe(400);
     expect(((await bad.json()) as { code: string }).code).toBe("req.invalid");
 
     // An out-of-range limit is rejected by the generated query schema, not
     // silently clamped.
-    const oversized = await fetch(`${BASE}/schemas?project_id=proj_schema_paging&limit=101`);
+    const oversized = await fetch(`${API}/schemas?project_id=proj_schema_paging&limit=101`);
     expect(oversized.status).toBe(400);
   });
 
+  test("POST /schemas refuses a key the user meta-schema does not allow, as the server does", async () => {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance",
+        "x-auth-methods": { password: { enabled: true } },
+        properties: { firstName: { type: "string", minimumLength: 3 } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; details: { issues: unknown[] } };
+    expect(body.code).toBe("sch.invalid_request");
+    expect(body.details.issues).toContainEqual(
+      expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
+    );
+  });
+
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
-    const res = await fetch(`${BASE}/schemas?project_id=proj_conformance`, {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ kind: "not-a-real-kind" }),
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("invalid_schema");
+    expect(body.code).toBe("sch.invalid_request");
   });
 
-  test("POST /flow_definitions returns a body matching GetFlowDefinitionResponse (envelope is identical)", async () => {
-    const res = await fetch(`${BASE}/flow_definitions`, {
+  test("POST /flow_definitions answers 201 with the flow-definition envelope", async () => {
+    const res = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -771,14 +830,10 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     expect(res.status).toBe(201);
-    const body = await res.json();
-    // POST 201 and GET 200 share the `flow-definition-response`
-    // envelope per the spec, so the GET response zod schema validates both.
-    expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 
   test("POST /flow_definitions stores a schema id as the objectType it names", async () => {
-    const schema = await fetch(`${BASE}/schemas?project_id=proj_conformance_handle`, {
+    const schema = await fetch(`${API}/schemas?project_id=proj_conformance_handle`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -791,7 +846,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     const { id } = (await schema.json()) as { id: string };
 
-    const res = await fetch(`${BASE}/flow_definitions`, {
+    const res = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -806,24 +861,49 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {
     const flowDefinition = validFlowDefinitionBody();
-    // Wire register as a purpose without the flip transition — the exact
-    // class of definition the real server rejects at apply time.
-    flowDefinition.purposes = { login: "identifier", register: "identifier" };
-    const res = await fetch(`${BASE}/flow_definitions`, {
+    // A transition to a step the definition does not have — the exact class
+    // of definition the real server rejects at apply time.
+    flowDefinition.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
+        transitions: { submit: { target: "missing" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    const res = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ project_id: "proj_conformance", flow_definition: flowDefinition }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { code: string; message: string; details: string };
+    const body = (await res.json()) as {
+      code: string;
+      message: string;
+      details: { details: string };
+    };
     expect(body.code).toBe("flowdef.invalid");
     expect(body.message).toBe("flow definition: invalid");
-    expect(body.details).toContain('must wire "user_not_found" transition');
+    expect(body.details.details).toContain('targets unknown step "missing"');
+  });
+
+  test("POST /flow_definitions refuses a key the definition does not have, as the server does", async () => {
+    const res = await fetch(`${API}/flow_definitions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: "proj_conformance",
+        flow_definition: { ...validFlowDefinitionBody(), status: "active" },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
   });
 
   test("POST /flow_definitions with a repeated name publishes a new revision", async () => {
     const publish = async () => {
-      const res = await fetch(`${BASE}/flow_definitions`, {
+      const res = await fetch(`${API}/flow_definitions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -842,21 +922,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     // The name filter lists that flow's revisions, newest first.
     const res = await fetch(
-      `${BASE}/flow_definitions?project_id=proj_conformance_revisions&name=login-flow`,
+      `${API}/flow_definitions?project_id=proj_conformance_revisions&name=login-flow`,
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { flow_definitions: { id: string }[] };
     expect(body.flow_definitions.map((entry) => entry.id)).toEqual([second, first]);
 
     const none = await fetch(
-      `${BASE}/flow_definitions?project_id=proj_conformance_revisions&name=no-such-flow`,
+      `${API}/flow_definitions?project_id=proj_conformance_revisions&name=no-such-flow`,
     );
     expect(((await none.json()) as { flow_definitions: unknown[] }).flow_definitions).toEqual([]);
   });
 
   test("GET /flow_definitions?revisions=latest keeps one revision per name and honours purpose", async () => {
     const publish = async (overrides: Record<string, unknown>) => {
-      const res = await fetch(`${BASE}/flow_definitions`, {
+      const res = await fetch(`${API}/flow_definitions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -876,7 +956,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     const list = async (params: string) => {
       const res = await fetch(
-        `${BASE}/flow_definitions?project_id=proj_conformance_latest${params}`,
+        `${API}/flow_definitions?project_id=proj_conformance_latest${params}`,
       );
       expect(res.status).toBe(200);
       const body = (await res.json()) as { flow_definitions: { id: string }[] };
@@ -892,9 +972,9 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(await list("&revisions=latest&purpose=login")).toEqual([loginV2]);
   });
 
-  test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
+  test("GET /flow_definitions lists the project's definitions", async () => {
     // Ensure at least one entry exists so the list is non-trivial.
-    const create = await fetch(`${BASE}/flow_definitions`, {
+    const create = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -904,22 +984,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     const { id } = (await create.json()) as { id: string };
     // Spec: `ListFlowDefinitionsQueryParams` requires `project_id`.
-    const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_list`);
+    const res = await fetch(`${API}/flow_definitions?project_id=proj_conformance_list`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(() => ListFlowDefinitionsResponse.parse(body)).not.toThrow();
 
     // Both read endpoints describe a flow definition the same way (#939), so
     // the row and the by-id document must be the same object.
     const row = (body as { flow_definitions: { id: string }[] }).flow_definitions.find(
       (entry) => entry.id === id,
     );
-    const detail = await (await fetch(`${BASE}/flow_definitions/${id}`)).json();
+    const detail = await (await fetch(`${API}/flow_definitions/${id}`)).json();
     expect(row).toEqual(detail);
   });
 
-  test("GET /flow_definitions/:id matches GetFlowDefinitionResponse", async () => {
-    const create = await fetch(`${BASE}/flow_definitions`, {
+  test("GET /flow_definitions/:flow_definition_id reads a definition back", async () => {
+    const create = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -928,16 +1007,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/flow_definitions/${id}`);
+    const res = await fetch(`${API}/flow_definitions/${id}`);
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 });
 
 describe("api-mock claim lifecycle — init / status / complete conformance", () => {
   async function createProject(name: string): Promise<{ id: string; projectSecret: string }> {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
@@ -946,8 +1023,8 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     return { id: body.id, projectSecret: body.project_secret };
   }
 
-  async function initClaim(projectId: string, secret: string): Promise<Response> {
-    return fetch(`${BASE}/projects/${projectId}/claim/init`, {
+  async function createProjectClaim(projectId: string, secret: string): Promise<Response> {
+    return fetch(`${API}/projects/${projectId}/claim/init`, {
       method: "POST",
       headers: { authorization: `Bearer ${secret}` },
     });
@@ -959,7 +1036,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     secret: string,
   ): Promise<Response> {
     return fetch(
-      `${BASE}/projects/${projectId}/claim/status?challenge_id=${encodeURIComponent(challengeId)}`,
+      `${API}/projects/${projectId}/claim/status?challenge_id=${encodeURIComponent(challengeId)}`,
       { headers: { authorization: `Bearer ${secret}` } },
     );
   }
@@ -976,14 +1053,14 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
    * refuses first anyway.
    */
   async function claimHeaders(cookie: string): Promise<Record<string, string>> {
-    const me = await fetch(`${BASE}/sessions/me/csrf`, { headers: { cookie } });
+    const me = await fetch(`${API}/sessions/me/csrf`, { headers: { cookie } });
     const token = me.ok ? (((await me.json()) as { csrf_token?: string }).csrf_token ?? "") : "";
     return { "content-type": "application/json", cookie, "x-zitadel-csrf": token };
   }
 
   test("POST /projects/:id/claim/init returns 201 with a claim challenge", async () => {
     const project = await createProject("claim-init");
-    const res = await initClaim(project.id, project.projectSecret);
+    const res = await createProjectClaim(project.id, project.projectSecret);
     expect(res.status).toBe(201);
     // orval emits no `*Response` zod for a 201 body — validate structurally,
     // mirroring the POST /projects test above.
@@ -998,7 +1075,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     // response body, so the snapshot is its only route to the id the
     // completion and expiry mutators take.
     const project = await createProject("claim-snapshot");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     expect(snapshotPlatformStore().claimChallengeIds).toContain(challenge_id);
@@ -1006,13 +1083,12 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("GET /projects/:id/claim/status is pending before completion", async () => {
     const project = await createProject("claim-status-pending");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await claimStatus(project.id, challenge_id, project.projectSecret);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(() => GetClaimStatusResponse.parse(body)).not.toThrow();
     const parsed = body as Record<string, unknown>;
     expect(parsed.status).toBe("pending");
     expect(parsed.team_id).toBeUndefined();
@@ -1023,7 +1099,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("GET /projects/:id/claim/status with a foreign project secret returns 403", async () => {
     const project = await createProject("claim-status-owner");
     const other = await createProject("claim-status-foreign");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await claimStatus(project.id, challenge_id, other.projectSecret);
@@ -1034,18 +1110,17 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("full flow: init → complete with session cookie → status completed", async () => {
     const project = await createProject("claim-full-flow");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
     expect(complete.status).toBe(200);
     const completeBody = await complete.json();
-    expect(() => CompleteClaimResponse.parse(completeBody)).not.toThrow();
     const completed = completeBody as Record<string, unknown>;
     expect(completed.project_id).toBe(project.id);
     expect(typeof completed.team_id).toBe("string");
@@ -1054,7 +1129,6 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const status = await claimStatus(project.id, challenge_id, project.projectSecret);
     expect(status.status).toBe(200);
     const statusBody = await status.json();
-    expect(() => GetClaimStatusResponse.parse(statusBody)).not.toThrow();
     const parsed = statusBody as Record<string, unknown>;
     expect(parsed.status).toBe("completed");
     expect(typeof parsed.team_id).toBe("string");
@@ -1064,16 +1138,16 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/init returns 409 once the project is claimed", async () => {
     const project = await createProject("claim-already-claimed");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
-    await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
 
-    const res = await initClaim(project.id, project.projectSecret);
+    const res = await createProjectClaim(project.id, project.projectSecret);
     expect(res.status).toBe(409);
     const body = (await res.json()) as { code: string; details: Record<string, unknown> };
     expect(body.code).toBe("proj.already_claimed");
@@ -1083,7 +1157,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("an expired challenge makes status and complete return 410", async () => {
     const project = await createProject("claim-expired");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     expireClaimChallenge(challenge_id);
 
@@ -1093,7 +1167,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(statusBody.code).toBe("proj.claim_expired");
 
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1107,11 +1181,11 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const project = await createProject("claim-window-expired");
     // Mint the challenge while the window is open, then close it: complete
     // must refuse even a live challenge once the project is too old.
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     expireClaimWindow(project.id);
 
-    const reinit = await initClaim(project.id, project.projectSecret);
+    const reinit = await createProjectClaim(project.id, project.projectSecret);
     expect(reinit.status).toBe(410);
     const reinitBody = (await reinit.json()) as Record<string, unknown>;
     expect(reinitBody.code).toBe("proj.claim_window_expired");
@@ -1124,7 +1198,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(statusBody.code).toBe("proj.claim_window_expired");
 
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1141,7 +1215,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(((await bothStatus.json()) as Record<string, unknown>).code).toBe(
       "proj.claim_window_expired",
     );
-    const bothComplete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const bothComplete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1154,10 +1228,10 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete without a session cookie returns 401", async () => {
     const project = await createProject("claim-complete-no-cookie");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ challenge_id }),
@@ -1169,11 +1243,11 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete without the CSRF token returns 403", async () => {
     const project = await createProject("claim-complete-no-csrf");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
       body: JSON.stringify({ challenge_id }),
@@ -1186,7 +1260,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/complete with an unknown challenge returns 404", async () => {
     const project = await createProject("claim-complete-unknown");
     const cookie = await platformSessionCookie();
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id: "ch_doesnotexist" }),
@@ -1197,7 +1271,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/complete without challenge_id returns 400", async () => {
     const project = await createProject("claim-complete-missing-id");
     const cookie = await platformSessionCookie();
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({}),
@@ -1208,7 +1282,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/init with another project's secret returns 404", async () => {
     const project = await createProject("claim-init-owner");
     const other = await createProject("claim-init-foreign");
-    const res = await initClaim(project.id, other.projectSecret);
+    const res = await createProjectClaim(project.id, other.projectSecret);
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("proj.not_found");
@@ -1216,11 +1290,11 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("GET /projects/:id/claim/status without a bearer token returns 401", async () => {
     const project = await createProject("claim-status-no-bearer");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await fetch(
-      `${BASE}/projects/${project.id}/claim/status?challenge_id=${encodeURIComponent(challenge_id)}`,
+      `${API}/projects/${project.id}/claim/status?challenge_id=${encodeURIComponent(challenge_id)}`,
     );
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
@@ -1229,13 +1303,13 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete with a customer-project session returns 401", async () => {
     const project = await createProject("claim-complete-ineligible");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     // A session for the customer project, not the platform project, must not
     // be able to claim (ADR 046 §2).
     const cookie = await sessionCookie(project.id);
-    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1248,11 +1322,11 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/complete on a mismatched project returns 404", async () => {
     const project = await createProject("claim-complete-path-a");
     const other = await createProject("claim-complete-path-b");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
-    const res = await fetch(`${BASE}/projects/${other.id}/claim/complete`, {
+    const res = await fetch(`${API}/projects/${other.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1262,10 +1336,10 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("a claim challenge is single-use: a second completion returns 409", async () => {
     const project = await createProject("claim-single-use");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
-    const url = `${BASE}/projects/${project.id}/claim/complete`;
+    const url = `${API}/projects/${project.id}/claim/complete`;
     const body = JSON.stringify({ challenge_id });
     const headers = await claimHeaders(cookie);
 
@@ -1284,10 +1358,10 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   // that landed stays reported as completed even after its challenge's TTL.
   test("a completed claim stays completed on status past challenge expiry", async () => {
     const project = await createProject("claim-completed-expired");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
@@ -1308,13 +1382,13 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   // never a false "can no longer be claimed" verdict.
   test("a pending challenge on a project claimed elsewhere reports completed", async () => {
     const project = await createProject("claim-cross-challenge-status");
-    const first = await initClaim(project.id, project.projectSecret);
+    const first = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id: polled } = (await first.json()) as { challenge_id: string };
-    const second = await initClaim(project.id, project.projectSecret);
+    const second = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id: winner } = (await second.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
-    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+    const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id: winner }),
@@ -1353,7 +1427,7 @@ describe("api-mock idp connections and variables", () => {
   });
 
   async function newProject(name: string): Promise<string> {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
@@ -1376,7 +1450,6 @@ describe("api-mock idp connections and variables", () => {
 
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(CreateIdpResponse.safeParse(body).success).toBe(true);
     expect(body.slug).toBe("google");
     expect(String(body.id)).toMatch(/^idp_/);
     expect(String(body.revision_id)).toMatch(/^idprev_/);
@@ -1475,7 +1548,6 @@ describe("api-mock idp connections and variables", () => {
 
     const ok = await fetch(`${BASE}/idps/${created.id}?project_id=${mine}`);
     expect(ok.status).toBe(200);
-    expect(GetIdpByIdResponse.safeParse(await ok.json()).success).toBe(true);
 
     const foreign = await fetch(`${BASE}/idps/${created.id}?project_id=${other}`);
     expect(foreign.status).toBe(404);
@@ -1492,7 +1564,6 @@ describe("api-mock idp connections and variables", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { idps: { slug: string }[] };
-    expect(QueryIdpsResponse.safeParse(body).success).toBe(true);
     expect(body.idps.map((i) => i.slug)).toEqual(["google"]);
   });
 
@@ -1515,7 +1586,6 @@ describe("api-mock idp connections and variables", () => {
 
     const res = await fetch(`${BASE}/variables?project_id=${projectId}`);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(GetVariablesResponse.safeParse(body).success).toBe(true);
     expect(body.GOOGLE_CLIENT_ID).toEqual({
       primary: "824.apps.googleusercontent.com",
       preview: "824.apps.googleusercontent.com",
@@ -1634,7 +1704,7 @@ describe("api-mock idp and variable contract details", () => {
   };
 
   async function newProject(name: string): Promise<string> {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
@@ -1669,7 +1739,23 @@ describe("api-mock idp and variable contract details", () => {
     });
 
     expect(repointed.status).toBe(400);
-    expect(((await repointed.json()) as { code: string }).code).toBe("idp.field_immutable");
+    expect(await repointed.json()).toMatchObject({
+      code: "idp.field_immutable",
+      details: { details: { fields: ["oidc.issuer"] } },
+    });
+
+    // An absent subject_claim reads as `sub`, so dropping an explicit one is no
+    // change, while naming another claim is.
+    const implicitSub = await putIdp(projectId, { ...base, subject_claim: undefined });
+
+    expect(implicitSub.status).toBe(200);
+
+    const otherClaim = await putIdp(projectId, { ...base, subject_claim: "oid" });
+
+    expect(otherClaim.status).toBe(400);
+    expect(await otherClaim.json()).toMatchObject({
+      details: { details: { fields: ["subject_claim"] } },
+    });
   });
 
   test("accepts a revision that changes something mutable", async () => {
@@ -1769,15 +1855,15 @@ describe("api-mock idp and variable contract details", () => {
     });
   });
 
-  test("answers not_implemented for a deployment's variables", async () => {
+  test("answers not found for the variables of a deployment the project does not hold", async () => {
     const projectId = await newProject("vars-deployment");
 
     const res = await fetch(
       `${BASE}/deployments/dep_01KX5N7C9D2E7F0N9WD3P2E4YM6/variables?project_id=${projectId}`,
     );
 
-    expect(res.status).toBe(501);
-    expect(((await res.json()) as { code?: string }).code).toBe("not_implemented");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code?: string }).code).toBe("dep.not_found");
   });
 
   test("reads back what the write did not touch", async () => {
@@ -1802,7 +1888,7 @@ describe("api-mock idp and variable contract details", () => {
 });
 describe("api-mock releases and deployments", () => {
   async function newProject(name: string): Promise<{ id: string; secret: string }> {
-    const res = await fetch(`${BASE}/projects`, {
+    const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
@@ -1812,10 +1898,17 @@ describe("api-mock releases and deployments", () => {
   }
 
   const addPrimary = (id: string, secret: string, pattern: string) =>
-    fetch(`${BASE}/projects/${id}/origins`, {
+    fetch(`${API}/projects/${id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
       body: JSON.stringify({ pattern, kind: "primary" }),
+    });
+
+  const addPreview = (id: string, secret: string, pattern: string) =>
+    fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ pattern, kind: "preview" }),
     });
 
   const rel1 = { pointers: [{ kind: "schema", revision_id: "sch_a" }] };
@@ -1834,6 +1927,145 @@ describe("api-mock releases and deployments", () => {
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
       body: JSON.stringify(body),
     });
+
+  /**
+   * The primary origin the projects of the revoke, guard and status tests list.
+   */
+  const PRIMARY_URL = "https://app.acme.com";
+
+  /**
+   * The preview pattern the projects of the revoke and status tests list.
+   */
+  const PREVIEW_PATTERN = "https://*-acmeinc.vercel.app";
+
+  /**
+   * Builds a release of the project as its operator.
+   *
+   * @param project - The project's id and secret.
+   * @param bundle - What the release pins.
+   * @returns The release, as the platform answered the create.
+   */
+  async function released(project: { id: string; secret: string }, bundle: object) {
+    const created = await createRelease(project.id, project.secret, bundle);
+
+    return (await created.json()) as { id: string };
+  }
+
+  /**
+   * Deploys a release of the project as its operator.
+   *
+   * @param project - The project's id and secret.
+   * @param body - What to deploy and where, as the API takes it.
+   * @returns The deployment, as the platform answered the create.
+   */
+  async function deployed(project: { id: string; secret: string }, body: object) {
+    const created = await createDeployment(project.id, project.secret, body);
+
+    return (await created.json()) as { id: string };
+  }
+
+  /**
+   * Removes a live preview as the project's operator.
+   *
+   * @param project - The project's id and secret.
+   * @param origin - The preview URL to remove.
+   * @returns The platform's answer.
+   */
+  function removeLivePreview(
+    project: { id: string; secret: string },
+    origin: string,
+  ): Promise<Response> {
+    return fetch(`${BASE}/projects/${project.id}/previews/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ origin }),
+    });
+  }
+
+  test("freezes the variables of the deployment's kind, untouched by later writes", async () => {
+    const project = await newProject("deployment-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const variables = `${BASE}/variables?project_id=${project.id}`;
+    const write = (kind: string, payload: object) =>
+      fetch(`${variables}&kind=${kind}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    await write("primary", { HOST: "app.acme.com", TOKEN: { value: "s3cr3t", secret: true } });
+    await write("preview", { HOST: "preview.acme.com" });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: "primary",
+      })
+    ).json()) as { id: string };
+    await write("primary", { HOST: "changed.acme.com" });
+
+    const res = await fetch(
+      `${BASE}/deployments/${deployment.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ HOST: "app.acme.com", TOKEN: { secret: true } });
+  });
+
+  test("reuses the restored deployment's frozen variables on rollback", async () => {
+    const project = await newProject("rollback-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const write = (payload: object) =>
+      fetch(`${BASE}/variables?project_id=${project.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    const deploy = async (body: object) => {
+      const release = (await (await createRelease(project.id, project.secret, body)).json()) as {
+        id: string;
+      };
+      return (await (
+        await createDeployment(project.id, project.secret, {
+          release_id: release.id,
+          targets: "primary",
+        })
+      ).json()) as { id: string };
+    };
+    await write({ HOST: "first.acme.com" });
+    const first = await deploy(rel1);
+    await write({ HOST: "second.acme.com" });
+    await deploy(rel2);
+    const rolledBack = (await (
+      await fetch(`${BASE}/deployments/${first.id}/rollback?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { id: string };
+
+    const res = await fetch(
+      `${BASE}/deployments/${rolledBack.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(await res.json()).toEqual({ HOST: "first.acme.com" });
+  });
+
+  test("refuses a bundled flow definition with a key the definition does not have", async () => {
+    const project = await newProject("release-build-flow-key");
+    const res = await fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({
+        bundle: { flow_definitions: [{ ...validFlowDefinitionBody(), status: "active" }] },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
+  });
 
   test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
     const project = await newProject("release-build-idps");
@@ -1891,6 +2123,59 @@ describe("api-mock releases and deployments", () => {
     expect(again.idps).toHaveLength(1);
   });
 
+  test("pins a bundled application and serves the revision it pins", async () => {
+    const project = await newProject("release-build-application");
+    const application = (redirect: string) => ({
+      slug: "shop",
+      name: "Shop",
+      clients: [
+        {
+          slug: "web",
+          client_id: "shop-web",
+          type: "confidential",
+          secret: "${{ SHOP_WEB_SECRET }}",
+          grant_types: ["authorization_code"],
+          redirect_uris: [redirect],
+        },
+      ],
+    });
+    const build = async (redirect: string) => {
+      const res = await fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ bundle: { applications: [application(redirect)] } }),
+      });
+      expect(res.status).toBe(201);
+      const pointers = (
+        (await res.json()) as {
+          pointers: { kind: string; handle: string; revision_id: string }[];
+        }
+      ).pointers;
+      const pointer = pointers.find((candidate) => candidate.kind === "application");
+      expect(pointer).toMatchObject({ handle: "shop" });
+      return pointer?.revision_id as string;
+    };
+    const read = async (revisionId: string) =>
+      fetch(`${BASE}/applications/revisions/${revisionId}?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      });
+
+    // A bundle of only an application is a release, as on the server.
+    const first = await build("https://shop.example.com/callback");
+    const second = await build("https://shop.example.com/cb");
+
+    expect(second).not.toBe(first);
+    const pinned = await read(first);
+    expect(pinned.status).toBe(200);
+    expect(await pinned.json()).toMatchObject({
+      revision_id: first,
+      slug: "shop",
+      declared: true,
+      definition: { clients: [{ redirect_uris: ["https://shop.example.com/callback"] }] },
+    });
+    expect((await read("apprev_missing")).status).toBe(404);
+  });
+
   test("refuses a build that would change a connection's fixed field", async () => {
     const project = await newProject("release-build-idp-immutable");
     const connection = (issuer: string) => ({
@@ -1928,7 +2213,101 @@ describe("api-mock releases and deployments", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
+    expect(await res.json()).toMatchObject({
+      code: "rel.invalid",
+      details: {
+        resources: [
+          {
+            kind: "idp",
+            handle: "google",
+            code: "idp.field_immutable",
+            details: { details: { fields: ["oidc.issuer"] } },
+          },
+        ],
+      },
+    });
+  });
+
+  test("evaluates a password policy as a password set would, storing nothing", async () => {
+    const project = await newProject("policy-evaluate");
+    const evaluate = (body: object) =>
+      fetch(`${BASE}/policies/evaluate?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ operation: "auth.factor.password.set", ...body }),
+      });
+    const decision = async (body: object) => {
+      const res = await evaluate(body);
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+
+    expect(
+      await decision({ config: { min_length: 12 }, input: { password: "a-long-enough-one" } }),
+    ).toEqual({
+      allowed: true,
+    });
+    expect(await decision({ config: { min_length: 12 }, input: { password: "short1" } })).toEqual({
+      allowed: false,
+      code: "user.password_policy_violation",
+      violations: { min_length: 12 },
+    });
+    // 13 code points, 14 bytes.
+    expect(
+      await decision({ config: { min_length: 14 }, input: { password: "Passwört12345" } }),
+    ).toMatchObject({
+      violations: { min_length: 14 },
+    });
+    expect(await decision({ config: {}, input: { password: "" } })).toEqual({
+      allowed: false,
+      code: "user.password_empty",
+    });
+    expect(await decision({ config: {}, input: { password: "a".repeat(65) } })).toMatchObject({
+      violations: { max_length: 64 },
+    });
+    expect(
+      await decision({
+        config: { history_depth: 2 },
+        input: { password: "reused" },
+        facts: { history_matches: [false, true] },
+      }),
+    ).toMatchObject({ violations: { history_depth: 2 } });
+    expect(
+      await decision({
+        config: { history_depth: 2 },
+        input: { password: "reused" },
+        facts: { self_service: false, history_matches: [true] },
+      }),
+    ).toEqual({ allowed: true });
+
+    const contradicting = await evaluate({
+      config: { min_length: 20, max_length: 10 },
+      input: { password: "x" },
+    });
+    expect(contradicting.status).toBe(400);
+    expect(((await contradicting.json()) as { code: string }).code).toBe("pol.invalid");
+    for (const malformed of [
+      { config: { min_lenght: 12 }, input: { password: "x" } },
+      { config: {}, input: { password: "x", passwd: "x" } },
+      { config: { history_depth: 2 }, input: { password: "x" }, facts: { history_match: [true] } },
+      { config: {}, input: { password: "a".repeat(4097) } },
+      {
+        config: {},
+        input: { password: "x" },
+        facts: { history_matches: [false, false, false, false, true] },
+      },
+    ]) {
+      const res = await evaluate(malformed);
+      expect(res.status, JSON.stringify(malformed)).toBe(400);
+      expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
+    }
+
+    const listed = (await (
+      await fetch(`${BASE}/policies?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { policies: unknown[] };
+    expect(listed.policies).toEqual([]);
   });
 
   test("builds a release whose bundle carries a policy, revising it only when it changes", async () => {
@@ -2051,7 +2430,7 @@ describe("api-mock releases and deployments", () => {
 
     const first = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(first.status).toBe(201);
     const deployment = (await first.json()) as {
@@ -2062,7 +2441,7 @@ describe("api-mock releases and deployments", () => {
 
     const again = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(again.status).toBe(200);
   });
@@ -2075,7 +2454,7 @@ describe("api-mock releases and deployments", () => {
 
     const noPrimary = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(noPrimary.status).toBe(400);
     expect(((await noPrimary.json()) as { code: string }).code).toBe("dep.invalid");
@@ -2100,13 +2479,13 @@ describe("api-mock releases and deployments", () => {
 
     const live = await createDeployment(project.id, project.secret, {
       release_id: first.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(await live.json()).toMatchObject({ kind: "primary", status: "live" });
 
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const history = (await (
@@ -2134,7 +2513,7 @@ describe("api-mock releases and deployments", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({
       code: "dep.invalid",
-      message: "deployment: deploy primary origins with the primary keyword",
+      message: "deployment: deploy to primary origins with the primary target",
     });
   });
 
@@ -2147,7 +2526,7 @@ describe("api-mock releases and deployments", () => {
     const firstDeploy = (await (
       await createDeployment(project.id, project.secret, {
         release_id: first.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
     const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
@@ -2155,7 +2534,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const rollback = await fetch(
@@ -2171,6 +2550,51 @@ describe("api-mock releases and deployments", () => {
     expect(((await rollback.json()) as { code: string }).code).toBe("dep.conflict");
   });
 
+  test("refuses a deploy that names an expected deployment where nothing is deployed", async () => {
+    const project = await newProject("deploy-guard-nothing-deployed");
+    await addPrimary(project.id, project.secret, PRIMARY_URL);
+    const release = await released(project, rel1);
+
+    const refused = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: "primary",
+      expected_deployment_id: "dep_none",
+    });
+
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({
+      code: "dep.conflict",
+      details: { deployment: null },
+    });
+  });
+
+  test("names a removed preview as the live deployment a new one to its URL replaces", async () => {
+    const previewUrl = "https://x-acmeinc.vercel.app";
+    const project = await newProject("deploy-guard-removed-preview");
+    await addPrimary(project.id, project.secret, PRIMARY_URL);
+    await addPreview(project.id, project.secret, PREVIEW_PATTERN);
+    const release = await released(project, rel1);
+    const primary = await deployed(project, { release_id: release.id, targets: "primary" });
+    const preview = await deployed(project, {
+      release_id: release.id,
+      targets: [previewUrl],
+      ttl: "PT1H",
+    });
+    await removeLivePreview(project, previewUrl);
+
+    const refused = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [previewUrl],
+      expected_deployment_id: primary.id,
+    });
+
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({
+      code: "dep.conflict",
+      details: { deployment: { id: preview.id, status: "live" } },
+    });
+  });
+
   test("deploys by digest the release of this project, not another's with the same digest", async () => {
     const first = await newProject("deploy-digest-a");
     const second = await newProject("deploy-digest-b");
@@ -2182,7 +2606,7 @@ describe("api-mock releases and deployments", () => {
 
     const deployed = await createDeployment(second.id, second.secret, {
       content_hash: own.content_hash,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     expect(deployed.status).toBe(201);
@@ -2190,7 +2614,7 @@ describe("api-mock releases and deployments", () => {
 
   test("writes a new preview deployment for a release the URL already serves", async () => {
     const project = await newProject("deploy-preview-renewal");
-    await fetch(`${BASE}/projects/${project.id}/origins`, {
+    await fetch(`${API}/projects/${project.id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
       body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
@@ -2198,17 +2622,17 @@ describe("api-mock releases and deployments", () => {
     const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
       id: string;
     };
-    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "1h" };
+    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "PT1H" };
     await createDeployment(project.id, project.secret, body);
 
-    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "30d" });
+    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "P30D" });
 
     expect(renewed.status).toBe(201);
   });
 
   test("gives a preview deployment without a ttl the project's default expiry", async () => {
     const project = await newProject("deploy-preview-default-ttl");
-    await fetch(`${BASE}/projects/${project.id}/origins`, {
+    await fetch(`${API}/projects/${project.id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
       body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
@@ -2217,17 +2641,20 @@ describe("api-mock releases and deployments", () => {
       id: string;
     };
 
-    const deployed = (await (
-      await createDeployment(project.id, project.secret, {
-        release_id: release.id,
-        targets: ["https://x-acme.vercel.app"],
-      })
-    ).json()) as { targets: { expires_at: string | null }[] };
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://x-acme.vercel.app"],
+    });
 
-    expect(deployed.targets[0]?.expires_at).not.toBeNull();
+    const listed = (await (await fetch(`${API}/projects/${project.id}/previews`)).json()) as {
+      previews: { expires_at: string }[];
+    };
+    expect(new Date(listed.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
   });
 
-  test("refuses a rollback to an origin that is no longer primary with 403", async () => {
+  test("a rollback keeps the origins it froze when one is no longer primary", async () => {
     const project = await newProject("deploy-rollback-removed");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
     await addPrimary(project.id, project.secret, "https://www.acme.com");
@@ -2237,10 +2664,10 @@ describe("api-mock releases and deployments", () => {
     const deployment = (await (
       await createDeployment(project.id, project.secret, {
         release_id: release.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
-    await fetch(`${BASE}/projects/${project.id}/origins/remove`, {
+    await fetch(`${API}/projects/${project.id}/origins/remove`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
       body: JSON.stringify({ pattern: "https://www.acme.com" }),
@@ -2255,8 +2682,46 @@ describe("api-mock releases and deployments", () => {
       },
     );
 
-    expect(rollback.status).toBe(403);
-    expect(((await rollback.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+    expect(rollback.status).toBe(200);
+    const restored = (await rollback.json()) as { targets: { origin: string }[] };
+    expect(restored.targets.map((target) => target.origin)).toEqual([
+      "https://app.acme.com",
+      "https://www.acme.com",
+    ]);
+  });
+
+  test("a live read leaves out an origin the newest primary deployment does not name", async () => {
+    const project = await newProject("deploy-rollback-narrower");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const narrow = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: "primary",
+      })
+    ).json()) as { id: string };
+    await addPrimary(project.id, project.secret, "https://www.acme.com");
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: "primary",
+    });
+    await fetch(`${BASE}/deployments/${narrow.id}/rollback?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ message: "revert" }),
+    });
+
+    const live = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { deployments: { targets: { origin: string }[] }[] };
+
+    expect(
+      live.deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+    ).toEqual(["https://app.acme.com"]);
   });
 
   test("rolls back to an earlier deployment, reversing the live release", async () => {
@@ -2268,7 +2733,7 @@ describe("api-mock releases and deployments", () => {
     const firstDeploy = (await (
       await createDeployment(project.id, project.secret, {
         release_id: first.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
 
@@ -2277,7 +2742,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const rollback = await fetch(
@@ -2304,6 +2769,244 @@ describe("api-mock releases and deployments", () => {
     expect(live.deployments[0]?.release_id).toBe(first.id);
   });
 
+  test("a preview deployment defaults an omitted ttl and writes one preview per URL", async () => {
+    const project = await newProject("deploy-preview");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+
+    // An omitted ttl is accepted: the project's default applies, so the preview
+    // is written with a future expiry rather than being refused.
+    const deployed = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+    });
+    expect(deployed.status).toBe(201);
+    const body = (await deployed.json()) as { targets: { origin: string }[] };
+    expect(body.targets).toEqual([{ origin: url }]);
+
+    const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+      previews: { origin: string; expires_at: string }[];
+    };
+    expect(listed.previews.map((preview) => preview.origin)).toEqual([url]);
+    expect(new Date(listed.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
+  });
+
+  test("refuses a deployment that mixes preview URLs with primary origins", async () => {
+    const project = await newProject("deploy-mixed");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const mixed = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://app.acme.com", "https://acme-git-sso-acmeinc.vercel.app"],
+      ttl: "PT168H",
+    });
+    expect(mixed.status).toBe(400);
+    expect(((await mixed.json()) as { code: string }).code).toBe("dep.invalid");
+  });
+
+  test("refuses a ttl on a primary-origin deployment", async () => {
+    const project = await newProject("deploy-primary-ttl");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    // ttl is only meaningful for previews: a primary-origin deployment that
+    // carries one is refused, even though an omitted ttl on a preview defaults.
+    const withTtl = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: "primary",
+      ttl: "PT168H",
+    });
+    expect(withTtl.status).toBe(400);
+    expect(((await withTtl.json()) as { code: string }).code).toBe("dep.invalid");
+  });
+
+  test("removes a preview idempotently and stops listing it", async () => {
+    const project = await newProject("preview-remove");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "PT168H",
+    });
+
+    const removeProjectPreview = () =>
+      fetch(`${BASE}/projects/${project.id}/previews/remove`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ origin: url }),
+      });
+
+    expect((await removeProjectPreview()).status).toBe(204);
+    const afterFirst = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+      previews: unknown[];
+    };
+    expect(afterFirst.previews).toHaveLength(0);
+
+    // Idempotent: removing an already-gone preview still answers 204.
+    expect((await removeProjectPreview()).status).toBe(204);
+  });
+
+  test("lets a release whose only preview was removed be revoked", async () => {
+    const project = await newProject("preview-remove-revoke");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "PT168H",
+    });
+    await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ origin: url }),
+    });
+
+    const revoked = await fetch(`${BASE}/releases/${release.id}/revoke?project_id=${project.id}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${project.secret}` },
+    });
+
+    expect(revoked.status).toBe(200);
+  });
+
+  test("renews a preview's expiry on a re-deploy of unchanged content", async () => {
+    const project = await newProject("preview-renew");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+
+    const first = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "PT60M",
+    });
+    expect(first.status).toBe(201);
+    const expiresFirst = (
+      (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+        previews: { expires_at: string }[];
+      }
+    ).previews[0]?.expires_at as string;
+
+    // Re-deploying the same release and variables writes a new deployment
+    // (201), the renewal, whose ttl pushes the preview's expiry later.
+    const again = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "PT168H",
+    });
+    expect(again.status).toBe(201);
+    const expiresAgain = (
+      (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+        previews: { expires_at: string }[];
+      }
+    ).previews[0]?.expires_at as string;
+    expect(new Date(expiresAgain).getTime()).toBeGreaterThan(new Date(expiresFirst).getTime());
+  });
+
+  test("pages the previews list with limit and next_page_token", async () => {
+    const project = await newProject("preview-paging");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const urls = [
+      "https://a-acmeinc.vercel.app",
+      "https://b-acmeinc.vercel.app",
+      "https://c-acmeinc.vercel.app",
+    ];
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: urls,
+      ttl: "PT168H",
+    });
+
+    const first = (await (
+      await fetch(`${BASE}/projects/${project.id}/previews?limit=2`)
+    ).json()) as { previews: { origin: string }[]; next_page_token?: string | null };
+    expect(first.previews).toHaveLength(2);
+    const token = first.next_page_token;
+    expect(typeof token).toBe("string");
+
+    const second = (await (
+      await fetch(`${BASE}/projects/${project.id}/previews?limit=2&page_token=${token}`)
+    ).json()) as { previews: { origin: string }[]; next_page_token?: string | null };
+    expect(second.previews).toHaveLength(1);
+    expect(second.next_page_token ?? null).toBeNull();
+
+    // Every URL appears exactly once across the two pages.
+    const seen = [...first.previews, ...second.previews].map((preview) => preview.origin).sort();
+    expect(seen).toEqual([...urls].sort());
+
+    // A token the mock never minted is rejected, like the real server.
+    const bad = await fetch(`${BASE}/projects/${project.id}/previews?page_token=not-a-cursor`);
+    expect(bad.status).toBe(400);
+  });
+
+  test("a preview removal leaves deployment history untouched", async () => {
+    const project = await newProject("preview-remove-history");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+    const deployed = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: [url],
+        ttl: "PT168H",
+      })
+    ).json()) as { id: string };
+    const historyBefore = (await (
+      await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
+    ).json()) as { deployed_at: string; targets: { origin: string }[] };
+
+    const removed = await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ origin: url }),
+    });
+    expect(removed.status).toBe(204);
+
+    // The live preview list no longer admits the URL — its preview is gone.
+    const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+      previews: unknown[];
+    };
+    expect(listed.previews).toHaveLength(0);
+    // Nor does the live deployments view.
+    const liveDeployments = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`)
+    ).json()) as { deployments: unknown[] };
+    expect(liveDeployments.deployments).toHaveLength(0);
+
+    // But the deployment that served it keeps its real timestamps — removal
+    // ends the preview, it does not rewrite history.
+    const historyAfter = (await (
+      await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
+    ).json()) as { deployed_at: string; targets: { origin: string }[] };
+    expect(historyAfter.deployed_at).toBe(historyBefore.deployed_at);
+    expect(historyAfter.targets).toEqual(historyBefore.targets);
+  });
+
   test("refuses to revoke a release an origin still serves, then allows it", async () => {
     const project = await newProject("release-revoke");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
@@ -2312,7 +3015,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: served.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const inUse = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
@@ -2327,7 +3030,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: next.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const ok = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
@@ -2337,4 +3040,1073 @@ describe("api-mock releases and deployments", () => {
     expect(ok.status).toBe(200);
     expect(((await ok.json()) as { revoked_at: string }).revoked_at).not.toBeNull();
   });
+
+  describe("a release a primary origin and a preview serve", () => {
+    /**
+     * A preview URL that {@link PREVIEW_PATTERN} admits.
+     */
+    const PREVIEW_URL = "https://acme-git-sso-acmeinc.vercel.app";
+
+    /**
+     * A project serving one release on its primary origin and on a preview URL.
+     *
+     * @param name - The project's name.
+     * @returns The project, the release, and the deployments that serve it on
+     * the primary origin and on the preview.
+     */
+    async function aReleaseServedTwice(name: string) {
+      const project = await newProject(name);
+      await addPrimary(project.id, project.secret, PRIMARY_URL);
+      await addPreview(project.id, project.secret, PREVIEW_PATTERN);
+      const release = await released(project, rel1);
+      const primary = await deployed(project, { release_id: release.id, targets: "primary" });
+      const preview = await deployed(project, {
+        release_id: release.id,
+        targets: [PREVIEW_URL],
+        ttl: "PT168H",
+      });
+
+      return { project, release, primary, preview };
+    }
+
+    /**
+     * Puts a second release live on the project's primary origins, as a deploy
+     * would.
+     *
+     * @param project - The project's id and secret.
+     * @returns The second release and the deployment that made it live.
+     */
+    async function aReplacementLive(project: { id: string; secret: string }) {
+      const release = await released(project, rel2);
+      const deployment = await deployed(project, { release_id: release.id, targets: "primary" });
+
+      return { release, deployment };
+    }
+
+    /**
+     * Revokes a release as the project's operator.
+     *
+     * @param project - The project's id and secret.
+     * @param releaseId - The release to revoke.
+     * @returns The platform's answer.
+     */
+    function revoke(project: { id: string; secret: string }, releaseId: string): Promise<Response> {
+      return fetch(`${BASE}/releases/${releaseId}/revoke?project_id=${project.id}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${project.secret}` },
+      });
+    }
+
+    /**
+     * Drops an origin from the project's origins as its operator.
+     *
+     * @param project - The project's id and secret.
+     * @param pattern - The origin to drop.
+     * @returns The platform's answer.
+     */
+    function removeOrigin(
+      project: { id: string; secret: string },
+      pattern: string,
+    ): Promise<Response> {
+      return fetch(`${BASE}/projects/${project.id}/origins/remove`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ pattern }),
+      });
+    }
+
+    /**
+     * What the live deployments view shows: each deployment with its release and
+     * the origins it serves.
+     *
+     * @param projectId - The project.
+     * @param origin - Ask only about this origin, as the API allows.
+     * @returns One entry per live deployment: its id, its release and its origins.
+     */
+    async function liveView(projectId: string, origin?: string) {
+      const filter = origin === undefined ? "" : `&origin=${encodeURIComponent(origin)}`;
+      const live = (await (
+        await fetch(`${BASE}/deployments?project_id=${projectId}&live=true${filter}`)
+      ).json()) as {
+        deployments: { id: string; release_id: string; targets: { origin: string }[] }[];
+      };
+
+      return live.deployments.map((deployment) => {
+        return [
+          deployment.id,
+          deployment.release_id,
+          deployment.targets.map((target) => {
+            return target.origin;
+          }),
+        ];
+      });
+    }
+
+    /**
+     * A project whose primary origin was dropped while its newest primary
+     * deployment still names it, and whose live preview then reused that URL.
+     *
+     * @param name - The project's name.
+     * @returns The project, its release, the URL and the deployments naming it.
+     */
+    async function aPrimaryUrlReusedByAPreview(name: string) {
+      const project = await newProject(name);
+      const reused = "https://app-acmeinc.vercel.app";
+      await addPrimary(project.id, project.secret, reused);
+      await addPreview(project.id, project.secret, PREVIEW_PATTERN);
+      const release = await released(project, rel1);
+      const primary = await deployed(project, { release_id: release.id, targets: "primary" });
+      await removeOrigin(project, reused);
+      const preview = await deployed(project, {
+        release_id: release.id,
+        targets: [reused],
+        ttl: "PT168H",
+      });
+
+      return { project, release, reused, primary, preview };
+    }
+
+    /**
+     * The status a deployment is read with by its ID.
+     *
+     * @param projectId - The project.
+     * @param deploymentId - The deployment.
+     * @returns Its status, `live` or `inactive`.
+     */
+    async function statusOf(projectId: string, deploymentId: string): Promise<string> {
+      const response = await fetch(`${BASE}/deployments/${deploymentId}?project_id=${projectId}`);
+      const deployment = (await response.json()) as { status: string };
+
+      return deployment.status;
+    }
+
+    /**
+     * The status of every deployment the history lists.
+     *
+     * @param projectId - The project.
+     * @returns Each deployment's id and status, newest first.
+     */
+    async function historyStatuses(projectId: string) {
+      const response = await fetch(`${BASE}/deployments?project_id=${projectId}`);
+      const history = (await response.json()) as {
+        deployments: { id: string; status: string }[];
+      };
+
+      return history.deployments.map((deployment) => {
+        return [deployment.id, deployment.status];
+      });
+    }
+
+    describe("revoking it", () => {
+      test("names each origin with its kind and the deployment that pins the release there", async () => {
+        const { project, release, primary, preview } = await aReleaseServedTwice("revoke-both");
+
+        const refused = await revoke(project, release.id);
+
+        expect(refused.status).toBe(409);
+        expect(await refused.json()).toEqual({
+          code: "rel.in_use",
+          message: "release: still served by an origin",
+          details: {
+            origins: [
+              { origin: PREVIEW_URL, deployment_id: preview.id, kind: "preview" },
+              { origin: PRIMARY_URL, deployment_id: primary.id, kind: "primary" },
+            ],
+          },
+        });
+      });
+
+      test("lists the origins in byte order, as the server does", async () => {
+        const project = await newProject("revoke-byte-order");
+        await addPrimary(project.id, project.secret, "https://app.test:3000");
+        await addPrimary(project.id, project.secret, "https://app.test.dev");
+        const release = await released(project, rel1);
+        await deployed(project, { release_id: release.id, targets: "primary" });
+
+        const refused = await revoke(project, release.id);
+
+        const body = (await refused.json()) as { details: { origins: { origin: string }[] } };
+        expect(
+          body.details.origins.map((entry) => {
+            return entry.origin;
+          }),
+        ).toEqual(["https://app.test.dev", "https://app.test:3000"]);
+      });
+
+      test("still names the primary origin once the preview is removed", async () => {
+        const { project, release, primary } = await aReleaseServedTwice("revoke-preview-removed");
+        await removeLivePreview(project, PREVIEW_URL);
+
+        const refused = await revoke(project, release.id);
+
+        expect(refused.status).toBe(409);
+        expect(((await refused.json()) as { details: unknown }).details).toEqual({
+          origins: [{ origin: PRIMARY_URL, deployment_id: primary.id, kind: "primary" }],
+        });
+      });
+
+      test("still names the preview once another release is live on the primary origin", async () => {
+        const { project, release, preview } = await aReleaseServedTwice("revoke-primary-replaced");
+        await aReplacementLive(project);
+
+        const refused = await revoke(project, release.id);
+
+        expect(refused.status).toBe(409);
+        expect(((await refused.json()) as { details: unknown }).details).toEqual({
+          origins: [{ origin: PREVIEW_URL, deployment_id: preview.id, kind: "preview" }],
+        });
+      });
+
+      test("allows the revoke once the preview is removed and another release is live", async () => {
+        const { project, release } = await aReleaseServedTwice("revoke-freed");
+        await removeLivePreview(project, PREVIEW_URL);
+        await aReplacementLive(project);
+
+        const revoked = await revoke(project, release.id);
+
+        expect(revoked.status).toBe(200);
+      });
+
+      test("allows the revoke of a release only an older primary deployment named once a newer one names fewer origins", async () => {
+        const project = await newProject("revoke-older-primary");
+        await addPrimary(project.id, project.secret, PRIMARY_URL);
+        await addPrimary(project.id, project.secret, "https://app2.acme.com");
+        const older = await released(project, rel1);
+        await deployed(project, { release_id: older.id, targets: "primary" });
+        await removeOrigin(project, "https://app2.acme.com");
+        await aReplacementLive(project);
+
+        const revoked = await revoke(project, older.id);
+
+        expect(revoked.status).toBe(200);
+      });
+
+      test("is not held by a preview that has expired", async () => {
+        const { project, release } = await aReleaseServedTwice("revoke-preview-expired");
+        await aReplacementLive(project);
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+          vi.setSystemTime(Date.now() + 8 * 24 * 3_600_000);
+
+          const revoked = await revoke(project, release.id);
+
+          expect(revoked.status).toBe(200);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      test("still names a primary origin the project stopped listing once the preview that reused its URL ended", async () => {
+        const { project, release, reused, primary } =
+          await aPrimaryUrlReusedByAPreview("revoke-unlisted-primary");
+        await removeLivePreview(project, reused);
+
+        const refused = await revoke(project, release.id);
+
+        expect(refused.status).toBe(409);
+        expect(((await refused.json()) as { details: unknown }).details).toEqual({
+          origins: [{ origin: reused, deployment_id: primary.id, kind: "primary" }],
+        });
+      });
+    });
+
+    describe("the live deployments view", () => {
+      test("shows both deployments in the live view when a preview reused a primary URL the project stopped listing", async () => {
+        const { project, release, reused, primary, preview } =
+          await aPrimaryUrlReusedByAPreview("revoke-live-reused");
+
+        const live = await liveView(project.id);
+
+        expect(live).toEqual([
+          [preview.id, release.id, [reused]],
+          [primary.id, release.id, [reused]],
+        ]);
+      });
+
+      test("shows only the preview for that URL in the live view when asked about the origin", async () => {
+        const { project, release, reused, preview } =
+          await aPrimaryUrlReusedByAPreview("revoke-live-origin");
+
+        const live = await liveView(project.id, reused);
+
+        expect(live).toEqual([[preview.id, release.id, [reused]]]);
+      });
+
+      test("shows nothing for that URL in the live view when asked about the origin once the preview ended", async () => {
+        const { project, reused } = await aPrimaryUrlReusedByAPreview("revoke-live-origin-ended");
+        await removeLivePreview(project, reused);
+
+        const live = await liveView(project.id, reused);
+
+        expect(live).toEqual([]);
+      });
+
+      test("reports every origin a deployment serves in the live view when asked about one of them", async () => {
+        const project = await newProject("revoke-live-all-origins");
+        await addPrimary(project.id, project.secret, PRIMARY_URL);
+        await addPrimary(project.id, project.secret, "https://app2.acme.com");
+        const release = await released(project, rel1);
+        const deployment = await deployed(project, { release_id: release.id, targets: "primary" });
+
+        const live = await liveView(project.id, PRIMARY_URL);
+
+        expect(live).toEqual([[deployment.id, release.id, [PRIMARY_URL, "https://app2.acme.com"]]]);
+      });
+
+      test("shows the primary deployment for a listed primary origin in the live view when asked about the origin", async () => {
+        const { project, release, primary } = await aReleaseServedTwice("revoke-live-listed");
+
+        const live = await liveView(project.id, PRIMARY_URL);
+
+        expect(live).toEqual([[primary.id, release.id, [PRIMARY_URL]]]);
+      });
+
+      test("shows the primary deployment and the preview that serve the release in the live view", async () => {
+        const { project, release, primary, preview } =
+          await aReleaseServedTwice("revoke-live-view");
+
+        const live = await liveView(project.id);
+
+        expect(live).toEqual([
+          [preview.id, release.id, [PREVIEW_URL]],
+          [primary.id, release.id, [PRIMARY_URL]],
+        ]);
+      });
+
+      test("stops showing a primary deployment another release replaced in the live view", async () => {
+        const { project, release, preview } = await aReleaseServedTwice("revoke-live-replaced");
+        const replacement = await aReplacementLive(project);
+
+        const live = await liveView(project.id);
+
+        expect(live).toEqual([
+          [replacement.deployment.id, replacement.release.id, [PRIMARY_URL]],
+          [preview.id, release.id, [PREVIEW_URL]],
+        ]);
+      });
+    });
+
+    describe("the deployments of one release", () => {
+      /**
+       * The ids of the deployments a list narrowed to one release answers.
+       *
+       * @param projectId - The project.
+       * @param releaseId - The release to narrow the list to.
+       * @param live - List the live view instead of the history.
+       * @returns The deployment ids, newest first.
+       */
+      async function ofRelease(projectId: string, releaseId: string, live = false) {
+        const view = live ? "&live=true" : "";
+        const response = await fetch(
+          `${BASE}/deployments?project_id=${projectId}&release_id=${releaseId}${view}`,
+        );
+        const listed = (await response.json()) as { deployments: { id: string }[] };
+
+        return listed.deployments.map((deployment) => {
+          return deployment.id;
+        });
+      }
+
+      test("lists every deployment of the release in the history, superseded ones included", async () => {
+        const { project, release, primary, preview } = await aReleaseServedTwice("release-history");
+        const replacement = await aReplacementLive(project);
+
+        expect(await ofRelease(project.id, release.id)).toEqual([preview.id, primary.id]);
+        expect(await ofRelease(project.id, replacement.release.id)).toEqual([
+          replacement.deployment.id,
+        ]);
+      });
+
+      test("lists only the live deployments that serve the release in the live view", async () => {
+        const { project, release, preview } = await aReleaseServedTwice("release-live");
+        await aReplacementLive(project);
+
+        expect(await ofRelease(project.id, release.id, true)).toEqual([preview.id]);
+      });
+    });
+
+    describe("a deployment's status", () => {
+      test("is live for a preview deployment while its preview serves", async () => {
+        const { project, preview } = await aReleaseServedTwice("status-preview-live");
+
+        const status = await statusOf(project.id, preview.id);
+
+        expect(status).toBe("live");
+      });
+
+      test("turns inactive for a preview deployment once its preview is removed", async () => {
+        const { project, preview } = await aReleaseServedTwice("status-preview-removed");
+        await removeLivePreview(project, PREVIEW_URL);
+
+        const status = await statusOf(project.id, preview.id);
+
+        expect(status).toBe("inactive");
+      });
+
+      test("turns inactive for a preview deployment once its preview has expired", async () => {
+        const { project, preview } = await aReleaseServedTwice("status-preview-expired");
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+          vi.setSystemTime(Date.now() + 8 * 24 * 3_600_000);
+
+          const status = await statusOf(project.id, preview.id);
+
+          expect(status).toBe("inactive");
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      test("lists a removed preview's deployment inactive beside the live primary one", async () => {
+        const { project, primary, preview } = await aReleaseServedTwice("status-history");
+        await removeLivePreview(project, PREVIEW_URL);
+
+        const history = await historyStatuses(project.id);
+
+        expect(history).toEqual([
+          [preview.id, "inactive"],
+          [primary.id, "live"],
+        ]);
+      });
+
+      test("stays live for the newest primary deployment once the project stops listing its origin", async () => {
+        const { project, primary } = await aPrimaryUrlReusedByAPreview("status-unlisted");
+
+        const status = await statusOf(project.id, primary.id);
+
+        expect(status).toBe("live");
+      });
+    });
+  });
 });
+
+/**
+ * The answers no other test here needs, so the route coverage below can prove
+ * every handler's success and error paths were checked against the contract.
+ */
+describe("api-mock error paths — each refusal a handler names", () => {
+  async function newProject(name: string): Promise<{ id: string; secret: string }> {
+    const res = await fetch(`${API}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string; project_secret: string };
+    return { id: body.id, secret: body.project_secret };
+  }
+
+  const send = (method: string, path: string, body?: unknown, headers?: Record<string, string>) =>
+    fetch(`${API}${path}`, {
+      method,
+      headers: { "content-type": "application/json", ...headers },
+      ...(body === undefined
+        ? {}
+        : { body: typeof body === "string" ? body : JSON.stringify(body) }),
+    });
+
+  async function expectRefusal(res: Response, status: number, code: string): Promise<void> {
+    expect({ status: res.status, code: ((await res.json()) as { code: string }).code }).toEqual({
+      status,
+      code,
+    });
+  }
+
+  const UNKNOWN_PROJECT = "proj_does_not_exist";
+
+  test("a body that is not JSON is req.invalid", async () => {
+    const { id } = await newProject("error-paths-json");
+    for (const path of [
+      "/projects",
+      `/projects/${id}/origins`,
+      `/projects/${id}/origins/remove`,
+      `/projects/${id}/previews/remove`,
+      `/releases?project_id=${id}`,
+      `/policies?project_id=${id}`,
+    ]) {
+      await expectRefusal(await send("POST", path, "{not json"), 400, "req.invalid");
+    }
+    await expectRefusal(
+      await send("PATCH", `/variables?project_id=${id}`, "{not json"),
+      400,
+      "req.invalid",
+    );
+  });
+
+  test("an origin of a project the mock does not hold is origin.not_found", async () => {
+    const pattern = { pattern: "https://app.acme.com", kind: "primary" };
+    await expectRefusal(
+      await send("POST", `/projects/${UNKNOWN_PROJECT}/origins`, pattern),
+      404,
+      "origin.not_found",
+    );
+    await expectRefusal(
+      await send("POST", `/projects/${UNKNOWN_PROJECT}/origins/remove`, {
+        pattern: pattern.pattern,
+      }),
+      404,
+      "origin.not_found",
+    );
+  });
+
+  test("a release of a project the mock does not hold is rel.project_not_found", async () => {
+    await expectRefusal(
+      await send("POST", `/releases?project_id=${UNKNOWN_PROJECT}`, {
+        pointers: [{ kind: "schema", revision_id: "sch_a" }],
+      }),
+      404,
+      "rel.project_not_found",
+    );
+    await expectRefusal(
+      await send("POST", `/releases/build?project_id=${UNKNOWN_PROJECT}`, {
+        bundle: { schemas: [] },
+      }),
+      404,
+      "rel.project_not_found",
+    );
+  });
+
+  test("a release reads back by id, and an unknown one is rel.not_found", async () => {
+    const { id } = await newProject("error-paths-release");
+    const created = await send("POST", `/releases?project_id=${id}`, {
+      pointers: [{ kind: "schema", revision_id: "sch_a" }],
+    });
+    const release = (await created.json()) as { id: string };
+    expect((await send("GET", `/releases/${release.id}?project_id=${id}`)).status).toBe(200);
+    await expectRefusal(
+      await send("GET", `/releases/rel_missing?project_id=${id}`),
+      404,
+      "rel.not_found",
+    );
+    await expectRefusal(
+      await send("POST", `/releases/rel_missing/revoke?project_id=${id}`),
+      404,
+      "rel.not_found",
+    );
+  });
+
+  test("a deployment names a project, release and targets the mock holds", async () => {
+    const { id } = await newProject("error-paths-deploy");
+    await send("POST", `/projects/${id}/origins`, {
+      pattern: "https://app.acme.com",
+      kind: "primary",
+    });
+    await send("POST", `/projects/${id}/origins`, {
+      pattern: "https://*.preview.acme.com",
+      kind: "preview",
+    });
+    const release = async (revision: string) =>
+      (
+        (await (
+          await send("POST", `/releases?project_id=${id}`, {
+            pointers: [{ kind: "schema", revision_id: revision }],
+          })
+        ).json()) as { id: string }
+      ).id;
+    const first = await release("sch_first");
+    const second = await release("sch_second");
+
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${UNKNOWN_PROJECT}`, {
+        release_id: first,
+        targets: "primary",
+      }),
+      404,
+      "env.project_not_found",
+    );
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: "rel_missing",
+        targets: "primary",
+      }),
+      404,
+      "rel.not_found",
+    );
+    const preview = "https://one.preview.acme.com";
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: first,
+        targets: [preview, preview],
+      }),
+      400,
+      "req.invalid",
+    );
+
+    const deployFirst = await send("POST", `/deployments?project_id=${id}`, {
+      release_id: first,
+      targets: "primary",
+    });
+    const firstDeployment = (await deployFirst.json()) as { id: string };
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: second,
+        targets: "primary",
+        expected_deployment_id: "dep_not_the_newest",
+      }),
+      409,
+      "dep.conflict",
+    );
+    expect(
+      (
+        await send("POST", `/deployments?project_id=${id}`, {
+          release_id: second,
+          targets: "primary",
+        })
+      ).status,
+    ).toBe(201);
+    const previewDeployment = (await (
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: second,
+        targets: [preview],
+      })
+    ).json()) as { id: string };
+
+    // The first release is served nowhere now, so it can be revoked: neither
+    // a deploy nor a rollback may serve it again.
+    expect((await send("POST", `/releases/${first}/revoke?project_id=${id}`)).status).toBe(200);
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: first,
+        targets: "primary",
+      }),
+      409,
+      "rel.revoked",
+    );
+    await expectRefusal(
+      await send("POST", `/deployments/${firstDeployment.id}/rollback?project_id=${id}`, {}),
+      409,
+      "rel.revoked",
+    );
+    await expectRefusal(
+      await send("POST", `/deployments/${previewDeployment.id}/rollback?project_id=${id}`, {}),
+      400,
+      "dep.invalid",
+    );
+    await expectRefusal(
+      await send("POST", `/deployments/dep_missing/rollback?project_id=${id}`, {}),
+      404,
+      "dep.not_found",
+    );
+    await expectRefusal(
+      await send(
+        "POST",
+        `/deployments/${firstDeployment.id}/rollback?project_id=${UNKNOWN_PROJECT}`,
+        {},
+      ),
+      404,
+      "env.project_not_found",
+    );
+    await expectRefusal(
+      await send("GET", `/deployments/dep_missing?project_id=${id}`),
+      404,
+      "dep.not_found",
+    );
+    await expectRefusal(
+      await send("GET", `/deployments?project_id=${id}&page_token=not-a-cursor`),
+      400,
+      "req.invalid",
+    );
+  });
+
+  test("a claim needs the project secret, and an unknown challenge is claim_challenge.not_found", async () => {
+    const { id, secret } = await newProject("error-paths-claim");
+    await expectRefusal(await send("POST", `/projects/${id}/claim/init`), 401, "auth.unauthorized");
+    const init = await send("POST", `/projects/${id}/claim/init`, undefined, {
+      authorization: `Bearer ${secret}`,
+    });
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    expect(
+      (await send("GET", `/projects/${id}/claim/window?challenge_id=${challenge_id}`)).status,
+    ).toBe(200);
+    await expectRefusal(
+      await send("GET", `/projects/${id}/claim/window?challenge_id=ch_missing`),
+      404,
+      "claim_challenge.not_found",
+    );
+    await expectRefusal(
+      await send("GET", `/projects/${id}/claim/status?challenge_id=ch_missing`, undefined, {
+        authorization: `Bearer ${secret}`,
+      }),
+      404,
+      "claim_challenge.not_found",
+    );
+  });
+
+  test("POST /users/query answers the project secret's users, and refuses without it", async () => {
+    const { secret } = await newProject("error-paths-users");
+    const ok = await send("POST", "/users/query", {}, { authorization: `Bearer ${secret}` });
+    expect(ok.status).toBe(200);
+    await expectRefusal(await send("POST", "/users/query", {}), 401, "auth.unauthorized");
+  });
+
+  test("an unknown flow definition is flowdef.not_found", async () => {
+    await expectRefusal(
+      await send("GET", "/flow_definitions/flowdef_missing"),
+      404,
+      "flowdef.not_found",
+    );
+  });
+
+  test("a policy publishes, reads back by id and revision, and refuses what it does not hold", async () => {
+    const { id } = await newProject("error-paths-policy");
+    const operation = "auth.factor.password.set";
+    await expectRefusal(
+      await send("POST", `/policies?project_id=${id}`, {
+        operation,
+        config: { min_length: 20, max_length: 10 },
+      }),
+      400,
+      "pol.invalid",
+    );
+    const published = await send("POST", `/policies?project_id=${id}`, {
+      operation,
+      config: { min_length: 12 },
+    });
+    expect(published.status).toBe(201);
+    const policy = (await published.json()) as { id: string; revision_id: string };
+    for (const path of [
+      `/policies/${policy.id}`,
+      `/policies/${policy.id}/revisions`,
+      `/policies/revisions/${policy.revision_id}`,
+    ]) {
+      expect((await send("GET", `${path}?project_id=${id}`)).status, path).toBe(200);
+      const missing = path
+        .replace(policy.id, "pol_missing")
+        .replace(policy.revision_id, "polrev_missing");
+      await expectRefusal(await send("GET", `${missing}?project_id=${id}`), 404, "pol.not_found");
+    }
+  });
+
+  test("deleting a variable the project does not hold is var.not_found", async () => {
+    const { id } = await newProject("error-paths-variables");
+    await expectRefusal(
+      await send("DELETE", `/variables/MISSING?project_id=${id}`),
+      404,
+      "var.not_found",
+    );
+  });
+
+  describe("the login flow", () => {
+    const start = async (purpose: "login" | "register") => {
+      const res = await send("POST", "/flows", { purpose, project_id: "proj_error_paths" });
+      expect(res.status).toBe(201);
+      return (await res.json()) as { id: string; session_token: string };
+    };
+
+    test("starts, reads back and advances a sign-in", async () => {
+      const flow = await start("login");
+      expect((await send("GET", `/flows/${flow.id}`)).status).toBe(200);
+      const next = await send("POST", `/flows/${flow.id}/submit`, {
+        session_token: flow.session_token,
+        action: "submit",
+        fields: { email: "error-paths@example.com" },
+      });
+      expect(next.status).toBe(200);
+    });
+
+    test("refuses an sso submission without return_target, and any submit on sso-redirect", async () => {
+      const flow = await start("login");
+      const sso = {
+        session_token: flow.session_token,
+        action: "sso",
+        fields: {},
+        sso_provider_id: "google",
+      };
+      await expectRefusal(await send("POST", `/flows/${flow.id}/submit`, sso), 400, "req.invalid");
+      const redirect = await send("POST", `/flows/${flow.id}/submit`, {
+        ...sso,
+        return_target: `${BASE}/login`,
+      });
+      expect(redirect.status).toBe(200);
+      await expectRefusal(
+        await send("POST", `/flows/${flow.id}/submit`, { action: "submit", fields: {} }),
+        400,
+        "flow.invalid_action",
+      );
+    });
+
+    test("refuses a sign-up without its proof of work", async () => {
+      const flow = await start("register");
+      const password = (await (
+        await send("POST", `/flows/${flow.id}/submit`, {
+          session_token: flow.session_token,
+          action: "submit",
+          fields: { email: "error-paths-signup@example.com", given_name: "E", family_name: "P" },
+        })
+      ).json()) as { id: string; session_token: string; step: { name: string } };
+      expect(password.step.name).toBe("register-password");
+      await expectRefusal(
+        await send("POST", `/flows/${password.id}/submit`, {
+          session_token: password.session_token,
+          action: "submit",
+          fields: { [PASSWORD_FIELD]: "hunter2-hunter2" },
+        }),
+        403,
+        "flow.proof_invalid",
+      );
+    });
+  });
+
+  /**
+   * The session handlers the Express routes shadow on the server, as the
+   * component, SDK and CLI tests reach them with `setupServer(...)`.
+   */
+  describe("in process", () => {
+    const mock = setupMockHandlers();
+    const inProcess = setupServer(...mock.handlers);
+    beforeAll(() => inProcess.listen({ onUnhandledRequest: "error" }));
+    afterAll(() => inProcess.close());
+
+    const call = (method: string, path: string, body?: unknown) =>
+      fetch(`${IN_PROCESS_ORIGIN}${API_PREFIX}${path}`, {
+        method,
+        headers: { "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    test("exchanges a handoff token, and answers 503 when told to fail", async () => {
+      expect(
+        (
+          await call("POST", "/sessions/exchange?project_id=proj_in_process", {
+            handoff_token: "t",
+          })
+        ).status,
+      ).toBe(200);
+      mock.failNextExchange();
+      await expectRefusal(
+        await call("POST", "/sessions/exchange?project_id=proj_in_process", { handoff_token: "t" }),
+        503,
+        "unavailable",
+      );
+    });
+
+    // submitFlowStep's 400 is either shape: this is the step with its error,
+    // the server-transport tests above send the error envelope.
+    test("refuses a submit as the same step with an error when told to", async () => {
+      const start = await call("POST", "/flows", {
+        purpose: "login",
+        project_id: "proj_in_process",
+      });
+      const flow = (await start.json()) as { id: string; session_token: string };
+      mock.rejectNextSubmit("error.invalid_credentials");
+      const res = await call("POST", `/flows/${flow.id}/submit`, {
+        session_token: flow.session_token,
+        action: "submit",
+        fields: { email: "in-process@example.com" },
+      });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { step: { error: string } }).step.error).toBe(
+        "error.invalid_credentials",
+      );
+    });
+
+    test("answers the session reads and sign-out of a signed-out browser with 401", async () => {
+      await expectRefusal(await call("GET", "/sessions/me"), 401, "auth.unauthorized");
+      await expectRefusal(await call("GET", "/sessions/me/csrf"), 401, "auth.unauthorized");
+      await expectRefusal(await call("DELETE", "/sessions/me"), 401, "auth.unauthorized");
+    });
+  });
+});
+
+describe("api-mock invitations", () => {
+  async function newProject(name: string): Promise<string> {
+    const res = await fetch(`${API}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    return ((await res.json()) as { id: string }).id;
+  }
+
+  type Created = { id: string; journey_id: string; link?: string; metadata?: unknown };
+
+  const invite = (projectId: string, body: Record<string, unknown> = {}) =>
+    fetch(`${API}/invitations?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "project_member",
+        project_member: { relation: "viewer" },
+        ...body,
+      }),
+    });
+
+  async function invited(projectId: string, body: Record<string, unknown> = {}): Promise<Created> {
+    const res = await invite(projectId, body);
+    expect(res.status).toBe(201);
+    return (await res.json()) as Created;
+  }
+
+  async function code(res: Response): Promise<{ status: number; code: string }> {
+    return { status: res.status, code: ((await res.json()) as { code: string }).code };
+  }
+
+  test("creates a pending invitation with its one-shot link", async () => {
+    const projectId = await newProject("invitations-create");
+
+    const created = await invited(projectId, { metadata: { name: "Ada" } });
+
+    expect(created).toMatchObject({
+      id: expect.stringMatching(/^inv_/),
+      status: "pending",
+      link: expect.stringMatching(/\/invitations\/accept#token=\S+$/),
+      metadata: { name: "Ada" },
+    });
+  });
+
+  test("never returns the link on a read", async () => {
+    const projectId = await newProject("invitations-read");
+    const created = await invited(projectId);
+
+    const one = (await (
+      await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`)
+    ).json()) as Record<string, unknown>;
+    const listed = (await (await fetch(`${API}/invitations?project_id=${projectId}`)).json()) as {
+      invitations: Record<string, unknown>[];
+    };
+
+    expect([one, ...listed.invitations].some((invitation) => "link" in invitation)).toBe(false);
+  });
+
+  test("lists newest first, filtered and paged", async () => {
+    const projectId = await newProject("invitations-list");
+    const first = await invited(projectId);
+    const second = await invited(projectId);
+    acceptInvitation(first.id);
+
+    const page = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&limit=1`)
+    ).json()) as { invitations: { id: string }[]; next_page_token?: string | null };
+    const pending = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&status=pending`)
+    ).json()) as { invitations: { id: string }[] };
+    const teams = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&type=team_member`)
+    ).json()) as { invitations: unknown[] };
+
+    expect({
+      page: page.invitations.map((invitation) => invitation.id),
+      next: page.next_page_token,
+      pending: pending.invitations.map((invitation) => invitation.id),
+      teams: teams.invitations,
+    }).toEqual({ page: [second.id], next: "1", pending: [second.id], teams: [] });
+  });
+
+  test("a replace keeps the journey and name and deletes the original", async () => {
+    const projectId = await newProject("invitations-replace");
+    const original = await invited(projectId, { metadata: { name: "Ada" } });
+
+    const replacement = await invited(projectId, { replaces_invitation_id: original.id });
+
+    expect({
+      journey: replacement.journey_id,
+      metadata: replacement.metadata,
+      original: (await fetch(`${API}/invitations/${original.id}?project_id=${projectId}`)).status,
+    }).toEqual({ journey: original.journey_id, metadata: { name: "Ada" }, original: 404 });
+  });
+
+  test("cancels a pending invitation", async () => {
+    const projectId = await newProject("invitations-cancel");
+    const created = await invited(projectId);
+
+    const res = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(204);
+  });
+
+  test("cancels an expired invitation", async () => {
+    const projectId = await newProject("invitations-cancel-expired");
+    const created = await invited(projectId);
+    expireInvitation(created.id);
+
+    const res = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(204);
+  });
+
+  test("refuses a team invitation as not implemented", async () => {
+    const projectId = await newProject("invitations-team");
+
+    const res = await fetch(`${API}/invitations?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "team_member",
+        team_member: { team_id: "team_1", role: "member" },
+      }),
+    });
+
+    expect(await code(res)).toEqual({ status: 501, code: "not_implemented" });
+  });
+
+  test("answers inv.not_found for an invitation the project does not hold", async () => {
+    const projectId = await newProject("invitations-missing");
+
+    const res = await fetch(`${API}/invitations/inv_missing?project_id=${projectId}`);
+
+    expect(await code(res)).toEqual({ status: 404, code: "inv.not_found" });
+  });
+
+  test("refuses to replace or cancel an accepted invitation", async () => {
+    const projectId = await newProject("invitations-accepted");
+    const created = await invited(projectId);
+    acceptInvitation(created.id);
+
+    const replaced = await invite(projectId, { replaces_invitation_id: created.id });
+    const cancelled = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect([await code(replaced), await code(cancelled)]).toEqual([
+      { status: 404, code: "inv.not_found" },
+      { status: 404, code: "inv.not_found" },
+    ]);
+  });
+});
+
+describe("api-mock route coverage — every handler answers by the contract", () => {
+  const app = createMockApp({ issuer: BASE });
+  const routes = mockRoutes(app);
+  const inSpec = new Set(specOperations.map((op) => routeKey(op.method, op.path)));
+
+  test("every route is a spec operation or listed as out of spec, with its reason", () => {
+    const listed = new Set(Object.keys(OUT_OF_SPEC_ROUTES).map((k) => routeKey(...splitKey(k))));
+    const unknown = routes
+      .map((r) => routeKey(r.method, r.path))
+      .filter((key) => !inSpec.has(key) && !listed.has(key));
+    expect(unknown, "add these to the spec or to OUT_OF_SPEC_ROUTES").toEqual([]);
+    const served = new Set(routes.map((r) => routeKey(r.method, r.path)));
+    const stale = [...listed].filter((key) => inSpec.has(key) || !served.has(key));
+    expect(stale, "OUT_OF_SPEC_ROUTES entries the spec now has or no route serves").toEqual([]);
+  });
+
+  test("every server route answered its success path, and every in-process one answered", () => {
+    const missing: string[] = [];
+    for (const route of routes) {
+      const key = routeKey(route.method, route.path);
+      if (!inSpec.has(key)) continue;
+      const seen = observations.filter((o) => o.transport === route.transport && o.key === key);
+      // The in-process session handlers only answer a signed-out browser.
+      const answered =
+        route.transport === "in-process" ? seen.length > 0 : seen.some((o) => o.status < 400);
+      if (!answered) {
+        missing.push(
+          `${key} (${route.transport}): no ${route.transport === "server" ? "success " : ""}answer`,
+        );
+      }
+    }
+    expect(
+      missing,
+      "only answers to requests made through this file's conformantFetch count: test these routes here",
+    ).toEqual([]);
+  });
+});
+
+function splitKey(key: string): [string, string] {
+  const [method, path] = key.split(" ");
+  return [method ?? "", path ?? ""];
+}

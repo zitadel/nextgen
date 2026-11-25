@@ -7,7 +7,7 @@
  * from it is a fiction. This script boots the packaged server (binary runtime +
  * SQLite by default, no Docker) via `@zitadel/testing`, bootstraps a project
  * with the default schema and login flow, seeds users, and then starts
- * `console:dev` with the dev proxy pointed at that instance:
+ * `@zitadel/console#dev` with the dev proxy pointed at that instance:
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
  *
@@ -38,9 +38,8 @@ import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
-
-import { runnerCommand, runnerLabel } from "../../../scripts/task-runner.mjs";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(appDir, "../..");
@@ -70,6 +69,11 @@ const PLATFORM_PROJECT_ID = "proj_platform";
 // pins the console's default project to `proj_platform` — which would leave
 // DEV_USER, seeded in the project this script bootstraps, unable to sign in.
 process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT = claimMode ? "true" : "false";
+// The browser opens the console on the Vite dev server, so the server counts it
+// as one of its console origins: a project that does not list it, the platform
+// project included, serves it the newest primary deployment, and its own Origin
+// reaches the server as is, for passkeys and SSO return targets alike.
+process.env.NEXTGEN_SERVER_CONSOLE_ORIGINS ??= consoleOrigin;
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -105,12 +109,10 @@ if (configuredServerBinary) {
     process.exit(1);
   });
 } else {
-  // Build (or cache-hit) the embedded server binary. Spawned here instead of
-  // declared as a task dep: server:build depends on console:build, so a
-  // dev-real -> server:build task dep would cycle the project graph.
-  const serverBuild = runnerCommand(["server:build"]);
+  // Build the embedded server binary, for a direct `pnpm run dev:real`;
+  // `turbo run dev:real` has built it already (turbo.json).
   await new Promise<void>((resolveBuild, rejectBuild) => {
-    const build = spawn(serverBuild.command, serverBuild.args, {
+    const build = spawn("turbo", ["run", "@zitadel/server#build"], {
       cwd: workspaceRoot,
       stdio: "inherit",
     });
@@ -121,7 +123,7 @@ if (configuredServerBinary) {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      rejectBuild(new Error(`${runnerLabel(["server:build"])} failed with ${detail}`));
+      rejectBuild(new Error(`turbo run @zitadel/server#build failed with ${detail}`));
     });
   });
 }
@@ -200,6 +202,8 @@ await writeFile(
 );
 
 const { baseUrl, projectId, projectSecret } = zitadel.handle;
+/** Where the instance serves the API: under `/api/v1` (ADR 077). */
+const api = apiBaseUrl(baseUrl);
 
 /**
  * Makes the dev account an admin of the seeded project.
@@ -213,7 +217,7 @@ const { baseUrl, projectId, projectSecret } = zitadel.handle;
 async function grantDevUserAdmin(userId: string): Promise<boolean> {
   try {
     const query = new URLSearchParams({ project_id: projectId });
-    const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
+    const response = await fetch(`${api}/grants?${query.toString()}`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
@@ -249,6 +253,8 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * data, not the instance.
  */
 const EMPLOYEE_EMAIL = "employee@zitadel.local";
+/** The revision the seeded connection was created as; a release pins it. */
+let idpRevisionId: string | null = null;
 
 async function seedAuthentication(): Promise<boolean> {
   const headers = {
@@ -256,7 +262,7 @@ async function seedAuthentication(): Promise<boolean> {
     "content-type": "application/json",
   };
   const scoped = (path: string, extra: Record<string, string> = {}) =>
-    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
   const post = (path: string, body: unknown) =>
     fetch(scoped(path), {
       method: "POST",
@@ -282,6 +288,7 @@ async function seedAuthentication(): Promise<boolean> {
       },
     });
     if (!idp.ok) return false;
+    idpRevisionId = ((await idp.json()) as { revision_id: string }).revision_id;
 
     const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
       headers,
@@ -348,6 +355,263 @@ if (!claimMode && !(await seedAuthentication())) {
   );
 }
 
+/**
+ * A schema named by a URI in two revisions, with a user on the older one, so
+ * the revision pickers and the Users revision filter show the id shapes the
+ * minted schemas above never do: a long `$id` that holds an underscore, which
+ * a menu and a 375px trigger have to cut, and a history with an `In use`
+ * revision that is not the latest. Best-effort, like the schemas above.
+ */
+const PARTNER_SCHEMA_ID = (version: string) =>
+  `https://partners.example/user_schemas/partner/${version}/partner-profile.schema.json`;
+
+async function seedSchemaRevisions(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    const properties = (base.properties ?? {}) as Record<string, unknown>;
+    // Same object type, so the second is a revision of the first.
+    const revision = (version: string, extra: Record<string, unknown> = {}) =>
+      post("/schemas", {
+        ...base,
+        $id: PARTNER_SCHEMA_ID(version),
+        kind: "user-schema",
+        objectType: "partner",
+        title: "Partners",
+        properties: { ...properties, ...extra },
+      });
+    const older = await revision("v1");
+    if (!older.ok) return false;
+    const newer = await revision("v2", { company: { type: "string", title: "Company" } });
+    if (!newer.ok) return false;
+    const user = await post("/users", {
+      schema: PARTNER_SCHEMA_ID("v1"),
+      attributes: { email: "partner@zitadel.local", givenName: "Pat", familyName: "Partner" },
+    });
+    return user.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedSchemaRevisions())) {
+  console.warn(
+    "[console-dev-real] could not seed the Partners schema revisions; the revision pickers show no URI ids.",
+  );
+}
+
+/**
+ * A `Contractors` schema whose identifier and display name sit inside an object,
+ * with one user on it, so the forms and the Users list show what the flat schemas
+ * above never do: a nested `x-identifier` (`contact.email`), an object group, an
+ * array and a nullable property. It carries its own properties instead of the
+ * bootstrapped ones, and drops their `x-display`, which would name a property it
+ * no longer has. Best-effort, like the schemas above.
+ */
+async function seedNestedSchema(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    const { $id: _id, "x-display": _display, ...document } = base;
+    const schema = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "contractor",
+      title: "Contractors",
+      "x-identifier": "contact.email",
+      "x-display": ["contact.name"],
+      required: ["contact", "skills", "manager"],
+      properties: {
+        contact: {
+          type: "object",
+          title: "Contact",
+          description: "They sign in with this email.",
+          required: ["email"],
+          properties: {
+            email: { type: "string", format: "email", title: "Email", "x-unique": "project" },
+            name: { type: "string", title: "Name" },
+          },
+        },
+        preferences: {
+          type: "object",
+          title: "Preferences",
+          properties: {
+            nickname: { type: "string", title: "Nickname" },
+            newsletter: { type: "boolean", title: "Newsletter" },
+          },
+        },
+        skills: { type: "array", title: "Skills", minItems: 1, items: { type: "string" } },
+        manager: { type: ["string", "null"], title: "Manager" },
+      },
+    });
+    if (!schema.ok) return false;
+    const { id } = (await schema.json()) as { id: string };
+    const user = await post("/users", {
+      schema: id,
+      attributes: {
+        contact: { email: "contractor@zitadel.local", name: "Casey Contractor" },
+        preferences: { nickname: "casey", newsletter: false },
+        skills: ["design", "research"],
+        manager: null,
+      },
+    });
+    return user.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedNestedSchema())) {
+  console.warn(
+    "[console-dev-real] could not seed the Contractors schema; no screen shows a nested identifier.",
+  );
+}
+
+/**
+ * Two releases pinning the project's configuration, and their deployments, so
+ * the release and deployment screens render against real data: one built from
+ * a clean tree with a message, pinning the newest revision of every user
+ * schema and login flow seeded above, the identity provider connection and a
+ * branding revision; one from a dirty tree without a message, pinning the
+ * flows and the schemas they sign into. Releases are otherwise only ever built
+ * by the CLI from a repository. Best-effort, like the rest: a failure costs
+ * the screens their rows, not the instance, and the warning says why.
+ */
+async function seedReleases(): Promise<string | null> {
+  const headers = { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const list = async <T,>(
+    path: string,
+    key: string,
+    extra: Record<string, string>,
+  ): Promise<T[]> => {
+    const response = await fetch(scoped(path, extra), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) throw new Error(`GET ${path} answered ${response.status}`);
+    return ((await response.json()) as Record<string, T[]>)[key] ?? [];
+  };
+  try {
+    const latest = { revisions: "latest" };
+    const [schemas, flows] = await Promise.all([
+      list<{ id: string; schema: { objectType?: string } }>("/schemas", "schemas", latest),
+      list<{ id: string; flow_definition: { user_schema?: string } }>(
+        "/flow_definitions",
+        "flow_definitions",
+        latest,
+      ),
+    ]);
+    const schemaPointers = schemas.map(({ id }) => ({ kind: "schema", revision_id: id }));
+    const flowPointers = flows.map(({ id }) => ({ kind: "flow_definition", revision_id: id }));
+    // A release must pin every handle its revisions name: the schema each
+    // flow signs into, and the provider the customer schema allows.
+    const signedInto = new Set(flows.map((flow) => flow.flow_definition.user_schema));
+    const flowSchemaPointers = schemas
+      .filter((schema) => signedInto.has(schema.schema.objectType))
+      .map(({ id }) => ({ kind: "schema", revision_id: id }));
+    const idpPointers = idpRevisionId ? [{ kind: "idp", revision_id: idpRevisionId }] : [];
+    const post = async <T,>(path: string, body: unknown): Promise<T> => {
+      const response = await fetch(scoped(path), {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) {
+        throw new Error(`POST ${path} answered ${response.status}: ${await response.text()}`);
+      }
+      return (await response.json()) as T;
+    };
+    // Nothing seeds a branding revision, and a release that pins none has no
+    // Branding group to show; one revision of the bundled template is enough.
+    const branding = await post<{ id: string }>("/branding", { layout: "split" });
+    const first = await post<{ id: string }>("/releases", {
+      pointers: [
+        ...schemaPointers,
+        ...flowPointers,
+        ...idpPointers,
+        { kind: "branding", revision_id: branding.id },
+      ],
+      message: "Add phone_number to human-user",
+      git_sha: "4a5b268343c0ffee0123456789abcdef01234567",
+    });
+    const second = await post<{ id: string }>("/releases", {
+      pointers: [...flowSchemaPointers, ...flowPointers],
+      git_sha: "9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de9",
+      git_dirty: true,
+    });
+    // Where the releases went: two primary origins and a preview pattern,
+    // then the first release to primary, the second after it (so the first
+    // reads as superseded), and the first again to a preview URL. Loopback
+    // stays admitted without a pattern, so the console itself is unaffected.
+    const origins = `/projects/${projectId}/origins`;
+    await post(origins, { pattern: "https://app.acme.com", kind: "primary" });
+    await post(origins, { pattern: "https://www.acme.com", kind: "primary" });
+    await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
+    await post("/deployments", { release_id: first.id, targets: "primary" });
+    await post("/deployments", { release_id: second.id, targets: "primary" });
+    await post("/deployments", {
+      release_id: first.id,
+      targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
+      ttl: "168h",
+    });
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+const releaseSeedFailure = claimMode ? null : await seedReleases();
+if (releaseSeedFailure !== null) {
+  console.warn(
+    `[console-dev-real] could not seed releases (${releaseSeedFailure}); the release and deployment screens will have no rows to show.`,
+  );
+}
+
 // Claim mode signs in against the platform project, because that is the only
 // session `claim/complete` accepts; bootstrapping it makes it the project
 // `runtime.json` names. The seeded users stay in the project being claimed —
@@ -361,7 +625,7 @@ if (!claimMode && !(await seedAuthentication())) {
  */
 async function mintClaimUrl(): Promise<string | null> {
   try {
-    const response = await fetch(`${baseUrl}/projects/${projectId}/claim/init`, {
+    const response = await fetch(`${api}/projects/${projectId}/claim/init`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: "{}",

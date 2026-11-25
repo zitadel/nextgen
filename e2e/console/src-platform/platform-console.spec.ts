@@ -1,15 +1,15 @@
 import { expect, registerWithPassword, test } from "@zitadel/testing/playwright";
 
-import { withErrorBody } from "../support/api";
+import { claimProject } from "../support/api";
 import { expectNoErrorBoundary } from "../support/screens";
 
 /**
  * A platform operator in the embedded console (#1300): signed up through the
  * console's own login, so homed in the platform project as a real operator
- * is, and granted admin on the instance's customer project by email. Every
+ * is, and admin of the instance's customer project by claiming it. Every
  * request the browser makes runs on the session cookie alone.
  *
- * The customer project is the only one the operator holds a grant on, so the
+ * The customer project is the only one the operator has access to, so the
  * console selects it on its own (`?project=`, #1299) and every screen below
  * reads it rather than the platform project the operator signed in to. What
  * this pins is that each of them answers for the customer project without an
@@ -26,17 +26,13 @@ test("a platform operator reaches every management screen without an error", asy
   await page.goto("/ui/console/");
   await registerWithPassword(page, operator);
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  // The account menu, which both the home and a project's screens draw.
+  await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
 
-  // Admin on the customer project, by email: the operator lives in the
-  // platform project, which is where a grant resolves an identifier (#1192).
-  // Written with the project's secret from the test process, never the page.
-  await withErrorBody(
-    zitadel.api.createGrant(
-      { user: { identifier: operator.email }, relation: "admin" },
-      { project_id: zitadel.handle.projectId },
-    ),
-  );
+  // Admin on the customer project by claiming it: an unclaimed project
+  // cannot grant a platform user (ADR 054 §4 amendment). The claim starts with
+  // the project's secret from the test process, never the page.
+  await claimProject(zitadel, page);
 
   const selected = new RegExp(`[?&]project=${zitadel.handle.projectId}(&|$)`);
   for (const [path, heading] of [
@@ -66,7 +62,7 @@ test("a platform operator reaches every management screen without an error", asy
   // not the platform project the operator signed in to. Only here do the two
   // differ, so the request body is what says which one it ran in.
   const flowStart = page.waitForRequest(
-    (request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/flow"),
+    (request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/flows"),
   );
   await page.goto("/ui/console/branding");
   expect((await flowStart).postDataJSON()).toMatchObject({
@@ -74,18 +70,47 @@ test("a platform operator reaches every management screen without an error", asy
   });
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
-  // The granted customer project: listed on the overview, where a row opens
-  // the project (selects it, lands on Users); its own page is Project settings.
+  // The platform project the console signs in to is the root, not a project
+  // to choose (D42): the server marks it, Projects never lists it, and this
+  // operator, who holds no grant on it, finds none of its screens in the
+  // root's sidebar.
+  const runtime = (await (await page.request.get("/console/runtime.json")).json()) as {
+    console_project_id?: string;
+    platform_project_id?: string;
+  };
+  expect(runtime.platform_project_id).toBeTruthy();
+  expect(runtime.platform_project_id).toBe(runtime.console_project_id);
+
+  // The granted customer project: listed on Projects, where a row opens the
+  // project (selects it, lands on its Overview, D35); its Settings open on
+  // their first page, General (D40).
   await page.goto("/ui/console/projects");
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
+  // Bootstrap names the platform project "Platform" (internal/bootstrap/platform).
+  await expect(page.getByRole("table").getByRole("link", { name: "Platform" })).toHaveCount(0);
+  // Its screens are not this operator's: the server answers the platform
+  // project's read with a refusal, so a URL that selects it goes on in their
+  // own project instead, and the root's sidebar lists none of its screens.
+  // The embedded console has no add-on either, so Projects is the root's
+  // only row.
+  await page.goto(`/ui/console/users?project=${runtime.platform_project_id}`);
+  await expect(page).toHaveURL(new RegExp(`/users\\?project=${zitadel.handle.projectId}$`));
+  await page.goto("/ui/console/projects");
+  await expect(projectLink).toBeVisible();
+  const root = page.getByRole("navigation", { name: "Account" });
+  await expect(root.getByRole("link")).toHaveText(["Projects"]);
   await projectLink.click();
-  await expect(page).toHaveURL(new RegExp(`/users\\?.*project=${zitadel.handle.projectId}`));
+  await expect(page).toHaveURL(new RegExp(`/console/?\\?project=${zitadel.handle.projectId}$`));
+  await expect(page.getByRole("region", { name: "Production" })).toBeVisible();
+  await expectNoErrorBoundary(page);
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name: "Project settings" })
+    .getByRole("link", { name: "Settings" })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
+  await expect(page).toHaveURL(
+    new RegExp(`/project/general\\?project=${zitadel.handle.projectId}$`),
+  );
   await expectNoErrorBoundary(page);
 
   const field = page.getByLabel("Project name");
@@ -115,7 +140,7 @@ test("a platform operator adds their name from the account menu", async ({ page,
   // The person heading the menu opens their profile.
   await page.getByRole("menuitem", { name: operator.email }).click();
 
-  await expect(page).toHaveURL(/\/settings\/profile/);
+  await expect(page).toHaveURL(/\/account(\?|$)/);
   await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
   const name = page.getByLabel("Name", { exact: true });
   await name.fill("Ada Lovelace");

@@ -1,8 +1,9 @@
 import type { OpenAPIV3_2 } from "fumadocs-openapi";
 import { createOpenAPI } from "fumadocs-openapi/server";
 
-// The server's API, bundled from api/openapi by scripts/bundle-openapi.mjs and
-// imported as a module, so it ships inside the build.
+// The server's API, shaped from the committed OpenAPI embed by
+// scripts/bundle-openapi.mjs and imported as a module, so it ships inside the
+// build.
 import openapiDocument from "../.generated/openapi.mjs";
 
 // note: this is a server-side API

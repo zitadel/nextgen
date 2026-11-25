@@ -1,4 +1,0 @@
-x-meta-schema: true
-type: string
-pattern: "^[^.]+$"
-description: The name of a single user attribute.

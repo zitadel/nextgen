@@ -1,8 +1,9 @@
 // Package harness is the Go side of the benchmark harness: the operations the
 // scenarios drive through the generated client, the fixtures that provision a
 // target, the sweep runner and the summariser. A running, healthy server is
-// a prerequisite: whoever provisions a lane (Moon locally, a container or a
-// cloud deployment elsewhere) starts it, and the harness is pointed at it.
+// a prerequisite: whoever provisions a lane (`pnpm run server` locally, a
+// container or a cloud deployment elsewhere) starts it, and the harness is
+// pointed at it.
 // The k6 JavaScript module (k6module) and the `k6 x nextgen` subcommand tree
 // (k6cmd) are thin layers over it.
 package harness
@@ -16,7 +17,7 @@ import (
 	"sync"
 
 	"github.com/ogen-go/ogen/ogenerrors"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // Target is a provisioned server and the one project and user the scenarios
@@ -164,11 +165,11 @@ func (c *Credentials) OAuth2(context.Context, api.OperationName) (api.OAuth2, er
 	return api.OAuth2{Token: c.Bearer()}, nil
 }
 
-// NextgenSession implements api.SecuritySource. No session cookie is held;
+// SessionCookie implements api.SecuritySource. No session cookie is held;
 // skipping lets the client fall through to the bearer on operations that
 // accept either.
-func (c *Credentials) NextgenSession(context.Context, api.OperationName) (api.NextgenSession, error) {
-	return api.NextgenSession{}, ogenerrors.ErrSkipClientSecurity
+func (c *Credentials) SessionCookie(context.Context, api.OperationName) (api.SessionCookie, error) {
+	return api.SessionCookie{}, ogenerrors.ErrSkipClientSecurity
 }
 
 var _ api.SecuritySource = (*Credentials)(nil)

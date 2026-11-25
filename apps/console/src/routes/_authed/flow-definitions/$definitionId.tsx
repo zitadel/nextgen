@@ -1,14 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Link2, Workflow } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DetailPanel, PanelTitle } from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_STACK, DetailHeader, DetailSection } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
-import { EYEBROW, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import {
   Table,
   TableBody,
@@ -18,15 +14,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
+import { fetchLatestBranding } from "@/features/branding/api";
+import { FlowCanvas } from "@/features/flow-definitions/components/flow-canvas";
 import {
   type FlowDefinition,
   type FlowStep,
   flowDisplayName,
   stepActionNames,
   stepFieldNames,
-} from "@/lib/flow-definition";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
-import { schemaDisplayName } from "@/lib/schema";
+} from "@/features/flow-definitions/model";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { RevisionLink } from "@/features/schemas/components/revision-link";
+import { schemaDisplayName } from "@/features/schemas/model";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
   staticData: { scope: "project", resource: "login flow" },
@@ -35,12 +34,14 @@ export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")(
     const entry = await api.getFlowDefinition(params.definitionId);
     // Structurally the list's `flow_definition`; orval renames per operation.
     const definition: FlowDefinition = entry.flow_definition;
-    return {
-      definition,
-      createdAt: entry.created_at,
+    const projectId = requireProjectScope(deps.project);
+    const [schema, branding] = await Promise.all([
       // No `expand` on this endpoint, so the badge costs a second call.
-      ...(await resolveSchema(definition.user_schema, requireProjectScope(deps.project))),
-    };
+      resolveSchema(definition.user_schema, projectId),
+      // The canvas paints the maintained defaults without it.
+      fetchLatestBranding(projectId).catch(() => undefined),
+    ]);
+    return { definition, createdAt: entry.created_at, branding, ...schema };
   },
   component: FlowDefinitionDetail,
 });
@@ -67,44 +68,48 @@ async function resolveSchema(
 }
 
 function FlowDefinitionDetail() {
-  const { definition, createdAt, schemaName, schemaId } = Route.useLoaderData();
+  const { definition, createdAt, branding, schemaName, schemaId } = Route.useLoaderData();
   const { definitionId } = Route.useParams();
   const name = flowDisplayName(definition);
   const steps = definition.steps ?? [];
 
   return (
-    <Page inset="panel">
-      <DetailPanel>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <PanelTitle icon={Workflow} title={name} />
-            {schemaName && schemaId && (
-              <Link to="/schemas/$schemaId" params={{ schemaId }} className="w-fit shrink-0">
-                <Badge variant="outline" className="h-5 gap-1 hover:bg-accent">
-                  <Link2 className="size-3" aria-hidden />
+    <Page>
+      <DetailHeader
+        title={name}
+        // The design draws a third value, `Expires at`; nothing backs it.
+        meta={[
+          { label: "Flow ID", value: definitionId, copyable: true },
+          { label: "Created", value: formatDate(createdAt) },
+        ]}
+      />
+
+      <div className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
+        <DetailSection
+          title="User schema"
+          aside={
+            schemaName && schemaId ? (
+              // The name opens the schema; the box beside it opens the revision
+              // the flow signs into, its newest.
+              <span className="flex min-w-0 flex-wrap items-center gap-3">
+                <Link
+                  to="/schemas/$schemaId"
+                  params={{ schemaId }}
+                  className="text-sm leading-5 text-foreground underline-offset-2 hover:underline"
+                >
                   {schemaName}
-                </Badge>
-              </Link>
-            )}
-          </div>
-
-          {/* The design draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <MetaCard>
-            <MetaValue label="Flow ID" value={definitionId} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(createdAt)} />
-          </MetaCard>
-        </div>
-
-        <Separator />
-
-        {/* No inset: `STEPS` lines up with the icon tile. (The schema detail
-            insets its equivalent to clear a tab strip; there are none here.) */}
-        <section className="flex flex-col gap-3">
-          <h2 className={EYEBROW}>Steps</h2>
+                </Link>
+                <RevisionLink schemaId={schemaId} name={schemaName} />
+              </span>
+            ) : (
+              definition.user_schema && (
+                <span className="text-sm leading-5 text-foreground">{definition.user_schema}</span>
+              )
+            )
+          }
+        >
           {/* `table-fixed`: equal thirds, not redistributed by content. */}
-          <Table className="table-fixed">
+          <Table className="table-fixed" aria-label="Steps">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className={`${HEAD_CELL} pl-2`}>Step</TableHead>
@@ -124,10 +129,12 @@ function FlowDefinitionDetail() {
               )}
             </TableBody>
           </Table>
-        </section>
 
-        <DocumentViewer document={definition} noun="definition" />
-      </DetailPanel>
+          <DocumentViewer document={definition} noun="definition" />
+        </DetailSection>
+
+        <FlowCanvas definition={definition} name={name} branding={branding} />
+      </div>
     </Page>
   );
 }

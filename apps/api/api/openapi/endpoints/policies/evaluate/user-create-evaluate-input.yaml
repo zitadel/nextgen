@@ -1,0 +1,16 @@
+title: UserCreateEvaluateInput
+type: object
+additionalProperties: false
+description: |
+  The sign-up as it reaches the server. A real sign-up proves the challenge
+  it solved; a dry run names it.
+required:
+  - solved_challenge
+properties:
+  solved_challenge:
+    type: string
+    enum:
+      - zitadel_pow
+    description: |
+      The challenge the sign-up solved. `zitadel_pow` is Zitadel's built-in
+      proof of work.

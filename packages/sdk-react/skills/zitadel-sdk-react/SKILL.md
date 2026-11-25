@@ -70,6 +70,10 @@ export function ProfilePage() {
   the flow completes.
 - The widget's `zitadel-*` events reach you as the `on*` callbacks listed under
   Widget props and events.
+- For your own UI (navigation, account menus, route guards), read who is
+  signed in with the `useSession()` hook, passing the same `project`. It asks
+  the server: treat its `error` state as unknown, never as signed out, and keep
+  no auth state of your own. The README has its states.
 
 ## Widget props and events
 

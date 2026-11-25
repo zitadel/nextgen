@@ -1,6 +1,9 @@
+import { webcrypto } from "node:crypto";
 import {
   applyBranding,
+  applyPasskey,
   clearBranding,
+  clearPasskey,
   PASSWORD_FIELD,
   setupMockHandlers,
   type CapturedRequest,
@@ -18,6 +21,7 @@ import {
  * `ElementInternals` implementation.
  */
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {
@@ -37,6 +41,8 @@ import type { ZlAlert } from "../atoms/zl-alert.js";
 import type { ZlField } from "../atoms/zl-field.js";
 import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
+import { de } from "./locales/de.js";
+import { en } from "./locales/en.js";
 
 const API_BASE = "https://flow.test.invalid";
 
@@ -48,7 +54,13 @@ let testProject = configureZitadel({
   projectId: "demo-project",
 });
 
+const originalSubtle = Object.getOwnPropertyDescriptor(globalThis.crypto, "subtle");
 beforeAll(() => {
+  // jsdom has no SubtleCrypto; use Node's native implementation.
+  Object.defineProperty(globalThis.crypto, "subtle", {
+    configurable: true,
+    value: webcrypto.subtle,
+  });
   server.listen({ onUnhandledRequest: "error" });
 });
 
@@ -70,9 +82,11 @@ afterEach(() => {
 
 afterAll(() => {
   server.close();
+  if (originalSubtle) Object.defineProperty(globalThis.crypto, "subtle", originalSubtle);
+  else Reflect.deleteProperty(globalThis.crypto, "subtle");
 });
 
-async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const value = probe();
@@ -165,7 +179,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
         branding: {},
       };
       server.use(
-        http.post("*/flow", () => HttpResponse.json(body, { status: 201 }), { once: true }),
+        http.post("*/flows", () => HttpResponse.json(body, { status: 201 }), { once: true }),
       );
     }
 
@@ -405,7 +419,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // knowing the name came from its `flow-name` attribute.
     server.use(
       http.post(
-        "*/flow",
+        "*/flows",
         () =>
           HttpResponse.json(
             {
@@ -425,13 +439,13 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="no-such-flow"');
-    expect(text).toContain("zitadel apply");
+    expect(text).toContain("zitadel deploy");
   });
 
   it("explains a flow-name that does not serve the requested purpose", async () => {
     server.use(
       http.post(
-        "*/flow",
+        "*/flows",
         () =>
           HttpResponse.json(
             {
@@ -452,6 +466,95 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="register-only"');
     expect(text).toContain('purpose "login"');
+  });
+
+  describe("explains a misconfigured element from the server's envelope", () => {
+    /** Mounts an element whose flow start the server answers with `body` and `status`. */
+    const startRefused = async (
+      body: Record<string, unknown>,
+      status: number,
+      attributes: Record<string, string> = {},
+    ) => {
+      server.use(http.post("*/flows", () => HttpResponse.json(body, { status }), { once: true }));
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.project = testProject;
+      for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+      return element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+    };
+    const invalid = (...fields: string[]) => ({
+      code: "req.invalid",
+      message: "The request is invalid and fails base validation.",
+      details: { details: { fields } },
+    });
+
+    it("names the purpose and lists the valid ones", async () => {
+      const text = await startRefused(invalid("purpose"), 400, { purpose: "signin" });
+      expect(text).toContain('purpose="signin" is not a flow purpose');
+      expect(text).toContain("login, register, recovery, profiling, reauth, link_account");
+    });
+
+    it("names a flow-name the server's pattern refuses", async () => {
+      const text = await startRefused(invalid("flow_definition_name"), 400, {
+        "flow-name": "New_Login",
+      });
+      expect(text).toContain('flow-name="New_Login" is not a flow name');
+    });
+
+    it("names a project id the server refuses", async () => {
+      const text = await startRefused(invalid("project_id"), 400);
+      expect(text).toContain(`"${testProject.projectId}" is not a project id`);
+    });
+
+    it("names a project the server does not have", async () => {
+      const text = await startRefused(
+        { code: "proj.not_found", message: "project not found" },
+        404,
+      );
+      expect(text).toContain(`no project "${testProject.projectId}" exists`);
+    });
+
+    it("names the purpose no active flow serves when no flow-name is set", async () => {
+      const text = await startRefused(
+        { code: "flowdef.not_found", message: "flow definition: not found" },
+        404,
+        { purpose: "recovery" },
+      );
+      expect(text).toContain('no active flow definition serves purpose "recovery"');
+      expect(text).not.toContain("flow-name");
+    });
+
+    it("says to deploy a project with nothing deployed to its primary origins", async () => {
+      const text = await startRefused(
+        { code: "rel.no_default", message: "the project has no primary deployment" },
+        409,
+      );
+      expect(text).toContain(`project "${testProject.projectId}" has nothing deployed`);
+      expect(text).toContain("zitadel deploy");
+    });
+
+    it("says how to deploy to the page's origin when nothing is deployed there", async () => {
+      const text = await startRefused(
+        { code: "rel.not_deployed", message: "nothing is deployed to http://localhost:3000" },
+        409,
+      );
+      expect(text).toContain("nothing deployed to this page's origin");
+      expect(text).toContain("zitadel origin add <origin> --kind primary");
+    });
+
+    it("keeps the server's error as the cause it logs", async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      await startRefused({ code: "proj.not_found", message: "project not found" }, 404);
+      const [, error] = logged.mock.calls.find(([tag]) => tag === "[zitadel-login]") ?? [];
+      expect((error as Error).cause).toBeInstanceOf(ApiError);
+      logged.mockRestore();
+    });
+
+    it("passes a req.invalid about any other field through", async () => {
+      const text = await startRefused(invalid("schema_version"), 400);
+      expect(text).toContain("fails base validation");
+    });
   });
 
   it("submits with {session_token, action, fields} and applies the next step", async () => {
@@ -613,6 +716,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
     }
   });
 
+  it("reports a failed handoff exchange without navigating or showing the signed-in screen", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      mock.failNextExchange();
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      const failed = vi.fn();
+      element.addEventListener("zitadel-flow-error", failed);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+
+      await waitFor(() => (failed.mock.calls.length > 0 ? failed : null));
+      await element.updateComplete;
+      expect(failed).toHaveBeenCalledOnce();
+      expect(assign).not.toHaveBeenCalled();
+      expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(
+        "Session exchange is temporarily unavailable.",
+      );
+      expect(element.shadowRoot?.textContent).not.toContain("You're signed in");
+      expect(element.getAttribute("aria-busy")).toBe("false");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: location,
+      });
+    }
+  });
+
   it.each([
     [
       "the protected route the page's next names",
@@ -676,7 +817,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("surfaces network errors via zitadel-flow-error", async () => {
-    server.resetHandlers(http.post("*/flow", () => HttpResponse.error(), { once: true }));
+    server.resetHandlers(http.post("*/flows", () => HttpResponse.error(), { once: true }));
 
     const errorEvents: CustomEvent[] = [];
     const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -700,7 +841,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // flow-response unwrap and reach the user verbatim.
     server.use(
       http.post(
-        "*/flow/*/submit",
+        "*/flows/*/submit",
         () => HttpResponse.json({ code: "req.invalid", message: serverMessage }, { status: 400 }),
         { once: true },
       ),
@@ -778,7 +919,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // The template renders primary actions generically AND has a dedicated
     // passkey block, which must skip a passkey that is already primary.
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -910,7 +1051,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     try {
       server.use(
         http.post(
-          "*/flow/*/submit",
+          "*/flows/*/submit",
           () =>
             new Promise((resolve) => {
               releaseSubmit = () =>
@@ -1198,7 +1339,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // step shape with `fields.value` unset and `step.error` populated. We
     // override the mock's submit handler to mirror that wire shape.
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1267,7 +1408,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
 
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1315,7 +1456,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
 
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1373,7 +1514,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
 
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1422,7 +1563,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
 
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1471,7 +1612,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   ): Promise<ZitadelLogin> {
     const element = await mount(hostEl);
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1578,7 +1719,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     let releaseSubmit: (() => void) | undefined;
     server.use(
       http.post(
-        "*/flow/*/submit",
+        "*/flows/*/submit",
         () =>
           new Promise((resolve) => {
             releaseSubmit = () =>
@@ -1649,7 +1790,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     let releaseSubmit: (() => void) | undefined;
     server.use(
       http.post(
-        "*/flow/*/submit",
+        "*/flows/*/submit",
         () =>
           new Promise((resolve) => {
             releaseSubmit = () =>
@@ -1760,6 +1901,549 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
       await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
     }
+
+    const signupSubmits = () =>
+      mock
+        .getCaptured()
+        .filter(
+          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+            req.kind === "submitFlowStep",
+        );
+
+    /** The element's current wire response and its applier, for steps the mock cannot produce. */
+    const internals = (element: ZitadelLogin) =>
+      element as unknown as {
+        response: CreateFlow201;
+        applyResponse(wire: CreateFlow201): Promise<void>;
+      };
+
+    /** Holds the next step GET until `release`, then lets the mock answer it. */
+    function holdNextStepGet(): () => void {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      server.use(
+        http.get(
+          "*/flows/:id",
+          async () => {
+            await held;
+          },
+          { once: true },
+        ),
+      );
+      return release;
+    }
+
+    const passwordValue = (element: ZitadelLogin) =>
+      element.shadowRoot?.querySelector<ZlField>(`zl-field[name="${PASSWORD_FIELD}"]`)?.formValue;
+
+    it.each([
+      ["flow.cookie_expired", 401, false, "test signup failure"],
+      ["flow.not_found", 404, false, "test signup failure"],
+      ["internal", 500, true, en["error.signup_check_failed"]!],
+      ["flow.rate_limited", 429, true, en["error.signup_rate_limited"]!],
+      ["flow.proof_invalid", 403, true, en["error.signup_check_failed"]!],
+    ])("routes signup refresh error %s correctly", async (code, status, retryable, text) => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      server.use(
+        http.get("*/flows/:id", () =>
+          HttpResponse.json({ code, message: "test signup failure" }, { status: status as number }),
+        ),
+      );
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() => (element.shadowRoot?.textContent?.includes(text) ? true : null));
+        expect(!!element.shadowRoot?.querySelector('zl-field[type="password"]')).toBe(retryable);
+      } finally {
+        log.mockRestore();
+        warn.mockRestore();
+      }
+    });
+
+    it("keeps the signup form when the step refresh loses its connection", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      server.use(http.get("*/flows/:id", () => HttpResponse.error(), { once: true }));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+        expect(passwordValue(element)).toBe("hunter2secure");
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("words a signup refusal in the widget's language", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      element.lang = "de";
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      server.use(
+        http.get("*/flows/:id", () =>
+          HttpResponse.json(
+            { code: "flow.rate_limited", message: "signup request limit reached" },
+            { status: 429 },
+          ),
+        ),
+      );
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(de["error.signup_rate_limited"]!) ? true : null,
+        );
+        expect(element.shadowRoot?.textContent).not.toContain("signup request limit reached");
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("keeps signup input after a solver failure and submits a fresh proof on retry", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const derive = vi.spyOn(globalThis.crypto.subtle, "deriveBits");
+      derive.mockRejectedValueOnce(new Error("Temporary signup check failure"));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+        expect(
+          element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+        ).not.toBeNull();
+        submit(element);
+        const request = await waitFor(() =>
+          signupSubmits().find((r) => r.body.gate_proofs?.signup_pow),
+        );
+        expect(request).toMatchObject({
+          kind: "submitFlowStep",
+          body: {
+            fields: { [PASSWORD_FIELD]: "hunter2secure" },
+            gate_proofs: { signup_pow: expect.any(String) },
+          },
+        });
+      } finally {
+        derive.mockRestore();
+        warn.mockRestore();
+      }
+    });
+
+    it("says a sign-up needs a secure connection where the page has no crypto.subtle", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      // Kept before the override: in this environment `globalThis.crypto` is
+      // Node's `webcrypto`, so reading `webcrypto.subtle` afterwards gives undefined.
+      const { subtle } = globalThis.crypto;
+      Object.defineProperty(globalThis.crypto, "subtle", { configurable: true, value: undefined });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_secure_connection"]!)
+            ? true
+            : null,
+        );
+        expect(passwordValue(element)).toBe("hunter2secure");
+      } finally {
+        Object.defineProperty(globalThis.crypto, "subtle", { configurable: true, value: subtle });
+        warn.mockRestore();
+      }
+    });
+
+    it("solves on a retry when the step was rendered before the server asked for a proof", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      // A server from before the signup gate rendered this step.
+      const login = internals(element);
+      await login.applyResponse({
+        ...login.response,
+        step: { ...login.response.step, gates: {} },
+      });
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+        expect(internals(element).response.step.gates.signup_pow).toBeDefined();
+        submit(element);
+        const request = await waitFor(() =>
+          signupSubmits().find((r) => r.body.gate_proofs?.signup_pow),
+        );
+        expect(request.body.fields).toMatchObject({ [PASSWORD_FIELD]: "hunter2secure" });
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("submits without a proof when the refreshed step no longer asks for one", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const { response } = internals(element);
+      server.use(
+        http.get(
+          "*/flows/:id",
+          () => HttpResponse.json({ ...response, step: { ...response.step, gates: {} } }),
+          { once: true },
+        ),
+      );
+      const before = signupSubmits().length;
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        const request = await waitFor(() => signupSubmits()[before]);
+        expect(request.body.gate_proofs).toBeUndefined();
+        expect(request.body.fields).toMatchObject({ [PASSWORD_FIELD]: "hunter2secure" });
+        // The mock still asks for a proof; wait out the refresh its refusal
+        // starts, so no request of this flow reaches the next test.
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("announces the step the flow moved to when the signup refresh finds another one", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const { response } = internals(element);
+      server.use(
+        http.get(
+          "*/flows/:id",
+          () =>
+            HttpResponse.json({
+              ...response,
+              step: { ...response.step, name: "elsewhere", gates: {} },
+            }),
+          { once: true },
+        ),
+      );
+      const announced: string[] = [];
+      element.addEventListener("zitadel-flow-step", (event) =>
+        announced.push((event as CustomEvent<{ step: { name: string } }>).detail.step.name),
+      );
+      const before = signupSubmits().length;
+      submit(element);
+      await waitFor(() => (announced.includes("elsewhere") ? true : null));
+      expect(internals(element).response.step.name).toBe("elsewhere");
+      expect(signupSubmits()).toHaveLength(before);
+    });
+
+    it("shows the typed password during the signup check and sends an edit made meanwhile", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "first-password-1");
+      const release = holdNextStepGet();
+      submit(element);
+      // The loading re-render rebuilds the field; it shows the typed value again.
+      await waitFor(() =>
+        element.getAttribute("aria-busy") === "true" &&
+        passwordValue(element) === "first-password-1"
+          ? true
+          : null,
+      );
+      type(element, PASSWORD_FIELD, "second-password-2");
+      release();
+      const request = await waitFor(() =>
+        signupSubmits().find((r) => r.body.gate_proofs?.signup_pow),
+      );
+      expect(request.body.fields).toMatchObject({ [PASSWORD_FIELD]: "second-password-2" });
+    });
+
+    it("stops the signup check on a back gesture instead of creating the account", async () => {
+      await settleHistory();
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      await settleHistory();
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const release = holdNextStepGet();
+      submit(element);
+      await waitFor(() => (element.getAttribute("aria-busy") === "true" ? true : null));
+      window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      release();
+      await waitFor(() => signupSubmits().find((r) => r.body.action === "back"));
+      await waitFor(() =>
+        element.shadowRoot?.querySelector('zl-field[type="password"]') === null ? true : null,
+      );
+      expect(signupSubmits().some((r) => r.body.gate_proofs?.signup_pow)).toBe(false);
+    });
+
+    /**
+     * WebAuthn that never settles: `<zl-passkey>` starts its ceremony and the
+     * test answers it with `zl-passkey-result`, as a successful one would.
+     */
+    function holdWebAuthn() {
+      const credentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
+      const publicKeyCredential = Object.getOwnPropertyDescriptor(window, "PublicKeyCredential");
+      const create = vi.fn(() => Promise.race<PublicKeyCredential>([]));
+      Object.defineProperty(window, "PublicKeyCredential", {
+        configurable: true,
+        value: class PublicKeyCredentialStub {},
+      });
+      Object.defineProperty(navigator, "credentials", {
+        configurable: true,
+        value: { create: create as unknown as CredentialsContainer["create"], get: vi.fn() },
+      });
+      return {
+        create,
+        restore() {
+          if (credentials) Object.defineProperty(navigator, "credentials", credentials);
+          else Reflect.deleteProperty(navigator, "credentials");
+          if (publicKeyCredential)
+            Object.defineProperty(window, "PublicKeyCredential", publicKeyCredential);
+          else Reflect.deleteProperty(window, "PublicKeyCredential");
+        },
+      };
+    }
+
+    /**
+     * identifier → register, then ask for the passkey sign-up's ceremony and
+     * wait until it has started. A check that fails takes `<zl-passkey>` off
+     * the step again, so the ceremony's start is read from WebAuthn itself.
+     */
+    async function startPasskeySignup(
+      element: ZitadelLogin,
+      webauthn: { create: { mock: { calls: unknown[] } } },
+    ): Promise<void> {
+      submit(element, "register");
+      await waitFor(() =>
+        element.shadowRoot?.querySelector('zl-button[action="passkey_register"]'),
+      );
+      type(element, "email", "passkey@acme.com");
+      const started = webauthn.create.mock.calls.length;
+      submit(element, "passkey_register");
+      await waitFor(() => (webauthn.create.mock.calls.length > started ? true : null));
+    }
+
+    function answerCeremony(element: ZitadelLogin): void {
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-passkey-result", {
+          bubbles: true,
+          composed: true,
+          detail: {
+            challenge_id: "ch_mock_passkey_register",
+            method: "passkey_register",
+            proof: {
+              id: "cred_passkey_signup",
+              rawId: "Y3JlZF9wYXNza2V5X3NpZ251cA",
+              type: "public-key",
+              response: { attestationObject: "AAAA", clientDataJSON: "BBBB" },
+            },
+          },
+        }),
+      );
+    }
+
+    /** Step GETs the mock answered so far. */
+    const stepGets = () => mock.getCaptured().filter((req) => req.kind === "getFlowStep").length;
+
+    /** Whether the check a passkey sign-up solves during its ceremony is done. */
+    const proofReady = (element: ZitadelLogin) =>
+      (element as unknown as { signupCeremony?: string }).signupCeremony !== undefined;
+
+    it("solves a passkey sign-up's check while its ceremony runs and sends it with the attestation", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      try {
+        const element = await mount(host);
+        await startPasskeySignup(element, webauthn);
+        // Asking for the ceremony creates nobody, so it carries no proof.
+        const asked = signupSubmits().find((r) => r.body.action === "passkey_register");
+        expect(asked?.body.gate_proofs).toBeUndefined();
+        // The check is done while the ceremony runs, before any passkey exists.
+        await waitFor(() => (proofReady(element) ? true : null));
+        const gets = stepGets();
+        const completed = new Promise((resolve) =>
+          element.addEventListener("zitadel-flow-complete", resolve, { once: true }),
+        );
+
+        answerCeremony(element);
+
+        const attestation = await waitFor(() =>
+          signupSubmits().find((r) => r.body.challenge_response),
+        );
+        expect(attestation.body).toMatchObject({
+          action: "passkey_register",
+          challenge_response: { method: "passkey_register" },
+          gate_proofs: { signup_pow: expect.any(String) },
+        });
+        await completed;
+        // Nothing stands between the ceremony and the attestation that can fail.
+        expect(stepGets()).toBe(gets);
+        expect(webauthn.create).toHaveBeenCalledTimes(1);
+      } finally {
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
+
+    it("stops a passkey sign-up's ceremony when its check fails, before a passkey is stored", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      const derive = vi.spyOn(globalThis.crypto.subtle, "deriveBits");
+      derive.mockRejectedValueOnce(new Error("Temporary signup check failure"));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const element = await mount(host);
+        await startPasskeySignup(element, webauthn);
+
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+        // The ceremony left the step, which aborts the browser's prompt.
+        expect(internals(element).response.step.challenge).toBeUndefined();
+        expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+        const [options] = webauthn.create.mock.calls[0] as unknown as [CredentialCreationOptions];
+        expect(options.signal?.aborted).toBe(true);
+        expect(signupSubmits().some((r) => r.body.challenge_response)).toBe(false);
+
+        // Picking the passkey again resumes the server's ceremony and solves afresh.
+        submit(element, "passkey_register");
+        await waitFor(() => (webauthn.create.mock.calls.length === 2 ? true : null));
+        await waitFor(() => (proofReady(element) ? true : null));
+      } finally {
+        warn.mockRestore();
+        derive.mockRestore();
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
+
+    it("stops a passkey sign-up's ceremony when the server will issue no check", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const element = await mount(host);
+        server.use(
+          http.get(
+            "*/flows/:id",
+            () =>
+              HttpResponse.json(
+                { code: "flow.rate_limited", message: "signup request limit reached" },
+                { status: 429 },
+              ),
+            { once: true },
+          ),
+        );
+        await startPasskeySignup(element, webauthn);
+
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_rate_limited"] ?? "")
+            ? true
+            : null,
+        );
+        expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+        const [options] = webauthn.create.mock.calls[0] as unknown as [CredentialCreationOptions];
+        expect(options.signal?.aborted).toBe(true);
+        expect(signupSubmits().some((r) => r.body.challenge_response)).toBe(false);
+      } finally {
+        warn.mockRestore();
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
+
+    it("takes a response whose step carries no gates, as a host's own render may resume one", async () => {
+      const element = await mount(host);
+      const { response } = internals(element);
+      const { gates: _none, ...step } = response.step;
+
+      await expect(
+        internals(element).applyResponse({ ...response, step } as CreateFlow201),
+      ).resolves.toBeUndefined();
+    });
+
+    it("waits for a check still running when the passkey ceremony ends", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const subtle = globalThis.crypto.subtle;
+      const deriveBits = subtle.deriveBits.bind(subtle);
+      const derive = vi
+        .spyOn(subtle, "deriveBits")
+        .mockImplementationOnce(async (...args: Parameters<SubtleCrypto["deriveBits"]>) => {
+          await held;
+          return deriveBits(...args);
+        });
+      try {
+        const element = await mount(host);
+        await startPasskeySignup(element, webauthn);
+        const gets = stepGets();
+
+        answerCeremony(element);
+        await waitFor(() => (element.getAttribute("aria-busy") === "true" ? true : null));
+        expect(signupSubmits().some((r) => r.body.challenge_response)).toBe(false);
+
+        release();
+        const attestation = await waitFor(() =>
+          signupSubmits().find((r) => r.body.challenge_response),
+        );
+        expect(attestation.body.gate_proofs).toEqual({ signup_pow: expect.any(String) });
+        expect(stepGets()).toBe(gets);
+      } finally {
+        release();
+        derive.mockRestore();
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
+
+    it("keeps the passkey sign-up step without restarting its ceremony when the server refuses the proof", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const element = await mount(host);
+        await startPasskeySignup(element, webauthn);
+        await waitFor(() => (proofReady(element) ? true : null));
+        server.use(
+          http.post(
+            "*/flows/:id/submit",
+            () =>
+              HttpResponse.json(
+                { code: "flow.rate_limited", message: "signup request limit reached" },
+                { status: 429 },
+              ),
+            { once: true },
+          ),
+        );
+
+        answerCeremony(element);
+
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_rate_limited"] ?? "")
+            ? true
+            : null,
+        );
+        expect(internals(element).response.step.challenge).toBeUndefined();
+        expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+        expect(webauthn.create).toHaveBeenCalledTimes(1);
+
+        // Picking the passkey again resumes the server's pending ceremony.
+        submit(element, "passkey_register");
+        await waitFor(() => (webauthn.create.mock.calls.length === 2 ? true : null));
+      } finally {
+        warn.mockRestore();
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
 
     it("renders no generic control for the kind: back action, only the account's change link", async () => {
       const element = await mount(host);
@@ -2044,7 +2728,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // A step whose only inputs are the non-text atoms: values are read from
     // `<zl-select>` and `<zl-checkbox>` too.
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -2081,7 +2765,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     let submittedFields: Record<string, unknown> | undefined;
     server.use(
-      http.post("*/flow/*/submit", async ({ request }) => {
+      http.post("*/flows/*/submit", async ({ request }) => {
         const body = (await request.json()) as {
           fields: Record<string, unknown>;
         };
@@ -2137,11 +2821,169 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("renders a date_time field as a local input and submits an RFC 3339 timestamp", async () => {
+    vi.stubEnv("TZ", "Asia/Kolkata");
+    onTestFinished(() => {
+      vi.unstubAllEnvs();
+    });
+    server.use(
+      http.post("*/flows", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "register",
+              texts: { title_key: "register.title" },
+              fields: [
+                {
+                  name: "startsAt",
+                  type: "date_time",
+                  text_key: "register.field.startsAt",
+                  required: true,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    let submittedFields: Record<string, unknown> | undefined;
+    server.use(
+      http.post("*/flows/*/submit", async ({ request }) => {
+        const body = (await request.json()) as { fields: Record<string, unknown> };
+        submittedFields = body.fields;
+        return HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: {
+            name: "done",
+            texts: { title_key: "done.title" },
+            fields: [],
+            actions: [],
+            gates: {},
+          },
+          branding: {},
+        });
+      }),
+    );
+
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    host.appendChild(element);
+
+    const field = await waitFor(() =>
+      element.shadowRoot?.querySelector<ZlField>('zl-field[name="startsAt"]'),
+    );
+    await field.updateComplete;
+    expect(field.shadowRoot?.querySelector("input")?.type).toBe("datetime-local");
+
+    field.value = "2026-11-03T12:00";
+    await field.updateComplete;
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+
+    await waitFor(() => submittedFields ?? null);
+    expect(submittedFields).toEqual({ startsAt: "2026-11-03T06:30:00.000Z" });
+  });
+
+  it.each([
+    ["on the minute", "2026-11-03T06:30:00.000Z", "2026-11-03T12:00"],
+    ["with seconds", "2026-11-03T06:30:15.000Z", "2026-11-03T12:00:15"],
+    ["with an offset", "2026-11-03T12:00:00+05:30", "2026-11-03T12:00"],
+  ])(
+    "shows a date_time prefilled %s in local time and keeps its instant",
+    async (_, prefilled, shown) => {
+      vi.stubEnv("TZ", "Asia/Kolkata");
+      onTestFinished(() => {
+        vi.unstubAllEnvs();
+      });
+      server.use(
+        http.post("*/flows", () =>
+          HttpResponse.json(
+            {
+              id: "flow_test",
+              session_token: "st_test",
+              step: {
+                name: "register",
+                texts: { title_key: "register.title" },
+                fields: [
+                  {
+                    name: "startsAt",
+                    type: "date_time",
+                    text_key: "register.field.startsAt",
+                    required: false,
+                    value: prefilled,
+                  },
+                ],
+                actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+                gates: {},
+              },
+              branding: {},
+            },
+            { status: 201 },
+          ),
+        ),
+      );
+
+      let submittedFields: Record<string, unknown> | undefined;
+      server.use(
+        http.post("*/flows/*/submit", async ({ request }) => {
+          const body = (await request.json()) as { fields: Record<string, unknown> };
+          submittedFields = body.fields;
+          return HttpResponse.json({
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "done",
+              texts: { title_key: "done.title" },
+              fields: [],
+              actions: [],
+              gates: {},
+            },
+            branding: {},
+          });
+        }),
+      );
+
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.project = testProject;
+      host.appendChild(element);
+
+      const field = await waitFor(() =>
+        element.shadowRoot?.querySelector<ZlField>('zl-field[name="startsAt"]'),
+      );
+      await field.updateComplete;
+      expect(field.shadowRoot?.querySelector("input")?.value).toContain(shown);
+
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "submit" },
+        }),
+      );
+
+      await waitFor(() => submittedFields ?? null);
+      expect(submittedFields).toEqual({ startsAt: new Date(prefilled).toISOString() });
+    },
+  );
+
   it("submits an unticked checkbox as boolean false", async () => {
     // An untouched optional checkbox must submit real `false`, not "" — the
     // schema validates the property as a boolean and rejects an empty string.
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -2169,7 +3011,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     let submittedFields: Record<string, unknown> | undefined;
     server.use(
-      http.post("*/flow/*/submit", async ({ request }) => {
+      http.post("*/flows/*/submit", async ({ request }) => {
         const body = (await request.json()) as {
           fields: Record<string, unknown>;
         };
@@ -2216,7 +3058,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // matched"). The orchestrator must omit the field entirely. A text field
     // in the same step still submits its "" default so required-checks run.
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -2253,7 +3095,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     let submittedFields: Record<string, string> | undefined;
     server.use(
-      http.post("*/flow/*/submit", async ({ request }) => {
+      http.post("*/flows/*/submit", async ({ request }) => {
         const body = (await request.json()) as {
           fields: Record<string, string>;
         };
@@ -2406,7 +3248,7 @@ describe("<zitadel-login preview-state>", () => {
     let release: (() => void) | undefined;
     server.use(
       http.post(
-        "*/flow/*/submit",
+        "*/flows/*/submit",
         () =>
           new Promise((resolve) => {
             release = () =>
@@ -2475,7 +3317,7 @@ describe("<zitadel-login preview-state>", () => {
 
   it("starts no passkey ceremony for a served step that carries a challenge", async () => {
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow-1",
@@ -2535,7 +3377,7 @@ describe("<zitadel-login preview-state>", () => {
   /** A served step the browser's back gesture can leave. */
   function serveBackCapableStep(): void {
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow-1",

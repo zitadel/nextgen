@@ -1,34 +1,29 @@
 import { existsSync, readFileSync } from "node:fs";
+import { LocalRuntime } from "@/lib/server";
 import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
-import {
-  agentsGuidanceSection,
-  readmeGuidanceSection,
-} from "../../../../../../src/lib/orca/patchers/rule/guidance";
-import {
-  appComponentTemplate,
-  appTemplateHtml,
-} from "../../../../../../src/lib/orca/patchers/rule/angular/templates";
-import { reactRenderer } from "../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { agentsGuidanceSection, readmeGuidanceSection } from "@/lib/orca/patchers/rule/guidance";
+import { appComponentTemplate, appTemplateHtml } from "@/lib/orca/patchers/rule/angular/templates";
+import { reactRenderer } from "@/lib/orca/patchers/rule/next/renderers/react";
 import {
   appVueTemplate,
   indexPageTemplate,
   loginPageTemplate,
   profilePageTemplate,
   registerPageTemplate,
-} from "../../../../../../src/lib/orca/patchers/rule/nuxt/templates";
-import { appTemplate as qwikAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/qwik/templates";
-import { appTemplate as reactAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/react/templates";
-import { appTemplate as solidAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/solid/templates";
-import { appTemplate as svelteAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/svelte/templates";
-import { appTemplate as vueAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/vue/templates";
-import { detectors } from "../../../../../../src/lib/orca/detectors";
-import { createOrca } from "../../../../../../src/lib/orca";
-import type { AbstractRulePatcher } from "../../../../../../src/lib/orca/patchers/rule/base";
-import { FRAMEWORK_IDS } from "../../../../../helpers/framework-ids";
+} from "@/lib/orca/patchers/rule/nuxt/templates";
+import { appTemplate as qwikAppTemplate } from "@/lib/orca/patchers/rule/qwik/templates";
+import { appTemplate as reactAppTemplate } from "@/lib/orca/patchers/rule/react/templates";
+import { appTemplate as solidAppTemplate } from "@/lib/orca/patchers/rule/solid/templates";
+import { appTemplate as svelteAppTemplate } from "@/lib/orca/patchers/rule/svelte/templates";
+import { appTemplate as vueAppTemplate } from "@/lib/orca/patchers/rule/vue/templates";
+import { detectors } from "@/lib/orca/detectors";
+import { createOrca } from "@/lib/orca";
+import type { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
 
 /**
  * Guard against guidance/template drift from the real package surfaces: every
@@ -80,7 +75,8 @@ function baseContext(frameworkId: string, overrides: Partial<PatchContext> = {})
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
-    server: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.17",
     ...overrides,
   } as PatchContext;
@@ -105,7 +101,7 @@ const ALL_FRAMEWORK_IDS = detectors.map((detector) => detector.framework);
  * cannot be left out of the corpus by a hand-kept list.
  */
 function plannedByFramework(frameworkId: string) {
-  const patcher = createOrca().patcherFor(frameworkId) as AbstractRulePatcher;
+  const patcher = createOrca(LocalRuntime.DIR).patcherFor(frameworkId) as AbstractRulePatcher;
   const writes: string[] = [];
   const dependencies = new Set<string>();
   for (const posture of [undefined, "page", "widget"] as const) {

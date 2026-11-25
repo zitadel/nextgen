@@ -44,17 +44,23 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 - **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`).
 - **Branding** (`/branding`).
 - **Authentication** (`/authentication`).
+- **Events** (`/events`, `/events/$eventId`): the project's events.
 - **Project settings** (`/project`).
-- **Settings** (`/settings/profile`), your profile, in the Settings view the
-  account menu opens.
+- **Projects** (`/projects`), the root's home, and beside it the platform
+  project's screens for someone who can act on it (D42): the project screens
+  above, with that project selected.
+- **Settings** (`/settings`): the platform project's General and Members for
+  someone who can act on it, then what the hosted cloud adds (Billing,
+  Support, Email).
 
 The sidebar is one level, in the order and with the icons of the design's
 "01 / Nav Level 1".
 
 **Not in the sidebar:**
 
-- `/` redirects to Users, `/settings` to the profile, and `/projects/$projectId` to
-  `/project` with that project selected.
+- `/` redirects to Users, `/settings` to its list's first page, and
+  `/projects/$projectId` to `/project` with that project selected.
+- `/account` is your profile, opened from the account menu.
 - `/system` shows server health.
 - `/login` and `/claim` render outside the app shell.
 
@@ -74,9 +80,11 @@ empty). Attaching `staticData.nav` to a new route lists it.
 ## API access and auth
 
 The console holds **no long-lived credential in the browser bundle**. It calls a
-same-origin API base (`/api` under the dev server, the origin root when
-embedded). Management requests carry no bearer: the `__nextgen_session` cookie
-authorizes them. Sign-in requests send the runtime publishable key (below).
+same-origin API under `/api/v1` (through the Vite proxy under the dev server,
+straight to the Go server when embedded). Management requests carry no bearer:
+the session cookie (`__Host-zitadel_session`, `zitadel_session` on
+`http://localhost`) authorizes them. Sign-in requests send the runtime
+publishable key (below).
 The dev proxy injects no credential. See the Vite proxy config and environment
 variables below.
 
@@ -84,7 +92,7 @@ variables below.
 
 Console users sign in through the embedded `<zitadel-login>` widget on
 `/login` (via `@zitadel/sdk-react`). Completing the flow exchanges the
-widget's handoff token for the `__nextgen_session` HttpOnly cookie; the
+widget's handoff token for the HttpOnly session cookie; the
 pathless `_authed` layout guards every screen by confirming that cookie
 against `GET /sessions/me` and redirects unauthenticated visitors to
 `/login?next=…`. Sign-out lives in the sidebar user menu
@@ -157,7 +165,7 @@ a fiction. **Default to the real-data loop.**
 ### Real data (default)
 
 ```sh
-moon run console:dev-real
+turbo run dev:real --filter=@zitadel/console
 ```
 
 One command: boots an ephemeral real instance (binary runtime + SQLite by
@@ -182,8 +190,8 @@ the same way — through the grant, not a secret.
 ### Mock backend
 
 ```sh
-PORT=8080 moon run api-mock:start          # terminal 1
-moon run console:dev                       # terminal 2
+turbo run start --filter=@zitadel/api-mock   # terminal 1, on :8080
+turbo run dev --filter=@zitadel/console      # terminal 2
 ```
 
 Fast and offline, and the full sign-in loop works (the mock serves
@@ -192,14 +200,14 @@ Fast and offline, and the full sign-in loop works (the mock serves
 needs no real data: it has **no user store**, so list screens cannot be
 meaningful and nothing about authorization can be proven there. It serves its
 own `/console/runtime.json`, naming the mock's platform project as the one the
-console signs into (so the claim page can complete, as in `console:dev-claim`),
+console signs into (so the claim page can complete, as in `dev:claim`),
 and the loop needs no variables: the dev proxy's default backend is the mock's
 port.
 
 ### Embedded build
 
 ```sh
-moon run workspace:server
+pnpm run server
 ```
 
 Serves the built bundle under `/ui/console/` — no HMR. Use it only to verify the
@@ -211,14 +219,14 @@ embed base path.
 | --- | --- | --- |
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.ts`) |
 | `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
-| `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api` under the dev server, the origin root in a build) |
+| `VITE_CONSOLE_API_BASE` | Client | A path or origin the SDK puts in front of the API's `/api/v1` (default: none, the page's own origin) |
 | `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
 
 ## Commands
 
 ```sh
-moon run console:dev-real   # dev server + seeded real backend (preferred)
-moon run console:dev        # dev server only (bring your own backend)
-moon run console:test
-moon run console:typecheck
+turbo run dev:real --filter=@zitadel/console   # dev server + seeded real backend (preferred)
+turbo run dev --filter=@zitadel/console        # dev server only (bring your own backend)
+turbo run test --filter=@zitadel/console
+turbo run typecheck --filter=@zitadel/console
 ```

@@ -17,6 +17,13 @@ const EXPECTED_FIELDS: Record<string, string[]> = {
   business: ["email", "givenName", "familyName", "companyName"],
 };
 
+/** The fields each use case names its users by (`x-display`); none for minimal. */
+const EXPECTED_DISPLAY: Record<string, string[] | undefined> = {
+  minimal: undefined,
+  consumer: ["givenName", "familyName"],
+  business: ["givenName", "familyName"],
+};
+
 function registerFields(flow: ReturnType<typeof getDefaultLoginFlow>): string[] {
   const register = flow.steps.find((step) => step.name === "register");
   return (register?.fields ?? []) as string[];
@@ -46,6 +53,11 @@ describe.each([...SETUP_USE_CASES])("use case %s", (useCase) => {
     };
     expect(Object.keys(schema.properties)).toEqual(expected);
     expect(schema.required).toEqual(["email"]);
+  });
+
+  it("names its users by the name fields it collects", () => {
+    const schema = getDefaultHumanUserSchema({ useCase }) as { "x-display"?: string[] };
+    expect(schema["x-display"]).toEqual(EXPECTED_DISPLAY[useCase]);
   });
 
   it("derives the register step's fields from the use case, not a hard-coded list", () => {

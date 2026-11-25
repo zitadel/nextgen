@@ -16,9 +16,10 @@
 import { MANDATORY_GATES_TAG } from "@zitadel/config/template";
 import { Liquid } from "liquidjs";
 
-import type { CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
+import type { CreateFlow201Step, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
+import { CUSTOM_IDENTIFIER_SUFFIX } from "./locales/index.js";
 import { hookName } from "../internal/hook-name.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import defaultTemplate from "./templates/default.liquid";
@@ -129,6 +130,27 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   });
 
   /**
+   * A field's help text, or, when it has none, a hint from the rules its
+   * validation declares: the minimum length of a password the user chooses.
+   * The server sets it from the project's password policy only where a
+   * password is chosen, so a sign-in step never shows it. Without the hint the
+   * rule surfaces only as an error after the first submit (#251).
+   *
+   * It filters the help text rather than the field so an ejected template that
+   * uses it degrades on an older runtime: without `strictFilters` an unknown
+   * filter passes its input through, which is the help text, not the field.
+   */
+  engine.registerFilter("fieldRuleHint", (help: unknown, field: unknown) => {
+    const text = stringify(help);
+    if (text !== "") return text;
+    const { type, validation } = (field ?? {}) as Partial<CreateFlow201StepFieldsItem>;
+    const minLength = validation?.min_length;
+    if (type !== "password" || minLength === undefined || minLength <= 0) return "";
+    const template = options.locale["hint.field_min_length"];
+    return template === undefined ? "" : interpolate(template, [String(minLength)]);
+  });
+
+  /**
    * Builds `<zl-select>` options from a field's closed `validation.enum`. The
    * wire only carries the allowed values (strings), so the label defaults to the
    * value — author the enum with display-ready text. Piped through `| json` into
@@ -228,6 +250,64 @@ function injectedKeyFallback(locale: Locale, key: string): string | undefined {
     return locale[key.slice(0, -".sso".length)];
   }
   return undefined;
+}
+
+type StepTexts = NonNullable<CreateFlow201Step["texts"]>;
+
+/**
+ * A step's texts as the template renders them. A step that collects an
+ * identifier other than an email address (a schema whose `x-identifier` is
+ * `employee_number`, say) describes itself with the
+ * `<step>.description.custom_identifier` variant where the locale has one,
+ * since the plain sentence may name the email: "Enter your email to continue"
+ * above an "Employee number" field. The variant replaces the `.sso` one too:
+ * a provider sentence may name the email as well, and leaving the providers
+ * out of the subtitle is the smaller loss, as they show on the step anyway.
+ */
+export function stepTexts(
+  texts: StepTexts,
+  fields: readonly CreateFlow201StepFieldsItem[],
+  locale: Locale,
+): StepTexts {
+  const key = texts.description_key;
+  if (!key || !collectsCustomIdentifier(fields)) return texts;
+  const plain = key.endsWith(SSO_DESCRIPTION_SUFFIX) ? key.slice(0, -".sso".length) : key;
+  const variant = `${plain}${CUSTOM_IDENTIFIER_SUFFIX}`;
+  return plain.endsWith(".description") && locale[variant] !== undefined
+    ? { ...texts, description_key: variant }
+    : texts;
+}
+
+/**
+ * The key a step's `notice` renders with. Like {@link stepTexts}, a step that
+ * collects an identifier other than an email address asks for the
+ * `notice.<reason>.custom_identifier` variant where the locale has one: the
+ * register step a sign-in moved to sign-up says the email had no account, and
+ * points at an email field it does not show.
+ *
+ * A step that does not collect the identifier, such as the password step a
+ * sign-up moves to sign-in, cannot tell: `step.identifier` carries no type.
+ * Its notices are worded for any identifier instead.
+ */
+export function stepNotice(
+  notice: string,
+  fields: readonly CreateFlow201StepFieldsItem[],
+  locale: Locale,
+): string {
+  const variant = `${notice}${CUSTOM_IDENTIFIER_SUFFIX}`;
+  return collectsCustomIdentifier(fields) && locale[variant] !== undefined ? variant : notice;
+}
+
+/**
+ * Whether the step collects the user's identifier and it is not an email
+ * address. The server marks the identifier field `autocomplete="username"`
+ * whatever its type (`field.yaml`), so that token finds it.
+ */
+function collectsCustomIdentifier(fields: readonly CreateFlow201StepFieldsItem[]): boolean {
+  const identifier = fields.find((field) =>
+    (field.autocomplete ?? "").toLowerCase().split(/\s+/).includes("username"),
+  );
+  return identifier !== undefined && identifier.type !== "email";
 }
 
 /**
@@ -336,7 +416,7 @@ function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError 
   // An inline-routed key can only render on its field; when the step
   // doesn't carry that field, fall through to the pre-localised message
   // paths so the error surfaces as a banner instead of vanishing.
-  const inlineField = fieldErrorKeys[key];
+  const inlineField = renderedField(fieldErrorKeys[key], ctx.fields);
   const orphanedInline =
     inlineField !== undefined && ctx.fields !== undefined && !ctx.fields.includes(inlineField);
   if (!orphanedInline && ctx.locale[key] !== undefined) {
@@ -377,6 +457,20 @@ function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError 
     return { message: ctx.locale[key] };
   }
   return { text_key: key };
+}
+
+/**
+ * The step field a {@link fieldErrorKeys} entry lands on. A sign-in method's
+ * field is keyed by its schema pointer (`x-auth-methods#password`), so
+ * `password` resolves to that when the step has no plain `password` field.
+ */
+function renderedField(
+  mapped: string | undefined,
+  fields: readonly string[] | undefined,
+): string | undefined {
+  if (mapped === undefined || fields === undefined || fields.includes(mapped)) return mapped;
+  const pointer = `x-auth-methods#${mapped}`;
+  return fields.includes(pointer) ? pointer : mapped;
 }
 
 /** `<step>.field.<name>` from the locale, else a humanised field name. */

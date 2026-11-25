@@ -1,5 +1,16 @@
-import type { FlagVariable } from "../oclif/types";
-import { resolveTelemetryToken } from "./config";
+/**
+ * An environment variable that sets what a global flag sets. The code that
+ * reads it declares it and reads it by `name`, and the CLI reference lists it
+ * beside the flag.
+ */
+export type FlagVariable<Flag extends string = string> = {
+  readonly name: string;
+  /** The global flag it stands in for, without `--`. */
+  readonly flag: Flag;
+  readonly description: string;
+  /** How it ranks against the flag and the other sources of the setting. */
+  readonly precedence: string;
+};
 
 /**
  * Outcome of resolving whether telemetry may run for this invocation. `reason`
@@ -8,15 +19,7 @@ import { resolveTelemetryToken } from "./config";
  */
 export type Consent = {
   readonly enabled: boolean;
-  readonly reason:
-    | "enabled"
-    | "no-token"
-    | "do-not-track"
-    | "env-opt-out"
-    | "flag-opt-out"
-    | "test-runner";
-  /** The resolved ingestion token, present only when `enabled` — so the caller never re-resolves it. */
-  readonly token?: string;
+  readonly reason: "enabled" | "do-not-track" | "env-opt-out" | "flag-opt-out" | "test-runner";
 };
 
 /** Inputs that can disable telemetry, kept explicit so the matrix is testable. */
@@ -27,7 +30,7 @@ export type ConsentInput = {
 };
 
 /** The cross-tool opt-out. */
-export const DO_NOT_TRACK: FlagVariable = {
+export const DO_NOT_TRACK: FlagVariable<"telemetry"> = {
   name: "DO_NOT_TRACK",
   flag: "telemetry",
   description:
@@ -39,12 +42,16 @@ export const DO_NOT_TRACK: FlagVariable = {
 const DISABLED_VALUES = new Set(["", "0", "false", "off", "no"]);
 
 /** The CLI's own opt-out. */
-export const ZITADEL_TELEMETRY: FlagVariable = {
+export const ZITADEL_TELEMETRY: FlagVariable<"telemetry"> = {
   name: "ZITADEL_TELEMETRY",
   flag: "telemetry",
   description: `An empty value or one of ${[...DISABLED_VALUES]
-    .filter((value) => value !== "")
-    .map((value) => `\`${value}\``)
+    .filter((value) => {
+      return value !== "";
+    })
+    .map((value) => {
+      return `\`${value}\``;
+    })
     .join(", ")} turns telemetry off.`,
   precedence: "Turns telemetry off even with `--telemetry`.",
 };
@@ -59,15 +66,14 @@ export const ZITADEL_TELEMETRY: FlagVariable = {
  * 3. `ZITADEL_TELEMETRY` set to a falsey token (`0`/`false`/`off`/`no`).
  * 4. An automated test run (`VITEST`/`NODE_ENV=test`) — never emit synthetic
  *    traffic or pay the shutdown flush; spawned CLI subprocesses inherit it.
- * 5. No ingestion token configured for the active channel — nothing to send to,
- *    so telemetry is inert regardless of consent.
  *
  * The user's own choices (1–3) come first so `reason` reports them even in a
  * test shell: the user agent reads it to decide whether to describe the
  * user's environment.
  *
  * Consent being enabled does not by itself send anything; the caller still
- * builds the client lazily and fails open on any transport error.
+ * needs somewhere to send (a Mixpanel token or the Vercel copy) and fails open
+ * on any transport error.
  */
 export function resolveConsent(input: ConsentInput): Consent {
   if (input.flag === false) {
@@ -88,10 +94,5 @@ export function resolveConsent(input: ConsentInput): Consent {
     return { enabled: false, reason: "test-runner" };
   }
 
-  const token = resolveTelemetryToken(input.env);
-  if (!token) {
-    return { enabled: false, reason: "no-token" };
-  }
-
-  return { enabled: true, reason: "enabled", token };
+  return { enabled: true, reason: "enabled" };
 }

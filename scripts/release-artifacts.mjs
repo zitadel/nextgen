@@ -5,18 +5,27 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapWithConcurrency, run, runReplayed } from "./dev-process.mjs";
+import { run, runReplayed } from "./dev-process.mjs";
+import { mapAll } from "./map-all.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
-  PUBLIC_RELEASE_PACKAGES,
+  SERVER_IMAGE,
   SERVER_PLATFORM_PACKAGES,
 } from "./release-manifest.mjs";
-import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
+import {
+  assertServerBuildPackage,
+  gitInfo,
+  serverLdflags,
+  serverModuleRoot,
+} from "./server-build.mjs";
 
-export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
+export {
+  PUBLIC_PACKAGE_DIRS,
+  SERVER_IMAGE,
+  SERVER_PLATFORM_PACKAGES,
+} from "./release-manifest.mjs";
 export { gitInfo } from "./server-build.mjs";
 
-export const SERVER_IMAGE = "ghcr.io/zitadel/nextgen";
 export const SERVER_PACKAGE = "@zitadel/server";
 export const SERVER_PACKAGE_MANIFEST = "apps/server/package.json";
 export const SERVER_PLATFORMS = [
@@ -51,6 +60,16 @@ export async function readServerRelease(repoRoot = defaultRepoRoot) {
   };
 }
 
+/** The public packages at the versions the checkout holds, `{ name, version, path }`. */
+export async function readReleasePackages(repoRoot = defaultRepoRoot) {
+  const packages = [];
+  for (const dir of PUBLIC_PACKAGE_DIRS) {
+    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
+    packages.push({ name: manifest.name, version: manifest.version, path: dir });
+  }
+  return packages;
+}
+
 export function validateSemver(version) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`invalid release version: ${version}`);
@@ -79,6 +98,11 @@ export async function buildServerBinaries(options = {}) {
   const info = options.gitInfo ?? (await gitInfo({ repoRoot, runCapture: options.runCapture }));
   const outDir = options.outDir ?? releaseDir(repoRoot, version);
   const platforms = options.platforms ?? SERVER_PLATFORMS;
+  // Where each platform's binary goes: the release directory's build/ by
+  // default; a platform package's build-binary task names its own bin/.
+  const outputFor =
+    options.output ??
+    ((platform) => join(platformDir(outDir, platform), binaryName(platform.goos)));
   const runFn = options.run ?? run;
   const baseEnv = { ...process.env, ...(options.env ?? {}) };
 
@@ -86,49 +110,85 @@ export async function buildServerBinaries(options = {}) {
 
   // The per-platform builds are independent and the Go build cache is safe
   // under concurrency, so cross-compile all platforms at once.
-  await mapWithConcurrency(platforms, platforms.length, async (platform) => {
-    const dir = platformDir(outDir, platform);
-    const output = join(dir, binaryName(platform.goos));
-    await mkdir(dir, { recursive: true });
-    await runFn(
-      "go",
-      [
-        "build",
-        "-trimpath",
-        "-ldflags",
-        serverLdflags({ version, commit: info.commit, date: info.date, strip: true }),
-        "-o",
-        output,
-        ".",
-      ],
-      {
-        cwd: repoRoot,
-        env: {
-          ...baseEnv,
-          CGO_ENABLED: "0",
-          GOOS: platform.goos,
-          GOARCH: platform.goarch,
+  await mapAll(
+    platforms,
+    async (platform) => {
+      const output = outputFor(platform);
+      await mkdir(dirname(output), { recursive: true });
+      await runFn(
+        "go",
+        [
+          "build",
+          "-trimpath",
+          "-ldflags",
+          serverLdflags({ version, commit: info.commit, date: info.date, strip: true }),
+          "-o",
+          output,
+          ".",
+        ],
+        {
+          cwd: serverModuleRoot(repoRoot),
+          env: {
+            ...baseEnv,
+            CGO_ENABLED: "0",
+            GOOS: platform.goos,
+            GOARCH: platform.goarch,
+          },
         },
-      },
-    );
-  });
+      );
+    },
+    platforms.length,
+  );
 
   return { outDir, platforms, version, gitInfo: info };
 }
 
-export async function stageServerNpmBinaries(options = {}) {
+/** Where a server platform package ships its binary. */
+export function packageBinaryPath(repoRoot, platformPackage) {
+  return join(repoRoot, platformPackage.packageDir, "bin", binaryName(platformPackage.goos));
+}
+
+/**
+ * Fails unless each platform package has its binary in bin/, where turbo's
+ * build-binary tasks leave it (`release.mjs binary`).
+ */
+export async function assertServerBinaries(options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const platformPackages = options.platformPackages ?? SERVER_PLATFORM_PACKAGES;
+  const missing = [];
+  for (const platformPackage of platformPackages) {
+    if (!(await exists(packageBinaryPath(repoRoot, platformPackage)))) {
+      missing.push(platformPackage.packageName);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `missing server binaries: ${missing.join(", ")}. Each comes from its package's ` +
+        "build-binary task, which turbo's pack, snapshot and publish depend on.",
+    );
+  }
+}
+
+/**
+ * Copies the platform packages' binaries, which the task graph built, into
+ * the release directory's build/, where the archives and the Docker context
+ * read them.
+ */
+export async function collectServerBinaries(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const version = options.version ?? (await readServerRelease(repoRoot)).version;
   const outDir = options.outDir ?? releaseDir(repoRoot, version);
-  const platforms = options.platformPackages ?? SERVER_PLATFORM_PACKAGES;
+  const platformPackages = options.platformPackages ?? SERVER_PLATFORM_PACKAGES;
 
-  for (const platform of platforms) {
-    const source = join(platformDir(outDir, platform), binaryName(platform.goos));
-    const destination = join(repoRoot, platform.packageDir, "bin", binaryName(platform.goos));
-    await rm(join(repoRoot, platform.packageDir, "bin"), { recursive: true, force: true });
+  await assertServerBinaries({ repoRoot, platformPackages });
+  for (const platformPackage of platformPackages) {
+    const destination = join(
+      platformDir(outDir, platformPackage),
+      binaryName(platformPackage.goos),
+    );
     await mkdir(dirname(destination), { recursive: true });
-    await copyFile(source, destination);
-    if (platform.goos !== "windows") {
+    await copyFile(packageBinaryPath(repoRoot, platformPackage), destination);
+    if (platformPackage.goos !== "windows") {
       await chmod(destination, 0o755);
     }
   }
@@ -164,9 +224,8 @@ export async function createArchives(options = {}) {
   // The archives are independent (one platform's binary each, distinct file
   // names) and gzip and zip use one core each, so compress all platforms at
   // once. The results keep platform order, so checksums.txt keeps its order.
-  const archives = await mapWithConcurrency(
+  const archives = await mapAll(
     SERVER_PLATFORMS,
-    SERVER_PLATFORMS.length,
     async (platform) => {
       const name = `nextgen_${version}_${platformName(platform)}`;
       const sourceDir = platformDir(outDir, platform);
@@ -203,6 +262,7 @@ export async function createArchives(options = {}) {
       );
       return archivePath;
     },
+    SERVER_PLATFORMS.length,
   );
 
   const checksumLines = [];
@@ -224,16 +284,21 @@ export async function packPublicPackages(options = {}) {
   await mkdir(tarballsDir, { recursive: true });
 
   // Packs are independent (distinct package dirs, distinct tarball names in a
-  // shared destination); cap concurrency so the cli prepack rebuild and the
-  // larger packages do not stampede the runner.
-  await mapWithConcurrency(options.dirs ?? PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
-    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
-    await assertPublishDirectoryReady({ repoRoot, dir, manifest });
-    await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
-      cwd: repoRoot,
-      env: process.env,
-    });
-  });
+  // shared destination); cap concurrency so the larger packages do not
+  // stampede the runner. A pack rebuilds nothing: every `prepack` is publint,
+  // and the graph built the dist folders it packs.
+  await mapAll(
+    options.dirs ?? PUBLIC_PACKAGE_DIRS,
+    async (dir) => {
+      const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
+      await assertPublishDirectoryReady({ repoRoot, dir, manifest });
+      await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
+        cwd: repoRoot,
+        env: process.env,
+      });
+    },
+    8,
+  );
 
   return tarballsDir;
 }
@@ -244,11 +309,10 @@ async function defaultTarballsDir(repoRoot, options) {
 }
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
-  const releasePackage = PUBLIC_RELEASE_PACKAGES.find((pkg) => pkg.dir === dir);
-  if (releasePackage?.buildTarget && !(await exists(join(repoRoot, dir, "dist")))) {
+  if (manifest.files?.includes("dist") && !(await exists(join(repoRoot, dir, "dist")))) {
     throw new Error(
       `${manifest.name} requires ${dir}/dist before packing. ` +
-        `Run moon run ${releasePackage.buildTarget} or moon run release:build-public-packages.`,
+        `Run turbo run build --filter=${manifest.name}.`,
     );
   }
 
@@ -330,11 +394,7 @@ export async function writeReleaseMetadata(options = {}) {
   const release = options.release ?? (await readServerRelease(repoRoot));
   const outDir = options.outDir ?? releaseDir(repoRoot, release.version);
   const info = options.gitInfo ?? (await gitInfo({ repoRoot }));
-  const packages = [];
-  for (const dir of PUBLIC_PACKAGE_DIRS) {
-    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
-    packages.push({ name: manifest.name, version: manifest.version, path: dir });
-  }
+  const packages = await readReleasePackages(repoRoot);
   const metadata = {
     version: release.version,
     tag: release.tag,

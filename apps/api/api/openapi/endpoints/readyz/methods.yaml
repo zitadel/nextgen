@@ -1,0 +1,40 @@
+get:
+  operationId: getReady
+  tags:
+    - System
+  summary: Check the server's readiness
+  description: |
+    Answers `ok` when the server can serve requests, which takes its database
+    answering within a second, and `fail` with `503` otherwise.
+
+    A readiness probe tells an orchestrator such as Kubernetes whether to send
+    the instance requests. Point it at `/readyz` at the root, where the probes
+    stay, not under `/api/v1`, so that a server whose database does not answer
+    gets no requests until it does. The check is one round trip to the
+    database.
+  security: []
+  responses:
+    '200':
+      description: The server and its database answer.
+      content:
+        text/plain:
+          examples:
+            ok:
+              summary: Server is ready
+              value: ok
+    '503':
+      description: The database did not answer within a second.
+      content:
+        text/plain:
+          examples:
+            fail:
+              summary: Server is not ready
+              value: fail
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: getReady-error-response.yaml

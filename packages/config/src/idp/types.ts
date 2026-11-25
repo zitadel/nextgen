@@ -1,3 +1,5 @@
+import slugify from "@sindresorhus/slugify";
+
 import { ISSUER_REQUIREMENT, isSupportedIssuer } from "./issuer.js";
 import { connectionLimits } from "./meta.js";
 
@@ -93,11 +95,29 @@ export function parseConnectionSlug(
   return ok(trimmed as ConnectionSlug);
 }
 
+/**
+ * The slug a display name suggests: transliterated to lowercase letters and
+ * digits with a dash between words, so `Zitadel Cloud` is `zitadel-cloud` and
+ * `Вход Acme` is `vkhod-acme`. It is cut to the slug's length, and is empty
+ * when the name has no letter or digit that can be transliterated, or when the
+ * result is one of `reserved`, which `parseConnectionSlug` would refuse.
+ *
+ * @param displayName - The name shown on the sign-in button.
+ * @param reserved - The slugs that cannot be used, as `parseConnectionSlug`
+ *   takes them.
+ * @returns The suggested slug, which the developer may still change.
+ */
+export function slugFromDisplayName(displayName: string, reserved: readonly string[] = []): string {
+  // `decamelize` would split `GitHub` into `git-hub`.
+  const slug = slugify(displayName, { decamelize: false }).slice(0, SLUG_MAX).replace(/-+$/, "");
+  return reserved.includes(slug) ? "" : slug;
+}
+
 /** The text on the sign-in button, or why there is none. */
 export function parseDisplayName(value: string): Parsed<DisplayName> {
   const trimmed = value.trim();
   if (trimmed === "") {
-    return refuse("Enter the name shown on the sign-in button.");
+    return refuse("The name shown on the sign-in button is empty.");
   }
   return trimmed.length > DISPLAY_NAME_MAX
     ? refuse(`Use at most ${DISPLAY_NAME_MAX} characters.`)
@@ -133,11 +153,11 @@ export function parseScopes(value: string | undefined): Parsed<Scopes> {
 /** A client id, or why none was given. Surrounding whitespace is dropped, so typed or piped text works. Vendors format them differently, so only emptiness is checked. */
 export function parseClientId(value: string): Parsed<ClientId> {
   const trimmed = value.trim();
-  return trimmed === "" ? refuse("Enter the client id.") : ok(trimmed as ClientId);
+  return trimmed === "" ? refuse("The client id is empty.") : ok(trimmed as ClientId);
 }
 
 /** A client secret, or why none was given. Surrounding whitespace is dropped, which is what lets a piped value with its newline work. */
 export function parseClientSecret(value: string): Parsed<ClientSecret> {
   const trimmed = value.trim();
-  return trimmed === "" ? refuse("Enter the client secret.") : ok(trimmed as ClientSecret);
+  return trimmed === "" ? refuse("The client secret is empty.") : ok(trimmed as ClientSecret);
 }

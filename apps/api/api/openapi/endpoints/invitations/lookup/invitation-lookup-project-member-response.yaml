@@ -1,0 +1,17 @@
+title: LookupProjectMemberInvitationResponse
+description: |
+  Lean view of a project-member invitation for the accept page: project, role,
+  inviter and expiry.
+allOf:
+  - $ref: invitation-lookup-common.yaml
+  - type: object
+    required:
+      - type
+      - project_member
+    properties:
+      type:
+        type: string
+        enum:
+          - project_member
+      project_member:
+        $ref: ../invitation-project-member-payload.yaml

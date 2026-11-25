@@ -18,7 +18,7 @@ brand, while Zitadel guards the credentials, sessions, and tokens underneath.
 ### I am contributing to Zitadel
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup (including the
-devcontainer), Moon commands, local checks, integration tests, source builds,
+devcontainer), Turborepo commands, local checks, integration tests, source builds,
 and release workflows. Agent-facing workspace rules live in
 [AGENTS.md](AGENTS.md).
 
@@ -35,7 +35,7 @@ and release workflows. Agent-facing workspace rules live in
 | Delete local Zitadel data                            | `npx @zitadel/cli@latest reset --force`        |
 
 The published `zitadel` runtime commands run the released local runtime through
-the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
+the `@zitadel/server` npm binary by default and do not require Docker, Go, Turborepo,
 or a source checkout. Docker remains available with
 `zitadel start --runtime docker`.
 
@@ -48,19 +48,21 @@ integrating Zitadel into an app; [AGENTS.md](AGENTS.md) is for agents
 contributing to this repository. The documentation site publishes LLM-friendly
 text at `/docs/llms.txt`, `/docs/llms-full.txt`, and page-level `.md` URLs.
 
-Install the skill into any skills-compatible agent (Claude Code, Cursor,
-Copilot, Codex, and more) straight from this repo:
+The CLI ships the Zitadel skills — the `zitadel` router skill, the CLI skill,
+and the per-framework SDK and component skills — and adds the ones of its
+version to your project, for any skills-compatible agent (Claude Code, Cursor,
+Copilot, Codex, and more):
 
 ```sh
-npx skills add zitadel/nextgen --full-depth
+npx @zitadel/cli@latest skills add
 ```
 
-`--full-depth` installs the whole set — the `zitadel` router skill, the CLI
-skill, and the per-framework SDK and component skills. Without it, only the
-top-level router skill is installed. The CLI skill also ships inside the
-`@zitadel/cli` package.
+They land in `.agents/skills/`, and in `.claude/skills/` for Claude Code. Run it
+again after updating the CLI to keep them in step. To install them from this
+repo's `main` instead, run `npx skills add zitadel/nextgen --full-depth`;
+without `--full-depth`, only the router skill is installed.
 
-After a successful interactive `setup`, the CLI suggests this command once if it
+After a successful interactive `setup`, the CLI suggests `skills add` once if it
 finds a coding agent on your machine. "Once" is per machine, not per project: the
 CLI records it in your user config directory. Set `NO_SKILLS_PROMPT=1` to never
 see it.
@@ -72,6 +74,8 @@ mkdir myapp
 cd myapp
 npx @zitadel/cli@latest doctor
 ```
+
+`doctor`, `setup` and `console` use the local server started in the current folder or in the nearest parent folder that has one, and `doctor` says which folder that is. A new, empty folder inside a folder where `start` ran therefore uses that server. To give the new folder a server of its own, run `npx @zitadel/cli@latest start` in it. `reset --force` deletes the local data of the folder it names, so check the folder `doctor` printed first.
 
 Pick a server before running `setup`. It cannot be changed on this app
 afterwards. Use `--server local` for local development, or point at a hosted
@@ -108,13 +112,23 @@ by their email address. Pass `--no-open` to print the link instead of opening
 a browser. For the admin credential file, how its password is handled, and
 how to turn the local admin off, see [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md).
 
-Open http://localhost:3000/login and register your first user. That user is
+Open http://localhost:3000/register and register your first user. That user is
 an end user of your app, a different identity from the console admin above.
 `setup` walks through the scaffold choices (such as which framework and use
 case) and writes the app into the current directory; pass `--skip-install` if
 you want to install dependencies yourself. The managed Zitadel runtime stores
 its metadata and data under `.zitadel/local/`; `stop` preserves that data and
 `reset --force` deletes it.
+
+Once you have signed in to your app, run the CLI with no subcommand to see every
+command, grouped by what you want to do:
+
+```sh
+npx @zitadel/cli@latest
+```
+
+With a global install, run `zitadel`. `zitadel <command> --help` lists a command's
+options, and the help of a command or a family of commands points back to this list.
 
 ### Zitadel Cloud
 
@@ -168,8 +182,8 @@ The documentation site lives in `apps/docs`: Fumadocs on Next.js, served
 under `/docs`.
 
 ```sh
-moon run docs:dev
-moon run docs:build
+pnpm run docs
+turbo run build --filter=@zitadel/docs
 ```
 
 The docs app bundles the OpenAPI source into a generated reference, has
@@ -190,19 +204,21 @@ For product direction and the four pillars, see [VISION.md](VISION.md).
 ## CI
 
 Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
-pull request UI as `ci / full-pr`: generated-file checks, lint, type checks,
-builds, unit and browser tests, the Go database lanes, a non-publishing release
-snapshot, and the end-to-end suites against the snapshot's npm tarballs.
-Changesets version PRs run a smaller release validation path instead. The full
-step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
+pull request UI as `ci / full-pr`. It runs, as far as the change reaches them,
+generated-file checks, lint, type checks, builds, unit and browser tests, the
+SQLite and Postgres lanes, the release's npm tarballs for all five server
+platforms, and the end-to-end suites against them. Changesets version PRs run
+the same check. The full step list is in
+[CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ## Releases
 
-Moon builds the artifacts (Go binaries, containers, archives) and the draft
-GitHub Release; Changesets owns versions, npm publishing, and release notes,
-with the public packages on one fixed release train. Build a local snapshot with
-`moon run release:snapshot` (more in [CONTRIBUTING.md](CONTRIBUTING.md)). To
-cut or recover a release, follow the
+Turborepo tasks build the artifacts (Go binaries, containers, archives) and the
+draft GitHub Release; Changesets owns versions, npm publishing, and release
+notes, with the public packages on one fixed release train. Build a local
+snapshot with `pnpm run release:snapshot` (more in
+[CONTRIBUTING.md](CONTRIBUTING.md)). To cut or recover a release, follow the
 [release runbook](docs/runbooks/manual-release.md); for when to add a
 changeset, see [`.changeset/README.md`](.changeset/README.md); for the
-rationale, see [ADR 002](docs/adrs/002-multi-package-release-strategy.md).
+rationale, see [ADR 002](docs/adrs/002-multi-package-release-strategy.md) and
+[ADR 089](docs/adrs/089-turborepo-task-runner.md).

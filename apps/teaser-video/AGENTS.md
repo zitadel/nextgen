@@ -5,8 +5,8 @@ real atoms of `@zitadel/components`. Not deployed and not published. How it is
 built and how to edit it: [README.md](README.md).
 
 ```sh
-moon run teaser-video:dev      # Remotion Studio, to scrub and preview
-moon run teaser-video:render   # dist/teaser.mp4
+turbo run dev --filter=@zitadel/teaser-video      # Remotion Studio, to scrub and preview
+turbo run render --filter=@zitadel/teaser-video   # dist/teaser.mp4
 ```
 
 - Drive every motion from `useCurrentFrame()`. Remotion screenshots each

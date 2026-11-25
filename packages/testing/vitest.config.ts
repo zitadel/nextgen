@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest } from "@zitadel/vitest-config";
 
 export default defineConfig({
   cacheDir: ".vitest",

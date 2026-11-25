@@ -1,7 +1,10 @@
-import { spawnSync } from "node:child_process";
+import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { execaSync } from "execa";
 
-import { ZitadelError } from "../../errors";
-import { reportWarning } from "../../warnings";
+import { ZitadelError } from "@/lib/errors";
+import { warnings } from "@/lib/ui";
+
 import {
   describeAcceptedNode,
   type NodeEngines,
@@ -23,14 +26,20 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
   abstract readonly nodeEngines: NodeEngines;
   /**
    * The packages a fresh app gets at an exact version because this scaffolder
-   * pins them, as `name@version`: the framework CLI, when it runs a fixed
-   * release, and any package that release writes at a fixed version. A
-   * framework CLI run `@latest`, and the ranges it writes, move to patched
-   * releases by themselves; a pin stays on its version until someone bumps
-   * it, so `cli:check-advisories` checks each against the npm advisory
-   * database.
+   * pins them, as `name@version`: the framework CLI (`framework-clis.ts`) and
+   * any package that release writes at a fixed version. The ranges it writes
+   * move to patched releases by themselves; a pin stays on its version until
+   * a bump merges, so `@zitadel/cli#check-advisories` checks each against the
+   * npm advisory database.
    */
   readonly pinnedPackages: ReadonlyArray<string> = [];
+  /**
+   * Whether the framework CLI names the app after the folder it runs in and
+   * refuses a folder name npm does not accept as a package name. When true and
+   * the folder's name is not one, {@link scaffold} creates the app in a
+   * subfolder with a valid name and moves it up.
+   */
+  protected readonly requiresValidFolderName: boolean = true;
 
   private readonly nodeVersion: string;
   private readonly platform: NodeJS.Platform;
@@ -55,11 +64,41 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
    */
   async scaffold(cwd: string, framework: string): Promise<void> {
     this.enforceNodeEngines(cwd);
+    if (this.requiresValidFolderName && npmPackageNameErrors(basename(cwd)).length > 0) {
+      await this.createInSubfolder(cwd, framework);
+      return;
+    }
     await this.create(cwd, framework);
   }
 
   /** Creates the project in `cwd` by running the framework CLI. */
   protected abstract create(cwd: string, framework: string): Promise<void>;
+
+  /**
+   * Creates the project in a subfolder of `cwd` named as a valid package name
+   * (the folder's name, lowercased, with each run of other characters as one
+   * `-`, cut to npm's 214 characters; `app` when nothing is left), then moves
+   * its entries up into `cwd`.
+   * The subfolder is renamed first because the project may have an entry of
+   * the same name (`app`, `src`), which would otherwise land inside itself.
+   */
+  private async createInSubfolder(cwd: string, framework: string): Promise<void> {
+    const name =
+      basename(cwd)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .slice(0, 214)
+        .replace(/^-+|-+$/g, "") || "app";
+    const subfolder = join(cwd, name);
+    await mkdir(subfolder);
+    await this.create(subfolder, framework);
+    const moving = join(cwd, `.${name}.moving`);
+    await rename(subfolder, moving);
+    for (const entry of await readdir(moving)) {
+      await rename(join(moving, entry), join(cwd, entry));
+    }
+    await rmdir(moving);
+  }
 
   /**
    * The framework CLI may refuse a Node outside its `engines.node`, which can
@@ -75,7 +114,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     if (support === "warned") {
       const reason =
         engines.enforcement === "refuse" ? ", as odd-numbered Node versions never reach LTS" : "";
-      reportWarning(
+      warnings.report(
         `${engines.label} supports Node ${range}; it runs on Node v${this.nodeVersion} with a warning${reason}`,
       );
     }
@@ -95,28 +134,29 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
    * Runs an external command in `cwd`, throwing a typed {@link ZitadelError} on
    * failure so the cause surfaces as a categorized CLI error. Distinguishes
    * "binary not on PATH" (`ENOENT` from the spawn itself) from "binary ran but
-   * exited non-zero" — the former previously got masked as a generic
-   * `exited with status 1`, leaving users to guess. Tests stub
-   * `node:child_process` to assert the command without spawning.
+   * exited non-zero" — the former is not masked as a generic
+   * `exited with status 1`, which would leave users to guess. Tests stub
+   * `execa` to assert the command without spawning.
    */
   protected runCommand(command: string, args: ReadonlyArray<string>, cwd: string): void {
-    const result = spawnSync(command, [...args], { cwd, encoding: "utf8" });
-    if (result.error) {
-      const err = result.error as NodeJS.ErrnoException;
-      const notFound = err.code === "ENOENT";
+    const result = execaSync(command, [...args], { cwd, reject: false });
+    if (result.code !== undefined) {
+      const notFound = result.code === "ENOENT";
       throw new ZitadelError(
         "E_VALIDATION",
-        notFound ? `Command not found: ${command}` : `Failed to spawn "${command}": ${err.message}`,
+        notFound
+          ? `Command not found: ${command}`
+          : `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
         {
           hint: notFound ? `Ensure '${command}' is installed and on PATH.` : undefined,
-          details: { command, args: [...args], code: err.code },
+          details: { command, args: [...args], code: result.code },
         },
       );
     }
-    const status = result.status ?? 1;
+    const status = result.exitCode ?? 1;
     if (status !== 0) {
-      const stdout = String(result.stdout ?? "");
-      const stderr = String(result.stderr ?? "");
+      const stdout = String(result.stdout);
+      const stderr = String(result.stderr);
       const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
       throw new ZitadelError(
         "E_VALIDATION",
@@ -136,4 +176,34 @@ function truncateCommandOutput(output: string): string {
     return output;
   }
   return `${output.slice(0, limit)}\n... output truncated ...`;
+}
+
+export function npmPackageNameErrors(name: string): string[] {
+  // This local preflight catches common package-name failures before the
+  // scaffolder mutates disk; framework generators still own stricter checks.
+  const errors: string[] = [];
+  if (name.length === 0) {
+    errors.push("name is empty");
+  }
+  if (name.length > 214) {
+    errors.push("name is longer than 214 characters");
+  }
+  if (name !== name.trim()) {
+    errors.push("name contains leading or trailing whitespace");
+  }
+  if (/[A-Z]/.test(name)) {
+    errors.push("name can no longer contain capital letters");
+  }
+  if (name.startsWith(".") || name.startsWith("_")) {
+    errors.push("name cannot start with a period or underscore");
+  }
+  if (!/^[a-z0-9][a-z0-9._~-]*$/.test(name)) {
+    errors.push(
+      "name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens",
+    );
+  }
+  if (name === "node_modules" || name === "favicon.ico") {
+    errors.push(`name "${name}" is reserved`);
+  }
+  return [...new Set(errors)];
 }

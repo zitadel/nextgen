@@ -42,8 +42,8 @@
 The customer's other apps, third-party apps and MCP clients
 ([#375](https://github.com/zitadel/nextgen/issues/375)) need a sign-in they
 can redirect to. The server has no OIDC endpoint yet, and the widget never
-sends the `auth_request_id` that `POST /flow` stores
-([`flow.go`](../../internal/api/flow.go)). Apps keep generated files and
+sends the `auth_request_id` that `POST /flows` stores
+([`flow.go`](../../apps/api/internal/api/flow.go)). Apps keep generated files and
 pinned packages for months, and Next.js reads its generated `matcher` at
 build time
 ([`next/index.ts`](../../apps/cli/src/lib/orca/patchers/rule/next/index.ts)),
@@ -132,8 +132,9 @@ one login app share a relying-party ID.
 ### 6. One namespace on the server
 
 A project's authorization server lives under `/oauth/{project_id}/` on the
-server, outside the resource API; the cloud's catch-all already receives it
-(ADR 076). Two paths under it are fixed now:
+server, outside the resource API; the cloud routes it to the server with a
+`vercel.json` rule of its own when it ships, as it does the server's other root
+paths (ADR 076, amended). Two paths under it are fixed now:
 `.well-known/openid-configuration`
 ([OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html))
 and `.well-known/oauth-authorization-server`
@@ -205,13 +206,18 @@ switch, on from the start, and declares the issuer login-only (ADR 082 §9).
    and redirects (`303`) to the issuer's login path with an opaque handle:
    `/login?auth_request=<handle>`.
 3. The handle is not a capability: a cookie set with the redirect binds it to
-   the browser, as `_zsso` binds a provider callback, and `POST /flow`
-   accepts it only with that binding. A second request in the same browser
-   must not end the first: bindings are per request, the flow cookie (one
-   `_zflow` per host today) gets one name per flow before the authorization
-   server ships, and the proxies pass both through unchanged.
+   the browser, as `_zsso` binds a provider callback, and `POST /flows`
+   accepts it only with that binding. Concurrent requests in one browser do
+   not end each other, up to a bounded number of bindings: bindings are per
+   request, the flow cookie (one `_zflow` per host today) gets one name per
+   flow before the authorization server ships, and the proxies pass both
+   through unchanged. The bound exists because `client_id` and `redirect_uri`
+   are public, so any site can send a browser to the endpoint and every
+   binding is sent on every request to the origin; the authorization endpoint
+   sets it, and reaching it expires the browser's oldest binding, which ends
+   the sign-in that started it.
 4. `<zitadel-login>` reads `auth_request` from the page URL and sends it as
-   `auth_request_id` on `POST /flow`, also when it restarts a flow; a
+   `auth_request_id` on `POST /flows`, also when it restarts a flow; a
    provider round trip returns to the same URL. Generated page code never
    sees it.
 5. `login_hint` pre-fills the identifier and maps onto `hint.login_name`,
@@ -230,7 +236,7 @@ switch, on from the start, and declares the issuer login-only (ADR 082 §9).
 
 Every response that leaves the app goes through the login page. Without
 interaction (a live session, `prompt=none`, or a failure after the redirect
-URI was validated), `POST /flow` answers a terminal step at once, seeing the
+URI was validated), `POST /flows` answers a terminal step at once, seeing the
 session in the cookie the proxy forwards (ADR 073). End session returns the
 same way with its own handle before the widget sends the browser to
 `post_logout_redirect_uri`; that handle and its confirmation are decided with
@@ -242,7 +248,7 @@ the endpoint. So the SDK proxy never passes a `Location` that leaves the app.
   whatever its terminal step says, to a `redirect_uri` the server computes:
   the registered redirect URI with `code`, `state` and `iss`
   ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207)), or an `error`.
-  `POST /flow` refuses an `auth_request_id` with a `redirect_uri`.
+  `POST /flows` refuses an `auth_request_id` with a `redirect_uri`.
 - The widget exchanges that step's handoff (`POST /sessions/exchange`)
   before navigating, so the session lands on the issuer's origin (ADR 073)
   and signing in for another app signs the user in to the login app too. The
@@ -290,7 +296,7 @@ screen. On the wire they are ordinary steps with reserved names,
 `account_choice` and `consent`, which the flow-definition meta-schema lists
 as reserved and the validator refuses, as it refuses the engine-injected
 `back` action
-([`flow_definition_validator.go`](../../internal/domain/flow_definition_validator.go)).
+([`flow_definition_validator.go`](../../apps/api/internal/domain/flow_definition_validator.go)).
 Their payload is documented with the step: the app's name, logo and redirect
 host (§8), the requested scopes with their text keys (ADR 082 §5), the
 accounts to choose from, and accept and deny actions. A widget template or a
@@ -378,7 +384,7 @@ to generated files.
 So fixes ship as package releases and reach apps as version bumps, with
 `doctor --fix` migrating a generated file it recognizes. Pins stay exact
 (ADR 074 §4); a fix reaches pinned apps through `doctor`'s
-[`dependency-version`](../../apps/cli/src/commands/doctor/checks/dependency-version.ts)
+[`dependency-version`](../../apps/cli/src/cli/commands/doctor/checks/dependency-version.ts)
 check, security advisories, and the server. The SDK proxy and the widget
 name their package and version on every request (`X-Zitadel-Client`); the
 server records them on the request's event and answers a version below a
@@ -480,7 +486,7 @@ from outside a browser request.
 
 1. Is `/__nextgen` the public name, or does it change before OIDC ships?
 2. The relying-party flag's name.
-3. Whether `POST /flow`'s free-form `redirect_uri` goes once authorization
+3. Whether `POST /flows`'s free-form `redirect_uri` goes once authorization
    requests exist; they already carry the allowlist its TODO asks for.
 4. Whether the server refuses clients below the security floor after GA.
 5. Whether the SDK serves [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)
@@ -571,3 +577,11 @@ On implementation: the CLI's
 [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the SDK and
 components READMEs, the API spec's `hint.login_name` description, and the
 [compose quick start](../quick-start/docker-compose.md).
+
+## Amendment (2026-10-31): §10, no project default target
+
+There is no project default target: a caller with no `Origin` is served the
+project's newest primary deployment
+([ADR 085](085-which-release-serves-a-request.md)). The rest of §10 stands: the
+code carries the deployment for an authorization code grant, and a refresh and
+userinfo resolve the newest deployment to the token's issuer.

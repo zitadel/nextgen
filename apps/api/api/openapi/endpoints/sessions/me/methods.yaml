@@ -1,0 +1,107 @@
+get:
+  operationId: getMySession
+  summary: Get my session
+  description: |
+    Returns the current state of the caller's session, including its factors and all currently satisfied assurance levels.
+
+    With `project_id`, the session is returned only when it belongs to that project.
+
+    An assurance level is a profile, such as `urn:nist:aal:2`, that the
+    session's verified factors satisfy. `assurance_levels[]` may shrink over time
+    as factor freshness windows expire, without the session itself expiring.
+    To restore a dropped level, use step-up authentication: create an
+    authentication attempt with the same `session_id`.
+  tags:
+    - Sessions
+  parameters:
+    - $ref: ../../../components/parameters/session-project-id.yaml
+  security:
+    - sessionCookie: []
+  responses:
+    '200':
+      description: The session.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../session-response.yaml
+    '401':
+      description: Missing or invalid session token.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/schemas/errors/sess-project_mismatch.yaml
+    '404':
+      description: Session not found.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/schemas/errors/sess-not_found.yaml
+    default:
+      $ref: getMySession-error-response.yaml
+
+delete:
+  operationId: revokeMySession
+  summary: Revoke my session
+  description: |
+    Revokes the caller's own session by deleting it, which signs the user out.
+
+    The request needs the session cookie issued at creation (or superseded by a
+    handoff exchange). It also needs the session's CSRF token from
+    `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone,
+    this still returns `204`. Any tokens derived from the session are
+    invalidated, and the response clears the cookie.
+
+    With `project_id`, only a session of that project is revoked. A session of
+    another project is left alone, and so is its cookie.
+  tags:
+    - Sessions
+  parameters:
+    - $ref: ../../../components/parameters/session-project-id.yaml
+  security:
+    - sessionCookie: []
+  responses:
+    '204':
+      description: The session was revoked and the cookie cleared. Also returned when the session was already absent.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-session-token.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: |
+        `sess.project_mismatch`: the session belongs to a different project than
+        `project_id`. It is not revoked, and its cookie is not cleared.
+
+        `auth.csrf_invalid`: the request came from another site, or did not carry
+        the session's `X-Zitadel-CSRF` token (see the `sessionCookie` scheme).
+        It is refused before the session is looked at. Fetch the token from
+        `GET /sessions/me/csrf` and send it.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+    default:
+      $ref: revokeMySession-error-response.yaml

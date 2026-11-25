@@ -30,7 +30,11 @@ export const VALIDATION_RULES = {
   steps: { scope: "flow", goRef: "validateSteps" },
   graph: { scope: "flow", goRef: "validateGraph" },
   cycles: { scope: "flow", goRef: "validateCycles" },
-  "flip-table": { scope: "flow", goRef: "validateFlipTableCoverage" },
+  // The API schema's `minLength: 1` on a transition's `target`.
+  "transition-target": { scope: "flow", goRef: null },
+  "warn/no-purpose-switch": { scope: "flow", goRef: null },
+  "warn/cross-flow-transition": { scope: "flow", goRef: null },
+  "warn/reserved-purpose": { scope: "flow", goRef: null },
 
   // Flow definition against the schema it pins.
   "schema/required-fields": { scope: "flow-schema", goRef: "validateRequiredUserSchemaFields" },
@@ -38,6 +42,7 @@ export const VALIDATION_RULES = {
   "schema/passkey-actions": { scope: "flow-schema", goRef: "validatePasskeyActionsEnabled" },
   "schema/on-success-manifest": { scope: "flow-schema", goRef: "validateOnSuccessManifests" },
   "warn/password-without-identifier": { scope: "flow-schema", goRef: null },
+  "warn/login-without-credential": { scope: "flow-schema", goRef: null },
 
   // SSO across schemas, flows and connection files. Only the CLI holds the
   // whole tree, so none has a server counterpart yet; #1014 is the server side

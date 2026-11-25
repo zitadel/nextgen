@@ -1,46 +1,45 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import { SolidDetector } from "../../../../../src/lib/orca/detectors/solid";
+import { SolidDetector } from "@/lib/orca/detectors/solid";
+import { it } from "@tests/fixtures";
 
-const dirs: string[] = [];
-
-async function project(deps: Record<string, string>): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "solid-detect-"));
-  dirs.push(cwd);
+/**
+ * Writes a package.json that declares the dependencies.
+ *
+ * @param cwd - The project directory.
+ * @param deps - The dependencies it declares.
+ * @returns The project directory.
+ */
+async function project(cwd: string, deps: Record<string, string>): Promise<string> {
   await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: deps }));
   return cwd;
 }
 
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
 describe("SolidDetector", () => {
-  it("recognises a Vite + Solid app and reports appDir 'src'", async () => {
-    const facts = await new SolidDetector().detect(await project({ "solid-js": "^1", vite: "^5" }));
+  it("recognises a Vite + Solid app and reports appDir 'src'", async ({ dir }) => {
+    const facts = await new SolidDetector().detect(
+      await project(dir, { "solid-js": "^1", vite: "^5" }),
+    );
     expect(facts?.id).toBe("solid");
     expect(facts?.appDir).toBe("src");
   });
 
-  it("excludes SolidStart (which ships Solid)", async () => {
+  it("excludes SolidStart (which ships Solid)", async ({ dir }) => {
     expect(
       await new SolidDetector().detect(
-        await project({ "@solidjs/start": "^1", "solid-js": "^1", vite: "^5" }),
+        await project(dir, { "@solidjs/start": "^1", "solid-js": "^1", vite: "^5" }),
       ),
     ).toBeNull();
   });
 
-  it("returns null without vite", async () => {
-    expect(await new SolidDetector().detect(await project({ "solid-js": "^1" }))).toBeNull();
+  it("returns null without vite", async ({ dir }) => {
+    expect(await new SolidDetector().detect(await project(dir, { "solid-js": "^1" }))).toBeNull();
   });
 
-  it("returns null without solid-js", async () => {
-    expect(await new SolidDetector().detect(await project({ vite: "^5" }))).toBeNull();
+  it("returns null without solid-js", async ({ dir }) => {
+    expect(await new SolidDetector().detect(await project(dir, { vite: "^5" }))).toBeNull();
   });
 });

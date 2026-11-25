@@ -10,7 +10,7 @@
 > and since [ADR 068](068-project-is-the-data-boundary.md) a project has no
 > environments, so read "environment's active release" as "the project's
 > deployed release". §5 is replaced by ADR 057.
-> **Context:** How tenant-authored LiquidJS login templates ("branding") are stored, validated, delivered to the login component, and edited through the CLI. Completes the write path for the read-only `Branding` projection already defined in [`flow-api` components](../../api/openapi/components/flows/branding.yaml) and consumed by `@zitadel/components`.
+> **Context:** How tenant-authored LiquidJS login templates ("branding") are stored, validated, delivered to the login component, and edited through the CLI. Completes the write path for the read-only `Branding` projection already defined in [`flow-api` components](../../apps/api/api/openapi/components/flows/branding.yaml) and consumed by `@zitadel/components`.
 
 ## Introduction
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { de } from "./de.js";
 import { en } from "./en.js";
 import { it as italian } from "./it.js";
-import { localeFor, mergeLocale } from "./index.js";
+import { builtinLocales, isHidden, localeFor, mergeLocale } from "./index.js";
 
 describe("built-in locale dictionaries", () => {
   it("keeps translated locale keys aligned with English", () => {
@@ -12,6 +12,27 @@ describe("built-in locale dictionaries", () => {
     expect(Object.keys(de).sort()).toEqual(englishKeys);
     expect(Object.keys(italian).sort()).toEqual(englishKeys);
   });
+
+  // The schema's identifier may be an employee number rather than an email.
+  // The variants show only for such an identifier; the other keys show on
+  // steps that cannot tell what it is.
+  it.each(Object.entries(builtinLocales))(
+    "names no email where the identifier may be another field (%s)",
+    (_, locale) => {
+      for (const key of [
+        "identifier.description.custom_identifier",
+        "notice.user_not_found.custom_identifier",
+        "passkey-first.action.email_fallback",
+        "notice.user_already_exists",
+        "error.invalid_credentials",
+        "error.password_incorrect",
+        "error.passkey_not_registered",
+      ]) {
+        expect(locale[key], key).toBeDefined();
+        expect(locale[key], key).not.toMatch(/mail/i);
+      }
+    },
+  );
 });
 
 describe("mergeLocale", () => {
@@ -68,6 +89,42 @@ describe("mergeLocale", () => {
 
     expect(merged["password.description.sso"]).toBe(builtin["password.description.sso"]);
   });
+
+  describe("the wording for an identifier that is not an email", () => {
+    const withVariant = {
+      "identifier.description": "Enter your email to continue",
+      "identifier.description.custom_identifier": "Enter your details to continue",
+    };
+
+    it("is dropped from a description the integrator rewrote", () => {
+      const merged = mergeLocale(withVariant, {
+        "identifier.description": "Enter your employee number",
+      });
+
+      expect(merged).not.toHaveProperty("identifier.description.custom_identifier");
+    });
+
+    it("is kept when the integrator wrote it too", () => {
+      const merged = mergeLocale(withVariant, {
+        "identifier.description": "Enter your employee number",
+        "identifier.description.custom_identifier": "Enter your employee number",
+      });
+
+      expect(merged["identifier.description.custom_identifier"]).toBe("Enter your employee number");
+    });
+
+    it("is dropped from a notice the integrator rewrote", () => {
+      const merged = mergeLocale(
+        {
+          "notice.user_not_found": "We couldn't find an account for that email.",
+          "notice.user_not_found.custom_identifier": "We couldn't find an account.",
+        },
+        { "notice.user_not_found": "No employee has that number yet." },
+      );
+
+      expect(merged).not.toHaveProperty("notice.user_not_found.custom_identifier");
+    });
+  });
 });
 
 describe("localeFor", () => {
@@ -110,5 +167,36 @@ describe("localeFor", () => {
     });
 
     expect(locale).not.toHaveProperty("password.description.sso");
+  });
+});
+
+describe("isHidden", () => {
+  const key = "notice.user_not_found";
+
+  it("hides a text the integrator set to an empty string in English for every language", () => {
+    const locales = { en: { [key]: "" } };
+
+    expect(isHidden("en-US", locales, key)).toBe(true);
+    expect(isHidden("de-DE", locales, key)).toBe(true);
+    expect(isHidden("fr", locales, key)).toBe(true);
+  });
+
+  it("shows a language's own text over an English empty string", () => {
+    const locales = { en: { [key]: "" }, de: { [key]: "Neues Konto" } };
+
+    expect(isHidden("de", locales, key)).toBe(false);
+    expect(isHidden("it", locales, key)).toBe(true);
+  });
+
+  it("hides a text only in the language that sets it to an empty string", () => {
+    const locales = { de: { [key]: "" } };
+
+    expect(isHidden("de", locales, key)).toBe(true);
+    expect(isHidden("en", locales, key)).toBe(false);
+  });
+
+  it("hides nothing without integrator text", () => {
+    expect(isHidden("en", undefined, key)).toBe(false);
+    expect(isHidden("en", { en: { [key]: "New account" } }, key)).toBe(false);
   });
 });

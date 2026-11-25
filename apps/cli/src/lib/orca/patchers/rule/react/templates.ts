@@ -1,7 +1,7 @@
-import { MANAGED_MARKER } from "../../../../paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
-import type { PatchContext } from "../../types";
-import { PROXY_PATH } from "../proxy";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 /**
  * The managed `src/App.tsx`: a minimal path-based router that renders the
@@ -34,7 +34,7 @@ export function appTemplate(ctx: PatchContext): string {
 // fall back to the neutral wording.`
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { useEffect } from "react";
 import { ${importNames} } from "@zitadel/sdk-react";${localesComment}
 
@@ -57,20 +57,20 @@ export default function App() {
   }
   if (path.startsWith("/profile")) {
     return (
-      <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+      <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
         <ZitadelSession project={project} postSignOutUrl="/login" />
       </div>
     );
   }
   if (path.startsWith("/register")) {
     return (
-      <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+      <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
         <ZitadelLogin project={project}${localesAttr} purpose="register" postSignInUrl="/profile" />
       </div>
     );
   }
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelLogin project={project}${localesAttr} purpose="login" postSignInUrl="/profile" />
     </div>
   );

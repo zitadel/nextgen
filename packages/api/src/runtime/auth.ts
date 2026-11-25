@@ -20,7 +20,7 @@ export function setApiAuthToken(token: string | undefined): void {
 
 /**
  * The CSRF token for the first-party browser surfaces (ADR 053 §5). A
- * state-changing request that the `__nextgen_session` cookie authenticates must
+ * state-changing request that the session cookie authenticates must
  * carry the session's token — `csrf_token` from `GET /sessions/me/csrf` — in the
  * `X-Zitadel-CSRF` header. The app sets it once it has loaded its session;
  * `runtime/fetch.ts` then adds the header to unsafe requests. Unset (every

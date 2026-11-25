@@ -25,13 +25,13 @@ interface Captured {
 const captured: Captured = {};
 
 const server = setupServer(
-  http.post(`${BASE}/users`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/users`, async ({ request }) => {
     captured.userBody = (await request.json()) as Record<string, unknown>;
     captured.userAuth = request.headers.get("authorization");
     captured.userQuery = new URL(request.url).searchParams.get("project_id") ?? "";
     return HttpResponse.json({ id: "user_1" }, { status: 201 });
   }),
-  http.put(`${BASE}/users/:userId/password`, async ({ request, params }) => {
+  http.put(`${BASE}/api/v1/users/:userId/password`, async ({ request, params }) => {
     captured.passwordBody = (await request.json()) as Record<string, unknown>;
     captured.passwordUserId = params.userId as string;
     return new HttpResponse(null, { status: 204 });
@@ -104,7 +104,7 @@ describe("seedUser via connectZitadel", () => {
 
   it("propagates unique-email conflicts", async () => {
     server.use(
-      http.post(`${BASE}/users`, () =>
+      http.post(`${BASE}/api/v1/users`, () =>
         HttpResponse.json({ code: "user.exists", message: "duplicate" }, { status: 409 }),
       ),
     );
@@ -145,7 +145,7 @@ describe("seed vocabulary", () => {
   it("seedUsers applies the per-index template and keeps unique defaults", async () => {
     let nextId = 0;
     server.use(
-      http.post(`${BASE}/users`, async ({ request }) => {
+      http.post(`${BASE}/api/v1/users`, async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         nextId += 1;
         return HttpResponse.json({ id: `user_${nextId}`, echo: body }, { status: 201 });

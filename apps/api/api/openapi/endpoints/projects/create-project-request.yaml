@@ -1,0 +1,21 @@
+type: object
+required:
+  - name
+properties:
+  name:
+    type: string
+    description: The name of the project.
+  origins:
+    type: array
+    items:
+      $ref: project-origin.yaml
+    description: |
+      The origins the project starts with. An omitted or empty list admits no
+      origin except a loopback origin, which is admitted without a pattern.
+  seed_defaults:
+    type: boolean
+    default: true
+    description: |
+      Whether the server creates a default user schema and flow for the project.
+      CLI-managed projects set this to `false` and upload their local `.zitadel/`
+      files through the schema and flow APIs.

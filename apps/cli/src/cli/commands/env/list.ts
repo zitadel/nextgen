@@ -1,0 +1,112 @@
+import { Environment } from "@/lib/environment";
+import { CommandGroups } from "@/cli/commands/groups";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
+import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
+
+/** The columns `list` renders, in order. */
+const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
+
+/**
+ * `zitadel env list` — the environments this machine can reach: one per
+ * `.env.<name>.local` that holds a project id, plus the process environment
+ * when it carries one. An environment that lives only in a CI secret store is
+ * not visible here, which is correct.
+ */
+export default class EnvList extends Telemetered(ReadCommand) {
+  static override description = "List the environments bound in this directory's .env files.";
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
+
+  static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
+  static override flags = {
+    fields: fieldsFlag({
+      fallback: ["name"],
+      shape: {
+        known: new Set(["name", "source", "server", "project_id", "resolved"]),
+        open: [],
+      },
+    }),
+    plain: plainFlag,
+  };
+
+  /**
+   * Lists the environments bound in this directory's `.env` files.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The environments as a list.
+   */
+  protected async execute({ flags }: Admitted<typeof EnvList>): Promise<CommandResult> {
+    const { name, values } = this.environment;
+
+    const bound = await Environment.bound(this.cwd);
+    const items = [
+      ...bound.map((entry) => {
+        return {
+          name: entry.name,
+          source: entry.file,
+          server: entry.values.ZITADEL_URL ?? "",
+          project_id: entry.values.ZITADEL_PROJECT_ID ?? "",
+        };
+      }),
+      ...(this.env.ZITADEL_PROJECT_ID
+        ? [
+            {
+              name: name.value,
+              source: "process environment",
+              server: this.env.ZITADEL_URL ?? "",
+              project_id: this.env.ZITADEL_PROJECT_ID,
+            },
+          ]
+        : []),
+    ].map((entry) => {
+      return {
+        ...entry,
+        resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
+      };
+    });
+
+    const rows = items.map((entry) => {
+      return {
+        ...entry,
+        resolved: entry.resolved ? "yes" : "",
+      };
+    });
+    const columns = COLUMNS;
+    const empty = "No environments found";
+    const footer = [`Resolved now: ${name.value} (from ${name.source})`];
+    const page = null;
+    const extra = {
+      resolved: {
+        name: name.value,
+        source: name.source,
+      },
+    };
+
+    const result = await this.listed(flags, {
+      columns,
+      rows,
+      items,
+      singular: "environment",
+      empty,
+      footer,
+      page,
+      extra,
+    });
+
+    return items.length === 0
+      ? {
+          ...result,
+          next: {
+            commands: [
+              this.suggest({
+                id: "env:add",
+                args: { name: "<name>" },
+              }),
+            ],
+          },
+        }
+      : result;
+  }
+}

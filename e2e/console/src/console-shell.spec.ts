@@ -23,6 +23,22 @@ import { expect, test } from "@playwright/test";
 
 import { AWAITING_SETUP, breakRuntime, dropRuntime, serveRuntime } from "../support/runtime";
 
+test("serves its own favicons under the embed base", async ({ page, request }) => {
+  await serveRuntime(page, AWAITING_SETUP);
+  await page.goto("/ui/console/");
+  const hrefs = await page
+    .locator('link[rel~="icon"], link[rel="apple-touch-icon"]')
+    .evaluateAll((links) => links.map((link) => (link as HTMLLinkElement).href));
+  expect(hrefs.length).toBeGreaterThan(0);
+  for (const href of hrefs) {
+    expect(new URL(href).pathname).toMatch(/^\/ui\/console\/favicons\//);
+    const response = await request.get(href);
+    expect(response.ok(), href).toBe(true);
+    // The SPA fallback answers an unknown path with index.html and a 200.
+    expect(response.headers()["content-type"], href).toMatch(/^image\//);
+  }
+});
+
 test("unauthenticated console redirects to login under the embed base", async ({ page }) => {
   // The console build is served under `/ui/console/` (it embeds in the Go
   // server), so the app only mounts there — not at the origin root. With no
