@@ -25,7 +25,7 @@ export function CallToAction({
       <a
         href={links.quickstart}
         onClick={() => trackEvent("clicked_link", { target: "quickstart", placement })}
-        className={`${BUTTON} bg-text-primary text-background hover:opacity-85`}
+        className={`${BUTTON} bg-highlight text-on-highlight hover:bg-highlight-hover`}
       >
         Read the quickstart
         <svg

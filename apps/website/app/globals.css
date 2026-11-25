@@ -2,17 +2,28 @@
 
 /* The look of the new zitadel.com, from zitadel/new-website's theme
    (packages/theme/styles/variables.css): only the values this page uses,
-   under the website's own names, so its components move over unchanged. */
+   under the website's own names, so its components move over unchanged.
+   The colors follow Lightbox's brand guidelines: black #0f0f11 and white
+   #f4f4f6 with the guide's gray ramp, and orange #f25543 the one highlight.
+   Its purple only shades the background (.page-light). */
 @theme {
   --color-background: #0f0f11;
   --color-foreground: #f4f4f6;
   --color-text-primary: #f4f4f6;
   --color-text-secondary: #bfbfcf;
   --color-text-muted: #82829c;
-  --color-text-accent: #bba5e4;
+  /* The highlight as text and marks: the prompt, the step labels. */
+  --color-text-accent: #f25543;
   --color-border-primary: #252528;
   --color-border-secondary: #484a57;
   --color-success: #33a779;
+  /* The highlight as a fill (the primary button), orange on both sides with
+     black text on it: light text on #f25543 is 3.1:1 and fails AA. */
+  --color-highlight: #f25543;
+  --color-highlight-hover: #f37d6d;
+  --color-on-highlight: #0f0f11;
+  /* The background's shadow: the guide's purple, never a highlight. */
+  --color-shade: #401889;
   /* The ink of translucent overlays (hover rows, tracks, pills): white on the
      dark side, near-black on the light. */
   --color-tint: #ffffff;
@@ -33,10 +44,11 @@
   --color-diff-removed: #fca5a5;
   --color-diff-removed-surface: rgb(248 113 113 / 0.1);
 
-  /* The stepper (spine.tsx, step.tsx) runs from Zitadel's orange at the first
-     step to a soft green at the last, where the login is live. */
+  /* The stepper (spine.tsx, step.tsx) runs along the guide's orange ramp,
+     from Zitadel's orange at the first step to a lighter one at the last,
+     where the login is live. */
   --color-step-start: #f25543;
-  --color-step-end: #5fd99a;
+  --color-step-end: #fa9e93;
 
   /* layout.tsx sets --font-arimo, --font-apk-futural and --font-azeret-mono
      on <html>. */
@@ -56,10 +68,9 @@
      soft fall, the dark side lit at its top edge too. */
   --window-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 16px -10px rgb(0 0 0 / 0.6);
   --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.25), 0 4px 12px -8px rgb(0 0 0 / 0.5);
-  /* How much of the step colors the display titles' foot takes, and where
-     their ink has faded out. */
-  --title-ink: 70%;
-  --title-fade: 125%;
+  /* How strong the gradient light over the page and in the finish shines
+     (.page-light, .finish-glow): orange on black glows, on white it washes. */
+  --light-strength: 1;
   color-scheme: dark;
 }
 
@@ -69,45 +80,98 @@
    the theme layer above. */
 :root[data-theme="light"] {
   color-scheme: light;
-  --color-background: #f6f6f8;
-  --color-foreground: #111114;
-  --color-text-primary: #111114;
-  --color-text-secondary: #4b4b5c;
-  --color-text-muted: #6d6d84;
-  --color-text-accent: #6a4cc2;
-  --color-border-primary: #e2e2e8;
-  --color-border-secondary: #c6c6d2;
+  --color-background: #f4f4f6;
+  --color-foreground: #0f0f11;
+  --color-text-primary: #0f0f11;
+  --color-text-secondary: #484a57;
+  --color-text-muted: #686883;
+  /* Orange text on white needs the ramp's deeper orange (5.6:1). */
+  --color-text-accent: #bd2514;
+  --color-border-primary: #e1e1e7;
+  --color-border-secondary: #cfcfde;
   --color-success: #1c7d56;
-  --color-tint: #111114;
+  --color-highlight-hover: #e84331;
+  --color-shade: #bba5e4;
+  --color-tint: #0f0f11;
   --color-window: #ffffff;
-  --color-window-bar: #f7f7f9;
-  --color-window-border: rgb(17 17 20 / 0.1);
-  --window-shadow: 0 1px 2px rgb(17 17 20 / 0.05), 0 6px 16px -10px rgb(17 17 20 / 0.12);
-  --color-window-sunken: rgb(17 17 20 / 0.025);
+  --color-window-bar: #fafafa;
+  --color-window-border: rgb(15 15 17 / 0.1);
+  --window-shadow: 0 1px 2px rgb(15 15 17 / 0.05), 0 6px 16px -10px rgb(15 15 17 / 0.12);
+  --color-window-sunken: rgb(15 15 17 / 0.025);
   --color-glass: rgb(255 255 255 / 0.65);
-  --glass-shadow: 0 1px 2px rgb(17 17 20 / 0.04), 0 4px 12px -8px rgb(17 17 20 / 0.1);
+  --glass-shadow: 0 1px 2px rgb(15 15 17 / 0.04), 0 4px 12px -8px rgb(15 15 17 / 0.1);
   --color-diff-added: #15803d;
   --color-diff-added-surface: rgb(34 197 94 / 0.12);
   --color-diff-removed: #b91c1c;
   --color-diff-removed-surface: rgb(239 68 68 / 0.1);
-  --color-step-start: #e5432f;
-  --color-step-end: #16a067;
-  /* Dark ink grays the step colors more than white does: less of it, and
-     gone by the foot. */
-  --title-ink: 95%;
-  --title-fade: 95%;
+  /* Text on the light side: the ramp's two deepest oranges. */
+  --color-step-start: #bd2514;
+  --color-step-end: #9c2316;
+  --light-strength: 0.45;
 }
 
 /* The page's own pieces: the hero (page.tsx), the logo (logo.tsx) and the
    steps' dots. */
 @layer components {
-  /* The hero takes the first screen under the header (h-16), its content
+  /* The hero takes the first screen under the header (h-18), its content
      just above the middle and the cue to the steps at its foot (page.tsx).
      Never shorter than its content needs, and on a very tall screen no
      taller than 60rem, so the content does not float in a void and the
      steps begin in view. */
   .hero {
-    min-height: clamp(36rem, 100svh - 4rem, 60rem);
+    min-height: clamp(36rem, 100svh - 4.5rem, 60rem);
+  }
+
+  /* The light over the top of the page (page.tsx), the guide's gradient
+     light: Zitadel's orange shining down from the top through slats, like
+     the guide's gradient shapes, and fading into the background, with its
+     purple as a shadow on the left. A fine grain over it, as on the guide's
+     slides, keeps the fades from banding. */
+  .page-light {
+    background:
+      radial-gradient(
+        38% 42% at 50% 0%,
+        color-mix(in oklch, var(--color-highlight) calc(var(--light-strength) * 22%), transparent),
+        transparent
+      ),
+      radial-gradient(
+        30% 40% at 8% 4%,
+        color-mix(in oklch, var(--color-shade) calc(var(--light-strength) * 28%), transparent),
+        transparent
+      );
+  }
+
+  .page-light::before,
+  .page-light::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    mask-image: radial-gradient(44% 50% at 50% 0%, #000 10%, transparent);
+  }
+
+  /* Each slat lit from its left edge to its right, where the next begins. */
+  .page-light::before {
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      color-mix(in oklch, var(--color-highlight) calc(var(--light-strength) * 10%), transparent) 4.5rem
+    );
+  }
+
+  .page-light::after {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.08;
+  }
+
+  /* The guide's tag: APK Futural, uppercase, 14px, for the labels over the
+     steps and the finish, the cue down to them and the footer's headings.
+     The web's smallest APK Futural is 12px. */
+  .tag {
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   /* The cue nods down now and then, once the hero has settled. */
@@ -117,41 +181,24 @@
     }
   }
 
-  /* The text of the page's two display titles, the hero's and the finish's
-     (showcase/finish.tsx), in one look: white at the top, and toward the
-     foot of each line the process's colors, --title-from on its left to
-     --title-to on its right (the hero: Zitadel's orange to the finish's
-     green; the finish: its own green). Cloned per line, so a title that
-     wraps lights every line alike. */
-  .display-title {
-    font-family: var(--font-heading);
-    letter-spacing: -0.025em;
-    background:
-      linear-gradient(180deg, var(--color-foreground) 30%, transparent var(--title-fade)),
-      linear-gradient(
-        in oklch to right,
-        color-mix(in oklch, var(--title-from, var(--step)) var(--title-ink), var(--color-foreground)),
-        color-mix(in oklch, var(--title-to, var(--step)) var(--title-ink), var(--color-foreground))
-      );
-    /* Room under the line for a descender, the g of "login": the text is
-       painted only where its background reaches. */
-    padding-block: 0.05em 0.15em;
-    -webkit-box-decoration-break: clone;
-    box-decoration-break: clone;
-    background-clip: text;
-    color: transparent;
-  }
-
-  /* The hero's title: on one line wherever the screen has room; on a phone
-     larger, on two (page.tsx breaks it after "Your login"). */
+  /* The hero's title, in the guide's largest heading, APK Futural Regular
+     56/64, plain in the foreground's color: on one line wherever the screen
+     has room; on a phone at 40/48, on two (page.tsx breaks it after "Your
+     login"). */
   .hero-title {
-    --title-from: var(--color-step-start);
-    --title-to: var(--color-step-end);
     max-width: calc(100vw - 3rem);
-    font-size: clamp(2.75rem, 5.5vw, 4rem);
-    line-height: 1.05;
+    font-family: var(--font-heading);
+    font-size: 2.5rem;
+    line-height: 3rem;
     text-align: center;
     text-wrap: balance;
+  }
+
+  @media (min-width: 40rem) {
+    .hero-title {
+      font-size: 3.5rem;
+      line-height: 4rem;
+    }
   }
 
   /* The line under the title: as wide as the title, never wider, so it adds
@@ -282,13 +329,14 @@
   }
 }
 
-/* The finish (showcase/finish.tsx): reached, its check fills green and
-   pops with a ring, its card lights from above and takes a green edge, and
+/* The finish (showcase/finish.tsx): reached, its check fills in the
+   stepper's last orange and pops with a ring, its card lights from above
+   and below and takes an orange edge, and
    its lines rise in one after another. Before then, once the spine has armed
    the list (spine.tsx), the lines wait out of sight; without script, or for
    reduced motion, they stand there from the start. */
 @layer components {
-  /* Its check, muted until reached, then dark on the green. */
+  /* Its check, muted until reached, then dark on the orange. */
   .finish-dot {
     color: var(--color-text-muted);
   }
@@ -306,12 +354,28 @@
     border-color: color-mix(in oklch, var(--step) 35%, transparent);
   }
 
+  /* The guide's gradient light again, as rings rising from the card's foot,
+     each lit toward its edge, and a glow from above in the step's orange. */
   .finish-glow {
-    background:
-      radial-gradient(60% 70% at 50% 0%, color-mix(in oklch, var(--step) 22%, transparent), transparent),
-      radial-gradient(40% 50% at 50% 100%, color-mix(in oklch, var(--color-step-start) 10%, transparent), transparent);
+    background: radial-gradient(
+      60% 70% at 50% 0%,
+      color-mix(in oklch, var(--step) calc(var(--light-strength) * 18%), transparent),
+      transparent
+    );
     opacity: 0.25;
     transition: opacity 1.2s var(--ease);
+  }
+
+  .finish-glow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-radial-gradient(
+      circle at 50% 150%,
+      transparent 0,
+      color-mix(in oklch, var(--color-highlight) calc(var(--light-strength) * 16%), transparent) 5rem
+    );
+    mask-image: linear-gradient(to top, #000, transparent 70%);
   }
 
   [data-reached] .finish-glow {
@@ -555,6 +619,6 @@
 }
 
 ::selection {
-  background-color: var(--color-text-primary);
-  color: var(--color-background);
+  background-color: var(--color-highlight);
+  color: var(--color-on-highlight);
 }

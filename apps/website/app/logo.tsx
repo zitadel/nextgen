@@ -43,6 +43,10 @@ const letters = [
   { id: "l", d: "M477.46 20.93L477.46 100.44L489.5 100.44L489.5 20.93L477.46 20.93Z" },
 ];
 
+// The logo at the brand guide's smallest on the web, the mark 29px high:
+// the mark fills 109 of the view box's 122 units, so the box is 33px.
+export const LOGO_SIZE = "h-[2.0625rem] w-auto";
+
 // The quiet spell between two plays by itself, at random in this range (ms).
 const AUTOPLAY_REST = [9000, 18000] as const;
 

@@ -26,11 +26,11 @@ function Yours({ step, children }: { step: string; children: string }) {
 export default function Home() {
   return (
     <>
-      {/* The light over the top of the page: the accent's purple on the left
-          meeting the finish's green on the right (showcase/finish.tsx). */}
+      {/* The light over the top of the page: orange through slats, purple as
+          its shadow (globals.css). */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60rem] bg-[radial-gradient(45%_55%_at_28%_0%,color-mix(in_oklch,var(--color-text-accent)_16%,transparent),transparent),radial-gradient(45%_55%_at_74%_0%,color-mix(in_oklch,var(--color-step-end)_9%,transparent),transparent)]"
+        className="page-light pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60rem]"
       />
       <SiteHeader />
       <main>
@@ -44,12 +44,10 @@ export default function Home() {
               inside it (.hero-lede), so the two read as one block. */}
           <div className="grid w-fit max-w-full justify-items-center">
             <h1 id="hero-title" className="hero-title">
-              <span className="display-title">
-                Your login <br className="sm:hidden" />
-                in one minute.
-              </span>
+              Your login <br className="sm:hidden" />
+              in one minute.
             </h1>
-            <p className="hero-lede teaser mt-5 text-balance text-center text-base text-text-secondary leading-7 md:text-lg md:leading-8">
+            <p className="hero-lede teaser mt-6 text-balance text-center text-base text-text-secondary leading-6 md:text-2xl md:leading-8">
               Open-source auth that lives in your repo:{" "}
               <Yours step="Add a field">your user model</Yours>,{" "}
               <Yours step="Change the flow">your flows</Yours>,{" "}
@@ -90,7 +88,7 @@ export default function Home() {
           <div aria-hidden="true" className="flex-[1.15]" />
           <a
             href={stepLink("Start Zitadel").href}
-            className="scroll-cue group absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 rounded-md px-2 py-1 font-mono text-text-muted text-xs leading-4 transition-colors hover:text-text-primary"
+            className="scroll-cue tag group absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 whitespace-nowrap rounded-md px-2 py-1 text-text-muted text-xs leading-4 transition-colors hover:text-text-primary"
           >
             How it works
             <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="size-4">

@@ -6,7 +6,7 @@ import { Spine } from "./spine";
 import { stepColor, stepId } from "./step";
 
 // The recorded steps, the brand's and the finish: the stepper's colors
-// spread over them, the finish's the last, green.
+// spread over them, the finish's the last.
 const COUNT = sessions.length + 2;
 
 const LABELS = [...sessions.map(({ label }) => label), brandStep.label];
@@ -23,7 +23,7 @@ export function stepLink(label: string) {
 /**
  * The hero's commands step by step, then what they let you change
  * (zitadel/new-website's TerminalShowcase): start, setup, a field, the flow,
- * the brand, and the way on, where the stepper ends in green. The steps hang
+ * the brand, and the way on, where the stepper ends. The steps hang
  * off a spine at their left, in a rail from a tablet up and in the gutter on
  * a phone, which fills as the visitor reads down (spine.tsx).
  */
