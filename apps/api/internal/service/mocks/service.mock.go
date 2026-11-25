@@ -18809,18 +18809,18 @@ func (m *MockApplicationService) EXPECT() *MockApplicationServiceMockRecorder {
 }
 
 // AuthenticateClient mocks base method.
-func (m *MockApplicationService) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*service.ServedApplicationClient, error) {
+func (m *MockApplicationService) AuthenticateClient(ctx context.Context, projectID, deploymentID, clientID, secret string) (*service.ServedApplicationClient, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AuthenticateClient", ctx, projectID, clientID, secret)
+	ret := m.ctrl.Call(m, "AuthenticateClient", ctx, projectID, deploymentID, clientID, secret)
 	ret0, _ := ret[0].(*service.ServedApplicationClient)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // AuthenticateClient indicates an expected call of AuthenticateClient.
-func (mr *MockApplicationServiceMockRecorder) AuthenticateClient(ctx, projectID, clientID, secret any) *MockApplicationServiceAuthenticateClientCall {
+func (mr *MockApplicationServiceMockRecorder) AuthenticateClient(ctx, projectID, deploymentID, clientID, secret any) *MockApplicationServiceAuthenticateClientCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthenticateClient", reflect.TypeOf((*MockApplicationService)(nil).AuthenticateClient), ctx, projectID, clientID, secret)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthenticateClient", reflect.TypeOf((*MockApplicationService)(nil).AuthenticateClient), ctx, projectID, deploymentID, clientID, secret)
 	return &MockApplicationServiceAuthenticateClientCall{Call: call}
 }
 
@@ -18836,13 +18836,13 @@ func (c *MockApplicationServiceAuthenticateClientCall) Return(arg0 *service.Serv
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockApplicationServiceAuthenticateClientCall) Do(f func(context.Context, string, string, string) (*service.ServedApplicationClient, error)) *MockApplicationServiceAuthenticateClientCall {
+func (c *MockApplicationServiceAuthenticateClientCall) Do(f func(context.Context, string, string, string, string) (*service.ServedApplicationClient, error)) *MockApplicationServiceAuthenticateClientCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockApplicationServiceAuthenticateClientCall) DoAndReturn(f func(context.Context, string, string, string) (*service.ServedApplicationClient, error)) *MockApplicationServiceAuthenticateClientCall {
+func (c *MockApplicationServiceAuthenticateClientCall) DoAndReturn(f func(context.Context, string, string, string, string) (*service.ServedApplicationClient, error)) *MockApplicationServiceAuthenticateClientCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
