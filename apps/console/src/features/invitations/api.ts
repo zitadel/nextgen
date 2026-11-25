@@ -1,3 +1,5 @@
+import { apiErrorCode } from "@zitadel/api/runtime/fetch";
+
 import { trackEvent } from "@/addon/analytics";
 import { api } from "@/api/zitadel";
 import { describeError } from "@/lib/api-error";
@@ -14,10 +16,33 @@ import {
 } from "./model";
 import { clearInvitationToken, holdInvitationTokenFor } from "./token";
 
-/** The first page of a project's invitations, or why it could not be read. */
+/**
+ * The first page of a project's invitations, or why it could not be read.
+ * `denied` is the server's answer that the viewer may not manage invitations,
+ * which only the project's admins may: the page then offers no inviting.
+ */
 export type InvitationsRead =
   | { invitations: Invitation[]; nextPageToken?: string }
+  | { denied: true }
   | { error: string };
+
+/** The server's refusal for anyone who is not an admin of the project. */
+const PERMISSION_DENIED = "inv.permission_denied";
+
+/**
+ * The page's first read, with a failure as a value: the Members tab stays
+ * readable beside it. The effective permissions are not readable yet (console
+ * ADR 0004 §5), so the refusal of this read is what says the viewer is no
+ * admin.
+ */
+export async function readInvitationsForPage(projectId: string): Promise<InvitationsRead> {
+  try {
+    return await readInvitations(projectId);
+  } catch (cause) {
+    if (apiErrorCode(cause) === PERMISSION_DENIED) return { denied: true };
+    return { error: describeError(cause, "The invitations could not be read.") };
+  }
+}
 
 /**
  * The statuses the tab lists. An accepted invitation is left out: the person
