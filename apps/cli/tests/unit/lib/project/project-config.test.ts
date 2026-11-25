@@ -1,4 +1,3 @@
-import { toZitadelError } from "@/lib/errors";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -36,11 +35,14 @@ describe("Project.config", () => {
       expect.unreachable("expected ProjectConfig.read to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ProjectConfigMissingError);
-      const zerr = toZitadelError(error);
-      expect(zerr.code).toBe("E_VALIDATION");
-      expect(zerr.message).toContain("zitadel.json was not found");
-      expect(zerr.hint).toBe("Set the project up first.");
-      expect(zerr.nextCommands).toBeUndefined();
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        hint: "Set the project up first.",
+      });
+      expect(error).toHaveProperty(
+        "message",
+        expect.stringContaining("zitadel.json was not found"),
+      );
     }
   });
 

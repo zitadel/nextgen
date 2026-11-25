@@ -327,15 +327,20 @@
 
 ## Errors
 
-- Keep errors on three levels: `Error`, a `<Package>Error` base, and `<Package><Condition>Error` classes extending the base.
-- Put every error of a package in `errors.ts` at the package root, exported from the barrel; import them from the barrel outside the package.
-- Derive a class's `name` from the class in the base; never write a literal `name`.
-- Give one class to each condition a caller handles, and no `reason` field that a caller branches on.
-- State `category`, `retryable`, `code`, `hint`, `details` and `cause` literally in each class; pick `category` from the seven kinds by the ordered decision list in the TSDoc of `ERROR_CATEGORIES` in `src/lib/errors.ts`.
-- Never throw `ZitadelError` or a `Refusal` from `src/lib`; write a lib `hint` as prose about files and variables, without a flag or command.
-- Where a lib failure needs flag-aware wording or next commands, the command that calls the lib catches the typed error with a plain try/catch and throws a `*_REFUSAL` with that wording.
-- In the catch, write one flat `if (error instanceof X) { throw ...; }` per class, then `throw error;`; never `else if`, `||`, `.catch` chains or a match on an error property.
-- Leave cancellation and prompts as they are.
+- Keep errors on three levels: `Error`, a `<Package>Error` base, and
+  `<Package><Condition>Error` classes; one class per condition a caller handles.
+- Put every error of a package in its root `errors.ts`, exported from the
+  barrel; outside the package import them from the barrel.
+- Derive `name` from the class in the base; state `category` (one of the seven
+  `ErrorCategory` kinds in `src/lib/errors.ts`), `retryable`, `code`, `hint`,
+  `details` and `cause` literally in each class.
+- Never throw `ZitadelError` or a `Refusal` from `src/lib`; a lib `hint` is
+  prose about files and variables, without a flag or command.
+- A command that words a lib failure wraps the call in a plain try/catch with
+  one flat `if (error instanceof X) { throw ...; }` per class, a `*_REFUSAL`
+  for each, and a final `throw error;`.
+- Match only by `instanceof`; never by `reason`, `code`, `name`, `message`,
+  `category` or `retryable`.
 
 ## Telemetry
 

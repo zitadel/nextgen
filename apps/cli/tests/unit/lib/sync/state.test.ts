@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import { SyncStateMalformedError } from "@/lib/sync";
 import { publishedIds, readState, updateScaffold, type ZitadelState } from "@/lib/sync/state";
 import { it } from "@tests/fixtures";
@@ -168,7 +167,7 @@ describe("publishedIds", () => {
       });
 
       expect(error).toBeInstanceOf(SyncStateMalformedError);
-      expect(toZitadelError(error)).toMatchObject({
+      expect(error).toMatchObject({
         code: "E_VALIDATION",
         details: {
           file: ".zitadel/state.json",

@@ -1,4 +1,3 @@
-import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,6 +9,7 @@ import {
   EnvironmentValueMissingError,
   EnvironmentValueUnboundError,
 } from "@/lib/environment";
+import { toZitadelError } from "@/lib/errors";
 
 describe("the environment errors", () => {
   it.each([

@@ -1,10 +1,15 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { Config } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import Start from "@/cli/commands/server/start";
 import { LocalRuntime } from "@/lib/server";
+import { LOCAL_RUNTIME_FILE } from "@/lib/server/local/runtime";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const config = {
   version: "0.0.0-test",
@@ -76,4 +81,19 @@ describe("--port", () => {
       });
     },
   );
+});
+
+describe("a record of the local server that is malformed", () => {
+  it("is refused with the reset and start that repair it", async ({ dir: cwd }) => {
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(join(cwd, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json"]);
+
+    expect(parseJson(result.stdout)).toMatchObject({
+      status: "error",
+      code: "E_VALIDATION",
+      hint: expect.stringContaining("reset --force"),
+    });
+  });
 });

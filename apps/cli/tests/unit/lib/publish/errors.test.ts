@@ -1,6 +1,6 @@
-import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
+import { toZitadelError } from "@/lib/errors";
 import {
   PublishConfigInvalidError,
   PublishConfigLiteralSecretError,

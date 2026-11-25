@@ -15,6 +15,7 @@ import {
   toZitadelError,
 } from "@/lib/errors";
 import {
+  ZitadelConfigFileReadFailedError,
   ZitadelConfigFileUnreadableError,
   ZitadelConfigError,
   ZitadelConfigResourceClashError,
@@ -127,6 +128,16 @@ describe("toZitadelError", () => {
       "a file the OS refused to read",
       new ZitadelConfigFileUnreadableError("x.json cannot be read (EACCES)"),
       "E_AUTH",
+    ],
+    [
+      "a file the OS would not let it touch",
+      new ZitadelConfigFileUnreadableError("x.json cannot be read (EPERM)"),
+      "E_AUTH",
+    ],
+    [
+      "a file it could not read for any other errno",
+      new ZitadelConfigFileReadFailedError("x.json cannot be read (EIO)"),
+      "E_VALIDATION",
     ],
   ])("maps %s to %s", (_name, err, code) => {
     expect(toZitadelError(err).code).toBe(code);
@@ -656,15 +667,5 @@ describe("a failure as a person is shown it", () => {
         misuse: false,
       });
     });
-  });
-});
-
-describe("toZitadelError for an error that carries a code", () => {
-  it("reports an error with a code and no category as a system error", () => {
-    const error = Object.assign(new Error("denied"), {
-      code: "EACCES",
-    });
-
-    expect(toZitadelError(error).code).toBe("E_AUTH");
   });
 });

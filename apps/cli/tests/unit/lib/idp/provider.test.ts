@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import { IdpError, ProviderChoice } from "@/lib/idp";
 import { Connection, ZitadelConfigError, ZitadelConfigResourceClashError } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
@@ -40,7 +39,7 @@ describe("ProviderChoice.fromFlags", () => {
     });
 
     expect(error).toBeInstanceOf(IdpError);
-    expect(toZitadelError(error)).toMatchObject({
+    expect(error).toMatchObject({
       code: "E_VALIDATION",
       message: "Unknown provider nope",
     });
@@ -52,7 +51,7 @@ describe("ProviderChoice.fromFlags", () => {
     });
 
     expect(error).toBeInstanceOf(IdpError);
-    expect(toZitadelError(error)).toMatchObject({
+    expect(error).toMatchObject({
       code: "E_VALIDATION",
     });
   });
@@ -63,7 +62,7 @@ describe("ProviderChoice.fromFlags", () => {
     });
 
     expect(error).toBeInstanceOf(IdpError);
-    expect(toZitadelError(error)).toMatchObject({
+    expect(error).toMatchObject({
       code: "E_VALIDATION",
       details: { missing: ["--display-name", "--issuer"] },
     });

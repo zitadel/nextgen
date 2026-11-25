@@ -44,7 +44,7 @@ import { ReadSsoFlags } from "@/cli/commands/setup/steps/read-sso-flags";
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { customExample, IdpSettingsMissingError, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
 import { Ui, warnings } from "@/lib/ui";
 import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
 import { FakeMachine } from "@tests/helpers/local-machine";
@@ -2383,7 +2383,7 @@ describe("setup", () => {
 
       const res = await runCliForTest(scriptedAgainst(dir, platform.url));
 
-      expect(res).toExitWith(5);
+      expect(res).toExitWith(3);
     });
 
     it("removes the .env.local it merged before it reached the failing file", async ({
@@ -4005,8 +4005,11 @@ describe("ReadSsoFlags", () => {
           return readingFlags(true);
         });
 
-        expect(error).toBeInstanceOf(IdpSettingsMissingError);
-        expect(error).toMatchObject({ code: "E_VALIDATION" });
+        expect(error).toBeInstanceOf(ZitadelError);
+        expect(error).toMatchObject({
+          code: "E_VALIDATION",
+          hint: expect.stringContaining("Describe the connection, e.g."),
+        });
       });
 
       it("does not ask", async () => {

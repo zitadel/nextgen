@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ZitadelConfigConnectionClientIdError,
+  ZitadelConfigConnectionNotOidcError,
+  ZitadelConfigConnectionUnusableError,
+  ZitadelConfigEditRefusedError,
+  ZitadelConfigError,
+  ZitadelConfigHandleInvalidError,
+  ZitadelConfigResourceClashError,
+  ZitadelConfigResourceMissingError,
+  ZitadelConfigSchemaAmbiguousError,
+  ZitadelConfigSchemaMissingError,
   ZitadelConfigFileBrokenError,
   ZitadelConfigDeployEmptyError,
   ZitadelConfigDeployTooLargeError,
@@ -444,6 +454,148 @@ describe("ZitadelConfigInternalError", () => {
   it("is an internal failure", () => {
     expect(new ZitadelConfigInternalError("not an object")).toMatchObject({
       category: "fault",
+    });
+  });
+});
+
+describe("ZitadelConfigError", () => {
+  it("is a validation failure that carries the hint and details it was given", () => {
+    const error = new ZitadelConfigError("boom", {
+      hint: "do this",
+      details: {
+        file: "a.json",
+      },
+    });
+
+    expect(error).toMatchObject({
+      name: "ZitadelConfigError",
+      category: "invalid",
+      retryable: false,
+      code: "E_VALIDATION",
+      hint: "do this",
+      details: {
+        file: "a.json",
+      },
+    });
+  });
+});
+
+describe("ZitadelConfigEditRefusedError", () => {
+  it("is a validation failure", () => {
+    expect(new ZitadelConfigEditRefusedError("would discard a comment")).toMatchObject({
+      category: "invalid",
+      code: "E_VALIDATION",
+    });
+  });
+});
+
+describe("ZitadelConfigHandleInvalidError", () => {
+  it("is a validation failure that names the handle in its details", () => {
+    expect(new ZitadelConfigHandleInvalidError("../x")).toMatchObject({
+      category: "invalid",
+      code: "E_VALIDATION",
+      details: {
+        handle: "../x",
+      },
+    });
+  });
+});
+
+describe("ZitadelConfigResourceClashError", () => {
+  it("is a conflict", () => {
+    expect(new ZitadelConfigResourceClashError("two with one slug")).toMatchObject({
+      category: "conflict",
+      code: "E_CONFLICT",
+    });
+  });
+});
+
+describe("ZitadelConfigResourceMissingError", () => {
+  it("is a missing failure", () => {
+    expect(new ZitadelConfigResourceMissingError("no such connection")).toMatchObject({
+      category: "missing",
+      code: "E_NOT_FOUND",
+    });
+  });
+});
+
+describe("ZitadelConfigSchemaMissingError", () => {
+  it("is a missing failure that says no schema is named so", () => {
+    const error = new ZitadelConfigSchemaMissingError("employees", []);
+
+    expect(error).toMatchObject({
+      category: "missing",
+      code: "E_NOT_FOUND",
+      message: "There is no user schema under .zitadel/schemas",
+      details: {
+        requested: "employees",
+        known: [],
+      },
+    });
+  });
+});
+
+describe("ZitadelConfigSchemaAmbiguousError", () => {
+  it("is a validation failure that names the name asked for", () => {
+    const error = new ZitadelConfigSchemaAmbiguousError("customers", []);
+
+    expect(error).toMatchObject({
+      category: "invalid",
+      code: "E_VALIDATION",
+      requested: "customers",
+    });
+  });
+});
+
+describe("ZitadelConfigConnectionClientIdError", () => {
+  it("is a validation failure that names the file and both client ids", () => {
+    const error = new ZitadelConfigConnectionClientIdError(GOOGLE_PATH, "old", "new");
+
+    expect(error).toMatchObject({
+      category: "invalid",
+      code: "E_VALIDATION",
+      message: `${GOOGLE_PATH} already uses client id old, not new`,
+      details: {
+        file: GOOGLE_PATH,
+        stored_client_id: "old",
+        supplied_client_id: "new",
+      },
+    });
+  });
+});
+
+describe("ZitadelConfigConnectionNotOidcError", () => {
+  it("is a conflict that names the file and the slug", () => {
+    const error = new ZitadelConfigConnectionNotOidcError(GOOGLE_PATH, "google");
+
+    expect(error).toMatchObject({
+      category: "conflict",
+      code: "E_CONFLICT",
+      details: {
+        file: GOOGLE_PATH,
+        slug: "google",
+      },
+    });
+  });
+});
+
+describe("ZitadelConfigConnectionUnusableError", () => {
+  it("is a validation failure that names the setting and what is wrong with it", () => {
+    const error = new ZitadelConfigConnectionUnusableError(
+      GOOGLE_PATH,
+      "google",
+      "a display name",
+      "blank",
+    );
+
+    expect(error).toMatchObject({
+      category: "invalid",
+      code: "E_VALIDATION",
+      message: `${GOOGLE_PATH} holds a display name that cannot be used: blank`,
+      details: {
+        file: GOOGLE_PATH,
+        slug: "google",
+      },
     });
   });
 });

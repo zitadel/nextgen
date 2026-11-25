@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BackendConflictError, BackendForbiddenError } from "@/lib/backend";
-import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
 import { PublishConfigInvalidError } from "@/lib/publish";
 import { Output } from "@/lib/ui";
@@ -461,7 +461,7 @@ describe("Publisher.prepare", () => {
       });
 
       expect(error).toBeInstanceOf(PublishConfigInvalidError);
-      expect(toZitadelError(error)).toMatchObject({
+      expect(error).toMatchObject({
         code: "E_VALIDATION",
       });
     });

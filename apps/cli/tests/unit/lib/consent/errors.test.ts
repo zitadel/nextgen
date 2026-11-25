@@ -1,7 +1,7 @@
-import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
 import { ConsentError, ConsentInternalError, ConsentRequiredError } from "@/lib/consent";
+import { toZitadelError } from "@/lib/errors";
 
 describe("the consent errors", () => {
   it.each([

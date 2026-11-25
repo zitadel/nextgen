@@ -1322,6 +1322,25 @@ describe("deploy", () => {
         });
       });
 
+      it("tells a connection holding its client_secret literally how to publish it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.enableSso("google", GOOGLE);
+        await app.editConnection("google", (connection) => {
+          connection.oidc.client_secret = "a-literal-secret";
+        });
+
+        const result = await app.deploy();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          command: "deploy",
+          code: "E_VALIDATION",
+          hint: expect.stringContaining("Publish a secret with the command below"),
+          next_commands: [expectedPublicCliCommand(app.againAsRun("variable set NAME --secret"))],
+        });
+      });
+
       it("prints no secret a connection holds", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

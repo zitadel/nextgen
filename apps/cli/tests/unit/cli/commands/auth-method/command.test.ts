@@ -1,4 +1,3 @@
-import { SyncStateMalformedError } from "@/lib/sync";
 import { mkdir } from "node:fs/promises";
 import { runCommand } from "@tests/helpers/run-cli";
 import { join } from "node:path";
@@ -12,8 +11,9 @@ import AuthMethodPasskeyDisable from "@/cli/commands/auth-method/passkey/disable
 import AuthMethodPasskeyEnable from "@/cli/commands/auth-method/passkey/enable";
 import AuthMethodPasswordEnable from "@/cli/commands/auth-method/password/enable";
 import AuthMethodSsoDisable from "@/cli/commands/auth-method/sso/disable";
-import { Consent } from "@/lib/consent";
+import { Consent, ConsentInternalError } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
+import { SyncStateMalformedError } from "@/lib/sync";
 
 import {
   ZitadelConfigFileBrokenError,
@@ -724,9 +724,9 @@ describe("AuthMethodCommand.write", () => {
       return writer.writeChange(read, change);
     });
 
+    expect(error).toBeInstanceOf(ConsentInternalError);
     expect(error).toMatchObject({
       message: "A destructive operation ran without consent",
-      category: "fault",
     });
   });
 

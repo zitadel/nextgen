@@ -1,7 +1,5 @@
-import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
-import type { ZitadelError } from "@/lib/errors";
 import { IdpError } from "@/lib/idp";
 import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import Setup from "@/cli/commands/setup";
@@ -35,12 +33,12 @@ function custom(values: Parameters<typeof selectionFromFlags>[1], names = flag) 
   return selection.connection;
 }
 
-function refusal(run: () => unknown): ZitadelError {
+function refusal(run: () => unknown): IdpError {
   try {
     run();
   } catch (error) {
     expect(error).toBeInstanceOf(IdpError);
-    return toZitadelError(error);
+    return error as IdpError;
   }
   throw new Error("expected a refusal");
 }
