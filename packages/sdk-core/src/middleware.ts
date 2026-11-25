@@ -1521,7 +1521,7 @@ export type ZitadelMiddlewareOptions = {
    * `/__nextgen/idp/{slug}/callback`, which is proxied only under the default prefix. So does the
    * OAuth issuer of the project, `{origin}/__nextgen/oauth/{projectId}`: the proxy also serves its
    * metadata at `/.well-known/oauth-authorization-server/__nextgen/oauth/{projectId}`, and answers
-   * `404` for an OAuth path of any other project ({@link proxyRoute}).
+   * `404` for an OAuth path of any other project (`proxyRoute` in `@zitadel/sdk-core`).
    *
    * @defaultValue "/__nextgen"
    * @example "/__nextgen"
