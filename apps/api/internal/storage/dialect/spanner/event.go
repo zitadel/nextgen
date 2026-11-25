@@ -152,7 +152,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		return err
 	}
 	event.OccurredAt = occurredAt
-	event.CreatedAt = createdAt.UTC()
+	event.CreatedAt = createdAt
 	event.Payload = payloadRaw
 	event.Metadata = metadataRaw
 	return nil
@@ -220,7 +220,6 @@ func (e eventStatements) ScanEvents(ctx context.Context, within *database.ListOp
 		scanned, err = collectRows(iter, func(row *spanner.Row) (events.Scanned, error) {
 			var s events.Scanned
 			err := row.Columns(&s.ID, &s.CreatedAt, &s.Matched)
-			s.CreatedAt = s.CreatedAt.UTC()
 			return s, err
 		})
 		return err
@@ -300,7 +299,6 @@ func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, project
 			if err := row.Columns(&c.SinkID, &c.ProjectID, &c.LastCreatedAt, &c.LastEventID); err != nil {
 				return nil, err
 			}
-			c.LastCreatedAt = c.LastCreatedAt.UTC()
 			return &c, nil
 		})
 		return err
@@ -388,8 +386,6 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 	}
 	ev.EventType = domain.EventType(eventType)
 	ev.Category = domain.EventCategory(category)
-	ev.OccurredAt = ev.OccurredAt.UTC()
-	ev.CreatedAt = ev.CreatedAt.UTC()
 	ev.TeamID = spannerNullStringPtr(teamID)
 	ev.ActorID = spannerNullStringPtr(actorID)
 	if actorType.Valid {

@@ -68,7 +68,6 @@ func (rs releaseStatements) CreateRelease(ctx context.Context, entity *domain.Re
 				if err := row.Columns(&entity.CreatedAt); err != nil {
 					return struct{}{}, err
 				}
-				entity.CreatedAt = entity.CreatedAt.UTC()
 				return struct{}{}, nil
 			})
 			return err

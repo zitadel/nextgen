@@ -118,8 +118,6 @@ func scanPreview(row *spanner.Row) (*domain.Preview, error) {
 	if err := row.Columns(&entity.ProjectID, &entity.Origin, &entity.ExpiresAt, &entity.CreatedAt); err != nil {
 		return nil, err
 	}
-	entity.ExpiresAt = entity.ExpiresAt.UTC()
-	entity.CreatedAt = entity.CreatedAt.UTC()
 	return &entity, nil
 }
 
