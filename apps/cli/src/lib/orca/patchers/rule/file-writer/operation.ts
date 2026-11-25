@@ -1,4 +1,4 @@
-import { OrcaInternalError, OrcaPatchFileConflictError } from "@/lib/orca/errors";
+import { OrcaInternalError, OrcaPatchFileUnsupportedError } from "@/lib/orca/errors";
 import type { FileOp } from "./types";
 import type { Entry, Workspace } from "./workspace";
 
@@ -113,12 +113,7 @@ export abstract class Operation<Kind extends FileOp["kind"]> {
     const isClash = !isDirectoryOp && located !== undefined && !located.entry.isFile;
 
     if (isClash) {
-      throw new OrcaPatchFileConflictError(`${path} is not a regular file`, {
-        hint: `Move or remove ${path} and rerun setup.`,
-        details: {
-          path,
-        },
-      });
+      throw new OrcaPatchFileUnsupportedError(`${path} is not a regular file`);
     }
 
     const before = !isDirectoryOp && located !== undefined ? await workspace.read(path) : undefined;

@@ -135,9 +135,7 @@ describe("Orca detection", () => {
   it("throws OrcaFrameworkMissingError for an unsupported requested framework", async ({ dir }) => {
     await expect(orca.detect(dir, "cobol")).rejects.toMatchObject({
       name: "OrcaFrameworkMissingError",
-      details: {
-        requested: "cobol",
-      },
+      message: 'Unsupported framework "cobol"',
     });
   });
 

@@ -133,13 +133,13 @@ export class DetectFramework extends WizardStep<
       })
       .catch((error: unknown) => {
         if (error instanceof OrcaFrameworkMismatchError) {
-          const { requested, detected, requestedName } = error.details ?? {};
+          const { requested, detected } = error.details ?? {};
           throw Object.assign(
             refusalError(FRAMEWORK_MISMATCH_REFUSAL, {
               message: error.message,
               requested: String(requested),
               detected: String(detected),
-              requestedName: String(requestedName ?? requested),
+              requestedName: orca.displayName(String(requested)),
             }),
             {
               cause: error,

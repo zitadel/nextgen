@@ -43,28 +43,21 @@ export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter((id) => 
 /**
  * Resolves a renderer id (an untrusted string from config) to its spec,
  * throwing a typed {@link OrcaRendererUnknownError} or
- * {@link OrcaRendererPendingError} rather than returning `undefined` so callers
- * get an actionable message. Rejects unknown ids and declared but unpublished
- * ids, guaranteeing the returned spec is safe to scaffold from.
+ * {@link OrcaRendererPendingError} rather than returning `undefined`
+ * so callers get an actionable message. Rejects ids that are unknown
+ * (`E_VALIDATION`) or declared-but-unpublished (`E_NOT_IMPLEMENTED`),
+ * guaranteeing the returned spec is safe to scaffold from.
  */
 export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
     throw new OrcaRendererUnknownError(`Unknown renderer "${id}"`, {
       hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}.`,
-      details: {
-        id,
-        available: AVAILABLE_RENDERER_IDS,
-      },
     });
   }
   const renderer = RENDERERS[id];
   if (renderer.status === "not-implemented") {
     throw new OrcaRendererPendingError(`Renderer "${id}" is declared but not yet published`, {
-      hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}; the <zitadel-flow> web component ships in a later package.`,
-      details: {
-        id,
-        available: AVAILABLE_RENDERER_IDS,
-      },
+      hint: "Use the react renderer for now; the <zitadel-flow> web component ships in a later package.",
     });
   }
   return renderer;

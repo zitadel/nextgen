@@ -70,7 +70,7 @@ describe("Operation", () => {
     );
 
     expect(error).toMatchObject({
-      name: "OrcaPatchFileConflictError",
+      name: "OrcaPatchFileUnsupportedError",
       message: expect.stringContaining("not a regular file"),
     });
     expect(seen).toEqual([]);
@@ -84,7 +84,7 @@ describe("Operation", () => {
     );
 
     expect(error).toMatchObject({
-      name: "OrcaPatchFileConflictError",
+      name: "OrcaPatchFileUnsupportedError",
     });
   });
 

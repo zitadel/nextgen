@@ -2,7 +2,7 @@ import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { execaSync } from "execa";
 
-import { OrcaScaffoldBlockedError } from "@/lib/orca/errors";
+import { OrcaScaffoldBlockedError, OrcaScaffoldCommandFailedError } from "@/lib/orca/errors";
 import { warnings } from "@/lib/ui";
 
 import {
@@ -130,7 +130,8 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
   }
 
   /**
-   * Runs an external command in `cwd`, throwing on failure. Distinguishes
+   * Runs an external command in `cwd`, throwing a typed {@link OrcaError} on
+   * failure. Distinguishes
    * "binary not on PATH" (`ENOENT` from the spawn itself) from "binary ran but
    * exited non-zero" — the former is not masked as a generic
    * `exited with status 1`, which would leave users to guess. Tests stub
@@ -142,23 +143,52 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
       if (result.code === "ENOENT") {
         throw new OrcaScaffoldBlockedError(`Command not found: ${command}`, {
           hint: `Ensure '${command}' is installed and on PATH.`,
-          details: { command, args: [...args], code: result.code },
+          details: {
+            command,
+            args: [...args],
+            code: result.code,
+          },
         });
       }
-      throw new Error(`Failed to spawn "${command}": ${result.originalMessage ?? result.message}`, {
-        cause: result,
-      });
+      throw new OrcaScaffoldCommandFailedError(
+        `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
+        {
+          details: {
+            command,
+            args: [...args],
+            code: result.code,
+          },
+        },
+      );
     }
     const status = result.exitCode ?? 1;
     if (status !== 0) {
-      throw new Error(
+      const stdout = String(result.stdout);
+      const stderr = String(result.stderr);
+      const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
+      throw new OrcaScaffoldCommandFailedError(
         `Command "${command} ${args.join(" ")}" exited with status ${String(status)}`,
         {
-          cause: result,
+          hint: output ? `Command output:\n${output}` : "Run the command directly for more detail.",
+          details: {
+            command,
+            args: [...args],
+            cwd,
+            stdout,
+            stderr,
+          },
         },
       );
     }
   }
+}
+
+function truncateCommandOutput(output: string): string {
+  const limit = 4000;
+  if (output.length <= limit) {
+    return output;
+  }
+  return `${output.slice(0, limit)}\n... output truncated ...`;
 }
 
 export function npmPackageNameErrors(name: string): string[] {

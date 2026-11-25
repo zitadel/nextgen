@@ -30,7 +30,6 @@ export {
   OrcaFrameworkMissingError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
-  OrcaPatchFileConflictError,
   OrcaPatchFileMissingError,
   OrcaPatchFileOverwriteError,
   OrcaPatchFileUnsupportedError,
@@ -38,6 +37,7 @@ export {
   OrcaRendererPendingError,
   OrcaRendererUnknownError,
   OrcaScaffoldBlockedError,
+  OrcaScaffoldCommandFailedError,
   OrcaScaffoldOccupiedError,
 } from "./errors";
 export type { Detector, FrameworkFacts } from "./detectors/types";
@@ -175,13 +175,8 @@ export class Orca {
         })
       : this.detectors;
     if (requested && candidates.length === 0) {
-      const supported = this.frameworkIds();
       throw new OrcaFrameworkMissingError(`Unsupported framework "${requested}"`, {
-        hint: `Supported frameworks: ${supported.join(", ")}.`,
-        details: {
-          requested,
-          supported,
-        },
+        hint: `Supported frameworks: ${this.frameworkIds().join(", ")}.`,
       });
     }
     for (const detector of candidates) {
@@ -218,10 +213,10 @@ export class Orca {
     try {
       return await this.detect(cwd);
     } catch (error) {
-      if (
-        error instanceof OrcaFrameworkMissingError ||
-        error instanceof OrcaFrameworkUnsupportedError
-      ) {
+      if (error instanceof OrcaFrameworkMissingError) {
+        return undefined;
+      }
+      if (error instanceof OrcaFrameworkUnsupportedError) {
         return undefined;
       }
       throw error;
@@ -327,15 +322,12 @@ export class Orca {
       return candidate.canScaffold(framework);
     });
     if (!scaffolder) {
-      const available = this.availableFrameworks().map((f) => {
-        return f.id;
-      });
       throw new OrcaInternalError(`No scaffolder supports "${framework}"`, {
-        hint: `Available frameworks: ${available.join(", ")}.`,
-        details: {
-          framework,
-          available,
-        },
+        hint: `Available frameworks: ${this.availableFrameworks()
+          .map((f) => {
+            return f.id;
+          })
+          .join(", ")}.`,
       });
     }
     return scaffolder;
@@ -352,9 +344,6 @@ export class Orca {
     if (!patcher) {
       throw new OrcaInternalError(`No patcher supports "${framework}"`, {
         hint: "Zitadel integration currently supports Next.js.",
-        details: {
-          framework,
-        },
       });
     }
     return patcher;
@@ -396,7 +385,6 @@ export class Orca {
         details: {
           requested,
           detected,
-          requestedName: name(requested),
         },
       },
     );

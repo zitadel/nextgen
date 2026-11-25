@@ -2,6 +2,7 @@ import { generateCode, parseModule } from "magicast";
 import { getDefaultExportOptions } from "magicast/helpers";
 import type { ProxifiedArray, ProxifiedModule, ProxifiedObject } from "magicast";
 
+import { errorMessage } from "@/lib/errors";
 import { OrcaPatchFileMissingError, OrcaPatchFileUnsupportedError } from "@/lib/orca/errors";
 import { tryCatch } from "@/lib/try-catch";
 
@@ -43,7 +44,7 @@ export class ConfigModule {
   }
 
   /**
-   * Parses a config file, or throws when it is missing,
+   * Parses a config file, or throws `E_VALIDATION` when it is missing,
    * unparseable or CommonJS.
    *
    * @param source - The file's text, or `undefined` when it does not exist.
@@ -57,9 +58,6 @@ export class ConfigModule {
     if (isMissing) {
       throw new OrcaPatchFileMissingError(`Cannot edit ${filename}: file not found`, {
         hint: `Run setup from a project that has ${filename}.`,
-        details: {
-          path: filename,
-        },
       });
     }
 
@@ -68,6 +66,9 @@ export class ConfigModule {
     if (error) {
       throw new OrcaPatchFileUnsupportedError(`Could not parse ${filename}`, {
         hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,
+        details: {
+          cause: errorMessage(error),
+        },
         cause: error,
       });
     }
@@ -145,7 +146,7 @@ export class ConfigModule {
    * The source to write back: the module's code, ending in a newline, when the
    * patcher changed anything, and the source untouched when it did not, so the
    * file-writer skips it instead of magicast reformatting a patched config.
-   * Throws when the edit left code that no longer parses, rather
+   * Throws `E_VALIDATION` when the edit left code that no longer parses, rather
    * than writing a broken config.
    */
   render(isChanged: boolean): string {
@@ -157,6 +158,9 @@ export class ConfigModule {
     if (error) {
       throw new OrcaPatchFileUnsupportedError(`Could not write ${this.filename}`, {
         hint: `The edit left ${this.filename} unparseable, so apply the Zitadel changes manually.`,
+        details: {
+          cause: errorMessage(error),
+        },
         cause: error,
       });
     }

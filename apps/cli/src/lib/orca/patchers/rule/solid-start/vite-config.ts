@@ -25,9 +25,6 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
         "Cannot edit the SolidStart Vite config: file not found",
         {
           hint: "Run setup from a SolidStart project that has a vite.config.ts.",
-          details: {
-            path: "vite.config.ts",
-          },
         },
       );
     }
@@ -115,7 +112,5 @@ function readBalanced(source: string, openParenIndex: number): { text: string; e
       }
     }
   }
-  throw new OrcaPatchFileUnsupportedError("Malformed Vite config: unbalanced solidStart() call", {
-    hint: "Fix the syntax of vite.config.ts and rerun.",
-  });
+  throw new OrcaPatchFileUnsupportedError("Malformed Vite config: unbalanced solidStart() call");
 }

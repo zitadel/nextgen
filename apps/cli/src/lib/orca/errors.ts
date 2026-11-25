@@ -4,9 +4,9 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
  * Anything orca fails with on purpose.
  *
  * @remarks
- * A caller catches this, or one of its subclasses; the CLI turns it into its
- * own error in one place. A failure nothing here anticipated is not one of
- * these: it bubbles as it was thrown.
+ * A command that calls orca catches this, or one of its subclasses, and words
+ * the failure itself. A failure nothing here anticipated is not one of these:
+ * it bubbles as it was thrown.
  */
 export abstract class OrcaError extends Error {
   /** The kind of failure; a subclass states its own. */
@@ -106,20 +106,20 @@ export class OrcaScaffoldBlockedError extends OrcaError {
 }
 
 /**
- * A file a patch needs, and the project does not have.
+ * An external command a scaffold runs that could not be spawned or exited non-zero.
  */
-export class OrcaPatchFileMissingError extends OrcaError {
-  override readonly category: ErrorCategory = "missing";
-  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+export class OrcaScaffoldCommandFailedError extends OrcaError {
+  override readonly category: ErrorCategory = "fault";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
   override readonly retryable: boolean = false;
 }
 
 /**
- * A file of the project that a patch cannot be written over.
+ * A file a patch needs, and the project does not have.
  */
-export class OrcaPatchFileConflictError extends OrcaError {
-  override readonly category: ErrorCategory = "conflict";
-  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+export class OrcaPatchFileMissingError extends OrcaError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
   override readonly retryable: boolean = false;
 }
 

@@ -56,9 +56,6 @@ export function devScriptPortEdit(
     if (source === undefined) {
       throw new OrcaPatchFileMissingError("package.json is required to pin the dev port", {
         hint: "Run setup from a project that has a package.json.",
-        details: {
-          path: "package.json",
-        },
       });
     }
     const devPort = portFromIssuer(issuer);
