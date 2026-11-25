@@ -8,14 +8,13 @@ import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/
 
 import {
   BackendConflictError,
-  BackendError,
+  type BackendError,
   BackendForbiddenError,
   BackendInternalError,
   BackendNotFoundError,
   BackendRejectedError,
   BackendUnauthorizedError,
   BackendUnavailableError,
-  BackendUnsupportedError,
 } from "./errors";
 
 /**
@@ -52,16 +51,8 @@ function refusalOf(error: ApiError): BackendError {
   if (error.status === 401) {
     return new BackendUnauthorizedError(message, options);
   }
-  // A 403 naming an origin the project does not hold is a refused target, not
-  // a bad credential: re-authenticating would never fix it.
-  if (error.status === 403) {
-    return apiErrorCode(error) === "proj.origin_not_allowed"
-      ? new BackendRejectedError(message, options)
-      : new BackendForbiddenError(message, options);
-  }
-  // Not implemented: the server will never do this, so retrying cannot help.
-  if (error.status === 501) {
-    return new BackendUnsupportedError(message, options);
+  if (error.status === 403 && apiErrorCode(error) !== "proj.origin_not_allowed") {
+    return new BackendForbiddenError(message, options);
   }
   // Too many requests: the server is telling the caller to come back, not that
   // the request was wrong, so it joins the failures a caller may retry rather
@@ -69,12 +60,7 @@ function refusalOf(error: ApiError): BackendError {
   if (error.status === 429 || error.status >= 500) {
     return new BackendUnavailableError(message, options);
   }
-  // The statuses that mean the body was wrong. Any other (a redirect, a 405, a
-  // 408) is one nobody anticipated, so it is not the user's to fix.
-  if (error.status === 400 || error.status === 422) {
-    return new BackendRejectedError(message, options);
-  }
-  return new BackendError(message, options);
+  return new BackendRejectedError(message, options);
 }
 
 /**

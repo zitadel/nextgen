@@ -6,10 +6,10 @@ import { distance } from "fastest-levenshtein";
 import { ApiService } from "@/lib/backend/api-service";
 import { connectionOf, responseFailure } from "@/lib/backend/client";
 import {
-  BackendError,
   BackendInternalError,
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
+  BackendRejectedError,
 } from "@/lib/backend/errors";
 import { request as fetchWithPolicy } from "@/lib/backend/transport";
 
@@ -481,7 +481,7 @@ export class OperationService extends ApiService {
    *
    * @param request - The request.
    * @returns The last page's status and body, with the page field holding every page's items.
-   * @throws BackendError when a page lacks its list.
+   * @throws BackendRejectedError when a page lacks its list.
    */
   async callAll(request: ApiRequest): Promise<ApiResponse> {
     const shape = request.operation.paging;
@@ -494,11 +494,14 @@ export class OperationService extends ApiService {
         try {
           return fields.items(response.raw);
         } catch (problem) {
-          throw new BackendError(problem instanceof Error ? problem.message : String(problem), {
-            details: {
-              response: response.raw,
+          throw new BackendRejectedError(
+            problem instanceof Error ? problem.message : String(problem),
+            {
+              details: {
+                response: response.raw,
+              },
             },
-          });
+          );
         }
       },
       next: (response) => {

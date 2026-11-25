@@ -118,10 +118,7 @@ export class Environment {
       // read.
       const values = await Dotenv.at(resolve(input.envFile)).read();
       if (values === undefined) {
-        throw new EnvironmentFileMissingError(
-          input.envFile,
-          `--env-file ${input.envFile} was not found`,
-        );
+        throw new EnvironmentFileMissingError(`--env-file ${input.envFile} was not found`);
       }
       sources.push({ source: `--env-file ${input.envFile}`, values });
     }

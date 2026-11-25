@@ -1,9 +1,10 @@
 import { allowDestructive, type ZitadelClient } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { Confirmer } from "@/lib/ui/questions";
 
-import { ConsentInternalError, ConsentRequiredError } from "./errors";
+import { ConsentInternalError } from "./errors";
 
 /**
  * What a destructive command does, as one word. It is the stable token of the
@@ -45,7 +46,7 @@ export type Gate = Readonly<{
   /**
    * Refuses in place of the default "Cannot … without --force" when nobody
    * can be asked and `--force` was not given, for a refusal that says more.
-   * Whatever it throws is a refusal, which {@link Consent.isRefusal} knows.
+   * It throws an `E_CONFIRMATION_REQUIRED` too, or {@link Consent.isRefusal} misses it.
    */
   refuse?: () => never;
 }>;
@@ -96,8 +97,8 @@ export class Consent {
 
   /**
    * Ask for consent. `--force` gives it without asking; with nobody to ask
-   * and no `--force` the gate refuses (a {@link ConsentRequiredError}, which
-   * only a person may agree to);
+   * and no `--force` the gate refuses (an `E_CONFIRMATION_REQUIRED` naming
+   * `--force`, which only a person may agree to);
    * otherwise the person is asked, and `undefined` is their no. Ctrl-C
    * throws `E_CANCELLED`, as every prompt does.
    *
@@ -107,9 +108,8 @@ export class Consent {
    * @param gate - What is being confirmed and how it refuses.
    * @param session - Who can answer, and whether the run may change anything.
    * @returns The consent, or `undefined` when the person said no.
-   * @throws {@link ConsentRequiredError} When nobody can be asked and
-   * `--force` was not given, unless the gate refuses in its own way, or
-   * `E_CANCELLED` on Ctrl-C.
+   * @throws {ZitadelError} `E_CONFIRMATION_REQUIRED` when nobody can be asked
+   * and `--force` was not given, or `E_CANCELLED` on Ctrl-C.
    * @throws {@link ConsentInternalError} When a dry run asks.
    */
   static async request(gate: Gate, session: ConsentSession): Promise<Consent | undefined> {
@@ -118,15 +118,7 @@ export class Consent {
     }
     try {
       if (!session.force && !session.interactive) {
-        try {
-          gate.refuse?.();
-        } catch (refusal) {
-          if (typeof refusal === "object" && refusal !== null) {
-            refusals.add(refusal);
-          }
-          throw refusal;
-        }
-        throw new ConsentRequiredError(gate.name, gate.message);
+        gate.refuse?.();
       }
       const agreed = await (session.confirmer ?? Ui.asker(session)).confirm({
         name: gate.name,
@@ -142,7 +134,7 @@ export class Consent {
       granted.add(consent);
       return consent;
     } catch (error) {
-      if (error instanceof ConsentRequiredError) {
+      if (error instanceof ZitadelError && error.code === "E_CONFIRMATION_REQUIRED") {
         refusals.add(error);
       }
       throw error;
@@ -170,11 +162,7 @@ export class Consent {
    * @returns Whether {@link Consent.request} threw it as a refusal.
    */
   static isRefusal(error: unknown): boolean {
-    if (typeof error !== "object" || error === null) {
-      return false;
-    }
-
-    return refusals.has(error) || (error instanceof Error && Consent.isRefusal(error.cause));
+    return typeof error === "object" && error !== null && refusals.has(error);
   }
 
   /**

@@ -136,16 +136,6 @@ export class PublishConnectionVariableSharedError extends PublishError {
   readonly variable: string;
 
   /**
-   * The credential field that names it; absent when two fields share it.
-   */
-  readonly field: "client_id" | "client_secret" | undefined;
-
-  /**
-   * Whether the variable the project holds is a secret, when it holds one.
-   */
-  readonly isSecret: boolean | undefined;
-
-  /**
    * Which kind of publish was refused.
    */
   readonly mode: "deploy" | "preview" | undefined;
@@ -161,8 +151,6 @@ export class PublishConnectionVariableSharedError extends PublishError {
     options: {
       readonly file: string;
       readonly variable: string;
-      readonly field?: "client_id" | "client_secret" | undefined;
-      readonly isSecret?: boolean | undefined;
       readonly mode?: "deploy" | "preview" | undefined;
       readonly details?: Readonly<Record<string, unknown>> | undefined;
     },
@@ -173,8 +161,6 @@ export class PublishConnectionVariableSharedError extends PublishError {
     });
     this.file = options.file;
     this.variable = options.variable;
-    this.field = options.field;
-    this.isSecret = options.isSecret;
     this.mode = options.mode;
   }
 }
@@ -265,11 +251,6 @@ export class PublishConnectionVariableMissingError extends PublishError {
   readonly field: "client_id" | "client_secret" | undefined;
 
   /**
-   * Whether the variable the project holds is a secret, when it holds one.
-   */
-  readonly isSecret: boolean | undefined;
-
-  /**
    * Which kind of publish was refused.
    */
   readonly mode: "deploy" | "preview" | undefined;
@@ -286,7 +267,6 @@ export class PublishConnectionVariableMissingError extends PublishError {
       readonly file: string;
       readonly variable: string;
       readonly field?: "client_id" | "client_secret" | undefined;
-      readonly isSecret?: boolean | undefined;
       readonly mode?: "deploy" | "preview" | undefined;
       readonly details?: Readonly<Record<string, unknown>> | undefined;
     },
@@ -298,7 +278,6 @@ export class PublishConnectionVariableMissingError extends PublishError {
     this.file = options.file;
     this.variable = options.variable;
     this.field = options.field;
-    this.isSecret = options.isSecret;
     this.mode = options.mode;
   }
 }

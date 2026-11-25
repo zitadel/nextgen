@@ -19,16 +19,14 @@ describe("the environment errors", () => {
       new EnvironmentServerInvalidError("bad", ".env", "https://zitadel.example"),
       "invalid",
     ],
-    ["file", new EnvironmentFileMissingError("a.env", "gone"), "missing"],
+    ["file", new EnvironmentFileMissingError("gone"), "missing"],
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(EnvironmentError);
     expect(error.category).toBe(category);
   });
 
   it("reports a missing file with the code it always had", () => {
-    expect(toZitadelError(new EnvironmentFileMissingError("a.env", "gone")).code).toBe(
-      "E_VALIDATION",
-    );
+    expect(toZitadelError(new EnvironmentFileMissingError("gone")).code).toBe("E_VALIDATION");
   });
 
   it("words the advice for a name that cannot be used", () => {
@@ -77,7 +75,7 @@ describe("the environment errors", () => {
 
 describe("the environment errors' codes", () => {
   it("reports a missing file as a validation failure, not a missing thing", () => {
-    expect(new EnvironmentFileMissingError("a.env", "why").code).toBe("E_VALIDATION");
+    expect(new EnvironmentFileMissingError("why").code).toBe("E_VALIDATION");
   });
 
   it("reports an invalid input as a validation failure", () => {

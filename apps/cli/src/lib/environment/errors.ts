@@ -150,26 +150,6 @@ export class EnvironmentFileMissingError extends EnvironmentError {
   override readonly category = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * The path that was given.
-   */
-  readonly path: string;
-
-  /**
-   * Make the failure.
-   *
-   * @param path - The path that was given.
-   * @param message - What went wrong.
-   */
-  constructor(path: string, message: string) {
-    super(message, {
-      details: {
-        path,
-      },
-    });
-    this.path = path;
-  }
 }
 
 /**

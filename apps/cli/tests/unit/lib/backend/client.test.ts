@@ -151,9 +151,9 @@ describe("responseFailure", () => {
     [429, "BackendUnavailableError"],
     [500, "BackendUnavailableError"],
     [503, "BackendUnavailableError"],
-    [501, "BackendUnsupportedError"],
-    [405, "BackendError"],
-    [408, "BackendError"],
+    [501, "BackendUnavailableError"],
+    [405, "BackendRejectedError"],
+    [408, "BackendRejectedError"],
   ])("raises a %i as a %s", (status, name) => {
     expect(responseFailure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
       name,

@@ -21,7 +21,6 @@ export {
 export {
   BackendConflictError,
   BackendError,
-  type BackendErrorOptions,
   BackendForbiddenError,
   BackendInternalError,
   BackendNotFoundError,
@@ -30,9 +29,7 @@ export {
   BackendRejectedError,
   BackendUnauthorizedError,
   BackendUnavailableError,
-  type BackendUnavailableErrorOptions,
   type BackendUnavailableReason,
-  BackendUnsupportedError,
 } from "./errors";
 export {
   type AttemptFactor,
