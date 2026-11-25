@@ -4,9 +4,9 @@
  */
 import "@zitadel/components";
 
-export { ZitadelLoginComponent } from "./lib/zitadel-login.component.js";
-export { ZitadelLogoutComponent } from "./lib/zitadel-logout.component.js";
-export { ZitadelSessionComponent } from "./lib/zitadel-session.component.js";
+export { ZitadelLogin } from "./lib/zitadel-login.component.js";
+export { ZitadelLogout } from "./lib/zitadel-logout.component.js";
+export { ZitadelSession } from "./lib/zitadel-session.component.js";
 export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
 export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";
 // The shared SPA widget types, named one by one so the public surface is a

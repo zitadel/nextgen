@@ -20,9 +20,9 @@ import "@zitadel/components";
  *
  * The component wraps the `<zitadel-logout>` widget and has the selector `zitadel-auth-logout`. Use
  * it where a user ends their session. The inputs and the server-render behavior are the same as for
- * {@link ZitadelLoginComponent}. The widget fires `zitadel-signout`, and the component re-emits its
- * detail on {@link ZitadelLogoutComponent.signout}. The underlying element is reachable through
- * {@link ZitadelLogoutComponent.element}.
+ * {@link ZitadelLogin}. The widget fires `zitadel-signout`, and the component re-emits its
+ * detail on {@link ZitadelLogout.signout}. The underlying element is reachable through
+ * {@link ZitadelLogout.element}.
  *
  * @example
  * ```html
@@ -46,12 +46,12 @@ import "@zitadel/components";
     (zitadel-signout)="onSignout($event)"
   ></zitadel-logout>`,
 })
-export class ZitadelLogoutComponent {
+export class ZitadelLogout {
   /**
    * The project handle that tells the widget which project to talk to.
    *
    * Create it once with {@link configureZitadel} and pass it here. When set, it wins over {@link
-   * ZitadelLogoutComponent.projectId} and {@link ZitadelLogoutComponent.proxyPath}, as it does
+   * ZitadelLogout.projectId} and {@link ZitadelLogout.proxyPath}, as it does
    * inside the widget. It is bound as a DOM property, and its project id, proxy path and `url` are
    * also written as the `project-id`, `proxy-path` and `url` attributes, so server-rendered markup
    * carries them before hydration. Unset, the widget falls back to the discrete inputs and then to
@@ -67,7 +67,7 @@ export class ZitadelLogoutComponent {
    * The id of the project the widget works with.
    *
    * Use it when you do not have a project handle. It is read only when {@link
-   * ZitadelLogoutComponent.project} is unset, and it is written as the `project-id` attribute so it
+   * ZitadelLogout.project} is unset, and it is written as the `project-id` attribute so it
    * survives server rendering. Unset, the widget falls back to the globally registered project.
    *
    * @example
@@ -81,7 +81,7 @@ export class ZitadelLogoutComponent {
    *
    * The widget requests `${proxyPath}/...` on your app's own origin, so the browser never calls
    * Zitadel across origins and no credentials leave your origin. It is read only when {@link
-   * ZitadelLogoutComponent.project} is unset, and it is written as the `proxy-path` attribute. Your
+   * ZitadelLogout.project} is unset, and it is written as the `proxy-path` attribute. Your
    * hosting platform must route this path to Zitadel.
    *
    * @defaultValue "/__nextgen"
@@ -144,7 +144,7 @@ export class ZitadelLogoutComponent {
   }
 
   /**
-   * Re-emits a `zitadel-signout` DOM event's detail on {@link ZitadelLogoutComponent.signout}.
+   * Re-emits a `zitadel-signout` DOM event's detail on {@link ZitadelLogout.signout}.
    *
    * The template calls it, so you do not. It is public only because Angular templates read it.
    *

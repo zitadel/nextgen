@@ -24,13 +24,13 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 
 ```ts
 import { Component } from '@angular/core';
-import { ZitadelLoginComponent, configureZitadel } from '@zitadel/sdk-angular';
+import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-angular';
 
 const project = configureZitadel({ projectId: '…', proxyPath: '/__nextgen' });
 
 @Component({
   standalone: true,
-  imports: [ZitadelLoginComponent],
+  imports: [ZitadelLogin],
   template: `<zitadel-auth-login
     [project]="project"
     purpose="login"
@@ -46,7 +46,7 @@ export class LoginPage {
 
 `<zitadel-auth-login>` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
 
-The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSessionComponent`).
+The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSession`).
 
 > The wrapper uses the selector `zitadel-auth-login` (not `zitadel-login`) because
 > the latter is the underlying custom element the component renders internally.

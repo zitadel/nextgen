@@ -69,13 +69,13 @@ Setup installs the SDK. To add it yourself, run:
 
     ```ts
     import { Component } from "@angular/core";
-    import { ZitadelLoginComponent, configureZitadel } from "@zitadel/sdk-angular";
+    import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-angular";
 
     const project = configureZitadel({ projectId: "proj_123", proxyPath: "/__nextgen" });
 
     @Component({
       standalone: true,
-      imports: [ZitadelLoginComponent],
+      imports: [ZitadelLogin],
       template: `<zitadel-auth-login [project]="project" purpose="login" postSignInUrl="/" />`,
     })
     export class LoginPage {

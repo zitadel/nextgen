@@ -30,15 +30,14 @@ There are two families.
 
 | Kind | Required exports |
 | --- | --- |
-| `ui` | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession` (Angular: the same with a `Component` suffix), `ZitadelLoginProps`, `ZitadelLogoutProps`, `ZitadelSessionProps`, `ZitadelFlowStepDetail`, `ZitadelFlowInputDetail`, `ZitadelFlowCompleteDetail`, `ZitadelFlowRedirectDetail`, `ZitadelFlowErrorDetail`, `ZitadelSignoutDetail`, `ZitadelFlowPurpose`, `ZitadelFlowStep`, `ZitadelFlowBehavior`, `configureZitadel`, `getApi`, `getZitadelConfig`, `businessLocales`, `ZitadelProject`, `ZitadelConfig` |
+| `ui` | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession`, `ZitadelLoginProps`, `ZitadelLogoutProps`, `ZitadelSessionProps`, `ZitadelFlowStepDetail`, `ZitadelFlowInputDetail`, `ZitadelFlowCompleteDetail`, `ZitadelFlowRedirectDetail`, `ZitadelFlowErrorDetail`, `ZitadelSignoutDetail`, `ZitadelFlowPurpose`, `ZitadelFlowStep`, `ZitadelFlowBehavior`, `configureZitadel`, `getApi`, `getZitadelConfig`, `businessLocales`, `ZitadelProject`, `ZitadelConfig` |
 | `widgets` | the components, the three props types, the six detail types and the three flow types of `ui` |
 | `client` | `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelProject`, `ZitadelConfig`, plus `businessLocales` when the SDK renders widgets |
 | `server` | the auth reader the entry declares, `ZitadelMiddlewareOptions`, `ZitadelAuthSession`, `AuthResult`, `AuthState`, `UnauthState`, `ClientAuthResult`, plus the handler when the entry declares one |
 | `other` | nothing is required |
 
 An SDK declares its entries in `packages/<sdk>/public-api.json`: each entry's
-`source` file, its `kind`, whether it renders `widgets`, a `componentSuffix`
-where the components are named differently, a `handler` and an `authReader`
+`source` file, its `kind`, whether it renders `widgets`, a `handler` and an `authReader`
 where the entry has them (each a `name` and the `why` behind it), and `extras`,
 the names it exports beyond the required ones because its framework needs them.
 The contract spec requires every `exports` key of the package to be declared
@@ -79,6 +78,12 @@ by what it returns, and writes the reason in the three places above.
   (`ZitadelLoginSolidProps`, `ZitadelLoginReactProps`, `ZitadelLoginSvelteProps`)
   and the `Zitadel*Config`, `Zitadel*Handlers` and `ZitadelWidgetAttributes`
   layers are not exported.
+- **Angular's components have no `Component` suffix.** Angular's own style
+  guide stopped asking for it in v20 and the CLI no longer generates it, so
+  the classes are `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession`, as in
+  every other SDK. Their template selectors are `zitadel-auth-login`,
+  `zitadel-auth-logout` and `zitadel-auth-session`, because `zitadel-login` and
+  its siblings are the widgets' own element names.
 - **Nothing is re-exported by barrel.** An SDK names what it exports
   (`export type { … }`), never `export type *` or `export *` from another
   package. The helpers of `@zitadel/sdk-core/types` (`widgetTags`,
@@ -113,6 +118,7 @@ by what it returns, and writes the reason in the three places above.
 | Was | Is |
 | --- | --- |
 | `ZitadelLoginSolidProps`, `…ReactProps`, `…SvelteProps` (and Logout, Session) | `ZitadelLoginProps` (and Logout, Session) |
+| `ZitadelLoginComponent`, `ZitadelLogoutComponent`, `ZitadelSessionComponent` (`sdk-angular`) | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession` |
 | `CreateFlowBodyPurpose` (the type the API client is generated with) | `ZitadelFlowPurpose`, declared in `sdk-core` |
 | `CreateFlow201Step` and `CreateFlow201StepComplete` as the types of an event's `step` and `behavior` | `ZitadelFlowStep` and `ZitadelFlowBehavior`, declared in `sdk-core` |
 | `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelProject`, `ZitadelConfig` from `@zitadel/api/config` | the same names from `@zitadel/sdk-core/config` |

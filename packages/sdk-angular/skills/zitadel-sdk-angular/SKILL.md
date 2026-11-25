@@ -44,13 +44,13 @@ The components are **standalone** — import them directly into a component's
 
    ```ts
    import { Component } from '@angular/core';
-   import { ZitadelLoginComponent, configureZitadel } from '@zitadel/sdk-angular';
+   import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-angular';
 
    const project = configureZitadel({ projectId: '…', proxyPath: '/__nextgen' });
 
    @Component({
      standalone: true,
-     imports: [ZitadelLoginComponent],
+     imports: [ZitadelLogin],
      template: `<zitadel-auth-login
        [project]="project"
        purpose="login"
@@ -71,7 +71,7 @@ The components are **standalone** — import them directly into a component's
 
 3. Wire them into your routes as ordinary standalone components, e.g. a
    `/login` route rendering `LoginPage` and a `/logout` route rendering a
-   component that imports `ZitadelLogoutComponent`. `purpose="login"` vs
+   component that imports `ZitadelLogout`. `purpose="login"` vs
    `purpose="register"` on `<zitadel-auth-login>` selects sign-in vs
    registration; `postSignInUrl` / `postSignOutUrl` are where the widget sends
    the user afterwards.
@@ -130,8 +130,8 @@ exact names, inputs, and props, treat the installed package as authoritative:
 - `node_modules/@zitadel/sdk-angular/README.md` — the install, usage, and
   proxy/deployment notes.
 - The TypeScript types / exports (`node_modules/@zitadel/sdk-angular/dist/types/public-api.d.ts`)
-  — the exported symbols (`ZitadelLoginComponent`, `ZitadelLogoutComponent`,
-  `ZitadelSessionComponent`, `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelConfig`,
+  — the exported symbols (`ZitadelLogin`, `ZitadelLogout`,
+  `ZitadelSession`, `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelConfig`,
   `ZitadelProject`, `businessLocales`) and every component `@Input()` /
   `@Output()`. Read them before using an input you are unsure of.
 
@@ -146,4 +146,4 @@ exact names, inputs, and props, treat the installed package as authoritative:
   `${proxyPath}` must be provided by your hosting platform, and the CLI cannot
   yet scaffold those configs. The CLI dev proxy covers local development only.
 - **Session card export name.** `<zitadel-auth-session>` is exported as
-  `ZitadelSessionComponent`.
+  `ZitadelSession`.

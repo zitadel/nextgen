@@ -809,7 +809,6 @@ describe("SDK public API ↔ the standard", () => {
     readonly source: string;
     readonly kind: Kind;
     readonly widgets?: boolean;
-    readonly componentSuffix?: string;
     readonly handler?: ReasonedName;
     readonly authReader?: ReasonedName;
     readonly extras?: ReadonlyArray<string>;
@@ -856,7 +855,7 @@ describe("SDK public API ↔ the standard", () => {
 
   /** The names that the kind of an entry requires, before its declared handler. */
   function requiredByKind(entry: EntryDeclaration): string[] {
-    const components = COMPONENTS.map((name) => `${name}${entry.componentSuffix ?? ""}`);
+    const components = COMPONENTS;
     switch (entry.kind) {
       case "ui":
         return [...components, ...WIDGET_TYPES, ...SETUP, "businessLocales"];

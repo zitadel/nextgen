@@ -22,9 +22,9 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { businessLocales } from "../public-api";
-import { ZitadelLoginComponent } from "./zitadel-login.component";
-import { ZitadelLogoutComponent } from "./zitadel-logout.component";
-import { ZitadelSessionComponent } from "./zitadel-session.component";
+import { ZitadelLogin } from "./zitadel-login.component";
+import { ZitadelLogout } from "./zitadel-logout.component";
+import { ZitadelSession } from "./zitadel-session.component";
 
 import { describeServerRenderCases } from "@zitadel/client-sdk-contract/server-render";
 
@@ -56,7 +56,7 @@ afterEach(() => {
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", async () => {
-    const { container } = await render(ZitadelLoginComponent, {
+    const { container } = await render(ZitadelLogin, {
       inputs: { project },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -65,7 +65,7 @@ describe("ZitadelLogin", () => {
   });
 
   it("binds discrete projectId/proxyPath", async () => {
-    const { container } = await render(ZitadelLoginComponent, {
+    const { container } = await render(ZitadelLogin, {
       inputs: { projectId: "proj-test", proxyPath: "/__nextgen" },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -74,7 +74,7 @@ describe("ZitadelLogin", () => {
   });
 
   it("forwards resumeFlowId to the widget", async () => {
-    const { container } = await render(ZitadelLoginComponent, {
+    const { container } = await render(ZitadelLogin, {
       inputs: { project, resumeFlowId: "flow_123" },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -82,7 +82,7 @@ describe("ZitadelLogin", () => {
   });
 
   it("reads a null resumeFlowId as no handle", async () => {
-    const { container } = await render(ZitadelLoginComponent, {
+    const { container } = await render(ZitadelLogin, {
       inputs: { project, resumeFlowId: null },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -91,7 +91,7 @@ describe("ZitadelLogin", () => {
 
   it("forwards locales and lang to the widget", async () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
-    const { container } = await render(ZitadelLoginComponent, {
+    const { container } = await render(ZitadelLogin, {
       inputs: { project, locales, lang: "de" },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -102,7 +102,7 @@ describe("ZitadelLogin", () => {
   it.each(Object.keys(ZITADEL_LOGIN_EVENT_HANDLERS))(
     "forwards %s through its @Output",
     async (eventName) => {
-      const { fixture, container } = await render(ZitadelLoginComponent, {
+      const { fixture, container } = await render(ZitadelLogin, {
         inputs: { project },
       });
       const spy = vi.fn();
@@ -115,7 +115,7 @@ describe("ZitadelLogin", () => {
   );
 
   it("exposes the underlying element via the element getter", async () => {
-    const { fixture, container } = await render(ZitadelLoginComponent, {
+    const { fixture, container } = await render(ZitadelLogin, {
       inputs: { project },
     });
     fixture.detectChanges();
@@ -129,7 +129,7 @@ describe("ZitadelLogin", () => {
 
 describe("ZitadelLogout", () => {
   it("binds the project handle as a property", async () => {
-    const { container } = await render(ZitadelLogoutComponent, {
+    const { container } = await render(ZitadelLogout, {
       inputs: { project },
     });
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
@@ -138,7 +138,7 @@ describe("ZitadelLogout", () => {
   });
 
   it("binds discrete projectId/proxyPath", async () => {
-    const { container } = await render(ZitadelLogoutComponent, {
+    const { container } = await render(ZitadelLogout, {
       inputs: { projectId: "proj-test", proxyPath: "/__nextgen" },
     });
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
@@ -149,7 +149,7 @@ describe("ZitadelLogout", () => {
   it.each(Object.keys(ZITADEL_LOGOUT_EVENT_HANDLERS))(
     "forwards %s through its @Output",
     async (eventName) => {
-      const { fixture, container } = await render(ZitadelLogoutComponent, {
+      const { fixture, container } = await render(ZitadelLogout, {
         inputs: { project },
       });
       const spy = vi.fn();
@@ -162,7 +162,7 @@ describe("ZitadelLogout", () => {
   );
 
   it("exposes the underlying element via the element getter", async () => {
-    const { fixture, container } = await render(ZitadelLogoutComponent, {
+    const { fixture, container } = await render(ZitadelLogout, {
       inputs: { project },
     });
     fixture.detectChanges();
@@ -176,7 +176,7 @@ describe("ZitadelLogout", () => {
 
 describe("ZitadelSession", () => {
   it("binds the project handle as a property", async () => {
-    const { container } = await render(ZitadelSessionComponent, {
+    const { container } = await render(ZitadelSession, {
       inputs: { project },
     });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
@@ -185,7 +185,7 @@ describe("ZitadelSession", () => {
   });
 
   it("binds discrete projectId/proxyPath", async () => {
-    const { container } = await render(ZitadelSessionComponent, {
+    const { container } = await render(ZitadelSession, {
       inputs: { projectId: "proj-test", proxyPath: "/__nextgen" },
     });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
@@ -194,7 +194,7 @@ describe("ZitadelSession", () => {
   });
 
   it("forwards the surface variant/theme", async () => {
-    const { container } = await render(ZitadelSessionComponent, {
+    const { container } = await render(ZitadelSession, {
       inputs: { project, variant: "page", theme: "light", suppressHeader: true },
     });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
@@ -206,7 +206,7 @@ describe("ZitadelSession", () => {
   it.each(Object.keys(ZITADEL_SESSION_EVENT_HANDLERS))(
     "forwards %s through its @Output",
     async (eventName) => {
-      const { fixture, container } = await render(ZitadelSessionComponent, {
+      const { fixture, container } = await render(ZitadelSession, {
         inputs: { project },
       });
       const spy = vi.fn();
@@ -219,7 +219,7 @@ describe("ZitadelSession", () => {
   );
 
   it("exposes the underlying element via the element getter", async () => {
-    const { fixture, container } = await render(ZitadelSessionComponent, {
+    const { fixture, container } = await render(ZitadelSession, {
       inputs: { project },
     });
     fixture.detectChanges();
@@ -292,7 +292,7 @@ describe("server-rendered widget config", () => {
   it("puts the login flow config into the server markup", async () => {
     const html = await serverRender(
       `<zitadel-auth-login purpose="register" flowName="signup" resumeFlowId="flow_123" postSignInUrl="/home" />`,
-      [ZitadelLoginComponent],
+      [ZitadelLogin],
     );
     expect(attributesOf(html, widgetTags.login)).toMatchObject({
       purpose: "register",
@@ -303,16 +303,16 @@ describe("server-rendered widget config", () => {
   });
 
   it("writes the login language into the server markup only when one is set", async () => {
-    const unset = await serverRender(`<zitadel-auth-login />`, [ZitadelLoginComponent]);
+    const unset = await serverRender(`<zitadel-auth-login />`, [ZitadelLogin]);
     expect(attributesOf(unset, widgetTags.login)).not.toHaveProperty("lang");
-    const set = await serverRender(`<zitadel-auth-login lang="de" />`, [ZitadelLoginComponent]);
+    const set = await serverRender(`<zitadel-auth-login lang="de" />`, [ZitadelLogin]);
     expect(attributesOf(set, widgetTags.login)).toMatchObject({ lang: "de" });
   });
 
   it("leaves the properties and the callbacks out of the server markup", async () => {
     const html = await serverRender(
       `<zitadel-auth-login [project]="{ projectId: 'p1', proxyPath: '/px' }" [locales]="{ en: {} }" />`,
-      [ZitadelLoginComponent],
+      [ZitadelLogin],
     );
     expect(attributesOf(html, widgetTags.login)).not.toHaveProperty("locales");
     expect(html).not.toMatch(/locales|flowStep|object Object/i);
@@ -320,7 +320,7 @@ describe("server-rendered widget config", () => {
 
   it("puts the session config into the server markup", async () => {
     const html = await serverRender(`<zitadel-auth-session postSignOutUrl="/bye" heading="Hi" />`, [
-      ZitadelSessionComponent,
+      ZitadelSession,
     ]);
     expect(attributesOf(html, widgetTags.session)).toMatchObject({
       "post-sign-out-url": "/bye",
@@ -342,7 +342,7 @@ describe("hydrating a server-rendered login", () => {
     });
     const template = `<zitadel-auth-login purpose="register" />`;
     const fetched = vi.spyOn(globalThis, "fetch");
-    const html = await serverRender(template, [ZitadelLoginComponent]);
+    const html = await serverRender(template, [ZitadelLogin]);
     document.body.innerHTML = html
       .slice(html.indexOf("<body"), html.indexOf("</body>"))
       .replace(/^<body[^>]*>/, "");
@@ -355,7 +355,7 @@ describe("hydrating a server-rendered login", () => {
     @Component({
       selector: "app-root",
       standalone: true,
-      imports: [ZitadelLoginComponent],
+      imports: [ZitadelLogin],
       template,
     })
     class Root {}
@@ -382,7 +382,7 @@ describe("hydrating a server-rendered login", () => {
     });
     const template = `<zitadel-auth-login resumeFlowId="flow_123" />`;
     const fetched = vi.spyOn(globalThis, "fetch");
-    const html = await serverRender(template, [ZitadelLoginComponent]);
+    const html = await serverRender(template, [ZitadelLogin]);
     const host = document.body;
     host.innerHTML = html
       .slice(html.indexOf("<body"), html.indexOf("</body>"))
@@ -396,7 +396,7 @@ describe("hydrating a server-rendered login", () => {
     @Component({
       selector: "app-root",
       standalone: true,
-      imports: [ZitadelLoginComponent],
+      imports: [ZitadelLogin],
       template,
     })
     class Root {}
@@ -430,7 +430,7 @@ describe("unset props keep the element's defaults", () => {
     ["theme", ""],
     ["suppressHeader", false],
   ] as const)("ZitadelSession keeps the default %s", async (prop, expected) => {
-    const { container } = await render(ZitadelSessionComponent, { inputs: { project } });
+    const { container } = await render(ZitadelSession, { inputs: { project } });
 
     expect(container.querySelector<ZitadelSessionElement>(widgetTags.session)![prop]).toBe(
       expected,
@@ -444,13 +444,13 @@ describe("unset props keep the element's defaults", () => {
     ["lang", ""],
     ["suppressPasswordToggle", false],
   ] as const)("ZitadelLogin keeps the default %s", async (prop, expected) => {
-    const { container } = await render(ZitadelLoginComponent, { inputs: { project } });
+    const { container } = await render(ZitadelLogin, { inputs: { project } });
 
     expect(container.querySelector<ZitadelLoginElement>(widgetTags.login)![prop]).toBe(expected);
   });
 
   it("ZitadelLogout keeps the default theme", async () => {
-    const { container } = await render(ZitadelLogoutComponent, { inputs: { project } });
+    const { container } = await render(ZitadelLogout, { inputs: { project } });
 
     expect(container.querySelector<ZitadelLogoutElement>(widgetTags.logout)!.theme).toBe("");
   });
@@ -464,7 +464,7 @@ describe("props that become unset restore the element's defaults", () => {
     ["theme", "light", ""],
     ["suppressHeader", true, false],
   ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
-    const { container, rerender } = await render(ZitadelSessionComponent, {
+    const { container, rerender } = await render(ZitadelSession, {
       inputs: { project, [prop]: given },
     });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session)!;
@@ -482,7 +482,7 @@ describe("props that become unset restore the element's defaults", () => {
     ["lang", "de", ""],
     ["suppressPasswordToggle", true, false],
   ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
-    const { container, rerender } = await render(ZitadelLoginComponent, {
+    const { container, rerender } = await render(ZitadelLogin, {
       inputs: { project, [prop]: given },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login)!;
@@ -494,7 +494,7 @@ describe("props that become unset restore the element's defaults", () => {
   });
 
   it("ZitadelLogout restores the default theme", async () => {
-    const { container, rerender } = await render(ZitadelLogoutComponent, {
+    const { container, rerender } = await render(ZitadelLogout, {
       inputs: { project, theme: "light" },
     });
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout)!;
@@ -552,19 +552,19 @@ const elementValues = (el: object, config: object): Record<string, unknown> =>
 
 describe("wrapper config parity", () => {
   it("forwards every ZitadelLoginConfig key to <zitadel-login>", async () => {
-    const { container } = await render(ZitadelLoginComponent, { inputs: { ...loginConfig } });
+    const { container } = await render(ZitadelLogin, { inputs: { ...loginConfig } });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
     expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
   });
 
   it("forwards every ZitadelSessionConfig key to <zitadel-session>", async () => {
-    const { container } = await render(ZitadelSessionComponent, { inputs: { ...sessionConfig } });
+    const { container } = await render(ZitadelSession, { inputs: { ...sessionConfig } });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
     expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
   });
 
   it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", async () => {
-    const { container } = await render(ZitadelLogoutComponent, { inputs: { ...logoutConfig } });
+    const { container } = await render(ZitadelLogout, { inputs: { ...logoutConfig } });
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
     expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
@@ -578,10 +578,10 @@ async function renderAttributes(
   props: Readonly<Record<string, unknown>>,
 ): Promise<Record<string, string>> {
   const component = {
-    login: ZitadelLoginComponent,
-    session: ZitadelSessionComponent,
-    logout: ZitadelLogoutComponent,
-  }[widget] as typeof ZitadelLoginComponent;
+    login: ZitadelLogin,
+    session: ZitadelSession,
+    logout: ZitadelLogout,
+  }[widget] as typeof ZitadelLogin;
   const { container } = await render(component, { inputs: { ...props } });
   const el = container.querySelector(`zitadel-${widget}`);
   expect(el, `<zitadel-${widget}> missing from the markup`).not.toBeNull();

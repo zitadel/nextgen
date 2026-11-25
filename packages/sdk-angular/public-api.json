@@ -3,7 +3,6 @@
     ".": {
       "source": "src/public-api.ts",
       "kind": "ui",
-      "componentSuffix": "Component",
       "extras": []
     }
   }

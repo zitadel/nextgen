@@ -30,23 +30,23 @@ import "@zitadel/components";
  * way instead of driving a custom element by hand. It has the selector `zitadel-auth-login`, not
  * the element name, and renders the real element in its template under `CUSTOM_ELEMENTS_SCHEMA`.
  * Use it on the page that signs a user in. To show who is signed in or to sign out, use {@link
- * ZitadelSessionComponent} or {@link ZitadelLogoutComponent}.
+ * ZitadelSession} or {@link ZitadelLogout}.
  *
- * The {@link ZitadelLoginComponent.project | project} handle is bound as a DOM property. The
+ * The {@link ZitadelLogin.project | project} handle is bound as a DOM property. The
  * discrete project id and same-origin proxy path are bound as properties too, and again as the
  * `project-id` and `proxy-path` attributes, so a server-rendered page carries them before
  * hydration. The handle wins over the discrete inputs, as it does inside the widget. Callbacks,
  * `locales` and the boolean options are properties and are not part of server markup. The widget
  * fires `zitadel-*` events, and the component re-emits each detail on the outputs {@link
- * ZitadelLoginComponent.flowStep}, {@link ZitadelLoginComponent.flowInput}, {@link
- * ZitadelLoginComponent.flowComplete}, {@link ZitadelLoginComponent.flowRedirect} and {@link
- * ZitadelLoginComponent.flowError}.
+ * ZitadelLogin.flowStep}, {@link ZitadelLogin.flowInput}, {@link
+ * ZitadelLogin.flowComplete}, {@link ZitadelLogin.flowRedirect} and {@link
+ * ZitadelLogin.flowError}.
  *
  * The widget is defined only in a browser. On the server the tag renders as an unknown element
  * until the browser upgrades it, so mount the component on the client after hydration. A widget
  * that starts before its configuration arrives shows an error instead of the flow.
  *
- * The underlying custom element is reachable through {@link ZitadelLoginComponent.element}, the
+ * The underlying custom element is reachable through {@link ZitadelLogin.element}, the
  * Angular counterpart of a React ref.
  *
  * @example
@@ -91,12 +91,12 @@ import "@zitadel/components";
     (zitadel-flow-error)="onFlowError($event)"
   ></zitadel-login>`,
 })
-export class ZitadelLoginComponent {
+export class ZitadelLogin {
   /**
    * The project handle that tells the widget which project to talk to.
    *
    * Create it once with {@link configureZitadel} and pass it here. When set, it wins over {@link
-   * ZitadelLoginComponent.projectId} and {@link ZitadelLoginComponent.proxyPath}, as it does inside
+   * ZitadelLogin.projectId} and {@link ZitadelLogin.proxyPath}, as it does inside
    * the widget. It is bound as a DOM property, and its project id, proxy path and `url` are also
    * written as the `project-id`, `proxy-path` and `url` attributes, so server-rendered markup
    * carries them before hydration. Unset, the widget falls back to the discrete inputs and then to
@@ -112,7 +112,7 @@ export class ZitadelLoginComponent {
    * The id of the project the widget works with.
    *
    * Use it when you do not have a project handle. It is read only when {@link
-   * ZitadelLoginComponent.project} is unset, and it is written as the `project-id` attribute so it
+   * ZitadelLogin.project} is unset, and it is written as the `project-id` attribute so it
    * survives server rendering. Unset, the widget falls back to the globally registered project.
    *
    * @example
@@ -126,7 +126,7 @@ export class ZitadelLoginComponent {
    *
    * The widget requests `${proxyPath}/...` on your app's own origin, so the browser never calls
    * Zitadel across origins and no credentials leave your origin. It is read only when {@link
-   * ZitadelLoginComponent.project} is unset, and it is written as the `proxy-path` attribute. Your
+   * ZitadelLogin.project} is unset, and it is written as the `proxy-path` attribute. Your
    * hosting platform must route this path to Zitadel.
    *
    * @defaultValue "/__nextgen"
@@ -141,7 +141,7 @@ export class ZitadelLoginComponent {
    * The kind of flow the widget starts.
    *
    * Use `"login"` on a sign-in page and the registration purpose on a sign-up page. It is ignored
-   * when {@link ZitadelLoginComponent.resumeFlowId} resolves to an existing flow. It is written as
+   * when {@link ZitadelLogin.resumeFlowId} resolves to an existing flow. It is written as
    * the `purpose` attribute.
    *
    * @defaultValue "login"
@@ -155,7 +155,7 @@ export class ZitadelLoginComponent {
   /**
    * The name of the flow definition to run.
    *
-   * Unset runs the project's default flow for {@link ZitadelLoginComponent.purpose}. Set it to run
+   * Unset runs the project's default flow for {@link ZitadelLogin.purpose}. Set it to run
    * a named flow that you configured for a product line or a tenant. It is written as the `flow-
    * name` attribute.
    *
@@ -170,12 +170,12 @@ export class ZitadelLoginComponent {
    *
    * When the page's `next` query parameter names a path on the same origin, as the server SDKs'
    * middleware sets it for a signed-out visit to a protected route, the widget returns there
-   * instead, unless {@link ZitadelLoginComponent.forcePostSignInUrl} is set. A `next` value is
+   * instead, unless {@link ZitadelLogin.forcePostSignInUrl} is set. A `next` value is
    * followed only when it is a path on the page's own origin. A full URL, a protocol-relative
    * `//host` value, or one with a backslash or control character is refused and the widget falls
    * back to this URL, so the parameter cannot turn the login page into an open redirect. A sign-in
    * through an identity provider keeps `next`. Unset leaves navigation to your {@link
-   * ZitadelLoginComponent.flowComplete} handler. It is written as the `post-sign-in-url` attribute.
+   * ZitadelLogin.flowComplete} handler. It is written as the `post-sign-in-url` attribute.
    *
    * @example
    * ```html
@@ -184,7 +184,7 @@ export class ZitadelLoginComponent {
    */
   @Input() postSignInUrl?: string;
   /**
-   * Whether the widget always navigates to {@link ZitadelLoginComponent.postSignInUrl}, even when
+   * Whether the widget always navigates to {@link ZitadelLogin.postSignInUrl}, even when
    * the page's `next` query parameter names a path.
    *
    * Set it on a page that uses `next` for something of its own. It is bound as a DOM property, so
@@ -328,7 +328,7 @@ export class ZitadelLoginComponent {
    *
    * Use it to start your own session or to navigate. The detail carries `waitUntil(promise)`: call
    * it to make the widget wait for your asynchronous work before it navigates to {@link
-   * ZitadelLoginComponent.postSignInUrl}.
+   * ZitadelLogin.postSignInUrl}.
    *
    * @example
    * ```html
@@ -375,7 +375,7 @@ export class ZitadelLoginComponent {
   }
 
   /**
-   * Re-emits a `zitadel-flow-step` DOM event's detail on {@link ZitadelLoginComponent.flowStep}.
+   * Re-emits a `zitadel-flow-step` DOM event's detail on {@link ZitadelLogin.flowStep}.
    *
    * The template calls it, so you do not. It is public only because Angular templates read it.
    *
@@ -386,7 +386,7 @@ export class ZitadelLoginComponent {
   }
 
   /**
-   * Re-emits a `zitadel-flow-input` DOM event's detail on {@link ZitadelLoginComponent.flowInput}.
+   * Re-emits a `zitadel-flow-input` DOM event's detail on {@link ZitadelLogin.flowInput}.
    *
    * The template calls it, so you do not. It is public only because Angular templates read it.
    *
@@ -398,7 +398,7 @@ export class ZitadelLoginComponent {
 
   /**
    * Re-emits a `zitadel-flow-complete` DOM event's detail on {@link
-   * ZitadelLoginComponent.flowComplete}.
+   * ZitadelLogin.flowComplete}.
    *
    * The template calls it, so you do not. It is public only because Angular templates read it.
    *
@@ -410,7 +410,7 @@ export class ZitadelLoginComponent {
 
   /**
    * Re-emits a `zitadel-flow-redirect` DOM event's detail on {@link
-   * ZitadelLoginComponent.flowRedirect}.
+   * ZitadelLogin.flowRedirect}.
    *
    * The template calls it, so you do not. It is public only because Angular templates read it.
    *
@@ -421,7 +421,7 @@ export class ZitadelLoginComponent {
   }
 
   /**
-   * Re-emits a `zitadel-flow-error` DOM event's detail on {@link ZitadelLoginComponent.flowError}.
+   * Re-emits a `zitadel-flow-error` DOM event's detail on {@link ZitadelLogin.flowError}.
    *
    * The template calls it, so you do not. It is public only because Angular templates read it.
    *
