@@ -329,15 +329,17 @@
 
 - Keep each package's errors in one `errors.ts` beside `index.ts`; import them
   from the barrel outside the package.
-- Name an error `<Package><Condition>Error`; it extends `<Package>Error`, which
-  extends `ZitadelLibError` in `src/lib/errors.ts`.
+- Name an error `<Package><Condition>Error`.
+- Extend `<Package>Error`, which extends `ZitadelLibError` in `src/lib/errors.ts`.
 - Derive `name` once, in `ZitadelLibError`; never per class.
 - Add an error class only when a catch site names it or it reports a different
   `code`, `category` or `retryable`.
-- Give an error a template-literal `message` that carries its facts and an
-  optional `cause`; add no other property, parameter or method.
-- State `category`, `retryable` and `code` as literals in each class;
-  `ErrorCategory` is the only type errors add.
+- Give an error a template-literal `message` that carries its facts, and an
+  optional `cause`.
+- Add no other property, parameter or method to an error.
+- State `category`, `retryable` and `code` as literals in each class.
+- Add no type for errors beyond `ErrorCategory`.
+- `toZitadelError` has one branch for `ZitadelLibError`; add no per-package branch.
 - Never put a hint, flag, command or suggestion in a lib error, and never
   throw `ZitadelError` or a `Refusal` from `src/lib`.
 - Catch a lib error where its command words it, in a plain `try`/`catch`.
@@ -349,8 +351,7 @@
   `src/lib/backend/client.ts`.
 - Write every hint and next command in the catching command's `*_REFUSAL`.
 - Spread the error into the refusal's values so no property is dropped.
-- Use no `as`, `!`, `any` or lookup table for errors; duplicate
-  instead.
+- Use no `as`, `!`, `any` or lookup table for errors; duplicate instead.
 - Let an error nobody anticipated bubble up unwrapped; utilities throw plain
   `Error`s.
 
