@@ -794,6 +794,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const identifier = this.response?.step.identifier;
     if (!identifier?.value) return nothing;
     return html`<input
+      id="zl-paired-identifier"
       type="text"
       part="paired-identifier"
       readonly
