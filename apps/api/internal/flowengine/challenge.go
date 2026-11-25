@@ -96,11 +96,13 @@ func (r *Runtime) issueChallenge(pc *processCtx, method string, resolved, fields
 		state.CollectedData.UserID = out.UserID
 	}
 	state.PendingChallenge = &PendingChallenge{
-		ID:       out.ChallengeID,
-		Method:   method,
-		Options:  out.Options,
-		IssuedAt: r.now(),
+		ID:          out.ChallengeID,
+		Method:      method,
+		Options:     out.Options,
+		IssuedAt:    r.now(),
+		Provisional: out.Provisional,
 	}
+	pc.issued = true
 	return r.renderPendingChallenge(pc, resolved)
 }
 

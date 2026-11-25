@@ -37,6 +37,10 @@ type AuthAttemptService interface {
 	// [domain.ErrAuthAttemptStaleChallenge], and a ceremony whose new user
 	// conflicts with an existing one as [domain.ErrUserAlreadyExists].
 	VerifyChallenge(ctx context.Context, in VerifyChallengeInput) (userID string, err error)
+	// ProvisionalRegistration reports whether challengeID is the attempt's
+	// current passkey registration and verifying it creates the attempt's
+	// user. A missing attempt or a superseded challenge reports false.
+	ProvisionalRegistration(ctx context.Context, projectID, attemptID, challengeID string) (bool, error)
 	// Handoff mints the single-use token the client exchanges for a
 	// session. Called by the state machine on the terminal step.
 	Handoff(ctx context.Context, in HandoffInput) (HandoffOutput, error)

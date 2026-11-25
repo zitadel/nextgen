@@ -19,6 +19,19 @@ func (r *Runtime) Render(ctx context.Context, defs Definitions, state *State) (S
 	if err != nil {
 		return StepResult{}, err
 	}
+	result, err := r.render(ctx, def, state)
+	if err != nil {
+		return result, err
+	}
+	if err := r.announceSignupGate(ctx, def, &result, false); err != nil {
+		return StepResult{}, err
+	}
+	return result, nil
+}
+
+// render renders the current step, or the step a parked SSO identity
+// resolves to.
+func (r *Runtime) render(ctx context.Context, def *domain.FlowDefinition, state *State) (StepResult, error) {
 	if result, reseal, err := r.resolveSSOIdentity(ctx, def, state); err != nil || result.Step != nil {
 		result.Reseal = reseal
 		return result, err

@@ -442,7 +442,11 @@ func (r *Runtime) Start(ctx context.Context, in StartInput) (StepResult, error) 
 	if err != nil {
 		return StepResult{}, err
 	}
-	return StepResult{State: state, Step: step}, nil
+	result := StepResult{State: state, Step: step}
+	if err := r.announceSignupGate(ctx, in.Definition, &result, false); err != nil {
+		return StepResult{}, err
+	}
+	return result, nil
 }
 
 // processCtx carries the per-submission context threaded through the
@@ -454,6 +458,8 @@ type processCtx struct {
 	state       *State
 	currentStep *domain.FlowDefinitionStep
 	in          SubmitInput
+	// issued is set once the submission issues the pending challenge.
+	issued bool
 }
 
 // Process advances the flow one step by dispatching the submission to
@@ -488,17 +494,29 @@ func (r *Runtime) Process(ctx context.Context, defs Definitions, state *State, i
 		}
 	}
 	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, in: in}
+	result, err := r.dispatch(pc)
+	if err != nil {
+		return result, err
+	}
+	if err := r.announceSignupGate(ctx, def, &result, pc.issued); err != nil {
+		return StepResult{}, err
+	}
+	return result, nil
+}
+
+// dispatch runs the submission through the handler for its action kind.
+func (r *Runtime) dispatch(pc *processCtx) (StepResult, error) {
 	// An external sign-in collects nothing on the step, so it skips the
 	// input pipeline like back and navigate do.
-	if in.Action == domain.FlowActionSSO || in.SSOProvider != nil {
+	if pc.in.Action == domain.FlowActionSSO || pc.in.SSOProvider != nil {
 		return r.processSSO(pc)
 	}
-	handler, ok := actionKindHandlers[stepActionKind(currentStep, in.Action)]
+	handler, ok := actionKindHandlers[stepActionKind(pc.currentStep, pc.in.Action)]
 	// Only an action the step declares can be submitted. The outcome names
 	// (user_not_found, sso_authenticated, ...) are routed by the engine
 	// alone; a client naming one would otherwise take that route.
 	if !ok {
-		return StepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), in.Action, currentStep.Name)
+		return StepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
 	}
 	return handler.process(r, pc)
 }

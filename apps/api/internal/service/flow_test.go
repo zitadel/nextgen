@@ -785,87 +785,33 @@ func (c *countingSignupProtection) Challenge(context.Context, *flowengine.State)
 	return &pow.PublicChallenge{ChallengeID: "ch_pow"}, nil
 }
 
-// A passkey registration that creates its user is a sign-up: the step that
-// carries its ceremony announces the gate, and a render prepares the puzzle.
-// The stored challenge decides, as at verification.
-func TestFlowService_GetStep_GatesAPasskeyRegistrationThatCreatesItsUser(t *testing.T) {
-	provisional, _ := registrationChallengeAttempt(t, "user_minted01", true, time.Now())
-	enrollment, _ := registrationChallengeAttempt(t, "user_1", false, time.Now())
-	for _, tc := range []struct {
-		name    string
-		attempt *domain.AuthAttempt
-		readErr error
-		method  string
-		gated   bool
-	}{
-		{name: "provisional registration", attempt: provisional, method: flowengine.ChallengeMethodPasskeyRegister, gated: true},
-		{name: "enrollment of a pinned user", attempt: enrollment, method: flowengine.ChallengeMethodPasskeyRegister},
-		{name: "superseded ceremony", attempt: &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, method: flowengine.ChallengeMethodPasskeyRegister},
-		{name: "attempt gone", readErr: domain.ErrAuthAttemptNotFound(), method: flowengine.ChallengeMethodPasskeyRegister},
-		{name: "passkey sign-in", method: flowengine.ChallengeMethodPasskey},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			def := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
-			def.Steps = []domain.FlowDefinitionStep{{Name: "start", Actions: []domain.FlowStepAction{{Name: "passkey_register", Kind: domain.FlowActionKindPasskeyRegister}}}}
-			state := &flowengine.State{ID: "flow-1", ProjectID: def.ProjectID, Progress: flowengine.Progress{DefinitionID: def.ID}, AuthAttemptID: "att-1"}
-			step := &flowengine.Step{Name: "start", Challenge: &flowengine.StepChallenge{Method: tc.method, ChallengeID: "ch-reg-1"}}
-			sm := &fakeStateMachine{renderResult: flowengine.StepResult{State: state, Step: step}}
+// A render of a step that announces the sign-up gate prepares its puzzle; one
+// that does not asks for none.
+func TestFlowService_GetStep_PreparesThePuzzleOfAGatedStep(t *testing.T) {
+	for _, gated := range []bool{true, false} {
+		def := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
+		state := &flowengine.State{ID: "flow-1", ProjectID: def.ProjectID, Progress: flowengine.Progress{DefinitionID: def.ID}, AuthAttemptID: "att-1"}
+		sm := &fakeStateMachine{renderResult: flowengine.StepResult{State: state, Step: &flowengine.Step{Name: "start", SignupRequired: gated}}}
+		protection := &countingSignupProtection{}
 
-			ctrl := gomock.NewController(t)
-			pool := servicemocks.NewMockPool(ctrl)
-			stmts := servicemocks.NewMockAllStatements(ctrl)
-			stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), def.ProjectID, def.ID).Return(def, nil)
-			if tc.method == flowengine.ChallengeMethodPasskeyRegister {
-				stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), def.ProjectID, "att-1").Return(tc.attempt, tc.readErr)
-			}
-			pool.EXPECT().Statements().Return(stmts).AnyTimes()
-			protection := &countingSignupProtection{}
-
-			res, err := service.NewFlowService(service.NewPool(pool), sm, domain.BuiltinSchemaBases{}, protection).
-				GetStep(t.Context(), service.GetFlowStepRequest{State: state})
-			require.NoError(t, err)
-			assert.Equal(t, tc.gated, res.Step.SignupRequired)
-			if tc.gated {
-				assert.Equal(t, 1, protection.issued)
-				require.NotNil(t, res.Step.SignupChallenge)
-			} else {
-				assert.Zero(t, protection.issued)
-			}
-		})
+		res, err := service.NewFlowService(stubGetFlowDefinition(t, def), sm, domain.BuiltinSchemaBases{}, protection).
+			GetStep(t.Context(), service.GetFlowStepRequest{State: state})
+		require.NoError(t, err)
+		if gated {
+			assert.Equal(t, 1, protection.issued)
+			require.NotNil(t, res.Step.SignupChallenge)
+		} else {
+			assert.Zero(t, protection.issued)
+			assert.Nil(t, res.Step.SignupChallenge)
+		}
 	}
-}
-
-// The sign-up gate looks the step up in the definition the result's state
-// names, read through the request's definitions, and the definition Process
-// ran on is not read again.
-func TestFlowService_Submit_GateReadsTheActiveDefinition(t *testing.T) {
-	ran := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	ran.Steps = []domain.FlowDefinitionStep{{Name: "start"}}
-	active := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
-	active.Steps = []domain.FlowDefinitionStep{{Name: "start", OnSuccess: new(domain.FlowOnSuccessCreateUser)}}
-	state := &flowengine.State{ID: "flow_1", ProjectID: ran.ProjectID, Progress: flowengine.Progress{DefinitionID: ran.ID}, AuthAttemptID: "att_1"}
-	result := &flowengine.State{ID: "flow_1", ProjectID: ran.ProjectID, Progress: flowengine.Progress{DefinitionID: active.ID}, AuthAttemptID: "att_1"}
-	sm := &fakeStateMachine{processResult: flowengine.StepResult{State: result, Step: &flowengine.Step{Name: "start"}}}
-
-	ctrl := gomock.NewController(t)
-	pool := servicemocks.NewMockPool(ctrl)
-	stmts := servicemocks.NewMockAllStatements(ctrl)
-	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), ran.ProjectID, ran.ID).Return(ran, nil).Times(1)
-	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), active.ProjectID, active.ID).Return(active, nil).Times(1)
-	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-
-	res, err := service.NewFlowService(service.NewPool(pool), sm, domain.BuiltinSchemaBases{}, nil).
-		Submit(t.Context(), service.SubmitFlowRequest{State: state, Action: "submit"})
-	require.NoError(t, err)
-	assert.Same(t, ran, sm.gotProcessDef)
-	assert.True(t, res.Step.SignupRequired, "the gate read the step of the definition the result names")
 }
 
 func TestFlowService_SignupIssuanceCannotDiscardTransition(t *testing.T) {
 	def := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
 	def.Steps = []domain.FlowDefinitionStep{{Name: "start", OnSuccess: new(domain.FlowOnSuccessCreateUser)}}
 	state := &flowengine.State{ProjectID: def.ProjectID, Progress: flowengine.Progress{DefinitionID: def.ID}, AuthAttemptID: "attempt"}
-	result := flowengine.StepResult{State: state, Step: &flowengine.Step{Name: "start"}}
+	result := flowengine.StepResult{State: state, Step: &flowengine.Step{Name: "start", SignupRequired: true}}
 	sm := &fakeStateMachine{startResult: result, processResult: result, renderResult: result}
 	protection := stubSignupProtection{err: domain.ErrFlowRateLimited()}
 	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, protection)

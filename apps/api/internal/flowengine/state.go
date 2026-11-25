@@ -129,6 +129,10 @@ type PendingChallenge struct {
 	// diagnostics and for the state machine to short-circuit obviously
 	// stale challenges before calling Verify.
 	IssuedAt time.Time
+
+	// Provisional is true when verifying the proof creates the flow's user,
+	// as the issued challenge said.
+	Provisional bool `json:",omitempty"`
 }
 
 // Progress captures the user's position within a single flow

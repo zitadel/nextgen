@@ -95,10 +95,11 @@ The use-case surface the HTTP handler depends on. Four methods:
 | `Submit` | Load the definition `state.DefinitionID` names, hand the request's `flowengine.Definitions` to `stateMachine.Process`. |
 | `GetStep` | Hand the request's `flowengine.Definitions` to `stateMachine.Render` (no advancement). |
 
-The engine and the sign-up gate read the running flow's definition through
-`flowengine.ActiveDefinition`. The request's `flowengine.Definitions` loads each
-revision once, by the id the state names, which the release the flow started
-under pins.
+The engine reads the running flow's definition through
+`flowengine.ActiveDefinition`, once per request; the step it returns announces
+the sign-up gate (`signup_gate.go`). The request's `flowengine.Definitions`
+loads the revision by the id the state names, which the release the flow
+started under pins.
 
 Service holds `*service.DB` (v2 statements), the `flowengine.StateMachine` interface,
 and the `idgen.Generator`. Flow definitions are loaded via

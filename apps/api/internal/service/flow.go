@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -225,9 +224,6 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 	if err != nil {
 		return flowengine.StepResult{}, err
 	}
-	if err := s.attachSignupGate(ctx, s.flowDefinitions(req.Definition.ProjectID, req.Definition), &result); err != nil {
-		return flowengine.StepResult{}, err
-	}
 	return flowengine.StepResult{State: result.State, Step: result.Step}, nil
 }
 
@@ -239,7 +235,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res fl
 	if req.State == nil {
 		return flowengine.StepResult{}, fmt.Errorf("flow service: submit without state")
 	}
-	defs := s.flowDefinitions(req.State.ProjectID)
+	defs := flowDefinitions{pool: s.v2Pool, projectID: req.State.ProjectID}
 	// todo: gracefully handle when the definition was updated (status, steps, etc.,) since the flow started
 	in := flowengine.SubmitInput{
 		Action:            req.Action,
@@ -254,9 +250,6 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res fl
 	in.SSOReturn = req.SSOReturn
 	result, err := s.stateMachine.Process(ctx, defs, req.State, in)
 	if err != nil {
-		return flowengine.StepResult{}, err
-	}
-	if err := s.attachSignupGate(ctx, defs, &result); err != nil {
 		return flowengine.StepResult{}, err
 	}
 	return flowengine.StepResult{
@@ -276,12 +269,8 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 	if req.State == nil {
 		return flowengine.StepResult{}, fmt.Errorf("flow service: get step without state")
 	}
-	defs := s.flowDefinitions(req.State.ProjectID)
-	result, err := s.stateMachine.Render(ctx, defs, req.State)
+	result, err := s.stateMachine.Render(ctx, flowDefinitions{pool: s.v2Pool, projectID: req.State.ProjectID}, req.State)
 	if err != nil {
-		return flowengine.StepResult{}, err
-	}
-	if err := s.attachSignupGate(ctx, defs, &result); err != nil {
 		return flowengine.StepResult{}, err
 	}
 	// A render may resolve parked SSO state. Return its updated cookie before
@@ -304,85 +293,14 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 	}, nil
 }
 
-// flowDefinitions loads one request's flow definitions by revision id and
-// keeps each it loaded, so the engine and the sign-up gate share one read.
-// A flow's state names a revision the release it started under pins, and
-// every later request runs under that sealed release.
+// flowDefinitions loads one request's flow definitions by revision id. A
+// flow's state names a revision the release it started under pins, and every
+// later request runs under that sealed release.
 type flowDefinitions struct {
 	pool      *DB
 	projectID string
-	loaded    map[string]*domain.FlowDefinition
 }
 
-// flowDefinitions starts the request's definitions with those already loaded.
-func (s *flowService) flowDefinitions(projectID string, loaded ...*domain.FlowDefinition) *flowDefinitions {
-	defs := &flowDefinitions{pool: s.v2Pool, projectID: projectID, loaded: map[string]*domain.FlowDefinition{}}
-	for _, def := range loaded {
-		defs.loaded[def.ID] = def
-	}
-	return defs
-}
-
-func (d *flowDefinitions) Definition(ctx context.Context, id string) (*domain.FlowDefinition, error) {
-	if def, ok := d.loaded[id]; ok {
-		return def, nil
-	}
-	def, err := d.pool.Statements().GetFlowDefinitionByID(ctx, d.projectID, id)
-	if err != nil {
-		return nil, err
-	}
-	d.loaded[id] = def
-	return def, nil
-}
-
-// attachSignupGate announces the sign-up gate on a step whose next submit
-// spends the sign-up proof: one whose on_success declares it, or one carrying a
-// passkey registration that creates its user. Runtime enforcement does not
-// depend on template markup or client-selected purpose. The step is looked up
-// in the definition of the flow active in result.State.
-func (s *flowService) attachSignupGate(ctx context.Context, defs flowengine.Definitions, result *flowengine.StepResult) error {
-	if result.Step == nil || result.State == nil {
-		return nil
-	}
-	def, err := flowengine.ActiveDefinition(ctx, defs, result.State)
-	if err != nil {
-		return err
-	}
-	step, ok := def.FindStep(result.Step.Name)
-	if ok && step.OnSuccessSpec().SpendsSignupProof {
-		result.Step.SignupRequired = true
-		return nil
-	}
-	creates, err := s.registrationCreatesUser(ctx, result)
-	if err != nil {
-		return err
-	}
-	result.Step.SignupRequired = creates
-	return nil
-}
-
-// registrationCreatesUser reports whether the step carries a passkey
-// registration that creates its user, which its attestation spends the
-// sign-up proof for. The attempt's stored challenge decides, as it does at
-// verification: the ceremony is provisional when no user was pinned at issue.
-func (s *flowService) registrationCreatesUser(ctx context.Context, result *flowengine.StepResult) (bool, error) {
-	challenge := result.Step.Challenge
-	if challenge == nil || challenge.Method != flowengine.ChallengeMethodPasskeyRegister {
-		return false, nil
-	}
-	attempt, err := s.v2Pool.Statements().GetAuthAttemptByID(ctx, result.State.ProjectID, result.State.AuthAttemptID)
-	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
-		// Nothing to gate: the attestation is refused with the attempt.
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("flow service: read auth attempt: %w", err)
-	}
-	stored, ok := attempt.ChallengeByID(challenge.ChallengeID)
-	if !ok {
-		// A superseded ceremony fails as stale when its attestation arrives.
-		return false, nil
-	}
-	registration, ok := stored.(*domain.AuthChallengePasskeyRegistration)
-	return ok && registration.Provisional, nil
+func (d flowDefinitions) Definition(ctx context.Context, id string) (*domain.FlowDefinition, error) {
+	return d.pool.Statements().GetFlowDefinitionByID(ctx, d.projectID, id)
 }
