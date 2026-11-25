@@ -239,7 +239,7 @@ describe("SPA patchers' root component", () => {
 
       await expect(patcher.patch(ctx, { cwd, dryRun: false, force: true })).rejects.toMatchObject({
         code: "E_CONFLICT",
-        details: { path: foreignRoot, writes: root },
+        message: expect.stringContaining(`mounts ${foreignRoot}, not the ${root}`),
       });
       expect(existsSync(join(cwd, root))).toBe(false);
       expect(existsSync(join(cwd, "zitadel.json"))).toBe(false);
@@ -275,7 +275,6 @@ describe("NextPatcher's request boundary", () => {
     ).rejects.toMatchObject({
       code: "E_CONFLICT",
       message: "Next.js 16 will not start with both middleware.ts and the proxy.ts setup writes",
-      details: { path: "middleware.ts", writes: "proxy.ts" },
     });
     expect(existsSync(join(cwd, "proxy.ts"))).toBe(false);
   });
@@ -286,7 +285,10 @@ describe("NextPatcher's request boundary", () => {
 
     await expect(
       new NextPatcher().patch(ctxFor("next", "app", 16), { cwd, dryRun: true, force: false }),
-    ).rejects.toMatchObject({ details: { path: "src/middleware.js", writes: "proxy.ts" } });
+    ).rejects.toMatchObject({
+      message:
+        "Next.js 16 will not start with both src/middleware.js and the proxy.ts setup writes",
+    });
   });
 
   it("refuses a second middleware file under another extension", async ({ dir }) => {
@@ -307,10 +309,8 @@ describe("NextPatcher's request boundary", () => {
       new NextPatcher().patch(ctxFor("next", "src/app"), { cwd, dryRun: true, force: false }),
     ).rejects.toMatchObject({
       code: "E_CONFLICT",
-      hint: expect.stringContaining(
-        'Pin next to the version range the app runs, such as "^16.0.0"',
-      ),
-      details: { path: "src/proxy.ts", writes: "src/middleware.ts" },
+      message:
+        "Next.js 16 will not start with both src/proxy.ts and the src/middleware.ts setup writes",
     });
   });
 

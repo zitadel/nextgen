@@ -1,4 +1,4 @@
-import { OrcaPatchFileMissingError, OrcaInvalidError } from "@/lib/orca/errors";
+import { OrcaInvalidError, OrcaPatchFileMissingError } from "@/lib/orca/errors";
 
 const MIDDLEWARE_PATH = "./src/middleware.ts";
 
@@ -21,21 +21,13 @@ const MIDDLEWARE_PATH = "./src/middleware.ts";
 export function solidStartConfigEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new OrcaPatchFileMissingError(
-        "Cannot edit the SolidStart Vite config: file not found",
-        {
-          hint: "Run setup from a SolidStart project that has a vite.config.ts.",
-        },
-      );
+      throw new OrcaPatchFileMissingError("Cannot edit the SolidStart Vite config: file not found");
     }
 
     const callIndex = source.indexOf("solidStart(");
     if (callIndex === -1) {
       throw new OrcaInvalidError(
         "Cannot wire middleware: no solidStart() plugin call found in the Vite config",
-        {
-          hint: "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config.",
-        },
       );
     }
 
@@ -54,9 +46,6 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
       // Unusual: a non-object argument (e.g. a variable). Don't guess — fail loud.
       throw new OrcaInvalidError(
         "Cannot wire middleware: solidStart() is called with a non-object argument",
-        {
-          hint: 'Pass an options object to solidStart(), e.g. solidStart({ middleware: "./src/middleware.ts" }).',
-        },
       );
     }
     // solidStart()  ->  solidStart({ middleware: "./src/middleware.ts" })

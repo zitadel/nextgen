@@ -103,9 +103,9 @@ export abstract class Operation<Kind extends FileOp["kind"]> {
     const located = await workspace.locate(candidates);
 
     if (preferred === undefined) {
-      throw new OrcaInternalError("An op needs at least one candidate path", {
-        hint: "This is an internal patcher error — please report it if you hit it.",
-      });
+      throw new OrcaInternalError(
+        "An op needs at least one candidate path (internal patcher error)",
+      );
     }
 
     const path = located?.path ?? preferred;

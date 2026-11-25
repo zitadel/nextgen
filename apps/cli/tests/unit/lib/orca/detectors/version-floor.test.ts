@@ -62,7 +62,7 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
         `${detector.displayName} "${below}" is below the supported floor`,
       );
       expect(error.message).toContain(`${detector.displayName} ${detector.versionFloor} and newer`);
-      expect(error.hint).toContain(
+      expect(error.message).toContain(
         `Upgrade the app to ${detector.displayName} ${detector.versionFloor} or later`,
       );
     });
@@ -159,7 +159,7 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
 );
 
 describe("enforceVersionFloor note", () => {
-  it("appends the detector's note to the upgrade hint", async ({ dir }) => {
+  it("appends the detector's note to the upgrade advice", async ({ dir }) => {
     const error = await refusal(
       enforceVersionFloor(
         {
@@ -172,8 +172,8 @@ describe("enforceVersionFloor note", () => {
         dir,
       ),
     );
-    expect(error.hint).toBe(
-      "Upgrade the app to Fake 2 or later and rerun. Older releases are insecure.",
+    expect(error.message).toContain(
+      "Upgrade the app to Fake 2 or later. Older releases are insecure.",
     );
   });
 });

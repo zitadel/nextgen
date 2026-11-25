@@ -40,9 +40,9 @@ export function angularRoutesEdit(): (source: string | undefined) => string {
         ? Reflect.get(moduleExports, "routes")
         : undefined;
     if (!isProxifiedArray(routes)) {
-      throw new OrcaInvalidError("Cannot wire Angular auth routes", {
-        hint: `Set "routes" in ${label} to an inline Routes array, or add /login, /register, and /profile manually.`,
-      });
+      throw new OrcaInvalidError(
+        `Cannot wire Angular auth routes: set "routes" in ${label} to an inline Routes array`,
+      );
     }
 
     const present = new Set(

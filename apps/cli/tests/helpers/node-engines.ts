@@ -239,10 +239,9 @@ export function describeNodeEngines(c: NodeEnginesCase): void {
           npmPublishes(c.fallback);
 
           await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toMatchObject({
-            hint: expect.stringContaining(`Switch to Node ${describeAcceptedNode(c.fallback)} and`),
-          });
-          await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toMatchObject({
-            hint: expect.not.stringContaining(c.fallback),
+            message: expect.stringContaining(
+              `switch to Node ${describeAcceptedNode(c.fallback)} and`,
+            ),
           });
         },
       );

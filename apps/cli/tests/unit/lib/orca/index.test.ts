@@ -144,7 +144,8 @@ describe("Orca detection", () => {
       code: "E_CONFLICT",
       message: "Setup detects Next.js here, not React (Vite)",
       name: "OrcaFrameworkMismatchError",
-      details: { requested: "react", detected: "next" },
+      requested: "react",
+      detected: "next",
     });
   });
 

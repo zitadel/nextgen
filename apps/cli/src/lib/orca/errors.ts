@@ -19,40 +19,21 @@ export abstract class OrcaError extends Error {
   abstract readonly code: ZitadelErrorCode;
 
   /**
-   * What to do about it.
-   */
-  readonly hint: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details: Readonly<Record<string, unknown>> | undefined;
-
-  /**
    * Make an orca failure.
    *
    * @param message - What went wrong.
-   * @param options - What to do about it, the facts behind it, and its cause.
+   * @param cause - The failure this one wraps, when it wraps one.
    */
-  constructor(
-    message: string,
-    options: {
-      readonly hint?: string | undefined;
-      readonly details?: Readonly<Record<string, unknown>> | undefined;
-      readonly cause?: unknown;
-    } = {},
-  ) {
+  constructor(message: string, cause?: unknown) {
     super(
       message,
-      options.cause === undefined
+      cause === undefined
         ? undefined
         : {
-            cause: options.cause,
+            cause,
           },
     );
     this.name = new.target.name;
-    this.hint = options.hint;
-    this.details = options.details;
   }
 }
 
@@ -99,12 +80,7 @@ export class OrcaFrameworkMismatchError extends OrcaError {
    * @param detected - The framework the directory holds.
    */
   constructor(message: string, requested: string, detected: string) {
-    super(message, {
-      details: {
-        requested,
-        detected,
-      },
-    });
+    super(message);
     this.requested = requested;
     this.detected = detected;
   }

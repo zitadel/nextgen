@@ -39,7 +39,10 @@ describe("WriteOp", () => {
       new WriteOp({ kind: "write", path: "a.txt", contents: "c" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({ code: "E_CONFLICT", details: { path: join(dir, "a.txt") } });
+    expect(error).toMatchObject({
+      code: "E_CONFLICT",
+      message: `Refusing to overwrite ${join(dir, "a.txt")}`,
+    });
   });
 
   it("replaces it when forced", async ({ dir }) => {

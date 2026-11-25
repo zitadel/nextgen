@@ -1,4 +1,4 @@
-import { OrcaRendererPendingError, OrcaInvalidError } from "@/lib/orca/errors";
+import { OrcaInvalidError, OrcaRendererPendingError } from "@/lib/orca/errors";
 import { litRenderer } from "./lit";
 import { reactRenderer } from "./react";
 import type { RendererId, RendererSpec } from "./types";
@@ -50,15 +50,13 @@ export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter((id) => 
  */
 export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
-    throw new OrcaInvalidError(`Unknown renderer "${id}"`, {
-      hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}.`,
-    });
+    throw new OrcaInvalidError(
+      `Unknown renderer "${id}"; available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}`,
+    );
   }
   const renderer = RENDERERS[id];
   if (renderer.status === "not-implemented") {
-    throw new OrcaRendererPendingError(`Renderer "${id}" is declared but not yet published`, {
-      hint: "Use the react renderer for now; the <zitadel-flow> web component ships in a later package.",
-    });
+    throw new OrcaRendererPendingError(`Renderer "${id}" is declared but not yet published`);
   }
   return renderer;
 }

@@ -34,9 +34,7 @@ export function configIssuerEdit(
 ): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new OrcaPatchFileMissingError("zitadel.json was not found", {
-        hint: "Set the project up first.",
-      });
+      throw new OrcaPatchFileMissingError("zitadel.json was not found");
     }
     const config = parseJsonObject(source, "zitadel.json");
     const environments = isObject(config.environments) ? config.environments : {};

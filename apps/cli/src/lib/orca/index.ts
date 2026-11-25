@@ -172,9 +172,9 @@ export class Orca {
         })
       : this.detectors;
     if (requested && candidates.length === 0) {
-      throw new OrcaFrameworkMissingError(`Unsupported framework "${requested}"`, {
-        hint: `Supported frameworks: ${this.frameworkIds().join(", ")}.`,
-      });
+      throw new OrcaFrameworkMissingError(
+        `Unsupported framework "${requested}"; supported frameworks: ${this.frameworkIds().join(", ")}`,
+      );
     }
     for (const detector of candidates) {
       const facts = await detector.detect(cwd);
@@ -196,9 +196,7 @@ export class Orca {
         }
       }
     }
-    throw new OrcaFrameworkMissingError("Could not detect a supported app framework", {
-      hint: "Run it from your app project directory, or from an empty directory to scaffold a new app.",
-    });
+    throw new OrcaFrameworkMissingError("Could not detect a supported app framework");
   }
 
   /**
@@ -269,10 +267,9 @@ export class Orca {
   async scaffoldUndoably(cwd: string, framework: string, force = false): Promise<UndoableScaffold> {
     const target = await this.inspectScaffoldTarget(cwd);
     if (!target.scaffoldable && !force) {
-      throw new OrcaScaffoldOccupiedError(`Cannot scaffold: ${cwd} is not empty`, {
-        hint: target.reason,
-        details: { entries: target.entries },
-      });
+      throw new OrcaScaffoldOccupiedError(
+        `Cannot scaffold: ${cwd} is not empty${target.reason ? ` (${target.reason})` : ""}`,
+      );
     }
     // A directory that does not exist yet is created only now, so a refusal or
     // a dry run leaves no trace of it, and an undo removes it again with any
@@ -319,13 +316,13 @@ export class Orca {
       return candidate.canScaffold(framework);
     });
     if (!scaffolder) {
-      throw new OrcaInternalError(`No scaffolder supports "${framework}"`, {
-        hint: `Available frameworks: ${this.availableFrameworks()
+      throw new OrcaInternalError(
+        `No scaffolder supports "${framework}"; available frameworks: ${this.availableFrameworks()
           .map((f) => {
             return f.id;
           })
-          .join(", ")}.`,
-      });
+          .join(", ")}`,
+      );
     }
     return scaffolder;
   }
@@ -339,9 +336,9 @@ export class Orca {
       return candidate.canPatch(framework);
     });
     if (!patcher) {
-      throw new OrcaInternalError(`No patcher supports "${framework}"`, {
-        hint: "Zitadel integration currently supports Next.js.",
-      });
+      throw new OrcaInternalError(
+        `No patcher supports "${framework}"; Zitadel integration currently supports Next.js`,
+      );
     }
     return patcher;
   }

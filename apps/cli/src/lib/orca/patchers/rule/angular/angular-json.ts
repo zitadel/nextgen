@@ -1,4 +1,4 @@
-import { OrcaPatchFileMissingError, OrcaInvalidError } from "@/lib/orca/errors";
+import { OrcaInvalidError, OrcaPatchFileMissingError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject } from "@/lib/json";
 
 /**
@@ -19,9 +19,9 @@ export function angularProxyEdit(opts: {
 }): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new OrcaPatchFileMissingError("Cannot wire Angular proxy: angular.json not found", {
-        hint: "Run setup from an Angular project.",
-      });
+      throw new OrcaPatchFileMissingError(
+        "Cannot wire Angular proxy: angular.json not found; run it from an Angular project",
+      );
     }
     const root = parseJsonObject(source, "angular.json");
     const projects = isObject(root.projects)
@@ -30,19 +30,14 @@ export function angularProxyEdit(opts: {
     const projectNames = Object.keys(projects ?? {});
     if (typeof root.defaultProject !== "string" && projectNames.length > 1) {
       throw new OrcaInvalidError(
-        "angular.json has multiple projects and no defaultProject to choose from",
-        {
-          hint: `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: ${projectNames.join(", ")}.`,
-        },
+        `angular.json has multiple projects and no defaultProject to choose from; projects: ${projectNames.join(", ")}`,
       );
     }
     const projectName =
       typeof root.defaultProject === "string" ? root.defaultProject : projectNames[0];
     const project = projects && projectName ? projects[projectName] : undefined;
     if (!isObject(project)) {
-      throw new OrcaInvalidError("No project found in angular.json", {
-        hint: 'Add "proxyConfig" to your serve target manually.',
-      });
+      throw new OrcaInvalidError("No project found in angular.json");
     }
     // Angular CLI has used both "architect" and "targets" for the target map.
     const targets = isObject(project.architect)
@@ -53,9 +48,7 @@ export function angularProxyEdit(opts: {
     const serve =
       targets && isObject(targets.serve) ? (targets.serve as Record<string, unknown>) : undefined;
     if (!serve) {
-      throw new OrcaInvalidError("No serve target in angular.json", {
-        hint: 'Add "proxyConfig" to your serve options manually.',
-      });
+      throw new OrcaInvalidError("No serve target in angular.json");
     }
     const options = isObject(serve.options) ? (serve.options as Record<string, unknown>) : {};
     const addsProxy = options.proxyConfig === undefined;

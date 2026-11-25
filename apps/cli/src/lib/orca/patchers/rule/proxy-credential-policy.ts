@@ -59,10 +59,7 @@ export function assertNoUnreviewedProjectSecretProxy(source: string, label: stri
   }
 
   throw new OrcaInvalidError(
-    `${label} may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange`,
-    {
-      hint: `Review the proxy manually: restrict the bearer to the exact POST /sessions/exchange or ${PREFIXED_EXCHANGE_PATH} pathname and preserve caller-provided authorization.`,
-    },
+    `${label} may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange; restrict the bearer to the exact POST /sessions/exchange or ${PREFIXED_EXCHANGE_PATH} pathname`,
   );
 }
 

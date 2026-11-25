@@ -131,20 +131,6 @@ describe("assertMountsRootComponent", () => {
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
       code: "E_CONFLICT",
       message: "src/main.jsx mounts src/App.jsx, not the src/App.tsx setup writes",
-      hint: expect.stringContaining('import App from "./App.tsx"'),
-      details: { path: "src/App.jsx", entry: "src/main.jsx", writes: "src/App.tsx" },
-    });
-  });
-
-  it("says replacing files can't fix it", async ({ dir }) => {
-    const cwd = await project(dir, {
-      "src/main.jsx": reactMain("./App.jsx"),
-      "src/App.jsx": "export default function App() {}\n",
-    });
-
-    await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
-      name: "OrcaPatchLayoutConflictError",
-      hint: expect.stringContaining("Your app would keep loading src/App.jsx"),
     });
   });
 
@@ -157,7 +143,7 @@ describe("assertMountsRootComponent", () => {
     });
 
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
-      details: { path: "src/App.jsx" },
+      message: expect.stringContaining("mounts src/App.jsx,"),
     });
   });
 
@@ -176,10 +162,10 @@ describe("assertMountsRootComponent", () => {
 
     await expect(
       assertMountsRootComponent(rootRelative, "src/main.jsx", REACT_ROOT),
-    ).rejects.toMatchObject({ details: { path: "src/Root.jsx" } });
+    ).rejects.toMatchObject({ message: expect.stringContaining("mounts src/Root.jsx,") });
     await expect(
       assertMountsRootComponent(aliased, "src/main.jsx", REACT_ROOT),
-    ).rejects.toMatchObject({ details: { path: "src/shell/Root.jsx" } });
+    ).rejects.toMatchObject({ message: expect.stringContaining("mounts src/shell/Root.jsx,") });
   });
 
   // A TypeScript entry may import `./App.js` and get `App.tsx`.
@@ -204,7 +190,7 @@ createRoot(document.getElementById("root")).render(<><Toaster /><App /></>);
     });
 
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
-      details: { path: "src/App.jsx" },
+      message: expect.stringContaining("mounts src/App.jsx,"),
     });
   });
 
@@ -283,7 +269,6 @@ bootstrapApplication(AppComponent, appConfig)
 
     await expect(assertMountsRootComponent(cwd, "src/main.ts", angular)).rejects.toMatchObject({
       message: "src/main.ts mounts src/app/app.component.ts, not the src/app/app.ts setup writes",
-      hint: expect.stringContaining('import { App } from "./app/app"'),
     });
   });
 
@@ -317,7 +302,7 @@ export default app
 
     await expect(
       assertMountsRootComponent(constructed, "src/main.js", svelte),
-    ).rejects.toMatchObject({ details: { path: "src/Shell.svelte" } });
+    ).rejects.toMatchObject({ message: expect.stringContaining("mounts src/Shell.svelte,") });
     await expect(assertMountsRootComponent(unrelated, "src/main.js", svelte)).resolves.toBe(
       undefined,
     );

@@ -137,7 +137,7 @@ describe("NextDetector", () => {
     await writeNextPackageJson(dir, { dependencies: { next: "15.2.2" } });
 
     await expect(detector.detect(dir)).rejects.toMatchObject({
-      hint: expect.stringContaining("CVE-2025-29927"),
+      message: expect.stringContaining("CVE-2025-29927"),
     });
   });
 
@@ -178,7 +178,7 @@ describe("NextDetector", () => {
 
     await expect(detector.detect(dir)).rejects.toMatchObject({
       code: "E_UNSUPPORTED_PROJECT_SHAPE",
-      hint: expect.stringContaining("Upgrade the app to Next.js 15.2.3 or later"),
+      message: expect.stringContaining("Upgrade the app to Next.js 15.2.3 or later"),
     });
   });
 

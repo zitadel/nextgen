@@ -15,16 +15,10 @@ import {
 } from "@/lib/orca/errors";
 
 describe("OrcaError", () => {
-  it("carries its message, name, hint, details and cause", () => {
+  it("carries its message, name and cause", () => {
     const cause = new Error("underneath");
 
-    const error = new OrcaInternalError("why", {
-      hint: "do",
-      details: {
-        a: 1,
-      },
-      cause,
-    });
+    const error = new OrcaInternalError("why", cause);
 
     expect(error).toBeInstanceOf(OrcaError);
     expect(error).toMatchObject({
@@ -32,10 +26,6 @@ describe("OrcaError", () => {
       name: "OrcaInternalError",
       code: "E_VALIDATION",
       category: "fault",
-      hint: "do",
-      details: {
-        a: 1,
-      },
       cause,
     });
   });
@@ -84,16 +74,12 @@ describe("the orca errors' codes", () => {
 });
 
 describe("the orca framework mismatch", () => {
-  it("keeps the framework asked for and the one detected, in its details too", () => {
+  it("keeps the framework asked for and the one detected", () => {
     const error = new OrcaFrameworkMismatchError("why", "react", "next");
 
     expect(error).toMatchObject({
       requested: "react",
       detected: "next",
-      details: {
-        requested: "react",
-        detected: "next",
-      },
     });
   });
 });

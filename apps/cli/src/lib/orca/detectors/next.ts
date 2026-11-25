@@ -45,8 +45,7 @@ export class NextDetector implements Detector {
         : undefined;
     if (!appDir) {
       throw new OrcaFrameworkUnsupportedError(
-        "Next.js Pages Router projects are not supported in v1",
-        { hint: "Create an App Router project with an app/ or src/app/ directory." },
+        "Next.js Pages Router projects are not supported in v1; create an App Router project with an app/ or src/app/ directory",
       );
     }
 

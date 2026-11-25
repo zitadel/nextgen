@@ -75,14 +75,14 @@ describe("getRenderer", () => {
     }
   });
 
-  it("does not advertise not-implemented renderers in the unknown-id hint", () => {
+  it("does not advertise not-implemented renderers in the unknown-id message", () => {
     try {
       getRenderer("vue");
       expect.unreachable("getRenderer should throw for an unknown renderer");
     } catch (error) {
-      const hint = (error as OrcaInvalidError).hint;
-      expect(hint).toContain("react");
-      expect(hint).not.toContain("web-component");
+      const { message } = error as OrcaInvalidError;
+      expect(message).toContain("react");
+      expect(message).not.toContain("web-component");
     }
   });
 });

@@ -120,11 +120,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     }
     if (support === "refused") {
       throw new OrcaInvalidError(
-        `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}`,
-        {
-          hint: `Switch to Node ${describeAcceptedNode(range)} and rerun, or create the ${this.displayName} app with that Node and run setup inside it.`,
-          details: { node: this.nodeVersion, required: range },
-        },
+        `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}; switch to Node ${describeAcceptedNode(range)} and rerun`,
       );
     }
   }
@@ -140,44 +136,20 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
   protected runCommand(command: string, args: ReadonlyArray<string>, cwd: string): void {
     const result = execaSync(command, [...args], { cwd, reject: false });
     if (result.code !== undefined) {
-      if (result.code === "ENOENT") {
-        throw new OrcaInvalidError(`Command not found: ${command}`, {
-          hint: `Ensure '${command}' is installed and on PATH.`,
-          details: {
-            command,
-            args: [...args],
-            code: result.code,
-          },
-        });
-      }
+      const notFound = result.code === "ENOENT";
       throw new OrcaInternalError(
-        `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
-        {
-          details: {
-            command,
-            args: [...args],
-            code: result.code,
-          },
-        },
+        notFound
+          ? `Command not found: ${command}`
+          : `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
       );
     }
     const status = result.exitCode ?? 1;
     if (status !== 0) {
-      const stdout = String(result.stdout);
-      const stderr = String(result.stderr);
-      const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
+      const output = truncateCommandOutput(
+        [String(result.stderr), String(result.stdout)].filter(Boolean).join("\n").trim(),
+      );
       throw new OrcaInternalError(
-        `Command "${command} ${args.join(" ")}" exited with status ${String(status)}`,
-        {
-          hint: output ? `Command output:\n${output}` : "Run the command directly for more detail.",
-          details: {
-            command,
-            args: [...args],
-            cwd,
-            stdout,
-            stderr,
-          },
-        },
+        `Command "${command} ${args.join(" ")}" exited with status ${String(status)}${output ? `:\n${output}` : ""}`,
       );
     }
   }

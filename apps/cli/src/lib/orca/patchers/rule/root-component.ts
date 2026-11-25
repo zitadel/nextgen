@@ -5,7 +5,6 @@ import { parseModule } from "magicast";
 
 import { OrcaPatchLayoutConflictError } from "@/lib/orca/errors";
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
-import { tryCatch } from "@/lib/try-catch";
 import { isFile } from "@/lib/fs";
 
 /**
@@ -101,16 +100,8 @@ export async function assertMountsRootComponent(
   if (mountedRoot === undefined) {
     return;
   }
-  const statement = importStatement(entry, root);
   throw new OrcaPatchLayoutConflictError(
     `${entry} mounts ${mountedRoot}, not the ${root.path} setup writes`,
-    {
-      hint:
-        `Your app would keep loading ${mountedRoot}, and the root component setup writes would ` +
-        `never run. In ${entry}, import the root as \`${statement}\` and mount that instead, ` +
-        `then rerun setup and move what you need from ${mountedRoot} into ${root.path}.`,
-      details: { path: mountedRoot, entry, writes: root.path },
-    },
   );
 }
 
@@ -213,13 +204,14 @@ export async function angularEntry(cwd: string): Promise<string> {
  * nothing this recognises.
  */
 function mountedSpecifiers(source: string, root: RootMount): string[] {
-  const [error, mod] = tryCatch(parseModule, source);
-  if (error) {
-    return [];
-  }
   // magicast's `$ast` may be a babel `File` (with `.program`) or the `Program`
   // node itself.
-  const ast = mod.$ast as AstNode;
+  let ast: AstNode;
+  try {
+    ast = parseModule(source).$ast as AstNode;
+  } catch {
+    return [];
+  }
   const program = (ast.program as AstNode | undefined) ?? ast;
   const imports = importedSpecifiers(program);
   const names: string[] = [];
@@ -383,17 +375,6 @@ async function resolveLocalModule(
     }
   }
   return undefined;
-}
-
-/** The import line that mounts the managed root from the entry's directory. */
-function importStatement(entry: string, root: RootMount): string {
-  const relative = posix.relative(posix.dirname(entry), root.path);
-  const stripped = root.extension
-    ? relative
-    : relative.slice(0, relative.length - posix.extname(relative).length);
-  const specifier = stripped.startsWith(".") ? stripped : `./${stripped}`;
-  const binding = root.binding.named ? `{ ${root.binding.name} }` : root.binding.name;
-  return `import ${binding} from "${specifier}"`;
 }
 
 /** `app` for `src/app/app.component.ts` and `src/App.tsx` alike. */

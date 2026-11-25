@@ -26,24 +26,19 @@ export async function enforceVersionFloor(
   cwd: string,
 ): Promise<void> {
   const { displayName, versionPackage, versionFloor, versionFloorNote } = detector;
-  const hint = [`Upgrade the app to ${displayName} ${versionFloor} or later and rerun.`]
-    .concat(versionFloorNote ?? [])
-    .join(" ");
   const supported = `the CLI integrates ${displayName} ${versionFloor} and newer`;
 
   const declared = dependencySpecProvablyBelow(pkg, versionPackage, versionFloor);
   if (declared !== undefined) {
     throw new OrcaFrameworkUnsupportedError(
-      `${displayName} "${declared}" is below the supported floor — ${supported}`,
-      { hint },
+      `${displayName} "${declared}" is below the supported floor — ${supported}. Upgrade the app to ${displayName} ${versionFloor} or later.${versionFloorNote ? ` ${versionFloorNote}` : ""}`,
     );
   }
 
   const installed = await installedVersionBelow(cwd, versionPackage, versionFloor);
   if (installed !== undefined) {
     throw new OrcaFrameworkUnsupportedError(
-      `${displayName} ${installed.version} is installed (${installed.path}), below the supported floor — ${supported}`,
-      { hint },
+      `${displayName} ${installed.version} is installed (${installed.path}), below the supported floor — ${supported}. Upgrade the app to ${displayName} ${versionFloor} or later.${versionFloorNote ? ` ${versionFloorNote}` : ""}`,
     );
   }
 }
