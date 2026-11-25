@@ -6,21 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 )
-
-func (h *Harness) EnsureCreateUserHandler(t testing.TB) *service.FlowCreateUserWithPasswordHandler {
-	t.Helper()
-	return service.NewFlowCreateUserHandler(
-		h.EnsureProjectHashers(t),
-		h.EnsurePasswordPolicy(t),
-		h.EnsureUserService(t),
-		h.EnsureSchemaStore(t),
-		h.EnsureServiceDB(t),
-		h.newSignupProtection(t))
-}
 
 // newSignupProtection builds the sign-up guard the flow engine's parts share
 // in the server; it keeps no state of its own beyond the database.
@@ -50,19 +38,20 @@ func (h *Harness) EnsureFlowStateMachine(t testing.TB) *flowengine.Runtime {
 	defer h.flowStateMachine.mutex.Unlock()
 
 	if h.flowStateMachine.value == nil {
-		fields := domain.NewSchemaFieldResolver()
-		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureServiceDB(t), h.EnsureSchemaStore(t), h.newSignupProtection(t))
-		h.flowStateMachine.value = flowengine.New(flowengine.Deps{
-			Schemas:       h.EnsureSchemaResolver(t),
-			SchemaStore:   h.EnsureSchemaStore(t),
-			Fields:        fields,
-			CreateUser:    h.EnsureCreateUserHandler(t),
-			AuthAttempts:  authAdapter,
-			SSOProviders:  service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
-			SSOIdentities: service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t), h.EnsureProjectHashers(t), h.EnsurePasswordPolicy(t)),
-			SSORedirects:  service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
-			Passwords:     h.EnsurePasswordPolicy(t),
-			Now:           time.Now,
+		h.flowStateMachine.value = service.NewFlowEngine(service.FlowEngineDeps{
+			DB:             h.EnsureServiceDB(t),
+			Schemas:        h.EnsureSchemaResolver(t),
+			SchemaStore:    h.EnsureSchemaStore(t),
+			AuthAttempts:   h.EnsureAuthAttemptService(t),
+			Users:          h.EnsureUserService(t),
+			IDPConnections: h.EnsureIDPConnectionService(t),
+			Keys:           h.EnsureKeyService(t),
+			Variables:      h.EnsureVariableService(t),
+			Hashers:        h.EnsureProjectHashers(t),
+			Passwords:      h.EnsurePasswordPolicy(t),
+			Protection:     h.newSignupProtection(t),
+			HTTPClient:     h.EnsureHttpClient(t),
+			Now:            time.Now,
 		})
 	}
 	return h.flowStateMachine.value
