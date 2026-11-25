@@ -3,6 +3,8 @@
  * for Next.js: this file is the glue between its cases and this SDK's handler.
  */
 
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { NextRequest } from "next/server";
 
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -109,19 +111,24 @@ describe("protected routes and encoded paths", () => {
 describe("an empty backend URL", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
   });
 
-  it("counts as unset, so the proxy calls the default backend", async () => {
+  it("counts as unset, so the proxy uses the next source", async () => {
     const requested: string[] = [];
-    vi.stubEnv("ZITADEL_URL", "");
-    vi.stubGlobal("fetch", async (input: string | URL | Request): Promise<Response> => {
-      requested.push(String(input));
-      return new Response("{}", { status: 200 });
+    const backend = createServer((request, response) => {
+      requested.push(request.url ?? "");
+      response.end("{}");
     });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    const { port } = backend.address() as AddressInfo;
+    vi.stubEnv("ZITADEL_URL", `http://127.0.0.1:${port}`);
 
-    await serve("http://localhost:3000/__nextgen/ping");
+    try {
+      await serve("http://localhost:3000/__nextgen/ping", {}, { url: "" });
+    } finally {
+      await new Promise((resolve) => backend.close(resolve));
+    }
 
-    expect(requested[0]).toMatch(/^http:\/\/localhost:8080/);
+    expect(requested).not.toEqual([]);
   });
 });
