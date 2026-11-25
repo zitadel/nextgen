@@ -327,20 +327,32 @@
 
 ## Errors
 
-- Keep errors on three levels: `Error`, a `<Package>Error` base, and
-  `<Package><Condition>Error` classes; one class per condition a caller handles.
-- Put every error of a package in its root `errors.ts`, exported from the
-  barrel; outside the package import them from the barrel.
-- Derive `name` from the class in the base; state `category` (one of the seven
-  `ErrorCategory` kinds in `src/lib/errors.ts`), `retryable`, `code`, `hint`,
-  `details` and `cause` literally in each class.
-- Never throw `ZitadelError` or a `Refusal` from `src/lib`; a lib `hint` is
-  prose about files and variables, without a flag or command.
-- A command that words a lib failure wraps the call in a plain try/catch with
-  one flat `if (error instanceof X) { throw ...; }` per class, a `*_REFUSAL`
-  for each, and a final `throw error;`.
-- Match only by `instanceof`; never by `reason`, `code`, `name`, `message`,
-  `category` or `retryable`.
+- Keep each package's errors in one `errors.ts` beside `index.ts`, exported
+  from the barrel; outside the package import them from the barrel.
+- Name an error `<Package><Condition>Error` and extend `<Package>Error`, which
+  extends `Error`: three levels, no more; derive `name` once, in the base.
+- Add an error class only when a catch site names it or it reports a different
+  `code`, `category` or `retryable`; otherwise throw the package error.
+- Give an error a template-literal `message` that carries its facts, an
+  optional `cause`, and literal `category`, `retryable` and `code`; add no
+  other property, parameter, type, constant, table or method.
+- Choose `category` by the ordered list in `src/lib/errors.ts`; `ErrorCategory`
+  is the only type errors add.
+- Never put a hint, flag, command or suggestion in a lib error, and never
+  throw `ZitadelError` or a `Refusal` from `src/lib`: lib code knows no command.
+- Catch a lib error where its command words it: `try { ... } catch (error)`,
+  one flat `if (error instanceof X) { throw refusalError(X_REFUSAL, ...); }`
+  per class, then `throw error;`; use this shape everywhere.
+- Recognise an error only by `instanceof`; never by `reason`, `code`, `hint`,
+  `message`, `status`, `name` or any other property.
+- Make a class for a server code (`rel.in_use`) where an `ApiError` becomes a
+  backend error, in `src/lib/backend/client.ts`; callers use `instanceof`.
+- Write every hint and next command in the catching command's `*_REFUSAL`.
+- Spread the error into the refusal's values so no property is dropped; use no
+  `as`, `!`, `any` or needless `null`, and `type-fest` for any type needed.
+- Use no `tryCatch`, no helper and no lookup for errors: duplicate instead.
+- Let an error nobody anticipated bubble up unwrapped; utilities throw plain
+  `Error`s.
 
 ## Telemetry
 
