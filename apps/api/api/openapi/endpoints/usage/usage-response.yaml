@@ -1,5 +1,5 @@
 type: object
-description: A project's usage per meter and bucket (ADR 088).
+description: A project's usage per meter and bucket (ADR 096).
 required:
   - data
   - sealed_through

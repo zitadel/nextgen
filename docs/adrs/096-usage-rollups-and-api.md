@@ -1,4 +1,4 @@
-# ADR 088: The Server Counts Usage Into Rollups and Serves Them
+# ADR 096: The Server Counts Usage Into Rollups and Serves Them
 
 > **Status:** Draft
 > **Date:** 2026-10-30
