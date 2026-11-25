@@ -1,6 +1,6 @@
 import { basename, join } from "node:path";
 
-import { OrcaPatchLayoutConflictError } from "@/lib/orca/errors";
+import { OrcaConflictError } from "@/lib/orca/errors";
 import { isFile } from "@/lib/fs";
 import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
@@ -337,15 +337,15 @@ function requestBoundaryFile(framework: PatchContext["framework"]): {
 const BOUNDARY_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
 
 /** Why the app's own request boundary at `existing` stops setup, which writes `target`. */
-function boundaryConflict(existing: string, target: string): OrcaPatchLayoutConflictError {
+function boundaryConflict(existing: string, target: string): OrcaConflictError {
   const existingName = basename(existing).split(".")[0];
   const targetName = basename(target, ".ts");
   if (existingName === targetName) {
-    return new OrcaPatchLayoutConflictError(
+    return new OrcaConflictError(
       `Next.js runs one ${targetName} file, and this app already has ${existing}`,
     );
   }
-  return new OrcaPatchLayoutConflictError(
+  return new OrcaConflictError(
     `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
   );
 }

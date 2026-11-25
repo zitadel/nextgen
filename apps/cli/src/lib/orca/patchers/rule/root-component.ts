@@ -3,7 +3,7 @@ import { join, posix } from "node:path";
 
 import { parseModule } from "magicast";
 
-import { OrcaPatchLayoutConflictError } from "@/lib/orca/errors";
+import { OrcaConflictError } from "@/lib/orca/errors";
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
 import { isFile } from "@/lib/fs";
 
@@ -59,7 +59,7 @@ const TYPESCRIPT_FOR_JAVASCRIPT: Readonly<Record<string, ReadonlyArray<string>>>
 };
 
 /**
- * Throws OrcaPatchLayoutConflictError when the app's entry mounts a root component from a
+ * Throws OrcaConflictError when the app's entry mounts a root component from a
  * file other than `root.path`, so setup stops before it creates a project
  * instead of writing a root component the app never loads.
  *
@@ -100,8 +100,9 @@ export async function assertMountsRootComponent(
   if (mountedRoot === undefined) {
     return;
   }
-  throw new OrcaPatchLayoutConflictError(
-    `${entry} mounts ${mountedRoot}, not the ${root.path} setup writes`,
+  const statement = importStatement(entry, root);
+  throw new OrcaConflictError(
+    `${entry} mounts ${mountedRoot}, not the ${root.path} setup writes; import the root as \`${statement}\` and mount that instead`,
   );
 }
 
@@ -375,6 +376,17 @@ async function resolveLocalModule(
     }
   }
   return undefined;
+}
+
+/** The import line that mounts the managed root from the entry's directory. */
+function importStatement(entry: string, root: RootMount): string {
+  const relative = posix.relative(posix.dirname(entry), root.path);
+  const stripped = root.extension
+    ? relative
+    : relative.slice(0, relative.length - posix.extname(relative).length);
+  const specifier = stripped.startsWith(".") ? stripped : `./${stripped}`;
+  const binding = root.binding.named ? `{ ${root.binding.name} }` : root.binding.name;
+  return `import ${binding} from "${specifier}"`;
 }
 
 /** `app` for `src/app/app.component.ts` and `src/App.tsx` alike. */

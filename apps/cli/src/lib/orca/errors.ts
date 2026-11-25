@@ -1,3 +1,4 @@
+import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
@@ -8,34 +9,7 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
  * the failure itself. A failure nothing here anticipated is not one of these:
  * it bubbles as it was thrown.
  */
-export abstract class OrcaError extends Error {
-  /** The kind of failure; a subclass states its own. */
-  abstract readonly category: ErrorCategory;
-
-  /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  abstract readonly retryable: boolean;
-
-  /** The stable product code the failure is reported with; a subclass states its own. */
-  abstract readonly code: ZitadelErrorCode;
-
-  /**
-   * Make an orca failure.
-   *
-   * @param message - What went wrong.
-   * @param cause - The failure this one wraps, when it wraps one.
-   */
-  constructor(message: string, cause?: unknown) {
-    super(
-      message,
-      cause === undefined
-        ? undefined
-        : {
-            cause,
-          },
-    );
-    this.name = new.target.name;
-  }
-}
+export abstract class OrcaError extends ZitadelLibError {}
 
 /**
  * A directory with no app of a framework orca knows, or a framework orca has
@@ -55,43 +29,6 @@ export class OrcaFrameworkMissingError extends OrcaError {
 export class OrcaFrameworkUnsupportedError extends OrcaError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_UNSUPPORTED_PROJECT_SHAPE";
-  override readonly retryable: boolean = false;
-}
-
-/**
- * An app of another framework than the one asked for.
- */
-export class OrcaFrameworkMismatchError extends OrcaError {
-  override readonly category: ErrorCategory = "conflict";
-  override readonly code: ZitadelErrorCode = "E_CONFLICT";
-  override readonly retryable: boolean = false;
-
-  /** The framework setup was asked to set up. */
-  readonly requested: string;
-
-  /** The framework the directory holds. */
-  readonly detected: string;
-
-  /**
-   * Make the failure.
-   *
-   * @param message - What went wrong.
-   * @param requested - The framework setup was asked to set up.
-   * @param detected - The framework the directory holds.
-   */
-  constructor(message: string, requested: string, detected: string) {
-    super(message);
-    this.requested = requested;
-    this.detected = detected;
-  }
-}
-
-/**
- * A directory that already holds something, so a scaffold cannot start in it.
- */
-export class OrcaScaffoldOccupiedError extends OrcaError {
-  override readonly category: ErrorCategory = "conflict";
-  override readonly code: ZitadelErrorCode = "E_CONFLICT";
   override readonly retryable: boolean = false;
 }
 
@@ -118,26 +55,6 @@ export class OrcaPatchFileMissingError extends OrcaError {
 }
 
 /**
- * A file the patch would write that already holds something else, and that
- * replacing it would resolve.
- */
-export class OrcaPatchFileOverwriteError extends OrcaError {
-  override readonly category: ErrorCategory = "conflict";
-  override readonly code: ZitadelErrorCode = "E_CONFLICT";
-  override readonly retryable: boolean = false;
-}
-
-/**
- * A file of the app, at a path the patch does not write, that would leave the
- * integration broken; replacing files resolves nothing.
- */
-export class OrcaPatchLayoutConflictError extends OrcaError {
-  override readonly category: ErrorCategory = "conflict";
-  override readonly code: ZitadelErrorCode = "E_CONFLICT";
-  override readonly retryable: boolean = false;
-}
-
-/**
  * A renderer that is declared and not published yet.
  */
 export class OrcaRendererPendingError extends OrcaError {
@@ -154,5 +71,17 @@ export class OrcaRendererPendingError extends OrcaError {
 export class OrcaInternalError extends OrcaError {
   override readonly category: ErrorCategory = "fault";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A request that conflicts with what the directory or the project already
+ * holds: an app of another framework than the one asked for, a directory a
+ * scaffold cannot start in, a file a patch would overwrite, or a file of the app
+ * that would leave the integration broken.
+ */
+export class OrcaConflictError extends OrcaError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
   override readonly retryable: boolean = false;
 }

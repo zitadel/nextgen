@@ -143,9 +143,7 @@ describe("Orca detection", () => {
     await expect(orca.detect(await nextProject(dir), "react")).rejects.toMatchObject({
       code: "E_CONFLICT",
       message: "Setup detects Next.js here, not React (Vite)",
-      name: "OrcaFrameworkMismatchError",
-      requested: "react",
-      detected: "next",
+      name: "OrcaConflictError",
     });
   });
 

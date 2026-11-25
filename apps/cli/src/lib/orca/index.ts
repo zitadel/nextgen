@@ -8,11 +8,10 @@ import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
 import {
-  OrcaFrameworkMismatchError,
+  OrcaConflictError,
   OrcaFrameworkMissingError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
-  OrcaScaffoldOccupiedError,
 } from "./errors";
 import { ManagedFile } from "./managed-file";
 import { patchers } from "./patchers";
@@ -25,17 +24,14 @@ import type { Scaffolder } from "./scaffolders/types";
 
 export { issuerFromPort } from "./detectors/port";
 export {
+  OrcaConflictError,
   OrcaError,
-  OrcaFrameworkMismatchError,
   OrcaFrameworkMissingError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
   OrcaInvalidError,
   OrcaPatchFileMissingError,
-  OrcaPatchFileOverwriteError,
-  OrcaPatchLayoutConflictError,
   OrcaRendererPendingError,
-  OrcaScaffoldOccupiedError,
 } from "./errors";
 export type { Detector, FrameworkFacts } from "./detectors/types";
 
@@ -160,7 +156,7 @@ export class Orca {
    * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},
    * honouring an explicit `requested` framework. Throws
    * {@link OrcaFrameworkMissingError} when nothing matches or
-   * `requested` has no detector, {@link OrcaFrameworkMismatchError} when
+   * `requested` has no detector, {@link OrcaConflictError} when
    * `cwd` holds an app of a framework other than `requested`, and
    * {@link OrcaFrameworkUnsupportedError} when a detector recognises an app
    * it does not support.
@@ -248,7 +244,7 @@ export class Orca {
 
   /**
    * Creates a new `framework` project in `cwd`, then re-detects it to return
-   * the resulting {@link FrameworkFacts}. Throws OrcaScaffoldOccupiedError when the
+   * the resulting {@link FrameworkFacts}. Throws OrcaConflictError when the
    * directory already contains a project ("already scaffolded") and OrcaInternalError
    * when no scaffolder supports the framework.
    */
@@ -267,7 +263,7 @@ export class Orca {
   async scaffoldUndoably(cwd: string, framework: string, force = false): Promise<UndoableScaffold> {
     const target = await this.inspectScaffoldTarget(cwd);
     if (!target.scaffoldable && !force) {
-      throw new OrcaScaffoldOccupiedError(
+      throw new OrcaConflictError(
         `Cannot scaffold: ${cwd} is not empty${target.reason ? ` (${target.reason})` : ""}`,
       );
     }
@@ -369,15 +365,11 @@ export class Orca {
   }
 
   /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
-  private frameworkMismatch(requested: string, detected: string): OrcaFrameworkMismatchError {
+  private frameworkMismatch(requested: string, detected: string): OrcaConflictError {
     const name = (id: string) => {
       return this.displayName(id);
     };
-    return new OrcaFrameworkMismatchError(
-      `Setup detects ${name(detected)} here, not ${name(requested)}`,
-      requested,
-      detected,
-    );
+    return new OrcaConflictError(`Setup detects ${name(detected)} here, not ${name(requested)}`);
   }
 }
 

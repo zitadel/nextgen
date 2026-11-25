@@ -2,7 +2,6 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 
 import { BackendError, BackendUnavailableError, type UnavailableReason } from "./backend";
 import { isObject } from "./json";
-import { OrcaError } from "./orca";
 import type { Suggested } from "./suggestion";
 
 /**
@@ -309,10 +308,6 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof BackendError) {
     return fromBackendError(error);
-  }
-
-  if (error instanceof OrcaError) {
-    return new ZitadelError(error.code, error.message);
   }
 
   if (error instanceof ZitadelLibError) {
