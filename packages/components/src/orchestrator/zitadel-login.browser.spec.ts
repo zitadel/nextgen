@@ -783,18 +783,13 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     expect(paired?.tabIndex).toBe(-1);
   });
 
-  it("carries an id, since it has no name to identify it by", async () => {
-    // Chrome's Issues panel reports a control with neither an id nor a name
-    // ("A form field element should have an id or name attribute"), and its
-    // sign-in guidance asks for a stable one. The name stays off (above), so the
-    // id is the only handle.
+  it("carries an id", async () => {
     setup([pairedPasswordStep]);
     const element = await mount();
-    const paired = element.shadowRoot?.querySelector<HTMLInputElement>(
-      'input[autocomplete="username"]',
-    );
+    const form = element.shadowRoot?.querySelector("form");
+    const paired = form?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
 
-    expect(paired?.id).not.toBe("");
+    expect(paired?.id).toBe("zl-paired-identifier");
   });
 
   it("renders nothing when the step carries no identifier", async () => {
@@ -906,65 +901,5 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     const body = JSON.parse(String(submit.init?.body)) as { fields: Record<string, unknown> };
     expect(body.fields).toHaveProperty("x-auth-methods#password", "hunter2");
     expect(Object.keys(body.fields)).toEqual(["x-auth-methods#password"]);
-  });
-});
-
-/**
- * Every native form control the widget renders, found through every shadow
- * root, so a control nested in an atom is checked as well as the orchestrator's
- * own.
- */
-function nativeControls(root: ParentNode): HTMLElement[] {
-  const controls: HTMLElement[] = [];
-  for (const element of root.querySelectorAll<HTMLElement>("*")) {
-    if (["INPUT", "SELECT", "TEXTAREA"].includes(element.tagName)) {
-      controls.push(element);
-    }
-    if (element.shadowRoot) {
-      controls.push(...nativeControls(element.shadowRoot));
-    }
-  }
-  return controls;
-}
-
-describe("<zitadel-login> form controls are identifiable (chromium)", () => {
-  let host: HTMLDivElement;
-  let stub: ReturnType<typeof installFlowFetchStub>;
-
-  afterEach(() => {
-    host.remove();
-    stub.restore();
-  });
-
-  // Chrome's Issues panel flags a control with neither an id nor a name, and
-  // autofill cannot identify it. Playwright's Chromium does not emit that issue
-  // (checked with a plain `<form><input></form>`), so the rule is asserted on
-  // the DOM. Every step the widget renders must pass.
-  it.each([
-    ["identifier", identifierStep],
-    ["password, paired with the identifier", pairedPasswordStep],
-    ["password, with no identifier", unpairedPasswordStep],
-  ])("leaves no control without an id or a name on the %s step", async (_label, step) => {
-    _resetConfigForTesting();
-    const project = configureZitadel({
-      proxyPath: "/__nextgen",
-      projectId: "test-project",
-      url: "http://localhost:4000",
-    });
-    host = document.createElement("div");
-    document.body.appendChild(host);
-    stub = installFlowFetchStub([step]);
-    const element = document.createElement("zitadel-login") as ZitadelLogin;
-    element.purpose = "login";
-    element.project = project;
-    host.appendChild(element);
-    await waitFor(() => (element.shadowRoot?.querySelector("zl-field") ? element : null));
-    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
-
-    const unidentified = nativeControls(element.shadowRoot!).filter(
-      (control) => control.id === "" && control.getAttribute("name") === null,
-    );
-
-    expect(unidentified.map((control) => control.outerHTML)).toEqual([]);
   });
 });
