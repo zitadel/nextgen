@@ -340,15 +340,6 @@ describe("deploy", () => {
           message:
             "Configuration validation failed (1 issue):\n  - .zitadel/policies/auth.factor.password.set.json: config.min_length Too small: expected number to be >=1",
           hint: "Fix the files named above and rerun; no changes were made.",
-          details: {
-            issues: [
-              {
-                rule: "contract/policy",
-                path: ".zitadel/policies/auth.factor.password.set.json",
-                message: "config.min_length Too small: expected number to be >=1",
-              },
-            ],
-          },
         });
       });
 
@@ -395,16 +386,6 @@ describe("deploy", () => {
           message:
             "Configuration validation failed (1 issue):\n  - .zitadel/policies/password.json: holds the auth.factor.password.set policy, so it must be named auth.factor.password.set.json",
           hint: "Fix the files named above and rerun; no changes were made.",
-          details: {
-            issues: [
-              {
-                rule: "contract/policy",
-                path: ".zitadel/policies/password.json",
-                message:
-                  "holds the auth.factor.password.set policy, so it must be named auth.factor.password.set.json",
-              },
-            ],
-          },
         });
       });
 
@@ -1314,11 +1295,6 @@ describe("deploy", () => {
           next_commands: [
             expectedPublicCliCommand(app.againAsRun("variable set GOOGLE_CLIENT_SECRET --secret")),
           ],
-          details: {
-            variable: "GOOGLE_CLIENT_SECRET",
-            field: "client_secret",
-            file: ".zitadel/idps/google.json",
-          },
         });
       });
 
@@ -1860,7 +1836,7 @@ describe("deploy", () => {
       });
 
       describe("refuses a mapping that cannot work", () => {
-        it.each(HARD_ERRORS)("deploy stops on %s", async (_name, edit, target, rule) => {
+        it.each(HARD_ERRORS)("deploy stops on %s", async (_name, edit, target) => {
           const app = await anAppWithGoogle();
           await edit(app);
 
@@ -1875,13 +1851,10 @@ describe("deploy", () => {
             code: "E_VALIDATION",
             message: `Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: ${issue}`,
             hint: "Fix the files named above and rerun; no changes were made.",
-            details: {
-              issues: [{ rule, path: ".zitadel/idps/google.json", message: issue }],
-            },
           });
         });
 
-        it.each(HARD_ERRORS)("deploy --dry-run stops on %s", async (_name, edit, target, rule) => {
+        it.each(HARD_ERRORS)("deploy --dry-run stops on %s", async (_name, edit, target) => {
           const app = await anAppWithGoogle();
           await edit(app);
 
@@ -1896,9 +1869,6 @@ describe("deploy", () => {
             code: "E_VALIDATION",
             message: `Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: ${issue}`,
             hint: "Fix the files named above and rerun; no changes were made.",
-            details: {
-              issues: [{ rule, path: ".zitadel/idps/google.json", message: issue }],
-            },
           });
         });
       });

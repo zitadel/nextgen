@@ -601,16 +601,6 @@ describe("preview", () => {
             'Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
           hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
           next_commands: [expectedPublicCliCommand(app.againAsRun("variable set NAME --secret"))],
-          details: {
-            issues: [
-              {
-                message:
-                  'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
-                path: ".zitadel/idps/google.json",
-                rule: "connection/literal-secret",
-              },
-            ],
-          },
         });
       });
 

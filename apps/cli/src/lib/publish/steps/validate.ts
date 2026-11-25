@@ -67,36 +67,15 @@ type ServerFinding = {
 };
 
 /**
- * A finding as `--json` lists it under `details.issues`.
- */
-type ReportedFinding = {
-  readonly rule: string;
-  readonly path: string;
-  readonly steps?: Issue["steps"];
-  readonly message: string;
-};
-
-/**
- * One finding as `--json` lists it.
- *
- * @param finding - A rule's issue or a server finding.
- * @returns Its rule, file, steps when the rule named any, and message.
- */
-function reported(finding: Issue | ServerFinding): ReportedFinding {
-  const base = { rule: finding.rule, path: finding.file };
-  if ("steps" in finding && finding.steps !== undefined) {
-    return { ...base, steps: finding.steps, message: finding.message };
-  }
-  return { ...base, message: finding.message };
-}
-
-/**
  * Stop the deploy on every error, named in one refusal, before anything is
  * sent.
  *
  * @param findings - Every finding.
- * @throws {@link PublishConfigInvalidError} when any finding is an error, and one of its
- *   variants when a finding is a secret written into a file or a key this CLI does not know.
+ * @throws {@link PublishConfigLiteralSecretRefusedKeyError} when a finding is a secret written
+ *   into a file and one is a key this CLI does not know.
+ * @throws {@link PublishConfigLiteralSecretError} when a finding is a secret written into a file.
+ * @throws {@link PublishConfigRefusedKeyError} when a finding is a key this CLI does not know.
+ * @throws {@link PublishConfigInvalidError} when any other finding is an error.
  */
 function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const errors = findings.filter((finding) => {
@@ -117,25 +96,16 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
     return UserSchema.refusesKey(finding);
   });
   const message = `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`;
-  const issues = errors.map(reported);
   if (literalSecret && refusedKey) {
-    throw new PublishConfigLiteralSecretRefusedKeyError(message, {
-      findings: issues,
-    });
+    throw new PublishConfigLiteralSecretRefusedKeyError(message);
   }
   if (literalSecret) {
-    throw new PublishConfigLiteralSecretError(message, {
-      findings: issues,
-    });
+    throw new PublishConfigLiteralSecretError(message);
   }
   if (refusedKey) {
-    throw new PublishConfigRefusedKeyError(message, {
-      findings: issues,
-    });
+    throw new PublishConfigRefusedKeyError(message);
   }
-  throw new PublishConfigInvalidError(message, {
-    findings: issues,
-  });
+  throw new PublishConfigInvalidError(message);
 }
 
 /**

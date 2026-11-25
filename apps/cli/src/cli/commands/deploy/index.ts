@@ -143,21 +143,18 @@ const DEPLOY_EMPTY_REFUSAL = {
 const CONFIG_INVALID_REFUSAL = {
   message: "{message}",
   hint: "Fix the files named above and rerun; no changes were made.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a configuration with errors in it, one of them a key a newer server added, is refused. */
 const CONFIG_INVALID_NEWER_REFUSAL = {
   message: "{message}",
   hint: "Fix the files named above and rerun; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a configuration with a secret written into a file is refused. */
 const CONFIG_INVALID_SECRET_REFUSAL = {
   message: "{message}",
   hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
-  details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
 
@@ -165,7 +162,6 @@ const CONFIG_INVALID_SECRET_REFUSAL = {
 const CONFIG_INVALID_SECRET_NEWER_REFUSAL = {
   message: "{message}",
   hint: 'Publish a secret with the command below and reference it as "${{ NAME }}". A key a newer Zitadel server added needs a CLI as new as the server.',
-  details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
 
@@ -173,14 +169,12 @@ const CONFIG_INVALID_SECRET_NEWER_REFUSAL = {
 const VARIABLE_SHARED_REFUSAL = {
   message: "{message}",
   hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a client secret that is not a secret variable is refused. */
 const SECRET_KIND_REFUSAL = {
   message: "{message}",
   hint: "The client secret must be a secret variable: publish it with the command below.",
-  details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
 
@@ -188,7 +182,6 @@ const SECRET_KIND_REFUSAL = {
 const PLAIN_KIND_REFUSAL = {
   message: "{message}",
   hint: "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-  details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
 
@@ -197,7 +190,6 @@ const VARIABLE_MISSING_REFUSAL = {
   code: "E_CREDENTIAL_MISSING",
   message: "{message}",
   hint: "Publish it with the command below, then deploy again.",
-  details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
 
@@ -314,7 +306,6 @@ export default class Deploy extends Telemetered(
           CONFIG_INVALID_SECRET_NEWER_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -334,7 +325,6 @@ export default class Deploy extends Telemetered(
           CONFIG_INVALID_SECRET_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -352,19 +342,16 @@ export default class Deploy extends Telemetered(
       if (error instanceof PublishConfigRefusedKeyError) {
         throw refusalError(CONFIG_INVALID_NEWER_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof PublishConfigInvalidError) {
         throw refusalError(CONFIG_INVALID_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof PublishConnectionVariableSharedError) {
         throw refusalError(VARIABLE_SHARED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof PublishConnectionVariableNotSecretError) {
@@ -372,7 +359,6 @@ export default class Deploy extends Telemetered(
           SECRET_KIND_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -393,7 +379,6 @@ export default class Deploy extends Telemetered(
           PLAIN_KIND_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -414,7 +399,6 @@ export default class Deploy extends Telemetered(
           VARIABLE_MISSING_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -435,7 +419,6 @@ export default class Deploy extends Telemetered(
           VARIABLE_MISSING_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -552,7 +535,6 @@ export default class Deploy extends Telemetered(
           CONFIG_INVALID_SECRET_NEWER_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -572,7 +554,6 @@ export default class Deploy extends Telemetered(
           CONFIG_INVALID_SECRET_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -590,19 +571,16 @@ export default class Deploy extends Telemetered(
       if (error instanceof PublishConfigRefusedKeyError) {
         throw refusalError(CONFIG_INVALID_NEWER_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof PublishConfigInvalidError) {
         throw refusalError(CONFIG_INVALID_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof PublishConnectionVariableSharedError) {
         throw refusalError(VARIABLE_SHARED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof PublishConnectionVariableNotSecretError) {
@@ -610,7 +588,6 @@ export default class Deploy extends Telemetered(
           SECRET_KIND_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -631,7 +608,6 @@ export default class Deploy extends Telemetered(
           PLAIN_KIND_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -652,7 +628,6 @@ export default class Deploy extends Telemetered(
           VARIABLE_MISSING_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {
@@ -673,7 +648,6 @@ export default class Deploy extends Telemetered(
           VARIABLE_MISSING_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             next: {

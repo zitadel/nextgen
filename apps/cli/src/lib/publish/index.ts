@@ -23,5 +23,4 @@ export {
   PublishConnectionVariableNotSecretError,
   PublishConnectionVariableSharedError,
   PublishError,
-  PublishReleaseRejectedError,
 } from "./errors";

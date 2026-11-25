@@ -58,7 +58,7 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
     return;
   }
   for (const connection of connections) {
-    checkCredentialVariables(ctx, connection, held);
+    checkCredentialVariables(connection, held);
   }
 }
 
@@ -91,7 +91,6 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  * exist, the client id is a plain one it can put in the authorize URL, the
  * client secret is a secret one, and they are not one and the same.
  *
- * @param ctx - The step's context.
  * @param connection - The connection.
  * @param held - The project's variables, and whether each is a secret.
  * @throws {@link PublishConnectionVariableSharedError} When the client id and secret
@@ -105,7 +104,6 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  *   secret names is not held.
  */
 function checkCredentialVariables(
-  ctx: StepContext,
   connection: Connection,
   held: ReadonlyMap<string, boolean>,
 ): void {
@@ -132,15 +130,6 @@ function checkCredentialVariables(
   if (idVariable !== undefined && idVariable === secretVariable) {
     throw new PublishConnectionVariableSharedError(
       `${file}: client_id and client_secret both name the variable ${idVariable}`,
-      {
-        file,
-        variable: idVariable,
-        mode: ctx.mode,
-        details: {
-          variable: idVariable,
-          file,
-        },
-      },
     );
   }
   for (const use of uses) {
@@ -151,63 +140,25 @@ function checkCredentialVariables(
     if (isSecret === undefined && wantsSecret) {
       throw new PublishConnectionVariableClientSecretMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
-        {
-          file,
-          variable,
-          mode: ctx.mode,
-          details: {
-            variable,
-            field,
-            file,
-          },
-        },
+        variable,
       );
     }
     if (isSecret === undefined) {
       throw new PublishConnectionVariableClientIdMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
-        {
-          file,
-          variable,
-          mode: ctx.mode,
-          details: {
-            variable,
-            field,
-            file,
-          },
-        },
+        variable,
       );
     }
     if (wantsSecret && !isSecret) {
       throw new PublishConnectionVariableNotSecretError(
         `${file}: ${field} names the variable ${variable}, which is not a secret`,
-        {
-          file,
-          variable,
-          mode: ctx.mode,
-          details: {
-            variable,
-            field,
-            file,
-            secret: isSecret,
-          },
-        },
+        variable,
       );
     }
     if (!wantsSecret && isSecret) {
       throw new PublishConnectionVariableNotPlainError(
         `${file}: ${field} names the variable ${variable}, which is a secret`,
-        {
-          file,
-          variable,
-          mode: ctx.mode,
-          details: {
-            variable,
-            field,
-            file,
-            secret: isSecret,
-          },
-        },
+        variable,
       );
     }
   }

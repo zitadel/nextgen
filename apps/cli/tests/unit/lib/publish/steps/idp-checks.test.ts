@@ -112,7 +112,6 @@ describe("validateConnections", () => {
       expect(error).toBeInstanceOf(PublishConnectionVariableClientSecretMissingError);
       expect(error).toMatchObject({
         variable: "ACME_CLIENT_SECRET",
-        mode: "deploy",
       });
     });
 
@@ -208,7 +207,6 @@ describe("validateConnections", () => {
       expect(error).toBeInstanceOf(PublishConnectionVariableClientSecretMissingError);
       expect(error).toMatchObject({
         variable: "ACME_CLIENT_SECRET",
-        mode: "preview",
       });
     });
 

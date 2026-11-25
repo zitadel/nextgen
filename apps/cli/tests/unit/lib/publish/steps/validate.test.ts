@@ -175,14 +175,9 @@ describe("validateStep", () => {
 
       expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
-        details: {
-          issues: [
-            expect.objectContaining({
-              path: ".zitadel/schemas/human-user.json",
-              message: expect.stringMatching(/x-auth-methods pasword is not/),
-            }),
-          ],
-        },
+        message: expect.stringMatching(
+          /\.zitadel\/schemas\/human-user\.json: .*x-auth-methods pasword is not/,
+        ),
       });
     });
   });
@@ -202,15 +197,9 @@ describe("validateStep", () => {
       });
 
       expect(error).toMatchObject({
-        details: {
-          issues: [
-            expect.objectContaining({
-              path: ".zitadel/schemas/human-user.json",
-              message:
-                "properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
-            }),
-          ],
-        },
+        message: expect.stringContaining(
+          ".zitadel/schemas/human-user.json: properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
+        ),
       });
     });
 
@@ -408,41 +397,7 @@ describe("validateStep", () => {
       expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        details: {
-          issues: [
-            expect.objectContaining({
-              message: expect.stringContaining("not a property in the user schema"),
-            }),
-          ],
-        },
-      });
-    });
-
-    it("lists the steps a refusal names under its issue", async () => {
-      const flow = aLoginFlow({ userSchema: "human-user" });
-      const config = aConfig({
-        schemas: { "human-user.json": aUserSchema() },
-        flows: {
-          "default-login.json": {
-            ...flow,
-            steps: [{ name: "identifier", sso_providers: ["google", "google"] }],
-          },
-        },
-      });
-
-      const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config }));
-      });
-
-      expect(error).toMatchObject({
-        details: {
-          issues: expect.arrayContaining([
-            expect.objectContaining({
-              steps: ["identifier"],
-              path: ".zitadel/flows/default-login.json",
-            }),
-          ]),
-        },
+        message: expect.stringContaining("not a property in the user schema"),
       });
     });
 
@@ -488,16 +443,9 @@ describe("validateStep", () => {
       expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        details: {
-          issues: [
-            {
-              path: ".zitadel/flows/default-login.json",
-              rule: "release/user-schema-resolves",
-              message:
-                'user_schema "missing-schema" is not the objectType of a schema in .zitadel/schemas/ ("human-user") or in the project.',
-            },
-          ],
-        },
+        message: expect.stringContaining(
+          '.zitadel/flows/default-login.json: user_schema "missing-schema" is not the objectType of a schema in .zitadel/schemas/ ("human-user") or in the project.',
+        ),
       });
     });
 
