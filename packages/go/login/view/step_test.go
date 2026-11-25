@@ -26,6 +26,13 @@ func (u upper) Errors(raw string) []string {
 	return out
 }
 
+// The variant selectors are the login package's to decide; here the step must
+// simply render whatever key it is handed, so these pass the key through. The
+// selection itself is covered by TestTextsCustomIdentifier.
+func (upper) DescriptionKey(key string, _ []api.Field) string { return key }
+
+func (upper) NoticeKey(notice string, _ []api.Field) string { return notice }
+
 func render(t *testing.T, step api.FlowStep) string {
 	t.Helper()
 	var out strings.Builder
@@ -100,7 +107,7 @@ func TestStep(t *testing.T) {
 	assert.Contains(t, html, `<p class="description">PASSWORD.DESCRIPTION</p>`)
 	assert.Contains(t, html, `<p class="notice" role="status">NOTICE.USER_ALREADY_EXISTS</p>`)
 	assert.Contains(t, html, `<p class="error" role="alert">ERROR.EMAIL_REQUIRED</p><p class="error" role="alert">ERROR.PASSWORD_REQUIRED</p>`, "one alert per key")
-	assert.Contains(t, html, `<input class="identifier" type="text" value="a@example.com" autocomplete="username" readonly`)
+	assert.Contains(t, html, `<input id="zl-paired-identifier" class="identifier" type="text" value="a@example.com" autocomplete="username" readonly`)
 	assert.Contains(t, html, `<button type="submit" name="action" value="submit" class="action primary" data-testid="zitadel-button-submit">PASSWORD.ACTION.SIGNIN</button>`)
 	assert.Contains(t, html, `<button type="submit" name="action" value="back" class="action back" data-testid="zitadel-button-back">BACK</button>`)
 	assert.Contains(t, html, `<button type="submit" name="action" value="passkey" class="action" data-testid="zitadel-button-passkey">PASSKEY</button>`, "a passkey action posts like any other")

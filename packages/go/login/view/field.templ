@@ -12,6 +12,11 @@ type Texts interface {
 	Text(key string) string
 	// Errors is a step's error payload as sentences, one per key.
 	Errors(raw string) []string
+	// DescriptionKey and NoticeKey pick the wording a step's fields call for:
+	// one collecting an identifier that is not an email needs a sentence that
+	// does not name the email.
+	DescriptionKey(key string, fields []api.Field) string
+	NoticeKey(notice string, fields []api.Field) string
 }
 
 // inputType is the native input type for a field type; the two differ only

@@ -13,19 +13,19 @@ import (
 // button does too: it posts its action, and the step comes back with the
 // challenge, the one thing that needs a script.
 templ Step(step api.FlowStep, t Texts, action string) {
-	// novalidate: a passkey button submits through requestSubmit(), which
-	// native validation would refuse while a required field is empty — and
-	// the password field of every auth method is required. The API validates
-	// each submission anyway, and reports it as the step's error.
+	// novalidate: native validation would refuse a button that does not submit
+	// the fields — a back or navigate action — while a required field is empty,
+	// and the password field of every auth method is required. The API
+	// validates each submission anyway, and reports it as the step's error.
 	<form method="post" action={ templ.SafeURL(action) } class="step" data-step={ step.Name } novalidate>
 		if key, ok := step.Texts.Value.TitleKey.Get(); ok {
 			<h1>{ t.Text(key) }</h1>
 		}
 		if key, ok := step.Texts.Value.DescriptionKey.Get(); ok && key != "" {
-			<p class="description">{ t.Text(key) }</p>
+			<p class="description">{ t.Text(t.DescriptionKey(key, step.Fields)) }</p>
 		}
 		if key, ok := step.Notice.Get(); ok {
-			<p class="notice" role="status">{ t.Text(key) }</p>
+			<p class="notice" role="status">{ t.Text(t.NoticeKey(key, step.Fields)) }</p>
 		}
 		if raw, ok := step.Error.Get(); ok {
 			for _, msg := range t.Errors(raw) {
@@ -38,8 +38,10 @@ templ Step(step api.FlowStep, t Texts, action string) {
 		if id, ok := step.Identifier.Get(); ok {
 			// The identifier of an earlier step, for a password manager to pair
 			// with the password: no name, so it is never submitted; hidden by
-			// CSS rather than type, so a manager still finds it.
-			<input class="identifier" type="text" value={ id.Value } autocomplete={ id.Autocomplete } readonly tabindex="-1" aria-hidden="true"/>
+			// CSS rather than type, so a manager still finds it. The id is the
+			// only handle it has left, and Chrome reports a control with
+			// neither (the widget carries the same one).
+			<input id="zl-paired-identifier" class="identifier" type="text" value={ id.Value } autocomplete={ id.Autocomplete } readonly tabindex="-1" aria-hidden="true"/>
 		}
 		for _, a := range step.Actions {
 			<button
