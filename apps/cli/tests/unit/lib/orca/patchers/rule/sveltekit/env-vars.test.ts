@@ -92,17 +92,13 @@ describe("envVarsEdit", () => {
 
   it("refuses a file that exports no variables", () => {
     expect(() => edit("export const settings = {};\n")).toThrow(
-      expect.objectContaining({
-        code: "E_VALIDATION",
-      }),
+      expect.objectContaining({ code: "E_VALIDATION" }),
     );
   });
 
   it("refuses variables it cannot edit in place", () => {
     expect(() => edit("export const variables = defineEnvVars(shared);\n")).toThrow(
-      expect.objectContaining({
-        code: "E_VALIDATION",
-      }),
+      expect.objectContaining({ code: "E_VALIDATION" }),
     );
   });
 });

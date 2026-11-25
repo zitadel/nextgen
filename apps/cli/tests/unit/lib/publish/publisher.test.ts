@@ -461,9 +461,7 @@ describe("Publisher.prepare", () => {
       });
 
       expect(error).toBeInstanceOf(PublishConfigInvalidError);
-      expect(error).toMatchObject({
-        code: "E_VALIDATION",
-      });
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 
     test("stops when the person cancels while the listing is read", async ({ dir }) => {

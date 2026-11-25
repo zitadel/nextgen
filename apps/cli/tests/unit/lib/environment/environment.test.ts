@@ -345,10 +345,7 @@ describe("Environment.resolve", () => {
       await write(dir, "staging.env", { ZITADEL_PROJECT_ID: "proj_file" });
 
       await expect(
-        resolve(dir, {
-          envName: "staging",
-          envFile: "staging.env",
-        }),
+        resolve(dir, { envName: "staging", envFile: "staging.env" }),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("--env-file"),

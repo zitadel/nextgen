@@ -30,9 +30,7 @@ describe("AddDepOp", () => {
       new AddDepOp({ kind: "add-dep", name: "a", version: "^1" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({
-      code: "E_VALIDATION",
-    });
+    expect(error).toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("adds the dependency, and names it for the report", async ({ dir }) => {

@@ -392,17 +392,13 @@ describe("Orca.scaffold", () => {
   it("refuses a non-empty directory without force", async ({ dir }) => {
     const cwd = await tmpPackageSafe(dir);
     await writeFile(join(cwd, ".gitignore"), "x\n");
-    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({
-      code: "E_CONFLICT",
-    });
+    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_CONFLICT" });
   });
 
   it("throws E_CONFLICT when the directory already contains a project", async ({ dir }) => {
     const cwd = dir;
     await writeFile(join(cwd, "package.json"), "{}");
-    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({
-      code: "E_CONFLICT",
-    });
+    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_CONFLICT" });
   });
 
   it("leaves a folder with an invalid package name as it was when the scaffolder fails in its subfolder", async ({

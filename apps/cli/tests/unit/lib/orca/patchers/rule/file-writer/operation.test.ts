@@ -49,9 +49,7 @@ describe("Operation", () => {
       new EditOp({ kind: "edit", path: [], edit: () => "" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({
-      code: "E_VALIDATION",
-    });
+    expect(error).toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("refuses a directory where a file is needed, before the op looks at it", async ({ dir }) => {
@@ -83,9 +81,7 @@ describe("Operation", () => {
       new WriteOp({ kind: "write", path: "x", contents: "c" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({
-      code: "E_VALIDATION",
-    });
+    expect(error).toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("lets a directory op act on a directory", async ({ dir }) => {

@@ -39,10 +39,7 @@ describe("ProviderChoice.fromFlags", () => {
     });
 
     expect(error).toBeInstanceOf(IdpError);
-    expect(error).toMatchObject({
-      code: "E_VALIDATION",
-      message: "Unknown provider nope",
-    });
+    expect(error).toMatchObject({ code: "E_VALIDATION", message: "Unknown provider nope" });
   });
 
   it("refuses a custom setting beside a catalog provider", () => {
@@ -51,9 +48,7 @@ describe("ProviderChoice.fromFlags", () => {
     });
 
     expect(error).toBeInstanceOf(IdpError);
-    expect(error).toMatchObject({
-      code: "E_VALIDATION",
-    });
+    expect(error).toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("holds a script to the flags and names the ones a custom connection lacks", () => {

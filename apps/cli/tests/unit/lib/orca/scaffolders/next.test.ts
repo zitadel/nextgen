@@ -47,10 +47,7 @@ describe("NextScaffolder", () => {
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       hint: expect.stringContaining("boom"),
-      details: expect.objectContaining({
-        stderr: "boom",
-        stdout: "hello",
-      }),
+      details: expect.objectContaining({ stderr: "boom", stdout: "hello" }),
     });
   });
 
