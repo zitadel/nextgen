@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
+import { toZitadelError } from "@/lib/errors";
+import { SyncStateMalformedError } from "@/lib/sync/errors";
 import { publishedIds, readState, updateScaffold, type ZitadelState } from "@/lib/sync/state";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -61,15 +62,29 @@ describe("readState", () => {
   });
 
   describe("when the state file is not JSON", () => {
-    it("refuses with the parser's error", async ({ dir }) => {
+    it("refuses as a malformed state, keeping the parser's error", async ({ dir }) => {
       await writeState(dir, "{ not json");
 
       const error = await rejectionOf(() => {
         return readState(dir);
       });
 
-      expect(error).toBeInstanceOf(SyntaxError);
+      expect(error).toBeInstanceOf(SyncStateMalformedError);
+      expect(error).toMatchObject({ cause: expect.any(SyntaxError) });
     });
+  });
+});
+
+describe("when the state file cannot be read", () => {
+  it("lets the file system's error through, not a malformed state", async ({ dir }) => {
+    await mkdir(join(dir, ".zitadel", "state.json"), { recursive: true });
+
+    const error = await rejectionOf(() => {
+      return publishedIds(dir, [CUSTOMERS]);
+    });
+
+    expect(error).not.toBeInstanceOf(SyncStateMalformedError);
+    expect(error).toMatchObject({ code: "EISDIR" });
   });
 });
 
@@ -166,8 +181,11 @@ describe("publishedIds", () => {
         return publishedIds(dir, [CUSTOMERS]);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
-      expect(error).toMatchObject({ code: "E_VALIDATION" });
+      expect(error).toBeInstanceOf(SyncStateMalformedError);
+      expect(toZitadelError(error)).toMatchObject({
+        code: "E_VALIDATION",
+        details: { file: ".zitadel/state.json" },
+      });
     },
   );
 });
