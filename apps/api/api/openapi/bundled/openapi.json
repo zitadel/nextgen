@@ -12564,6 +12564,35 @@
         }
       }
     },
+    "session.expired": {
+      "post": {
+        "operationId": "sessionExpired",
+        "summary": "session.expired",
+        "description": "A session expired and was reaped by the background sweeper. The actor\ntype is system.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/session-expired-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "team.created": {
       "post": {
         "operationId": "teamCreated",
@@ -25498,6 +25527,31 @@
           }
         ]
       },
+      "session-expired-event": {
+        "title": "SessionExpiredEvent",
+        "description": "An event of type session.expired, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "session.expired"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/empty-event-payload"
+              }
+            }
+          }
+        ]
+      },
       "team-payload": {
         "title": "TeamPayload",
         "type": "object",
@@ -25951,6 +26005,9 @@
             "$ref": "#/components/schemas/session-established-event"
           },
           {
+            "$ref": "#/components/schemas/session-expired-event"
+          },
+          {
             "$ref": "#/components/schemas/team-created-event"
           },
           {
@@ -26026,6 +26083,7 @@
             "schema.created": "#/components/schemas/schema-created-event",
             "session.deleted": "#/components/schemas/session-deleted-event",
             "session.established": "#/components/schemas/session-established-event",
+            "session.expired": "#/components/schemas/session-expired-event",
             "team.created": "#/components/schemas/team-created-event",
             "team.deactivated": "#/components/schemas/team-deactivated-event",
             "team.updated": "#/components/schemas/team-updated-event",

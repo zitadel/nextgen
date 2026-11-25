@@ -50,6 +50,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/jobs"
 	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/secrets"
@@ -311,10 +312,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		projectHashers,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(serviceDBPool, userRefs, service.SessionConfig{
-		DefaultTTL: cfg.Session.DefaultTTL,
-		MaxTTL:     cfg.Session.MaxTTL,
-	})
+	sessionService := service.NewSessionService(serviceDBPool, userRefs, cfg.Session)
 	projectService := service.NewProjectService(
 		serviceDBPool,
 		cfg.Schema.BuiltinPublicBase,
@@ -511,6 +509,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	retentionJob.Start()
 	defer retentionJob.Close()
 
+	jobsEngine, err := startJobsEngine(ctx, serviceDBPool, cfg.Jobs, cfg.Session.GC)
+	if err != nil {
+		return fmt.Errorf("start jobs engine: %w", err)
+	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = jobsEngine.Close(closeCtx)
+	}()
+
 	shipper := audit.NewShipper(exportAdapter, cfg.Events.Export)
 	if err := shipper.Start(ctx); err != nil {
 		return fmt.Errorf("start event shipper: %w", err)
@@ -652,6 +660,36 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	case err := <-serverErr:
 		return err
 	}
+}
+
+// startJobsEngine builds the shared jobs.Engine, optionally registers
+// sessions.gc and SetPeriodic from config, and Start()s the poll loop when
+// jobs.trigger_secret is unset (self-hosted). RetentionJob is separate.
+func startJobsEngine(ctx context.Context, pool *service.DB, jobsCfg jobs.Config, gcCfg service.SessionsGCConfig) (*jobs.Engine, error) {
+	gcCfg = service.ApplySessionsGCDefaults(gcCfg)
+	engine := jobs.New(jobs.PoolTransactor(pool), jobsCfg)
+	if gcCfg.Enabled {
+		reaper := service.NewSessionsGC(pool, gcCfg)
+		if err := engine.RegisterWorker("sessions-gc", service.JobNameSessionsGC, func(ctx context.Context, _ jobs.Work) error {
+			return reaper.Perform(ctx)
+		}, jobs.WorkerOpts{}); err != nil {
+			return nil, err
+		}
+		if err := pool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			_, err := tx.Statements().SetPeriodic(ctx, service.JobNameSessionsGC, gcCfg.Period, domain.PeriodicOpts{})
+			return err
+		}); err != nil {
+			return nil, fmt.Errorf("SetPeriodic %s: %w", service.JobNameSessionsGC, err)
+		}
+	}
+	// Cron drain (Slice 4) owns the wake when trigger_secret is set.
+	if jobsCfg.TriggerSecret != "" {
+		return engine, nil
+	}
+	if err := engine.Start(ctx); err != nil {
+		return nil, err
+	}
+	return engine, nil
 }
 
 // reportPlatformDrift logs how the platform project differs from what a
@@ -893,6 +931,21 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// anonymous shell POST /sessions mints (domain.SessionAnonymousTTL).
 	v.SetDefault("session.default_ttl", domain.SessionDefaultTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
+	jobsDef := jobs.DefaultConfig()
+	v.SetDefault("jobs.concurrency", jobsDef.Concurrency)
+	v.SetDefault("jobs.poll_interval", jobsDef.PollInterval)
+	v.SetDefault("jobs.take_batch_size", jobsDef.TakeBatchSize)
+	v.SetDefault("jobs.lease_duration", jobsDef.LeaseDuration)
+	v.SetDefault("jobs.heartbeat_interval", jobsDef.HeartbeatInterval)
+	v.SetDefault("jobs.max_attempts", jobsDef.MaxAttempts)
+	v.SetDefault("jobs.backoff_cap", jobsDef.BackoffCap)
+	v.SetDefault("jobs.retain", jobsDef.Retain)
+	v.SetDefault("jobs.trigger_secret", "")
+	v.SetDefault("jobs.lease_by", jobsDef.LeaseBy)
+	sessionsGCDef := service.DefaultSessionsGCConfig()
+	v.SetDefault("session.gc.enabled", sessionsGCDef.Enabled)
+	v.SetDefault("session.gc.period", sessionsGCDef.Period)
+	v.SetDefault("session.gc.batch_size", sessionsGCDef.BatchSize)
 	// Empty means "the deployment's first-created non-platform project is the
 	// default" (Console ADR 0004 §2; the built-in platform row is skipped by
 	// the heuristic); set NEXTGEN_PLATFORM_PROJECT_ID to pin an existing

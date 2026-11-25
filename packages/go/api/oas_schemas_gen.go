@@ -27761,6 +27761,7 @@ type Event struct {
 	SchemaCreatedEvent               SchemaCreatedEvent
 	SessionDeletedEvent              SessionDeletedEvent
 	SessionEstablishedEvent          SessionEstablishedEvent
+	SessionExpiredEvent              SessionExpiredEvent
 	TeamCreatedEvent                 TeamCreatedEvent
 	TeamDeactivatedEvent             TeamDeactivatedEvent
 	TeamUpdatedEvent                 TeamUpdatedEvent
@@ -27822,6 +27823,7 @@ const (
 	SchemaCreatedEventEvent               EventType = "schema.created"
 	SessionDeletedEventEvent              EventType = "session.deleted"
 	SessionEstablishedEventEvent          EventType = "session.established"
+	SessionExpiredEventEvent              EventType = "session.expired"
 	TeamCreatedEventEvent                 EventType = "team.created"
 	TeamDeactivatedEventEvent             EventType = "team.deactivated"
 	TeamUpdatedEventEvent                 EventType = "team.updated"
@@ -27979,6 +27981,9 @@ func (s Event) IsSessionDeletedEvent() bool { return s.Type == SessionDeletedEve
 
 // IsSessionEstablishedEvent reports whether Event is SessionEstablishedEvent.
 func (s Event) IsSessionEstablishedEvent() bool { return s.Type == SessionEstablishedEventEvent }
+
+// IsSessionExpiredEvent reports whether Event is SessionExpiredEvent.
+func (s Event) IsSessionExpiredEvent() bool { return s.Type == SessionExpiredEventEvent }
 
 // IsTeamCreatedEvent reports whether Event is TeamCreatedEvent.
 func (s Event) IsTeamCreatedEvent() bool { return s.Type == TeamCreatedEventEvent }
@@ -28949,6 +28954,27 @@ func (s Event) GetSessionEstablishedEvent() (v SessionEstablishedEvent, ok bool)
 func NewSessionEstablishedEventEvent(v SessionEstablishedEvent) Event {
 	var s Event
 	s.SetSessionEstablishedEvent(v)
+	return s
+}
+
+// SetSessionExpiredEvent sets Event to SessionExpiredEvent.
+func (s *Event) SetSessionExpiredEvent(v SessionExpiredEvent) {
+	s.Type = SessionExpiredEventEvent
+	s.SessionExpiredEvent = v
+}
+
+// GetSessionExpiredEvent returns SessionExpiredEvent and true boolean if Event is SessionExpiredEvent.
+func (s Event) GetSessionExpiredEvent() (v SessionExpiredEvent, ok bool) {
+	if !s.IsSessionExpiredEvent() {
+		return v, false
+	}
+	return s.SessionExpiredEvent, true
+}
+
+// NewSessionExpiredEventEvent returns new Event from SessionExpiredEvent.
+func NewSessionExpiredEventEvent(v SessionExpiredEvent) Event {
+	var s Event
+	s.SetSessionExpiredEvent(v)
 	return s
 }
 
@@ -73488,6 +73514,74 @@ func (o OptNilSessionEstablishedEventActorType) Or(d SessionEstablishedEventActo
 	return d
 }
 
+// NewOptNilSessionExpiredEventActorType returns new OptNilSessionExpiredEventActorType with value set to v.
+func NewOptNilSessionExpiredEventActorType(v SessionExpiredEventActorType) OptNilSessionExpiredEventActorType {
+	return OptNilSessionExpiredEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilSessionExpiredEventActorType is optional nullable SessionExpiredEventActorType.
+type OptNilSessionExpiredEventActorType struct {
+	Value SessionExpiredEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilSessionExpiredEventActorType was set.
+func (o OptNilSessionExpiredEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilSessionExpiredEventActorType) Reset() {
+	var v SessionExpiredEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilSessionExpiredEventActorType) SetTo(v SessionExpiredEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilSessionExpiredEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilSessionExpiredEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v SessionExpiredEventActorType
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilSessionExpiredEventActorType) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilSessionExpiredEventActorType) Get() (v SessionExpiredEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilSessionExpiredEventActorType) Or(d SessionExpiredEventActorType) SessionExpiredEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilSessionID returns new OptNilSessionID with value set to v.
 func NewOptNilSessionID(v SessionID) OptNilSessionID {
 	return OptNilSessionID{
@@ -78962,6 +79056,52 @@ func (o OptSessionEstablishedEventDelegationType) Get() (v SessionEstablishedEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSessionEstablishedEventDelegationType) Or(d SessionEstablishedEventDelegationType) SessionEstablishedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSessionExpiredEventDelegationType returns new OptSessionExpiredEventDelegationType with value set to v.
+func NewOptSessionExpiredEventDelegationType(v SessionExpiredEventDelegationType) OptSessionExpiredEventDelegationType {
+	return OptSessionExpiredEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessionExpiredEventDelegationType is optional SessionExpiredEventDelegationType.
+type OptSessionExpiredEventDelegationType struct {
+	Value SessionExpiredEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptSessionExpiredEventDelegationType was set.
+func (o OptSessionExpiredEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessionExpiredEventDelegationType) Reset() {
+	var v SessionExpiredEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessionExpiredEventDelegationType) SetTo(v SessionExpiredEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessionExpiredEventDelegationType) Get() (v SessionExpiredEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessionExpiredEventDelegationType) Or(d SessionExpiredEventDelegationType) SessionExpiredEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -102999,6 +103139,466 @@ func (s *SessionEstablishedPayload) SetUserID(val OptString) {
 	s.UserID = val
 }
 
+// Merged schema.
+// Ref: #
+type SessionExpiredEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category SessionExpiredEventCategory `json:"category"`
+	// When the action happened, on the server's clock, to the millisecond.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock, to the millisecond.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilSessionExpiredEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a session, a token, a sign-in
+	// check or a credential belongs to, or the user a change was made to. Absent on an event that concerns
+	// no user.
+	UserID OptNilString `json:"user_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptSessionExpiredEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                            `json:"delegation_id"`
+	Grantor        OptString                            `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
+	// `request.api` event of a request carries `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *SessionExpiredEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *SessionExpiredEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *SessionExpiredEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *SessionExpiredEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *SessionExpiredEvent) GetCategory() SessionExpiredEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *SessionExpiredEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *SessionExpiredEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *SessionExpiredEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *SessionExpiredEvent) GetActorType() OptNilSessionExpiredEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *SessionExpiredEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *SessionExpiredEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *SessionExpiredEvent) GetUserID() OptNilString {
+	return s.UserID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *SessionExpiredEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *SessionExpiredEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *SessionExpiredEvent) GetDelegationType() OptSessionExpiredEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *SessionExpiredEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *SessionExpiredEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *SessionExpiredEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *SessionExpiredEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *SessionExpiredEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *SessionExpiredEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *SessionExpiredEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *SessionExpiredEvent) GetPayload() EmptyEventPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *SessionExpiredEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *SessionExpiredEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *SessionExpiredEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *SessionExpiredEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *SessionExpiredEvent) SetCategory(val SessionExpiredEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *SessionExpiredEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *SessionExpiredEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *SessionExpiredEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *SessionExpiredEvent) SetActorType(val OptNilSessionExpiredEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *SessionExpiredEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *SessionExpiredEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *SessionExpiredEvent) SetUserID(val OptNilString) {
+	s.UserID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *SessionExpiredEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *SessionExpiredEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *SessionExpiredEvent) SetDelegationType(val OptSessionExpiredEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *SessionExpiredEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *SessionExpiredEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *SessionExpiredEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *SessionExpiredEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *SessionExpiredEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *SessionExpiredEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *SessionExpiredEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *SessionExpiredEvent) SetPayload(val EmptyEventPayload) {
+	s.Payload = val
+}
+
+type SessionExpiredEventActorType string
+
+const (
+	SessionExpiredEventActorTypeHuman   SessionExpiredEventActorType = "human"
+	SessionExpiredEventActorTypeService SessionExpiredEventActorType = "service"
+	SessionExpiredEventActorTypeSystem  SessionExpiredEventActorType = "system"
+	SessionExpiredEventActorTypeAgent   SessionExpiredEventActorType = "agent"
+)
+
+// AllValues returns all SessionExpiredEventActorType values.
+func (SessionExpiredEventActorType) AllValues() []SessionExpiredEventActorType {
+	return []SessionExpiredEventActorType{
+		SessionExpiredEventActorTypeHuman,
+		SessionExpiredEventActorTypeService,
+		SessionExpiredEventActorTypeSystem,
+		SessionExpiredEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SessionExpiredEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case SessionExpiredEventActorTypeHuman:
+		return []byte(s), nil
+	case SessionExpiredEventActorTypeService:
+		return []byte(s), nil
+	case SessionExpiredEventActorTypeSystem:
+		return []byte(s), nil
+	case SessionExpiredEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SessionExpiredEventActorType) UnmarshalText(data []byte) error {
+	switch SessionExpiredEventActorType(data) {
+	case SessionExpiredEventActorTypeHuman:
+		*s = SessionExpiredEventActorTypeHuman
+		return nil
+	case SessionExpiredEventActorTypeService:
+		*s = SessionExpiredEventActorTypeService
+		return nil
+	case SessionExpiredEventActorTypeSystem:
+		*s = SessionExpiredEventActorTypeSystem
+		return nil
+	case SessionExpiredEventActorTypeAgent:
+		*s = SessionExpiredEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type SessionExpiredEventCategory string
+
+const (
+	SessionExpiredEventCategoryRequest SessionExpiredEventCategory = "request"
+	SessionExpiredEventCategoryAuth    SessionExpiredEventCategory = "auth"
+	SessionExpiredEventCategorySession SessionExpiredEventCategory = "session"
+	SessionExpiredEventCategoryAdmin   SessionExpiredEventCategory = "admin"
+	SessionExpiredEventCategoryEntity  SessionExpiredEventCategory = "entity"
+	SessionExpiredEventCategorySignal  SessionExpiredEventCategory = "signal"
+)
+
+// AllValues returns all SessionExpiredEventCategory values.
+func (SessionExpiredEventCategory) AllValues() []SessionExpiredEventCategory {
+	return []SessionExpiredEventCategory{
+		SessionExpiredEventCategoryRequest,
+		SessionExpiredEventCategoryAuth,
+		SessionExpiredEventCategorySession,
+		SessionExpiredEventCategoryAdmin,
+		SessionExpiredEventCategoryEntity,
+		SessionExpiredEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SessionExpiredEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case SessionExpiredEventCategoryRequest:
+		return []byte(s), nil
+	case SessionExpiredEventCategoryAuth:
+		return []byte(s), nil
+	case SessionExpiredEventCategorySession:
+		return []byte(s), nil
+	case SessionExpiredEventCategoryAdmin:
+		return []byte(s), nil
+	case SessionExpiredEventCategoryEntity:
+		return []byte(s), nil
+	case SessionExpiredEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SessionExpiredEventCategory) UnmarshalText(data []byte) error {
+	switch SessionExpiredEventCategory(data) {
+	case SessionExpiredEventCategoryRequest:
+		*s = SessionExpiredEventCategoryRequest
+		return nil
+	case SessionExpiredEventCategoryAuth:
+		*s = SessionExpiredEventCategoryAuth
+		return nil
+	case SessionExpiredEventCategorySession:
+		*s = SessionExpiredEventCategorySession
+		return nil
+	case SessionExpiredEventCategoryAdmin:
+		*s = SessionExpiredEventCategoryAdmin
+		return nil
+	case SessionExpiredEventCategoryEntity:
+		*s = SessionExpiredEventCategoryEntity
+		return nil
+	case SessionExpiredEventCategorySignal:
+		*s = SessionExpiredEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type SessionExpiredEventDelegationType string
+
+const (
+	SessionExpiredEventDelegationTypeDirect    SessionExpiredEventDelegationType = "direct"
+	SessionExpiredEventDelegationTypeDelegated SessionExpiredEventDelegationType = "delegated"
+	SessionExpiredEventDelegationTypePatShared SessionExpiredEventDelegationType = "pat_shared"
+	SessionExpiredEventDelegationTypeExchanged SessionExpiredEventDelegationType = "exchanged"
+)
+
+// AllValues returns all SessionExpiredEventDelegationType values.
+func (SessionExpiredEventDelegationType) AllValues() []SessionExpiredEventDelegationType {
+	return []SessionExpiredEventDelegationType{
+		SessionExpiredEventDelegationTypeDirect,
+		SessionExpiredEventDelegationTypeDelegated,
+		SessionExpiredEventDelegationTypePatShared,
+		SessionExpiredEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SessionExpiredEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case SessionExpiredEventDelegationTypeDirect:
+		return []byte(s), nil
+	case SessionExpiredEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case SessionExpiredEventDelegationTypePatShared:
+		return []byte(s), nil
+	case SessionExpiredEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SessionExpiredEventDelegationType) UnmarshalText(data []byte) error {
+	switch SessionExpiredEventDelegationType(data) {
+	case SessionExpiredEventDelegationTypeDirect:
+		*s = SessionExpiredEventDelegationTypeDirect
+		return nil
+	case SessionExpiredEventDelegationTypeDelegated:
+		*s = SessionExpiredEventDelegationTypeDelegated
+		return nil
+	case SessionExpiredEventDelegationTypePatShared:
+		*s = SessionExpiredEventDelegationTypePatShared
+		return nil
+	case SessionExpiredEventDelegationTypeExchanged:
+		*s = SessionExpiredEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Field to filter sessions by:
 //
 //   - `created_at`: RFC3339 timestamp
@@ -116644,6 +117244,7 @@ func (*WebhookDelivered) requestApiRes()                  {}
 func (*WebhookDelivered) schemaCreatedRes()               {}
 func (*WebhookDelivered) sessionDeletedRes()              {}
 func (*WebhookDelivered) sessionEstablishedRes()          {}
+func (*WebhookDelivered) sessionExpiredRes()              {}
 func (*WebhookDelivered) teamCreatedRes()                 {}
 func (*WebhookDelivered) teamDeactivatedRes()             {}
 func (*WebhookDelivered) teamUpdatedRes()                 {}
@@ -116714,6 +117315,7 @@ func (*WebhookNotDelivered) requestApiRes()                  {}
 func (*WebhookNotDelivered) schemaCreatedRes()               {}
 func (*WebhookNotDelivered) sessionDeletedRes()              {}
 func (*WebhookNotDelivered) sessionEstablishedRes()          {}
+func (*WebhookNotDelivered) sessionExpiredRes()              {}
 func (*WebhookNotDelivered) teamCreatedRes()                 {}
 func (*WebhookNotDelivered) teamDeactivatedRes()             {}
 func (*WebhookNotDelivered) teamUpdatedRes()                 {}

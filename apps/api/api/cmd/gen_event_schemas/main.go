@@ -52,6 +52,7 @@ var payloadByEventType = map[string]string{
 
 	"session.established": "session-established-payload.yaml",
 	"session.deleted":     "session-deleted-payload.yaml",
+	"session.expired":     "empty-event-payload.yaml",
 
 	"flow.signup_challenge.issued":   "empty-event-payload.yaml",
 	"flow.signup_challenge.consumed": "empty-event-payload.yaml",
@@ -164,6 +165,8 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"session.established": {description: "A session was established, by a sign-in or by exchanging a session."},
 	"session.deleted":     {description: "A session was revoked."},
+	"session.expired": {description: "A session expired and was reaped by the background sweeper. " +
+		"The actor type is system."},
 
 	"flow.signup_challenge.issued":   {description: "A sign-up proof-of-work challenge was issued."},
 	"flow.signup_challenge.consumed": {description: "A signup proof was spent before attempting user creation."},
