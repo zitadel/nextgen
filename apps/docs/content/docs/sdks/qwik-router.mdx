@@ -50,7 +50,7 @@ Setup installs both packages. To add them yourself, install them as dev dependen
     The CLI adds the plugin, the routes, environment files, and both SDK packages. No config file changes: Qwik Router picks up `plugin@*.ts` route files on its own.
 
     <Files>
-      <File name="src/routes/plugin@nextgen.ts" />
+      <File name="src/routes/plugin@zitadel.ts" />
       <File name="src/routes/index.tsx" />
       <File name="src/routes/login/index.tsx" />
       <File name="src/routes/register/index.tsx" />
@@ -63,12 +63,12 @@ Setup installs both packages. To add them yourself, install them as dev dependen
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Create `src/routes/plugin@nextgen.ts`. The handler reads `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` per request from the request event's `env`, which is where Vite loads `.env.local`:
+    Create `src/routes/plugin@zitadel.ts`. The handler reads `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` per request from the request event's `env`, which is where Vite loads `.env.local`:
 
     ```ts
-    import { createNextgenMiddleware } from "@zitadel/sdk-qwik-router/server";
+    import { createZitadelOnRequest } from "@zitadel/sdk-qwik-router/server";
 
-    export const onRequest = createNextgenMiddleware({
+    export const onRequest = createZitadelOnRequest({
       protectedRoutes: ["/profile"],
       loginPath: "/login",
     });

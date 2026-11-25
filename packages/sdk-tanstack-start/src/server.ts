@@ -1,23 +1,23 @@
 /**
  * The server entry for TanStack Start apps.
  *
- * It exports the request middleware factory {@link createNextgenMiddleware}, the plain decision
- * function {@link handleNextgenRequest} for a custom server entry, and {@link getAuth} to read
+ * It exports the request middleware factory {@link createZitadelRequestMiddleware}, the plain decision
+ * function {@link handleZitadelRequest} for a custom server entry, and {@link getAuth} to read
  * the signed-in user in a server function. It runs on Node.js and on edge runtimes such as
  * Cloudflare Workers and Vercel Edge, because it needs no Node built-ins.
  *
  * @module
  */
-export { handleNextgenRequest, createNextgenMiddleware, getAuth } from "./middleware";
+export { handleZitadelRequest, createZitadelRequestMiddleware, getAuth } from "./middleware";
 export type {
-  NextgenRequestDecision,
-  NextgenRequestOptions,
+  ZitadelRequestDecision,
+  ZitadelRequestOptions,
   RequestMiddlewareContext,
 } from "./middleware";
 export type {
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   AuthResult,
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   ClientAuthResult,

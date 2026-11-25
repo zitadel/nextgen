@@ -1,8 +1,8 @@
-export { createNextgenMiddleware, getAuth } from "./runtime/server/middleware";
+export { createZitadelMiddleware, getAuth } from "./runtime/server/middleware";
 export type {
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   AuthResult,
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   ClientAuthResult,

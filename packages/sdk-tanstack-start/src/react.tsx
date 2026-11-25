@@ -132,7 +132,7 @@ function clientOnly<P, R>(Component: Widget<P, R>, displayName: string): Widget<
  *
  * Use it on the login and register pages, with the project handle from
  * {@link client!configureZitadel}. The widget talks to the backend through the same-origin
- * proxy path that {@link server!createNextgenMiddleware} serves, so register the middleware
+ * proxy path that {@link server!createZitadelRequestMiddleware} serves, so register the middleware
  * first. The widget returns to the protected route that sent the visitor to the login page,
  * following `next` only when it is a path on the page's own origin. It also accepts the
  * standard HTML attributes (`class`, `style`, `id`, `aria-*`, `data-*` and similar), and no

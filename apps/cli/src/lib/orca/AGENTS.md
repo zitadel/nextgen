@@ -19,3 +19,8 @@ runs as the CLI's own control flow, so the CLI's code style does not apply to it
 - A scanner's edge cases (unbalanced brackets, quotes, escapes) are pinned by
   its tests; a rewrite that is not a behaviour change has no reason to exist.
 - Brief every agent and subagent with these rules before any repo-wide sweep.
+- A name an SDK exports (an import, a factory, a configuration key, a route
+  file name) is written by a template here: when an SDK renames one, change the
+  template and its unit test only, regenerate the fixtures
+  (`turbo run generate --filter=@zitadel/conformance-<name>`), and read the
+  patcher's diff line by line before it is committed.

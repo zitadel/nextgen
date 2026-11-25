@@ -5,11 +5,11 @@
  * SDK, so their documentation lives there.
  */
 export type {
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   // Client-safe auth shapes (token absent), declared once in sdk-core.
   ClientSession,
   ClientAuthState,

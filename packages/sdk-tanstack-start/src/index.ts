@@ -8,18 +8,18 @@
  *
  * @module
  */
-export { handleNextgenRequest, createNextgenMiddleware, getAuth } from "./server.js";
+export { handleZitadelRequest, createZitadelRequestMiddleware, getAuth } from "./server.js";
 export type {
-  NextgenRequestDecision,
-  NextgenRequestOptions,
+  ZitadelRequestDecision,
+  ZitadelRequestOptions,
   RequestMiddlewareContext,
 } from "./server.js";
 export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
 export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";
 export type {
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   AuthResult,
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   ClientAuthResult,

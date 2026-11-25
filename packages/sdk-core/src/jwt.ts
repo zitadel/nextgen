@@ -855,7 +855,7 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     // Any other unexpected error (network failure, malformed JWKS, Web Crypto
     // exception) is worth logging so operators can distinguish infrastructure
     // failures from genuine bad tokens.
-    console.error("[nextgen] verifyJwt unexpected error:", err);
+    console.error("[zitadel] verifyJwt unexpected error:", err);
     return null;
   }
 }

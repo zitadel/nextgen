@@ -11,7 +11,7 @@ import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
  * `src/start.ts` — the TanStack Start server entry that the framework auto-loads
  * (`#tanstack-start-entry`). It must export a `startInstance` from `createStart`;
  * we wire a global request middleware via `requestMiddleware`. The middleware is
- * built from `createNextgenMiddleware`, which on every request proxies
+ * built from `createZitadelRequestMiddleware`, which on every request proxies
  * `/__nextgen/*` to the auth backend (attaching the project service-key from
  * `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
  * unauthenticated requests away from protected routes. `url` and `projectSecret`
@@ -27,14 +27,14 @@ import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 export function startTemplate(): string {
   return `${ManagedFile.MARKER}
 import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
-import { createNextgenMiddleware } from "@zitadel/sdk-tanstack-start/server";
+import { createZitadelRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
 
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
 const authMiddleware = createMiddleware({ type: "request" }).server(
-  createNextgenMiddleware({
+  createZitadelRequestMiddleware({
     protectedRoutes: ["/profile"],
     loginPath: "/login",
   }),

@@ -10,21 +10,21 @@ const defaultValue: ClientAuthResult = { isAuthenticated: false, session: null }
  * The React context that carries the client-safe auth state. It defaults to signed out, so a
  * component rendered outside a provider never throws.
  */
-const NextgenAuthContext = createContext<ClientAuthResult>(defaultValue);
+const ZitadelAuthContext = createContext<ClientAuthResult>(defaultValue);
 
 /**
  * Provides a client-safe auth state to the client components below it.
  *
- * In the standard server-seeded setup, render {@link server!NextgenProvider | NextgenProvider}
+ * In the standard server-seeded setup, render {@link server!ZitadelProvider | ZitadelProvider}
  * from `@zitadel/sdk-next/server` instead. It converts the result of
- * {@link server!getAuth | getAuth} to the client-safe shape and drops the raw session token before
+ * {@link server!auth | auth} to the client-safe shape and drops the raw session token before
  * the value crosses the server-to-client boundary, and its `server-only` guard keeps it out of
  * client wrappers where the strip would come too late.
  *
  * Render this component directly only from client code that already holds a client-safe value,
  * for example a state seeded from a {@link session!getSession | getSession} read in an effect.
  * The `value` prop is typed as {@link ClientAuthResult} on purpose: passing the token-bearing
- * result of {@link server!getAuth | getAuth} is a type error, so the raw session token cannot
+ * result of {@link server!auth | auth} is a type error, so the raw session token cannot
  * enter client-side state by accident. Without any provider above, {@link useAuth} reads as
  * signed out.
  *
@@ -52,7 +52,7 @@ export function AuthContextProvider({
    * The client-safe auth state that every {@link useAuth} call below this provider reads.
    *
    * It is typed as {@link ClientAuthResult} so that a token-bearing result of
-   * {@link server!getAuth | getAuth} is a type error here. The provider does not copy or
+   * {@link server!auth | auth} is a type error here. The provider does not copy or
    * validate the value, so pass an object that is already token-less.
    */
   value: ClientAuthResult;
@@ -61,7 +61,7 @@ export function AuthContextProvider({
    */
   children: ReactNode;
 }) {
-  return <NextgenAuthContext.Provider value={value}>{children}</NextgenAuthContext.Provider>;
+  return <ZitadelAuthContext.Provider value={value}>{children}</ZitadelAuthContext.Provider>;
 }
 
 /**
@@ -86,5 +86,5 @@ export function AuthContextProvider({
  * ```
  */
 export function useAuthContext(): ClientAuthResult {
-  return useContext(NextgenAuthContext);
+  return useContext(ZitadelAuthContext);
 }

@@ -2,12 +2,12 @@
  * The client-safe React bindings of `@zitadel/sdk-next`, for Client Components.
  *
  * This is the entry point for modules that start with `"use client"`. It pulls in no server-only
- * module (`next/headers`, {@link server!getAuth | getAuth}), so it is safe to import anywhere. It
+ * module (`next/headers`, {@link server!auth | auth}), so it is safe to import anywhere. It
  * exposes {@link useAuth} to read the signed-in state and {@link AuthContextProvider} to seed it
  * from client-side data.
  *
- * {@link server!NextgenProvider | NextgenProvider} is deliberately not exported here. It accepts
- * the token-bearing result of {@link server!getAuth | getAuth}, so it must run in a Server
+ * {@link server!ZitadelProvider | ZitadelProvider} is deliberately not exported here. It accepts
+ * the token-bearing result of {@link server!auth | auth}, so it must run in a Server
  * Component: wrapping it in a `"use client"` file would serialize the raw session token across the
  * server-to-client boundary before the provider strips it, and any script on the page could read it
  * from the flight payload. Import it from `@zitadel/sdk-next/server` instead, where the
@@ -36,6 +36,6 @@ export type {
   ClientAuthResult,
   ClientAuthState,
   ClientSession,
-  NextgenSession,
+  ZitadelAuthSession,
   UnauthState,
 } from "./types.js";

@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 /**
- * Return to the protected route after sign-in. `createNextgenMiddleware` sends a
+ * Return to the protected route after sign-in. `zitadelMiddleware` sends a
  * signed-out request for a protected route to `/login?next=<path and query>`,
  * and `<zitadel-login>` returns there once the session cookie is set, instead of
  * going to its `post-sign-in-url` (`/admin` in this demo). Which values the

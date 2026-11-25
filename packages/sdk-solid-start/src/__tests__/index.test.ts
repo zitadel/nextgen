@@ -5,7 +5,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import * as client from "../client";
 import * as index from "../index";
 import * as server from "../server";
-import type { AuthResult, AuthState, NextgenSession, UnauthState } from "../index";
+import type { AuthResult, AuthState, ZitadelAuthSession, UnauthState } from "../index";
 
 // The package ships only what its build emits, so an `exports` target the build
 // misses breaks every consumer that imports it. `test` runs after `build`.
@@ -61,7 +61,7 @@ describe("index entry", () => {
   // does with every other server SDK.
   it("exports the types its helpers answer with", () => {
     expectTypeOf(index.getAuth).returns.toEqualTypeOf<AuthResult>();
-    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
+    expectTypeOf<AuthState["session"]>().toEqualTypeOf<ZitadelAuthSession>();
     expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
   });
 });

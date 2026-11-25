@@ -4,25 +4,25 @@ import type {
   AuthOptions,
   AuthResult,
   AuthState,
-  NextgenMiddlewareOptions,
-  NextgenSession,
+  ZitadelMiddlewareOptions,
+  ZitadelAuthSession,
   UnauthState,
 } from "../server";
 
-import { getAuth, NextgenProvider } from "../server";
+import { auth, ZitadelProvider } from "../server";
 
 describe("server entry", () => {
-  // A Server Component imports `getAuth` and the types it answers with from one
+  // A Server Component imports `auth` and the types it answers with from one
   // place, as it does with every other server SDK.
   it("exports the types its helpers answer with", () => {
-    expectTypeOf(getAuth).returns.resolves.toEqualTypeOf<AuthResult>();
-    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
+    expectTypeOf(auth).returns.resolves.toEqualTypeOf<AuthResult>();
+    expectTypeOf<AuthState["session"]>().toEqualTypeOf<ZitadelAuthSession>();
     expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
-    expectTypeOf<AuthOptions["audience"]>().toEqualTypeOf<NextgenMiddlewareOptions["audience"]>();
+    expectTypeOf<AuthOptions["audience"]>().toEqualTypeOf<ZitadelMiddlewareOptions["audience"]>();
   });
 
   it("loads and exports the server helpers", () => {
-    expect(getAuth).toBeTypeOf("function");
-    expect(NextgenProvider).toBeTypeOf("function");
+    expect(auth).toBeTypeOf("function");
+    expect(ZitadelProvider).toBeTypeOf("function");
   });
 });

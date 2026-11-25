@@ -68,7 +68,7 @@ function warnMissingProject(): void {
   }
   warnedMissingProject = true;
   console.warn(
-    "[nextgen] getSession(): no project id is known, so no session counts as signed in. " +
+    "[zitadel] getSession(): no project id is known, so no session counts as signed in. " +
       "Pass `projectId` or call configureZitadel() first.",
   );
 }
@@ -121,7 +121,7 @@ function warnMissingProject(): void {
 export async function getSession(options: GetSessionOptions = {}): Promise<ClientAuthResult> {
   if (typeof window === "undefined") {
     throw new Error(
-      "[nextgen] getSession() reads the session from the browser; on a server, " +
+      "[zitadel] getSession() reads the session from the browser; on a server, " +
         "use your framework SDK's server-side session helper.",
     );
   }
@@ -168,7 +168,7 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
         ? ` (req.not_found: a server older than this SDK does not serve the API under ${API_PREFIX})`
         : "";
     throw new Error(
-      `[nextgen] Session read failed: HTTP ${response.status} from ${endpoint}${cause}`,
+      `[zitadel] Session read failed: HTTP ${response.status} from ${endpoint}${cause}`,
     );
   }
 

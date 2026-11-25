@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { getAuth } from "../request-handler";
-import type { ClientAuthResult, ClientSession, NextgenSession } from "../types";
+import type { ClientAuthResult, ClientSession, ZitadelAuthSession } from "../types";
 
 type ServerAuth = ReturnType<typeof getAuth>;
 
@@ -14,12 +14,12 @@ function stripToken(auth: ServerAuth): ClientAuthResult {
 
 describe("ClientAuthResult", () => {
   it("is the session getAuth() returns without its token", () => {
-    expectTypeOf<ClientSession>().toEqualTypeOf<Omit<NextgenSession, "token">>();
+    expectTypeOf<ClientSession>().toEqualTypeOf<Omit<ZitadelAuthSession, "token">>();
     expectTypeOf(stripToken).returns.toEqualTypeOf<ClientAuthResult>();
   });
 
   it("carries identifier, identifierProperty and display, not email and name", () => {
-    const session: NextgenSession = {
+    const session: ZitadelAuthSession = {
       userId: "u1",
       identifier: "a@example.com",
       identifierProperty: "email",

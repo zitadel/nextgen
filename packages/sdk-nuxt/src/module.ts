@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 
 import type { NuxtModule } from "@nuxt/schema";
-import type { NextgenMiddlewareOptions } from "./runtime/types";
+import type { ZitadelMiddlewareOptions } from "./runtime/types";
 
 const DEFAULT_PROXY_PATH = "/__nextgen";
 
@@ -93,24 +93,24 @@ function settingsLookup(rootDir: string): (name: string) => string | undefined {
  * The Nuxt module that wires Zitadel sign-in into an app.
  *
  * Add `"@zitadel/sdk-nuxt/module"` to `modules` in `nuxt.config.ts` and configure it under the
- * `nextgen` key with {@link NextgenMiddlewareOptions}. No `server/middleware` file is needed,
- * because the module registers the middleware itself. Use {@link server!createNextgenMiddleware} from
+ * `zitadel` key with {@link ZitadelMiddlewareOptions}. No `server/middleware` file is needed,
+ * because the module registers the middleware itself. Use {@link server!createZitadelMiddleware} from
  * the server entry instead only when the app must register the middleware by hand.
  *
  * What setup does:
  *
- * - Stores the options in the private `runtimeConfig.nextgen`. Each option can then still be
- *   changed on a running server through a `NUXT_NEXTGEN_<NAME>` environment variable, for example
- *   `NUXT_NEXTGEN_LOGIN_PATH` or `NUXT_NEXTGEN_PROTECTED_ROUTES='["/admin*"]'`. Nitro parses
+ * - Stores the options in the private `runtimeConfig.zitadel`. Each option can then still be
+ *   changed on a running server through a `NUXT_ZITADEL_<NAME>` environment variable, for example
+ *   `NUXT_ZITADEL_LOGIN_PATH` or `NUXT_ZITADEL_PROTECTED_ROUTES='["/admin*"]'`. Nitro parses
  *   those values, so a JSON list becomes a list and a number becomes a number.
  * - Never bakes `url` or `projectId` in from the build's environment. The running server reads
  *   `ZITADEL_URL` and `ZITADEL_PROJECT_ID` (or the public `NUXT_PUBLIC_ZITADEL_PROJECT_ID`) when
- *   it runs, so one build works in every environment. A value set under `nextgen` in
- *   `nuxt.config.ts` or in `NUXT_NEXTGEN_*` wins over `ZITADEL_*`. Only `nuxt dev` also reads
+ *   it runs, so one build works in every environment. A value set under `zitadel` in
+ *   `nuxt.config.ts` or in `NUXT_ZITADEL_*` wins over `ZITADEL_*`. Only `nuxt dev` also reads
  *   `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET` and the public project id from `.env.local`, where
  *   `zitadel setup` writes them, because the dev server writes no build output.
  * - Keeps the project secret on the server. The server reads it from
- *   `NUXT_NEXTGEN_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET` when it runs and sends it upstream
+ *   `NUXT_ZITADEL_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET` when it runs and sends it upstream
  *   only on the session-exchange call. It is never copied into the build output or the client
  *   bundle, because a build that copied it would leak it to anyone who can read `.output/`.
  * - Publishes `proxyPath` and the project id in the public runtime config, so the client plugin
@@ -139,20 +139,20 @@ function settingsLookup(rootDir: string): (name: string) => string | undefined {
  * ```ts
  * export default defineNuxtConfig({
  *   modules: ["@zitadel/sdk-nuxt/module"],
- *   nextgen: {
+ *   zitadel: {
  *     protectedRoutes: ["/dashboard*"],
  *     loginPath: "/login",
  *   },
  * });
  * ```
  *
- * @see {@link NextgenMiddlewareOptions} for every option and its default.
+ * @see {@link ZitadelMiddlewareOptions} for every option and its default.
  */
-const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
-  defineNuxtModule<NextgenMiddlewareOptions>({
+const zitadelModule: NuxtModule<ZitadelMiddlewareOptions> =
+  defineNuxtModule<ZitadelMiddlewareOptions>({
     meta: {
       name: "@zitadel/sdk-nuxt",
-      configKey: "nextgen",
+      configKey: "zitadel",
     },
     defaults: {
       proxyPath: DEFAULT_PROXY_PATH,
@@ -164,13 +164,13 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       const setting = settingsLookup(nuxt.options.rootDir);
       const proxyPath = options.proxyPath ?? DEFAULT_PROXY_PATH;
 
-      nuxt.options.runtimeConfig.nextgen = {
+      nuxt.options.runtimeConfig.zitadel = {
         // Only a URL the app set in nuxt.config is kept. The key exists (empty)
-        // so `NUXT_NEXTGEN_URL` can set it at runtime; `ZITADEL_URL` is read by
+        // so `NUXT_ZITADEL_URL` can set it at runtime; `ZITADEL_URL` is read by
         // the running server and never baked into the build.
         url: options.url || (nuxt.options.dev ? setting("ZITADEL_URL") : undefined) || "",
         // The project a session must belong to for its user to count as signed
-        // in, when set here or through NUXT_NEXTGEN_PROJECT_ID. Unset, the
+        // in, when set here or through NUXT_ZITADEL_PROJECT_ID. Unset, the
         // handler takes the public project id the widgets sign users in to,
         // which NUXT_PUBLIC_ZITADEL_PROJECT_ID sets at runtime, then
         // ZITADEL_PROJECT_ID at runtime. Nothing is read from the build's
@@ -194,7 +194,7 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
         jwtKey: options.jwtKey,
         // Server-only. Never filled from the build environment, which would
         // copy it into `.output/`: the running server reads it from
-        // `NUXT_NEXTGEN_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`. Only
+        // `NUXT_ZITADEL_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`. Only
         // `nuxt dev`, which writes no build output, fills it from `.env.local`
         // that the dev server would not otherwise see.
         projectSecret: (nuxt.options.dev ? setting("ZITADEL_PROJECT_SECRET") : undefined) ?? "",
@@ -204,7 +204,6 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       // call `configureZitadel()` without hardcoding paths.
       const publicConfig = nuxt.options.runtimeConfig.public;
       publicConfig.zitadelProxyPath = proxyPath;
-      publicConfig.nextgenProxyPath = proxyPath;
       // A project id set in `runtimeConfig.public` wins. The key is set even
       // when empty, so `NUXT_PUBLIC_ZITADEL_PROJECT_ID` can still fill it at
       // runtime.
@@ -245,4 +244,4 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
     },
   });
 
-export default nextgenModule;
+export default zitadelModule;

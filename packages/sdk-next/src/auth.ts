@@ -6,33 +6,33 @@ import { joinURL } from "ufo";
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import type { AuthResult, NextgenMiddlewareOptions } from "./types.js";
+import type { AuthResult, ZitadelMiddlewareOptions } from "./types.js";
 
 import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
 
 /**
- * Options for {@link getAuth}, the token-verification subset of the middleware options.
+ * Options for {@link auth}, the token-verification subset of the middleware options.
  *
- * The middleware verifies a session token before it tunnels it, and {@link getAuth} verifies it
+ * The middleware verifies a session token before it tunnels it, and {@link auth} verifies it
  * again, so both must apply the same rules. When the middleware runs with custom verification
  * settings, such as a non-default `audience` or `allowedAlgorithms`, pass the same values here.
- * Otherwise a token the middleware accepted can fail re-verification in {@link getAuth} and render
+ * Otherwise a token the middleware accepted can fail re-verification in {@link auth} and render
  * as signed out, with only a console warning to explain it. Each option has the meaning and the
- * default documented on {@link NextgenMiddlewareOptions}.
+ * default documented on {@link ZitadelMiddlewareOptions}.
  *
  * @example
  * ```ts
- * import { getAuth, type AuthOptions } from "@zitadel/sdk-next/server";
+ * import { auth, type AuthOptions } from "@zitadel/sdk-next/server";
  *
  * const options: AuthOptions = {
  *   projectId: process.env.ZITADEL_PROJECT_ID,
  *   audience: "https://api.example.com",
  * };
- * const auth = await getAuth(options);
+ * const auth = await auth(options);
  * ```
  */
 export type AuthOptions = Pick<
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   | "url"
   | "projectId"
   | "allowedAlgorithms"
@@ -48,7 +48,7 @@ export type AuthOptions = Pick<
  * to `projectId`.
  *
  * It wraps `checkOpaqueSessionToken` from `@zitadel/sdk-core`, which the middleware uses too, in
- * React's `cache()`. Many components that call {@link getAuth} in the same render pass then share a
+ * React's `cache()`. Many components that call {@link auth} in the same render pass then share a
  * single backend round trip. The arguments are primitives on purpose, because `cache()` memoizes
  * by argument identity: an options object would defeat the deduplication.
  */
@@ -60,7 +60,7 @@ const checkOpaqueSession = cache(
 /**
  * Reads and verifies the auth state in a React Server Component or a Next.js Route Handler.
  *
- * The middleware tunnels the session token to the render on the internal `x-nextgen-auth-token`
+ * The middleware tunnels the session token to the render on the internal `x-zitadel-auth-token`
  * request header, and this function verifies the token before it trusts it. The header alone is
  * never proof of anything, so every value it reads is verified:
  *
@@ -109,18 +109,22 @@ const checkOpaqueSession = cache(
  * the build. Client components read the state through {@link useAuth} from
  * `@zitadel/sdk-next/react` or through {@link session!getSession | getSession}.
  *
+ * Naming: auth() reads the request from the async context that Next.js provides (headers()), so
+ * it takes no request argument and is async. The other SDKs' getAuth(event) are synchronous and
+ * need the framework's event handed to them, which is why the two names differ.
+ *
  * @param options - Verification settings, which must match the middleware's; see
  *   {@link AuthOptions}.
  * @returns The current {@link AuthResult}. The `session.token` is the raw session token, for
  *   calling upstream APIs from the server. Never forward it into a client component:
- *   {@link NextgenProvider} strips it for you.
+ *   {@link ZitadelProvider} strips it for you.
  *
  * @example
  * ```tsx
- * import { getAuth } from "@zitadel/sdk-next/server";
+ * import { auth } from "@zitadel/sdk-next/server";
  *
  * export default async function Page() {
- *   const auth = await getAuth();
+ *   const auth = await auth();
  *   if (!auth.isAuthenticated) {
  *     return <p>Not signed in</p>;
  *   }
@@ -128,9 +132,9 @@ const checkOpaqueSession = cache(
  * }
  * ```
  */
-export async function getAuth(options: AuthOptions = {}): Promise<AuthResult> {
+export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   const headerStore = await headers();
-  const token = headerStore.get("x-nextgen-auth-token");
+  const token = headerStore.get("x-zitadel-auth-token");
 
   if (!token) {
     return { isAuthenticated: false, session: null };
@@ -186,12 +190,12 @@ export async function getAuth(options: AuthOptions = {}): Promise<AuthResult> {
     // same checks moments earlier). Reaching this branch means the header was
     // NOT vetted by the middleware — a route outside the `matcher` received a
     // client-forged header — or the JWKS endpoint is unreachable from this
-    // runtime, or getAuth() runs with verification options that diverge from the
+    // runtime, or auth() runs with verification options that diverge from the
     // middleware's.
     console.warn(
-      "[nextgen] getAuth(): rejected an x-nextgen-auth-token header that failed JWT " +
+      "[zitadel] auth(): rejected an x-zitadel-auth-token header that failed JWT " +
         "verification. If this route is not covered by the middleware matcher, this was " +
-        "a forged client header; otherwise check that getAuth() and the middleware use the " +
+        "a forged client header; otherwise check that auth() and the middleware use the " +
         `same verification options and that the JWKS endpoint at ${joinURL(url, "/auth/keys")} is reachable.`,
     );
     return { isAuthenticated: false, session: null };
@@ -219,7 +223,7 @@ export async function getAuth(options: AuthOptions = {}): Promise<AuthResult> {
 let warnedMissingProject = false;
 
 /**
- * Warns once per process that no project id is configured, which is why {@link getAuth} signs no
+ * Warns once per process that no project id is configured, which is why {@link auth} signs no
  * one in. Logging once keeps a misconfigured app from flooding its server log on every render.
  */
 function warnMissingProject(): void {
@@ -228,8 +232,8 @@ function warnMissingProject(): void {
   }
   warnedMissingProject = true;
   console.warn(
-    "[nextgen] getAuth(): no project id is configured, so no session counts as signed in. " +
-      "Set ZITADEL_PROJECT_ID, or pass the middleware's `projectId` to getAuth() (with " +
+    "[zitadel] auth(): no project id is configured, so no session counts as signed in. " +
+      "Set ZITADEL_PROJECT_ID, or pass the middleware's `projectId` to auth() (with " +
       "createProxy(config), that is config.projectId).",
   );
 }

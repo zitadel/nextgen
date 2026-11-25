@@ -12,7 +12,7 @@ import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middlewar
 
 import type { RequestMiddlewareContext } from "../middleware";
 
-import { createNextgenMiddleware, getAuth } from "../middleware";
+import { createZitadelRequestMiddleware, getAuth } from "../middleware";
 
 async function serve(
   url: string,
@@ -22,14 +22,14 @@ async function serve(
   const request = new Request(url, { method: init.method ?? "GET", headers: init.headers });
   let continued = false;
   let auth: AuthResult | undefined;
-  const response = await createNextgenMiddleware({
+  const response = await createZitadelRequestMiddleware({
     ...options,
     clientAddress: init.clientIp,
   })({
     request,
     next: async (opts) => {
       continued = true;
-      auth = opts?.context?.nextgenAuth as AuthResult | undefined;
+      auth = opts?.context?.zitadelAuth as AuthResult | undefined;
       return { response: new Response("ok", { status: 200 }) };
     },
   });
@@ -54,15 +54,15 @@ function configureProject(configured?: string, environment?: string): ServeOptio
 }
 
 async function readAuth(context: unknown): Promise<AuthResult> {
-  return getAuth(context as { readonly nextgenAuth?: AuthResult } | undefined);
+  return getAuth(context as { readonly zitadelAuth?: AuthResult } | undefined);
 }
 
 function expectHandlerType(): void {
-  expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toExtend<
+  expectTypeOf(createZitadelRequestMiddleware({ url: "http://localhost:4000" })).toExtend<
     (ctx: RequestMiddlewareContext) => Promise<Response>
   >();
   // TanStack Start types next() as returning its result with or without a promise.
-  expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toBeCallableWith({
+  expectTypeOf(createZitadelRequestMiddleware({ url: "http://localhost:4000" })).toBeCallableWith({
     request: new Request("http://localhost:3000/"),
     next: () => ({ response: new Response("ok") }),
   });

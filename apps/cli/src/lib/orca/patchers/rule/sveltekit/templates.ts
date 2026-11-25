@@ -9,7 +9,7 @@ const WIDGET_WRAP =
   "position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark";
 
 /**
- * `src/hooks.server.ts` — the SvelteKit server hook. `createNextgenMiddleware`
+ * `src/hooks.server.ts` — the SvelteKit server hook. `createZitadelHandle`
  * proxies `/__nextgen/*` to the auth backend (attaching the project service-key
  * from `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
  * unauthenticated requests away from protected routes. The settings come from
@@ -20,9 +20,9 @@ const WIDGET_WRAP =
 export function hooksServerTemplate(): string {
   return `${ManagedFile.MARKER}
 import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
-import { createNextgenMiddleware } from "@zitadel/sdk-sveltekit/server";
+import { createZitadelHandle } from "@zitadel/sdk-sveltekit/server";
 
-export const handle = createNextgenMiddleware({
+export const handle = createZitadelHandle({
   url: ZITADEL_URL,
   projectSecret: ZITADEL_PROJECT_SECRET,
   projectId: ZITADEL_PROJECT_ID,

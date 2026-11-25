@@ -38,13 +38,11 @@ describe("QwikRouterPatcher.plan", () => {
   it("writes the onRequest plugin and file-based routes under src/", () => {
     const plan = new QwikRouterPatcher().plan(ctx());
 
-    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(ManagedFile.MARKER);
-    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(
+    expect(writeContents(plan, "src/routes/plugin@zitadel.ts")).toContain(ManagedFile.MARKER);
+    expect(writeContents(plan, "src/routes/plugin@zitadel.ts")).toContain(
       "@zitadel/sdk-qwik-router/server",
     );
-    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(
-      "createNextgenMiddleware",
-    );
+    expect(writeContents(plan, "src/routes/plugin@zitadel.ts")).toContain("createZitadelOnRequest");
 
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain('purpose="login"');
@@ -62,7 +60,7 @@ describe("QwikRouterPatcher.plan", () => {
     // on it or overwrites it under --force.
     expect(writeContents(plan, "src/routes/index.tsx")).toBeUndefined();
     // The auth boundary and the auth routes are still written.
-    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(ManagedFile.MARKER);
+    expect(writeContents(plan, "src/routes/plugin@zitadel.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register/index.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("ZitadelSession");
@@ -82,7 +80,7 @@ describe("QwikRouterPatcher.plan", () => {
   });
 
   it.each([
-    "src/routes/plugin@nextgen.ts",
+    "src/routes/plugin@zitadel.ts",
     "src/routes/index.tsx",
     "src/routes/login/index.tsx",
     "src/routes/register/index.tsx",
@@ -168,7 +166,7 @@ describe("QwikRouterPatcher.artifacts", () => {
       framework: { id: "qwik-router", appDir: "src", devPort: 5173, url: "http://localhost:5173" },
       rendererId: "qwik",
     });
-    expect(artifacts.markedFiles).toContain("src/routes/plugin@nextgen.ts");
+    expect(artifacts.markedFiles).toContain("src/routes/plugin@zitadel.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login/index.tsx");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-qwik-router", "@zitadel/sdk-qwik"]);
     expect(artifacts.configEdits).toEqual(["package.json"]);

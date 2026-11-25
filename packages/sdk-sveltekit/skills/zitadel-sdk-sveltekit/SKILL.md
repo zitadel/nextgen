@@ -11,10 +11,10 @@ description: >-
 
 # @zitadel/sdk-sveltekit
 
-A SvelteKit `handle` hook and helpers that add Zitadel (Nextgen) auth to a
+A SvelteKit `handle` hook and helpers that add Zitadel auth to a
 SvelteKit app. The hook proxies auth traffic same-origin under `/__nextgen`,
 verifies the session JWT via JWKS on the server, writes the result to
-`event.locals.nextgenAuth`, and redirects unauthenticated requests on protected
+`event.locals.zitadelAuth`, and redirects unauthenticated requests on protected
 routes. The package is server-only; the widgets come from `@zitadel/sdk-svelte`.
 
 ## When to use
@@ -56,9 +56,9 @@ Then create or extend `src/hooks.server.ts`:
 
 ```ts
 import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from '$app/env/private';
-import { createNextgenMiddleware } from '@zitadel/sdk-sveltekit/server';
+import { createZitadelHandle } from '@zitadel/sdk-sveltekit/server';
 
-export const handle = createNextgenMiddleware({
+export const handle = createZitadelHandle({
   url: ZITADEL_URL,
   projectSecret: ZITADEL_PROJECT_SECRET,
   projectId: ZITADEL_PROJECT_ID,
@@ -141,7 +141,7 @@ names and defaults against the installed version rather than assuming.
 - **Mount the widgets client-side only.** Their config is set as element
   properties, which server-rendered markup cannot carry; use `onMount`, not the
   deprecated `$app/environment` (SvelteKit 3).
-- **Keep `App.Locals` declared.** The package merges `nextgenAuth` into it, so
+- **Keep `App.Locals` declared.** The package merges `zitadelAuth` into it, so
   `src/app.d.ts` must keep the `App` namespace with a `Locals` interface.
 - **Client-side navigation skips the hook.** Without a `+page.server.ts` guard,
   only the `ZitadelSession` card sends a signed-out visitor away.

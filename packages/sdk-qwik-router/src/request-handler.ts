@@ -1,6 +1,6 @@
 import type {
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -49,7 +49,7 @@ export interface QwikCookieValue {
  * The handler always sets `path: "/"`, `httpOnly: true` and `sameSite: "lax"`, so the session
  * cookie is never readable from page scripts and is still sent on a top-level navigation back
  * to the app, for example the redirect from an identity provider. You never build this type; it
- * documents what {@link createNextgenMiddleware} writes. Only `secure` and `maxAge` vary, and
+ * documents what {@link createZitadelOnRequest} writes. Only `secure` and `maxAge` vary, and
  * both come from the session verdict.
  */
 export interface QwikCookieOptions {
@@ -96,7 +96,7 @@ export interface QwikCookieOptions {
  * fields the handler touches keeps the built output free of a Qwik import, the same way
  * `sdk-nuxt` shims the imports of Nuxt. The shape is structurally compatible with the real
  * `RequestEvent` (a type-level test asserts it), so the handler that
- * {@link createNextgenMiddleware} returns drops straight into an `onRequest` export. You never
+ * {@link createZitadelOnRequest} returns drops straight into an `onRequest` export. You never
  * build one; Qwik passes the real event. Use this type only to type a test double for the
  * handler.
  *
@@ -395,7 +395,7 @@ async function proxyResponse(
 /**
  * The key under which the auth result is stored on {@link QwikRequestEvent.sharedMap}.
  */
-const SHARED_MAP_KEY = "nextgenAuth";
+const SHARED_MAP_KEY = "zitadelAuth";
 
 /**
  * The route policy, plus what the shared session resolution judges the session by.
@@ -503,11 +503,11 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  * Creates the Qwik Router `onRequest` handler that proxies, verifies sessions and guards routes
  * in a single pass.
  *
- * Use it once per app, in a root plugin such as `src/routes/plugin@nextgen.ts` or in a root
+ * Use it once per app, in a root plugin such as `src/routes/plugin@zitadel.ts` or in a root
  * layout, so it runs before every route. It replaces hand-written auth plumbing: without it the
  * browser cannot reach the same-origin proxy path, {@link getAuth} has nothing to read, and no
  * route is guarded. On each request it works in this order. It answers `400` when the request
- * carries the internal `x-nextgen-auth-token` header. That header is an internal channel that
+ * carries the internal `x-zitadel-auth-token` header. That header is an internal channel that
  * only the SDK writes after verifying a session, so refusing it outright, on every route
  * including ignored routes and the proxy path, is safer than trying to strip it. A client that
  * copies headers from an earlier response and sends it is rejected, not ignored. It skips paths
@@ -531,28 +531,32 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  * {@link getAuth}. When the backend cannot say whether a session is live, a protected route
  * answers `503` instead of redirecting.
  *
- * @param options - See {@link NextgenMiddlewareOptions}. The extra `projectSecret` is the project
+ * Naming: A Qwik Router route file exports its server hook as onRequest, so the name ends in
+ * OnRequest and the call reads export const onRequest = createZitadelOnRequest(...). It is a
+ * factory, called once to return the handler, so it starts with create.
+ *
+ * @param options - See {@link ZitadelMiddlewareOptions}. The extra `projectSecret` is the project
  *   service key, sent as the bearer on the `POST /sessions/exchange` handoff only. It takes
  *   precedence over `ZITADEL_PROJECT_SECRET`.
  * @returns The `onRequest` handler to export from a root plugin or layout.
  * @throws An `Error` when `loginPath` is not a relative path that starts with a single `/`. An
  *   absolute or protocol-relative URL would allow an open redirect, so it is refused when the
  *   handler is built rather than at the first redirect.
- * @defaultValue `{}`, which uses the defaults of {@link NextgenMiddlewareOptions} and the
+ * @defaultValue `{}`, which uses the defaults of {@link ZitadelMiddlewareOptions} and the
  *   environment.
  * @example
  * ```ts
- * // src/routes/plugin@nextgen.ts
- * import { createNextgenMiddleware } from "@zitadel/sdk-qwik-router/server";
+ * // src/routes/plugin@zitadel.ts
+ * import { createZitadelOnRequest } from "@zitadel/sdk-qwik-router/server";
  *
- * export const onRequest = createNextgenMiddleware({
+ * export const onRequest = createZitadelOnRequest({
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
  * ```
  */
-export function createNextgenMiddleware(
-  options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
+export function createZitadelOnRequest(
+  options: ZitadelMiddlewareOptions & { projectSecret?: string } = {},
 ): (ev: QwikRequestEvent) => Promise<void> {
   const {
     url: urlOption,
@@ -574,7 +578,7 @@ export function createNextgenMiddleware(
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
     throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+      `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
         `would allow open-redirect attacks.`,
     );
@@ -583,9 +587,9 @@ export function createNextgenMiddleware(
   return async (ev: QwikRequestEvent): Promise<void> => {
     const { pathname } = ev.url;
 
-    // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+    // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
     // request that carries it, on every route, before anything else runs.
-    if (ev.request.headers.has("x-nextgen-auth-token")) {
+    if (ev.request.headers.has("x-zitadel-auth-token")) {
       ev.send(new Response("Bad Request", { status: 400 }));
       return;
     }
@@ -638,11 +642,15 @@ export function createNextgenMiddleware(
  * Call it in a `routeLoader$`, a `routeAction$` or an endpoint to learn who is signed in, and
  * use it to guard client-side navigations, which the handler's `protectedRoutes` does not cover.
  * It reads from {@link QwikRequestEvent.sharedMap}, so it works only after the handler from
- * {@link createNextgenMiddleware} ran earlier in the same request. When no handler ran, for
+ * {@link createZitadelOnRequest} ran earlier in the same request. When no handler ran, for
  * example on a path matched by `ignoredRoutes`, it returns the unauthenticated result rather
  * than throwing. An unauthenticated result also means that the check could not decide on a
  * route that is not protected, so do not treat it as proof that the user has no session. The result holds the session token, so do not return it from a loader to the
  * browser; return only the fields the page needs.
+ *
+ * Naming: Takes the framework's own request event or context and returns the verified result
+ * that the handler stored on it. It reads and never creates, so it is called getAuth, and it is
+ * synchronous because the framework has already handed over the event.
  *
  * @param ev - The current Qwik Router request event, or any object with a `sharedMap`.
  * @returns The current {@link AuthResult}, unauthenticated with a `null` session when the

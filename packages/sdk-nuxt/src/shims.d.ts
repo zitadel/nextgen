@@ -14,11 +14,11 @@ interface ImportMeta {
 declare module "#imports" {
   export function useState<T>(key: string, init: () => T): { readonly value: T };
   export function defineNuxtPlugin(setup: () => void): unknown;
-  // Nuxt returns the h3 event; its context is augmented with `nextgenAuth`
+  // Nuxt returns the h3 event; its context is augmented with `zitadelAuth`
   // by runtime/server/middleware.ts.
   export function useRequestEvent(): import("h3").H3Event | undefined;
   export function useRuntimeConfig(): {
-    nextgen?: {
+    zitadel?: {
       url?: string;
       issuerUrl?: string;
       proxyPath?: string;

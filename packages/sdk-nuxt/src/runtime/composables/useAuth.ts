@@ -34,7 +34,7 @@ import type { ClientAuthResult } from "../types";
  * ```
  */
 export const useAuth = (): ClientAuthResult =>
-  useState<ClientAuthResult>("nextgen-auth", () => ({
+  useState<ClientAuthResult>("zitadel-auth", () => ({
     isAuthenticated: false,
     session: null,
   })).value;

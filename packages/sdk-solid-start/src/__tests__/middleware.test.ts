@@ -14,7 +14,7 @@ import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middlewar
 
 import type { SolidFetchEvent } from "../middleware";
 
-import { createNextgenMiddleware, getAuth } from "../middleware";
+import { createZitadelMiddleware, getAuth } from "../middleware";
 
 async function serve(
   url: string,
@@ -27,7 +27,7 @@ async function serve(
     clientAddress: init.clientIp,
     response: { headers: new Headers() },
   };
-  const response = await createNextgenMiddleware(options).onRequest[0]!(event);
+  const response = await createZitadelMiddleware(options).onRequest[0]!(event);
   const headers = new Headers(response?.headers);
   // SolidStart merges the response stub's headers into the page it sends.
   if (!response) {
@@ -42,7 +42,7 @@ async function serve(
     answered: response !== undefined,
     status: response?.status ?? 200,
     headers,
-    auth: event.locals.nextgenAuth,
+    auth: event.locals.zitadelAuth,
     body: (await response?.text()) ?? "",
   };
 }
@@ -66,7 +66,7 @@ async function readAuth(context: unknown): Promise<AuthResult> {
 }
 
 function expectHandlerType(): void {
-  expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toExtend<
+  expectTypeOf(createZitadelMiddleware({ url: "http://localhost:4000" })).toExtend<
     Parameters<typeof createMiddleware>[0]
   >();
 }

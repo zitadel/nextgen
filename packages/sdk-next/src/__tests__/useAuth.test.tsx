@@ -2,14 +2,14 @@ import { renderHook, act } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { describe, it, expect } from "vitest";
 
-import type { AuthResult, ClientAuthResult, NextgenSession } from "../types";
+import type { AuthResult, ClientAuthResult, ZitadelAuthSession } from "../types";
 
 // useAuth/AuthContextProvider come through the public client entry — the same
-// path consumers use. NextgenProvider is server-only (it accepts the
-// token-bearing getAuth() result), so its public homes are /server and the root;
+// path consumers use. ZitadelProvider is server-only (it accepts the
+// token-bearing auth() result), so its public homes are /server and the root;
 // tests import the defining module directly (the vitest alias stubs the
 // server-only guard).
-import { NextgenProvider } from "../provider";
+import { ZitadelProvider } from "../provider";
 import { AuthContextProvider, useAuth } from "../react";
 
 function wrapper(initialSession: AuthResult) {
@@ -19,7 +19,7 @@ function wrapper(initialSession: AuthResult) {
   function Wrapper({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<AuthResult>(initialSession);
     setSessionRef = setSession;
-    return <NextgenProvider session={session}>{children}</NextgenProvider>;
+    return <ZitadelProvider session={session}>{children}</ZitadelProvider>;
   }
 
   return { Wrapper, getSetSession: () => setSessionRef };
@@ -108,11 +108,11 @@ describe("useAuth()", () => {
   });
 });
 
-describe("NextgenProvider input shapes", () => {
-  function renderWith(session: Parameters<typeof NextgenProvider>[0]["session"]) {
+describe("ZitadelProvider input shapes", () => {
+  function renderWith(session: Parameters<typeof ZitadelProvider>[0]["session"]) {
     return renderHook(() => useAuth(), {
       wrapper: ({ children }: { children: ReactNode }) => (
-        <NextgenProvider session={session}>{children}</NextgenProvider>
+        <ZitadelProvider session={session}>{children}</ZitadelProvider>
       ),
     });
   }
@@ -132,7 +132,7 @@ describe("NextgenProvider input shapes", () => {
   });
 
   it("wraps and strips a bare session object", () => {
-    const bare: NextgenSession = {
+    const bare: ZitadelAuthSession = {
       userId: "u4",
       identifier: "d@d.com",
       identifierProperty: "email",

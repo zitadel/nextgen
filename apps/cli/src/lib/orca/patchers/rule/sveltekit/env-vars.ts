@@ -3,7 +3,7 @@ import { withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
 import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 /**
- * The settings the hook passes to `createNextgenMiddleware`, read from
+ * The settings the hook passes to `createZitadelHandle`, read from
  * `$app/env/private`. SvelteKit keeps a declared variable server-only unless it
  * is marked `public`, and shows the description on hover.
  */

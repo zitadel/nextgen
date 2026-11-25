@@ -10,7 +10,7 @@ Rules for the packages without an `AGENTS.md` of their own: the SDKs
 change needs a changeset, and the whole train versions together.
 
 - **`sdk-core` is the shared contract**: JWT verification (`verifyJwt`),
-  middleware primitives, runtime resolution, and the `NextgenSession` /
+  middleware primitives, runtime resolution, and the `ZitadelAuthSession` /
   `AuthResult` types the SDKs re-export through `@zitadel/sdk-core/types`.
   Change a shared type there; never fork it into a framework package.
 - **Exports are consumer contract**: removing or renaming an `exports` entry
@@ -23,6 +23,18 @@ change needs a changeset, and the whole train versions together.
 - **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
   points use `export type *`. This is the one statement of it; READMEs link
   here.
+- **Name a server entry after its framework, and say why.** A meta-framework
+  SDK exposes the entry its framework asks for under the framework's own term
+  (`createZitadelHandle` for SvelteKit's `handle`, `zitadelMiddleware` for the
+  function Next.js calls), and a name that starts with `create` is a factory
+  that returns the handler. Write the reason in the `public-api.json` entry,
+  in the TSDoc of the function and in [ADR 090](../docs/adrs/090-sdk-public-api-standard.md).
+- **Reach the API package only through `sdk-core`.** An SDK imports
+  `@zitadel/sdk-core/config`, never `@zitadel/api`, and a name an app can see is
+  declared by hand in `sdk-core`, never re-exported from the generated client.
+- **Never put the codename "nextgen" in a public name, header, configuration
+  key or text.** Use Zitadel. The one exception is the `/__nextgen` proxy path,
+  which the server also knows.
 - **Keep each package's build tool** (its `build` script). `sdk-next` builds
   per file with `tsc` because bundlers merge `"use client"` modules into shared
   chunks and strip the directive. Never unify the builds without re-testing
@@ -59,6 +71,37 @@ change needs a changeset, and the whole train versions together.
   the reader to the package's README and types for props, exports and APIs,
   never listing them. A changed property updates the README or types; edit a
   skill only when the pattern changes.
+
+### Documenting an SDK
+
+The reference of every SDK is built from its doc comments, and a coding agent
+may have nothing else to read. Rules for those comments:
+
+- **Write every doc comment as a multi-line block**, never `/** text */`
+  on one line, for each export, property, parameter, prop and event.
+- **Say what it is, why it exists, when to use it and when not to,** what it
+  does when unset or invalid, which option wins, and what happens on the server,
+  on the edge and while hydrating.
+- **Put the caveats from the history in the comment, in words.** Read the
+  commits of the symbol (`git log -S'<name>'`); never cite an issue, pull
+  request or commit number.
+- **Give every exported function, component, hook and options type an
+  `@example`** that uses real imports and real prop names.
+- **State only what you verified in the code.** Unsure: leave it out and list
+  the symbol as "reason unknown" in the pull request.
+- **Document a property that `sdk-core` defines once, in `sdk-core`.** An SDK
+  documents only what is local to it, and links the rest with `{@link}`.
+- **Link a name only where every SDK that shows the comment exports it.**
+  Otherwise write it as a plain literal; TypeDoc fails on a dead link.
+- **Build the references with `pnpm run docs:api`** at the root. It must print
+  no warning. Each SDK's `typedoc.json` differs from the others only in its
+  `name` and `entryPoints` (Svelte also in `tsconfig`, because TypeDoc cannot
+  read `.svelte`); shared options live in the root `typedoc.base.json`.
+- **Describe a change to an SDK's exports in its `public-api.json`** and in
+  [ADR 090](../docs/adrs/090-sdk-public-api-standard.md), and name the new
+  entry after its framework with the reason, as described above.
+
+`sdk-core` has rules of its own: [`sdk-core/AGENTS.md`](sdk-core/AGENTS.md).
 
 ## `packages/api`
 

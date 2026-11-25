@@ -11,7 +11,7 @@ import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 
 import type { SolidFetchEvent } from "../middleware";
 
-import { createNextgenMiddleware } from "../middleware";
+import { createZitadelMiddleware } from "../middleware";
 
 const PROJECT = "proj_app";
 const SESSION = `zitadel_session_${PROJECT}`;
@@ -38,7 +38,7 @@ describe("session cookies on h3 v2's error headers", () => {
       response: { headers: new Headers(), errHeaders: new Headers() },
     };
 
-    const answer = await createNextgenMiddleware({
+    const answer = await createZitadelMiddleware({
       url: "http://localhost:4000",
       projectId: PROJECT,
     }).onRequest[0]!(event);

@@ -14,7 +14,7 @@ import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middlewar
 
 import type { QwikCookieOptions, QwikRequestEvent } from "../request-handler";
 
-import { createNextgenMiddleware, getAuth } from "../request-handler";
+import { createZitadelOnRequest, getAuth } from "../request-handler";
 
 class RedirectMarker {
   readonly status: number;
@@ -68,7 +68,7 @@ async function serve(
     },
   };
   try {
-    await createNextgenMiddleware(options)(ev);
+    await createZitadelOnRequest(options)(ev);
   } catch (err) {
     if (!(err instanceof RedirectMarker)) throw err;
   }
@@ -81,7 +81,7 @@ async function serve(
     answered: sent !== undefined || redirected !== undefined,
     status: sent?.status ?? redirected?.status ?? 200,
     headers,
-    auth: ev.sharedMap.get("nextgenAuth") as AuthResult | undefined,
+    auth: ev.sharedMap.get("zitadelAuth") as AuthResult | undefined,
     body: (await sent?.text()) ?? "",
   };
 }
@@ -113,9 +113,7 @@ async function readAuth(context: unknown): Promise<AuthResult> {
 }
 
 function expectHandlerType(): void {
-  expectTypeOf(
-    createNextgenMiddleware({ url: "http://localhost:4000" }),
-  ).toExtend<RequestHandler>();
+  expectTypeOf(createZitadelOnRequest({ url: "http://localhost:4000" })).toExtend<RequestHandler>();
 }
 
 describeServerMiddleware({

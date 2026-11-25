@@ -1,7 +1,7 @@
 /**
  * The main entry of the Qwik Router SDK.
  *
- * This entry re-exports the server API ({@link createNextgenMiddleware}, {@link getAuth}) and the
+ * This entry re-exports the server API ({@link createZitadelOnRequest}, {@link getAuth}) and the
  * project configuration helpers ({@link configureZitadel}, {@link getApi},
  * {@link getZitadelConfig}), so an app that imports only from the package root gets everything.
  * Import from `@zitadel/sdk-qwik-router/server` in server code and from
@@ -11,20 +11,20 @@
  *
  * @example
  * ```ts
- * import { configureZitadel, createNextgenMiddleware } from "@zitadel/sdk-qwik-router";
+ * import { configureZitadel, createZitadelOnRequest } from "@zitadel/sdk-qwik-router";
  * ```
  *
  * @module
  */
 
-export { createNextgenMiddleware, getAuth } from "./server.js";
+export { createZitadelOnRequest, getAuth } from "./server.js";
 export type { QwikRequestEvent, QwikCookieValue, QwikCookieOptions } from "./server.js";
 export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
 export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";
 export type {
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   AuthResult,
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   ClientAuthResult,

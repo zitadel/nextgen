@@ -13,7 +13,7 @@ import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contra
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
 
-import { createNextgenMiddleware, getAuth } from "../handle";
+import { createZitadelHandle, getAuth } from "../handle";
 
 async function serve(
   url: string,
@@ -58,7 +58,7 @@ async function serve(
     },
   } as unknown as RequestEvent;
   const resolve = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
-  const response = (await createNextgenMiddleware(options)({
+  const response = (await createZitadelHandle(options)({
     event,
     resolve,
   } as unknown as Parameters<Handle>[0])) as Response;
@@ -70,7 +70,7 @@ async function serve(
     answered: resolve.mock.calls.length === 0,
     status: response.status,
     headers,
-    auth: event.locals.nextgenAuth as AuthResult | undefined,
+    auth: event.locals.zitadelAuth as AuthResult | undefined,
     body: await response.text(),
   };
 }
@@ -111,7 +111,7 @@ async function readAuth(context: unknown): Promise<AuthResult> {
 }
 
 function expectHandlerType(): void {
-  expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toExtend<Handle>();
+  expectTypeOf(createZitadelHandle({ url: "http://localhost:4000" })).toExtend<Handle>();
 }
 
 describeServerMiddleware({

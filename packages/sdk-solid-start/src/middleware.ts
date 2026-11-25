@@ -1,6 +1,6 @@
 import type {
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -34,7 +34,7 @@ const PROCESS_ENV: Record<string, string | undefined> =
  * SolidStart and its Vinxi and Nitro substrate are not dependencies of this package. Typing only
  * the few fields the middleware touches keeps the install light and independent of the
  * framework's bundler changes. The shape is structurally compatible with the real `FetchEvent`,
- * so the handler that {@link createNextgenMiddleware} returns can be passed straight to
+ * so the handler that {@link createZitadelMiddleware} returns can be passed straight to
  * SolidStart's `createMiddleware`.
  *
  * @example
@@ -53,7 +53,7 @@ export interface SolidFetchEvent {
    *
    * The middleware reads its URL, method, body and the `cookie`, `authorization` and
    * `x-forwarded-*` headers to proxy the same-origin proxy path and to judge the session. It
-   * rejects with a `400` any request that carries the internal `x-nextgen-auth-token` header,
+   * rejects with a `400` any request that carries the internal `x-zitadel-auth-token` header,
    * because only the middleware itself may set that header.
    */
   readonly request: Request;
@@ -61,7 +61,7 @@ export interface SolidFetchEvent {
    * The per-request store that SolidStart shares between the middleware and the server functions
    * and routes that run after it.
    *
-   * The middleware writes the session verdict to the `nextgenAuth` key on every request it does
+   * The middleware writes the session verdict to the `zitadelAuth` key on every request it does
    * not ignore. Read the verdict back with {@link getAuth} instead of reaching into the store.
    */
   readonly locals: Record<string, unknown> & {
@@ -71,7 +71,7 @@ export interface SolidFetchEvent {
      * It is absent on a request the middleware skipped because the path matched an ignored route,
      * or proxied, and {@link getAuth} reads an absent verdict as signed out.
      */
-    nextgenAuth?: AuthResult;
+    zitadelAuth?: AuthResult;
   };
   /**
    * The direct client address, when the platform adapter resolves one.
@@ -108,7 +108,7 @@ export interface SolidFetchEvent {
 }
 
 /**
- * The `{ onRequest }` config that {@link createNextgenMiddleware} returns.
+ * The `{ onRequest }` config that {@link createZitadelMiddleware} returns.
  *
  * On SolidStart 2, pass it to `createMiddleware` from `@solidjs/start/middleware` and export the
  * result as the default of the file that `solidStart({ middleware })` names. A bare config object
@@ -117,11 +117,11 @@ export interface SolidFetchEvent {
  * @example
  * ```ts
  * import { createMiddleware } from "@solidjs/start/middleware";
- * import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+ * import { createZitadelMiddleware } from "@zitadel/sdk-solid-start/server";
  *
- * const nextgen = createNextgenMiddleware({ protectedRoutes: ["/admin*"] });
+ * const zitadel = createZitadelMiddleware({ protectedRoutes: ["/admin*"] });
  *
- * export default createMiddleware({ onRequest: [...nextgen.onRequest] });
+ * export default createMiddleware({ onRequest: [...zitadel.onRequest] });
  * ```
  */
 export interface SolidMiddlewareConfig {
@@ -130,7 +130,7 @@ export interface SolidMiddlewareConfig {
    *
    * Each handler returns a `Response` to answer the request itself, such as the proxy answer, a
    * redirect to the login page or a `503`, or `undefined` to let the request continue.
-   * {@link createNextgenMiddleware} returns one handler. Spread this array into your own
+   * {@link createZitadelMiddleware} returns one handler. Spread this array into your own
    * `onRequest` to run your handlers alongside it, and put it first if later handlers need the
    * session verdict. It is a mutable array because `createMiddleware` does not accept a readonly
    * one.
@@ -344,7 +344,7 @@ async function handleAuth(
     verification,
   );
 
-  event.locals.nextgenAuth = auth;
+  event.locals.zitadelAuth = auth;
   // A dead session's cookie is cleared so the browser stops replaying it (each
   // replay costs a backend session check), and a session of this project still
   // under the shared name is copied to the project's own cookie. A live session
@@ -397,7 +397,7 @@ async function handleAuth(
  * proxy path answers `404`.
  *
  * For each request the handler does three things in order. It rejects with `400` any request
- * that carries the internal `x-nextgen-auth-token` header. It forwards everything under the proxy
+ * that carries the internal `x-zitadel-auth-token` header. It forwards everything under the proxy
  * path to the Zitadel server, so the browser only ever talks to the app's own origin. It judges
  * the session of every other request and stores the verdict where {@link getAuth} reads it.
  * Requests that match `ignoredRoutes` skip all of this, and carry no verdict.
@@ -412,13 +412,17 @@ async function handleAuth(
  *
  * To compose with your own handlers, pass them in the same call, as in the second example.
  *
+ * Naming: SolidStart registers middleware in src/middleware.ts through createMiddleware, and
+ * this factory returns the configuration object that createMiddleware takes. It is a factory,
+ * called once, so it starts with create.
+ *
  * @example
  * ```ts
  * import { createMiddleware } from "@solidjs/start/middleware";
- * import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+ * import { createZitadelMiddleware } from "@zitadel/sdk-solid-start/server";
  *
  * export default createMiddleware(
- *   createNextgenMiddleware({
+ *   createZitadelMiddleware({
  *     url: process.env.ZITADEL_URL,
  *     projectSecret: process.env.ZITADEL_PROJECT_SECRET,
  *     protectedRoutes: ["/admin*", "/dashboard*"],
@@ -430,16 +434,16 @@ async function handleAuth(
  * @example
  * ```ts
  * import { createMiddleware } from "@solidjs/start/middleware";
- * import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+ * import { createZitadelMiddleware } from "@zitadel/sdk-solid-start/server";
  *
- * const nextgen = createNextgenMiddleware({ protectedRoutes: ["/admin*"] });
+ * const zitadel = createZitadelMiddleware({ protectedRoutes: ["/admin*"] });
  *
  * export default createMiddleware({
- *   onRequest: [...nextgen.onRequest, async () => undefined],
+ *   onRequest: [...zitadel.onRequest, async () => undefined],
  * });
  * ```
  *
- * @param options - The middleware configuration, which is {@link NextgenMiddlewareOptions} plus
+ * @param options - The middleware configuration, which is {@link ZitadelMiddlewareOptions} plus
  *   `projectSecret`. The `url` defaults to `ZITADEL_URL`, else `http://localhost:8080`, and the
  *   `projectSecret` to `ZITADEL_PROJECT_SECRET`. The secret is the project service key.
  * @returns The SolidStart middleware config.
@@ -447,8 +451,8 @@ async function handleAuth(
  *   or protocol-relative URL would turn the login redirect into an open redirect, so it is
  *   refused when the middleware is created.
  */
-export function createNextgenMiddleware(
-  options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
+export function createZitadelMiddleware(
+  options: ZitadelMiddlewareOptions & { projectSecret?: string } = {},
 ): SolidMiddlewareConfig {
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
@@ -470,7 +474,7 @@ export function createNextgenMiddleware(
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
     throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+      `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
         `would allow open-redirect attacks.`,
     );
@@ -480,9 +484,9 @@ export function createNextgenMiddleware(
     const url2 = new URL(event.request.url);
     const { pathname } = url2;
 
-    // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+    // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
     // request that carries it, on every route, before anything else runs.
-    if (event.request.headers.has("x-nextgen-auth-token")) {
+    if (event.request.headers.has("x-zitadel-auth-token")) {
       return new Response("Bad Request", { status: 400 });
     }
 
@@ -519,6 +523,10 @@ export function createNextgenMiddleware(
  * judge, such as an ignored route: an absent verdict reads as signed out, so a guard fails
  * closed.
  *
+ * Naming: Takes the framework's own request event or context and returns the verified result
+ * that the handler stored on it. It reads and never creates, so it is called getAuth, and it is
+ * synchronous because the framework has already handed over the event.
+ *
  * @example
  * ```ts
  * import { getRequestEvent } from "solid-js/web";
@@ -539,5 +547,5 @@ export function createNextgenMiddleware(
  *   result when the middleware found no valid session or did not run.
  */
 export function getAuth(event: SolidFetchEvent): AuthResult {
-  return event.locals.nextgenAuth ?? { isAuthenticated: false, session: null };
+  return event.locals.zitadelAuth ?? { isAuthenticated: false, session: null };
 }

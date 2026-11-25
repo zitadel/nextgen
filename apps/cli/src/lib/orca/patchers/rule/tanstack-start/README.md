@@ -2,7 +2,7 @@
 
 Integrates Zitadel auth into a TanStack Start app (React). Like Next and Nuxt, TanStack
 Start proxies and verifies the session server-side — here through the
-`createNextgenMiddleware` request middleware from `@zitadel/sdk-tanstack-start`.
+`createZitadelRequestMiddleware` request middleware from `@zitadel/sdk-tanstack-start`.
 
 The detector requires `react` and `@tanstack/react-start` 1.168.10 or newer. It runs before the
 React detector, which excludes `@tanstack/react-start`.

@@ -1,13 +1,13 @@
-import { getAuth } from "@zitadel/sdk-next/server";
+import { auth } from "@zitadel/sdk-next/server";
 import { DEMO_PROJECT_ID } from "../../project";
 
 /**
  * A protected page a sign-in can return to (see `proxy.ts`). It says who is
- * signed in from `getAuth()`, the session the middleware judged for this
+ * signed in from `auth()`, the session the middleware judged for this
  * project, and never renders a cookie or a token.
  */
 export default async function DashboardPage() {
-  const session = await getAuth({ projectId: DEMO_PROJECT_ID });
+  const session = await auth({ projectId: DEMO_PROJECT_ID });
   const who = session.isAuthenticated
     ? (session.session.display ?? session.session.identifier ?? session.session.userId)
     : null;

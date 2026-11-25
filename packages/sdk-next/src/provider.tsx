@@ -6,7 +6,7 @@ import type {
   AuthResult,
   ClientAuthResult,
   ClientSession,
-  NextgenSession,
+  ZitadelAuthSession,
   UnauthState,
 } from "./types.js";
 
@@ -26,7 +26,7 @@ const signedOut: UnauthState = { isAuthenticated: false, session: null };
  * @param session - A token-bearing or client-safe session.
  * @returns A session that holds only `userId`, `identifier`, `identifierProperty` and `display`.
  */
-function toClientSession(session: ClientSession | NextgenSession): ClientSession {
+function toClientSession(session: ClientSession | ZitadelAuthSession): ClientSession {
   return {
     userId: session.userId,
     identifier: session.identifier,
@@ -39,12 +39,12 @@ function toClientSession(session: ClientSession | NextgenSession): ClientSession
  * Seeds client components with the server-known auth state, without the session token.
  *
  * Render it in a Server Component, typically the root layout, and pass the result of
- * {@link getAuth} directly. The client components below it then read the state with
+ * {@link auth} directly. The client components below it then read the state with
  * {@link useAuth}, and the page needs no client-side fetch to know who is signed in on first paint.
  *
  * Run in a Server Component, it converts the input to the client-safe {@link ClientAuthResult},
  * which drops the raw session token, and only the stripped value is serialized across the
- * server-to-client boundary. Passing the full {@link getAuth} result straight into a
+ * server-to-client boundary. Passing the full {@link auth} result straight into a
  * `"use client"` component would embed the raw token in the React Server Components flight
  * payload, where any script on the page can read it. `@zitadel/sdk-nuxt` strips the token before
  * it seeds client state for the same reason.
@@ -59,9 +59,9 @@ function toClientSession(session: ClientSession | NextgenSession): ClientSession
  *
  * Client components therefore see only `userId`, `identifier`, `identifierProperty` and `display`.
  * The seeded state is the state at render time and does not update afterwards. On a route the
- * middleware `matcher` does not cover, {@link getAuth} reports signed out, so the seeded state is
+ * middleware `matcher` does not cover, {@link auth} reports signed out, so the seeded state is
  * signed out there too. When a server module needs the raw token, for example to call an upstream
- * API, read it from {@link getAuth} in a Server Component or Route Handler, never through this
+ * API, read it from {@link auth} in a Server Component or Route Handler, never through this
  * provider.
  *
  * @param props - The `session` to seed and the `children` to render below it.
@@ -70,32 +70,32 @@ function toClientSession(session: ClientSession | NextgenSession): ClientSession
  *
  * @example
  * ```tsx
- * import { getAuth, NextgenProvider } from "@zitadel/sdk-next/server";
+ * import { auth, ZitadelProvider } from "@zitadel/sdk-next/server";
  *
  * export default async function RootLayout({ children }: { children: React.ReactNode }) {
- *   const session = await getAuth();
+ *   const session = await auth();
  *   return (
  *     <html>
  *       <body>
- *         <NextgenProvider session={session}>{children}</NextgenProvider>
+ *         <ZitadelProvider session={session}>{children}</ZitadelProvider>
  *       </body>
  *     </html>
  *   );
  * }
  * ```
  */
-export function NextgenProvider({
+export function ZitadelProvider({
   session,
   children,
 }: {
   /**
-   * The auth state to seed, normally the result of {@link getAuth}.
+   * The auth state to seed, normally the result of {@link auth}.
    *
    * A bare session, a client-safe result and `null` are accepted too, and `null` reads as signed
    * out. Only the client-safe fields survive the conversion: the raw token is dropped whatever
    * the input.
    */
-  session: AuthResult | ClientAuthResult | ClientSession | NextgenSession | null;
+  session: AuthResult | ClientAuthResult | ClientSession | ZitadelAuthSession | null;
   /**
    * The subtree whose client components read the state with {@link useAuth}.
    */

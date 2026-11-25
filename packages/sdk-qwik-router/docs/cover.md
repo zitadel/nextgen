@@ -4,7 +4,7 @@ The server half of the Zitadel SDK for Qwik 2 apps. It is a single Qwik Router `
 
 ## Main components
 
-- {@link index.createNextgenMiddleware | createNextgenMiddleware} builds the `onRequest` handler you export from a root plugin such as `src/routes/plugin@nextgen.ts`. Use it once per app; it proxies, verifies and guards in one pass.
+- {@link index.createZitadelOnRequest | createZitadelOnRequest} builds the `onRequest` handler you export from a root plugin such as `src/routes/plugin@zitadel.ts`. Use it once per app; it proxies, verifies and guards in one pass.
 - {@link index.getAuth | getAuth} reads the auth result the handler left on the request. Call it in a `routeLoader$`, `routeAction$` or endpoint to learn who is signed in.
 - {@link index.configureZitadel | configureZitadel}, {@link index.getApi | getApi} and {@link index.getZitadelConfig | getZitadelConfig} configure and read the project the SDK talks to. They are re-exported so an app that depends only on this package needs no other import for them.
 - {@link index.QwikRequestEvent | QwikRequestEvent} is the slice of Qwik Router's `RequestEvent` the handler reads. You do not build one; it is documented so you can see exactly which fields the handler depends on.
@@ -15,7 +15,7 @@ This package is not a wrapper around a custom element: it renders nothing, so th
 
 What this package does is run on every request, in this order:
 
-1. It refuses any request that carries the internal `x-nextgen-auth-token` header with a `400`, because that header is an internal channel and clients never send it.
+1. It refuses any request that carries the internal `x-zitadel-auth-token` header with a `400`, because that header is an internal channel and clients never send it.
 2. It skips paths matched by `ignoredRoutes`.
 3. It proxies the same-origin `/__nextgen/*` path (the `proxyPath` option) to the Zitadel backend. The browser only ever talks to your app's origin, so the widgets need no CORS setup and the session cookie stays first-party. The project secret is attached as a bearer only on the session handoff exchange and never reaches the browser.
 4. For every other request it judges the session, stores the result on `ev.sharedMap` for {@link index.getAuth | getAuth}, applies the session cookies the verdict asks for, and on a protected route with nobody signed in redirects to `loginPath` with the requested path in `?next=`. When the backend cannot say whether the session is live, a protected route answers `503` instead of sending a possibly signed-in user to the login page.
@@ -31,4 +31,4 @@ The handler is written against Web standards only (`Request`, `Response`, `fetch
 ## Where to go next
 
 - The [README on GitHub](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-router#readme) has installation, the handler options table and setup steps.
-- Start from {@link index.createNextgenMiddleware | createNextgenMiddleware}, then {@link index.getAuth | getAuth}.
+- Start from {@link index.createZitadelOnRequest | createZitadelOnRequest}, then {@link index.getAuth | getAuth}.

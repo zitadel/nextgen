@@ -1,9 +1,9 @@
-export { createNextgenMiddleware, getAuth } from "./middleware";
+export { createZitadelMiddleware, getAuth } from "./middleware";
 export type { SolidFetchEvent, SolidMiddlewareConfig } from "./middleware";
 export type {
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   AuthResult,
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   ClientAuthResult,

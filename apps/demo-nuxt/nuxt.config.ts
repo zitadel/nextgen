@@ -13,7 +13,7 @@ export default defineNuxtConfig({
       extends: "../../../tsconfig.base.json",
     },
   },
-  nextgen: {
+  zitadel: {
     protectedRoutes: ["/admin", "/admin/*"],
     loginPath: "/login",
   },

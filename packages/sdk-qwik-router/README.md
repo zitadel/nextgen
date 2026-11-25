@@ -29,12 +29,12 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 
 ### 1. Request handler
 
-Add a root plugin, e.g. `src/routes/plugin@nextgen.ts`:
+Add a root plugin, e.g. `src/routes/plugin@zitadel.ts`:
 
 ```ts
-import { createNextgenMiddleware } from '@zitadel/sdk-qwik-router/server';
+import { createZitadelOnRequest } from '@zitadel/sdk-qwik-router/server';
 
-export const onRequest = createNextgenMiddleware({
+export const onRequest = createZitadelOnRequest({
   protectedRoutes: ['/admin', '/dashboard*'],
   loginPath: '/login',
 });
@@ -58,7 +58,7 @@ To run alongside your own `onRequest`, export an array — Qwik Router runs them
 order:
 
 ```ts
-export const onRequest = [createNextgenMiddleware({ /* … */ }), myOnRequest];
+export const onRequest = [createZitadelOnRequest({ /* … */ }), myOnRequest];
 ```
 
 ### 2. Reading auth in a loader, action, or endpoint

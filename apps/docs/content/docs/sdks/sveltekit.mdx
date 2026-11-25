@@ -81,9 +81,9 @@ Setup installs both packages. To add them yourself, run:
 
     ```ts
     import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
-    import { createNextgenMiddleware } from "@zitadel/sdk-sveltekit/server";
+    import { createZitadelHandle } from "@zitadel/sdk-sveltekit/server";
 
-    export const handle = createNextgenMiddleware({
+    export const handle = createZitadelHandle({
       url: ZITADEL_URL,
       projectSecret: ZITADEL_PROJECT_SECRET,
       projectId: ZITADEL_PROJECT_ID,
@@ -118,7 +118,7 @@ Setup installs both packages. To add them yourself, run:
 
 <Steps>
   <Step>The hook proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
-  <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(event)` in a load function or endpoint.</Step>
+  <Step>It verifies the session token and puts the result on `event.locals.zitadelAuth`; read it with `getAuth(event)` in a load function or endpoint.</Step>
   <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in.</Step>
 </Steps>
 

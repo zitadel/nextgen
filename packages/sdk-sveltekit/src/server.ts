@@ -1,9 +1,9 @@
-export { createNextgenMiddleware, getAuth } from "./handle";
-export type { NextgenHandle } from "./handle";
+export { createZitadelHandle, getAuth } from "./handle";
+export type { ZitadelHandle } from "./handle";
 export type {
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   AuthResult,
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   ClientAuthResult,

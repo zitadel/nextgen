@@ -71,7 +71,7 @@ export const HOP_BY_HOP: ReadonlySet<string> = new Set([
  * of such a header on an incoming request as untrusted: a client can send it, so a server
  * component must verify what it reads and never trust it as set by the middleware.
  */
-export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-token"]);
+export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-zitadel-auth-token"]);
 
 /**
  * Returns whether a pathname matches at least one route pattern.
@@ -321,14 +321,6 @@ const LOOPBACK_SERVER_SESSION_COOKIE = "zitadel_session";
 export const SERVER_SESSION_COOKIE = `${HOST_PREFIX}${LOOPBACK_SERVER_SESSION_COOKIE}`;
 
 /**
- * The name of the session cookie that earlier versions used, the server's and every app's own.
- *
- * It is never read, renamed or passed on: a proxy strips it on the way up and discards its
- * `Set-Cookie` on the way back.
- */
-const LEGACY_SESSION_COOKIE = "__nextgen_session";
-
-/**
  * Returns the name that the session cookie of the server has in a browser.
  *
  * It is the canonical {@link SERVER_SESSION_COOKIE} wherever the cookie is `Secure`, and
@@ -395,15 +387,15 @@ function isServerSessionCookie(name: string): boolean {
 
 /**
  * Returns whether a name is a session cookie: the server's or any app's own, under the name of
- * either transport, or one of the earlier name.
+ * either transport.
  *
  * @param name - The cookie name.
  * @returns `true` for any session cookie.
  */
 function isSessionCookie(name: string): boolean {
   const bare = name.startsWith(HOST_PREFIX) ? name.slice(HOST_PREFIX.length) : name;
-  return [LOOPBACK_SERVER_SESSION_COOKIE, LEGACY_SESSION_COOKIE].some(
-    (family) => bare === family || bare.startsWith(`${family}_`),
+  return (
+    bare === LOOPBACK_SERVER_SESSION_COOKIE || bare.startsWith(`${LOOPBACK_SERVER_SESSION_COOKIE}_`)
   );
 }
 
@@ -1032,8 +1024,8 @@ function parsedJson(text: string): unknown {
 /**
  * The session of a signed-in user, as server code sees it.
  *
- * Identity follows the user-reference vocabulary of the API: render {@link NextgenSession.display},
- * fall back to {@link NextgenSession.identifier}, then to {@link NextgenSession.userId}. The
+ * Identity follows the user-reference vocabulary of the API: render {@link ZitadelAuthSession.display},
+ * fall back to {@link ZitadelAuthSession.identifier}, then to {@link ZitadelAuthSession.userId}. The
  * session carries the raw token for server-side use, so it must never be serialized into a page, a
  * server-rendered payload or a client fetch result. Convert it to a client-safe session without the token first.
  *
@@ -1042,7 +1034,7 @@ function parsedJson(text: string): unknown {
  * const name = session.display ?? session.identifier ?? session.userId;
  * ```
  */
-export type NextgenSession = {
+export type ZitadelAuthSession = {
   /**
    * The unique identifier of the user, the `sub` claim.
    */
@@ -1089,7 +1081,7 @@ export type AuthState = {
   /**
    * The verified session, including the raw token for server-side use.
    */
-  session: NextgenSession;
+  session: ZitadelAuthSession;
 };
 
 /**
@@ -1184,16 +1176,16 @@ export type ClientAuthResult = ClientAuthState | UnauthState;
 /**
  * The options of the SDK middleware factory.
  *
- * Every server SDK passes them to `createNextgenMiddleware`, or to the equivalent of its
+ * Every server SDK passes them to `createZitadelMiddleware`, or to the equivalent of its
  * framework, so the options have one meaning everywhere. Every option is optional, but a project id
  * is needed for any session to count as signed in. The middleware resolves the session of each
  * request with `resolveSession`, serves the same-origin proxy under
- * {@link NextgenMiddlewareOptions.proxyPath}, and redirects signed-out requests for protected
+ * {@link ZitadelMiddlewareOptions.proxyPath}, and redirects signed-out requests for protected
  * routes to the login page.
  *
  * @example
  * ```ts
- * const options: NextgenMiddlewareOptions = {
+ * const options: ZitadelMiddlewareOptions = {
  *   url: "https://auth.example.com",
  *   projectId: "296547382910273",
  *   protectedRoutes: ["/dashboard*", "/settings"],
@@ -1202,7 +1194,7 @@ export type ClientAuthResult = ClientAuthState | UnauthState;
  * };
  * ```
  */
-export type NextgenMiddlewareOptions = {
+export type ZitadelMiddlewareOptions = {
   /**
    * The full URL of the Zitadel auth backend.
    *
@@ -1257,7 +1249,7 @@ export type NextgenMiddlewareOptions = {
    * The pathnames that require a valid session.
    *
    * A request to one of these routes without a valid session is redirected to
-   * {@link NextgenMiddlewareOptions.loginPath}, with the requested path in the `next` query
+   * {@link ZitadelMiddlewareOptions.loginPath}, with the requested path in the `next` query
    * parameter. An entry that ends with `*` matches any sub-path, for example `"/admin*"`. An entry
    * without it matches exactly, with or without a trailing slash. Matching is done by
    * `matchesRoutes`.
@@ -1382,7 +1374,7 @@ export type NextgenMiddlewareOptions = {
    * The validation is a call to `GET /sessions/me` at the backend. A token that the backend does not
    * answer for within this window is not refused: the request counts as signed out, its session
    * cookie is kept, and a protected route answers `503`, see
-   * {@link NextgenMiddlewareOptions.protectedRoutes}. A slow backend therefore never signs users
+   * {@link ZitadelMiddlewareOptions.protectedRoutes}. A slow backend therefore never signs users
    * out.
    *
    * @defaultValue 5000
@@ -1767,7 +1759,7 @@ function failureCause(err: unknown, timeoutMs: number): string {
  */
 function undecided(endpoint: string, cause: string): OpaqueSessionCheck {
   console.warn(
-    `[nextgen] Could not check the session cookie against ${endpoint} (${cause}). ` +
+    `[zitadel] Could not check the session cookie against ${endpoint} (${cause}). ` +
       "That is not a refusal: the request counts as signed out, and the cookie is kept.",
   );
   return { verdict: "undecided" };
@@ -1820,7 +1812,7 @@ export interface SessionRequest extends BrowserRequest {
 /**
  * The settings that {@link resolveSession} judges the session of a request by.
  *
- * The server SDKs build it from {@link NextgenMiddlewareOptions} after they apply the defaults, so
+ * The server SDKs build it from {@link ZitadelMiddlewareOptions} after they apply the defaults, so
  * each field here has the meaning of the option of the same name.
  */
 export interface ResolveSessionOptions {
@@ -1831,7 +1823,7 @@ export interface ResolveSessionOptions {
   /**
    * The project id that the app signs its users in to.
    *
-   * With `undefined`, no session counts as signed in. See {@link NextgenMiddlewareOptions.projectId}.
+   * With `undefined`, no session counts as signed in. See {@link ZitadelMiddlewareOptions.projectId}.
    */
   readonly projectId: string | undefined;
   /**
@@ -1942,7 +1934,7 @@ function warnMissingProject(): void {
   }
   warnedMissingProject = true;
   console.error(
-    "[nextgen] No project id is configured, so no session counts as signed in. " +
+    "[zitadel] No project id is configured, so no session counts as signed in. " +
       "Set ZITADEL_PROJECT_ID (or the `projectId` option) to the project this app signs its users in to.",
   );
 }

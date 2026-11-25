@@ -8,11 +8,11 @@
  * the browser.
  */
 export type {
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   // Client-safe auth shapes (token absent), declared once in sdk-core.
   ClientSession,
   ClientAuthState,

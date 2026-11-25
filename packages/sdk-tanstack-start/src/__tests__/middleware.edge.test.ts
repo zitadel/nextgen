@@ -1,12 +1,12 @@
-import { createNextgenMiddleware } from "@zitadel/sdk-tanstack-start/server";
+import { createZitadelRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
 
-import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
 
 /** Sends a request through the built middleware, the way TanStack Start would, and returns the answer. */
-async function serve(request: Request, options: NextgenMiddlewareOptions): Promise<Response> {
-  return createNextgenMiddleware({ ...options, clientAddress: CLIENT_ADDRESS })({
+async function serve(request: Request, options: ZitadelMiddlewareOptions): Promise<Response> {
+  return createZitadelRequestMiddleware({ ...options, clientAddress: CLIENT_ADDRESS })({
     request,
     next: async () => ({ response: new Response("ok") }),
   });

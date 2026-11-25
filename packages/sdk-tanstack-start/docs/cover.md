@@ -6,9 +6,9 @@ The Zitadel SDK for TanStack Start apps. It is for developers who want sign-in, 
 
 Server, from `@zitadel/sdk-tanstack-start/server`:
 
-- {@link server!createNextgenMiddleware} builds the request-middleware handler you register in `src/start.ts`. Use it for every app: it proxies auth traffic, verifies the session and guards protected routes in one pass.
+- {@link server!createZitadelRequestMiddleware} builds the request-middleware handler you register in `src/start.ts`. Use it for every app: it proxies auth traffic, verifies the session and guards protected routes in one pass.
 - {@link server!getAuth} reads the signed-in user from the context a server function receives. Use it in a server function, and call that function from a route's `beforeLoad` to guard the route.
-- {@link server!handleNextgenRequest} is the same proxy, verify and protect decision as a plain function from a `Request` to a {@link server!NextgenRequestDecision}. Use it when you wire a custom server entry instead of TanStack Start's middleware.
+- {@link server!handleZitadelRequest} is the same proxy, verify and protect decision as a plain function from a `Request` to a {@link server!ZitadelRequestDecision}. Use it when you wire a custom server entry instead of TanStack Start's middleware.
 
 Client, from `@zitadel/sdk-tanstack-start/client`:
 
@@ -26,7 +26,7 @@ The wrappers are not compiled to static markup and the package defines no elemen
 
 TanStack Start server-renders every route, and the server markup for a widget would carry none of its props. The browser defines the elements before React hydrates, so a server-rendered `<zitadel-login>` would upgrade with the element defaults (purpose `login`, no project) and start a flow before hydration applied the real props. The three components here therefore render nothing on the server and during hydration, and mount the widget right after, with every prop in place before the element starts its flow. On a client-side navigation they mount at once. The element definitions exist only in the browser.
 
-The widgets talk to your auth backend through the same-origin `/__nextgen` proxy, which the request middleware serves: the `proxyPath` option sets the prefix, and the project secret is attached only to the session handoff, never sent to the browser. The middleware also verifies the session JWT against the backend's JWKS, places the result on the request context as `nextgenAuth`, and redirects signed-out visitors on protected routes to the login path. A session counts only in the app's own project.
+The widgets talk to your auth backend through the same-origin `/__nextgen` proxy, which the request middleware serves: the `proxyPath` option sets the prefix, and the project secret is attached only to the session handoff, never sent to the browser. The middleware also verifies the session JWT against the backend's JWKS, places the result on the request context as `zitadelAuth`, and redirects signed-out visitors on protected routes to the login path. A session counts only in the app's own project.
 
 ## Edge runtimes
 
@@ -37,4 +37,4 @@ The `/react` entry loads without a DOM: `@zitadel/components` has an edge build 
 ## Where to go next
 
 - The [README on GitHub](https://github.com/zitadel/nextgen/tree/main/packages/sdk-tanstack-start#readme) has the install steps and the full middleware option table.
-- Start from {@link server!createNextgenMiddleware} for the server and {@link react!ZitadelLogin} for the browser.
+- Start from {@link server!createZitadelRequestMiddleware} for the server and {@link react!ZitadelLogin} for the browser.

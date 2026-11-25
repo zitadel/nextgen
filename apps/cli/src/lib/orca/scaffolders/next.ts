@@ -7,7 +7,7 @@ import type { NodeEngines } from "./node-engines";
  * fresh app is the one the patcher was written against. `create-next-app`
  * writes `next` at its own version, so this is also the Next.js every fresh
  * app runs, until its developer upgrades it. Its route protection is
- * `createNextgenMiddleware`, which runs in Next's Middleware / Proxy, and 16.2.x had
+ * `createZitadelMiddleware`, which runs in Next's Middleware / Proxy, and 16.2.x had
  * several bypasses of that layer: keep the pin on a release with no high or
  * critical advisory, as `@zitadel/cli#check-advisories` checks.
  */

@@ -7,16 +7,16 @@
         "AuthResult",
         "AuthState",
         "ClientAuthResult",
-        "NextgenMiddlewareOptions",
-        "NextgenSession",
         "QwikCookieOptions",
         "QwikCookieValue",
         "QwikRequestEvent",
         "UnauthState",
+        "ZitadelAuthSession",
         "ZitadelConfig",
+        "ZitadelMiddlewareOptions",
         "ZitadelProject",
         "configureZitadel",
-        "createNextgenMiddleware",
+        "createZitadelOnRequest",
         "getApi",
         "getAuth",
         "getZitadelConfig"
@@ -25,6 +25,14 @@
     "./server": {
       "source": "src/server.ts",
       "kind": "server",
+      "handler": {
+        "name": "createZitadelOnRequest",
+        "why": "A Qwik Router route file exports its server hook as onRequest, so the name ends in OnRequest and the call reads export const onRequest = createZitadelOnRequest(...). It is a factory, called once to return the handler, so it starts with create."
+      },
+      "authReader": {
+        "name": "getAuth",
+        "why": "Takes the framework's own request event or context and returns the verified result that the handler stored on it. It reads and never creates, so it is called getAuth, and it is synchronous because the framework has already handed over the event."
+      },
       "extras": [
         "QwikCookieOptions",
         "QwikCookieValue",

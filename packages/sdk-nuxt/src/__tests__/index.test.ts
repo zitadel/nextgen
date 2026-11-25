@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { AuthState, NextgenSession, UnauthState } from "../index";
+import type { AuthState, ZitadelAuthSession, UnauthState } from "../index";
 
 import { businessLocales } from "../index";
 
@@ -15,7 +15,7 @@ describe("package entry", () => {
   // The same auth types every other server SDK exports, so a server route can
   // type `auth.session` without rebuilding them.
   it("exports the session and auth state types", () => {
-    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
+    expectTypeOf<AuthState["session"]>().toEqualTypeOf<ZitadelAuthSession>();
     expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
   });
 });

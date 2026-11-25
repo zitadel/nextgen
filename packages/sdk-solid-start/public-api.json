@@ -7,15 +7,15 @@
         "AuthResult",
         "AuthState",
         "ClientAuthResult",
-        "NextgenMiddlewareOptions",
-        "NextgenSession",
         "SolidFetchEvent",
         "SolidMiddlewareConfig",
         "UnauthState",
+        "ZitadelAuthSession",
         "ZitadelConfig",
+        "ZitadelMiddlewareOptions",
         "ZitadelProject",
         "configureZitadel",
-        "createNextgenMiddleware",
+        "createZitadelMiddleware",
         "getApi",
         "getAuth",
         "getZitadelConfig"
@@ -24,6 +24,14 @@
     "./server": {
       "source": "src/server.ts",
       "kind": "server",
+      "handler": {
+        "name": "createZitadelMiddleware",
+        "why": "SolidStart registers middleware in src/middleware.ts through createMiddleware, and this factory returns the configuration object that createMiddleware takes. It is a factory, called once, so it starts with create."
+      },
+      "authReader": {
+        "name": "getAuth",
+        "why": "Takes the framework's own request event or context and returns the verified result that the handler stored on it. It reads and never creates, so it is called getAuth, and it is synchronous because the framework has already handed over the event."
+      },
       "extras": [
         "SolidFetchEvent",
         "SolidMiddlewareConfig"

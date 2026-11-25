@@ -3,7 +3,7 @@
  *
  * It exposes {@link getSession}, which asks the server who is signed in through the same-origin
  * proxy path. It works on any page, including routes the middleware `matcher` does not cover,
- * where the server-side {@link server!getAuth | getAuth} cannot see the session. The result
+ * where the server-side {@link server!auth | auth} cannot see the session. The result
  * carries no session token.
  *
  * @module
@@ -75,7 +75,7 @@ function warnMissingProject(): void {
   }
   warnedMissingProject = true;
   console.warn(
-    "[nextgen] getSession(): no project id is known, so no session counts as signed in. " +
+    "[zitadel] getSession(): no project id is known, so no session counts as signed in. " +
       "Pass `projectId` (e.g. process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID) or call " +
       "configureZitadel() first.",
   );
@@ -89,11 +89,11 @@ function warnMissingProject(): void {
  * `matcher` does not cover. It fetches the same-origin
  * `{proxyPath}/api/v1/sessions/me?project_id=...` with credentials and `cache: "no-store"`, the
  * same read the `<zitadel-session>` card performs, so the answer is the server's and not a
- * client-side guess. Unlike server-side {@link server!getAuth | getAuth}, it does not require the
+ * client-side guess. Unlike server-side {@link server!auth | auth}, it does not require the
  * route to be covered by the middleware `matcher`. Only the proxy path itself must be matched,
  * which the scaffolded request boundary always does. It throws on the server, because there is no
  * browser to read from. In a Server Component or Route Handler use
- * {@link server!getAuth | getAuth}.
+ * {@link server!auth | auth}.
  *
  * A session counts only in the app's own project: `options.projectId`, else the project of
  * `configureZitadel()`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`. With none of them it reads as
@@ -154,8 +154,8 @@ function warnMissingProject(): void {
 export async function getSession(options: GetSessionOptions = {}): Promise<ClientAuthResult> {
   if (typeof window === "undefined") {
     throw new Error(
-      "[nextgen] getSession() reads the session from the browser. " +
-        "In Server Components and Route Handlers use getAuth() from @zitadel/sdk-next/server " +
+      "[zitadel] getSession() reads the session from the browser. " +
+        "In Server Components and Route Handlers use auth() from @zitadel/sdk-next/server " +
         "(requires the route to be covered by the middleware matcher).",
     );
   }

@@ -24,10 +24,10 @@ Create `src/middleware.ts` and register it via the `solidStart()` plugin in
 ```ts
 // src/middleware.ts
 import { createMiddleware } from '@solidjs/start/middleware';
-import { createNextgenMiddleware } from '@zitadel/sdk-solid-start/server';
+import { createZitadelMiddleware } from '@zitadel/sdk-solid-start/server';
 
 export default createMiddleware(
-  createNextgenMiddleware({
+  createZitadelMiddleware({
     protectedRoutes: ['/admin', '/dashboard*'],
     loginPath: '/login',
   }),
@@ -40,7 +40,7 @@ them only to override.
 
 SolidStart 2 registers this module's default export as an array of h3
 middleware, so the config must be wrapped in SolidStart's `createMiddleware`.
-Exporting the bare `createNextgenMiddleware(...)` object registers nothing and
+Exporting the bare `createZitadelMiddleware(...)` object registers nothing and
 `/__nextgen/*` 404s.
 
 ```ts
@@ -60,17 +60,17 @@ The middleware runs on every request and does three things in one pass:
    is attached as the bearer only on the `POST /sessions/exchange` handoff, and
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
-   result to `event.locals.nextgenAuth`.
+   result to `event.locals.zitadelAuth`.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 To compose with your own handlers, spread the config's `onRequest`:
 
 ```ts
 import { createMiddleware } from '@solidjs/start/middleware';
-import { createNextgenMiddleware } from '@zitadel/sdk-solid-start/server';
+import { createZitadelMiddleware } from '@zitadel/sdk-solid-start/server';
 
 export default createMiddleware({
-  onRequest: [...createNextgenMiddleware({ /* … */ }).onRequest, myOnRequest],
+  onRequest: [...createZitadelMiddleware({ /* … */ }).onRequest, myOnRequest],
 });
 ```
 

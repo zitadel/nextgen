@@ -1,7 +1,7 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import type {
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -30,7 +30,7 @@ const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
 
 /**
- * The type of the SvelteKit `handle` hook that {@link createNextgenMiddleware} returns.
+ * The type of the SvelteKit `handle` hook that {@link createZitadelHandle} returns.
  *
  * The type is declared structurally from `RequestEvent` instead of importing `Handle`. SvelteKit 2
  * exports `Handle` from `@sveltejs/kit`, but SvelteKit 3 declares it only under
@@ -39,21 +39,21 @@ const PROCESS_ENV: Record<string, string | undefined> =
  * shape is assignable to either `Handle`, because it accepts a `resolve` that takes no options
  * argument and the hook never passes one.
  *
- * Use it to type a hook that you compose with {@link createNextgenMiddleware} through
+ * Use it to type a hook that you compose with {@link createZitadelHandle} through
  * `sequence()` from `@sveltejs/kit/hooks`. The hook returns a `Promise` of a `Response` and
  * always receives the request event and the downstream `resolve` function.
  *
  * @example
  * ```ts
- * import type { NextgenHandle } from "@zitadel/sdk-sveltekit/server";
+ * import type { ZitadelHandle } from "@zitadel/sdk-sveltekit/server";
  *
- * export const logRequests: NextgenHandle = async ({ event, resolve }) => {
+ * export const logRequests: ZitadelHandle = async ({ event, resolve }) => {
  *   console.log(event.request.method, event.url.pathname);
  *   return resolve(event);
  * };
  * ```
  */
-export type NextgenHandle = (input: {
+export type ZitadelHandle = (input: {
   event: RequestEvent;
   resolve: (event: RequestEvent) => Promise<Response> | Response;
 }) => Promise<Response>;
@@ -64,7 +64,7 @@ declare global {
     /**
      * The shape of `event.locals`, which SvelteKit reads to type the request locals.
      *
-     * Declaring the interface here merges {@link Locals.nextgenAuth} into your own `App.Locals`
+     * Declaring the interface here merges {@link Locals.zitadelAuth} into your own `App.Locals`
      * from `src/app.d.ts`, so {@link getAuth} and load functions see the typed auth result without
      * any manual wiring.
      */
@@ -72,12 +72,12 @@ declare global {
       /**
        * The verified auth result of the current request.
        *
-       * The hook from {@link createNextgenMiddleware} writes it on every request that is neither
+       * The hook from {@link createZitadelHandle} writes it on every request that is neither
        * proxied nor ignored. It is `undefined` before the hook has run and on routes listed in
-       * {@link NextgenMiddlewareOptions.ignoredRoutes}. Read it through {@link getAuth}, which
+       * {@link ZitadelMiddlewareOptions.ignoredRoutes}. Read it through {@link getAuth}, which
        * turns the missing case into a signed-out result.
        */
-      nextgenAuth?: AuthResult;
+      zitadelAuth?: AuthResult;
     }
   }
 }
@@ -236,10 +236,10 @@ async function proxyRequest(
 }
 
 /**
- * The options that {@link createNextgenMiddleware} passes to the auth step.
+ * The options that {@link createZitadelHandle} passes to the auth step.
  *
  * They are the route policy plus what the shared session resolver judges the session by, taken
- * from the public {@link NextgenMiddlewareOptions} after defaults are applied.
+ * from the public {@link ZitadelMiddlewareOptions} after defaults are applied.
  */
 interface AuthHandlerOptions extends ResolveSessionOptions {
   /**
@@ -255,7 +255,7 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 /**
  * Verifies the session, records the result, and either continues the request or redirects.
  *
- * The function writes the auth result to `event.locals.nextgenAuth`, then continues the request
+ * The function writes the auth result to `event.locals.zitadelAuth`, then continues the request
  * through `resolve`, or redirects to the login page with status `302` on a protected route that
  * has no valid session. Either way the response carries the session cookies that the verdict asks
  * for. When the backend cannot say whether the session is live, a protected route answers `503`
@@ -299,7 +299,7 @@ async function handleAuth(
     verification,
   );
 
-  event.locals.nextgenAuth = auth;
+  event.locals.zitadelAuth = auth;
 
   // The backend could not say whether the session is live. The user may well
   // be signed in, so a protected route answers 503 rather than send them to
@@ -382,20 +382,20 @@ function withNoStore(response: Response): Response {
  *
  * For each request the hook, in order:
  *
- * 1. answers `400` to any request that carries `x-nextgen-auth-token`. The header is an internal
+ * 1. answers `400` to any request that carries `x-zitadel-auth-token`. The header is an internal
  *    channel that only the SDK writes after verifying a session, so a client has no reason to send
  *    it, and refusing it outright is safer than removing it, because no framework's header
  *    mutability matters then. The check covers every route, including ignored routes and the
  *    proxy path;
- * 2. passes requests that match {@link NextgenMiddlewareOptions.ignoredRoutes} straight to
- *    `resolve`, without proxying, verification or `event.locals.nextgenAuth`;
- * 3. proxies requests under {@link NextgenMiddlewareOptions.proxyPath} to
- *    {@link NextgenMiddlewareOptions.url}, so the browser talks to the auth backend same-origin.
+ * 2. passes requests that match {@link ZitadelMiddlewareOptions.ignoredRoutes} straight to
+ *    `resolve`, without proxying, verification or `event.locals.zitadelAuth`;
+ * 3. proxies requests under {@link ZitadelMiddlewareOptions.proxyPath} to
+ *    {@link ZitadelMiddlewareOptions.url}, so the browser talks to the auth backend same-origin.
  *    The project secret is attached as the bearer on the `POST /sessions/exchange` handoff alone
  *    and never reaches the browser;
  * 4. verifies the session token against the server's JWKS with Web Crypto, or asks the backend
- *    about an opaque token, and stores the result in `event.locals.nextgenAuth`. On a protected
- *    route with no session it redirects to {@link NextgenMiddlewareOptions.loginPath} with the
+ *    about an opaque token, and stores the result in `event.locals.zitadelAuth`. On a protected
+ *    route with no session it redirects to {@link ZitadelMiddlewareOptions.loginPath} with the
  *    requested path in `?next=`, so the user returns there after signing in. When the backend
  *    cannot say whether the session is live, a protected route answers `503` instead of sending a
  *    possibly signed-in user to the login page.
@@ -416,18 +416,23 @@ function withNoStore(response: Response): Response {
  * `process.env` only when `process` exists. It therefore runs on Cloudflare Workers and other
  * edge adapters.
  *
+ * Naming: SvelteKit calls this hook handle: it is the handle export of hooks.server.ts and is
+ * composed with sequence(), so the name ends in Handle and the call reads export const handle =
+ * createZitadelHandle(...). It is a factory, called once to return the hook, so it starts with
+ * create.
+ *
  * @param options - The middleware settings, which are all optional. `projectSecret` is the
  *   project service key, sent as the bearer on the `POST /sessions/exchange` handoff only.
- * @returns A SvelteKit `handle` hook of type {@link NextgenHandle}.
+ * @returns A SvelteKit `handle` hook of type {@link ZitadelHandle}.
  * @throws Error when `loginPath` is not a relative path that starts with a single `/`, because an
  *   absolute or protocol-relative URL would let the login redirect leave the app, which is an
  *   open redirect.
  * @example
  * ```ts
  * import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
- * import { createNextgenMiddleware } from "@zitadel/sdk-sveltekit/server";
+ * import { createZitadelHandle } from "@zitadel/sdk-sveltekit/server";
  *
- * export const handle = createNextgenMiddleware({
+ * export const handle = createZitadelHandle({
  *   url: ZITADEL_URL,
  *   projectSecret: ZITADEL_PROJECT_SECRET,
  *   projectId: ZITADEL_PROJECT_ID,
@@ -438,15 +443,15 @@ function withNoStore(response: Response): Response {
  * @example
  * ```ts
  * import { sequence } from "@sveltejs/kit/hooks";
- * import { createNextgenMiddleware } from "@zitadel/sdk-sveltekit/server";
+ * import { createZitadelHandle } from "@zitadel/sdk-sveltekit/server";
  *
- * export const handle = sequence(createNextgenMiddleware({ protectedRoutes: ["/admin*"] }), myHook);
+ * export const handle = sequence(createZitadelHandle({ protectedRoutes: ["/admin*"] }), myHook);
  * ```
  * @see {@link getAuth}
  */
-export function createNextgenMiddleware(
-  options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
-): NextgenHandle {
+export function createZitadelHandle(
+  options: ZitadelMiddlewareOptions & { projectSecret?: string } = {},
+): ZitadelHandle {
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
@@ -469,7 +474,7 @@ export function createNextgenMiddleware(
   // (e.g. "//evil.com") would redirect the browser to an external host.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
     throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+      `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
         `would allow open-redirect attacks.`,
     );
@@ -478,9 +483,9 @@ export function createNextgenMiddleware(
   return async ({ event, resolve }) => {
     const { pathname } = event.url;
 
-    // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+    // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
     // request that carries it, on every route, before anything else runs.
-    if (event.request.headers.has("x-nextgen-auth-token")) {
+    if (event.request.headers.has("x-zitadel-auth-token")) {
       return new Response("Bad Request", { status: 400 });
     }
 
@@ -510,14 +515,18 @@ export function createNextgenMiddleware(
 /**
  * Reads the auth state of a request inside a load function, endpoint or action.
  *
- * Call it after the hook from {@link createNextgenMiddleware} has run. The function only reads
- * `event.locals.nextgenAuth`, so it performs no verification and no network call. When the hook
+ * Call it after the hook from {@link createZitadelHandle} has run. The function only reads
+ * `event.locals.zitadelAuth`, so it performs no verification and no network call. When the hook
  * has not written a result, for example on a route in
- * {@link NextgenMiddlewareOptions.ignoredRoutes}, the function returns a signed-out result
+ * {@link ZitadelMiddlewareOptions.ignoredRoutes}, the function returns a signed-out result
  * instead of `undefined`. The result carries the session token, so keep it on the server: return
  * only the fields you need from a load function, because load data is serialized into the page.
  * Client-side navigation does not reach the hook, so a page that must stay protected calls this
  * function in its own load function.
+ *
+ * Naming: Takes the framework's own request event or context and returns the verified result
+ * that the handler stored on it. It reads and never creates, so it is called getAuth, and it is
+ * synchronous because the framework has already handed over the event.
  *
  * @param event - The current SvelteKit request event.
  * @returns The current {@link AuthResult}: signed in with a session, or signed out with a `null`
@@ -535,8 +544,8 @@ export function createNextgenMiddleware(
  *   return { userId: auth.session.userId };
  * };
  * ```
- * @see {@link createNextgenMiddleware}
+ * @see {@link createZitadelHandle}
  */
 export function getAuth(event: RequestEvent): AuthResult {
-  return event.locals.nextgenAuth ?? { isAuthenticated: false, session: null };
+  return event.locals.zitadelAuth ?? { isAuthenticated: false, session: null };
 }

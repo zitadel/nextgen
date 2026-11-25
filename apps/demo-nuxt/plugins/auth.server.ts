@@ -3,7 +3,7 @@ import type { ClientAuthResult } from "@zitadel/sdk-nuxt";
 
 export default defineNuxtPlugin(() => {
   const event = useRequestEvent();
-  const auth = event?.context.nextgenAuth ?? {
+  const auth = event?.context.zitadelAuth ?? {
     isAuthenticated: false as const,
     session: null,
   };
@@ -22,5 +22,5 @@ export default defineNuxtPlugin(() => {
       }
     : { isAuthenticated: false, session: null };
 
-  useState<ClientAuthResult>("nextgen-auth", () => clientAuth);
+  useState<ClientAuthResult>("zitadel-auth", () => clientAuth);
 });

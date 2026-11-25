@@ -38,9 +38,9 @@ Then create (or extend) `src/hooks.server.ts`:
 
 ```ts
 import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from '$app/env/private';
-import { createNextgenMiddleware } from '@zitadel/sdk-sveltekit/server';
+import { createZitadelHandle } from '@zitadel/sdk-sveltekit/server';
 
-export const handle = createNextgenMiddleware({
+export const handle = createZitadelHandle({
   url: ZITADEL_URL,
   projectSecret: ZITADEL_PROJECT_SECRET,
   projectId: ZITADEL_PROJECT_ID,
@@ -58,27 +58,27 @@ The hook runs on every request and does three things in one pass:
    is attached as the bearer only on the `POST /sessions/exchange` handoff, and
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
-   result to `event.locals.nextgenAuth`.
+   result to `event.locals.zitadelAuth`.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 Compose it with your existing hooks via `sequence()`:
 
 ```ts
 import { sequence } from '@sveltejs/kit/hooks';
-import { createNextgenMiddleware } from '@zitadel/sdk-sveltekit/server';
+import { createZitadelHandle } from '@zitadel/sdk-sveltekit/server';
 
-export const handle = sequence(createNextgenMiddleware({ /* … */ }), myOtherHandle);
+export const handle = sequence(createZitadelHandle({ /* … */ }), myOtherHandle);
 ```
 
 ### 2. Type the auth locals
 
-`@zitadel/sdk-sveltekit/server` augments `App.Locals` with `nextgenAuth`
+`@zitadel/sdk-sveltekit/server` augments `App.Locals` with `zitadelAuth`
 automatically. Make sure your `src/app.d.ts` keeps the `App` namespace:
 
 ```ts
 declare global {
   namespace App {
-    // nextgenAuth is merged in by @zitadel/sdk-sveltekit
+    // zitadelAuth is merged in by @zitadel/sdk-sveltekit
     interface Locals {}
   }
 }

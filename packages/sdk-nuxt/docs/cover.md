@@ -8,15 +8,15 @@ This is the API reference. The README on GitHub covers installation and a walkth
 
 The package has three entry points.
 
-- `@zitadel/sdk-nuxt/module` holds the Nuxt module. It is the default export, listed under `modules` in `nuxt.config.ts` and configured under the `nextgen` key with {@link index!NextgenMiddlewareOptions}. It installs everything below, so most apps need nothing else.
-- `@zitadel/sdk-nuxt/server` holds {@link server!createNextgenMiddleware}, which builds the Nitro middleware by hand for an app that wants to register it itself in `server/middleware`, and {@link server!getAuth}, which reads the verified session from the H3 event in a server route or API handler.
+- `@zitadel/sdk-nuxt/module` holds the Nuxt module. It is the default export, listed under `modules` in `nuxt.config.ts` and configured under the `zitadel` key with {@link index!ZitadelMiddlewareOptions}. It installs everything below, so most apps need nothing else.
+- `@zitadel/sdk-nuxt/server` holds {@link server!createZitadelMiddleware}, which builds the Nitro middleware by hand for an app that wants to register it itself in `server/middleware`, and {@link server!getAuth}, which reads the verified session from the H3 event in a server route or API handler.
 - `@zitadel/sdk-nuxt` holds {@link index!useZitadelProject}, which returns the {@link index!ZitadelProject} handle to pass to a widget's `project` prop, and `businessLocales`, the copy overlay the client plugin provides as `$zitadelBusinessLocales`. Importing this entry also registers the widget elements in the browser.
 
 The module also auto-imports two composables that are not exported from an entry: `useAuth()` returns the client-safe session state (the raw token is left out of the server-rendered payload), and `useZitadelApi()` returns the typed API client for the configured project.
 
 ### Module options
 
-The module takes {@link index!NextgenMiddlewareOptions}, the same options `createNextgenMiddleware` takes. Each one is stored in the private `runtimeConfig.nextgen`, so it can be changed on a running server with a `NUXT_NEXTGEN_<NAME>` environment variable without a rebuild.
+The module takes {@link index!ZitadelMiddlewareOptions}, the same options `createZitadelMiddleware` takes. Each one is stored in the private `runtimeConfig.zitadel`, so it can be changed on a running server with a `NUXT_ZITADEL_<NAME>` environment variable without a rebuild.
 
 | Option | Default | Effect |
 | --- | --- | --- |
@@ -35,7 +35,7 @@ The module takes {@link index!NextgenMiddlewareOptions}, the same options `creat
 | `opaqueTokenTimeoutMs` | `5000` | How long the backend may take to answer for an opaque session token. On timeout the cookie is kept and a protected route answers `503`. |
 | `jwtKey` | none | Reserved for offline JWT verification; not used yet. |
 
-An option left unset, or set to an empty value, takes its default. The project secret is not an option. The server reads it from `NUXT_NEXTGEN_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET` when it runs and sends it to the backend only on the session-exchange call, so it never enters the build output or the browser.
+An option left unset, or set to an empty value, takes its default. The project secret is not an option. The server reads it from `NUXT_ZITADEL_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET` when it runs and sends it to the backend only on the session-exchange call, so it never enters the build output or the browser.
 
 ## How it works
 
@@ -57,5 +57,5 @@ What renders on the edge is the server side only: the proxy, the session state a
 
 - The [README on GitHub](https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme) for installation and a walkthrough.
 - The module: `@zitadel/sdk-nuxt/module`.
-- The server helpers {@link server!createNextgenMiddleware} and {@link server!getAuth}.
-- The auth types {@link index!AuthResult} and {@link index!ClientAuthResult}, and the options type {@link index!NextgenMiddlewareOptions}.
+- The server helpers {@link server!createZitadelMiddleware} and {@link server!getAuth}.
+- The auth types {@link index!AuthResult} and {@link index!ClientAuthResult}, and the options type {@link index!ZitadelMiddlewareOptions}.

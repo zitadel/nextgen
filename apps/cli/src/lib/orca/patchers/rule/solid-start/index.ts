@@ -28,7 +28,7 @@ const VITE_CONFIG_PATHS = configCandidates("vite.config");
 /**
  * Rule-based patcher for a SolidStart app. Like Next.js and Nuxt, SolidStart
  * proxies the backend and verifies the session through server middleware — here
- * the `@zitadel/sdk-solid-start` `createNextgenMiddleware` in `src/middleware.ts`,
+ * the `@zitadel/sdk-solid-start` `createZitadelMiddleware` in `src/middleware.ts`,
  * registered via the `solidStart({ middleware })` plugin option in a
  * non-destructive `vite.config.*` edit (SolidStart 2 reads middleware from the
  * Vite plugin, not a top-level `app.config.ts` field). Contributes the

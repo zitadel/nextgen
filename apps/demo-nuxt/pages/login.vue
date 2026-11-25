@@ -26,7 +26,7 @@
 import type { ClientAuthResult } from "@zitadel/sdk-nuxt";
 import { useZitadelProject } from "@zitadel/sdk-nuxt";
 
-const auth = useState<ClientAuthResult>("nextgen-auth");
+const auth = useState<ClientAuthResult>("zitadel-auth");
 if (auth.value?.isAuthenticated) {
   await navigateTo("/admin");
 }

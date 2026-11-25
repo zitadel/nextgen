@@ -1,9 +1,9 @@
 export type {
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
 } from "./middleware.js";
 export {
   HOP_BY_HOP,

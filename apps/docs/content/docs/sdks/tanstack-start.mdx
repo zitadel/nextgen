@@ -67,14 +67,14 @@ Setup installs the SDK. To add it yourself, run:
 
     ```ts
     import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
-    import { createNextgenMiddleware } from "@zitadel/sdk-tanstack-start/server";
+    import { createZitadelRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
 
     const csrfMiddleware = createCsrfMiddleware({
       filter: (ctx) => ctx.handlerType === "serverFn",
     });
 
     const authMiddleware = createMiddleware({ type: "request" }).server(
-      createNextgenMiddleware({
+      createZitadelRequestMiddleware({
         protectedRoutes: ["/profile"],
         loginPath: "/login",
       }),
@@ -138,7 +138,7 @@ Setup installs the SDK. To add it yourself, run:
 
 <Steps>
   <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
-  <Step>It verifies the session token and passes the result on as `nextgenAuth` in the request context, which server functions receive; read it with `getAuth(context)`.</Step>
+  <Step>It verifies the session token and passes the result on as `zitadelAuth` in the request context, which server functions receive; read it with `getAuth(context)`.</Step>
   <Step>It redirects unauthenticated document requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in. Routes guard client-side navigation in `beforeLoad`.</Step>
 </Steps>
 

@@ -11,7 +11,7 @@ description: >-
 
 # @zitadel/sdk-qwik-router
 
-A Qwik Router request handler and helpers that add Zitadel (Nextgen) auth to a
+A Qwik Router request handler and helpers that add Zitadel auth to a
 Qwik 2 app. The handler proxies auth traffic same-origin under `/__nextgen`,
 verifies the session JWT via JWKS on the server, stores the result on
 `requestEvent.sharedMap`, and redirects unauthenticated requests on protected
@@ -40,12 +40,12 @@ must migrate to `@qwik.dev/*` first.
 
 ## Integrate
 
-**1. Request handler.** Add a root plugin, e.g. `src/routes/plugin@nextgen.ts`:
+**1. Request handler.** Add a root plugin, e.g. `src/routes/plugin@zitadel.ts`:
 
 ```ts
-import { createNextgenMiddleware } from '@zitadel/sdk-qwik-router/server';
+import { createZitadelOnRequest } from '@zitadel/sdk-qwik-router/server';
 
-export const onRequest = createNextgenMiddleware({
+export const onRequest = createZitadelOnRequest({
   protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
   loginPath: '/login',
 });
@@ -57,7 +57,7 @@ read per request from Qwik Router's `requestEvent.env` (where Vite loads
 Sessions count only in the app's own project: `projectId`, else
 `ZITADEL_PROJECT_ID`, else `PUBLIC_ZITADEL_PROJECT_ID`, read the same way. With
 none set, nobody is signed in. To run
-alongside your own handler, export an array: `[createNextgenMiddleware({...}), myOnRequest]`.
+alongside your own handler, export an array: `[createZitadelOnRequest({...}), myOnRequest]`.
 
 **2. Read auth server-side** with `getAuth(ev)` in a `routeLoader$`, action, or
 endpoint:

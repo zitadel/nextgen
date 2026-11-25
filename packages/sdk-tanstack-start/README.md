@@ -26,14 +26,14 @@ functions, so restore it with `createCsrfMiddleware` and list it before auth:
 
 ```ts
 import { createCsrfMiddleware, createMiddleware, createStart } from '@tanstack/react-start';
-import { createNextgenMiddleware } from '@zitadel/sdk-tanstack-start/server';
+import { createZitadelRequestMiddleware } from '@zitadel/sdk-tanstack-start/server';
 
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === 'serverFn',
 });
 
 const authMiddleware = createMiddleware({ type: 'request' }).server(
-  createNextgenMiddleware({
+  createZitadelRequestMiddleware({
     url: process.env.ZITADEL_URL,
     projectSecret: process.env.ZITADEL_PROJECT_SECRET,
     protectedRoutes: ['/admin', '/dashboard*'],
@@ -52,12 +52,12 @@ The middleware runs on every request and does three things in one pass:
    is attached as the bearer only on the `POST /sessions/exchange` handoff, and
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and places the
-   result on the request context as `nextgenAuth`, which server functions
+   result on the request context as `zitadelAuth`, which server functions
    receive.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 The proxy/verify/protect decision is also exported as the framework-agnostic
-`handleNextgenRequest(request, options)` if you prefer to wire it into a custom
+`handleZitadelRequest(request, options)` if you prefer to wire it into a custom
 server entry.
 
 ### 2. Reading auth in a server function, and guarding a route

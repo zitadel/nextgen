@@ -800,11 +800,18 @@ describe("SDK public API ↔ the standard", () => {
   );
 
   type Kind = "ui" | "widgets" | "client" | "server" | "other";
+  /** A name an SDK chose for something that other SDKs name differently, and why. */
+  interface ReasonedName {
+    readonly name: string;
+    readonly why: string;
+  }
   interface EntryDeclaration {
     readonly source: string;
     readonly kind: Kind;
     readonly widgets?: boolean;
     readonly componentSuffix?: string;
+    readonly handler?: ReasonedName;
+    readonly authReader?: ReasonedName;
     readonly extras?: ReadonlyArray<string>;
   }
   interface PublicApi {
@@ -833,11 +840,9 @@ describe("SDK public API ↔ the standard", () => {
     "ZitadelProject",
     "ZitadelConfig",
   ];
-  const SERVER = [
-    "createNextgenMiddleware",
-    "getAuth",
-    "NextgenMiddlewareOptions",
-    "NextgenSession",
+  const SERVER_TYPES = [
+    "ZitadelMiddlewareOptions",
+    "ZitadelAuthSession",
     "AuthResult",
     "AuthState",
     "UnauthState",
@@ -846,6 +851,11 @@ describe("SDK public API ↔ the standard", () => {
 
   /** The names an entry must export, from its kind (ADR 090). */
   function required(entry: EntryDeclaration): string[] {
+    return [...requiredByKind(entry), ...(entry.handler ? [entry.handler.name] : [])];
+  }
+
+  /** The names that the kind of an entry requires, before its declared handler. */
+  function requiredByKind(entry: EntryDeclaration): string[] {
     const components = COMPONENTS.map((name) => `${name}${entry.componentSuffix ?? ""}`);
     switch (entry.kind) {
       case "ui":
@@ -855,7 +865,7 @@ describe("SDK public API ↔ the standard", () => {
       case "client":
         return [...SETUP, ...(entry.widgets ? ["businessLocales"] : [])];
       case "server":
-        return SERVER;
+        return [...(entry.authReader ? [entry.authReader.name] : []), ...SERVER_TYPES];
       case "other":
         return [];
     }

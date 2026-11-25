@@ -9,7 +9,7 @@ its users in through Zitadel. The login and sign-out widgets live in
 
 ## Main components
 
-- {@link index!createNextgenMiddleware} builds the middleware config. Wrap it in
+- {@link index!createZitadelMiddleware} builds the middleware config. Wrap it in
   SolidStart's `createMiddleware` and register it with the `solidStart()`
   plugin; use it once per app.
 - {@link index!getAuth} reads the session verdict the middleware stored, inside a
@@ -19,23 +19,23 @@ its users in through Zitadel. The login and sign-out widgets live in
   entry, so an app needs only this one dependency).
 - {@link index!SolidMiddlewareConfig} and {@link index!SolidFetchEvent} type the config and
   the slice of SolidStart's request event the middleware touches.
-- {@link index!AuthResult}, {@link index!NextgenSession}, {@link index!NextgenMiddlewareOptions}
+- {@link index!AuthResult}, {@link index!ZitadelAuthSession}, {@link index!ZitadelMiddlewareOptions}
   and the other session and option types describe what `getAuth` returns and
   what the middleware accepts.
 
 ## How it works
 
-`createNextgenMiddleware` returns a plain `{ onRequest }` config, and on
+`createZitadelMiddleware` returns a plain `{ onRequest }` config, and on
 SolidStart 2 it only takes effect inside `createMiddleware`, which turns it into
 the array of h3 middleware SolidStart registers. One handler then does three
 things for each request. It refuses any request that already carries the
-internal `x-nextgen-auth-token` header. It forwards everything under the proxy
+internal `x-zitadel-auth-token` header. It forwards everything under the proxy
 path (`/__nextgen` by default) to your Zitadel server, so the browser only ever
 talks to the app's own origin; the project secret is attached only to the
 session handoff exchange and never reaches the browser, and the session cookie
 is renamed per project on the way through. Every other request has its session
 verified against the server's keys and the verdict written to
-`event.locals.nextgenAuth`, which {@link index!getAuth} reads. A protected route with
+`event.locals.zitadelAuth`, which {@link index!getAuth} reads. A protected route with
 no session redirects to the login path with the requested path in `?next=`; if
 the server cannot say whether the session is live, the route answers `503`
 instead of sending a signed-in user to the login page.

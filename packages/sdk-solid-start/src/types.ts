@@ -8,11 +8,11 @@
  * @module
  */
 export type {
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   ClientSession,
   ClientAuthState,
   ClientAuthResult,

@@ -9,8 +9,8 @@ const WIDGET_WRAP =
   "position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark";
 
 /**
- * `src/routes/plugin@nextgen.ts` — the Qwik Router root `onRequest` plugin.
- * `createNextgenMiddleware` proxies `/__nextgen/*` to the auth backend (attaching
+ * `src/routes/plugin@zitadel.ts` — the Qwik Router root `onRequest` plugin.
+ * `createZitadelOnRequest` proxies `/__nextgen/*` to the auth backend (attaching
  * the project service-key from `ZITADEL_PROJECT_SECRET`), verifies the session
  * JWT, and redirects unauthenticated requests away from protected routes. `url`
  * and `projectSecret` are read per request from Qwik Router's `ev.env` (which
@@ -19,9 +19,9 @@ const WIDGET_WRAP =
  */
 export function pluginTemplate(): string {
   return `${ManagedFile.MARKER}
-import { createNextgenMiddleware } from "@zitadel/sdk-qwik-router/server";
+import { createZitadelOnRequest } from "@zitadel/sdk-qwik-router/server";
 
-export const onRequest = createNextgenMiddleware({
+export const onRequest = createZitadelOnRequest({
   protectedRoutes: ["/profile"],
   loginPath: "/login",
 });

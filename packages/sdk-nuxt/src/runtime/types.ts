@@ -8,11 +8,11 @@
  * scripts on the page could read it. Use `getAuth` on the server when the raw token is needed.
  */
 export type {
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   ClientSession,
   ClientAuthState,
   ClientAuthResult,

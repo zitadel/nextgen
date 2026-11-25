@@ -80,10 +80,10 @@ describe("getSession()", () => {
     warn.mockRestore();
   });
 
-  it("refuses to run server-side and points at getAuth()", async () => {
+  it("refuses to run server-side and points at auth()", async () => {
     vi.stubGlobal("window", undefined);
 
-    await expect(getSession()).rejects.toThrow(/getAuth\(\)/);
+    await expect(getSession()).rejects.toThrow(/auth\(\)/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

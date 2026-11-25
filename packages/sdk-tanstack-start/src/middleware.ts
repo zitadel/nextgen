@@ -1,4 +1,4 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { AuthResult, ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 
 import {
@@ -25,13 +25,13 @@ const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
 
 /**
- * The decision {@link handleNextgenRequest} makes for one request.
+ * The decision {@link handleZitadelRequest} makes for one request.
  *
  * It is either a ready-to-send `Response` (a proxied answer, a login redirect, or a refusal) or
  * an instruction to continue the request with the resolved {@link AuthResult}, which the caller
  * attaches to the router context. Branch on `type`.
  */
-export type NextgenRequestDecision =
+export type ZitadelRequestDecision =
   | {
       /**
        * The discriminant for a request that was a call under the proxy path, forwarded to the
@@ -101,12 +101,12 @@ export type NextgenRequestDecision =
     };
 
 /**
- * The options accepted by {@link handleNextgenRequest} and {@link createNextgenMiddleware}.
+ * The options accepted by {@link handleZitadelRequest} and {@link createZitadelRequestMiddleware}.
  *
- * It is the shared {@link NextgenMiddlewareOptions} plus two members that only this adapter
+ * It is the shared {@link ZitadelMiddlewareOptions} plus two members that only this adapter
  * needs.
  */
-export type NextgenRequestOptions = NextgenMiddlewareOptions & {
+export type ZitadelRequestOptions = ZitadelMiddlewareOptions & {
   /**
    * The project secret, sent as the bearer on the session handoff only.
    *
@@ -295,27 +295,27 @@ function parseCookieHeader(header: string | null): Map<string, string> {
  * Decides what to do with a single request: proxy it, redirect it, refuse it, or let it
  * through with the resolved session.
  *
- * This is the framework-agnostic core that {@link createNextgenMiddleware} wraps. It takes a
- * Web `Request` and returns a {@link NextgenRequestDecision}, so the full auth contract is
+ * This is the framework-agnostic core that {@link createZitadelRequestMiddleware} wraps. It takes a
+ * Web `Request` and returns a {@link ZitadelRequestDecision}, so the full auth contract is
  * testable without TanStack Start, and a custom server entry can use it directly. The checks
  * run in this order:
  *
- * 1. A request that carries the internal `x-nextgen-auth-token` header is refused with `400` on
+ * 1. A request that carries the internal `x-zitadel-auth-token` header is refused with `400` on
  *    every route, including ignored routes and the proxy path, and before anything else runs.
  *    The header is an internal channel that only an SDK writes after verifying a session.
  *    Refusing it outright is safer than removing it, because no framework's header
  *    mutability matters and no code path can forget a route.
- * 2. A path in {@link NextgenMiddlewareOptions.ignoredRoutes} continues signed out, without any
+ * 2. A path in {@link ZitadelMiddlewareOptions.ignoredRoutes} continues signed out, without any
  *    session check.
- * 3. A path under {@link NextgenMiddlewareOptions.proxyPath} is forwarded to the auth backend.
+ * 3. A path under {@link ZitadelMiddlewareOptions.proxyPath} is forwarded to the auth backend.
  *    The project secret is attached only to the session handoff and never sent to the browser,
  *    because on every operation it would turn this public boundary into an open relay with
  *    project authority. The client address comes only from
- *    {@link NextgenRequestOptions | clientAddress}, never from a request header, so a client
+ *    {@link ZitadelRequestOptions | clientAddress}, never from a request header, so a client
  *    cannot forge it.
  * 4. Any other path has its session resolved from the `Authorization` bearer token or the
  *    session cookie. A session counts only in the app's own project: the project id comes from
- *    {@link NextgenMiddlewareOptions.projectId}, else the `ZITADEL_PROJECT_ID` environment
+ *    {@link ZitadelMiddlewareOptions.projectId}, else the `ZITADEL_PROJECT_ID` environment
  *    variable, else `VITE_ZITADEL_PROJECT_ID`. A signed-out request for a protected route
  *    redirects to the login path with the requested path in `?next=`, and a protected route
  *    whose session the backend could not check answers `503` instead, because the visitor may
@@ -332,16 +332,16 @@ function parseCookieHeader(header: string | null): Map<string, string> {
  *
  * @param request - The incoming Web `Request`.
  * @param options - The configuration, defaulting to an empty object.
- * @returns A {@link NextgenRequestDecision} that tells the caller what to send or do next.
- * @throws Error when {@link NextgenMiddlewareOptions.loginPath} is not a relative path starting
+ * @returns A {@link ZitadelRequestDecision} that tells the caller what to send or do next.
+ * @throws Error when {@link ZitadelMiddlewareOptions.loginPath} is not a relative path starting
  *   with a single `/`, which would allow open-redirect attacks.
  *
  * @example
  * ```ts
- * import { handleNextgenRequest } from "@zitadel/sdk-tanstack-start/server";
+ * import { handleZitadelRequest } from "@zitadel/sdk-tanstack-start/server";
  *
  * export async function handle(request: Request): Promise<Response> {
- *   const decision = await handleNextgenRequest(request, { protectedRoutes: ["/admin*"] });
+ *   const decision = await handleZitadelRequest(request, { protectedRoutes: ["/admin*"] });
  *   if (decision.type !== "continue") {
  *     return decision.response;
  *   }
@@ -349,10 +349,10 @@ function parseCookieHeader(header: string | null): Map<string, string> {
  * }
  * ```
  */
-export async function handleNextgenRequest(
+export async function handleZitadelRequest(
   request: Request,
-  options: NextgenRequestOptions = {},
-): Promise<NextgenRequestDecision> {
+  options: ZitadelRequestOptions = {},
+): Promise<ZitadelRequestDecision> {
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
@@ -374,7 +374,7 @@ export async function handleNextgenRequest(
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
     throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+      `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
         `would allow open-redirect attacks.`,
     );
@@ -383,9 +383,9 @@ export async function handleNextgenRequest(
   const url2 = new URL(request.url);
   const { pathname } = url2;
 
-  // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+  // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
   // request that carries it, on every route, before anything else runs.
-  if (request.headers.has("x-nextgen-auth-token")) {
+  if (request.headers.has("x-zitadel-auth-token")) {
     return { type: "reject", response: new Response("Bad Request", { status: 400 }) };
   }
 
@@ -483,7 +483,7 @@ export interface RequestMiddlewareContext {
    * Hands the request on to the rest of the app.
    *
    * Pass `context` to add values that server functions read from their own context. The
-   * handler adds `nextgenAuth`. TanStack Start returns the result with or without a promise,
+   * handler adds `zitadelAuth`. TanStack Start returns the result with or without a promise,
    * so the type accepts both, and the handler awaits the result either way. The type is
    * hand-written, and not imported, so it stays free of TanStack's changing middleware generics.
    */
@@ -510,34 +510,38 @@ export interface RequestMiddlewareContext {
 /**
  * The key under which the auth result is placed on the router context.
  */
-const CONTEXT_KEY = "nextgenAuth";
+const CONTEXT_KEY = "zitadelAuth";
 
 /**
  * Creates a TanStack Start request-middleware server handler that proxies auth traffic,
  * verifies the session, and protects routes.
  *
  * Register the handler as a global request middleware in the framework server entry,
- * `src/start.ts`. It wraps {@link handleNextgenRequest}: a proxy, redirect or refusal decision
+ * `src/start.ts`. It wraps {@link handleZitadelRequest}: a proxy, redirect or refusal decision
  * is returned as the response, and a `continue` decision calls `next` with the result under the
- * `nextgenAuth` context key, so loaders and server functions read it with {@link getAuth}. When
+ * `zitadelAuth` context key, so loaders and server functions read it with {@link getAuth}. When
  * the decision carries cookies to set, the handler copies the downstream response (its headers
  * may be immutable), appends them, and marks it `Cache-Control: private, no-store` so no shared
  * cache keeps them. The login redirect and the cookie rules are those of
- * {@link handleNextgenRequest}. TanStack Start is not a dependency of this package, so the handler is typed
+ * {@link handleZitadelRequest}. TanStack Start is not a dependency of this package, so the handler is typed
  * against {@link RequestMiddlewareContext} instead.
  *
- * @param options - The middleware configuration, see {@link NextgenRequestOptions}.
+ * Naming: TanStack Start has request middleware and function middleware, both registered in
+ * start.ts, so the name says RequestMiddleware to tell the two apart. It is a factory, called
+ * once to return the middleware, so it starts with create.
+ *
+ * @param options - The middleware configuration, see {@link ZitadelRequestOptions}.
  * @returns A request-middleware server handler that resolves to the response to send.
- * @throws Error when {@link NextgenMiddlewareOptions.loginPath} is not a relative path. The
+ * @throws Error when {@link ZitadelMiddlewareOptions.loginPath} is not a relative path. The
  *   error surfaces on the first request that reaches the handler.
  *
  * @example
  * ```ts
  * import { createMiddleware, createStart } from "@tanstack/react-start";
- * import { createNextgenMiddleware } from "@zitadel/sdk-tanstack-start/server";
+ * import { createZitadelRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
  *
  * const authMiddleware = createMiddleware({ type: "request" }).server(
- *   createNextgenMiddleware({
+ *   createZitadelRequestMiddleware({
  *     url: process.env.ZITADEL_URL,
  *     projectSecret: process.env.ZITADEL_PROJECT_SECRET,
  *     protectedRoutes: ["/admin*"],
@@ -550,11 +554,11 @@ const CONTEXT_KEY = "nextgenAuth";
  * }));
  * ```
  */
-export function createNextgenMiddleware(
-  options: NextgenRequestOptions = {},
+export function createZitadelRequestMiddleware(
+  options: ZitadelRequestOptions = {},
 ): (ctx: RequestMiddlewareContext) => Promise<Response> {
   return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
-    const decision = await handleNextgenRequest(request, options);
+    const decision = await handleZitadelRequest(request, options);
 
     if (decision.type === "continue") {
       const result = await next({ context: { [CONTEXT_KEY]: decision.auth } });
@@ -574,18 +578,22 @@ export function createNextgenMiddleware(
 }
 
 /**
- * Reads the auth state that {@link createNextgenMiddleware} placed on the request context.
+ * Reads the auth state that {@link createZitadelRequestMiddleware} placed on the request context.
  *
  * A server function receives the request-middleware context, and this function picks the
- * `nextgenAuth` value out of it. Use it in a server function to learn who is signed in, and
+ * `zitadelAuth` value out of it. Use it in a server function to learn who is signed in, and
  * call that server function from a route's `beforeLoad` to guard the route. Do not read the
  * route's own `beforeLoad` context directly: TanStack Start nests request-middleware context
  * under `serverContext`, and on a client-side navigation `beforeLoad` runs in the browser, where
  * the value does not exist.
  *
- * When the context is `undefined` or carries no `nextgenAuth` (the middleware is not registered,
- * or the route is in {@link NextgenMiddlewareOptions.ignoredRoutes}), the result is the
+ * When the context is `undefined` or carries no `zitadelAuth` (the middleware is not registered,
+ * or the route is in {@link ZitadelMiddlewareOptions.ignoredRoutes}), the result is the
  * signed-out value, so a caller never has to check for a missing result.
+ *
+ * Naming: Takes the framework's own request event or context and returns the verified result
+ * that the handler stored on it. It reads and never creates, so it is called getAuth, and it is
+ * synchronous because the framework has already handed over the event.
  *
  * @param context - The context a server function handler receives, or `undefined`.
  * @returns The current {@link AuthResult}, signed out when the context carries none.
@@ -600,6 +608,6 @@ export function createNextgenMiddleware(
  * });
  * ```
  */
-export function getAuth(context: { readonly nextgenAuth?: AuthResult } | undefined): AuthResult {
-  return context?.nextgenAuth ?? { isAuthenticated: false, session: null };
+export function getAuth(context: { readonly zitadelAuth?: AuthResult } | undefined): AuthResult {
+  return context?.zitadelAuth ?? { isAuthenticated: false, session: null };
 }

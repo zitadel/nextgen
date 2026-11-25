@@ -13,12 +13,12 @@ import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contra
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
 
-import { createNextgenMiddleware, getAuth } from "../../runtime/server/middleware";
+import { createZitadelMiddleware, getAuth } from "../../runtime/server/middleware";
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
 
 // Each case starts from an app that sets no runtime config.
 beforeEach(() => {
-  setRuntimeConfig({ nextgen: {} });
+  setRuntimeConfig({ zitadel: {} });
 });
 
 async function serve(
@@ -34,12 +34,12 @@ async function serve(
       };
     });
   }
-  app.use(createNextgenMiddleware(options));
+  app.use(createZitadelMiddleware(options));
   let continued = false;
   let auth: AuthResult | undefined;
   app.use((event) => {
     continued = true;
-    auth = event.context.nextgenAuth;
+    auth = event.context.zitadelAuth;
     return { ok: true };
   });
   const response = await toWebHandler(app)(
@@ -58,7 +58,7 @@ async function serve(
 }
 
 function configureSecret(configured?: string, environment?: string): ServeOptions {
-  setRuntimeConfig({ nextgen: { projectSecret: configured } });
+  setRuntimeConfig({ zitadel: { projectSecret: configured } });
   vi.stubEnv("ZITADEL_PROJECT_SECRET", environment);
   return {};
 }
@@ -74,8 +74,8 @@ async function readAuth(context: unknown): Promise<AuthResult> {
 }
 
 function expectHandlerType(): void {
-  expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toExtend<EventHandler>();
-  expectTypeOf<H3EventContext["nextgenAuth"]>().toEqualTypeOf<AuthResult | undefined>();
+  expectTypeOf(createZitadelMiddleware({ url: "http://localhost:4000" })).toExtend<EventHandler>();
+  expectTypeOf<H3EventContext["zitadelAuth"]>().toEqualTypeOf<AuthResult | undefined>();
 }
 
 describeServerMiddleware({

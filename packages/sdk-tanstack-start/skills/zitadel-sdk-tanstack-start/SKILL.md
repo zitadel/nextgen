@@ -11,10 +11,10 @@ description: >-
 
 # @zitadel/sdk-tanstack-start
 
-TanStack Start request middleware and helpers that add Zitadel (Nextgen) auth to
+TanStack Start request middleware and helpers that add Zitadel auth to
 a TanStack Start app. The middleware proxies auth traffic same-origin under
 `/__nextgen`, verifies the session JWT via JWKS on the server, places the result
-on the request context as `nextgenAuth`, and redirects unauthenticated requests
+on the request context as `zitadelAuth`, and redirects unauthenticated requests
 on protected routes. Unlike the other meta-framework SDKs it also ships the
 widgets (a `/react` entry), so no other Zitadel package is needed.
 
@@ -42,14 +42,14 @@ CSRF protection for server functions, so list `createCsrfMiddleware` before auth
 
 ```ts
 import { createCsrfMiddleware, createMiddleware, createStart } from '@tanstack/react-start';
-import { createNextgenMiddleware } from '@zitadel/sdk-tanstack-start/server';
+import { createZitadelRequestMiddleware } from '@zitadel/sdk-tanstack-start/server';
 
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === 'serverFn',
 });
 
 const authMiddleware = createMiddleware({ type: 'request' }).server(
-  createNextgenMiddleware({
+  createZitadelRequestMiddleware({
     url: process.env.ZITADEL_URL,
     projectSecret: process.env.ZITADEL_PROJECT_SECRET,
     protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
@@ -67,7 +67,7 @@ Sessions count only in the app's own project: `projectId`, else
 signed in.
 
 The same proxy/verify/protect decision is exported as the framework-agnostic
-`handleNextgenRequest(request, options)` for a custom server entry.
+`handleZitadelRequest(request, options)` for a custom server entry.
 
 **2. Read auth and guard routes through a server function.** Server functions
 receive the middleware's context; a route's `beforeLoad` does not, and on
@@ -140,7 +140,7 @@ than assuming.
   right after, with every prop in place; do not expect them in the SSR markup.
 - **Keep `createCsrfMiddleware` ahead of auth.** `src/start.ts` opts the app out
   of TanStack Start's automatic CSRF protection.
-- **`beforeLoad` has no `nextgenAuth`.** Read it with `getAuth(context)` inside a
+- **`beforeLoad` has no `zitadelAuth`.** Read it with `getAuth(context)` inside a
   server function, not from the route context.
 - **Never return `getAuth(context)` itself from a server function.** Its session
   carries the raw token, and a server function's result reaches browser scripts.

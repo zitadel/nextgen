@@ -1,7 +1,7 @@
 # Qwik Router patcher
 
 Integrates Zitadel auth into a Qwik Router app on Qwik 2. Like Next and Nuxt, Qwik Router
-proxies and verifies the session server-side — here through the `createNextgenMiddleware`
+proxies and verifies the session server-side — here through the `createZitadelOnRequest`
 plugin from `@zitadel/sdk-qwik-router`.
 
 The detector requires `@qwik.dev/core` and `@qwik.dev/router` at `2.0.0-beta.45` or newer.
@@ -10,7 +10,7 @@ widgets need Qwik 2.
 
 ## What it patches
 
-- `src/routes/plugin@nextgen.ts` — the root `onRequest` plugin (infrastructure): proxies
+- `src/routes/plugin@zitadel.ts` — the root `onRequest` plugin (infrastructure): proxies
   `/__nextgen/*`, verifies the session, and redirects unauthenticated requests for
   `/profile` to `/login`
 - `src/routes/index.tsx`, `src/routes/login/index.tsx`, `src/routes/register/index.tsx`,

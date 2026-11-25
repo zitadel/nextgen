@@ -9,7 +9,7 @@ const WIDGET_WRAP =
   "position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark";
 
 /**
- * `src/middleware.ts` — the SolidStart middleware entrypoint. `createNextgenMiddleware`
+ * `src/middleware.ts` — the SolidStart middleware entrypoint. `createZitadelMiddleware`
  * returns a `{ onRequest: [...] }` config object that proxies `/__nextgen/*` to
  * the auth backend (attaching the project service-key from
  * `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
@@ -27,10 +27,10 @@ const WIDGET_WRAP =
 export function middlewareTemplate(): string {
   return `${ManagedFile.MARKER}
 import { createMiddleware } from "@solidjs/start/middleware";
-import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+import { createZitadelMiddleware } from "@zitadel/sdk-solid-start/server";
 
 export default createMiddleware(
-  createNextgenMiddleware({
+  createZitadelMiddleware({
     protectedRoutes: ["/profile"],
     loginPath: "/login",
   }),

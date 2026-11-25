@@ -14,8 +14,8 @@ import type { ClientAuthResult } from "./types";
  * so the widgets and `useZitadelApi()` find the proxy and the project without per-element
  * attributes. Configuration is skipped when either the proxy path or the project id is empty.
  *
- * The proxy path comes from `runtimeConfig.public.zitadelProxyPath`, then `nextgenProxyPath`, then
- * `nextgenApiBase`, then `/__nextgen`. The private `runtimeConfig.nextgen` exists only on the
+ * The proxy path comes from `runtimeConfig.public.zitadelProxyPath`, then
+ * `zitadelApiBase`, then `/__nextgen`. The private `runtimeConfig.zitadel` exists only on the
  * server, so the browser uses the default backend URL instead of reading it, which Nuxt would warn
  * about.
  *
@@ -23,7 +23,7 @@ import type { ClientAuthResult } from "./types";
  */
 export default defineNuxtPlugin(() => {
   const event = useRequestEvent();
-  const auth = event?.context.nextgenAuth ?? {
+  const auth = event?.context.zitadelAuth ?? {
     isAuthenticated: false as const,
     session: null,
   };
@@ -45,7 +45,7 @@ export default defineNuxtPlugin(() => {
       }
     : { isAuthenticated: false, session: null };
 
-  useState<ClientAuthResult>("nextgen-auth", () => clientAuth);
+  useState<ClientAuthResult>("zitadel-auth", () => clientAuth);
 
   // Initialise SDK-wide config so web components (<zitadel-login>,
   // <zitadel-logout>) resolve proxyPath and projectId from the shared
@@ -54,14 +54,13 @@ export default defineNuxtPlugin(() => {
   const publicConfig = runtimeConfig.public;
   const proxyPath =
     (publicConfig.zitadelProxyPath as string | undefined) ??
-    (publicConfig.nextgenProxyPath as string | undefined) ??
-    (publicConfig.nextgenApiBase as string | undefined) ??
+    (publicConfig.zitadelApiBase as string | undefined) ??
     "/__nextgen";
   const projectId = (publicConfig.zitadelProjectId as string | undefined) ?? "";
-  // `runtimeConfig.nextgen` is private, so it exists only on the server;
+  // `runtimeConfig.zitadel` is private, so it exists only on the server;
   // reading it in the browser makes Nuxt warn (NUXT_E1003). The browser keeps
   // the default, as it always did.
-  const privateConfig = import.meta.server ? runtimeConfig.nextgen : undefined;
+  const privateConfig = import.meta.server ? runtimeConfig.zitadel : undefined;
   const url = import.meta.server ? resolveUrl(privateConfig) : DEFAULT_URL;
 
   if (proxyPath && projectId) {

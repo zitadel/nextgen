@@ -1,7 +1,7 @@
 # SolidStart patcher
 
 Integrates Zitadel auth into a SolidStart app. Like Next and Nuxt, SolidStart proxies and
-verifies the session server-side — here through the `createNextgenMiddleware` middleware
+verifies the session server-side — here through the `createZitadelMiddleware` middleware
 from `@zitadel/sdk-solid-start`.
 
 The detector requires `solid-js` and `@solidjs/start` 2 or newer. SolidStart 1 registers

@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { AuthResult, AuthState, NextgenSession, UnauthState } from "../server";
+import type { AuthResult, AuthState, ZitadelAuthSession, UnauthState } from "../server";
 
 import { getAuth } from "../server";
 
@@ -9,7 +9,7 @@ describe("server entry", () => {
   // does with every other server SDK.
   it("exports the types its helpers answer with", () => {
     expectTypeOf(getAuth).returns.toEqualTypeOf<AuthResult>();
-    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
+    expectTypeOf<AuthState["session"]>().toEqualTypeOf<ZitadelAuthSession>();
     expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
   });
 });

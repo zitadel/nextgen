@@ -11,25 +11,29 @@
         "ClientAuthResult",
         "ClientAuthState",
         "ClientSession",
-        "NextgenMiddlewareOptions",
-        "NextgenProvider",
-        "NextgenSession",
         "ProxyHandler",
         "ProxyOptions",
         "UnauthState",
-        "createNextgenMiddleware",
+        "ZitadelAuthSession",
+        "ZitadelMiddlewareOptions",
+        "ZitadelProvider",
+        "auth",
         "createProxy",
-        "getAuth",
         "useAuth",
-        "useAuthContext"
+        "useAuthContext",
+        "zitadelMiddleware"
       ]
     },
     "./server": {
       "source": "src/server.ts",
       "kind": "server",
+      "authReader": {
+        "name": "auth",
+        "why": "auth() reads the request from the async context that Next.js provides (headers()), so it takes no request argument and is async. The other SDKs' getAuth(event) are synchronous and need the framework's event handed to them, which is why the two names differ."
+      },
       "extras": [
         "AuthOptions",
-        "NextgenProvider"
+        "ZitadelProvider"
       ]
     },
     "./client": {
@@ -56,8 +60,8 @@
         "ClientAuthResult",
         "ClientAuthState",
         "ClientSession",
-        "NextgenSession",
         "UnauthState",
+        "ZitadelAuthSession",
         "useAuth",
         "useAuthContext"
       ]
@@ -65,10 +69,13 @@
     "./middleware": {
       "source": "src/middleware.ts",
       "kind": "other",
+      "handler": {
+        "name": "zitadelMiddleware",
+        "why": "Next.js runs the function that middleware.ts (proxy.ts from Next.js 16) exports, with each request. zitadelMiddleware(request, options) is that function: it handles the request itself and returns the response. It is not a factory, so it has no create prefix. createProxy(project, options) is the factory that returns a handler."
+      },
       "extras": [
         "ProxyHandler",
         "ProxyOptions",
-        "createNextgenMiddleware",
         "createProxy"
       ]
     },

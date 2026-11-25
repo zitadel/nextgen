@@ -8,11 +8,11 @@
  * @module
  */
 export type {
-  NextgenSession,
+  ZitadelAuthSession,
   AuthState,
   UnauthState,
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   // The client-safe auth shapes, which carry no token.
   ClientSession,
   ClientAuthState,

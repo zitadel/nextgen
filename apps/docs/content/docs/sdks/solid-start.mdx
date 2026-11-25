@@ -68,10 +68,10 @@ Setup installs both packages. To add them yourself, run:
 
     ```ts
     import { createMiddleware } from "@solidjs/start/middleware";
-    import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+    import { createZitadelMiddleware } from "@zitadel/sdk-solid-start/server";
 
     export default createMiddleware(
-      createNextgenMiddleware({
+      createZitadelMiddleware({
         protectedRoutes: ["/profile"],
         loginPath: "/login",
       }),
@@ -117,7 +117,7 @@ Setup installs both packages. To add them yourself, run:
 
 <Steps>
   <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
-  <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(getRequestEvent()!)` in a server function.</Step>
+  <Step>It verifies the session token and puts the result on `event.locals.zitadelAuth`; read it with `getAuth(getRequestEvent()!)` in a server function.</Step>
   <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in.</Step>
 </Steps>
 

@@ -1,6 +1,6 @@
 import type {
   AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -45,7 +45,7 @@ declare module "h3" {
      * not run, for example on an ignored route or in a handler outside its reach, so read it
      * through {@link getAuth}, which answers signed out in that case.
      */
-    nextgenAuth?: AuthResult;
+    zitadelAuth?: AuthResult;
   }
 }
 
@@ -110,7 +110,7 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  *
  * For each request the handler works in this order:
  *
- * 1. A request that carries the internal `x-nextgen-auth-token` header is refused with `400`.
+ * 1. A request that carries the internal `x-zitadel-auth-token` header is refused with `400`.
  *    Clients never send it, and it is checked on every route, before anything else, so it cannot
  *    be used to inject a session.
  * 2. A path that matches `ignoredRoutes` is skipped: no proxy, no verification, no protection.
@@ -132,7 +132,11 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  *
  * The factory works on Node and on edge runtimes such as Cloudflare Workers and Vercel Edge.
  *
- * @param options - The middleware options, described by {@link NextgenMiddlewareOptions}. Every
+ * Naming: Nuxt calls these server middleware: a file in server/middleware that default-exports
+ * an h3 event handler. This factory returns that handler. It is a factory, called once, so it
+ * starts with create.
+ *
+ * @param options - The middleware options, described by {@link ZitadelMiddlewareOptions}. Every
  *   field is optional. An empty `url` counts as unset and falls back to `ZITADEL_URL`, then
  *   `http://localhost:8080`.
  * @returns An H3 event handler suitable as a global server middleware.
@@ -142,16 +146,16 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * @example
  * ```ts
  * // server/middleware/auth.ts
- * import { createNextgenMiddleware } from "@zitadel/sdk-nuxt/server";
+ * import { createZitadelMiddleware } from "@zitadel/sdk-nuxt/server";
  *
- * export default createNextgenMiddleware({
+ * export default createZitadelMiddleware({
  *   url: process.env.ZITADEL_URL,
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
  * ```
  */
-export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}): EventHandler {
+export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}): EventHandler {
   const {
     projectId = process.env.ZITADEL_PROJECT_ID || process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
@@ -176,16 +180,16 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
   // (e.g. "//evil.com") would redirect the browser to an external host.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
     throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+      `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
         `would allow open-redirect attacks.`,
     );
   }
 
   return defineEventHandler(async (event: H3Event) => {
-    // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+    // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
     // request that carries it, on every route, before anything else runs.
-    if (getRequestHeader(event, "x-nextgen-auth-token") !== undefined) {
+    if (getRequestHeader(event, "x-zitadel-auth-token") !== undefined) {
       setResponseStatus(event, 400);
       return "Bad Request";
     }
@@ -283,7 +287,7 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = resolveProjectSecret(config.nextgen);
+    const projectSecret = resolveProjectSecret(config.zitadel);
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }
@@ -332,7 +336,7 @@ async function proxyRequest(
 }
 
 /**
- * The options {@link handleAuth} takes after the public {@link NextgenMiddlewareOptions} is
+ * The options {@link handleAuth} takes after the public {@link ZitadelMiddlewareOptions} is
  * destructured.
  *
  * It holds the route policy, plus what the shared {@link resolveSession} judges the session by.
@@ -371,7 +375,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
     verification,
   );
 
-  event.context.nextgenAuth = auth;
+  event.context.zitadelAuth = auth;
 
   // The backend could not say whether the session is live. The user may well
   // be signed in, so a protected route answers 503 rather than send them to
@@ -407,6 +411,10 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
  * token is needed to call an upstream API on the visitor's behalf. Never forward it to the
  * browser.
  *
+ * Naming: Takes the framework's own request event or context and returns the verified result
+ * that the handler stored on it. It reads and never creates, so it is called getAuth, and it is
+ * synchronous because the framework has already handed over the event.
+ *
  * @param event - The current H3 event.
  * @returns The current {@link AuthResult}. It is signed out, with a `null` session, when the
  *   middleware did not run for the request or nobody is signed in.
@@ -425,5 +433,5 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
  * ```
  */
 export function getAuth(event: H3Event): AuthResult {
-  return event.context.nextgenAuth ?? { isAuthenticated: false, session: null };
+  return event.context.zitadelAuth ?? { isAuthenticated: false, session: null };
 }

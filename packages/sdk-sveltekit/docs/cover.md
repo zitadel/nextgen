@@ -9,13 +9,13 @@ widgets are not in this package: they come from `@zitadel/sdk-svelte`.
 
 ## Main components
 
-- {@link server!createNextgenMiddleware} builds the `handle` hook for `src/hooks.server.ts`.
+- {@link server!createZitadelHandle} builds the `handle` hook for `src/hooks.server.ts`.
   Use it once per app; compose it with your own hooks through `sequence()`.
 - {@link server!getAuth} reads the verified auth state from a request event in a load
   function, endpoint or action, after the hook has run.
-- {@link server!NextgenHandle} is the type of the hook, so it can be composed and
+- {@link server!ZitadelHandle} is the type of the hook, so it can be composed and
   typed without importing it from SvelteKit.
-- {@link server!NextgenMiddlewareOptions} lists every setting the hook accepts
+- {@link server!ZitadelMiddlewareOptions} lists every setting the hook accepts
   (`url`, `projectId`, `protectedRoutes`, `loginPath`, token checks, timeouts).
 - {@link server!AuthResult} is what `getAuth` returns: signed in with a session, or
   not signed in.
@@ -32,7 +32,7 @@ front of every request:
   talks to your own origin. The project secret is attached as the bearer on
   the `POST /sessions/exchange` handoff alone and never reaches the browser.
 - Every other request has its session token verified against the server's
-  JWKS with Web Crypto, and the result is written to `event.locals.nextgenAuth`.
+  JWKS with Web Crypto, and the result is written to `event.locals.zitadelAuth`.
   `App.Locals` is augmented for you, so {@link server!getAuth} is typed.
 - On a protected route with no valid session the hook redirects to `loginPath`
   with the requested path in `?next=`. If the backend cannot say whether the
@@ -58,4 +58,4 @@ nothing.
 
 - The [README](https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit#readme)
   has install and setup steps.
-- Start from {@link server!createNextgenMiddleware}, then {@link server!getAuth}.
+- Start from {@link server!createZitadelHandle}, then {@link server!getAuth}.

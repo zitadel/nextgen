@@ -704,10 +704,6 @@ describe("proxySessionCookies", () => {
       "another project's",
       "zitadel_session_proj_other=other; __Host-zitadel_session_proj_other=other",
     ],
-    [
-      "the old",
-      `__nextgen_session=old; __nextgen_session_${PROJECT}=old; __nextgen_session_proj_other=old`,
-    ],
   ])("keeps %s session cookies back", (_label, sessions) => {
     const cookies = proxySessionCookies(
       proxied({ cookie: `${sessions}; _zflow=f` }),
@@ -819,21 +815,6 @@ describe("proxySessionCookies", () => {
     );
 
     expect(setCookies).toEqual([`${OWN}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`]);
-  });
-
-  // ADR 083: an old session cookie is neither renamed nor passed on.
-  it("drops a Set-Cookie of an old session cookie", async () => {
-    const cookies = proxySessionCookies(proxied(), PROJECT, UPSTREAM);
-
-    const { setCookies } = await cookies.toBrowser(
-      answer(200, {}, [
-        "__nextgen_session=tok; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax",
-        `__nextgen_session_${PROJECT}=tok; Path=/; HttpOnly`,
-        "_zflow=f; Path=/",
-      ]),
-    );
-
-    expect(setCookies).toEqual(["_zflow=f; Path=/"]);
   });
 
   it("passes the cookies through as they are without a project", async () => {
@@ -999,22 +980,6 @@ describe("proxySessionCookies", () => {
       );
 
       expect(setCookies[0]).toBe(`${OWN_HTTPS}=old; Path=/; HttpOnly; SameSite=Lax; Secure`);
-    });
-
-    // ADR 083: an old session cookie is no credential and no source of one.
-    it("is never one kept under an old name", async () => {
-      const cookies = proxySessionCookies(
-        proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
-        PROJECT,
-        UPSTREAM,
-      );
-
-      const forBrowser = await cookies.toBrowser(
-        answer(200, { project_id: PROJECT, user_id: "u1" }),
-      );
-
-      expect(cookies.upstreamCookie).toBeNull();
-      expect(forBrowser.setCookies).toEqual([]);
     });
   });
 
@@ -1296,27 +1261,6 @@ describe("proxySessionCookies", () => {
       );
     });
 
-    // ADR 083: the session of an old cookie is neither asked about nor ended,
-    // and the cookie is not touched.
-    it.each([
-      ["sign-out", SIGN_OUT, answer(204, null, [SERVER_CLEARED])],
-      ["sign-in", SIGN_IN, answer(200, {}, ["zitadel_session=new; Path=/; HttpOnly"])],
-    ])("leaves a session under an old name alone on %s", async (_label, request, response) => {
-      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
-      const cookies = proxySessionCookies(
-        proxied({ ...request, cookie: `${OWN}=current; __nextgen_session=earlier` }),
-        PROJECT,
-        UPSTREAM,
-      );
-
-      const { setCookies } = await cookies.toBrowser(response);
-
-      expect(setCookies.filter((setCookie) => setCookie.startsWith("__nextgen_session"))).toEqual(
-        [],
-      );
-      expect(fetchMock).not.toHaveBeenCalled();
-    });
-
     it("touches nothing when the sign-in fails", async () => {
       const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
       const cookies = proxySessionCookies(
@@ -1534,19 +1478,6 @@ describe("resolveSession", () => {
     );
 
     expect(resolved.auth).toMatchObject({ isAuthenticated: true, session: { token: "mine" } });
-  });
-
-  // ADR 083: an old session cookie is no credential and no source of one.
-  it("neither reads nor copies a session cookie from before ADR 083", async () => {
-    const fetchMock = backend(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
-
-    const resolved = await resolveSession(
-      request({ __nextgen_session: "old", __nextgen_session_proj_app: "old" }),
-      OPTIONS,
-    );
-
-    expect(resolved).toEqual({ auth: SIGNED_OUT, undecided: false, cookies: [] });
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("clears with Secure where the app is served over https", async () => {
