@@ -28,4 +28,12 @@ describe("the full-viewport wrapper around a login widget", () => {
     expect(wrappers.length).toBeGreaterThan(0);
     expect(wrappers.filter((wrapper) => !CENTERED.test(wrapper))).toEqual([]);
   });
+
+  it("gives each Angular component host the width the widget fills", () => {
+    const source = readFileSync(join(RULE_DIR, "angular", "templates.ts"), "utf8");
+    const hosts = source.match(/<zitadel-auth-(?:login|session)\n[\s\S]*?><\/zitadel-auth-/g) ?? [];
+
+    expect(hosts).toHaveLength(3);
+    expect(hosts.filter((host) => !host.includes("display:block;width:100%"))).toEqual([]);
+  });
 });

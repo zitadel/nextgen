@@ -266,6 +266,7 @@ export function appTemplateHtml(ctx: PatchContext): string {
 @if (path.startsWith('/profile')) {
   <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-session
+      style="display:block;width:100%"
       [project]="project"
       [postSignOutUrl]="'/login'"
     ></zitadel-auth-session>
@@ -273,6 +274,7 @@ export function appTemplateHtml(ctx: PatchContext): string {
 } @else if (path.startsWith('/register')) {
   <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
+      style="display:block;width:100%"
       [project]="project"${localesBinding}
       purpose="register"
       [postSignInUrl]="'/profile'"
@@ -281,6 +283,7 @@ export function appTemplateHtml(ctx: PatchContext): string {
 } @else {
   <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
+      style="display:block;width:100%"
       [project]="project"${localesBinding}
       purpose="login"
       [postSignInUrl]="'/profile'"
