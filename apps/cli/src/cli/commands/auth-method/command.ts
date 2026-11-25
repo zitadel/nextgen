@@ -1,5 +1,4 @@
 import type { Interfaces } from "@oclif/core";
-
 import { CUSTOM_PROVIDER, IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { environmentFlags } from "@/cli/core/environment-flags";

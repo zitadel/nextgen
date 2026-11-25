@@ -67,27 +67,49 @@ const FORCE_REQUIRED_REFUSAL = {
   details: { question: "{question}" },
 } as const satisfies Refusal;
 
+/** How an operation id or a path that names nothing the API has is refused. */
+const OPERATION_UNKNOWN_REFUSAL = {
+  message: "{message}",
+  hint: "{hint}",
+  next: [{ id: "api:ls", flags: { json: true } }],
+} as const satisfies Refusal;
+
+/** How a path whose method does not pick one operation is refused. */
+const OPERATION_AMBIGUOUS_REFUSAL = {
+  message: "{message}",
+  hint: "{hint}",
+  next: [{ id: "api:ls", flags: { json: true } }],
+} as const satisfies Refusal;
+
 /**
  * The operation an operation id or a path names, or the refusal that says how to
  * list them.
  */
 function resolveTarget(ref: string, method?: string): Target {
   try {
-    return Operation.named(ref, method);
+    try {
+      return Operation.named(ref, method);
+    } catch (error) {
+      if (error instanceof BackendOperationUnknownError) {
+        throw Object.assign(
+          refusalError(OPERATION_UNKNOWN_REFUSAL, {
+            message: error.message,
+            hint: error.hint ?? "",
+          }),
+          { cause: error },
+        );
+      }
+      throw error;
+    }
   } catch (error) {
-    if (
-      error instanceof BackendOperationUnknownError ||
-      error instanceof BackendOperationAmbiguousError
-    ) {
-      throw new ZitadelError("E_VALIDATION", error.message, {
-        hint: error.hint,
-        nextCommands: [
-          {
-            id: "api:ls",
-            flags: { json: true },
-          },
-        ],
-      });
+    if (error instanceof BackendOperationAmbiguousError) {
+      throw Object.assign(
+        refusalError(OPERATION_AMBIGUOUS_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+        }),
+        { cause: error },
+      );
     }
     throw error;
   }
