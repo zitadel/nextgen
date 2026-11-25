@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SchemaService } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { PublishError } from "@/lib/publish";
 import { validateStep } from "@/lib/publish/steps/validate";
 import {
   aBranding,
@@ -17,7 +18,20 @@ import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
 import { holdingVariables, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
 import { aSchemaListing } from "@tests/helpers/schemas";
 import { aStepContext } from "@tests/helpers/step-context";
-import { rejectionOf } from "@tests/helpers/thrown-value";
+import { rejectionOf as rejectionOfRun } from "@tests/helpers/thrown-value";
+
+/**
+ * What `run` rejects with, as the CLI reports it: a publish refusal is turned
+ * into its error at the boundary, every other rejection is left as it is.
+ *
+ * @param run - What to run.
+ * @returns The reported error, or `undefined` when `run` resolves.
+ */
+const rejectionOf = async (run: () => unknown): Promise<unknown> => {
+  const error = await rejectionOfRun(run);
+
+  return error instanceof PublishError ? toZitadelError(error) : error;
+};
 
 /**
  * What the step reports for a configuration it accepts.

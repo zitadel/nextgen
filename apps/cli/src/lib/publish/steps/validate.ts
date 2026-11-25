@@ -1,5 +1,5 @@
-import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
+import { PublishConfigInvalidError } from "@/lib/publish/errors";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
 
@@ -86,11 +86,11 @@ function reported(finding: Issue | ServerFinding): ReportedFinding {
 }
 
 /**
- * Stop the deploy on every error, named in one `E_VALIDATION`, before anything
- * is sent.
+ * Stop the deploy on every error, named in one refusal, before anything is
+ * sent.
  *
  * @param findings - Every finding.
- * @throws {@link ZitadelError} `E_VALIDATION` when any finding is an error.
+ * @throws {@link PublishConfigInvalidError} when any finding is an error.
  */
 function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const errors = findings.filter((finding) => {
@@ -106,29 +106,16 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
     return `  - ${finding.file}: ${finding.message}`;
   });
   // Any refused key may be one a newer server declares and this CLI's
-  // meta-schema does not know yet, so the hint says what fixes that too.
+  // meta-schema does not know yet.
   const refusedKey = errors.some((finding) => {
     return UserSchema.refusesKey(finding);
   });
-  const fix = literalSecret
-    ? 'Publish a secret with the command below and reference it as "${{ NAME }}".'
-    : "Fix the files named above and rerun; no changes were made.";
-  const hint = refusedKey
-    ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
-    : fix;
-  throw new ZitadelError(
-    "E_VALIDATION",
+  throw new PublishConfigInvalidError(
     `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
     {
-      hint,
-      ...(literalSecret
-        ? {
-            nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
-          }
-        : {}),
-      details: {
-        issues: errors.map(reported),
-      },
+      findings: errors.map(reported),
+      literalSecret,
+      refusedKey,
     },
   );
 }

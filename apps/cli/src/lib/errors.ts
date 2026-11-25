@@ -18,6 +18,7 @@ import {
   OrcaRendererError,
   OrcaScaffoldBlockedError,
 } from "./orca";
+import { PublishConfigInvalidError, PublishConnectionError, PublishError } from "./publish";
 import { ZitadelConfigError, ZitadelConfigEditBreaksFlowsError } from "./zitadel";
 
 /**
@@ -312,6 +313,82 @@ function orcaErrorHint(error: OrcaError): string | undefined {
   return hint === "" ? undefined : hint;
 }
 
+/**
+ * The code a failure of publishing is reported with.
+ *
+ * @param error - The failure.
+ * @returns `E_CREDENTIAL_MISSING` for a variable the project lacks, and the
+ *   code of its category for any other.
+ */
+function publishErrorCode(error: PublishError): ZitadelErrorCode {
+  if (error instanceof PublishConnectionError && error.reason === "missing-variable") {
+    return "E_CREDENTIAL_MISSING";
+  }
+
+  return CATEGORY_CODES[error.category];
+}
+
+/**
+ * What to do about a failure of publishing, worded with the CLI's commands and
+ * flags, which the library leaves out.
+ *
+ * @param error - The failure.
+ * @returns The advice and the commands to run next, each left out when there
+ *   is none.
+ */
+function publishErrorAdvice(error: PublishError): {
+  hint?: string;
+  nextCommands?: readonly Suggested[];
+} {
+  if (error instanceof PublishConfigInvalidError) {
+    const fix = error.literalSecret
+      ? 'Publish a secret with the command below and reference it as "${{ NAME }}".'
+      : "Fix the files named above and rerun; no changes were made.";
+
+    return {
+      hint: error.refusedKey
+        ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
+        : fix,
+      ...(error.literalSecret
+        ? {
+            nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
+          }
+        : {}),
+    };
+  }
+
+  if (error instanceof PublishConnectionError) {
+    if (error.reason === "shared-variable") {
+      return {
+        hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+      };
+    }
+
+    const wantsSecret = error.field === "client_secret";
+    const setCommand: Suggested = {
+      id: "variable:set",
+      args: { name: error.variable },
+      flags: { secret: wantsSecret, preview: error.mode === "preview" },
+    };
+
+    if (error.reason === "missing-variable") {
+      return {
+        hint: "Publish it with the command below, then deploy again.",
+        nextCommands: [setCommand],
+      };
+    }
+
+    return {
+      hint: wantsSecret
+        ? "The client secret must be a secret variable: publish it with the command below."
+        : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
+      nextCommands: [setCommand],
+    };
+  }
+
+  return {};
+}
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
@@ -460,6 +537,18 @@ export function toZitadelError(error: unknown): ZitadelError {
 
     return new ZitadelError(orcaErrorCode(error), error.message, {
       ...(hint === undefined ? {} : { hint }),
+      details: error.details ?? { original: pickErrorShape(error) },
+    });
+  }
+
+  // Publishing's own refusals: the library says what is wrong, and the advice
+  // names the commands to fix it.
+  if (error instanceof PublishError) {
+    const { hint, nextCommands } = publishErrorAdvice(error);
+
+    return new ZitadelError(publishErrorCode(error), error.message, {
+      ...(hint === undefined ? {} : { hint }),
+      ...(nextCommands === undefined ? {} : { nextCommands }),
       details: error.details ?? { original: pickErrorShape(error) },
     });
   }

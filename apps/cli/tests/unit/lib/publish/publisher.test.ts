@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BackendConflictError, BackendForbiddenError } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
+import { PublishConfigInvalidError } from "@/lib/publish";
 import { Output } from "@/lib/ui";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
@@ -452,7 +453,8 @@ describe("Publisher.prepare", () => {
         return aPublisherListing(BROKEN_LISTING).prepare(aDryRunOf(dir));
       });
 
-      expect(error).toMatchObject({ code: "E_VALIDATION" });
+      expect(error).toBeInstanceOf(PublishConfigInvalidError);
+      expect(toZitadelError(error)).toMatchObject({ code: "E_VALIDATION" });
     });
 
     test("stops when the person cancels while the listing is read", async ({ dir }) => {

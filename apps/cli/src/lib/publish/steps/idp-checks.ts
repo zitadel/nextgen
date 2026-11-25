@@ -1,7 +1,6 @@
 import { BackendForbiddenError, type VariableService } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
+import { PublishConnectionError } from "@/lib/publish/errors";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
-import type { Suggestion } from "@/lib/suggestion";
 import type { Connection } from "@/lib/zitadel";
 
 /**
@@ -31,10 +30,9 @@ const VARIABLE_KIND = {
  *
  * @param ctx - The step's context: the connections and the variables.
  * @returns Nothing when every connection's variables are held as it needs.
- * @throws {@link ZitadelError} `E_VALIDATION` When a connection's client id and
- *   secret name one variable, or a variable is not the kind its field needs.
- * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a connection names a
- *   variable the project does not hold.
+ * @throws {@link PublishConnectionError} When a connection's client id and
+ *   secret name one variable, a variable is not the kind its field needs, or
+ *   the project does not hold the variable a connection names.
  * @throws {@link BackendForbiddenError} When a deploy's token may not read the
  *   variables.
  */
@@ -84,10 +82,9 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  * @param ctx - The step's context.
  * @param connection - The connection.
  * @param held - The project's variables, and whether each is a secret.
- * @throws {@link ZitadelError} `E_VALIDATION` When the client id and secret
- *   name one variable, or a variable is not the kind its field needs.
- * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a named variable is
- *   not held.
+ * @throws {@link PublishConnectionError} When the client id and secret name
+ *   one variable, a variable is not the kind its field needs, or a named
+ *   variable is not held.
  */
 function checkCredentialVariables(
   ctx: StepContext,
@@ -115,47 +112,35 @@ function checkCredentialVariables(
   const idVariable: string | undefined = id?.variable;
   const secretVariable: string | undefined = secret?.variable;
   if (idVariable !== undefined && idVariable === secretVariable) {
-    throw new ZitadelError(
-      "E_VALIDATION",
+    throw new PublishConnectionError(
+      "shared-variable",
       `${file}: client_id and client_secret both name the variable ${idVariable}`,
-      {
-        hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-        details: { variable: idVariable, file },
-      },
+      { file, variable: idVariable, mode: ctx.mode, details: { variable: idVariable, file } },
     );
   }
   for (const use of uses) {
     const field = use.field;
     const variable = use.variable;
     const wantsSecret = field === "client_secret";
-    const setCommand: Suggestion = {
-      id: "variable:set",
-      args: { name: variable },
-      flags: { secret: wantsSecret, preview: ctx.mode === "preview" },
-    };
     const isSecret = held.get(variable);
     if (isSecret === undefined) {
-      throw new ZitadelError(
-        "E_CREDENTIAL_MISSING",
+      throw new PublishConnectionError(
+        "missing-variable",
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
-        {
-          hint: "Publish it with the command below, then deploy again.",
-          nextCommands: [setCommand],
-          details: { variable, field, file },
-        },
+        { file, field, variable, mode: ctx.mode, details: { variable, field, file } },
       );
     }
     if (isSecret !== wantsSecret) {
       const kind = isSecret ? "a secret" : "not a secret";
-      const hint = wantsSecret
-        ? "The client secret must be a secret variable: publish it with the command below."
-        : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.";
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new PublishConnectionError(
+        "wrong-kind",
         `${file}: ${field} names the variable ${variable}, which is ${kind}`,
         {
-          hint,
-          nextCommands: [setCommand],
+          file,
+          field,
+          variable,
+          isSecret,
+          mode: ctx.mode,
           details: { variable, field, file, secret: isSecret },
         },
       );

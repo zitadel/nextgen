@@ -12,3 +12,16 @@ export {
   type PublishOutcome,
   type ReleaseRequest,
 } from "./publisher";
+export {
+  PublishConfigInvalidError,
+  PublishConnectionError,
+  PublishError,
+  PublishReleaseRejectedError,
+} from "./errors";
+export type {
+  PublishConfigInvalidOptions,
+  PublishConnectionOptions,
+  PublishConnectionReason,
+  PublishErrorOptions,
+  PublishFinding,
+} from "./errors";

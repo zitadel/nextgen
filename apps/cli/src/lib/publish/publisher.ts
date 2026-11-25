@@ -14,11 +14,12 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
-import { isCancellation, ZitadelError } from "@/lib/errors";
+import { isCancellation } from "@/lib/errors";
 import { Output } from "@/lib/ui";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
+import { PublishReleaseRejectedError } from "./errors";
 import { bundleIsDirty, headSha } from "./git";
 import {
   type ConfigurationType,
@@ -226,7 +227,7 @@ export class Publisher {
    * @param store - Where the configuration is kept.
    * @returns The configuration, and whether the listing was needed but could
    *   not be read.
-   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
+   * @throws The run's cancellation, when the person stops the command.
    */
   private async loadKnowingDeployed(store: DiskStore): Promise<KnownConfig> {
     const unknown = await ZitadelConfig.loadUnchecked(store);
@@ -261,7 +262,7 @@ export class Publisher {
    * what the local files say.
    *
    * @returns The slugs, or undefined when the listing could not be read.
-   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
+   * @throws The run's cancellation, when the person stops the command.
    */
   private async listDeployed(): Promise<ReadonlySet<string> | undefined> {
     try {
@@ -287,7 +288,7 @@ export class Publisher {
    *
    * @param request - The directory, the mode, and how to show what the steps say.
    * @returns The bundle, what the steps reported, and the commit it was built from.
-   * @throws {@link ZitadelError} `E_VALIDATION` naming each file a step refuses.
+   * @throws {@link PublishConfigInvalidError} naming each file a step refuses.
    */
   async prepare(request: PrepareRequest): Promise<PreparedRelease> {
     const store = new DiskStore(request.cwd);
@@ -456,7 +457,7 @@ export class Publisher {
    *
    * @param bundle - The bundle read from disk.
    * @returns The same bundle, typed as the API takes it.
-   * @throws {@link ZitadelError} `E_VALIDATION` naming each field the API does
+   * @throws {@link PublishReleaseRejectedError} naming each field the API does
    *   not take.
    */
   private static narrow(bundle: ConfigurationBundle): ReleaseBundle {
@@ -469,14 +470,9 @@ export class Publisher {
       const field = issue.path.join(".") || "(root)";
       return `  - bundle.${field} ${issue.message}`;
     });
-    throw new ZitadelError(
-      "E_VALIDATION",
+    throw new PublishReleaseRejectedError(
       `The release body does not match what the API takes, so nothing was sent:\n${lines.join("\n")}`,
-      {
-        details: {
-          issues,
-        },
-      },
+      { details: { issues } },
     );
   }
 }

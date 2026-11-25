@@ -1,13 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import { BackendForbiddenError } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { PublishError } from "@/lib/publish";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
 import type { ClientStubs } from "@tests/helpers/fake-client";
 import { holdingVariables, SECRET_VARIABLE } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
-import { rejectionOf } from "@tests/helpers/thrown-value";
+import { rejectionOf as rejectionOfRun } from "@tests/helpers/thrown-value";
+
+/**
+ * What `run` rejects with, as the CLI reports it: a publish refusal is turned
+ * into its error at the boundary, every other rejection is left as it is.
+ *
+ * @param run - What to run.
+ * @returns The reported error, or `undefined` when `run` resolves.
+ */
+const rejectionOf = async (run: () => unknown): Promise<unknown> => {
+  const error = await rejectionOfRun(run);
+
+  return error instanceof PublishError ? toZitadelError(error) : error;
+};
 
 /**
  * A configuration holding one connection, the default `acme` one.
