@@ -86055,19 +86055,10 @@ func (s *InvitationLookupMembership) encodeFields(e *jx.Encoder) {
 		e.FieldStart("relation")
 		s.Relation.Encode(e)
 	}
-	{
-		e.FieldStart("sources")
-		e.ArrStart()
-		for _, elem := range s.Sources {
-			elem.Encode(e)
-		}
-		e.ArrEnd()
-	}
 }
 
-var jsonFieldsNameOfInvitationLookupMembership = [2]string{
+var jsonFieldsNameOfInvitationLookupMembership = [1]string{
 	0: "relation",
-	1: "sources",
 }
 
 // Decode decodes InvitationLookupMembership from json.
@@ -86089,24 +86080,6 @@ func (s *InvitationLookupMembership) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"relation\"")
 			}
-		case "sources":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				s.Sources = make([]ProjectMemberSource, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem ProjectMemberSource
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Sources = append(s.Sources, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"sources\"")
-			}
 		default:
 			return d.Skip()
 		}
@@ -86117,7 +86090,7 @@ func (s *InvitationLookupMembership) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

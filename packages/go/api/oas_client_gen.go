@@ -38,10 +38,10 @@ type Invoker interface {
 	// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
 	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
-	// A user who already holds a role on the project, from a grant or the owning team, gets
-	// `409 inv.already_member` with that role as `details.details.relation`: no grant is written and the
-	// invitation stays pending. `lookupInvitation` (`POST /invitations/lookup`) returns the same role as
-	// `membership` before accept is called.
+	// A user who already has access to the project, through a grant to them or to a team they're in, the
+	// owning team, or operating the deployment, gets `409 inv.already_member` with their strongest role as
+	// `details.details.relation`: no grant is written and the invitation stays pending. `lookupInvitation`
+	// (`POST /invitations/lookup`) returns the same role as `membership` before accept is called.
 	//
 	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
 	// that scheme's CSRF rules.
@@ -1297,8 +1297,8 @@ type Invoker interface {
 	// Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
 	// expiry.
 	//
-	// It also returns the role the signed-in user already holds on the project as `membership`; a user
-	// with a role can neither accept nor decline the invitation.
+	// It also returns the access the signed-in user already has to the project as `membership`; a user
+	// with access can neither accept nor decline the invitation.
 	//
 	// Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
@@ -1522,7 +1522,7 @@ type Invoker interface {
 	//
 	// Send the plaintext token from the invitation link fragment. The invitation keeps its metadata for
 	// administrators, but this response returns `metadata` as null. The inviter cannot decline their own
-	// invitation; an administrator cancels it instead. A user who already holds a role on the project gets
+	// invitation; an administrator cancels it instead. A user who already has access to the project gets
 	// `409 inv.already_member`, and the invitation stays pending. Every unknown or finished token answers
 	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 	// Cookie requests follow that scheme's CSRF rules.
@@ -1921,10 +1921,10 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 // active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
 // cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 //
-// A user who already holds a role on the project, from a grant or the owning team, gets
-// `409 inv.already_member` with that role as `details.details.relation`: no grant is written and the
-// invitation stays pending. `lookupInvitation` (`POST /invitations/lookup`) returns the same role as
-// `membership` before accept is called.
+// A user who already has access to the project, through a grant to them or to a team they're in, the
+// owning team, or operating the deployment, gets `409 inv.already_member` with their strongest role as
+// `details.details.relation`: no grant is written and the invitation stays pending. `lookupInvitation`
+// (`POST /invitations/lookup`) returns the same role as `membership` before accept is called.
 //
 // Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
 // that scheme's CSRF rules.
@@ -16065,8 +16065,8 @@ func (c *Client) sendListVariables(ctx context.Context, params ListVariablesPara
 // Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
 // expiry.
 //
-// It also returns the role the signed-in user already holds on the project as `membership`; a user
-// with a role can neither accept nor decline the invitation.
+// It also returns the access the signed-in user already has to the project as `membership`; a user
+// with access can neither accept nor decline the invitation.
 //
 // Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 // the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
@@ -18138,7 +18138,7 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 //
 // Send the plaintext token from the invitation link fragment. The invitation keeps its metadata for
 // administrators, but this response returns `metadata` as null. The inviter cannot decline their own
-// invitation; an administrator cancels it instead. A user who already holds a role on the project gets
+// invitation; an administrator cancels it instead. A user who already has access to the project gets
 // `409 inv.already_member`, and the invitation stays pending. Every unknown or finished token answers
 // the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 // Cookie requests follow that scheme's CSRF rules.

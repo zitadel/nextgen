@@ -222,17 +222,6 @@ func TestAuthzAssignmentStatements_ListProjectMembers(t *testing.T) {
 		}
 		assert.ElementsMatch(t, allowed, memberUserIDs(list(100, byUserID, nil).Items),
 			"the list follows the authorization check")
-
-		// One person reads as the list reads them, every role included.
-		for _, member := range atLeast("") {
-			got, err := d.stmts.GetProjectMember(t.Context(), projectID, member.UserID)
-			require.NoError(t, err)
-			assert.Equal(t, member, got, "the strongest role and its sources, as listed")
-		}
-		for _, userID := range []string{deleted, expired, revoked, elsewhere, left, deactivated} {
-			_, err := d.stmts.GetProjectMember(t.Context(), projectID, userID)
-			assert.ErrorAs(t, err, new(*database.NoRowFoundError), "%s holds no role on the project", userID)
-		}
 	})
 }
 

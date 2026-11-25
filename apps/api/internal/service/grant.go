@@ -157,7 +157,7 @@ func (s *GrantService) commitGrant(ctx context.Context, input CreateGrantInput, 
 }
 
 func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, input CreateGrantInput, principalType domain.AuthzPrincipalType, principalID string) (*domain.AuthzAssignment, error) {
-	// Waits out an accept's read-then-write in EnsureUserGrant, which holds
+	// Waits out an accept's read-then-write in WriteUserGrant, which holds
 	// this lock, so the two never race on the unique binding.
 	if err := stmts.LockProject(ctx, input.ProjectID); err != nil {
 		return nil, err
@@ -185,12 +185,13 @@ func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, inpu
 	return asgn, nil
 }
 
-// EnsureUserGrant gives userID relation on the project inside the caller's
-// transaction, for invitation acceptance (ADR 086 §4). An identical active
-// grant is already done; an identical expired one is revoked and written anew.
-// It reads first because a unique violation would abort a Postgres transaction.
-func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements, projectID, userID, relation string, now time.Time) (err error) {
-	ctx, end := startSpan(ctx, "GrantService.EnsureUserGrant")
+// WriteUserGrant gives userID relation on the project inside the caller's
+// transaction, for invitation acceptance (ADR 086 §4), which has refused a
+// user with any access already. An expired grant of the same relation is
+// revoked first: it still holds the unique binding, and a unique violation
+// would abort a Postgres transaction.
+func (s *GrantService) WriteUserGrant(ctx context.Context, stmts AllStatements, projectID, userID, relation string, now time.Time) (err error) {
+	ctx, end := startSpan(ctx, "GrantService.WriteUserGrant")
 	defer end(&err)
 
 	if _, ok := allowedGrantRelations[relation]; !ok {
@@ -209,21 +210,14 @@ func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements,
 	if err != nil {
 		return err
 	}
-	var expired []*domain.AuthzAssignment
+	// An expired managed, direct grant of the same relation still holds the
+	// unique binding the write targets, so clear it first; delegated rows sit
+	// outside that binding.
 	for _, asgn := range held {
-		// Only a managed, direct grant of the same relation can collide;
-		// delegated rows sit outside the unique binding the write targets.
-		if !isManagedGrant(asgn) || asgn.DelegationID != nil || asgn.Relation != relation {
+		if !isManagedGrant(asgn) || asgn.DelegationID != nil || asgn.Relation != relation ||
+			asgn.ExpiresAt == nil || now.Before(*asgn.ExpiresAt) {
 			continue
 		}
-		// Still active: the user already has the relation.
-		if asgn.ExpiresAt == nil || now.Before(*asgn.ExpiresAt) {
-			return nil
-		}
-		expired = append(expired, asgn)
-	}
-	// Expired rows still hold the unique binding, so clear them first.
-	for _, asgn := range expired {
 		if err := stmts.RevokeAuthzAssignment(ctx, projectID, asgn.ID); err != nil {
 			// An administrator revoked it since the read: already cleared.
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {

@@ -546,33 +546,33 @@ amendments.
   cancelled journeys. The audit event `invitation.cancelled` (§5) is still
   written for every cancel.
 
-## Amendment (2026-11-25): a member can't redeem an invitation
+## Amendment (2026-11-25): a user with access can't redeem an invitation
 
 This replaces §4's `project_member` adapter rules for a role the user already
 holds, and the same-relation rule of the first 2026-11-12 amendment (#3330).
 
-- **Invitations bring people into a project; they don't change a member's
-  role.** A user who already holds any role on the project can neither accept
-  nor decline its invitations: both answer `409 inv.already_member`, with the
-  role held as `relation` in the error's details. Changing a role goes through
-  grants.
+- **Invitations bring people into a project; they don't change anyone's
+  access.** A user who already has access to the project can neither accept
+  nor decline its invitations: both answer `409 inv.already_member`, with
+  their strongest role as `relation` in the error's details. Changing a role
+  goes through grants.
 - **The invitation stays pending** for the person it was meant for. No grant
   is written and no event is emitted: the refused transaction rolls back.
-- **A role is what the members list (§6) counts:** an unexpired grant to the
-  user or to a team they are an active member of, or active membership of the
-  owning team. A platform operator holds no role through operating the
-  deployment, and an expired grant is no role either, so accept still renews
-  it.
-- **The check belongs to the type's adapter**, like the grant: `project_member`
-  reads the user's membership on the project, and `team_member` will read
-  team membership. Accept runs it after the project lock, so it sees a grant
-  that a racing accept or administrator wrote.
-- **Lookup returns the same answer** as `membership` on the `project_member`
-  variant: `{ relation, sources }`, shaped as the members list shapes a
-  member, or null, so the accept page can show it in place of Accept and
-  Decline.
-  Each type's variant carries its own, so a project role never blocks a team
-  invitation.
-- §4's "a different relation already held: a second grant is created" no
-  longer happens, so accepting never leaves redundant grants or duplicate
-  rows in the members list.
+- **Access is what the authorization check grants**, by any path: a grant to
+  the user or to a team they are a member of, the owning team, a grant
+  borrowed through a team (tuple-to-userset), or operating the deployment
+  (ADR 075). An expired grant gives none, so accept still renews it.
+- **The check belongs to the type's adapter**, like the grant. For
+  `project_member` it asks the resolver for the user's strongest project role:
+  the check accept already runs on the inviter (§10), now one injected check
+  for both. `team_member` will ask about team membership. Accept and decline
+  run it after the project lock, so it sees a grant that a racing accept or
+  administrator wrote.
+- **Lookup returns the same answer** as `membership: { relation }` on the
+  `project_member` variant, or null, so the accept page can show it in place
+  of Accept and Decline. Each type's variant carries its own, so access to a
+  project never blocks a team invitation.
+- **The grant call writes; it no longer ensures.** `EnsureUserGrant` becomes
+  `WriteUserGrant`: the redeemer holds no unexpired grant, so it only revokes
+  an expired grant of the same relation before writing. §4's "a different
+  relation already held: a second grant is created" no longer happens.

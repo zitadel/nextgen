@@ -12,8 +12,9 @@ post:
     inviter cannot accept their own invitation. Every unknown or finished token
     answers the same opaque `404`.
 
-    A user who already holds a role on the project, from a grant or the owning
-    team, gets `409 inv.already_member` with that role as
+    A user who already has access to the project, through a grant to them or
+    to a team they're in, the owning team, or operating the deployment, gets
+    `409 inv.already_member` with their strongest role as
     `details.details.relation`: no grant is written and the invitation stays
     pending. `lookupInvitation` (`POST /invitations/lookup`) returns the same
     role as `membership` before accept is called.
@@ -65,7 +66,7 @@ post:
             $ref: ../../../components/error-details.yaml
     '409':
       description: |
-        The user already holds a role on the project (`inv.already_member`), or
+        The user already has access to the project (`inv.already_member`), or
         the project is unclaimed or inactive, so acceptance cannot complete.
       content:
         application/json:

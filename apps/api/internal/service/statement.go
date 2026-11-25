@@ -973,10 +973,6 @@ type AuthzAssignmentStatements interface {
 	// unexpired grant. Each carries their strongest role and every way they
 	// hold it.
 	ListProjectMembers(ctx context.Context, projectID, minRelation string, page database.Page[domain.ProjectMemberField]) (*database.ListResult[*domain.ProjectMemberRecord], error)
-	// GetProjectMember returns userID's strongest role on the project and every
-	// way they hold it, read as ListProjectMembers reads everyone. A user with
-	// no role misses with NoRowFoundError.
-	GetProjectMember(ctx context.Context, projectID, userID string) (*domain.ProjectMemberRecord, error)
 	// ListProjectsOwnedThroughMember returns the projects, ordered by project
 	// id, whose active owning team has userID as an active member (a
 	// membership edge). Admin grants, platform operators and the project

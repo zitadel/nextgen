@@ -11068,42 +11068,6 @@ func (s *InvitationLookupMembership) Validate() error {
 			Error: err,
 		})
 	}
-	if err := func() error {
-		if s.Sources == nil {
-			return errors.New("nil is invalid value")
-		}
-		if err := (validate.Array{
-			MinLength:    1,
-			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
-		}).ValidateLength(len(s.Sources)); err != nil {
-			return errors.Wrap(err, "array")
-		}
-		var failures []validate.FieldError
-		for i, elem := range s.Sources {
-			if err := func() error {
-				if err := elem.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				failures = append(failures, validate.FieldError{
-					Name:  fmt.Sprintf("[%d]", i),
-					Error: err,
-				})
-			}
-		}
-		if len(failures) > 0 {
-			return &validate.Error{Fields: failures}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "sources",
-			Error: err,
-		})
-	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}

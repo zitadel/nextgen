@@ -4294,45 +4294,6 @@ func (c *MockAllStatementsGetProjectByIDCall) DoAndReturn(f func(context.Context
 	return c
 }
 
-// GetProjectMember mocks base method.
-func (m *MockAllStatements) GetProjectMember(ctx context.Context, projectID, userID string) (*domain.ProjectMemberRecord, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProjectMember", ctx, projectID, userID)
-	ret0, _ := ret[0].(*domain.ProjectMemberRecord)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetProjectMember indicates an expected call of GetProjectMember.
-func (mr *MockAllStatementsMockRecorder) GetProjectMember(ctx, projectID, userID any) *MockAllStatementsGetProjectMemberCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectMember", reflect.TypeOf((*MockAllStatements)(nil).GetProjectMember), ctx, projectID, userID)
-	return &MockAllStatementsGetProjectMemberCall{Call: call}
-}
-
-// MockAllStatementsGetProjectMemberCall wrap *gomock.Call
-type MockAllStatementsGetProjectMemberCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetProjectMemberCall) Return(arg0 *domain.ProjectMemberRecord, arg1 error) *MockAllStatementsGetProjectMemberCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetProjectMemberCall) Do(f func(context.Context, string, string) (*domain.ProjectMemberRecord, error)) *MockAllStatementsGetProjectMemberCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetProjectMemberCall) DoAndReturn(f func(context.Context, string, string) (*domain.ProjectMemberRecord, error)) *MockAllStatementsGetProjectMemberCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetReleaseByContentHash mocks base method.
 func (m *MockAllStatements) GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error) {
 	m.ctrl.T.Helper()
@@ -14395,45 +14356,6 @@ func (c *MockAuthzAssignmentStatementsGetAuthzAssignmentCall) Do(f func(context.
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzAssignmentStatementsGetAuthzAssignmentCall) DoAndReturn(f func(context.Context, string, string) (*domain.AuthzAssignment, error)) *MockAuthzAssignmentStatementsGetAuthzAssignmentCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// GetProjectMember mocks base method.
-func (m *MockAuthzAssignmentStatements) GetProjectMember(ctx context.Context, projectID, userID string) (*domain.ProjectMemberRecord, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProjectMember", ctx, projectID, userID)
-	ret0, _ := ret[0].(*domain.ProjectMemberRecord)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetProjectMember indicates an expected call of GetProjectMember.
-func (mr *MockAuthzAssignmentStatementsMockRecorder) GetProjectMember(ctx, projectID, userID any) *MockAuthzAssignmentStatementsGetProjectMemberCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectMember", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).GetProjectMember), ctx, projectID, userID)
-	return &MockAuthzAssignmentStatementsGetProjectMemberCall{Call: call}
-}
-
-// MockAuthzAssignmentStatementsGetProjectMemberCall wrap *gomock.Call
-type MockAuthzAssignmentStatementsGetProjectMemberCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAuthzAssignmentStatementsGetProjectMemberCall) Return(arg0 *domain.ProjectMemberRecord, arg1 error) *MockAuthzAssignmentStatementsGetProjectMemberCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAuthzAssignmentStatementsGetProjectMemberCall) Do(f func(context.Context, string, string) (*domain.ProjectMemberRecord, error)) *MockAuthzAssignmentStatementsGetProjectMemberCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzAssignmentStatementsGetProjectMemberCall) DoAndReturn(f func(context.Context, string, string) (*domain.ProjectMemberRecord, error)) *MockAuthzAssignmentStatementsGetProjectMemberCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

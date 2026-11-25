@@ -51186,15 +51186,12 @@ func (s *InvitationExpand) UnmarshalText(data []byte) error {
 
 type InvitationID string
 
-// The role the signed-in user already holds on the project, and every way they hold it, as
-// `listProjectMembers` (`GET /projects/{project_id}/members`) lists a member.
+// The access the signed-in user already has to the project.
 // Ref: #
 type InvitationLookupMembership struct {
-	// The user's strongest role on the project. A stronger role includes the weaker ones.
+	// The user's strongest role on the project, by any path: a grant to them or to a team they're in, the
+	// owning team, or operating the deployment. A stronger role includes the weaker ones.
 	Relation InvitationLookupMembershipRelation `json:"relation"`
-	// How the user holds `relation`: owning-team access first, then grants to teams, then grants to the
-	// user. Grants of a weaker role are left out.
-	Sources []ProjectMemberSource `json:"sources"`
 }
 
 // GetRelation returns the value of Relation.
@@ -51202,22 +51199,13 @@ func (s *InvitationLookupMembership) GetRelation() InvitationLookupMembershipRel
 	return s.Relation
 }
 
-// GetSources returns the value of Sources.
-func (s *InvitationLookupMembership) GetSources() []ProjectMemberSource {
-	return s.Sources
-}
-
 // SetRelation sets the value of Relation.
 func (s *InvitationLookupMembership) SetRelation(val InvitationLookupMembershipRelation) {
 	s.Relation = val
 }
 
-// SetSources sets the value of Sources.
-func (s *InvitationLookupMembership) SetSources(val []ProjectMemberSource) {
-	s.Sources = val
-}
-
-// The user's strongest role on the project. A stronger role includes the weaker ones.
+// The user's strongest role on the project, by any path: a grant to them or to a team they're in, the
+// owning team, or operating the deployment. A stronger role includes the weaker ones.
 type InvitationLookupMembershipRelation string
 
 const (
@@ -51283,9 +51271,9 @@ type InvitationLookupProjectMemberResponse struct {
 	Status        InvitationStatus                          `json:"status"`
 	Type          InvitationLookupProjectMemberResponseType `json:"type"`
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
-	// The role the signed-in user already holds on the project, from a grant or the owning team. A user
-	// who holds one can neither accept nor decline the invitation: both answer `409 inv.already_member`
-	// and leave it pending for the person it was meant for. Null when the user holds no role.
+	// The access the signed-in user already has to the project. A user with access can neither accept nor
+	// decline the invitation: both answer `409 inv.already_member` and leave it pending for the person it
+	// was meant for. Null when the user has no access.
 	Membership OptNilInvitationLookupMembership `json:"membership"`
 }
 

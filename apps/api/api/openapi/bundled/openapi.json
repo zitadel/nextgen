@@ -9481,7 +9481,7 @@
       "post": {
         "operationId": "lookupInvitation",
         "summary": "Look up an invitation by token",
-        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nIt also returns the role the signed-in user already holds on the project\nas `membership`; a user with a role can neither accept nor decline the\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do).\n",
+        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nIt also returns the access the signed-in user already has to the project\nas `membership`; a user with access can neither accept nor decline the\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do).\n",
         "tags": [
           "Invitations"
         ],
@@ -9551,7 +9551,7 @@
       "post": {
         "operationId": "acceptInvitation",
         "summary": "Accept an invitation",
-        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nA user who already holds a role on the project, from a grant or the owning\nteam, gets `409 inv.already_member` with that role as\n`details.details.relation`: no grant is written and the invitation stays\npending. `lookupInvitation` (`POST /invitations/lookup`) returns the same\nrole as `membership` before accept is called.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nA user who already has access to the project, through a grant to them or\nto a team they're in, the owning team, or operating the deployment, gets\n`409 inv.already_member` with their strongest role as\n`details.details.relation`: no grant is written and the invitation stays\npending. `lookupInvitation` (`POST /invitations/lookup`) returns the same\nrole as `membership` before accept is called.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9622,7 +9622,7 @@
             }
           },
           "409": {
-            "description": "The user already holds a role on the project (`inv.already_member`), or\nthe project is unclaimed or inactive, so acceptance cannot complete.\n",
+            "description": "The user already has access to the project (`inv.already_member`), or\nthe project is unclaimed or inactive, so acceptance cannot complete.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -9641,7 +9641,7 @@
       "post": {
         "operationId": "rejectInvitation",
         "summary": "Decline an invitation",
-        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. The\ninvitation keeps its metadata for administrators, but this response\nreturns `metadata` as null. The inviter cannot decline their own invitation; an administrator\ncancels it instead. A user who already holds a role on the project gets\n`409 inv.already_member`, and the invitation stays pending. Every unknown\nor finished token answers the same opaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. The\ninvitation keeps its metadata for administrators, but this response\nreturns `metadata` as null. The inviter cannot decline their own invitation; an administrator\ncancels it instead. A user who already has access to the project gets\n`409 inv.already_member`, and the invitation stays pending. Every unknown\nor finished token answers the same opaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9712,7 +9712,7 @@
             }
           },
           "409": {
-            "description": "The user already holds a role on the project (`inv.already_member`).",
+            "description": "The user already has access to the project (`inv.already_member`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -23262,11 +23262,10 @@
       },
       "invitation-lookup-membership": {
         "title": "LookupInvitationMembership",
-        "description": "The role the signed-in user already holds on the project, and every way\nthey hold it, as `listProjectMembers` (`GET /projects/{project_id}/members`)\nlists a member.\n",
+        "description": "The access the signed-in user already has to the project.\n",
         "type": "object",
         "required": [
-          "relation",
-          "sources"
+          "relation"
         ],
         "properties": {
           "relation": {
@@ -23276,15 +23275,7 @@
               "editor",
               "admin"
             ],
-            "description": "The user's strongest role on the project. A stronger role includes the\nweaker ones.\n"
-          },
-          "sources": {
-            "type": "array",
-            "minItems": 1,
-            "description": "How the user holds `relation`: owning-team access first, then grants to\nteams, then grants to the user. Grants of a weaker role are left out.\n",
-            "items": {
-              "$ref": "#/components/schemas/project-member-source"
-            }
+            "description": "The user's strongest role on the project, by any path: a grant to them\nor to a team they're in, the owning team, or operating the deployment.\nA stronger role includes the weaker ones.\n"
           }
         }
       },
@@ -23312,7 +23303,7 @@
                 "$ref": "#/components/schemas/invitation-project-member-payload"
               },
               "membership": {
-                "description": "The role the signed-in user already holds on the project, from a\ngrant or the owning team. A user who holds one can neither accept\nnor decline the invitation: both answer `409 inv.already_member`\nand leave it pending for the person it was meant for. Null when the\nuser holds no role.\n",
+                "description": "The access the signed-in user already has to the project. A user\nwith access can neither accept nor decline the invitation: both\nanswer `409 inv.already_member` and leave it pending for the person\nit was meant for. Null when the user has no access.\n",
                 "oneOf": [
                   {
                     "$ref": "#/components/schemas/invitation-lookup-membership"

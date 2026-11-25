@@ -64,27 +64,14 @@ func expectStatusChange(s *servicemocks.MockAllStatements, entity *domain.Invita
 		})
 }
 
-// expectNoMembership is a redeemer who holds no role on the project.
-func expectNoMembership(s *servicemocks.MockAllStatements, userID string) {
-	s.EXPECT().GetProjectMember(gomock.Any(), invitationProjectID, userID).Return(nil, database.NewNoRowFoundError(nil))
-}
-
-// heldAdmin is a redeemer who holds admin through the owning team and a grant.
-func heldAdmin(userID string) *domain.ProjectMemberRecord {
-	return &domain.ProjectMemberRecord{
-		UserID:        userID,
-		HomeProjectID: grantPlatformProjID,
-		Relation:      "admin",
-		Sources: []domain.ProjectMemberSourceRecord{
-			{OwningTeam: true, TeamID: "team_owner", TeamName: "Owners"},
-			{GrantID: "asgn_admin"},
-		},
-	}
-}
-
-func inviterAdmin(admin bool) service.InviterCheck {
-	return func(context.Context, service.AllStatements, string, string) (bool, error) {
-		return admin, nil
+// projectRoles answers each user's strongest role on the invitation's project
+// from roles; a user it does not name holds none.
+func projectRoles(roles map[string]string) service.ProjectRoleCheck {
+	return func(_ context.Context, _ service.AllStatements, projectID, userID string) (string, error) {
+		if projectID != invitationProjectID {
+			return "", nil
+		}
+		return roles[userID], nil
 	}
 }
 
@@ -97,7 +84,6 @@ func TestInvitationService_Lookup(t *testing.T) {
 		expectActiveUserPrincipal(s, "user_colleague")
 		expectInvitationByToken(s, pendingInvitation(new("user_admin")))
 		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
-		expectNoMembership(s, "user_colleague")
 
 		got, err := svc.Lookup(t.Context(), invitationToken, "user_colleague")
 		require.NoError(t, err)
@@ -105,20 +91,19 @@ func TestInvitationService_Lookup(t *testing.T) {
 		assert.Equal(t, "inv_1", got.ID)
 		require.NotNil(t, got.Inviter)
 		assert.Equal(t, "Ada Lovelace", got.Inviter.Display)
-		assert.Nil(t, got.Membership, "a colleague without a role can accept")
+		assert.Empty(t, got.HeldRelation, "a colleague without access can accept")
 	})
 
-	t.Run("names the role a member already holds", func(t *testing.T) {
+	t.Run("names the role a user with access already holds", func(t *testing.T) {
 		t.Parallel()
-		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		svc, s, _, _ := newMockedInvitationServiceChecking(t, grantPlatformProjID, projectRoles(map[string]string{"user_colleague": "editor"}))
 		expectActiveUserPrincipal(s, "user_colleague")
 		expectInvitationByToken(s, pendingInvitation(nil))
 		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
-		s.EXPECT().GetProjectMember(gomock.Any(), invitationProjectID, "user_colleague").Return(heldAdmin("user_colleague"), nil)
 
 		got, err := svc.Lookup(t.Context(), invitationToken, "user_colleague")
 		require.NoError(t, err)
-		assert.Equal(t, heldAdmin("user_colleague"), got.Membership)
+		assert.Equal(t, "editor", got.HeldRelation)
 	})
 
 	t.Run("an inviter that no longer resolves degrades to its id", func(t *testing.T) {
@@ -127,7 +112,6 @@ func TestInvitationService_Lookup(t *testing.T) {
 		expectActiveUserPrincipal(s, "user_colleague")
 		expectInvitationByToken(s, pendingInvitation(new("user_gone")))
 		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
-		expectNoMembership(s, "user_colleague")
 
 		got, err := svc.Lookup(t.Context(), invitationToken, "user_colleague")
 		require.NoError(t, err)
@@ -140,7 +124,6 @@ func TestInvitationService_Lookup(t *testing.T) {
 		expectActiveUserPrincipal(s, "user_colleague")
 		expectInvitationByToken(s, pendingInvitation(nil))
 		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
-		expectNoMembership(s, "user_colleague")
 
 		got, err := svc.Lookup(t.Context(), invitationToken, "user_colleague")
 		require.NoError(t, err)
@@ -173,7 +156,6 @@ func TestInvitationService_Lookup(t *testing.T) {
 		expectActiveUserPrincipal(s, "user_colleague")
 		expectInvitationByToken(s, pendingInvitation(new("user_local")))
 		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
-		expectNoMembership(s, "user_colleague")
 
 		got, err := svc.Lookup(t.Context(), invitationToken, "user_colleague")
 		require.NoError(t, err)
@@ -255,7 +237,6 @@ func TestInvitationService_Accept(t *testing.T) {
 			expectInvitationByToken(s, entity)
 			// Accept locks first; a grant write locks again.
 			s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil).MinTimes(1)
-			expectNoMembership(s, accepter)
 			expectClaimedProject(s, invitationProjectID)
 			expectActiveUserPrincipal(s, accepter)
 			s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(tc.held, nil)
@@ -301,8 +282,11 @@ func TestInvitationService_Accept(t *testing.T) {
 		createdBy *string
 		// inactive refuses the user before the token is read.
 		inactive bool
-		setup    func(s *servicemocks.MockAllStatements, entity *domain.Invitation)
-		wantErr  error
+		// roles are the users' roles on the project; none by default, so the
+		// inviter no longer administers it.
+		roles   map[string]string
+		setup   func(s *servicemocks.MockAllStatements, entity *domain.Invitation)
+		wantErr error
 	}{
 		{
 			name:      "the inviter accepting their own invitation",
@@ -357,18 +341,16 @@ func TestInvitationService_Accept(t *testing.T) {
 		},
 		{
 			// No status change and no grant: the link stays for its invitee.
-			name:      "a user who already holds a role on the project",
+			name:      "a user who already has access to the project",
 			createdBy: new("user_admin"),
-			setup: func(s *servicemocks.MockAllStatements, _ *domain.Invitation) {
-				s.EXPECT().GetProjectMember(gomock.Any(), invitationProjectID, accepter).Return(heldAdmin(accepter), nil)
-			},
-			wantErr: domain.ErrInvitationAlreadyMember("admin"),
+			roles:     map[string]string{"user_admin": "admin", accepter: "viewer"},
+			wantErr:   domain.ErrInvitationAlreadyMember("viewer"),
 		},
 	}
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			svc, s, _, _ := newMockedInvitationServiceChecking(t, grantPlatformProjID, inviterAdmin(false))
+			svc, s, _, _ := newMockedInvitationServiceChecking(t, grantPlatformProjID, projectRoles(tc.roles))
 			entity := pendingInvitation(tc.createdBy)
 			if tc.inactive {
 				expectInactiveUser(s, accepter)
@@ -381,8 +363,6 @@ func TestInvitationService_Accept(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(s, entity)
 			}
-			// After the setup, so a setup's membership comes first.
-			s.EXPECT().GetProjectMember(gomock.Any(), invitationProjectID, accepter).Return(nil, database.NewNoRowFoundError(nil)).AnyTimes()
 			_, err := svc.Accept(t.Context(), invitationToken, accepter)
 			require.ErrorIs(t, err, tc.wantErr)
 		})
@@ -397,15 +377,17 @@ func TestInvitationService_Accept(t *testing.T) {
 
 	t.Run("an invitation a project secret created skips the inviter check", func(t *testing.T) {
 		t.Parallel()
-		svc, s, _, _ := newMockedInvitationServiceChecking(t, grantPlatformProjID, func(context.Context, service.AllStatements, string, string) (bool, error) {
-			t.Error("the inviter check ran for an invitation without a creator")
-			return false, nil
+		svc, s, _, _ := newMockedInvitationServiceChecking(t, grantPlatformProjID, func(_ context.Context, _ service.AllStatements, _, userID string) (string, error) {
+			// Only the redeemer is checked.
+			if userID != accepter {
+				t.Errorf("the role check ran for %s on an invitation without a creator", userID)
+			}
+			return "", nil
 		})
 		entity := pendingInvitation(nil)
 		expectActiveUserPrincipal(s, accepter)
 		expectInvitationByToken(s, entity)
 		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil).Times(2)
-		expectNoMembership(s, accepter)
 		expectClaimedProject(s, invitationProjectID)
 		expectActiveUserPrincipal(s, accepter)
 		s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(nil, nil)
@@ -428,7 +410,6 @@ func TestInvitationService_Reject(t *testing.T) {
 		entity.EncryptedMetadata = new("ciphertext")
 		expectInvitationByToken(s, entity)
 		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
-		expectNoMembership(s, "user_colleague")
 		expectStatusChange(s, entity, domain.InvitationStatusRejected, "user_colleague")
 
 		got, err := svc.Reject(t.Context(), invitationToken, "user_colleague")
@@ -453,13 +434,12 @@ func TestInvitationService_Reject(t *testing.T) {
 		assert.Empty(t, *events)
 	})
 
-	t.Run("a user who already holds a role on the project", func(t *testing.T) {
+	t.Run("a user who already has access to the project", func(t *testing.T) {
 		t.Parallel()
-		svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
+		svc, s, _, events := newMockedInvitationServiceChecking(t, grantPlatformProjID, projectRoles(map[string]string{"user_colleague": "admin"}))
 		expectActiveUserPrincipal(s, "user_colleague")
 		expectInvitationByToken(s, pendingInvitation(new("user_admin")))
 		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
-		s.EXPECT().GetProjectMember(gomock.Any(), invitationProjectID, "user_colleague").Return(heldAdmin("user_colleague"), nil)
 
 		// No status change: the link stays pending for its invitee.
 		_, err := svc.Reject(t.Context(), invitationToken, "user_colleague")

@@ -1,12 +1,9 @@
 title: LookupInvitationMembership
 description: |
-  The role the signed-in user already holds on the project, and every way
-  they hold it, as `listProjectMembers` (`GET /projects/{project_id}/members`)
-  lists a member.
+  The access the signed-in user already has to the project.
 type: object
 required:
   - relation
-  - sources
 properties:
   relation:
     type: string
@@ -15,13 +12,6 @@ properties:
       - editor
       - admin
     description: |
-      The user's strongest role on the project. A stronger role includes the
-      weaker ones.
-  sources:
-    type: array
-    minItems: 1
-    description: |
-      How the user holds `relation`: owning-team access first, then grants to
-      teams, then grants to the user. Grants of a weaker role are left out.
-    items:
-      $ref: ../../projects/by_id/members/project-member-source.yaml
+      The user's strongest role on the project, by any path: a grant to them
+      or to a team they're in, the owning team, or operating the deployment.
+      A stronger role includes the weaker ones.

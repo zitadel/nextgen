@@ -51,11 +51,10 @@ func ProjectMembersCursorUserID(page database.Page[domain.ProjectMemberField]) (
 	return userID, nil
 }
 
-// WriteProjectMemberSources emits the query behind ListProjectMembers and
-// GetProjectMember: every way the first limit people (0 for no limit) hold one
-// of relations on a project, in user id order (descending when desc) after
-// afterUserID in that order ("" for the first page), restricted to userID
-// when it is set. It selects user_id, home_project_id,
+// WriteProjectMemberSources emits the query behind ListProjectMembers: every
+// way the first limit people (0 for no limit) hold one of relations on a
+// project, in user id order (descending when desc) after afterUserID in that
+// order ("" for the first page). It selects user_id, home_project_id,
 // source_rank (0 owning team, 1 team grant, 2 user grant), grant_id, team_id,
 // relation and team_name. The owning team holds admin, so it is a source only
 // when relations includes admin. An empty relations matches nobody.
@@ -73,19 +72,15 @@ func ProjectMembersCursorUserID(page database.Page[domain.ProjectMemberField]) (
 // directly, and sources are then read only for the page's people.
 // How much of a large team is read for the candidates is up to the dialect's
 // planner.
-func WriteProjectMemberSources(w ArgWriter, env Env, projectID string, relations []string, userID, afterUserID string, desc bool, limit uint32) {
+func WriteProjectMemberSources(w ArgWriter, env Env, projectID string, relations []string, afterUserID string, desc bool, limit uint32) {
 	compare, direction := " > ", " ASC"
 	if desc {
 		compare, direction = " < ", " DESC"
 	}
-	writePeople := func(column string) {
+	writeAfter := func(column string) {
 		if afterUserID != "" {
 			w.WriteString(` AND ` + column + compare)
 			w.WriteArg(afterUserID)
-		}
-		if userID != "" {
-			w.WriteString(` AND ` + column + ` = `)
-			w.WriteArg(userID)
 		}
 	}
 	writeLimit := func() {
@@ -163,7 +158,7 @@ direct_grants AS (
 	w.WriteArg(domain.UserStatusActive.String())
 	w.WriteString(`
   WHERE g.principal_type = 'user'`)
-	writePeople("g.principal_id")
+	writeAfter("g.principal_id")
 	w.WriteString(`
 ),
 direct_people AS (
@@ -186,7 +181,7 @@ people AS (
 	writeMembershipEdgeMatchIn(w, "th.home_project_id", "", "th.team_id", "", "", "")
 	w.WriteString(`
     WHERE TRUE`)
-	writePeople("e.member_id")
+	writeAfter("e.member_id")
 	w.WriteString(`
     UNION ALL
     SELECT dp.user_id
@@ -216,23 +211,6 @@ LEFT JOIN `)
 	writeTable(w, env, "teams")
 	w.WriteString(` tm ON tm.project_id = s.home_project_id AND tm.id = s.team_id
 ORDER BY s.user_id` + direction + `, s.source_rank, s.grant_id`)
-}
-
-// OneProjectMember is GetProjectMember's answer: the one record read restricts
-// to userID, or NoRowFoundError when the user holds no role. An empty userID
-// misses without reading, since the query would read everyone.
-func OneProjectMember(userID string, read func() ([]*domain.ProjectMemberRecord, error)) (*domain.ProjectMemberRecord, error) {
-	if userID == "" {
-		return nil, database.NewNoRowFoundError(nil)
-	}
-	members, err := read()
-	if err != nil {
-		return nil, err
-	}
-	if len(members) == 0 {
-		return nil, database.NewNoRowFoundError(nil)
-	}
-	return members[0], nil
 }
 
 // WriteActiveOwningTeamID emits a SELECT of the principal_id of a project's

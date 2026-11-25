@@ -27,20 +27,21 @@ type InvitationService struct {
 	keys   KeyService
 	grants *GrantService
 	refs   UserRefResolver
-	// inviterIsAdmin is the authz check accept asks of the creator.
-	inviterIsAdmin InviterCheck
+	// projectRole is the authz check redeeming asks of the creator and the
+	// redeemer.
+	projectRole ProjectRoleCheck
 	// consoleBaseURL never ends in a slash.
 	consoleBaseURL    string
 	platformProjectID string
 }
 
-func NewInvitationService(db *DB, keys KeyService, grants *GrantService, refs UserRefResolver, inviterIsAdmin InviterCheck, consoleBaseURL, platformProjectID string) *InvitationService {
+func NewInvitationService(db *DB, keys KeyService, grants *GrantService, refs UserRefResolver, projectRole ProjectRoleCheck, consoleBaseURL, platformProjectID string) *InvitationService {
 	return &InvitationService{
 		db:                db,
 		keys:              keys,
 		grants:            grants,
 		refs:              refs,
-		inviterIsAdmin:    inviterIsAdmin,
+		projectRole:       projectRole,
 		consoleBaseURL:    consoleBaseURL,
 		platformProjectID: platformProjectID,
 	}
@@ -290,9 +291,9 @@ type InvitationLookup struct {
 	// Inviter names CreatedBy for a redeemer who cannot read platform users.
 	// Nil when a project secret created the invitation.
 	Inviter *domain.UserRef
-	// Membership is the access the redeemer already holds on the project,
-	// which refuses accept and decline. Nil when they hold none.
-	Membership *domain.ProjectMemberRecord
+	// HeldRelation is the role the redeemer already holds on the project,
+	// which refuses accept and decline. Empty when they hold none.
+	HeldRelation string
 }
 
 // resolveInviters sets each invitation's Inviter from its CreatedBy.
@@ -352,10 +353,11 @@ func (s *InvitationService) inviterRefs(ctx context.Context, projectID string, i
 	return out, nil
 }
 
-// InviterCheck reports whether userID still administers projectID, reading
-// through stmts inside the accept's transaction. The API layer provides it
-// (api.InviterAdminCheck), next to the other authz checks.
-type InviterCheck func(ctx context.Context, stmts AllStatements, projectID, userID string) (bool, error)
+// ProjectRoleCheck returns userID's strongest role on projectID (viewer,
+// editor or admin), "" for none, over every path the authorization check
+// honors. It reads through stmts inside the caller's transaction. The API
+// layer provides it (api.ProjectRoleCheck), next to the other authz checks.
+type ProjectRoleCheck func(ctx context.Context, stmts AllStatements, projectID, userID string) (string, error)
 
 // Lookup finds a pending invitation by its link's token for userID.
 func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_ *InvitationLookup, err error) {
@@ -379,7 +381,7 @@ func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_
 		}
 		found.Inviter = new(refs[*entity.CreatedBy])
 	}
-	if found.Membership, err = s.heldAccess(ctx, stmts, entity, userID); err != nil {
+	if found.HeldRelation, err = s.heldAccess(ctx, stmts, entity, userID); err != nil {
 		return nil, mapInvitationError(err, "failed to look up invitation")
 	}
 	return found, nil
@@ -426,11 +428,11 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 		}
 		// A project secret names no user, so only the project check applies.
 		if entity.CreatedBy != nil {
-			admin, err := s.inviterIsAdmin(ctx, stmts, entity.ProjectID, *entity.CreatedBy)
+			role, err := s.projectRole(ctx, stmts, entity.ProjectID, *entity.CreatedBy)
 			if err != nil {
 				return err
 			}
-			if !admin {
+			if role != "admin" {
 				return domain.ErrInvitationInviterNotAdmin()
 			}
 		}
@@ -463,7 +465,7 @@ func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatement
 		if entity.ProjectMember == nil {
 			return domain.ErrInternal(fmt.Errorf("invitation %q has no project_member object", entity.ID))
 		}
-		err := s.grants.EnsureUserGrant(ctx, stmts, entity.ProjectID, userID, entity.ProjectMember.Relation, now)
+		err := s.grants.WriteUserGrant(ctx, stmts, entity.ProjectID, userID, entity.ProjectMember.Relation, now)
 		// Create validated the relation, so a refusal here is a stored fault.
 		if errors.Is(err, domain.ErrGrantInvalid()) {
 			return domain.ErrInternal(err).WithMessage("invitation holds an invalid relation")
@@ -479,26 +481,26 @@ func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatement
 }
 
 // heldAccess is the type's adapter for what userID already holds of what the
-// invitation grants: for project_member, any role on the project, from any
-// source. Nil when they hold none, and for a type with no check yet.
-func (s *InvitationService) heldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (*domain.ProjectMemberRecord, error) {
+// invitation grants: for project_member, their strongest role on the project
+// by any path. Empty when they hold none, and for a type with no check yet.
+func (s *InvitationService) heldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (string, error) {
 	switch entity.Type {
 	case domain.InvitationTypeProjectMember:
-		return s.grants.ProjectMembership(ctx, stmts, entity.ProjectID, userID)
+		return s.projectRole(ctx, stmts, entity.ProjectID, userID)
 	default:
-		return nil, nil
+		return "", nil
 	}
 }
 
-// refuseHeldAccess refuses redeeming for a user who already holds access, so
-// no redundant grant is written and the invitation stays pending.
+// refuseHeldAccess refuses redeeming for a user who already has access, so the
+// invitation stays pending for the person it was meant for.
 func (s *InvitationService) refuseHeldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) error {
 	held, err := s.heldAccess(ctx, stmts, entity, userID)
 	if err != nil {
 		return err
 	}
-	if held != nil {
-		return domain.ErrInvitationAlreadyMember(held.Relation)
+	if held != "" {
+		return domain.ErrInvitationAlreadyMember(held)
 	}
 	return nil
 }

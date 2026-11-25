@@ -17,11 +17,10 @@ allOf:
         $ref: ../invitation-project-member-payload.yaml
       membership:
         description: |
-          The role the signed-in user already holds on the project, from a
-          grant or the owning team. A user who holds one can neither accept
-          nor decline the invitation: both answer `409 inv.already_member`
-          and leave it pending for the person it was meant for. Null when the
-          user holds no role.
+          The access the signed-in user already has to the project. A user
+          with access can neither accept nor decline the invitation: both
+          answer `409 inv.already_member` and leave it pending for the person
+          it was meant for. Null when the user has no access.
         oneOf:
           - $ref: invitation-lookup-membership.yaml
           - type: 'null'
