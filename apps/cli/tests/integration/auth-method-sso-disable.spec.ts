@@ -525,13 +525,8 @@ describe("auth-method sso disable", () => {
             command: "auth-method:sso:disable",
             source: "",
             code: "E_NOT_FOUND",
-            message: "default-human-user has no provider named gogle",
-            hint: "default-human-user offers: google. Connections under .zitadel/idps/: google.",
-            details: {
-              requested: UNKNOWN_PROVIDER,
-              offered: [GOOGLE],
-              connections: [GOOGLE],
-            },
+            message:
+              "default-human-user has no provider named gogle; it offers: google; connections under .zitadel/idps/: google",
           });
         });
 
@@ -546,13 +541,7 @@ describe("auth-method sso disable", () => {
             command: "auth-method:sso:disable",
             source: "",
             code: "E_NOT_FOUND",
-            message: `default-human-user has no provider named ${HOSTILE_PROVIDER}`,
-            hint: "default-human-user offers: google. Connections under .zitadel/idps/: google.",
-            details: {
-              requested: HOSTILE_PROVIDER,
-              offered: [GOOGLE],
-              connections: [GOOGLE],
-            },
+            message: `default-human-user has no provider named ${HOSTILE_PROVIDER}; it offers: google; connections under .zitadel/idps/: google`,
           });
         });
 

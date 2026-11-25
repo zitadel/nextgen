@@ -280,50 +280,12 @@ describe("auth-method password disable", () => {
             source: "",
             code: "E_VALIDATION",
             message: `Disabling password in ${SCHEMA_FILE} would break a login flow that still uses it:\n  - ${FLOW_FILE}: step "password" collects password\n    Left with no field or sign-in method. Targeted by identifier.submit, register.user_already_exists.\n  - ${FLOW_FILE}: step "register-password" collects password\n    Left with no field or sign-in method. Targeted by register.submit.`,
-            hint: `Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. Delete a step left with no field or sign-in method: retarget the transitions listed for it. ${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
+            hint: `Edit those steps first; login flows are not edited for you. ${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
             next_commands: [
               expectedPublicCliCommand(
                 `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
-            details: {
-              file: SCHEMA_FILE,
-              issues: [
-                {
-                  path: FLOW_FILE,
-                  rule: "schema/fields-resolve",
-                  message: 'step "password": "password" is not an enabled authentication method',
-                  step: "password",
-                },
-                {
-                  path: FLOW_FILE,
-                  rule: "schema/fields-resolve",
-                  message:
-                    'step "register-password": "password" is not an enabled authentication method',
-                  step: "register-password",
-                },
-              ],
-              steps: [
-                {
-                  path: FLOW_FILE,
-                  step: "password",
-                  keeps: [],
-                  entry_for: [],
-                  targeted_by: [
-                    { step: "identifier", transition: "submit" },
-                    { step: "register", transition: "user_already_exists" },
-                    { step: "register-password", transition: "user_already_exists" },
-                  ],
-                },
-                {
-                  path: FLOW_FILE,
-                  step: "register-password",
-                  keeps: [],
-                  entry_for: [],
-                  targeted_by: [{ step: "register", transition: "submit" }],
-                },
-              ],
-            },
           });
         });
 

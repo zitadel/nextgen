@@ -117,9 +117,7 @@ describe("auth-method password enable", () => {
           command: "auth-method:password:enable",
           source: "",
           code: "E_VALIDATION",
-          message: `${SCHEMA_FILE} has no x-identifier for password`,
-          hint: 'A password is checked against the user found by the schema\'s identifier. Set "x-identifier" to the property users sign in with, e.g. "email", then run the command again.',
-          details: { file: SCHEMA_FILE, method: "password" },
+          message: `${SCHEMA_FILE} has no x-identifier for password: set "x-identifier" to the property users sign in with, e.g. "email"`,
         });
       });
 

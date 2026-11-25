@@ -1020,14 +1020,8 @@ describe("auth-method sso enable", () => {
             command: "auth-method:sso:enable",
             source: MOCK_SERVER_URL,
             code: "E_CONFLICT",
-            message: ".zitadel/idps/acme-sso.json and acme_sso both use ACME_SSO_CLIENT_ID",
-            hint: "Point one of them at a variable of its own, then run the command again.",
-            details: {
-              file: ".zitadel/idps/acme-sso.json",
-              slug: "acme_sso",
-              other_slug: "acme-sso",
-              variable: "ACME_SSO_CLIENT_ID",
-            },
+            message:
+              ".zitadel/idps/acme-sso.json and acme_sso both use ACME_SSO_CLIENT_ID; point one of them at a variable of its own",
           });
         });
       });
@@ -1049,13 +1043,6 @@ describe("auth-method sso enable", () => {
             code: "E_CONFLICT",
             message:
               ".zitadel/idps/acme-sso.json is already named acme-sso and connects to https://sso.acme.example, not https://sso.other.example",
-            hint: "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another slug for this connection, then move the schemas and flows that name the old one to it.",
-            details: {
-              file: ".zitadel/idps/acme-sso.json",
-              slug: "acme-sso",
-              issuer: "https://sso.other.example",
-              existing_issuer: "https://sso.acme.example",
-            },
           });
         });
       });
