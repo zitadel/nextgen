@@ -24,13 +24,13 @@
  * @module
  */
 export { auth } from "./auth.js";
-export type { AuthOptions } from "./auth.js";
+export type { ZitadelAuthOptions } from "./auth.js";
 export { ZitadelProvider } from "./provider.js";
 export type {
-  AuthResult,
-  AuthState,
-  UnauthState,
+  ZitadelAuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
   ZitadelAuthSession,
-  ClientAuthResult,
+  ZitadelClientAuthResult,
   ZitadelMiddlewareOptions,
 } from "./types.js";

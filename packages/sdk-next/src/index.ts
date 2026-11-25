@@ -24,9 +24,9 @@
  */
 export * from "./types.js";
 export { zitadelMiddleware, createProxy } from "./middleware.js";
-export type { ProxyOptions, ProxyHandler } from "./middleware.js";
+export type { ZitadelProxyOptions, ZitadelProxyHandler } from "./middleware.js";
 export { auth } from "./auth.js";
-export type { AuthOptions } from "./auth.js";
+export type { ZitadelAuthOptions } from "./auth.js";
 export { ZitadelProvider } from "./provider.js";
 export { AuthContextProvider, useAuthContext } from "./context.js";
 export { useAuth } from "./useAuth.js";

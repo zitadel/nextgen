@@ -7,12 +7,12 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import type { AuthResult } from "@zitadel/sdk-core/middleware";
+import type { ZitadelAuthResult } from "@zitadel/sdk-core/middleware";
 import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
 
-import type { RequestMiddlewareContext } from "../middleware";
+import type { ZitadelRequestMiddlewareContext } from "../middleware";
 
 import { createZitadelRequestMiddleware, getAuth } from "../middleware";
 
@@ -23,7 +23,7 @@ async function serve(
 ): Promise<Served> {
   const request = new Request(url, { method: init.method ?? "GET", headers: init.headers });
   let continued = false;
-  let auth: AuthResult | undefined;
+  let auth: ZitadelAuthResult | undefined;
   const response = await createZitadelRequestMiddleware({
     ...options,
     clientAddress: init.clientIp,
@@ -31,7 +31,7 @@ async function serve(
     request,
     next: async (opts) => {
       continued = true;
-      auth = opts?.context?.zitadelAuth as AuthResult | undefined;
+      auth = opts?.context?.zitadelAuth as ZitadelAuthResult | undefined;
       return { response: new Response("ok", { status: 200 }) };
     },
   });
@@ -55,13 +55,13 @@ function configureProject(configured?: string, environment?: string): ServeOptio
   return { projectId: configured };
 }
 
-async function readAuth(context: unknown): Promise<AuthResult> {
-  return getAuth(context as { readonly zitadelAuth?: AuthResult } | undefined);
+async function readAuth(context: unknown): Promise<ZitadelAuthResult> {
+  return getAuth(context as { readonly zitadelAuth?: ZitadelAuthResult } | undefined);
 }
 
 function expectHandlerType(): void {
   expectTypeOf(createZitadelRequestMiddleware({ url: "http://localhost:4000" })).toExtend<
-    (ctx: RequestMiddlewareContext) => Promise<Response>
+    (ctx: ZitadelRequestMiddlewareContext) => Promise<Response>
   >();
   // TanStack Start types next() as returning its result with or without a promise.
   expectTypeOf(createZitadelRequestMiddleware({ url: "http://localhost:4000" })).toBeCallableWith({

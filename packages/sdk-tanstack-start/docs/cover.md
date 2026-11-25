@@ -8,7 +8,7 @@ Server, from `@zitadel/sdk-tanstack-start/server`:
 
 - {@link server!createZitadelRequestMiddleware} builds the request-middleware handler you register in `src/start.ts`. Use it for every app: it proxies auth traffic, verifies the session and guards protected routes in one pass.
 - {@link server!getAuth} reads the signed-in user from the context a server function receives. Use it in a server function, and call that function from a route's `beforeLoad` to guard the route.
-- {@link server!handleZitadelRequest} is the same proxy, verify and protect decision as a plain function from a `Request` to a {@link server!ZitadelRequestDecision}. Use it when you wire a custom server entry instead of TanStack Start's middleware.
+- {@link server!handleZitadelRequest} is the same proxy, verify and protect decision as a plain function from a `Request` to a {@link server!ZitadelRequestResult}. Use it when you wire a custom server entry instead of TanStack Start's middleware.
 
 Client, from `@zitadel/sdk-tanstack-start/client`:
 

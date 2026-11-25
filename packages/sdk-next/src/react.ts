@@ -13,7 +13,7 @@
  * from the flight payload. Import it from `@zitadel/sdk-next/server` instead, where the
  * `server-only` guard turns a client-side import into a build error. To seed the context from
  * client-side state, such as a {@link session!getSession | getSession} read, render
- * {@link AuthContextProvider}, which is typed as the token-less {@link ClientAuthResult} and
+ * {@link AuthContextProvider}, which is typed as the token-less {@link ZitadelClientAuthResult} and
  * strips nothing.
  *
  * @example
@@ -32,11 +32,11 @@
 export { AuthContextProvider, useAuthContext } from "./context.js";
 export { useAuth } from "./useAuth.js";
 export type {
-  AuthResult,
-  AuthState,
-  ClientAuthResult,
-  ClientAuthState,
-  ClientSession,
+  ZitadelAuthResult,
+  ZitadelAuthState,
+  ZitadelClientAuthResult,
+  ZitadelClientAuthState,
+  ZitadelClientSession,
   ZitadelAuthSession,
-  UnauthState,
+  ZitadelUnauthState,
 } from "./types.js";

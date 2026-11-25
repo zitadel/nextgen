@@ -37,7 +37,7 @@ There are two families.
 | `ui` | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession`, `ZitadelLoginProps`, `ZitadelLogoutProps`, `ZitadelSessionProps`, `ZitadelFlowStepDetail`, `ZitadelFlowInputDetail`, `ZitadelFlowCompleteDetail`, `ZitadelFlowRedirectDetail`, `ZitadelFlowErrorDetail`, `ZitadelSignoutDetail`, `ZitadelFlowPurpose`, `ZitadelFlowStep`, `ZitadelFlowBehavior`, `configureZitadel`, `getApi`, `getZitadelConfig`, `businessLocales`, `ZitadelProject`, `ZitadelConfig` |
 | `widgets` | the components, the three props types, the six detail types and the three flow types of `ui` |
 | `client` | `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelProject`, `ZitadelConfig`, plus `businessLocales` when the SDK renders widgets |
-| `server` | the auth reader the entry declares, `ZitadelMiddlewareOptions`, `ZitadelAuthSession`, `AuthResult`, `AuthState`, `UnauthState`, `ClientAuthResult`, plus the handler when the entry declares one |
+| `server` | the auth reader the entry declares, `ZitadelMiddlewareOptions`, `ZitadelAuthSession`, `ZitadelAuthResult`, `ZitadelAuthState`, `ZitadelUnauthState`, `ZitadelClientAuthResult`, plus the handler when the entry declares one |
 | `other` | nothing is required |
 
 An SDK declares its entries in `packages/<sdk>/public-api.json`: each entry's
@@ -206,13 +206,53 @@ Rules that follow:
   `sessionStore` and their types are extras of `sdk-react` and `sdk-next` until
   a second framework needs them.
 
+## Naming of types
+
+These rules apply to every exported type, interface and class of every SDK,
+`sdk-core` included. Values are not renamed by them.
+
+1. **Prefix every exported type with `Zitadel`.** An app imports from several
+   SDKs and from auth libraries, and `AuthOptions`, `JwtPayload`,
+   `ProxyHandler` and `AuthState` collide with them.
+2. **Shape: `Zitadel<Noun>[<Qualifier>]<Suffix>`.** A widget name goes right
+   after the prefix (`ZitadelLoginProps`), never after the suffix and never
+   with a framework word.
+3. **The suffix vocabulary is closed:** `Props`, `Config`, `Options`, `Detail`,
+   `EventMap`, `Handlers`, `Result`, `State`, `Status`, `Error` and
+   `ErrorCode`, `Snapshot`. Anything else needs a reason in the TSDoc.
+4. **`Options` is named after the function, `Result` after the function that
+   returns it** (`getSession`, `ZitadelGetSessionOptions`). Never `Input`,
+   `Params`, `Args` or `Decision`.
+5. **`Error` ends a name only for a failure:** a class extending `Error` with a
+   stable `code`, or a plain `{ code, message }` reported as data. A code union
+   is `<Name>ErrorCode`.
+6. **Use `interface` for named object shapes, and `type` for unions,
+   intersections, mapped and utility types, function types and tuples.**
+7. **Every property of a type that an SDK hands to app code is `readonly`, and
+   every array it accepts as input is `readonly T[]`.** An input type may widen
+   later, and an output type may only gain fields.
+8. **Properties are camelCase.** snake_case is allowed only on a field copied
+   verbatim from the wire, and the TSDoc says so.
+9. **Names are singular for one thing.** Plural is for a bag of callbacks
+   (`Handlers`) or a bag of options that is a list.
+10. **A type that stands in for a framework type keeps the framework word after
+    the prefix** (`ZitadelQwikRequestEvent`). A type that a `createZitadel<X>`
+    factory returns is `Zitadel<X>` where that is free.
+11. **One stem has one meaning under one prefix.** `ZitadelSession` is the
+    widget, `ZitadelAuthSession` is the server session with its token,
+    `ZitadelClientSession` is the browser-safe one, and `ZitadelSessionStore*`
+    is the browser store.
+12. **List a rename** in Renames, in `public-api.json`, in the TSDoc, in the
+    README and `SKILL.md` of every package that names it, and in the changeset's
+    `**Breaking:**` paragraph.
+
 ## Renames
 
 | Was | Is |
 | --- | --- |
 | `ZitadelLoginSolidProps`, `…ReactProps`, `…SvelteProps` (and Logout, Session) | `ZitadelLoginProps` (and Logout, Session) |
 | `ZitadelLoginConfig`, `ZitadelLogoutConfig`, `ZitadelSessionConfig`, the `*Handlers` types, `ZitadelNavigationDetail`, `ZitadelWidgetAttributes` and `WithZitadelWidgetAttributes` as exports of a UI SDK | not exported; the config, handler and navigation types are in `@zitadel/sdk-core/types` |
-| `WidgetName`, `WidgetTag`, `StandardAttributeName`, `StandardAttributes`, `StandardAttributeProps` and the `Zitadel*EventMap` interfaces as exports of an SDK | not exported |
+| `ZitadelWidgetName`, `ZitadelWidgetTag`, `ZitadelStandardAttributeName`, `ZitadelStandardAttributes`, `ZitadelStandardAttributeProps` and the `Zitadel*EventMap` interfaces as exports of an SDK | not exported |
 | the session, event and widget-name types in the `./components` entry of `sdk-tanstack-start` | not exported |
 | `ZitadelLoginComponent`, `ZitadelLogoutComponent`, `ZitadelSessionComponent` (`sdk-angular`) | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession` |
 | `CreateFlowBodyPurpose` (the type the API client is generated with) | `ZitadelFlowPurpose`, declared in `sdk-core` |
@@ -221,10 +261,17 @@ Rules that follow:
 | the `@zitadel/sdk-tanstack-start/react` widget entry | `@zitadel/sdk-tanstack-start/components`, the name every meta-framework SDK uses |
 | `createNextgenHandle`, `createNextgenOnRequest`, `createNextgenRequestMiddleware`, `createNextgenMiddleware`, `nextgenMiddleware`, `handleNextgenRequest` | `createZitadelHandle`, `createZitadelOnRequest`, `createZitadelRequestMiddleware`, `createZitadelMiddleware`, `zitadelMiddleware`, `handleZitadelRequest` |
 | `NextgenSession` | `ZitadelAuthSession` (`ZitadelSession` is the widget) |
+| every exported type without the `Zitadel` prefix, for example `AuthState`, `AuthResult`, `ClientSession`, `SessionStore`, `JwtPayload`, `ProxyHandler`, `AuthOptions` | the same name with the `Zitadel` prefix |
+| `ZitadelRequestDecision` | `ZitadelRequestResult` (rule 4) |
+| `ZitadelRuntimeInput` | `ZitadelRuntimeOptions` (rule 4) |
+| `QwikRequestEvent`, `QwikCookieValue`, `QwikCookieOptions`, `SolidFetchEvent`, `SolidMiddlewareConfig` | `ZitadelQwikRequestEvent`, `ZitadelQwikCookieValue`, `ZitadelQwikCookieOptions`, `ZitadelSolidFetchEvent`, `ZitadelSolidMiddlewareConfig` (rule 10) |
+| `RequestMiddlewareContext` (`sdk-tanstack-start`) | `ZitadelRequestMiddlewareContext` |
+| `UseSessionResult`, `GetSessionOptions` | `ZitadelUseSessionResult`, `ZitadelGetSessionOptions` (rule 4) |
+| `SessionError`, `SessionErrorCode`, `SessionStatus`, `SessionSnapshot`, `SessionStore`, `SessionStoreOptions` | the same names with the `Zitadel` prefix; they name the browser store (rule 11) |
 | `ZitadelLoginProps`, `ZitadelLogoutProps`, `ZitadelSessionProps` of `sdk-angular`, which were the callback props of `sdk-core` | the inputs of each component only |
 | `@Input()` and `@Output()` in `sdk-angular`, peers `@angular/core` and `@angular/common` `>=17` | `input()` and `output()`, peers `>=19` |
 | the local `configureZitadel` of `sdk-angular` | the shared one from `@zitadel/sdk-core/config` |
-| `NextgenMiddlewareOptions`, `NextgenProvider`, `NextgenHandle`, `NextgenRequestOptions`, `NextgenRequestDecision` | `ZitadelMiddlewareOptions`, `ZitadelProvider`, `ZitadelHandle`, `ZitadelRequestOptions`, `ZitadelRequestDecision` |
+| `NextgenMiddlewareOptions`, `NextgenProvider`, `NextgenHandle`, `NextgenRequestOptions`, `NextgenRequestDecision` | `ZitadelMiddlewareOptions`, `ZitadelProvider`, `ZitadelHandle`, `ZitadelRequestOptions`, `ZitadelRequestResult` |
 | the `x-nextgen-auth-token` header, `nextgenAuth` on the request context, the Nuxt `nextgen` configuration key and `NUXT_NEXTGEN_*` variables, the `plugin@nextgen.ts` Qwik route | `x-zitadel-auth-token`, `zitadelAuth`, `zitadel`, `NUXT_ZITADEL_*`, `plugin@zitadel.ts` |
 | the legacy `__nextgen_session` cookie handling in `sdk-core` | removed; the server already refuses that name |
 | `runtimeConfig.public.nextgenProxyPath` and `nextgenApiBase` (Nuxt), and the `NUXT_PUBLIC_NEXTGEN_*` variables that set them | `zitadelProxyPath` and `zitadelApiBase`, and `NUXT_PUBLIC_ZITADEL_*`; the module and the server handler refuse the old ones |

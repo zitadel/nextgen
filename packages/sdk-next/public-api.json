@@ -5,15 +5,15 @@
       "kind": "other",
       "extras": [
         "AuthContextProvider",
-        "AuthOptions",
-        "AuthResult",
-        "AuthState",
-        "ClientAuthResult",
-        "ClientAuthState",
-        "ClientSession",
-        "ProxyHandler",
-        "ProxyOptions",
-        "UnauthState",
+        "ZitadelAuthOptions",
+        "ZitadelAuthResult",
+        "ZitadelAuthState",
+        "ZitadelClientAuthResult",
+        "ZitadelClientAuthState",
+        "ZitadelClientSession",
+        "ZitadelProxyHandler",
+        "ZitadelProxyOptions",
+        "ZitadelUnauthState",
         "ZitadelAuthSession",
         "ZitadelMiddlewareOptions",
         "ZitadelProvider",
@@ -32,7 +32,7 @@
         "why": "auth() reads the request from the async context that Next.js provides (headers()), so it takes no request argument and is async. The other SDKs' getAuth(event) are synchronous and need the framework's event handed to them, which is why the two names differ."
       },
       "extras": [
-        "AuthOptions",
+        "ZitadelAuthOptions",
         "ZitadelProvider"
       ]
     },
@@ -55,12 +55,12 @@
       "kind": "other",
       "extras": [
         "AuthContextProvider",
-        "AuthResult",
-        "AuthState",
-        "ClientAuthResult",
-        "ClientAuthState",
-        "ClientSession",
-        "UnauthState",
+        "ZitadelAuthResult",
+        "ZitadelAuthState",
+        "ZitadelClientAuthResult",
+        "ZitadelClientAuthState",
+        "ZitadelClientSession",
+        "ZitadelUnauthState",
         "ZitadelAuthSession",
         "useAuth",
         "useAuthContext"
@@ -74,8 +74,8 @@
         "why": "Next.js runs the function that middleware.ts (proxy.ts from Next.js 16) exports, with each request. zitadelMiddleware(request, options) is that function: it handles the request itself and returns the response. It is not a factory, so it has no create prefix. createProxy(project, options) is the factory that returns a handler."
       },
       "extras": [
-        "ProxyHandler",
-        "ProxyOptions",
+        "ZitadelProxyHandler",
+        "ZitadelProxyOptions",
         "createProxy"
       ]
     },
@@ -88,10 +88,10 @@
       "source": "src/session.ts",
       "kind": "other",
       "extras": [
-        "ClientAuthResult",
-        "ClientAuthState",
-        "ClientSession",
-        "GetSessionOptions",
+        "ZitadelClientAuthResult",
+        "ZitadelClientAuthState",
+        "ZitadelClientSession",
+        "ZitadelGetSessionOptions",
         "getSession"
       ]
     }

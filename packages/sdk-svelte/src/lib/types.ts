@@ -1,5 +1,5 @@
 import type {
-  StandardAttributeProps,
+  ZitadelStandardAttributeProps,
   ZitadelLoginProps as ZitadelLoginWidgetProps,
   ZitadelLogoutProps as ZitadelLogoutWidgetProps,
   ZitadelSessionProps as ZitadelSessionWidgetProps,
@@ -37,7 +37,7 @@ export type {
  * the `title` prop leaves `title="null"` on the element, because Svelte assigns
  * it as a property.
  */
-type ZitadelWidgetAttributes = StandardAttributeProps<HTMLAttributes<HTMLElement>>;
+type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<HTMLAttributes<HTMLElement>>;
 
 /**
  * Props of {@link ZitadelLogin}: the widget's own props and event callbacks

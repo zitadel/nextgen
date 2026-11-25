@@ -1,5 +1,5 @@
 import type { ClassList, HTMLElementAttrs } from "@qwik.dev/core";
-import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
+import type { ZitadelStandardAttributeProps } from "@zitadel/sdk-core/types";
 
 /**
  * Re-exports the shared event detail types that the `on...$` callbacks receive.
@@ -27,7 +27,7 @@ export type {
  * They are passed to the widget element, and nothing else is, so no prop the type accepts is
  * silently dropped. Use them for attributes such as `id`, `style`, `aria-*` and `data-*`.
  */
-export type ZitadelWidgetAttributes = StandardAttributeProps<
+export type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
   HTMLElementAttrs & {
     /**
      * The CSS classes for the widget element.

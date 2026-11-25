@@ -1,4 +1,4 @@
-import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
+import type { ZitadelStandardAttributeProps } from "@zitadel/sdk-core/types";
 import type * as React from "react";
 
 /**
@@ -13,4 +13,6 @@ import type * as React from "react";
  *
  * @internal
  */
-export type ZitadelWidgetAttributes = StandardAttributeProps<React.HTMLAttributes<HTMLElement>>;
+export type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
+  React.HTMLAttributes<HTMLElement>
+>;

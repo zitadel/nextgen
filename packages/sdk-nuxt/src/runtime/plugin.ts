@@ -2,7 +2,7 @@ import { defineNuxtPlugin, useRequestEvent, useRuntimeConfig, useState } from "#
 import { configureZitadel } from "@zitadel/sdk-core/config";
 
 import { DEFAULT_URL, resolveUrl } from "./lib/settings";
-import type { ClientAuthResult } from "./types";
+import type { ZitadelClientAuthResult } from "./types";
 
 /**
  * The universal Nuxt plugin that seeds the auth state and configures the API client.
@@ -33,7 +33,7 @@ export default defineNuxtPlugin(() => {
   // to client-side JavaScript and third-party scripts. Vue components only
   // need userId / identifier / display; use getAuth(event) server-side when the
   // token itself is required.
-  const clientAuth: ClientAuthResult = auth.isAuthenticated
+  const clientAuth: ZitadelClientAuthResult = auth.isAuthenticated
     ? {
         isAuthenticated: true,
         session: {
@@ -45,7 +45,7 @@ export default defineNuxtPlugin(() => {
       }
     : { isAuthenticated: false, session: null };
 
-  useState<ClientAuthResult>("zitadel-auth", () => clientAuth);
+  useState<ZitadelClientAuthResult>("zitadel-auth", () => clientAuth);
 
   // Initialise SDK-wide config so web components (<zitadel-login>,
   // <zitadel-logout>) resolve proxyPath and projectId from the shared

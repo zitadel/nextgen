@@ -17,8 +17,8 @@
  */
 import type { ZitadelProject } from "@zitadel/sdk-core/config";
 import type {
-  ProxyRoute,
-  ResolveSessionOptions,
+  ZitadelProxyRoute,
+  ZitadelResolveSessionOptions,
   ZitadelMiddlewareOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -249,7 +249,7 @@ export async function zitadelMiddleware(
 async function proxyRequest(
   req: NextRequest,
   authUrl: string,
-  route: ProxyRoute,
+  route: ZitadelProxyRoute,
   projectId: string | undefined,
   proxyTimeoutMs: number,
   projectSecretOption: string | undefined,
@@ -357,7 +357,7 @@ async function proxyRequest(
  * The options {@link handleAuth} receives after {@link zitadelMiddleware} destructures its
  * public options: the route policy, plus what the shared session resolver judges the session by.
  */
-interface AuthHandlerOptions extends ResolveSessionOptions {
+interface AuthHandlerOptions extends ZitadelResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
   readonly pathname: string;
@@ -444,12 +444,12 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
  *
  * @example
  * ```ts
- * import type { ProxyOptions } from "@zitadel/sdk-next/middleware";
+ * import type { ZitadelProxyOptions } from "@zitadel/sdk-next/middleware";
  *
- * const options: ProxyOptions = { protectedRoutes: ["/admin*"], loginPath: "/login" };
+ * const options: ZitadelProxyOptions = { protectedRoutes: ["/admin*"], loginPath: "/login" };
  * ```
  */
-export type ProxyOptions = Omit<ZitadelMiddlewareOptions, "proxyPath" | "url">;
+export type ZitadelProxyOptions = Omit<ZitadelMiddlewareOptions, "proxyPath" | "url">;
 
 /**
  * The middleware handler that {@link createProxy} returns.
@@ -458,7 +458,7 @@ export type ProxyOptions = Omit<ZitadelMiddlewareOptions, "proxyPath" | "url">;
  * {@link zitadelMiddleware}. Export it from `proxy.ts` as `proxy`, or as `middleware` on
  * Next.js 15.
  */
-export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response>;
+export type ZitadelProxyHandler = (req: NextRequest) => Promise<NextResponse | Response>;
 
 /**
  * Creates a configured middleware handler from the project handle that `configureZitadel()`
@@ -475,7 +475,7 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  * projectId })` too, or sessions read as signed out on the server.
  *
  * @param config - The project handle from `configureZitadel()`.
- * @param options - Route protection and JWT options; see {@link ProxyOptions}.
+ * @param options - Route protection and JWT options; see {@link ZitadelProxyOptions}.
  * @returns A middleware handler to export from `proxy.ts`.
  *
  * @example
@@ -501,7 +501,10 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  * export { proxy } from "./src/zitadel";
  * ```
  */
-export function createProxy(config: ZitadelProject, options: ProxyOptions = {}): ProxyHandler {
+export function createProxy(
+  config: ZitadelProject,
+  options: ZitadelProxyOptions = {},
+): ZitadelProxyHandler {
   const mergedOptions: ZitadelMiddlewareOptions = {
     ...options,
     projectId: options.projectId ?? (config.projectId || undefined),

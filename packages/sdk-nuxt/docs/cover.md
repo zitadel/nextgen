@@ -60,4 +60,4 @@ What renders on the edge is the server side only: the proxy, the session state a
 - The [README on GitHub](https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme) for installation and a walkthrough.
 - The module: `@zitadel/sdk-nuxt/module`.
 - The server helpers {@link server!createZitadelMiddleware} and {@link server!getAuth}.
-- The auth types {@link index!AuthResult} and {@link index!ClientAuthResult}, and the options type {@link index!ZitadelMiddlewareOptions}.
+- The auth types {@link index!ZitadelAuthResult} and {@link index!ZitadelClientAuthResult}, and the options type {@link index!ZitadelMiddlewareOptions}.

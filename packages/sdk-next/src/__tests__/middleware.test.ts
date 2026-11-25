@@ -9,7 +9,7 @@ import { NextRequest } from "next/server";
 
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import type { AuthResult } from "@zitadel/sdk-core/middleware";
+import type { ZitadelAuthResult } from "@zitadel/sdk-core/middleware";
 import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
@@ -67,7 +67,7 @@ function configureProject(configured?: string, environment?: string): ServeOptio
   return { projectId: configured };
 }
 
-async function readAuth(context: unknown, options: ServeOptions = {}): Promise<AuthResult> {
+async function readAuth(context: unknown, options: ServeOptions = {}): Promise<ZitadelAuthResult> {
   mockHeaders.clear();
   for (const [name, value] of Object.entries((context ?? {}) as Record<string, string>)) {
     mockHeaders.set(name, value);

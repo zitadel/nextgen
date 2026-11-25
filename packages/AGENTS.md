@@ -13,7 +13,7 @@ change needs a changeset, and the whole train versions together.
 
 - **`sdk-core` is the shared contract**: JWT verification (`verifyJwt`),
   middleware primitives, runtime resolution, and the `ZitadelAuthSession` /
-  `AuthResult` types the SDKs re-export from `@zitadel/sdk-core/middleware`.
+  `ZitadelAuthResult` types the SDKs re-export from `@zitadel/sdk-core/middleware`.
   Change a shared type there; never fork it into a framework package.
 - **Exports are consumer contract**: removing or renaming an `exports` entry
   (`/server`, `/client`, `/types`, …) is a breaking change, and an addition
@@ -106,6 +106,8 @@ may have nothing else to read. Rules for those comments:
   fails CI.
 - **Keep each SDK's `typedoc.json` to its `name` and `entryPoints`** (Svelte also
   `tsconfig`); shared options live in the root `typedoc.base.json`.
+- **Name every exported type by the rules** in [Naming of types](../docs/adrs/090-sdk-public-api-standard.md#naming-of-types);
+  the prefix is `Zitadel`, without exception.
 - **Describe a change to an SDK's exports** in its `public-api.json` and in
   [ADR 090](../docs/adrs/090-sdk-public-api-standard.md).
 

@@ -1,9 +1,9 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import type {
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelMiddlewareOptions,
-  ProxyRoute,
-  ResolveSessionOptions,
+  ZitadelProxyRoute,
+  ZitadelResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 
@@ -80,7 +80,7 @@ declare global {
        * {@link ZitadelMiddlewareOptions.ignoredRoutes}. Read it through {@link getAuth}, which
        * turns the missing case into a signed-out result.
        */
-      zitadelAuth?: AuthResult;
+      zitadelAuth?: ZitadelAuthResult;
     }
   }
 }
@@ -165,7 +165,7 @@ function buildUpstreamHeaders(event: RequestEvent): Headers {
 async function proxyRequest(
   event: RequestEvent,
   authUrl: string,
-  route: ProxyRoute,
+  route: ZitadelProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
@@ -248,7 +248,7 @@ async function proxyRequest(
  * They are the route policy plus what the shared session resolver judges the session by, taken
  * from the public {@link ZitadelMiddlewareOptions} after defaults are applied.
  */
-interface AuthHandlerOptions extends ResolveSessionOptions {
+interface AuthHandlerOptions extends ZitadelResolveSessionOptions {
   /**
    * The route patterns that require a session.
    */
@@ -548,7 +548,7 @@ export function createZitadelHandle(options: ZitadelMiddlewareOptions = {}): Zit
  * synchronous because the framework has already handed over the event.
  *
  * @param event - The current SvelteKit request event.
- * @returns The current {@link AuthResult}: signed in with a session, or signed out with a `null`
+ * @returns The current {@link ZitadelAuthResult}: signed in with a session, or signed out with a `null`
  *   session.
  * @example
  * ```ts
@@ -565,6 +565,6 @@ export function createZitadelHandle(options: ZitadelMiddlewareOptions = {}): Zit
  * ```
  * @see {@link createZitadelHandle}
  */
-export function getAuth(event: RequestEvent): AuthResult {
+export function getAuth(event: RequestEvent): ZitadelAuthResult {
   return event.locals.zitadelAuth ?? { isAuthenticated: false, session: null };
 }

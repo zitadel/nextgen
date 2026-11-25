@@ -1,10 +1,10 @@
 export { createZitadelMiddleware, getAuth } from "./middleware";
-export type { SolidFetchEvent, SolidMiddlewareConfig } from "./middleware";
+export type { ZitadelSolidFetchEvent, ZitadelSolidMiddlewareConfig } from "./middleware";
 export type {
   ZitadelMiddlewareOptions,
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./types.js";

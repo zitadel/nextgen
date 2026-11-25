@@ -5,7 +5,7 @@
  * {@link describeServerMiddleware}.
  */
 
-import type { AuthResult, ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { ZitadelAuthResult, ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
@@ -191,7 +191,7 @@ export interface Served {
   readonly status: number;
   readonly headers: Headers;
   /** What a downstream handler reads as the session; undefined when none was set. */
-  readonly auth: AuthResult | undefined;
+  readonly auth: ZitadelAuthResult | undefined;
   /** The answer's body. */
   readonly body: string;
 }
@@ -209,7 +209,7 @@ export interface ServerSdkAdapter {
   /** Configures the project id the same way as {@link configureSecret}. */
   configureProject(configured?: string, environment?: string): ServeOptions;
   /** Reads the auth result the way a page does, from the request context the handler fills. */
-  readAuth(context: unknown): Promise<AuthResult>;
+  readAuth(context: unknown): Promise<ZitadelAuthResult>;
   /** Asserts, at type level, that the handler is assignable to the framework's handler type. */
   expectHandlerType(): void;
   /**

@@ -1,8 +1,11 @@
+import { ZitadelRuntimeError } from "./runtime-error.js";
+
+export { ZitadelRuntimeError };
 export type {
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  AuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelAuthResult,
   ZitadelMiddlewareOptions,
 } from "./middleware.js";
 export {
@@ -14,7 +17,6 @@ export {
   proxyRoute,
   refusedProxyResponse,
   checkOpaqueSessionToken,
-  validateOpaqueSessionToken,
   jwtNamesProject,
   resolveSession,
   SESSION_PROJECT_MISMATCH,
@@ -27,19 +29,19 @@ export {
   SESSION_COOKIE_CACHE_CONTROL,
 } from "./middleware.js";
 export type {
-  OpaqueSession,
-  OpaqueSessionCheck,
-  SessionRequest,
-  SessionCookie,
-  ResolveSessionOptions,
-  ResolvedSession,
-  ProxiedRequest,
-  ProxiedAnswer,
-  ProxiedSessionCookies,
-  ProxyRoute,
-  ProxyRouteOptions,
-  ProxyUpstream,
-  BrowserRequest,
+  ZitadelOpaqueSession,
+  ZitadelOpaqueSessionCheck,
+  ZitadelSessionRequest,
+  ZitadelSessionCookie,
+  ZitadelResolveSessionOptions,
+  ZitadelResolvedSession,
+  ZitadelProxiedRequest,
+  ZitadelProxiedAnswer,
+  ZitadelProxiedSessionCookies,
+  ZitadelProxyRoute,
+  ZitadelProxyRouteOptions,
+  ZitadelProxyUpstream,
+  ZitadelBrowserRequest,
 } from "./middleware.js";
 export {
   verifyJwt,
@@ -50,7 +52,12 @@ export {
   JWKS_MIN_REFRESH_MS,
   clearJwksCache,
 } from "./jwt.js";
-export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
+export type {
+  ZitadelJwtPayload,
+  ZitadelJwtHeader,
+  ZitadelDecodedJwt,
+  ZitadelVerifyJwtOptions,
+} from "./jwt.js";
 
 /**
  * The deployment stage an app runs in.
@@ -70,7 +77,7 @@ export type ZitadelEnvironment = "development" | "preview" | "production";
  * reading environment variables by hand, so that a missing value fails at startup and not on the
  * first request.
  */
-export type ZitadelRuntime = {
+export interface ZitadelRuntime {
   /**
    * The project id that the app signs its users in to.
    */
@@ -85,7 +92,7 @@ export type ZitadelRuntime = {
    * It is always set in `production` and optional in the other stages.
    */
   issuer?: string;
-};
+}
 
 /**
  * The unvalidated values that {@link resolveZitadelRuntime} turns into a {@link ZitadelRuntime}.
@@ -93,7 +100,7 @@ export type ZitadelRuntime = {
  * Every field is optional, because each usually comes from an environment variable that may be
  * unset.
  */
-export type ZitadelRuntimeInput = {
+export interface ZitadelRuntimeOptions {
   /**
    * The project id.
    *
@@ -109,48 +116,9 @@ export type ZitadelRuntimeInput = {
   /**
    * The issuer URL of the auth backend.
    *
-   * It is required when the {@link ZitadelRuntimeInput.environment} is `production`.
+   * It is required when the {@link ZitadelRuntimeOptions.environment} is `production`.
    */
   issuer?: string;
-};
-
-/**
- * The error thrown when the runtime cannot be resolved.
- *
- * The causes are a missing project id, a missing issuer in production, and an unknown environment
- * name. It fails startup loudly, so an app never runs unconfigured: an app without a project id
- * would otherwise treat every session as signed out and look broken for no visible reason.
- *
- * @example
- * ```ts
- * try {
- *   resolveZitadelRuntimeEnv();
- * } catch (error) {
- *   if (error instanceof ZitadelRuntimeError) {
- *     console.error(error.code, error.message);
- *   }
- * }
- * ```
- */
-export class ZitadelRuntimeError extends Error {
-  /**
-   * A stable machine-readable code.
-   *
-   * It is `E_ZITADEL_CONFIG` for every cause today, so branch on it and not on the message.
-   */
-  readonly code: string;
-
-  /**
-   * Creates the error with its stable code.
-   *
-   * @param code - The stable error code.
-   * @param message - What is wrong and which variable fixes it.
-   */
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = "ZitadelRuntimeError";
-    this.code = code;
-  }
 }
 
 /**
@@ -208,7 +176,7 @@ export function resolveZitadelRuntimeEnv(
  * // { projectId: "296547382910273", environment: "development", issuer: undefined }
  * ```
  */
-export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntime {
+export function resolveZitadelRuntime(input: ZitadelRuntimeOptions): ZitadelRuntime {
   const environment = input.environment ?? "development";
   if (!input.projectId) {
     throw new ZitadelRuntimeError(

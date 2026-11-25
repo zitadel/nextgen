@@ -19,9 +19,9 @@ SolidStart from one package; the middleware supplies what the widgets talk to.
 - {@link index!configureZitadel}, {@link index!getApi} and {@link index!getZitadelConfig} set up
   and read the typed Zitadel API client (also exported from the `./client`
   entry, so an app needs only this one dependency).
-- {@link index!SolidMiddlewareConfig} and {@link index!SolidFetchEvent} type the config and
+- {@link index!ZitadelSolidMiddlewareConfig} and {@link index!ZitadelSolidFetchEvent} type the config and
   the slice of SolidStart's request event the middleware touches.
-- {@link index!AuthResult}, {@link index!ZitadelAuthSession}, {@link index!ZitadelMiddlewareOptions}
+- {@link index!ZitadelAuthResult}, {@link index!ZitadelAuthSession}, {@link index!ZitadelMiddlewareOptions}
   and the other session and option types describe what `getAuth` returns and
   what the middleware accepts.
 

@@ -15,8 +15,8 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
-  type WidgetTag,
-  type WidgetName,
+  type ZitadelWidgetTag,
+  type ZitadelWidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -79,7 +79,10 @@ async function serverRender(
   return host.firstElementChild!;
 }
 
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+function widgetIn<Tag extends ZitadelWidgetTag>(
+  root: ParentNode,
+  tag: Tag,
+): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
   if (!element) {
     throw new Error(`no <${tag}> was rendered`);
@@ -625,7 +628,7 @@ const staleOnRemoval: readonly string[] = [];
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref` on the component, the way a consumer does.
 // `update` renders it again with other attributes.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
+async function mountWidget(widget: ZitadelWidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
   configureZitadel(project);
   const current = shallowRef(attributes);

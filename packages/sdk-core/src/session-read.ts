@@ -3,7 +3,8 @@ import type { GetMySession200 } from "@zitadel/api/generated/model";
 import { getZitadelConfig } from "./config.js";
 import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 
-import type { ClientAuthResult } from "./middleware.js";
+import type { ZitadelClientAuthResult } from "./middleware.js";
+import { ZitadelRuntimeError } from "./runtime-error.js";
 
 /**
  * The proxy path used when neither the options nor `configureZitadel` name one.
@@ -16,7 +17,7 @@ const DEFAULT_PROXY_PATH = "/__nextgen";
 /**
  * The shared signed-out result.
  */
-const signedOut: ClientAuthResult = { isAuthenticated: false, session: null };
+const signedOut: ZitadelClientAuthResult = { isAuthenticated: false, session: null };
 
 /**
  * The options of {@link getSession}.
@@ -26,10 +27,10 @@ const signedOut: ClientAuthResult = { isAuthenticated: false, session: null };
  *
  * @example
  * ```ts
- * const options: GetSessionOptions = { projectId: "296547382910273", proxyPath: "/__nextgen" };
+ * const options: ZitadelGetSessionOptions = { projectId: "296547382910273", proxyPath: "/__nextgen" };
  * ```
  */
-export type GetSessionOptions = {
+export interface ZitadelGetSessionOptions {
   /**
    * The same-origin proxy path that the app forwards to the auth backend.
    *
@@ -52,7 +53,7 @@ export type GetSessionOptions = {
    * @defaultValue The project id from `configureZitadel` when it has run on this page.
    */
   projectId?: string;
-};
+}
 
 /**
  * Whether the missing-project warning has been logged on this page.
@@ -105,8 +106,9 @@ function warnMissingProject(): void {
  *
  * @param options - The proxy path and project id; both fall back to `configureZitadel`.
  * @returns The signed-in session without the token, or the signed-out state.
- * @throws {Error} When called on a server, or when the proxy answers something other than a
- * session or a signed-out answer.
+ * @throws {ZitadelRuntimeError} With the code `E_ZITADEL_SESSION_NO_BROWSER` when called on a
+ * server, or `E_ZITADEL_SESSION_READ_FAILED` when the proxy answers something other than a session
+ * or a signed-out answer.
  *
  * @example
  * ```ts
@@ -118,10 +120,13 @@ function warnMissingProject(): void {
  * }
  * ```
  */
-export async function getSession(options: GetSessionOptions = {}): Promise<ClientAuthResult> {
+export async function getSession(
+  options: ZitadelGetSessionOptions = {},
+): Promise<ZitadelClientAuthResult> {
   if (typeof window === "undefined") {
-    throw new Error(
-      "[zitadel] getSession() reads the session from the browser; on a server, " +
+    throw new ZitadelRuntimeError(
+      "E_ZITADEL_SESSION_NO_BROWSER",
+      "getSession() reads the session from the browser; on a server, " +
         "use your framework SDK's server-side session helper.",
     );
   }
@@ -167,8 +172,9 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
       code === "req.not_found"
         ? ` (req.not_found: a server older than this SDK does not serve the API under ${API_PREFIX})`
         : "";
-    throw new Error(
-      `[zitadel] Session read failed: HTTP ${response.status} from ${endpoint}${cause}`,
+    throw new ZitadelRuntimeError(
+      "E_ZITADEL_SESSION_READ_FAILED",
+      `Session read failed: HTTP ${response.status} from ${endpoint}${cause}`,
     );
   }
 
@@ -192,7 +198,11 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   };
 }
 
-export type { ClientAuthResult, ClientAuthState, ClientSession } from "./middleware.js";
+export type {
+  ZitadelClientAuthResult,
+  ZitadelClientAuthState,
+  ZitadelClientSession,
+} from "./middleware.js";
 
 /**
  * The error body that the backend answers with: a stable code and a message.

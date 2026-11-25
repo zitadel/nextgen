@@ -9,7 +9,7 @@
  * @packageDocumentation
  */
 
-import type { JwtPayload } from "./jwt.js";
+import type { ZitadelJwtPayload } from "./jwt.js";
 
 import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { joinURL } from "ufo";
@@ -265,7 +265,7 @@ function warnOnce(message: string): void {
 /**
  * What decides where the proxy sends a request.
  */
-export interface ProxyRouteOptions {
+export interface ZitadelProxyRouteOptions {
   /**
    * The path prefix that the app proxies.
    *
@@ -285,7 +285,7 @@ export interface ProxyRouteOptions {
 /**
  * Where a request that the proxy handles goes.
  */
-export interface ProxyRoute {
+export interface ZitadelProxyRoute {
   /**
    * The path on the server, for example `/api/v1/flows`. It is empty for a request to the proxy
    * path itself.
@@ -339,7 +339,10 @@ function isUnder(path: string, prefix: string): boolean {
  * @param options - The proxy path, the project and the login page of the app.
  * @returns The route, or `undefined` when the request is not the proxy's.
  */
-export function proxyRoute(pathname: string, options: ProxyRouteOptions): ProxyRoute | undefined {
+export function proxyRoute(
+  pathname: string,
+  options: ZitadelProxyRouteOptions,
+): ZitadelProxyRoute | undefined {
   const { proxyPath, loginPath } = options;
   const headers = {
     "x-forwarded-prefix": proxyPath,
@@ -398,7 +401,7 @@ function issuerPart(path: string): string {
  * @param options - The proxy path, the project and the login page of the app.
  * @returns `true` when the proxy answers `404` itself.
  */
-function refusesOAuthPath(path: string, options: ProxyRouteOptions): boolean {
+function refusesOAuthPath(path: string, options: ZitadelProxyRouteOptions): boolean {
   const decoded = decodePath(path);
   const head = decodePath(path.split("/")[1] ?? "");
   const escaped = /^(?:oauth|\.well-known)(?:\/|$)/i.test(head) && head !== path.split("/")[1];
@@ -424,7 +427,10 @@ function refusesOAuthPath(path: string, options: ProxyRouteOptions): boolean {
  * @param isOwn - Decides from the path of the issuer on the server whether the request names it.
  * @returns `true` when the request names the issuer of the project of this app.
  */
-function servesIssuer(options: ProxyRouteOptions, isOwn: (ownIssuer: string) => boolean): boolean {
+function servesIssuer(
+  options: ZitadelProxyRouteOptions,
+  isOwn: (ownIssuer: string) => boolean,
+): boolean {
   const { proxyPath, projectId } = options;
   if (!projectId) {
     warnOnce(
@@ -589,18 +595,19 @@ export const SERVER_SESSION_COOKIE = `${HOST_PREFIX}${LOOPBACK_SERVER_SESSION_CO
  * for Safari and so cannot carry the `__Host-` prefix. On `localhost` the Console of a local server
  * keeps its session under this name.
  *
- * @param secure - Whether the cookie is `Secure`, that is whether the request is not plain http to
- * a loopback host.
+ * @param options - The options.
+ * @param options.secure - Whether the cookie is `Secure`, that is whether the request is not plain
+ * http to a loopback host.
  * @returns The cookie name.
  *
  * @example
  * ```ts
- * serverSessionCookieName(true); // "__Host-zitadel_session"
- * serverSessionCookieName(false); // "zitadel_session"
+ * serverSessionCookieName({ secure: true }); // "__Host-zitadel_session"
+ * serverSessionCookieName({ secure: false }); // "zitadel_session"
  * ```
  */
-export function serverSessionCookieName(secure: boolean): string {
-  return secure ? SERVER_SESSION_COOKIE : LOOPBACK_SERVER_SESSION_COOKIE;
+export function serverSessionCookieName(options: { secure: boolean }): string {
+  return options.secure ? SERVER_SESSION_COOKIE : LOOPBACK_SERVER_SESSION_COOKIE;
 }
 
 /**
@@ -615,18 +622,22 @@ export function serverSessionCookieName(secure: boolean): string {
  * Every byte of the id outside `[A-Za-z0-9_-]` is percent-encoded, so any configured id makes a
  * valid cookie name. The ids that the server mints need no encoding.
  *
- * @param projectId - The project id that the app signs its users in to.
- * @param secure - Whether the cookie is `Secure`.
+ * @param options - The options.
+ * @param options.projectId - The project id that the app signs its users in to.
+ * @param options.secure - Whether the cookie is `Secure`.
  * @returns The cookie name.
  *
  * @example
  * ```ts
- * sessionCookieName("296547382910273", true); // "__Host-zitadel_session_296547382910273"
- * sessionCookieName("296547382910273", false); // "zitadel_session_296547382910273"
+ * sessionCookieName({ projectId: "296547382910273", secure: true });
+ * // "__Host-zitadel_session_296547382910273"
+ * sessionCookieName({ projectId: "296547382910273", secure: false });
+ * // "zitadel_session_296547382910273"
  * ```
  */
-export function sessionCookieName(projectId: string, secure: boolean): string {
-  let name = `${serverSessionCookieName(secure)}_`;
+export function sessionCookieName(options: { projectId: string; secure: boolean }): string {
+  const { projectId, secure } = options;
+  let name = `${serverSessionCookieName({ secure })}_`;
   for (const byte of new TextEncoder().encode(projectId)) {
     const char = String.fromCharCode(byte);
     name += /[A-Za-z0-9_-]/.test(char)
@@ -667,7 +678,7 @@ function isSessionCookie(name: string): boolean {
  * into a `Set-Cookie` value. The result carries `Path=/`, `HttpOnly` and `SameSite=Lax`, and never
  * a `Domain`.
  */
-export interface SessionCookie {
+export interface ZitadelSessionCookie {
   /**
    * The name of the cookie.
    *
@@ -708,14 +719,14 @@ export interface SessionCookie {
  * @example
  * ```ts
  * serializeSessionCookie({
- *   name: sessionCookieName("296547382910273", true),
+ *   name: sessionCookieName({ projectId: "296547382910273", secure: true }),
  *   value: token,
  *   maxAge: 3600,
  *   secure: true,
  * });
  * ```
  */
-export function serializeSessionCookie(cookie: SessionCookie): string {
+export function serializeSessionCookie(cookie: ZitadelSessionCookie): string {
   const attributes = [`${cookie.name}=${cookie.value}`, "Path=/"];
   if (cookie.maxAge !== undefined) {
     attributes.push(`Max-Age=${cookie.maxAge}`);
@@ -743,7 +754,7 @@ export const SESSION_COOKIE_CACHE_CONTROL = "private, no-store";
  * the app forwarded win over the request URL, so an app behind a TLS proxy that talks to it over
  * loopback keeps `Secure`.
  */
-export interface BrowserRequest {
+export interface ZitadelBrowserRequest {
   /**
    * The own request URL of the app.
    *
@@ -787,7 +798,7 @@ function firstForwarded(value: string | null | undefined): string | undefined {
  * @param request - The request of the browser.
  * @returns `true` when the cookie needs `Secure`.
  */
-function secureFor(request: BrowserRequest): boolean {
+function secureFor(request: ZitadelBrowserRequest): boolean {
   let url: URL;
   try {
     url = new URL(request.requestUrl);
@@ -827,7 +838,7 @@ function secondsUntil(epochMs: number): number | undefined {
  * @param secure - Whether the cookie is `Secure`.
  * @returns The clearing cookie.
  */
-function clearedCookie(name: string, secure: boolean): SessionCookie {
+function clearedCookie(name: string, secure: boolean): ZitadelSessionCookie {
   return { name, value: "", maxAge: 0, secure };
 }
 
@@ -852,8 +863,8 @@ function copiedToProjectCookie(
   projectId: string,
   maxAge: number | undefined,
   secure: boolean,
-): SessionCookie {
-  return { name: sessionCookieName(projectId, secure), value: token, maxAge, secure };
+): ZitadelSessionCookie {
+  return { name: sessionCookieName({ projectId, secure }), value: token, maxAge, secure };
 }
 
 /**
@@ -934,10 +945,10 @@ function setCookieName(setCookie: string): string {
 /**
  * What a proxied request carries that decides its session cookies.
  *
- * It extends {@link BrowserRequest}, whose request URL and forwarded headers decide whether a
+ * It extends {@link ZitadelBrowserRequest}, whose request URL and forwarded headers decide whether a
  * cookie needs `Secure`. Build it from the request that the browser sent to the same-origin proxy.
  */
-export interface ProxiedRequest extends BrowserRequest {
+export interface ZitadelProxiedRequest extends ZitadelBrowserRequest {
   /**
    * The HTTP method of the request that the browser sent to the same-origin proxy.
    *
@@ -968,7 +979,7 @@ export interface ProxiedRequest extends BrowserRequest {
  * Those calls ask the server about a session that is kept under the name of the server, and revoke
  * it on sign-out.
  */
-export interface ProxyUpstream {
+export interface ZitadelProxyUpstream {
   /**
    * The base URL of the auth backend.
    *
@@ -988,7 +999,7 @@ export interface ProxyUpstream {
 /**
  * What a proxied answer sends the browser.
  */
-export interface ProxiedAnswer {
+export interface ZitadelProxiedAnswer {
   /**
    * The `Set-Cookie` header values to send the browser, already serialized.
    */
@@ -1005,7 +1016,7 @@ export interface ProxiedAnswer {
 /**
  * The session cookies of a proxied call, on the way up and on the way back.
  */
-export interface ProxiedSessionCookies {
+export interface ZitadelProxiedSessionCookies {
   /**
    * The `Cookie` header to send upstream, or `null` to send none.
    */
@@ -1015,7 +1026,7 @@ export interface ProxiedSessionCookies {
    * the body to send. Send this body, never the upstream response's own, which
    * this may have read.
    */
-  toBrowser(upstream: Response): Promise<ProxiedAnswer>;
+  toBrowser(upstream: Response): Promise<ZitadelProxiedAnswer>;
 }
 
 /**
@@ -1077,10 +1088,10 @@ export interface ProxiedSessionCookies {
  * ```
  */
 export function proxySessionCookies(
-  request: ProxiedRequest,
+  request: ZitadelProxiedRequest,
   projectId: string | undefined,
-  upstream: ProxyUpstream,
-): ProxiedSessionCookies {
+  upstream: ZitadelProxyUpstream,
+): ZitadelProxiedSessionCookies {
   if (!projectId) {
     return {
       upstreamCookie: request.cookie,
@@ -1092,8 +1103,8 @@ export function proxySessionCookies(
   }
 
   const secure = secureFor(request);
-  const ownName = sessionCookieName(projectId, secure);
-  const serverName = serverSessionCookieName(secure);
+  const ownName = sessionCookieName({ projectId, secure });
+  const serverName = serverSessionCookieName({ secure });
   const pieces = cookiePieces(request.cookie);
   const own = cookieValue(pieces, ownName);
   // A session kept under the server's name, which goes up to the probe only.
@@ -1176,7 +1187,7 @@ export function proxySessionCookies(
 async function retiresSharedSession(
   token: string,
   projectId: string,
-  upstream: ProxyUpstream,
+  upstream: ZitadelProxyUpstream,
   signsOut: boolean,
 ): Promise<boolean> {
   if (isJwtShaped(token)) {
@@ -1241,7 +1252,7 @@ const CSRF_HEADER = "X-Zitadel-CSRF";
 async function revokeSession(
   cookie: string,
   projectId: string,
-  upstream: ProxyUpstream,
+  upstream: ZitadelProxyUpstream,
 ): Promise<void> {
   try {
     const res = await fetch(
@@ -1295,86 +1306,86 @@ function parsedJson(text: string): unknown {
  * const name = session.display ?? session.identifier ?? session.userId;
  * ```
  */
-export type ZitadelAuthSession = {
+export interface ZitadelAuthSession {
   /**
    * The unique identifier of the user, the `sub` claim.
    */
-  userId: string;
+  readonly userId: string;
   /**
    * The user schema's designated identifier value, the login identifier such as an email address
    * or a username, or `null` when it is unresolved.
    *
    * On the JWT path it carries the `email` claim.
    */
-  identifier: string | null;
+  readonly identifier: string | null;
   /**
    * The schema property that the identifier came from, for example `"email"`, or `null` when it is
    * unknown.
    *
    * An identity from JWT claims carries no property attribution, so it is `null` there.
    */
-  identifierProperty: string | null;
+  readonly identifierProperty: string | null;
   /**
    * The display name rendering of the user, or `null` when the schema designates none.
    */
-  display: string | null;
+  readonly display: string | null;
   /**
    * The raw session token.
    *
    * It is the verified JWT, or the opaque session token that the backend confirmed. It is a
    * credential: keep it on the server and out of any client payload.
    */
-  token: string;
-};
+  readonly token: string;
+}
 
 /**
  * The auth state of a user who is signed in.
  *
- * It is one half of {@link AuthResult}; check {@link AuthState.isAuthenticated} to narrow.
+ * It is one half of {@link ZitadelAuthResult}; check {@link ZitadelAuthState.isAuthenticated} to narrow.
  */
-export type AuthState = {
+export interface ZitadelAuthState {
   /**
    * Always `true`.
    *
-   * It is the discriminant that narrows an {@link AuthResult}.
+   * It is the discriminant that narrows an {@link ZitadelAuthResult}.
    */
-  isAuthenticated: true;
+  readonly isAuthenticated: true;
   /**
    * The verified session, including the raw token for server-side use.
    */
-  session: ZitadelAuthSession;
-};
+  readonly session: ZitadelAuthSession;
+}
 
 /**
  * The auth state of a user who is not signed in.
  *
- * It is the other half of {@link AuthResult}. It is also what a request gets when the backend gave
+ * It is the other half of {@link ZitadelAuthResult}. It is also what a request gets when the backend gave
  * no verdict on the session cookie; the session resolution reports that case separately.
  */
-export type UnauthState = {
+export interface ZitadelUnauthState {
   /**
    * Always `false`.
    *
-   * It is the discriminant that narrows an {@link AuthResult}.
+   * It is the discriminant that narrows an {@link ZitadelAuthResult}.
    */
-  isAuthenticated: false;
+  readonly isAuthenticated: false;
   /**
    * Always `null`, because there is no session to read.
    */
-  session: null;
-};
+  readonly session: null;
+}
 
 /**
  * The union of the possible auth states of a request, signed in or signed out.
  *
  * @example
  * ```ts
- * function greeting(auth: AuthResult): string {
+ * function greeting(auth: ZitadelAuthResult): string {
  *   return auth.isAuthenticated ? `Hello ${auth.session.display ?? auth.session.userId}` : "Hello";
  * }
  * ```
  */
-export type AuthResult = AuthState | UnauthState;
+export type ZitadelAuthResult = ZitadelAuthState | ZitadelUnauthState;
 
 /**
  * The client-safe session that is exposed to the UI of an app, such as headers and account menus.
@@ -1382,40 +1393,40 @@ export type AuthResult = AuthState | UnauthState;
  * It is identical to the session of a signed-in user on the server but omits the token: the raw session token must never
  * reach client-side JavaScript, whether through a server-rendered payload or a client fetch result.
  */
-export type ClientSession = {
+export interface ZitadelClientSession {
   /**
    * The unique identifier of the user, the `sub` claim.
    */
-  userId: string;
+  readonly userId: string;
   /**
    * The designated identifier value, the login identifier, or `null` when it is unresolved.
    */
-  identifier: string | null;
+  readonly identifier: string | null;
   /**
    * The schema property that the identifier came from, or `null` when it is unknown.
    */
-  identifierProperty: string | null;
+  readonly identifierProperty: string | null;
   /**
    * The display name rendering of the user, or `null` when the schema designates none.
    */
-  display: string | null;
-};
+  readonly display: string | null;
+}
 
 /**
  * The client-safe auth state of a user who is signed in.
  */
-export type ClientAuthState = {
+export interface ZitadelClientAuthState {
   /**
    * Always `true`.
    *
-   * It is the discriminant that narrows a {@link ClientAuthResult}.
+   * It is the discriminant that narrows a {@link ZitadelClientAuthResult}.
    */
-  isAuthenticated: true;
+  readonly isAuthenticated: true;
   /**
    * The identity of the signed-in user, without the raw token.
    */
-  session: ClientSession;
-};
+  readonly session: ZitadelClientSession;
+}
 
 /**
  * The union of the client-safe auth states.
@@ -1426,13 +1437,13 @@ export type ClientAuthState = {
  *
  * @example
  * ```ts
- * const auth: ClientAuthResult = await getSession();
+ * const auth: ZitadelClientAuthResult = await getSession();
  * if (!auth.isAuthenticated) {
  *   showSignInButton();
  * }
  * ```
  */
-export type ClientAuthResult = ClientAuthState | UnauthState;
+export type ZitadelClientAuthResult = ZitadelClientAuthState | ZitadelUnauthState;
 
 /**
  * The options of the SDK middleware factory.
@@ -1455,7 +1466,7 @@ export type ClientAuthResult = ClientAuthState | UnauthState;
  * };
  * ```
  */
-export type ZitadelMiddlewareOptions = {
+export interface ZitadelMiddlewareOptions {
   /**
    * The full URL of the Zitadel auth backend.
    *
@@ -1545,7 +1556,7 @@ export type ZitadelMiddlewareOptions = {
    * @defaultValue []
    * @example ["/dashboard*", "/settings"]
    */
-  protectedRoutes?: string[];
+  protectedRoutes?: readonly string[];
 
   /**
    * The pathnames that the middleware skips completely.
@@ -1558,7 +1569,7 @@ export type ZitadelMiddlewareOptions = {
    * @defaultValue []
    * @example ["/api/webhooks*", "/healthz"]
    */
-  ignoredRoutes?: string[];
+  ignoredRoutes?: readonly string[];
 
   /**
    * The pathname that unauthenticated users are redirected to.
@@ -1593,7 +1604,7 @@ export type ZitadelMiddlewareOptions = {
    * @defaultValue ["RS256", "ES256"]
    * @example ["ES256"]
    */
-  allowedAlgorithms?: string[];
+  allowedAlgorithms?: readonly string[];
 
   /**
    * The clock-skew tolerance in milliseconds.
@@ -1616,7 +1627,7 @@ export type ZitadelMiddlewareOptions = {
    * @defaultValue undefined
    * @example "296547382910273"
    */
-  audience?: string | string[];
+  audience?: string | readonly string[];
 
   /**
    * The accepted values of the JWT `typ` header, compared case-insensitively.
@@ -1626,7 +1637,7 @@ export type ZitadelMiddlewareOptions = {
    *
    * @defaultValue ["JWT", "at+JWT"]
    */
-  allowedTokenTypes?: string[];
+  allowedTokenTypes?: readonly string[];
 
   /**
    * The timeout of a JWKS request, in milliseconds.
@@ -1662,7 +1673,7 @@ export type ZitadelMiddlewareOptions = {
    * @example 3000
    */
   opaqueTokenTimeoutMs?: number;
-};
+}
 
 /**
  * What the backend reports for an opaque, non-JWT, session token.
@@ -1674,7 +1685,7 @@ export type ZitadelMiddlewareOptions = {
  * callers keep its cookie and do not clear it: an anonymous sign-in may still complete, and the
  * session of the other project belongs to the app that signed it in.
  */
-export interface OpaqueSession {
+export interface ZitadelOpaqueSession {
   /**
    * The id of the signed-in user in the project of this app.
    *
@@ -1686,7 +1697,7 @@ export interface OpaqueSession {
    */
   readonly identifier: string | null;
   /**
-   * The schema property that {@link OpaqueSession.identifier} came from, for example `"email"`, or
+   * The schema property that {@link ZitadelOpaqueSession.identifier} came from, for example `"email"`, or
    * `null`.
    */
   readonly identifierProperty: string | null;
@@ -1716,7 +1727,7 @@ export const SESSION_PROJECT_MISMATCH = "sess.project_mismatch";
  *
  * @returns The session.
  */
-function noUser(): OpaqueSession {
+function noUser(): ZitadelOpaqueSession {
   return {
     userId: null,
     identifier: null,
@@ -1736,7 +1747,7 @@ function noUser(): OpaqueSession {
  * @param projectId - The project id of this app.
  * @returns The session.
  */
-function sessionAnswer(body: unknown, projectId: string): OpaqueSession {
+function sessionAnswer(body: unknown, projectId: string): ZitadelOpaqueSession {
   const answer = (typeof body === "object" && body !== null ? body : {}) as {
     project_id?: unknown;
     user_id?: unknown;
@@ -1762,7 +1773,7 @@ function sessionAnswer(body: unknown, projectId: string): OpaqueSession {
  *
  * - `live`: the backend holds a live session for the token. Its user id is `null` when the session
  *   names no user of the project of this app, because it is an anonymous one or one of another
- *   project, see {@link OpaqueSession}.
+ *   project, see {@link ZitadelOpaqueSession}.
  * - `refused`: the backend judged the token and refused it with `401`, or found the session that it
  *   names gone, with `404` and the `sess.not_found` code. Only this verdict makes the cookie dead.
  * - `undecided`: the backend gave no verdict. The cause is a `5xx` or any other answer, no answer
@@ -1770,7 +1781,7 @@ function sessionAnswer(body: unknown, projectId: string): OpaqueSession {
  *   `401`, when it cannot decide, for example because its token or key store failed, so that an
  *   outage does not sign its users out. The request counts as signed out, but the cookie is kept.
  */
-export type OpaqueSessionCheck =
+export type ZitadelOpaqueSessionCheck =
   | {
       /**
        * The backend holds a live session for the token.
@@ -1779,7 +1790,7 @@ export type OpaqueSessionCheck =
       /**
        * What the backend reports about that session.
        */
-      readonly session: OpaqueSession;
+      readonly session: ZitadelOpaqueSession;
     }
   | {
       /**
@@ -1833,28 +1844,35 @@ const ROUTE_NOT_FOUND = "req.not_found";
  * When there is no verdict, the function logs why with `console.warn`. The request then renders
  * signed out, or answers `503` on a protected route, and nothing else would say what went wrong.
  *
- * @param token - The opaque session token from the session cookie of the app.
- * @param issuerUrl - The base URL of the auth backend.
- * @param timeoutMs - How long to wait for the backend before giving up, in milliseconds.
- * @param projectId - The project id that the app signs its users in to. Without one, no session can
- * be shown to belong here: the backend is not asked, and the session reads as live with no user, so
- * its cookie is kept.
+ * @param options - The options.
+ * @param options.token - The opaque session token from the session cookie of the app.
+ * @param options.issuerUrl - The base URL of the auth backend.
+ * @param options.timeoutMs - How long to wait for the backend before giving up, in milliseconds.
+ * @param options.projectId - The project id that the app signs its users in to. Without one, no
+ * session can be shown to belong here: the backend is not asked, and the session reads as live with
+ * no user, so its cookie is kept.
  * @returns The verdict of the backend.
  *
  * @example
  * ```ts
- * const check = await checkOpaqueSessionToken(token, "https://auth.example.com", 5000, projectId);
+ * const check = await checkOpaqueSessionToken({
+ *   token,
+ *   issuerUrl: "https://auth.example.com",
+ *   timeoutMs: 5000,
+ *   projectId,
+ * });
  * if (check.verdict === "refused") {
  *   clearSessionCookie();
  * }
  * ```
  */
-export async function checkOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-  projectId: string,
-): Promise<OpaqueSessionCheck> {
+export async function checkOpaqueSessionToken(options: {
+  token: string;
+  issuerUrl: string;
+  timeoutMs: number;
+  projectId: string;
+}): Promise<ZitadelOpaqueSessionCheck> {
+  const { token, issuerUrl, timeoutMs, projectId } = options;
   if (!projectId) {
     return { verdict: "live", session: noUser() };
   }
@@ -1969,38 +1987,6 @@ export function clearSessionCheckCache(): void {
 }
 
 /**
- * Validates an opaque session token by asking the backend whether the session is live in the
- * project of this app.
- *
- * The call is `GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`. The value `null` folds a
- * refusal and no verdict together, so it says whether the request is signed in and not whether the
- * cookie is dead. Clearing the cookie on `null` signs users out whenever the backend fails. To
- * decide that, use {@link checkOpaqueSessionToken}.
- *
- * @param token - The opaque session token from the session cookie of the app.
- * @param issuerUrl - The base URL of the auth backend.
- * @param timeoutMs - How long to wait for the backend before giving up, in milliseconds.
- * @param projectId - The project id that the app signs its users in to.
- * @returns The live session, with a `null` user id when it names no user of this project, or `null`
- * when the backend did not confirm one because it refused the token or gave no verdict.
- *
- * @example
- * ```ts
- * const session = await validateOpaqueSessionToken(token, issuerUrl, 5000, projectId);
- * const signedIn = session?.userId != null;
- * ```
- */
-export async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-  projectId: string,
-): Promise<OpaqueSession | null> {
-  const check = await checkOpaqueSessionToken(token, issuerUrl, timeoutMs, projectId);
-  return check.verdict === "live" ? check.session : null;
-}
-
-/**
  * Reads the `code` of an error envelope.
  *
  * @param res - The response to read.
@@ -2038,7 +2024,7 @@ function failureCause(err: unknown, timeoutMs: number): string {
  * @param cause - Why there is no verdict.
  * @returns The `undecided` verdict.
  */
-function undecided(endpoint: string, cause: string): OpaqueSessionCheck {
+function undecided(endpoint: string, cause: string): ZitadelOpaqueSessionCheck {
   console.warn(
     `[zitadel] Could not check the session cookie against ${endpoint} (${cause}). ` +
       "That is not a refusal: the request counts as signed out, and the cookie is kept.",
@@ -2062,7 +2048,7 @@ function undecided(endpoint: string, cause: string): OpaqueSessionCheck {
  * jwtNamesProject({ aud: ["296547382910273"] }, "296547382910273"); // true
  * ```
  */
-export function jwtNamesProject(payload: JwtPayload, projectId: string): boolean {
+export function jwtNamesProject(payload: ZitadelJwtPayload, projectId: string): boolean {
   const audience = payload.aud === undefined ? [] : [payload.aud].flat();
   return projectId !== "" && audience.includes(projectId);
 }
@@ -2070,10 +2056,10 @@ export function jwtNamesProject(payload: JwtPayload, projectId: string): boolean
 /**
  * What a request carries that decides its session.
  *
- * It extends {@link BrowserRequest}, whose request URL and forwarded headers decide whether a
+ * It extends {@link ZitadelBrowserRequest}, whose request URL and forwarded headers decide whether a
  * cookie needs `Secure`.
  */
-export interface SessionRequest extends BrowserRequest {
+export interface ZitadelSessionRequest extends ZitadelBrowserRequest {
   /**
    * The `Authorization: Bearer` token, or `null` when absent.
    *
@@ -2096,7 +2082,7 @@ export interface SessionRequest extends BrowserRequest {
  * The server SDKs build it from {@link ZitadelMiddlewareOptions} after they apply the defaults, so
  * each field here has the meaning of the option of the same name.
  */
-export interface ResolveSessionOptions {
+export interface ZitadelResolveSessionOptions {
   /**
    * The base URL of the auth backend, which is the issuer that the session is checked against.
    */
@@ -2144,7 +2130,7 @@ export interface ResolveSessionOptions {
    * Whether an opaque session cookie is checked with the backend, a call to
    * the server on every request. `false` leaves it to a render layer that
    * checks the session itself, as sdk-next's `auth()` does: the result hands
-   * the token on as {@link ResolvedSession.unchecked}. A JWT is judged either
+   * the token on as {@link ZitadelResolvedSession.unchecked}. A JWT is judged either
    * way, without a call.
    *
    * Use `false` in a framework whose middleware runs on every route, including prefetches, so that
@@ -2159,14 +2145,14 @@ export interface ResolveSessionOptions {
 /**
  * The session of a request, as {@link resolveSession} judged it.
  */
-export interface ResolvedSession {
+export interface ZitadelResolvedSession {
   /**
    * Whether the request is signed in, and as whom.
    */
-  readonly auth: AuthResult;
+  readonly auth: ZitadelAuthResult;
   /**
    * Whether the backend gave no verdict on the session cookie
-   * ({@link OpaqueSessionCheck}). The request counts as signed out and the
+   * ({@link ZitadelOpaqueSessionCheck}). The request counts as signed out and the
    * cookie is kept; a protected route answers `503` rather than send a user
    * who may well be signed in to the login page.
    */
@@ -2182,10 +2168,10 @@ export interface ResolvedSession {
    * backend gave no verdict on, and one behind a Bearer token that signed the
    * request in, which was never judged.
    */
-  readonly cookies: readonly SessionCookie[];
+  readonly cookies: readonly ZitadelSessionCookie[];
   /**
    * The opaque session token the backend was not asked about, when
-   * {@link ResolveSessionOptions.checkOpaqueSession} is `false`. The request
+   * {@link ZitadelResolveSessionOptions.checkOpaqueSession} is `false`. The request
    * counts as signed out here and its cookie is left as it is: whatever reads
    * the session next checks the token itself.
    */
@@ -2197,7 +2183,7 @@ export interface ResolvedSession {
  *
  * @returns The state.
  */
-function signedOut(): UnauthState {
+function signedOut(): ZitadelUnauthState {
   return { isAuthenticated: false, session: null };
 }
 
@@ -2225,11 +2211,14 @@ function warnMissingProject(): void {
  * @returns The cookie name and token, or `null` when there is none.
  */
 function storedSession(
-  cookie: SessionRequest["cookie"],
+  cookie: ZitadelSessionRequest["cookie"],
   projectId: string,
   secure: boolean,
 ): { readonly name: string; readonly token: string } | null {
-  for (const name of [sessionCookieName(projectId, secure), serverSessionCookieName(secure)]) {
+  for (const name of [
+    sessionCookieName({ projectId, secure }),
+    serverSessionCookieName({ secure }),
+  ]) {
     const token = cookie(name);
     if (token) {
       return { name, token };
@@ -2246,7 +2235,7 @@ interface JwtVerdict {
   /**
    * Who the JWT signs in.
    */
-  readonly auth: AuthResult;
+  readonly auth: ZitadelAuthResult;
   /**
    * Whether a cookie that holds the JWT is dead, so that the browser can drop it.
    */
@@ -2272,7 +2261,7 @@ interface JwtVerdict {
 async function judgeJwt(
   token: string,
   projectId: string,
-  options: ResolveSessionOptions,
+  options: ZitadelResolveSessionOptions,
 ): Promise<JwtVerdict> {
   const payload = isJwtShaped(token)
     ? await verifyJwt(token, {
@@ -2322,11 +2311,11 @@ async function judgeJwt(
  *   names the project. It never reaches the backend, which does not re-check JWT claims.
  * - Any other session cookie is checked by the backend, with {@link checkOpaqueSessionToken}, and
  *   signs its user in when the session is live in this project. With
- *   {@link ResolveSessionOptions.checkOpaqueSession} set to `false` it is not checked: the result
+ *   {@link ZitadelResolveSessionOptions.checkOpaqueSession} set to `false` it is not checked: the result
  *   hands it on unchecked and touches no cookie.
  * - Only a cookie that held a dead session is cleared: one that the backend refused, or a JWT that
  *   fails verification or names no user of this project. When the backend gives no verdict, the
- *   result says so, see {@link ResolvedSession.undecided}, and the cookie stays.
+ *   result says so, see {@link ZitadelResolvedSession.undecided}, and the cookie stays.
  * - Without a project, nothing signs in, a warning is logged once, and no cookie is touched.
  *
  * @param request - What the request carries: the bearer token, a cookie reader and the data that
@@ -2360,9 +2349,9 @@ async function judgeJwt(
  * ```
  */
 export async function resolveSession(
-  request: SessionRequest,
-  options: ResolveSessionOptions,
-): Promise<ResolvedSession> {
+  request: ZitadelSessionRequest,
+  options: ZitadelResolveSessionOptions,
+): Promise<ZitadelResolvedSession> {
   const { url, projectId, opaqueTokenTimeoutMs } = options;
   if (!projectId) {
     warnMissingProject();
@@ -2385,11 +2374,11 @@ export async function resolveSession(
   }
   // A session of this project in the server's cookie is copied to the
   // project's own once it signs a user in; one already there stays as it is.
-  const moved = (maxAge: number | undefined): SessionCookie[] =>
-    stored.name === serverSessionCookieName(secure)
+  const moved = (maxAge: number | undefined): ZitadelSessionCookie[] =>
+    stored.name === serverSessionCookieName({ secure })
       ? [copiedToProjectCookie(stored.token, projectId, maxAge, secure)]
       : [];
-  const cleared = (): SessionCookie[] => [clearedCookie(stored.name, secure)];
+  const cleared = (): ZitadelSessionCookie[] => [clearedCookie(stored.name, secure)];
 
   if (isJwtShaped(stored.token)) {
     const judged = await judgeJwt(stored.token, projectId, options);
@@ -2403,7 +2392,12 @@ export async function resolveSession(
     return { auth: signedOut(), undecided: false, cookies: [], unchecked: stored.token };
   }
 
-  const check = await checkOpaqueSessionToken(stored.token, url, opaqueTokenTimeoutMs, projectId);
+  const check = await checkOpaqueSessionToken({
+    token: stored.token,
+    issuerUrl: url,
+    timeoutMs: opaqueTokenTimeoutMs,
+    projectId,
+  });
   const userId = check.verdict === "live" ? check.session.userId : null;
   if (check.verdict === "live" && userId) {
     const { session } = check;

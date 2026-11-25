@@ -2,9 +2,9 @@ export { createZitadelHandle, getAuth } from "./handle";
 export type { ZitadelHandle } from "./handle";
 export type {
   ZitadelMiddlewareOptions,
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./types.js";

@@ -9,11 +9,11 @@
  * @module
  */
 import { getZitadelConfig } from "@zitadel/sdk-core/config";
-import type { GetSessionOptions as CoreGetSessionOptions } from "@zitadel/sdk-core/session";
+import type { ZitadelGetSessionOptions as CoreGetSessionOptions } from "@zitadel/sdk-core/session";
 
 import { getSession as readSession } from "@zitadel/sdk-core/session";
 
-import type { ClientAuthResult } from "./types.js";
+import type { ZitadelClientAuthResult } from "./types.js";
 
 /**
  * Options for {@link getSession}.
@@ -29,10 +29,10 @@ import type { ClientAuthResult } from "./types.js";
  *
  * @example
  * ```ts
- * const options: GetSessionOptions = { projectId: "296547382910273", proxyPath: "/auth-proxy" };
+ * const options: ZitadelGetSessionOptions = { projectId: "296547382910273", proxyPath: "/auth-proxy" };
  * ```
  */
-export type GetSessionOptions = CoreGetSessionOptions;
+export type ZitadelGetSessionOptions = CoreGetSessionOptions;
 
 /**
  * Reads `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, which Next.js inlines into client bundles at build time.
@@ -105,19 +105,19 @@ function warnMissingProject(): void {
  * re-reads on the next page load. To react in place instead, listen for the widgets'
  * `zitadel-signout` and `zitadel-flow-complete` events and read again.
  *
- * @param options - The proxy path and project id; see {@link GetSessionOptions}.
- * @returns The current {@link ClientAuthResult}.
+ * @param options - The proxy path and project id; see {@link ZitadelGetSessionOptions}.
+ * @returns The current {@link ZitadelClientAuthResult}.
  * @throws When called outside a browser, or when the server answers with an unexpected response.
  *
  * @example
  * ```tsx
  * "use client";
  * import { useEffect, useState } from "react";
- * import { getSession, type ClientAuthResult } from "@zitadel/sdk-next/session";
+ * import { getSession, type ZitadelClientAuthResult } from "@zitadel/sdk-next/session";
  *
  * export function HeaderNav() {
  *   // undefined means not yet known: render neutral chrome, not "Sign in".
- *   const [auth, setAuth] = useState<ClientAuthResult>();
+ *   const [auth, setAuth] = useState<ZitadelClientAuthResult>();
  *   const [failed, setFailed] = useState(false);
  *   useEffect(() => {
  *     getSession({ projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID }).then(setAuth, () =>
@@ -138,7 +138,9 @@ function warnMissingProject(): void {
  * }
  * ```
  */
-export async function getSession(options: GetSessionOptions = {}): Promise<ClientAuthResult> {
+export async function getSession(
+  options: ZitadelGetSessionOptions = {},
+): Promise<ZitadelClientAuthResult> {
   if (typeof window === "undefined") {
     throw new Error(
       "[zitadel] getSession() reads the session from the browser. " +
@@ -155,4 +157,8 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   return readSession({ proxyPath: options.proxyPath, projectId });
 }
 
-export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types.js";
+export type {
+  ZitadelClientAuthResult,
+  ZitadelClientAuthState,
+  ZitadelClientSession,
+} from "./types.js";

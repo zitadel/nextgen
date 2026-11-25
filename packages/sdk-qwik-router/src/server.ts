@@ -15,12 +15,16 @@
  */
 
 export { createZitadelOnRequest, getAuth } from "./request-handler";
-export type { QwikRequestEvent, QwikCookieValue, QwikCookieOptions } from "./request-handler";
+export type {
+  ZitadelQwikRequestEvent,
+  ZitadelQwikCookieValue,
+  ZitadelQwikCookieOptions,
+} from "./request-handler";
 export type {
   ZitadelMiddlewareOptions,
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./types.js";

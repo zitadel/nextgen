@@ -9,12 +9,12 @@ import type { RequestHandler } from "@qwik.dev/router";
 
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import type { AuthResult } from "@zitadel/sdk-core/middleware";
+import type { ZitadelAuthResult } from "@zitadel/sdk-core/middleware";
 import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
 
-import type { QwikCookieOptions, QwikRequestEvent } from "../request-handler";
+import type { ZitadelQwikCookieOptions, ZitadelQwikRequestEvent } from "../request-handler";
 
 import { createZitadelOnRequest, getAuth } from "../request-handler";
 
@@ -45,7 +45,7 @@ async function serve(
   let redirected: { status: number; url: string } | undefined;
   // The headers of the response Qwik sends when the handler sends none itself.
   const responseHeaders = new Headers();
-  const ev: QwikRequestEvent = {
+  const ev: ZitadelQwikRequestEvent = {
     request: new Request(url, { method: init.method ?? "GET", headers: init.headers }),
     url: new URL(url),
     sharedMap: new Map<string, unknown>(),
@@ -89,13 +89,13 @@ async function serve(
     answered: sent !== undefined || redirected !== undefined,
     status: sent?.status ?? redirected?.status ?? 200,
     headers,
-    auth: ev.sharedMap.get("zitadelAuth") as AuthResult | undefined,
+    auth: ev.sharedMap.get("zitadelAuth") as ZitadelAuthResult | undefined,
     body: (await sent?.text()) ?? "",
   };
 }
 
 /** The `Set-Cookie` value Qwik writes for `ev.cookie.set(name, value, opts)`. */
-function serializeCookie(name: string, value: string, opts: QwikCookieOptions): string {
+function serializeCookie(name: string, value: string, opts: ZitadelQwikCookieOptions): string {
   const attributes = [`${name}=${value}`];
   if (opts.path) {
     attributes.push(`Path=${opts.path}`);
@@ -126,7 +126,7 @@ function configureProject(configured?: string, environment?: string): ServeOptio
   return { projectId: configured };
 }
 
-async function readAuth(context: unknown): Promise<AuthResult> {
+async function readAuth(context: unknown): Promise<ZitadelAuthResult> {
   return getAuth({ sharedMap: new Map(Object.entries(context ?? {})) });
 }
 

@@ -17,8 +17,8 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
-  type WidgetTag,
-  type WidgetName,
+  type ZitadelWidgetTag,
+  type ZitadelWidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
@@ -53,7 +53,10 @@ import * as sdk from "./index";
 // rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+function widgetIn<Tag extends ZitadelWidgetTag>(
+  root: ParentNode,
+  tag: Tag,
+): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
   if (!element) {
     throw new Error(`no <${tag}> was rendered`);
@@ -639,7 +642,7 @@ const staleOnRemoval: readonly string[] = [];
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref`, the way a consumer does. `update` renders it
 // again with other attributes.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
+async function mountWidget(widget: ZitadelWidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
   configureZitadel(project);
   let element: HTMLElement | null = null;

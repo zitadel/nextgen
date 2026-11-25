@@ -23,6 +23,16 @@ project configuration from `@zitadel/sdk-core/config`.
 - **Do not add a handler name here.** Each meta-framework SDK names its own
   server entry after its framework; see the SDK rules.
 
+## Growing the public types
+
+- **Handle a closed union the server may grow with a default branch:**
+  `ZitadelFlowPurpose`, `ZitadelFlowBehavior`, `ZitadelSessionStatus` and
+  `ZitadelSessionErrorCode`; say so in the TSDoc of each.
+- **Add a new field to an options or state interface as optional,** so no
+  existing caller breaks; an output type only gains fields.
+- **Put a new connection setting on `ZitadelProject` and `ZitadelConfig`,**
+  never as a new flat shortcut option on an SDK.
+
 ## The contract spec and its cache
 
 - List every file `src/contract.spec.ts` reads in the `test` inputs of `turbo.json`;

@@ -10,7 +10,7 @@ import type { Handle } from "@sveltejs/kit/hooks";
 
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import type { AuthResult } from "@zitadel/sdk-core/middleware";
+import type { ZitadelAuthResult } from "@zitadel/sdk-core/middleware";
 import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
@@ -76,7 +76,7 @@ async function serve(
     answered: resolve.mock.calls.length === 0,
     status: response.status,
     headers,
-    auth: event.locals.zitadelAuth as AuthResult | undefined,
+    auth: event.locals.zitadelAuth as ZitadelAuthResult | undefined,
     body: await response.text(),
   };
 }
@@ -120,7 +120,7 @@ function configureProject(configured?: string, environment?: string): ServeOptio
   return { projectId: configured };
 }
 
-async function readAuth(context: unknown): Promise<AuthResult> {
+async function readAuth(context: unknown): Promise<ZitadelAuthResult> {
   return getAuth({ locals: context ?? {} } as unknown as RequestEvent);
 }
 

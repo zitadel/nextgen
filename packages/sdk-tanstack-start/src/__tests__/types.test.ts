@@ -1,12 +1,12 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { getAuth } from "../middleware";
-import type { ClientAuthResult, ClientSession, ZitadelAuthSession } from "../types";
+import type { ZitadelClientAuthResult, ZitadelClientSession, ZitadelAuthSession } from "../types";
 
 type ServerAuth = ReturnType<typeof getAuth>;
 
 /** Drops the raw token, exactly as a load function or loader does before serialising. */
-function stripToken(auth: ServerAuth): ClientAuthResult {
+function stripToken(auth: ServerAuth): ZitadelClientAuthResult {
   if (!auth.isAuthenticated) {
     return auth;
   }
@@ -14,10 +14,10 @@ function stripToken(auth: ServerAuth): ClientAuthResult {
   return { isAuthenticated: true, session };
 }
 
-describe("ClientAuthResult", () => {
+describe("ZitadelClientAuthResult", () => {
   it("is the session getAuth() returns without its token", () => {
-    expectTypeOf<ClientSession>().toEqualTypeOf<Omit<ZitadelAuthSession, "token">>();
-    expectTypeOf(stripToken).returns.toEqualTypeOf<ClientAuthResult>();
+    expectTypeOf<ZitadelClientSession>().toEqualTypeOf<Omit<ZitadelAuthSession, "token">>();
+    expectTypeOf(stripToken).returns.toEqualTypeOf<ZitadelClientAuthResult>();
   });
 
   it("carries identifier, identifierProperty and display, not email and name", () => {

@@ -19,7 +19,7 @@ from one package.
   typed without importing it from SvelteKit.
 - {@link server!ZitadelMiddlewareOptions} lists every setting the hook accepts
   (`url`, `projectId`, `protectedRoutes`, `loginPath`, token checks, timeouts).
-- {@link server!AuthResult} is what `getAuth` returns: signed in with a session, or
+- {@link server!ZitadelAuthResult} is what `getAuth` returns: signed in with a session, or
   not signed in.
 - {@link client!configureZitadel}, {@link client!getApi} and {@link client!getZitadelConfig}, from
   `@zitadel/sdk-sveltekit/client`, configure the browser API client before a

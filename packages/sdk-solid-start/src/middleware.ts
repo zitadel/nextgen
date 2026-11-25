@@ -1,8 +1,8 @@
 import type {
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelMiddlewareOptions,
-  ProxyRoute,
-  ResolveSessionOptions,
+  ZitadelProxyRoute,
+  ZitadelResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 
@@ -42,15 +42,15 @@ const PROCESS_ENV: Record<string, string | undefined> =
  *
  * @example
  * ```ts
- * import type { SolidFetchEvent } from "@zitadel/sdk-solid-start/server";
+ * import type { ZitadelSolidFetchEvent } from "@zitadel/sdk-solid-start/server";
  *
- * async function logRequests(event: SolidFetchEvent): Promise<Response | undefined> {
+ * async function logRequests(event: ZitadelSolidFetchEvent): Promise<Response | undefined> {
  *   console.log(event.request.method, new URL(event.request.url).pathname);
  *   return undefined;
  * }
  * ```
  */
-export interface SolidFetchEvent {
+export interface ZitadelSolidFetchEvent {
   /**
    * The incoming request.
    *
@@ -74,7 +74,7 @@ export interface SolidFetchEvent {
      * It is absent on a request the middleware skipped because the path matched an ignored route,
      * or proxied, and {@link getAuth} reads an absent verdict as signed out.
      */
-    zitadelAuth?: AuthResult;
+    zitadelAuth?: ZitadelAuthResult;
   };
   /**
    * The direct client address, when the platform adapter resolves one.
@@ -127,7 +127,7 @@ export interface SolidFetchEvent {
  * export default createMiddleware({ onRequest: [...zitadel.onRequest] });
  * ```
  */
-export interface SolidMiddlewareConfig {
+export interface ZitadelSolidMiddlewareConfig {
   /**
    * The handlers that SolidStart runs for each request, in order.
    *
@@ -138,7 +138,7 @@ export interface SolidMiddlewareConfig {
    * session verdict. It is a mutable array because `createMiddleware` does not accept a readonly
    * one.
    */
-  readonly onRequest: Array<(event: SolidFetchEvent) => Promise<Response | undefined>>;
+  readonly onRequest: Array<(event: ZitadelSolidFetchEvent) => Promise<Response | undefined>>;
 }
 
 /**
@@ -173,14 +173,14 @@ function parseCookieHeader(header: string | null): Map<string, string> {
  * It copies the incoming headers and drops the hop-by-hop headers and the SDK-internal ones, so
  * a client cannot smuggle an internal channel upstream. It then sets the `x-forwarded-*` headers
  * so the server sees the real client origin. The client address comes from
- * {@link SolidFetchEvent.clientAddress}, appended to any existing `x-forwarded-for` chain.
+ * {@link ZitadelSolidFetchEvent.clientAddress}, appended to any existing `x-forwarded-for` chain.
  *
  * @param event - The current request event.
  * @param url - The parsed URL of the incoming request, the source of the host and protocol that
  *   fill `x-forwarded-host` and `x-forwarded-proto` when the request lacks them.
  * @returns The upstream request headers.
  */
-function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
+function buildUpstreamHeaders(event: ZitadelSolidFetchEvent, url: URL): Headers {
   const headers = new Headers();
   for (const [key, value] of event.request.headers) {
     const lower = key.toLowerCase();
@@ -228,10 +228,10 @@ function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
  * @throws Error when the upstream call fails or times out.
  */
 async function proxyRequest(
-  event: SolidFetchEvent,
+  event: ZitadelSolidFetchEvent,
   url: URL,
   authUrl: string,
-  route: ProxyRoute,
+  route: ZitadelProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
@@ -307,7 +307,7 @@ async function proxyRequest(
  * The options that {@link handleAuth} needs: the route policy, plus what {@link resolveSession}
  * judges the session by.
  */
-interface AuthHandlerOptions extends ResolveSessionOptions {
+interface AuthHandlerOptions extends ZitadelResolveSessionOptions {
   /**
    * The route patterns that require a signed-in session.
    */
@@ -332,7 +332,7 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  * @returns A redirect or `503` response, or `undefined` to let the request continue.
  */
 async function handleAuth(
-  event: SolidFetchEvent,
+  event: ZitadelSolidFetchEvent,
   url2: URL,
   opts: AuthHandlerOptions,
 ): Promise<Response | undefined> {
@@ -474,7 +474,7 @@ async function handleAuth(
  */
 export function createZitadelMiddleware(
   options: ZitadelMiddlewareOptions = {},
-): SolidMiddlewareConfig {
+): ZitadelSolidMiddlewareConfig {
   const {
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
@@ -501,7 +501,7 @@ export function createZitadelMiddleware(
     );
   }
 
-  const onRequest = async (event: SolidFetchEvent): Promise<Response | undefined> => {
+  const onRequest = async (event: ZitadelSolidFetchEvent): Promise<Response | undefined> => {
     const url2 = new URL(event.request.url);
     const { pathname } = url2;
 
@@ -570,9 +570,9 @@ export function createZitadelMiddleware(
  * ```
  *
  * @param event - The current SolidStart request event.
- * @returns The {@link AuthResult} for the request: the session when signed in, or a signed-out
+ * @returns The {@link ZitadelAuthResult} for the request: the session when signed in, or a signed-out
  *   result when the middleware found no valid session or did not run.
  */
-export function getAuth(event: SolidFetchEvent): AuthResult {
+export function getAuth(event: ZitadelSolidFetchEvent): ZitadelAuthResult {
   return event.locals.zitadelAuth ?? { isAuthenticated: false, session: null };
 }

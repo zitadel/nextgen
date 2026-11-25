@@ -3,11 +3,11 @@ import "server-only";
 import type { ReactNode } from "react";
 
 import type {
-  AuthResult,
-  ClientAuthResult,
-  ClientSession,
+  ZitadelAuthResult,
+  ZitadelClientAuthResult,
+  ZitadelClientSession,
   ZitadelAuthSession,
-  UnauthState,
+  ZitadelUnauthState,
 } from "./types.js";
 
 import { AuthContextProvider } from "./context.js";
@@ -15,7 +15,7 @@ import { AuthContextProvider } from "./context.js";
 /**
  * The signed-out state shared by every conversion that finds no signed-in user.
  */
-const signedOut: UnauthState = { isAuthenticated: false, session: null };
+const signedOut: ZitadelUnauthState = { isAuthenticated: false, session: null };
 
 /**
  * Converts a session to the client-safe shape by picking each field explicitly.
@@ -26,7 +26,7 @@ const signedOut: UnauthState = { isAuthenticated: false, session: null };
  * @param session - A token-bearing or client-safe session.
  * @returns A session that holds only `userId`, `identifier`, `identifierProperty` and `display`.
  */
-function toClientSession(session: ClientSession | ZitadelAuthSession): ClientSession {
+function toClientSession(session: ZitadelClientSession | ZitadelAuthSession): ZitadelClientSession {
   return {
     userId: session.userId,
     identifier: session.identifier,
@@ -42,7 +42,7 @@ function toClientSession(session: ClientSession | ZitadelAuthSession): ClientSes
  * {@link auth} directly. The client components below it then read the state with
  * {@link useAuth}, and the page needs no client-side fetch to know who is signed in on first paint.
  *
- * Run in a Server Component, it converts the input to the client-safe {@link ClientAuthResult},
+ * Run in a Server Component, it converts the input to the client-safe {@link ZitadelClientAuthResult},
  * which drops the raw session token, and only the stripped value is serialized across the
  * server-to-client boundary. Passing the full {@link auth} result straight into a
  * `"use client"` component would embed the raw token in the React Server Components flight
@@ -55,7 +55,7 @@ function toClientSession(session: ClientSession | ZitadelAuthSession): ClientSes
  * prop, token included, would serialize into the payload before this code ran. The `server-only`
  * import turns that wrapper into a build error instead of a silent leak. To seed a client-side
  * tree, for example from {@link session!getSession | getSession}, use {@link AuthContextProvider}
- * from `@zitadel/sdk-next/react`, which is typed as the token-less {@link ClientAuthResult} and strips nothing.
+ * from `@zitadel/sdk-next/react`, which is typed as the token-less {@link ZitadelClientAuthResult} and strips nothing.
  *
  * Client components therefore see only `userId`, `identifier`, `identifierProperty` and `display`.
  * The seeded state is the state at render time and does not update afterwards. On a route the
@@ -95,13 +95,18 @@ export function ZitadelProvider({
    * out. Only the client-safe fields survive the conversion: the raw token is dropped whatever
    * the input.
    */
-  session: AuthResult | ClientAuthResult | ClientSession | ZitadelAuthSession | null;
+  session:
+    | ZitadelAuthResult
+    | ZitadelClientAuthResult
+    | ZitadelClientSession
+    | ZitadelAuthSession
+    | null;
   /**
    * The subtree whose client components read the state with {@link useAuth}.
    */
   children: ReactNode;
 }) {
-  let value: ClientAuthResult;
+  let value: ZitadelClientAuthResult;
   if (!session) {
     value = signedOut;
   } else if ("isAuthenticated" in session) {

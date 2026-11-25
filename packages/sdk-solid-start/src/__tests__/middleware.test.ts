@@ -9,12 +9,12 @@ import type { createMiddleware } from "@solidjs/start/middleware";
 
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import type { AuthResult } from "@zitadel/sdk-core/middleware";
+import type { ZitadelAuthResult } from "@zitadel/sdk-core/middleware";
 import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
 
-import type { SolidFetchEvent } from "../middleware";
+import type { ZitadelSolidFetchEvent } from "../middleware";
 
 import { createZitadelMiddleware, getAuth } from "../middleware";
 
@@ -23,7 +23,7 @@ async function serve(
   init: ServeInit = {},
   options: ServeOptions = {},
 ): Promise<Served> {
-  const event: SolidFetchEvent = {
+  const event: ZitadelSolidFetchEvent = {
     request: new Request(url, { method: init.method ?? "GET", headers: init.headers }),
     locals: {},
     clientAddress: init.clientIp,
@@ -62,10 +62,10 @@ function configureProject(configured?: string, environment?: string): ServeOptio
   return { projectId: configured };
 }
 
-async function readAuth(context: unknown): Promise<AuthResult> {
+async function readAuth(context: unknown): Promise<ZitadelAuthResult> {
   return getAuth({
     request: new Request("http://localhost:3000/"),
-    locals: (context ?? {}) as SolidFetchEvent["locals"],
+    locals: (context ?? {}) as ZitadelSolidFetchEvent["locals"],
   });
 }
 

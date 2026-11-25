@@ -11,8 +11,8 @@ import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
-  type WidgetTag,
-  type WidgetName,
+  type ZitadelWidgetTag,
+  type ZitadelWidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -116,7 +116,10 @@ async function dispatchUntilForwarded(
   }
 }
 
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+function widgetIn<Tag extends ZitadelWidgetTag>(
+  root: ParentNode,
+  tag: Tag,
+): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
   if (!element) {
     throw new Error(`no <${tag}> was rendered`);
@@ -907,7 +910,7 @@ const staleOnRemoval: readonly string[] = [];
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref` signal, the way a consumer does. `update`
 // renders it again with other attributes.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
+async function mountWidget(widget: ZitadelWidgetName, attributes: Attributes) {
   const refs = {
     login: createSignal<ZitadelLoginElement | undefined>(undefined),
     logout: createSignal<ZitadelLogoutElement | undefined>(undefined),

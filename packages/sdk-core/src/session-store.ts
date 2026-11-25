@@ -1,7 +1,7 @@
 import { getZitadelConfig, type ZitadelProject } from "./config.js";
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 
-import type { ClientSession } from "./middleware.js";
+import type { ZitadelClientSession } from "./middleware.js";
 import { getSession } from "./session-read.js";
 
 /**
@@ -11,8 +11,10 @@ import { getSession } from "./session-read.js";
  * value means no answer has arrived yet. The `error` value means there is no answer because the
  * read failed or could not be made, which is unknown and never signed out: do not redirect a user
  * to the sign-in page on it.
+ *
+ * The server may add values, so handle an unknown one with a default branch.
  */
-export type SessionStatus = "loading" | "authenticated" | "unauthenticated" | "error";
+export type ZitadelSessionStatus = "loading" | "authenticated" | "unauthenticated" | "error";
 
 /**
  * Why a read gave no answer.
@@ -21,36 +23,38 @@ export type SessionStatus = "loading" | "authenticated" | "unauthenticated" | "e
  * `configureZitadel` has not run; it is a misconfiguration. The `session.read_failed` code means
  * that the server answered something other than a session or a signed-out answer, for example
  * through a misrouted proxy or an unreachable backend.
+ *
+ * The server may add codes, so handle an unknown one with a default branch.
  */
-export type SessionErrorCode = "session.no_project" | "session.read_failed";
+export type ZitadelSessionErrorCode = "session.no_project" | "session.read_failed";
 
 /**
  * A failed read, as plain data.
  *
  * It is plain data so that a framework can serialize it, for example into a server-rendered page.
  */
-export type SessionError = {
+export interface ZitadelSessionError {
   /**
    * A stable code to branch on.
    */
-  code: SessionErrorCode;
+  code: ZitadelSessionErrorCode;
   /**
    * A human-readable description of the failure.
    *
    * The text is meant for logs and can change between versions, so do not branch on it.
    */
   message: string;
-};
+}
 
 /**
  * The session as a store holds it: flat plain data, so that a framework can serialize it.
  *
  * The status and the session are the last answer that the server gave. A refresh keeps them while
- * it runs and sets {@link SessionSnapshot.isRefreshing}. A refresh that fails keeps them too and
- * reports the failure in {@link SessionSnapshot.error}, so signed-in chrome does not disappear on
+ * it runs and sets {@link ZitadelSessionSnapshot.isRefreshing}. A refresh that fails keeps them too and
+ * reports the failure in {@link ZitadelSessionSnapshot.error}, so signed-in chrome does not disappear on
  * a transient failure. The error clears on the next successful read.
  */
-export type SessionSnapshot = {
+export interface ZitadelSessionSnapshot {
   /**
    * Where the read stands.
    *
@@ -58,21 +62,21 @@ export type SessionSnapshot = {
    * and during hydration it is always `loading`, so the first client render matches the server
    * markup.
    */
-  status: SessionStatus;
+  status: ZitadelSessionStatus;
   /**
    * The client-safe identity of the signed-in user.
    *
-   * It is `null` unless {@link SessionSnapshot.status} is `authenticated`. It never carries the
+   * It is `null` unless {@link ZitadelSessionSnapshot.status} is `authenticated`. It never carries the
    * session token.
    */
-  session: ClientSession | null;
+  session: ZitadelClientSession | null;
   /**
    * Why the latest read failed.
    *
    * It is `null` when the latest read succeeded. A failed refresh sets it while the earlier answer
-   * stays in {@link SessionSnapshot.status} and {@link SessionSnapshot.session}.
+   * stays in {@link ZitadelSessionSnapshot.status} and {@link ZitadelSessionSnapshot.session}.
    */
-  error: SessionError | null;
+  error: ZitadelSessionError | null;
   /**
    * Whether a read is running while an earlier answer is shown.
    *
@@ -80,7 +84,7 @@ export type SessionSnapshot = {
    * the first read, where the status is `loading`.
    */
   isRefreshing: boolean;
-};
+}
 
 /**
  * Which session a store reads.
@@ -90,14 +94,14 @@ export type SessionSnapshot = {
  *
  * @example
  * ```ts
- * const options: SessionStoreOptions = { projectId: "296547382910273" };
+ * const options: ZitadelSessionStoreOptions = { projectId: "296547382910273" };
  * ```
  */
-export type SessionStoreOptions = {
+export interface ZitadelSessionStoreOptions {
   /**
    * The project handle that `configureZitadel` returned.
    *
-   * It wins over {@link SessionStoreOptions.projectId} and {@link SessionStoreOptions.proxyPath}.
+   * It wins over {@link ZitadelSessionStoreOptions.projectId} and {@link ZitadelSessionStoreOptions.proxyPath}.
    */
   project?: ZitadelProject;
   /**
@@ -114,31 +118,31 @@ export type SessionStoreOptions = {
    * @defaultValue The path from `configureZitadel` when it has run, else "/__nextgen".
    */
   proxyPath?: string;
-};
+}
 
 /**
  * One session read, shared by everything on the page that reads the same project through the same
  * proxy path.
  *
  * It follows the contract of an external store, so a framework SDK binds its reactivity to
- * {@link SessionStore.subscribe} and {@link SessionStore.getSnapshot}, and uses
- * {@link SessionStore.getServerSnapshot} for what a server renders and what hydration starts from.
+ * {@link ZitadelSessionStore.subscribe} and {@link ZitadelSessionStore.getSnapshot}, and uses
+ * {@link ZitadelSessionStore.getServerSnapshot} for what a server renders and what hydration starts from.
  * Sharing the read means that a header, a menu and a guard cause one request and not three.
  */
-export type SessionStore = {
+export interface ZitadelSessionStore {
   /**
    * Returns the current snapshot.
    *
    * It returns the same object until the snapshot changes, which an external-store binding needs to
    * avoid endless re-renders.
    */
-  getSnapshot: () => SessionSnapshot;
+  getSnapshot: () => ZitadelSessionSnapshot;
   /**
    * Returns the snapshot to render on a server and to hydrate from.
    *
    * It is always the `loading` snapshot, so the first client render matches the server markup.
    */
-  getServerSnapshot: () => SessionSnapshot;
+  getServerSnapshot: () => ZitadelSessionSnapshot;
   /**
    * Listens for snapshot changes and returns the function that stops listening.
    *
@@ -158,7 +162,7 @@ export type SessionStore = {
    * widget signs a user in or out, for example from the flow-complete and sign-out handlers, so
    * that the chrome of the app updates in place.
    */
-  refresh: () => Promise<SessionSnapshot>;
+  refresh: () => Promise<ZitadelSessionSnapshot>;
   /**
    * Resolves with the first snapshot that is not `loading`.
    *
@@ -166,8 +170,8 @@ export type SessionStore = {
    * rejects. On a server it resolves at once with the `loading` snapshot, so do not guard routes
    * with it during server rendering.
    */
-  settled: () => Promise<SessionSnapshot>;
-};
+  settled: () => Promise<ZitadelSessionSnapshot>;
+}
 
 /**
  * The proxy path used when neither the options nor `configureZitadel` name one.
@@ -177,7 +181,7 @@ const DEFAULT_PROXY_PATH = "/__nextgen";
 /**
  * The snapshot before any answer has arrived.
  */
-const loading: SessionSnapshot = {
+const loading: ZitadelSessionSnapshot = {
   status: "loading",
   session: null,
   error: null,
@@ -187,7 +191,7 @@ const loading: SessionSnapshot = {
 /**
  * The store that a server gets: it reads nothing, keeps no state and renders `loading`.
  */
-const serverStore: SessionStore = {
+const serverStore: ZitadelSessionStore = {
   getSnapshot: () => loading,
   getServerSnapshot: () => loading,
   subscribe: () => () => {},
@@ -199,7 +203,7 @@ const serverStore: SessionStore = {
  * The shared state of one read, kept while anything listens to it.
  */
 type Entry = {
-  snapshot: SessionSnapshot;
+  snapshot: ZitadelSessionSnapshot;
   listeners: Set<() => void>;
   /**
    * Counts reads, so an answer that a later read overtook is dropped.
@@ -208,7 +212,7 @@ type Entry = {
   /**
    * Resolves with the snapshot of the newest read.
    */
-  latest: Promise<SessionSnapshot>;
+  latest: Promise<ZitadelSessionSnapshot>;
 };
 
 /**
@@ -218,7 +222,7 @@ const entries = new Map<string, Entry>();
 /**
  * One handle per key, so a framework that runs {@link sessionStore} again gets the same one.
  */
-const stores = new Map<string, SessionStore>();
+const stores = new Map<string, ZitadelSessionStore>();
 
 /**
  * Stores a new snapshot and notifies the listeners.
@@ -226,7 +230,7 @@ const stores = new Map<string, SessionStore>();
  * @param entry - The shared read.
  * @param snapshot - The new snapshot.
  */
-function publish(entry: Entry, snapshot: SessionSnapshot): void {
+function publish(entry: Entry, snapshot: ZitadelSessionSnapshot): void {
   entry.snapshot = snapshot;
   for (const listener of entry.listeners) {
     listener();
@@ -263,7 +267,7 @@ function publish(entry: Entry, snapshot: SessionSnapshot): void {
  * unsubscribe();
  * ```
  */
-export function sessionStore(options: SessionStoreOptions = {}): SessionStore {
+export function sessionStore(options: ZitadelSessionStoreOptions = {}): ZitadelSessionStore {
   if (typeof window === "undefined") {
     return serverStore;
   }
@@ -289,11 +293,11 @@ export function sessionStore(options: SessionStoreOptions = {}): SessionStore {
  * @param proxyPath - The resolved proxy path.
  * @returns The store.
  */
-function createStore(key: string, projectId: string, proxyPath: string): SessionStore {
+function createStore(key: string, projectId: string, proxyPath: string): ZitadelSessionStore {
   /**
    * Starts a read and returns what resolves with the snapshot of the newest read.
    */
-  function read(entry: Entry): Promise<SessionSnapshot> {
+  function read(entry: Entry): Promise<ZitadelSessionSnapshot> {
     const generation = ++entry.generation;
     if (entry.snapshot.status !== "loading" && !entry.snapshot.isRefreshing) {
       publish(entry, { ...entry.snapshot, isRefreshing: true });
@@ -313,7 +317,7 @@ function createStore(key: string, projectId: string, proxyPath: string): Session
   /**
    * Returns the snapshot that one read leads to from the previous snapshot.
    */
-  async function readOnce(previous: SessionSnapshot): Promise<SessionSnapshot> {
+  async function readOnce(previous: ZitadelSessionSnapshot): Promise<ZitadelSessionSnapshot> {
     if (!projectId) {
       return failed(previous, {
         code: "session.no_project",
@@ -406,7 +410,10 @@ function createStore(key: string, projectId: string, proxyPath: string): Session
  * @param error - The failure.
  * @returns The new snapshot.
  */
-function failed(previous: SessionSnapshot, error: SessionError): SessionSnapshot {
+function failed(
+  previous: ZitadelSessionSnapshot,
+  error: ZitadelSessionError,
+): ZitadelSessionSnapshot {
   if (previous.status === "authenticated" || previous.status === "unauthenticated") {
     return { ...previous, error, isRefreshing: false };
   }

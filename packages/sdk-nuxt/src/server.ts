@@ -1,9 +1,9 @@
 export { createZitadelMiddleware, getAuth } from "./runtime/server/middleware";
 export type {
   ZitadelMiddlewareOptions,
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./runtime/types.js";

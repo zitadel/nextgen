@@ -1,6 +1,6 @@
 "use client";
 
-import type { ClientAuthResult } from "./types.js";
+import type { ZitadelClientAuthResult } from "./types.js";
 
 import { useAuthContext } from "./context.js";
 
@@ -8,7 +8,7 @@ import { useAuthContext } from "./context.js";
  * Reads the signed-in state that {@link server!ZitadelProvider | ZitadelProvider} seeded, from a
  * Client Component.
  *
- * It returns the client-safe {@link ClientAuthResult}: `userId`, `identifier`,
+ * It returns the client-safe {@link ZitadelClientAuthResult}: `userId`, `identifier`,
  * `identifierProperty` and `display`. The raw session token is stripped on the server by the
  * provider and is never available in the browser, so an upstream API call that needs the token
  * must run on the server through {@link server!auth | auth}. The shape is the same one
@@ -20,7 +20,7 @@ import { useAuthContext } from "./context.js";
  * see the session there. For chrome on such pages, read the session live with
  * {@link session!getSession | getSession} from `@zitadel/sdk-next/session` instead.
  *
- * @returns The {@link ClientAuthResult} of the nearest provider, or the signed-out state.
+ * @returns The {@link ZitadelClientAuthResult} of the nearest provider, or the signed-out state.
  *
  * @example
  * ```tsx
@@ -37,6 +37,6 @@ import { useAuthContext } from "./context.js";
  * }
  * ```
  */
-export function useAuth(): ClientAuthResult {
+export function useAuth(): ZitadelClientAuthResult {
   return useAuthContext();
 }

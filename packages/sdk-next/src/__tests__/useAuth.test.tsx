@@ -2,7 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { describe, it, expect } from "vitest";
 
-import type { AuthResult, ClientAuthResult, ZitadelAuthSession } from "../types";
+import type { ZitadelAuthResult, ZitadelClientAuthResult, ZitadelAuthSession } from "../types";
 
 // useAuth/AuthContextProvider come through the public client entry — the same
 // path consumers use. ZitadelProvider is server-only (it accepts the
@@ -12,12 +12,12 @@ import type { AuthResult, ClientAuthResult, ZitadelAuthSession } from "../types"
 import { ZitadelProvider } from "../provider";
 import { AuthContextProvider, useAuth } from "../react";
 
-function wrapper(initialSession: AuthResult) {
-  let setSessionRef: ((s: AuthResult) => void) | null = null;
+function wrapper(initialSession: ZitadelAuthResult) {
+  let setSessionRef: ((s: ZitadelAuthResult) => void) | null = null;
 
   // biome-ignore lint/correctness/noComponentHookFactories: a fixture each test builds once, so the component keeps one identity across its renders.
   function Wrapper({ children }: { children: ReactNode }) {
-    const [session, setSession] = useState<AuthResult>(initialSession);
+    const [session, setSession] = useState<ZitadelAuthResult>(initialSession);
     setSessionRef = setSession;
     return <ZitadelProvider session={session}>{children}</ZitadelProvider>;
   }
@@ -27,7 +27,7 @@ function wrapper(initialSession: AuthResult) {
 
 describe("useAuth()", () => {
   it("returns signed-out state when provider has unauthenticated session", () => {
-    const session: AuthResult = { isAuthenticated: false, session: null };
+    const session: ZitadelAuthResult = { isAuthenticated: false, session: null };
     const { Wrapper } = wrapper(session);
     const { result } = renderHook(() => useAuth(), { wrapper: Wrapper });
     expect(result.current.isAuthenticated).toBe(false);
@@ -35,7 +35,7 @@ describe("useAuth()", () => {
   });
 
   it("returns signed-in state when provider has authenticated session", () => {
-    const session: AuthResult = {
+    const session: ZitadelAuthResult = {
       isAuthenticated: true,
       session: {
         userId: "user-1",
@@ -55,7 +55,7 @@ describe("useAuth()", () => {
   });
 
   it("strips the raw token before the session reaches client state", () => {
-    const session: AuthResult = {
+    const session: ZitadelAuthResult = {
       isAuthenticated: true,
       session: {
         userId: "user-1",
@@ -83,8 +83,8 @@ describe("useAuth()", () => {
   });
 
   it("hook updates when session changes via re-render", () => {
-    const signedOut: AuthResult = { isAuthenticated: false, session: null };
-    const signedIn: AuthResult = {
+    const signedOut: ZitadelAuthResult = { isAuthenticated: false, session: null };
+    const signedIn: ZitadelAuthResult = {
       isAuthenticated: true,
       session: {
         userId: "u2",
@@ -125,7 +125,7 @@ describe("ZitadelProvider input shapes", () => {
   });
 
   it("passes an already client-safe result through unchanged", () => {
-    const clientResult: ClientAuthResult = {
+    const clientResult: ZitadelClientAuthResult = {
       isAuthenticated: true,
       session: { userId: "u3", identifier: null, identifierProperty: null, display: null },
     };
@@ -151,7 +151,7 @@ describe("ZitadelProvider input shapes", () => {
 
 describe("AuthContextProvider (client-side seeding)", () => {
   it("feeds a client-safe value straight to useAuth()", () => {
-    const seeded: ClientAuthResult = {
+    const seeded: ZitadelClientAuthResult = {
       isAuthenticated: true,
       session: { userId: "u5", identifier: "e@e.com", identifierProperty: "email", display: null },
     };

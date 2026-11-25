@@ -1,6 +1,6 @@
 import type {
-  AuthResult,
-  ProxyRoute,
+  ZitadelAuthResult,
+  ZitadelProxyRoute,
   ZitadelMiddlewareOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -34,10 +34,10 @@ const PROCESS_ENV: Record<string, string | undefined> =
  * The decision {@link handleZitadelRequest} makes for one request.
  *
  * It is either a ready-to-send `Response` (a proxied answer, a login redirect, or a refusal) or
- * an instruction to continue the request with the resolved {@link AuthResult}, which the caller
+ * an instruction to continue the request with the resolved {@link ZitadelAuthResult}, which the caller
  * attaches to the router context. Branch on `type`.
  */
-export type ZitadelRequestDecision =
+export type ZitadelRequestResult =
   | {
       /**
        * The discriminant for a request that was a call under the proxy path, forwarded to the
@@ -94,7 +94,7 @@ export type ZitadelRequestDecision =
        *
        * Attach it to the router context.
        */
-      readonly auth: AuthResult;
+      readonly auth: ZitadelAuthResult;
       /**
        * The `Set-Cookie` values the response to this request must carry.
        *
@@ -196,7 +196,7 @@ async function proxyRequest(
   request: Request,
   url: URL,
   authUrl: string,
-  route: ProxyRoute,
+  route: ZitadelProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   clientAddress: string | undefined,
@@ -299,7 +299,7 @@ function parseCookieHeader(header: string | null): Map<string, string> {
  * through with the resolved session.
  *
  * This is the framework-agnostic core that {@link createZitadelRequestMiddleware} wraps. It takes a
- * Web `Request` and returns a {@link ZitadelRequestDecision}, so the full auth contract is
+ * Web `Request` and returns a {@link ZitadelRequestResult}, so the full auth contract is
  * testable without TanStack Start, and a custom server entry can use it directly. The checks
  * run in this order:
  *
@@ -343,7 +343,7 @@ function parseCookieHeader(header: string | null): Map<string, string> {
  *
  * @param request - The incoming Web `Request`.
  * @param options - The configuration, defaulting to an empty object.
- * @returns A {@link ZitadelRequestDecision} that tells the caller what to send or do next.
+ * @returns A {@link ZitadelRequestResult} that tells the caller what to send or do next.
  * @throws Error when {@link ZitadelMiddlewareOptions.loginPath} is not a relative path starting
  *   with a single `/`, which would allow open-redirect attacks.
  *
@@ -363,7 +363,7 @@ function parseCookieHeader(header: string | null): Map<string, string> {
 export async function handleZitadelRequest(
   request: Request,
   options: ZitadelRequestOptions = {},
-): Promise<ZitadelRequestDecision> {
+): Promise<ZitadelRequestResult> {
   const {
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
@@ -491,7 +491,7 @@ export async function handleZitadelRequest(
  * touches keeps the install light and resilient to changes in TanStack's server middleware
  * API, and the shape stays structurally compatible with the real context.
  */
-export interface RequestMiddlewareContext {
+export interface ZitadelRequestMiddlewareContext {
   /**
    * The incoming Web `Request`, as TanStack Start's request middleware receives it.
    */
@@ -541,7 +541,7 @@ const CONTEXT_KEY = "zitadelAuth";
  * may be immutable), appends them, and marks it `Cache-Control: private, no-store` so no shared
  * cache keeps them. The login redirect and the cookie rules are those of
  * {@link handleZitadelRequest}. TanStack Start is not a dependency of this package, so the handler is typed
- * against {@link RequestMiddlewareContext} instead.
+ * against {@link ZitadelRequestMiddlewareContext} instead.
  *
  * Naming: TanStack Start has request middleware and function middleware, both registered in
  * start.ts, so the name says RequestMiddleware to tell the two apart. It is a factory, called
@@ -575,8 +575,8 @@ const CONTEXT_KEY = "zitadelAuth";
  */
 export function createZitadelRequestMiddleware(
   options: ZitadelRequestOptions = {},
-): (ctx: RequestMiddlewareContext) => Promise<Response> {
-  return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
+): (ctx: ZitadelRequestMiddlewareContext) => Promise<Response> {
+  return async ({ request, next }: ZitadelRequestMiddlewareContext): Promise<Response> => {
     const decision = await handleZitadelRequest(request, options);
 
     if (decision.type === "continue") {
@@ -615,7 +615,7 @@ export function createZitadelRequestMiddleware(
  * synchronous because the framework has already handed over the event.
  *
  * @param context - The context a server function handler receives, or `undefined`.
- * @returns The current {@link AuthResult}, signed out when the context carries none.
+ * @returns The current {@link ZitadelAuthResult}, signed out when the context carries none.
  *
  * @example
  * ```ts
@@ -627,6 +627,8 @@ export function createZitadelRequestMiddleware(
  * });
  * ```
  */
-export function getAuth(context: { readonly zitadelAuth?: AuthResult } | undefined): AuthResult {
+export function getAuth(
+  context: { readonly zitadelAuth?: ZitadelAuthResult } | undefined,
+): ZitadelAuthResult {
   return context?.zitadelAuth ?? { isAuthenticated: false, session: null };
 }

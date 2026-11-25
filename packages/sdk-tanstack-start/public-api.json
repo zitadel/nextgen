@@ -4,16 +4,16 @@
       "source": "src/index.ts",
       "kind": "other",
       "extras": [
-        "AuthResult",
-        "AuthState",
-        "ClientAuthResult",
-        "RequestMiddlewareContext",
-        "UnauthState",
+        "ZitadelAuthResult",
+        "ZitadelAuthState",
+        "ZitadelClientAuthResult",
+        "ZitadelRequestMiddlewareContext",
+        "ZitadelUnauthState",
         "ZitadelAuthSession",
         "ZitadelConfig",
         "ZitadelMiddlewareOptions",
         "ZitadelProject",
-        "ZitadelRequestDecision",
+        "ZitadelRequestResult",
         "ZitadelRequestOptions",
         "configureZitadel",
         "createZitadelRequestMiddleware",
@@ -35,8 +35,8 @@
         "why": "Takes the framework's own request event or context and returns the verified result that the handler stored on it. It reads and never creates, so it is called getAuth, and it is synchronous because the framework has already handed over the event."
       },
       "extras": [
-        "RequestMiddlewareContext",
-        "ZitadelRequestDecision",
+        "ZitadelRequestMiddlewareContext",
+        "ZitadelRequestResult",
         "ZitadelRequestOptions",
         "handleZitadelRequest"
       ]

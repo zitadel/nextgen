@@ -1,8 +1,8 @@
 import type {
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelMiddlewareOptions,
-  ProxyRoute,
-  ResolveSessionOptions,
+  ZitadelProxyRoute,
+  ZitadelResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 
@@ -25,7 +25,7 @@ import {
  *
  * `process` is undefined in some edge and serverless runtimes, so the environment is read
  * defensively. That way the `process.env` fallback never throws a `ReferenceError`. The Qwik
- * Router environment getter ({@link QwikRequestEvent.env}) is the primary source; this is only
+ * Router environment getter ({@link ZitadelQwikRequestEvent.env}) is the primary source; this is only
  * the fallback.
  */
 const PROCESS_ENV: Record<string, string | undefined> =
@@ -38,7 +38,7 @@ const PROCESS_ENV: Record<string, string | undefined> =
  * Router cookie object has more fields and is structurally assignable to this type, so you never
  * build one yourself.
  */
-export interface QwikCookieValue {
+export interface ZitadelQwikCookieValue {
   /**
    * The decoded value of the cookie, as sent by the browser or set earlier in the same request.
    */
@@ -55,7 +55,7 @@ export interface QwikCookieValue {
  * documents what {@link createZitadelOnRequest} writes. Only `secure` and `maxAge` vary, and
  * both come from the session verdict.
  */
-export interface QwikCookieOptions {
+export interface ZitadelQwikCookieOptions {
   /**
    * The path the cookie applies to.
    *
@@ -105,14 +105,14 @@ export interface QwikCookieOptions {
  *
  * @example
  * ```ts
- * import type { QwikRequestEvent } from "@zitadel/sdk-qwik-router/server";
+ * import type { ZitadelQwikRequestEvent } from "@zitadel/sdk-qwik-router/server";
  *
- * function clientAddress(ev: Pick<QwikRequestEvent, "clientConn">): string | undefined {
+ * function clientAddress(ev: Pick<ZitadelQwikRequestEvent, "clientConn">): string | undefined {
  *   return ev.clientConn.ip;
  * }
  * ```
  */
-export interface QwikRequestEvent {
+export interface ZitadelQwikRequestEvent {
   /**
    * The incoming request.
    *
@@ -161,21 +161,21 @@ export interface QwikRequestEvent {
      * @param name - The cookie name.
      * @returns The cookie, or `null` when the request carries none by that name.
      */
-    get(name: string): QwikCookieValue | null;
+    get(name: string): ZitadelQwikCookieValue | null;
     /**
      * Reads every cookie of the request.
      *
      * @returns The cookies keyed by name.
      */
-    getAll(): Record<string, QwikCookieValue>;
+    getAll(): Record<string, ZitadelQwikCookieValue>;
     /**
      * Sets a cookie on the outgoing response.
      *
      * @param name - The cookie name.
      * @param value - The cookie value.
-     * @param options - See {@link QwikCookieOptions}.
+     * @param options - See {@link ZitadelQwikCookieOptions}.
      */
-    set(name: string, value: string, options?: QwikCookieOptions): void;
+    set(name: string, value: string, options?: ZitadelQwikCookieOptions): void;
     /**
      * Expires a cookie on the outgoing response.
      *
@@ -272,12 +272,12 @@ function parseCookieHeader(header: string | null): Map<string, string> {
  * It copies all incoming headers, drops the hop-by-hop headers and the headers that are internal
  * to the SDK, and sets `X-Forwarded-Host` and `X-Forwarded-Proto` when they are missing, so the
  * auth server sees the real client origin. The client IP comes from
- * {@link QwikRequestEvent.clientConn} and is appended to any existing `X-Forwarded-For` chain.
+ * {@link ZitadelQwikRequestEvent.clientConn} and is appended to any existing `X-Forwarded-For` chain.
  *
  * @param ev - The current request event.
  * @returns The headers to send to the auth backend.
  */
-function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
+function buildUpstreamHeaders(ev: ZitadelQwikRequestEvent): Headers {
   const headers = new Headers();
   for (const [key, value] of ev.request.headers) {
     const lower = key.toLowerCase();
@@ -331,9 +331,9 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
  *   `proxyTimeoutMs`, and the network error of `fetch` when it is unreachable.
  */
 async function proxyResponse(
-  ev: QwikRequestEvent,
+  ev: ZitadelQwikRequestEvent,
   authUrl: string,
-  route: ProxyRoute,
+  route: ZitadelProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
@@ -406,14 +406,14 @@ async function proxyResponse(
 }
 
 /**
- * The key under which the auth result is stored on {@link QwikRequestEvent.sharedMap}.
+ * The key under which the auth result is stored on {@link ZitadelQwikRequestEvent.sharedMap}.
  */
 const SHARED_MAP_KEY = "zitadelAuth";
 
 /**
  * The route policy, plus what the shared session resolution judges the session by.
  */
-interface AuthHandlerOptions extends ResolveSessionOptions {
+interface AuthHandlerOptions extends ZitadelResolveSessionOptions {
   /**
    * The route patterns that require a signed-in session.
    */
@@ -425,7 +425,7 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 }
 
 /**
- * Judges the session and writes the auth result to {@link QwikRequestEvent.sharedMap}.
+ * Judges the session and writes the auth result to {@link ZitadelQwikRequestEvent.sharedMap}.
  *
  * It sets the session cookies the judgement asks for. On a protected route with nobody signed in
  * it throws the redirect to the login page, with the requested path in `?next=`. When the
@@ -450,7 +450,7 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  * @throws The redirect marker of `ev.redirect` for an unauthenticated visitor of a protected
  *   route.
  */
-async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promise<void> {
+async function handleAuth(ev: ZitadelQwikRequestEvent, opts: AuthHandlerOptions): Promise<void> {
   const { protectedRoutes, loginPath, ...verification } = opts;
   const { pathname } = ev.url;
 
@@ -526,7 +526,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  *
  * The backend URL, the project secret and the project id are read on every request, never once
  * when the handler is built. The order is the explicit option, then the Qwik Router environment
- * getter ({@link QwikRequestEvent.env}, where Vite loads `.env` and `.env.local`), then
+ * getter ({@link ZitadelQwikRequestEvent.env}, where Vite loads `.env` and `.env.local`), then
  * `process.env`. A factory-time read would miss `.env` files, because Qwik does not put them on
  * `process.env`, and the proxy would fall back to the default `http://localhost:8080` and fail
  * with "fetch failed". The project id resolves from the `projectId` option, then
@@ -573,7 +573,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  */
 export function createZitadelOnRequest(
   options: ZitadelMiddlewareOptions = {},
-): (ev: QwikRequestEvent) => Promise<void> {
+): (ev: ZitadelQwikRequestEvent) => Promise<void> {
   const {
     url: urlOption,
     projectId: projectIdOption,
@@ -600,7 +600,7 @@ export function createZitadelOnRequest(
     );
   }
 
-  return async (ev: QwikRequestEvent): Promise<void> => {
+  return async (ev: ZitadelQwikRequestEvent): Promise<void> => {
     const { pathname } = ev.url;
 
     // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
@@ -664,7 +664,7 @@ export function createZitadelOnRequest(
  *
  * Call it in a `routeLoader$`, a `routeAction$` or an endpoint to learn who is signed in, and
  * use it to guard client-side navigations, which the handler's `protectedRoutes` does not cover.
- * It reads from {@link QwikRequestEvent.sharedMap}, so it works only after the handler from
+ * It reads from {@link ZitadelQwikRequestEvent.sharedMap}, so it works only after the handler from
  * {@link createZitadelOnRequest} ran earlier in the same request. When no handler ran, for
  * example on a path matched by `ignoredRoutes`, it returns the unauthenticated result rather
  * than throwing. An unauthenticated result also means that the check could not decide on a
@@ -676,7 +676,7 @@ export function createZitadelOnRequest(
  * synchronous because the framework has already handed over the event.
  *
  * @param ev - The current Qwik Router request event, or any object with a `sharedMap`.
- * @returns The current {@link AuthResult}, unauthenticated with a `null` session when the
+ * @returns The current {@link ZitadelAuthResult}, unauthenticated with a `null` session when the
  *   handler stored nothing.
  * @example
  * ```ts
@@ -692,9 +692,9 @@ export function createZitadelOnRequest(
  * });
  * ```
  */
-export function getAuth(ev: { sharedMap: Map<string, unknown> }): AuthResult {
+export function getAuth(ev: { sharedMap: Map<string, unknown> }): ZitadelAuthResult {
   return (
-    (ev.sharedMap.get(SHARED_MAP_KEY) as AuthResult | undefined) ?? {
+    (ev.sharedMap.get(SHARED_MAP_KEY) as ZitadelAuthResult | undefined) ?? {
       isAuthenticated: false,
       session: null,
     }

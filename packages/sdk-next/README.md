@@ -157,7 +157,7 @@ ever ran. The `server-only` guard turns that wrapper into a build error
 instead of a silent leak. To seed the context from client-side state (e.g. a
 `getSession()` read), render `AuthContextProvider` from
 `@zitadel/sdk-next/react` — it is typed as the token-less
-`ClientAuthResult`, and it does not strip anything, so pass it a value that
+`ZitadelClientAuthResult`, and it does not strip anything, so pass it a value that
 already has no token.
 
 Then in any client component:
@@ -172,7 +172,7 @@ export function UserBadge() {
 }
 ```
 
-`useAuth()` returns the same client-safe `ClientAuthResult` shape as
+`useAuth()` returns the same client-safe `ZitadelClientAuthResult` shape as
 `getSession()` and sdk-nuxt's `useAuth()`. It reflects what the server knew
 when the page rendered — which, like `auth()`, is only a live session on
 routes the middleware `matcher` covers.
@@ -192,11 +192,11 @@ else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`; with none, it reads as signed out:
 ```tsx
 'use client';
 import { useEffect, useState } from 'react';
-import { getSession, type ClientAuthResult } from '@zitadel/sdk-next/session';
+import { getSession, type ZitadelClientAuthResult } from '@zitadel/sdk-next/session';
 
 export function HeaderNav() {
   // undefined = not yet known — render neutral chrome, not "Sign in".
-  const [auth, setAuth] = useState<ClientAuthResult>();
+  const [auth, setAuth] = useState<ZitadelClientAuthResult>();
   const [error, setError] = useState<Error>();
   useEffect(() => {
     getSession({ projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID }).then(setAuth, setError);

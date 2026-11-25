@@ -1,6 +1,6 @@
 import {
-  type SessionSnapshot,
-  type SessionStoreOptions,
+  type ZitadelSessionSnapshot,
+  type ZitadelSessionStoreOptions,
   sessionStore,
 } from "@zitadel/sdk-core/session";
 import * as React from "react";
@@ -9,10 +9,10 @@ import * as React from "react";
  * The state {@link useSession} returns: the session snapshot and a way to read it again.
  *
  * The snapshot part is flat plain data: `status`, `session`, `error` and `isRefreshing`. They are
- * documented on {@link SessionSnapshot}. The session never carries a token, because the token is
+ * documented on {@link ZitadelSessionSnapshot}. The session never carries a token, because the token is
  * an `HttpOnly` cookie that client code cannot read.
  */
-export type UseSessionResult = SessionSnapshot & {
+export type ZitadelUseSessionResult = ZitadelSessionSnapshot & {
   /**
    * Reads the session again and updates every component that uses the same project.
    *
@@ -24,7 +24,7 @@ export type UseSessionResult = SessionSnapshot & {
    *
    * @returns The snapshot of the newest read.
    */
-  refresh: () => Promise<SessionSnapshot>;
+  refresh: () => Promise<ZitadelSessionSnapshot>;
 };
 
 /**
@@ -78,12 +78,12 @@ export type UseSessionResult = SessionSnapshot & {
  *   take them. Unset values fall back to {@link configureZitadel}, and the proxy path then to
  *   `/__nextgen`. Without any project id the snapshot is an `error` with the code
  *   `session.no_project`, which is a misconfiguration and not a signed-out visitor.
- * @returns The snapshot and {@link UseSessionResult | refresh}. The session holds `userId`,
+ * @returns The snapshot and {@link ZitadelUseSessionResult | refresh}. The session holds `userId`,
  *   `identifier`, `identifierProperty` and `display`, and never a token.
  * @see {@link sessionStore}
  * @see {@link getSession}
  */
-export function useSession(options: SessionStoreOptions = {}): UseSessionResult {
+export function useSession(options: ZitadelSessionStoreOptions = {}): ZitadelUseSessionResult {
   const store = sessionStore(options);
   const snapshot = React.useSyncExternalStore(
     store.subscribe,

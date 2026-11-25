@@ -18,14 +18,18 @@
  */
 
 export { createZitadelOnRequest, getAuth } from "./server.js";
-export type { QwikRequestEvent, QwikCookieValue, QwikCookieOptions } from "./server.js";
+export type {
+  ZitadelQwikRequestEvent,
+  ZitadelQwikCookieValue,
+  ZitadelQwikCookieOptions,
+} from "./server.js";
 export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
 export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";
 export type {
   ZitadelMiddlewareOptions,
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./types.js";

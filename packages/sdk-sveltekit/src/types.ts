@@ -6,12 +6,12 @@
  */
 export type {
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  AuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelAuthResult,
   ZitadelMiddlewareOptions,
   // Client-safe auth shapes (token absent), declared once in sdk-core.
-  ClientSession,
-  ClientAuthState,
-  ClientAuthResult,
+  ZitadelClientSession,
+  ZitadelClientAuthState,
+  ZitadelClientAuthResult,
 } from "@zitadel/sdk-core/middleware";

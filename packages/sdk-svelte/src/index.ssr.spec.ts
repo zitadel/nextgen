@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
-import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
+import { type ZitadelWidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
 import {
   describeServerRenderCases,
@@ -131,7 +131,7 @@ describe("server-rendered widget options", () => {
 
 /** The attributes on the widget's element in the markup a server would send. */
 async function renderAttributes(
-  widget: WidgetName,
+  widget: ZitadelWidgetName,
   props: Readonly<Record<string, unknown>>,
 ): Promise<Record<string, string>> {
   return serverAttributes(

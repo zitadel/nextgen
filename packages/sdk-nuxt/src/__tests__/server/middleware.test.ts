@@ -10,7 +10,7 @@ import type { EventHandler, H3Event, H3EventContext } from "h3";
 import { createApp, toWebHandler } from "h3";
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import type { AuthResult } from "@zitadel/sdk-core/middleware";
+import type { ZitadelAuthResult } from "@zitadel/sdk-core/middleware";
 import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
@@ -38,7 +38,7 @@ async function serve(
   }
   app.use(createZitadelMiddleware(options));
   let continued = false;
-  let auth: AuthResult | undefined;
+  let auth: ZitadelAuthResult | undefined;
   app.use((event) => {
     continued = true;
     auth = event.context.zitadelAuth;
@@ -71,13 +71,13 @@ function configureProject(configured?: string, environment?: string): ServeOptio
   return { projectId: configured };
 }
 
-async function readAuth(context: unknown): Promise<AuthResult> {
+async function readAuth(context: unknown): Promise<ZitadelAuthResult> {
   return getAuth({ context: context ?? {} } as unknown as H3Event);
 }
 
 function expectHandlerType(): void {
   expectTypeOf(createZitadelMiddleware({ url: "http://localhost:4000" })).toExtend<EventHandler>();
-  expectTypeOf<H3EventContext["zitadelAuth"]>().toEqualTypeOf<AuthResult | undefined>();
+  expectTypeOf<H3EventContext["zitadelAuth"]>().toEqualTypeOf<ZitadelAuthResult | undefined>();
 }
 
 describeServerMiddleware({

@@ -18,7 +18,7 @@ import {
   ZITADEL_LOGIN_EVENTS,
   ZITADEL_LOGOUT_EVENTS,
   ZITADEL_SESSION_EVENTS,
-  type WidgetTag,
+  type ZitadelWidgetTag,
   type ZitadelLoginProps as ZitadelLoginWidgetProps,
   type ZitadelLogoutProps as ZitadelLogoutWidgetProps,
   type ZitadelSessionProps as ZitadelSessionWidgetProps,
@@ -51,19 +51,19 @@ export type {
 
 export { getSession, sessionStore } from "@zitadel/sdk-core/session";
 export type {
-  ClientAuthResult,
-  ClientAuthState,
-  ClientSession,
-  GetSessionOptions,
-  SessionError,
-  SessionErrorCode,
-  SessionSnapshot,
-  SessionStatus,
-  SessionStore,
-  SessionStoreOptions,
+  ZitadelClientAuthResult,
+  ZitadelClientAuthState,
+  ZitadelClientSession,
+  ZitadelGetSessionOptions,
+  ZitadelSessionError,
+  ZitadelSessionErrorCode,
+  ZitadelSessionSnapshot,
+  ZitadelSessionStatus,
+  ZitadelSessionStore,
+  ZitadelSessionStoreOptions,
 } from "@zitadel/sdk-core/session";
 export { useSession } from "./session.js";
-export type { UseSessionResult } from "./session.js";
+export type { ZitadelUseSessionResult } from "./session.js";
 
 /*
  * Re-exported so scaffolded apps can wire the business copy overlay without a
@@ -76,7 +76,7 @@ export { businessLocales } from "@zitadel/components";
  *
  * @typeParam Tag - The widget tag the class stands in for.
  */
-type ElementClass<Tag extends WidgetTag> = {
+type ElementClass<Tag extends ZitadelWidgetTag> = {
   new (): HTMLElementTagNameMap[Tag];
   prototype: HTMLElementTagNameMap[Tag];
 };
@@ -91,7 +91,7 @@ type ElementClass<Tag extends WidgetTag> = {
  * @param value - The object to check.
  * @returns Whether the object has a `name` and a `prototype`.
  */
-function isElementClass<Tag extends WidgetTag>(value: object): value is ElementClass<Tag> {
+function isElementClass<Tag extends ZitadelWidgetTag>(value: object): value is ElementClass<Tag> {
   return "name" in value && "prototype" in value;
 }
 
@@ -161,7 +161,7 @@ function eventName<Name extends keyof EventDetails>(
  * @returns A stand-in element class with a `name` and a lazily answering `prototype`.
  * @throws Error when the stand-in cannot be built as an element class.
  */
-function asAttributes<Tag extends WidgetTag>(
+function asAttributes<Tag extends ZitadelWidgetTag>(
   tag: Tag,
   ...keys: readonly string[]
 ): ElementClass<Tag> {

@@ -1,8 +1,8 @@
 import type {
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelMiddlewareOptions,
-  ProxyRoute,
-  ResolveSessionOptions,
+  ZitadelProxyRoute,
+  ZitadelResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 import type { EventHandler, H3Event } from "h3";
@@ -58,7 +58,7 @@ declare module "h3" {
      * not run, for example on an ignored route or in a handler outside its reach, so read it
      * through {@link getAuth}, which answers signed out in that case.
      */
-    zitadelAuth?: AuthResult;
+    zitadelAuth?: ZitadelAuthResult;
   }
 }
 
@@ -283,7 +283,7 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
 async function proxyRequest(
   event: H3Event,
   authUrl: string,
-  route: ProxyRoute,
+  route: ZitadelProxyRoute,
   url: URL,
   projectId: string | undefined,
   proxyTimeoutMs: number,
@@ -384,7 +384,7 @@ async function proxyRequest(
  *
  * It holds the route policy, plus what the shared {@link resolveSession} judges the session by.
  */
-interface AuthHandlerOptions extends ResolveSessionOptions {
+interface AuthHandlerOptions extends ZitadelResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
   readonly pathname: string;
@@ -459,7 +459,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
  * synchronous because the framework has already handed over the event.
  *
  * @param event - The current H3 event.
- * @returns The current {@link AuthResult}. It is signed out, with a `null` session, when the
+ * @returns The current {@link ZitadelAuthResult}. It is signed out, with a `null` session, when the
  *   middleware did not run for the request or nobody is signed in.
  *
  * @example
@@ -475,6 +475,6 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
  * });
  * ```
  */
-export function getAuth(event: H3Event): AuthResult {
+export function getAuth(event: H3Event): ZitadelAuthResult {
   return event.context.zitadelAuth ?? { isAuthenticated: false, session: null };
 }

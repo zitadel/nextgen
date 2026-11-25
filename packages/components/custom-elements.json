@@ -8870,6 +8870,26 @@
             },
             {
               "kind": "method",
+              "name": "navigateTo",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "target",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The server- or app-supplied URL to navigate to."
+                }
+              ],
+              "description": "Navigates the browser to `target` when it resolves to an `http:` or\n`https:` URL against the document base; any other scheme (`javascript:`,\n`data:`, …) is refused and reported through `zitadel-flow-error`."
+            },
+            {
+              "kind": "method",
               "name": "maybeCompleteFlow",
               "privacy": "private",
               "return": {
@@ -9918,6 +9938,33 @@
             },
             {
               "kind": "method",
+              "name": "navigateTo",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "target",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The app-supplied URL to navigate to."
+                },
+                {
+                  "name": "assign",
+                  "type": {
+                    "text": "(url: string) => void"
+                  },
+                  "description": "Performs the navigation once the scheme is allowed."
+                }
+              ],
+              "description": "Navigates the browser to `target` when it resolves to an `http:` or\n`https:` URL against the document base; any other scheme (`javascript:`,\n`data:`, …) is refused and shown as the error message in the open menu."
+            },
+            {
+              "kind": "method",
               "name": "handleSignOutClick",
               "privacy": "private",
               "return": {
@@ -10172,6 +10219,33 @@
                 }
               },
               "description": "Signs out, then optionally navigates to `postSignOutUrl`; a failure stays put."
+            },
+            {
+              "kind": "method",
+              "name": "navigateTo",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "target",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The app-supplied URL to navigate to."
+                },
+                {
+                  "name": "assign",
+                  "type": {
+                    "text": "(url: string) => void"
+                  },
+                  "description": "Performs the navigation once the scheme is allowed."
+                }
+              ],
+              "description": "Navigates the browser to `target` when it resolves to an `http:` or\n`https:` URL against the document base; any other scheme (`javascript:`,\n`data:`, …) is refused and shown as the error message."
             },
             {
               "kind": "method",

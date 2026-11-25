@@ -1,4 +1,4 @@
-import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
+import type { ZitadelStandardAttributeProps } from "@zitadel/sdk-core/types";
 import type { JSX } from "solid-js";
 
 /**
@@ -34,4 +34,6 @@ export type {
  * <ZitadelLogin project={project} class="auth-card" aria-label="Sign in" />;
  * ```
  */
-export type ZitadelWidgetAttributes = StandardAttributeProps<JSX.HTMLAttributes<HTMLElement>>;
+export type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
+  JSX.HTMLAttributes<HTMLElement>
+>;

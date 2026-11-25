@@ -1,7 +1,12 @@
 import { createApp, toWebHandler } from "h3";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import type { AuthResult, AuthState, ZitadelAuthSession, UnauthState } from "../server";
+import type {
+  ZitadelAuthResult,
+  ZitadelAuthState,
+  ZitadelAuthSession,
+  ZitadelUnauthState,
+} from "../server";
 
 import { createZitadelMiddleware, getAuth } from "../server";
 
@@ -14,9 +19,9 @@ describe("server entry", () => {
   // A server route imports its helpers and their types from one place, as it
   // does with every other server SDK.
   it("exports the types its helpers answer with", () => {
-    expectTypeOf(getAuth).returns.toEqualTypeOf<AuthResult>();
-    expectTypeOf<AuthState["session"]>().toEqualTypeOf<ZitadelAuthSession>();
-    expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
+    expectTypeOf(getAuth).returns.toEqualTypeOf<ZitadelAuthResult>();
+    expectTypeOf<ZitadelAuthState["session"]>().toEqualTypeOf<ZitadelAuthSession>();
+    expectTypeOf<ZitadelUnauthState["session"]>().toEqualTypeOf<null>();
   });
 
   // `useRuntimeConfig().zitadel.url` is "" until a value sets it, and the

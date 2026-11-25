@@ -6,7 +6,7 @@ import { joinURL } from "ufo";
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import type { AuthResult, ZitadelMiddlewareOptions } from "./types.js";
+import type { ZitadelAuthResult, ZitadelMiddlewareOptions } from "./types.js";
 
 import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
 
@@ -22,16 +22,16 @@ import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
  *
  * @example
  * ```ts
- * import { auth, type AuthOptions } from "@zitadel/sdk-next/server";
+ * import { auth, type ZitadelAuthOptions } from "@zitadel/sdk-next/server";
  *
- * const options: AuthOptions = {
+ * const options: ZitadelAuthOptions = {
  *   projectId: process.env.ZITADEL_PROJECT_ID,
  *   audience: "https://api.example.com",
  * };
  * const session = await auth(options);
  * ```
  */
-export type AuthOptions = Pick<
+export type ZitadelAuthOptions = Pick<
   ZitadelMiddlewareOptions,
   | "url"
   | "projectId"
@@ -54,7 +54,7 @@ export type AuthOptions = Pick<
  */
 const checkOpaqueSession = cache(
   (token: string, issuerUrl: string, timeoutMs: number, projectId: string) =>
-    checkOpaqueSessionToken(token, issuerUrl, timeoutMs, projectId),
+    checkOpaqueSessionToken({ token, issuerUrl, timeoutMs, projectId }),
 );
 
 /**
@@ -114,8 +114,8 @@ const checkOpaqueSession = cache(
  * need the framework's event handed to them, which is why the two names differ.
  *
  * @param options - Verification settings, which must match the middleware's; see
- *   {@link AuthOptions}.
- * @returns The current {@link AuthResult}. The `session.token` is the raw session token, for
+ *   {@link ZitadelAuthOptions}.
+ * @returns The current {@link ZitadelAuthResult}. The `session.token` is the raw session token, for
  *   calling upstream APIs from the server. Never forward it into a client component:
  *   {@link ZitadelProvider} strips it for you.
  *
@@ -132,7 +132,7 @@ const checkOpaqueSession = cache(
  * }
  * ```
  */
-export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
+export async function auth(options: ZitadelAuthOptions = {}): Promise<ZitadelAuthResult> {
   const headerStore = await headers();
   const token = headerStore.get("x-zitadel-auth-token");
 

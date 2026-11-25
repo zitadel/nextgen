@@ -9,11 +9,11 @@
  */
 export type {
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  AuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelAuthResult,
   ZitadelMiddlewareOptions,
-  ClientSession,
-  ClientAuthState,
-  ClientAuthResult,
+  ZitadelClientSession,
+  ZitadelClientAuthState,
+  ZitadelClientAuthResult,
 } from "@zitadel/sdk-core/middleware";

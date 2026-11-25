@@ -17,6 +17,8 @@ import type { ZitadelProject } from "./config.js";
  * - `reauth` asks a signed-in user to prove who they are again before a sensitive action.
  * - `link_account` links an additional sign-in method or identity provider to the user.
  *
+ * The server may add purposes, so handle an unknown one with a default branch.
+ *
  * @example
  * ```tsx
  * <ZitadelLogin project={project} purpose="register" />
@@ -39,6 +41,8 @@ export type ZitadelFlowPurpose =
  *   OpenID Connect or SAML sign-in.
  * - `show` renders the last step as a result screen, for example "registration confirmed", and
  *   leaves the page where it is.
+ *
+ * The server may add behaviors, so handle an unknown one with a default branch.
  *
  * The SDKs declare this union themselves, for the reason given at {@link ZitadelFlowPurpose}, and
  * `types.spec.ts` fails when it stops matching the API.
@@ -883,7 +887,7 @@ const STANDARD_NAMES = [
  *
  * @internal
  */
-export type StandardAttributeName =
+export type ZitadelStandardAttributeName =
   | (typeof STANDARD_NAMES)[number]
   | `data-${string}`
   | `aria-${string}`;
@@ -898,8 +902,8 @@ export type StandardAttributeName =
  *
  * @internal
  */
-export type StandardAttributes<Props extends object, Prefix extends string = ""> = {
-  [Name in keyof Props & StandardAttributeName as Name extends NativeName
+export type ZitadelStandardAttributes<Props extends object, Prefix extends string = ""> = {
+  [Name in keyof Props & ZitadelStandardAttributeName as Name extends NativeName
     ? Name
     : `${Prefix}${Name}`]?: Props[Name];
 };
@@ -914,9 +918,9 @@ export type StandardAttributes<Props extends object, Prefix extends string = "">
  *
  * @internal
  */
-export type StandardAttributeProps<Attributes extends object> = Pick<
+export type ZitadelStandardAttributeProps<Attributes extends object> = Pick<
   Attributes,
-  Extract<keyof Attributes, StandardAttributeName>
+  Extract<keyof Attributes, ZitadelStandardAttributeName>
 >;
 
 /**
@@ -930,7 +934,7 @@ export type StandardAttributeProps<Attributes extends object> = Pick<
  *
  * @internal
  */
-export function isStandardAttributeName(name: string): name is StandardAttributeName {
+export function isStandardAttributeName(name: string): name is ZitadelStandardAttributeName {
   return (
     STANDARD_NAMES.some((standard) => standard === name) ||
     (name.startsWith("data-") && name.length > "data-".length) ||
@@ -993,7 +997,7 @@ const isOmitted = (name: string, value: unknown): boolean =>
 export function standardAttributes<Props extends object, Prefix extends string = "">(
   props: Props,
   prefix?: Prefix,
-): StandardAttributes<Props, Prefix>;
+): ZitadelStandardAttributes<Props, Prefix>;
 // The one place the record is typed loosely: the overload above is the type callers get.
 export function standardAttributes(props: object, prefix = ""): Record<string, unknown> {
   const record: Record<string, unknown> = {};
@@ -1024,7 +1028,7 @@ export const widgetNames = ["login", "logout", "session"] as const;
  *
  * @internal
  */
-export type WidgetName = (typeof widgetNames)[number];
+export type ZitadelWidgetName = (typeof widgetNames)[number];
 
 /**
  * The tag names of the widget elements.
@@ -1038,11 +1042,11 @@ export const widgetTags = {
   login: "zitadel-login",
   logout: "zitadel-logout",
   session: "zitadel-session",
-} as const satisfies Record<WidgetName, `zitadel-${WidgetName}`>;
+} as const satisfies Record<ZitadelWidgetName, `zitadel-${ZitadelWidgetName}`>;
 
 /**
  * The tag name of a widget element.
  *
  * @internal
  */
-export type WidgetTag = (typeof widgetTags)[WidgetName];
+export type ZitadelWidgetTag = (typeof widgetTags)[ZitadelWidgetName];

@@ -25,9 +25,9 @@
  *
  * | Field | Purpose | Verified |
  * |-------|---------|----------|
- * | `alg` | Signing algorithm (`RS256`, `ES256`, and so on) | Checked against {@link VerifyJwtOptions.allowedAlgorithms} before the JWKS is fetched; `none` is always rejected |
+ * | `alg` | Signing algorithm (`RS256`, `ES256`, and so on) | Checked against {@link ZitadelVerifyJwtOptions.allowedAlgorithms} before the JWKS is fetched; `none` is always rejected |
  * | `kid` | Key id, which selects the public key from the JWKS | Used for the key lookup; the first key of the JWKS is used when absent |
- * | `typ` | Token type (`JWT`, `at+JWT`) | Checked against {@link VerifyJwtOptions.allowedTokenTypes}, case-insensitively |
+ * | `typ` | Token type (`JWT`, `at+JWT`) | Checked against {@link ZitadelVerifyJwtOptions.allowedTokenTypes}, case-insensitively |
  * | `enc` | Encryption algorithm, present in encrypted (JWE) tokens only | Not applicable: only signed (JWS) tokens are verified |
  * | `cty` | Content type of the secured content | Not applicable: standard OIDC and OAuth servers do not set it |
  *
@@ -37,11 +37,11 @@
  *
  * | Claim | Purpose | How |
  * |-------|---------|-----|
- * | `iss` | Issuer, the URL of the auth server that issued the token | Must be present and equal {@link VerifyJwtOptions.issuerUrl} |
- * | `exp` | Expiration time, a Unix timestamp | Must be present and in the future, with {@link VerifyJwtOptions.clockSkewMs} tolerance |
- * | `nbf` | Not before, a Unix timestamp | Must be in the past, with {@link VerifyJwtOptions.clockSkewMs} tolerance |
- * | `iat` | Issued at, a Unix timestamp | Must not be in the future beyond {@link VerifyJwtOptions.clockSkewMs} |
- * | `aud` | Audience, the intended recipients | Checked against {@link VerifyJwtOptions.audience} when that option is set |
+ * | `iss` | Issuer, the URL of the auth server that issued the token | Must be present and equal {@link ZitadelVerifyJwtOptions.issuerUrl} |
+ * | `exp` | Expiration time, a Unix timestamp | Must be present and in the future, with {@link ZitadelVerifyJwtOptions.clockSkewMs} tolerance |
+ * | `nbf` | Not before, a Unix timestamp | Must be in the past, with {@link ZitadelVerifyJwtOptions.clockSkewMs} tolerance |
+ * | `iat` | Issued at, a Unix timestamp | Must not be in the future beyond {@link ZitadelVerifyJwtOptions.clockSkewMs} |
+ * | `aud` | Audience, the intended recipients | Checked against {@link ZitadelVerifyJwtOptions.audience} when that option is set |
  *
  * The claims that are read and not validated: `sub` (the user id), `email` and `name`.
  *
@@ -113,7 +113,7 @@ export const JWKS_MIN_REFRESH_MS = 30 * 1_000;
  * const userId = payload?.sub;
  * ```
  */
-export interface JwtPayload {
+export interface ZitadelJwtPayload {
   /**
    * The issuer (`iss`), which identifies the auth server that created the token.
    *
@@ -167,7 +167,7 @@ export interface JwtPayload {
  * The three fields below are the only ones that this module reads. Other header parameters are
  * preserved under the index signature.
  */
-export interface JwtHeader {
+export interface ZitadelJwtHeader {
   /**
    * The signing algorithm (`alg`), for example `"RS256"` or `"ES256"`.
    *
@@ -196,17 +196,17 @@ export interface JwtHeader {
  * Do not act on these values before signature verification: anyone can craft a token with any
  * claims. {@link decodeJwt} returns this type only to carry the raw data into the next step.
  */
-export interface DecodedJwt {
+export interface ZitadelDecodedJwt {
   /**
    * The protected header: the algorithm, the key id and the token type that the token claims.
    */
-  readonly header: JwtHeader;
+  readonly header: ZitadelJwtHeader;
   /**
    * The claims.
    *
    * They are unverified, so never trust them until {@link verifyJwt} accepts the token.
    */
-  readonly payload: JwtPayload;
+  readonly payload: ZitadelJwtPayload;
 }
 
 /**
@@ -243,7 +243,7 @@ interface JwksCacheEntry {
  *
  * @example
  * ```ts
- * const options: VerifyJwtOptions = {
+ * const options: ZitadelVerifyJwtOptions = {
  *   issuerUrl: "https://auth.example.com",
  *   allowedAlgorithms: ["RS256", "ES256"],
  *   clockSkewMs: 5000,
@@ -251,7 +251,7 @@ interface JwksCacheEntry {
  * };
  * ```
  */
-export interface VerifyJwtOptions {
+export interface ZitadelVerifyJwtOptions {
   /**
    * The base URL of the auth backend.
    *
@@ -438,7 +438,7 @@ function splitToken(token: string): readonly [string, string, string] | null {
  * console.log(header.kid);
  * ```
  */
-export function decodeJwt(token: string): DecodedJwt {
+export function decodeJwt(token: string): ZitadelDecodedJwt {
   const segments = splitToken(token);
   if (!segments) {
     throw new TypeError(
@@ -447,8 +447,8 @@ export function decodeJwt(token: string): DecodedJwt {
   }
   const [h, p] = segments;
   return {
-    header: JSON.parse(DECODER.decode(base64UrlDecode(h))) as JwtHeader,
-    payload: JSON.parse(DECODER.decode(base64UrlDecode(p))) as JwtPayload,
+    header: JSON.parse(DECODER.decode(base64UrlDecode(h))) as ZitadelJwtHeader,
+    payload: JSON.parse(DECODER.decode(base64UrlDecode(p))) as ZitadelJwtPayload,
   };
 }
 
@@ -722,13 +722,13 @@ async function resolveJwk(
  * 1. Split the token. It returns `null` at once when fewer than three dot-separated segments are
  *    present.
  * 2. Reject the token when `alg` is missing, is `none` in any casing, or is not in
- *    {@link VerifyJwtOptions.allowedAlgorithms} when that list is set.
- * 3. Reject the token when `typ` is not in {@link VerifyJwtOptions.allowedTokenTypes} when that
+ *    {@link ZitadelVerifyJwtOptions.allowedAlgorithms} when that list is set.
+ * 3. Reject the token when `typ` is not in {@link ZitadelVerifyJwtOptions.allowedTokenTypes} when that
  *    list is not empty.
  * 4. Fetch the matching public key from the JWKS endpoint, or take it from the cache.
  * 5. Verify the signature over `header.payload`.
- * 6. Reject the token when `iss` is absent or does not equal {@link VerifyJwtOptions.issuerUrl}.
- * 7. Reject the token when {@link VerifyJwtOptions.audience} is set and `aud` contains none of
+ * 6. Reject the token when `iss` is absent or does not equal {@link ZitadelVerifyJwtOptions.issuerUrl}.
+ * 7. Reject the token when {@link ZitadelVerifyJwtOptions.audience} is set and `aud` contains none of
  *    its values.
  * 8. Reject the token when `exp` is absent or in the past, allowing the clock skew.
  * 9. Reject the token when `nbf` is in the future, allowing the clock skew.
@@ -758,7 +758,10 @@ async function resolveJwk(
  * }
  * ```
  */
-export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<JwtPayload | null> {
+export async function verifyJwt(
+  token: string,
+  opts: ZitadelVerifyJwtOptions,
+): Promise<ZitadelJwtPayload | null> {
   try {
     const {
       issuerUrl,
@@ -775,8 +778,8 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     }
     const [rawHeader, rawPayload, rawSig] = segments;
 
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(rawHeader))) as JwtHeader;
-    const payload = JSON.parse(DECODER.decode(base64UrlDecode(rawPayload))) as JwtPayload;
+    const header = JSON.parse(DECODER.decode(base64UrlDecode(rawHeader))) as ZitadelJwtHeader;
+    const payload = JSON.parse(DECODER.decode(base64UrlDecode(rawPayload))) as ZitadelJwtPayload;
 
     // RFC 7515 §4.1.1 requires 'alg' in the JWT header. A token that omits it
     // is structurally invalid — we reject it rather than guessing an algorithm.

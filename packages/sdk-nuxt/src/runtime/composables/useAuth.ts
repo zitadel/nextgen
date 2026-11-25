@@ -1,6 +1,6 @@
 import { useState } from "#imports";
 
-import type { ClientAuthResult } from "../types";
+import type { ZitadelClientAuthResult } from "../types";
 
 /**
  * Returns the current auth state in a Nuxt page or component.
@@ -14,11 +14,11 @@ import type { ClientAuthResult } from "../types";
  * the middleware did not run for the request, for example on an ignored route, the state reads
  * as signed out.
  *
- * The returned {@link ClientAuthResult} omits the raw token on purpose. The token would otherwise
+ * The returned {@link ZitadelClientAuthResult} omits the raw token on purpose. The token would otherwise
  * be serialized into the server-rendered payload, where scripts on the page could read it. Use
  * `getAuth` in a server route or middleware when the token is needed to call an upstream API.
  *
- * @returns The current {@link ClientAuthResult}. It is signed out, with a `null` session, when
+ * @returns The current {@link ZitadelClientAuthResult}. It is signed out, with a `null` session, when
  *   nobody is signed in.
  *
  * @example
@@ -33,8 +33,8 @@ import type { ClientAuthResult } from "../types";
  * </template>
  * ```
  */
-export const useAuth = (): ClientAuthResult =>
-  useState<ClientAuthResult>("zitadel-auth", () => ({
+export const useAuth = (): ZitadelClientAuthResult =>
+  useState<ZitadelClientAuthResult>("zitadel-auth", () => ({
     isAuthenticated: false,
     session: null,
   })).value;

@@ -1,5 +1,5 @@
 import type {
-  StandardAttributeProps,
+  ZitadelStandardAttributeProps,
   ZitadelLoginProps as CoreLoginProps,
   ZitadelLogoutProps as CoreLogoutProps,
   ZitadelSessionProps as CoreSessionProps,
@@ -56,7 +56,7 @@ export type ZitadelSessionProps = CoreSessionProps & ZitadelWidgetAttributes;
  * breaks Vue's own overloads. A template accepts a `data-*` attribute anyway, except under
  * `strictTemplates`, which rejects it.
  */
-export type ZitadelWidgetAttributes = StandardAttributeProps<
+export type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
   Omit<HTMLAttributes, "class" | "style"> & {
     /**
      * The name of the slot of a parent custom element that the widget element is assigned to.

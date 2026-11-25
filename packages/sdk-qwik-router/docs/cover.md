@@ -7,7 +7,7 @@ The server half of the Zitadel SDK for Qwik 2 apps. It is a single Qwik Router `
 - {@link index.createZitadelOnRequest | createZitadelOnRequest} builds the `onRequest` handler you export from a root plugin such as `src/routes/plugin@zitadel.ts`. Use it once per app; it proxies, verifies and guards in one pass.
 - {@link index.getAuth | getAuth} reads the auth result the handler left on the request. Call it in a `routeLoader$`, `routeAction$` or endpoint to learn who is signed in.
 - {@link index.configureZitadel | configureZitadel}, {@link index.getApi | getApi} and {@link index.getZitadelConfig | getZitadelConfig} configure and read the project the SDK talks to. They are re-exported so an app that depends only on this package needs no other import for them.
-- {@link index.QwikRequestEvent | QwikRequestEvent} is the slice of Qwik Router's `RequestEvent` the handler reads. You do not build one; it is documented so you can see exactly which fields the handler depends on.
+- {@link index.ZitadelQwikRequestEvent | ZitadelQwikRequestEvent} is the slice of Qwik Router's `RequestEvent` the handler reads. You do not build one; it is documented so you can see exactly which fields the handler depends on.
 
 ## How it works
 

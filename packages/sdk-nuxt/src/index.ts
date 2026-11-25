@@ -15,9 +15,9 @@ export { useZitadelProject } from "./runtime/composables/useZitadelProject.js";
 export type { ZitadelProject } from "@zitadel/sdk-core/config";
 export type {
   ZitadelMiddlewareOptions,
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./runtime/types.js";

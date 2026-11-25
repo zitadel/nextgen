@@ -1,4 +1,4 @@
-import { type WidgetName, widgetNames } from "@zitadel/sdk-core/types";
+import { type ZitadelWidgetName, widgetNames } from "@zitadel/sdk-core/types";
 
 import { describe, expect, it } from "vitest";
 
@@ -7,7 +7,7 @@ export type Sdk = "react" | "vue" | "angular" | "svelte" | "solid" | "qwik";
 
 /** The attributes on the widget's element in the markup a server would send. */
 export type RenderAttributes = (
-  widget: WidgetName,
+  widget: ZitadelWidgetName,
   props: Readonly<Record<string, unknown>>,
 ) => Promise<Record<string, string>>;
 

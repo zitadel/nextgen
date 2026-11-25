@@ -22,9 +22,8 @@ import {
   serializeSessionCookie,
   serverSessionCookieName,
   sessionCookieName,
-  validateOpaqueSessionToken,
-  type ProxiedRequest,
-  type ResolveSessionOptions,
+  type ZitadelProxiedRequest,
+  type ZitadelResolveSessionOptions,
 } from "./middleware.js";
 
 /** The upstream response headers for one proxied call. */
@@ -531,7 +530,14 @@ describe("opaque session tokens", () => {
         }),
       );
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "live",
         session: {
           userId: "u1",
@@ -546,7 +552,12 @@ describe("opaque session tokens", () => {
     it("asks the backend for the session the cookie names, in this app's project", async () => {
       const fetchMock = backend(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
-      await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(fetchMock).toHaveBeenCalledWith(
         "http://auth.test/api/v1/sessions/me?project_id=proj_app",
@@ -557,7 +568,12 @@ describe("opaque session tokens", () => {
     it("asks the backend at an address given with a trailing slash", async () => {
       const fetchMock = backend(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
-      await checkOpaqueSessionToken("tok", "http://auth.test/", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test/",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(fetchMock).toHaveBeenCalledWith(
         "http://auth.test/api/v1/sessions/me?project_id=proj_app",
@@ -572,7 +588,12 @@ describe("opaque session tokens", () => {
         backend(Response.json(body));
 
         expect(
-          await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT),
+          await checkOpaqueSessionToken({
+            token: "tok",
+            issuerUrl: "http://auth.test",
+            timeoutMs: 1000,
+            projectId: PROJECT,
+          }),
         ).toMatchObject({ verdict: "live", session: { userId: null } });
       },
     );
@@ -588,7 +609,14 @@ describe("opaque session tokens", () => {
     ])("reports a session of another project, when %s, as live with no user", async (_l, res) => {
       backend(res);
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "live",
         session: {
           userId: null,
@@ -604,7 +632,14 @@ describe("opaque session tokens", () => {
     it("reports no user, without asking the backend, when no project is configured", async () => {
       const fetchMock = backend(Response.json({ user_id: "u1" }));
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, "")).toMatchObject({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: "",
+        }),
+      ).toMatchObject({
         verdict: "live",
         session: { userId: null },
       });
@@ -623,7 +658,14 @@ describe("opaque session tokens", () => {
     ])("reports the cookie as refused for %s", async (_label, response) => {
       backend(response);
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "refused",
       });
       expect(warn).not.toHaveBeenCalled();
@@ -643,7 +685,14 @@ describe("opaque session tokens", () => {
     ])("gives no verdict for %s", async (_label, response) => {
       backend(response);
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "undecided",
       });
     });
@@ -651,7 +700,14 @@ describe("opaque session tokens", () => {
     it("gives no verdict when the backend does not answer in time", async () => {
       silentBackend();
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 10, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 10,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "undecided",
       });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("no answer within 10 ms"));
@@ -662,7 +718,12 @@ describe("opaque session tokens", () => {
         new TypeError("fetch failed", { cause: new Error("connect ECONNREFUSED 127.0.0.1:4000") }),
       );
 
-      await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -674,7 +735,14 @@ describe("opaque session tokens", () => {
     it("says a backend without the operation is older than the SDK", async () => {
       backend(Response.json({ code: "req.not_found" }, { status: 404 }));
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "undecided",
       });
       expect(warn).toHaveBeenCalledWith(
@@ -686,7 +754,12 @@ describe("opaque session tokens", () => {
       const fetchMock = vi.fn(async () => Response.json({ project_id: PROJECT, user_id: "u1" }));
       vi.stubGlobal("fetch", fetchMock);
 
-      await checkOpaqueSessionToken("tok", "http://auth.test/api/v1/", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test/api/v1/",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(fetchMock).toHaveBeenCalledWith(
         `http://auth.test/api/v1/sessions/me?project_id=${PROJECT}`,
@@ -697,7 +770,12 @@ describe("opaque session tokens", () => {
     it("logs the status of an answer that is no verdict", async () => {
       backend(new Response(null, { status: 502 }));
 
-      await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("(HTTP 502)"));
     });
@@ -710,8 +788,18 @@ describe("opaque session tokens", () => {
       );
       vi.stubGlobal("fetch", fetchMock);
 
-      await checkOpaqueSessionToken("console", "http://auth.test", 1000, PROJECT);
-      const again = await checkOpaqueSessionToken("console", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "console",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
+      const again = await checkOpaqueSessionToken({
+        token: "console",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(again).toMatchObject({ verdict: "live", session: { userId: null } });
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -721,41 +809,20 @@ describe("opaque session tokens", () => {
       const fetchMock = vi.fn(async () => Response.json({ project_id: PROJECT }));
       vi.stubGlobal("fetch", fetchMock);
 
-      await checkOpaqueSessionToken("anon", "http://auth.test", 1000, PROJECT);
-      await checkOpaqueSessionToken("anon", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "anon",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
+      await checkOpaqueSessionToken({
+        token: "anon",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("validateOpaqueSessionToken", () => {
-    it("returns the user of a live session", async () => {
-      backend(Response.json({ project_id: PROJECT, user_id: "u1", user: { identifier: "a@b.c" } }));
-
-      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
-        userId: "u1",
-        identifier: "a@b.c",
-        identifierProperty: null,
-        display: null,
-        expiresAt: null,
-      });
-    });
-
-    it("returns no user for a session of another project", async () => {
-      backend(Response.json({ code: "sess.project_mismatch" }, { status: 403 }));
-
-      expect(
-        await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT),
-      ).toMatchObject({ userId: null });
-    });
-
-    it.each([
-      ["a refusal", new Response(null, { status: 401 })],
-      ["no verdict", new Response(null, { status: 500 })],
-    ])("reports no live session for %s", async (_label, response) => {
-      backend(response);
-
-      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toBeNull();
     });
   });
 });
@@ -778,32 +845,38 @@ describe("jwtNamesProject", () => {
 
 describe("sessionCookieName", () => {
   it("appends the project id to the server's name where the cookie is Secure", () => {
-    expect(sessionCookieName("proj_01K7ZD3E", true)).toBe("__Host-zitadel_session_proj_01K7ZD3E");
-  });
-
-  it("appends the project id to the server's loopback name over loopback http", () => {
-    expect(sessionCookieName("proj_01K7ZD3E", false)).toBe("zitadel_session_proj_01K7ZD3E");
-  });
-
-  it("keeps the hyphens of a UUID", () => {
-    expect(sessionCookieName("proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f", true)).toBe(
-      "__Host-zitadel_session_proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f",
+    expect(sessionCookieName({ projectId: "proj_01K7ZD3E", secure: true })).toBe(
+      "__Host-zitadel_session_proj_01K7ZD3E",
     );
   });
 
+  it("appends the project id to the server's loopback name over loopback http", () => {
+    expect(sessionCookieName({ projectId: "proj_01K7ZD3E", secure: false })).toBe(
+      "zitadel_session_proj_01K7ZD3E",
+    );
+  });
+
+  it("keeps the hyphens of a UUID", () => {
+    expect(
+      sessionCookieName({ projectId: "proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f", secure: true }),
+    ).toBe("__Host-zitadel_session_proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f");
+  });
+
   it("percent-encodes what a cookie name cannot hold", () => {
-    expect(sessionCookieName("a b;c=ü", false)).toBe("zitadel_session_a%20b%3Bc%3D%C3%BC");
+    expect(sessionCookieName({ projectId: "a b;c=ü", secure: false })).toBe(
+      "zitadel_session_a%20b%3Bc%3D%C3%BC",
+    );
   });
 });
 
 describe("serverSessionCookieName", () => {
   it("is the canonical name where the cookie is Secure", () => {
-    expect(serverSessionCookieName(true)).toBe("__Host-zitadel_session");
-    expect(serverSessionCookieName(true)).toBe(SERVER_SESSION_COOKIE);
+    expect(serverSessionCookieName({ secure: true })).toBe("__Host-zitadel_session");
+    expect(serverSessionCookieName({ secure: true })).toBe(SERVER_SESSION_COOKIE);
   });
 
   it("drops the prefix over loopback http", () => {
-    expect(serverSessionCookieName(false)).toBe("zitadel_session");
+    expect(serverSessionCookieName({ secure: false })).toBe("zitadel_session");
   });
 });
 
@@ -837,7 +910,7 @@ describe("proxySessionCookies", () => {
   const UPSTREAM = { url: "http://auth.test", timeoutMs: 1000 };
   const HTTPS_APP = "https://app.example.com/__nextgen/flows";
 
-  function proxied(overrides: Partial<ProxiedRequest> = {}): ProxiedRequest {
+  function proxied(overrides: Partial<ZitadelProxiedRequest> = {}): ZitadelProxiedRequest {
     return {
       method: "GET",
       path: "/flows",
@@ -1484,7 +1557,7 @@ describe("resolveSession", () => {
   const OWN_HTTPS = "__Host-zitadel_session_proj_app";
   /** The server's session cookie on a loopback host, where the Console keeps its own. */
   const SHARED = "zitadel_session";
-  const OPTIONS: ResolveSessionOptions = {
+  const OPTIONS: ZitadelResolveSessionOptions = {
     url: "http://auth.test",
     projectId: PROJECT,
     allowedAlgorithms: ["RS256"],

@@ -10,15 +10,15 @@
  */
 export { handleZitadelRequest, createZitadelRequestMiddleware, getAuth } from "./middleware";
 export type {
-  ZitadelRequestDecision,
+  ZitadelRequestResult,
   ZitadelRequestOptions,
-  RequestMiddlewareContext,
+  ZitadelRequestMiddlewareContext,
 } from "./middleware";
 export type {
   ZitadelMiddlewareOptions,
-  AuthResult,
+  ZitadelAuthResult,
   ZitadelAuthSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./types.js";

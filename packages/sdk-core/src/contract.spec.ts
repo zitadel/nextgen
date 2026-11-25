@@ -888,10 +888,10 @@ describe("SDK public API ↔ the standard", () => {
   const SERVER_TYPES = [
     "ZitadelMiddlewareOptions",
     "ZitadelAuthSession",
-    "AuthResult",
-    "AuthState",
-    "UnauthState",
-    "ClientAuthResult",
+    "ZitadelAuthResult",
+    "ZitadelAuthState",
+    "ZitadelUnauthState",
+    "ZitadelClientAuthResult",
   ];
 
   /** The names an entry must export, from its kind (ADR 090). */

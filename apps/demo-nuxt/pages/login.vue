@@ -23,10 +23,10 @@
 </template>
 
 <script setup lang="ts">
-import type { ClientAuthResult } from "@zitadel/sdk-nuxt";
+import type { ZitadelClientAuthResult } from "@zitadel/sdk-nuxt";
 import { useZitadelProject } from "@zitadel/sdk-nuxt";
 
-const auth = useState<ClientAuthResult>("zitadel-auth");
+const auth = useState<ZitadelClientAuthResult>("zitadel-auth");
 if (auth.value?.isAuthenticated) {
   await navigateTo("/admin");
 }
