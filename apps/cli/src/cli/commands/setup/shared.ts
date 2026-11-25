@@ -54,7 +54,6 @@ import { LocalRuntime, type LocalMachine, type ResolvedServer, ZitadelRuntime } 
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { tryCatch } from "@/lib/try-catch";
 import type { Questions, Spinner, Step, Ui } from "@/lib/ui";
 import {
   CONFIG_DIRECTORIES,
@@ -1341,17 +1340,21 @@ export function retryOptionsFromFlags(
     ssoScopes?: string;
   }>,
 ): SetupRetryOptions {
-  const [, selection] = tryCatch(() => {
-    if (flags.sso === undefined) {
-      return undefined;
-    }
-    return selectionFromFlags(
-      flags.sso,
-      customFlagValues(flags, SETUP_FLAG_KEYS),
-      SETUP_FLAG_NAMES,
-      "",
-    );
-  });
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let selection: ReturnType<typeof selectionFromFlags> | undefined;
+  try {
+    selection =
+      flags.sso === undefined
+        ? undefined
+        : selectionFromFlags(
+            flags.sso,
+            customFlagValues(flags, SETUP_FLAG_KEYS),
+            SETUP_FLAG_NAMES,
+            "",
+          );
+  } catch {
+    selection = undefined;
+  }
   return {
     ssoTyped:
       selection === undefined &&

@@ -358,19 +358,14 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
       declared: manifest.dependencies,
       scripts: new Set(Object.keys(manifest.scripts)),
     });
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let planned: Awaited<ReturnType<FileWriter["scaffold"]>>;
     try {
-      const planned = await new FileWriter({
+      planned = await new FileWriter({
         cwd: this.cwd,
         dryRun: true,
         force: this.force,
       }).scaffold(plan);
-
-      return {
-        framework,
-        manifest,
-        plan,
-        planned,
-      };
     } catch (error) {
       if (error instanceof OrcaPatchFileOverwriteError) {
         throw refusalError(FILE_OVERWRITE_REFUSAL, {
@@ -380,6 +375,13 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
       }
       throw error;
     }
+
+    return {
+      framework,
+      manifest,
+      plan,
+      planned,
+    };
   }
 
   /** A package manager command as the reader runs it, from the shell's directory. */

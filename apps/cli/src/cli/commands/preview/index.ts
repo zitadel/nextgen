@@ -359,52 +359,16 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, publisher } = await this.connected(flags);
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let prepared: Awaited<ReturnType<Publisher["prepare"]>>;
     try {
-      const prepared = await publisher.prepare({
+      prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "preview",
         dryRun: true,
         compare: false,
       });
-      for (const warning of prepared.warnings) {
-        warnings.report(warning);
-      }
-      this.narrate(prepared.notices);
-
-      const dryRun = dryRunResult({
-        verb: "deploy",
-        topic: "preview",
-        noun: `the preview to ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"}`,
-        next: this.suggest({
-          id: "preview",
-          flags: {
-            origin: [...urls],
-            ttl: flags.ttl?.canonical,
-            message: flags.message,
-            strict: flags.strict,
-          },
-        }),
-      });
-
-      return {
-        ...dryRun,
-        pretty: prose(
-          [
-            dryRun.summary.title,
-            ...urls.map((url) => {
-              return `  - ${url}`;
-            }),
-          ].join("\n"),
-        ),
-        data: { ...(dryRun.data as object), targets: urls },
-        summary: {
-          ...dryRun.summary,
-          lines: urls.map((url) => {
-            return `  - ${escapeControlCharacters(url)}`;
-          }),
-        },
-      };
     } catch (error) {
       if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
         throw refusalError(
@@ -556,6 +520,44 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       }
       throw error;
     }
+    for (const warning of prepared.warnings) {
+      warnings.report(warning);
+    }
+    this.narrate(prepared.notices);
+
+    const dryRun = dryRunResult({
+      verb: "deploy",
+      topic: "preview",
+      noun: `the preview to ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"}`,
+      next: this.suggest({
+        id: "preview",
+        flags: {
+          origin: [...urls],
+          ttl: flags.ttl?.canonical,
+          message: flags.message,
+          strict: flags.strict,
+        },
+      }),
+    });
+
+    return {
+      ...dryRun,
+      pretty: prose(
+        [
+          dryRun.summary.title,
+          ...urls.map((url) => {
+            return `  - ${url}`;
+          }),
+        ].join("\n"),
+      ),
+      data: { ...(dryRun.data as object), targets: urls },
+      summary: {
+        ...dryRun.summary,
+        lines: urls.map((url) => {
+          return `  - ${escapeControlCharacters(url)}`;
+        }),
+      },
+    };
   }
 
   /**
@@ -577,81 +579,16 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, client, projectId, publisher } = await this.connected(flags);
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let prepared: Awaited<ReturnType<Publisher["prepare"]>>;
     try {
-      const prepared = await publisher.prepare({
+      prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "preview",
         dryRun: false,
         compare: false,
       });
-      for (const warning of prepared.warnings) {
-        warnings.report(warning);
-      }
-      this.narrate(prepared.notices);
-
-      const message = await deployMessage(flags.message, this.cwd, this.env);
-      const { release, deployment } = await publisher.preview({
-        prepared,
-        message,
-        urls,
-        ...(flags.ttl === undefined
-          ? {}
-          : {
-              ttl: flags.ttl.iso,
-            }),
-      });
-
-      const expiries = await PreviewExpiries.of(client, projectId).live(
-        deployment.targets.map((target) => {
-          return target.origin;
-        }),
-      );
-      const previews = deployment.targets.map((target) => {
-        return {
-          url: target.origin,
-          expires_at: expiries.get(target.origin) ?? null,
-        };
-      });
-
-      const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
-
-      const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
-
-      return {
-        status: "ok",
-        data: {
-          title,
-          release_id: release.id,
-          content_hash: release.content_hash,
-          deployment_id: deployment.id,
-          previews,
-          release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
-        },
-        pretty: prose(
-          [
-            `Previewed ${release.content_hash} on ${previewUrls}`,
-            ...previews.map((preview) => {
-              return preview.expires_at === null
-                ? `  - ${preview.url}`
-                : `  - ${preview.url} (until ${preview.expires_at})`;
-            }),
-            `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
-          ].join("\n"),
-        ),
-        summary: {
-          title,
-          sections: [],
-          lines: [
-            ...previews.map((preview) => {
-              return preview.expires_at === null
-                ? `  - ${escapeControlCharacters(preview.url)}`
-                : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
-            }),
-            `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
-          ],
-        },
-      };
     } catch (error) {
       if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
         throw refusalError(
@@ -803,6 +740,73 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       }
       throw error;
     }
+    for (const warning of prepared.warnings) {
+      warnings.report(warning);
+    }
+    this.narrate(prepared.notices);
+
+    const message = await deployMessage(flags.message, this.cwd, this.env);
+    const { release, deployment } = await publisher.preview({
+      prepared,
+      message,
+      urls,
+      ...(flags.ttl === undefined
+        ? {}
+        : {
+            ttl: flags.ttl.iso,
+          }),
+    });
+
+    const expiries = await PreviewExpiries.of(client, projectId).live(
+      deployment.targets.map((target) => {
+        return target.origin;
+      }),
+    );
+    const previews = deployment.targets.map((target) => {
+      return {
+        url: target.origin,
+        expires_at: expiries.get(target.origin) ?? null,
+      };
+    });
+
+    const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
+
+    const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
+
+    return {
+      status: "ok",
+      data: {
+        title,
+        release_id: release.id,
+        content_hash: release.content_hash,
+        deployment_id: deployment.id,
+        previews,
+        release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+      },
+      pretty: prose(
+        [
+          `Previewed ${release.content_hash} on ${previewUrls}`,
+          ...previews.map((preview) => {
+            return preview.expires_at === null
+              ? `  - ${preview.url}`
+              : `  - ${preview.url} (until ${preview.expires_at})`;
+          }),
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+        ].join("\n"),
+      ),
+      summary: {
+        title,
+        sections: [],
+        lines: [
+          ...previews.map((preview) => {
+            return preview.expires_at === null
+              ? `  - ${escapeControlCharacters(preview.url)}`
+              : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
+          }),
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
+        ],
+      },
+    };
   }
 
   /**

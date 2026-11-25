@@ -69,54 +69,16 @@ export async function loadPatchContext(
   orca: Orca,
   cliVersion: string,
 ): Promise<PatchContext> {
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let config: Awaited<ReturnType<ReturnType<typeof Project.at>["config"]>>;
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let secret: Awaited<ReturnType<ReturnType<typeof Project.at>["secret"]>>;
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let framework: Awaited<ReturnType<typeof orca.detect>>;
   try {
-    const config = await Project.at(cwd).config();
-    const secret = await Project.at(cwd).secret();
-    const framework = await orca.detect(cwd);
-    const scaffold = await Orca.readManifest(cwd);
-    const configured = await configuredIssuer(cwd);
-    const issuerScaffold = configured === undefined ? await Orca.readManifest(cwd) : undefined;
-    const issuer =
-      configured ??
-      (typeof issuerScaffold?.dev_port === "number"
-        ? issuerFromPort(issuerScaffold.dev_port)
-        : framework.url);
-    const developmentEnv = await readIfReadable(join(cwd, ".env.development.local"));
-    return {
-      framework,
-      rendererId: config.rendererId,
-      issuer,
-      server: typeof config.data.server === "string" ? config.data.server : "",
-      defaultServer: ZitadelRuntime.DEFAULT,
-      cliVersion,
-      sdkVersion: CliPackage.at(cliVersion).selector(),
-      scaffoldedFramework: scaffold?.scaffolded_framework,
-      posture: scaffold?.posture ?? "page",
-      preset: config.preset,
-      useCase: config.useCase,
-      developmentServerUrl:
-        developmentEnv === undefined ? undefined : parseEnv(developmentEnv).ZITADEL_URL,
-      project: {
-        id: secret.data.project_id,
-        project_secret: secret.data.project_secret,
-        preview_secret: secret.data.preview_secret,
-        origins: [
-          ...(secret.data.primary_origins ?? []).map((pattern) => {
-            return {
-              pattern,
-              kind: "primary" as const,
-            };
-          }),
-          ...secret.data.preview_origins.map((pattern) => {
-            return {
-              pattern,
-              kind: "preview" as const,
-            };
-          }),
-        ],
-        created_at: secret.data.created_at,
-      },
-    };
+    config = await Project.at(cwd).config();
+    secret = await Project.at(cwd).secret();
+    framework = await orca.detect(cwd);
   } catch (error) {
     if (error instanceof ProjectConfigMissingError) {
       throw refusalError(CONFIG_MISSING_REFUSAL, {});
@@ -129,6 +91,50 @@ export async function loadPatchContext(
     }
     throw error;
   }
+  const scaffold = await Orca.readManifest(cwd);
+  const configured = await configuredIssuer(cwd);
+  const issuerScaffold = configured === undefined ? await Orca.readManifest(cwd) : undefined;
+  const issuer =
+    configured ??
+    (typeof issuerScaffold?.dev_port === "number"
+      ? issuerFromPort(issuerScaffold.dev_port)
+      : framework.url);
+  const developmentEnv = await readIfReadable(join(cwd, ".env.development.local"));
+  return {
+    framework,
+    rendererId: config.rendererId,
+    issuer,
+    server: typeof config.data.server === "string" ? config.data.server : "",
+    defaultServer: ZitadelRuntime.DEFAULT,
+    cliVersion,
+    sdkVersion: CliPackage.at(cliVersion).selector(),
+    scaffoldedFramework: scaffold?.scaffolded_framework,
+    posture: scaffold?.posture ?? "page",
+    preset: config.preset,
+    useCase: config.useCase,
+    developmentServerUrl:
+      developmentEnv === undefined ? undefined : parseEnv(developmentEnv).ZITADEL_URL,
+    project: {
+      id: secret.data.project_id,
+      project_secret: secret.data.project_secret,
+      preview_secret: secret.data.preview_secret,
+      origins: [
+        ...(secret.data.primary_origins ?? []).map((pattern) => {
+          return {
+            pattern,
+            kind: "primary" as const,
+          };
+        }),
+        ...secret.data.preview_origins.map((pattern) => {
+          return {
+            pattern,
+            kind: "preview" as const,
+          };
+        }),
+      ],
+      created_at: secret.data.created_at,
+    },
+  };
 }
 
 /**

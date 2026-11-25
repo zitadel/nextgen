@@ -10,7 +10,6 @@ import {
   IdpSettingsMissingError,
   ProviderChoice,
 } from "@/lib/idp";
-import { tryCatch } from "@/lib/try-catch";
 import { WizardStep } from "@/lib/wizard";
 
 /** How a setting the platform refuses is refused. */
@@ -80,45 +79,42 @@ export class ChooseProvider extends WizardStep<"choice", Fact<"choice">, Fact<"f
    * @returns How the flags choose a provider.
    */
   async run(needs: Fact<"flags">): Promise<Fact<"choice">> {
-    const [error, choice] = tryCatch(() => {
-      return ProviderChoice.fromFlags(needs.flags, {
-        interactive: !this.deps.nonInteractive && !this.deps.dryRun,
-      });
-    });
-    if (error instanceof IdpSettingRefusedError) {
-      throw refusalError(SETTING_REFUSED_REFUSAL, {
-        message: error.message,
-        flag: error.flag,
-      });
-    }
-    if (error instanceof IdpSettingsConflictError) {
-      throw refusalError(SETTINGS_CONFLICT_REFUSAL, {
-        message: error.message,
-        provider: ENABLE_FLAG_NAMES.provider,
-        custom: CUSTOM_PROVIDER,
-        them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
-        flags: error.given,
-      });
-    }
-    if (error instanceof IdpSettingsMissingError) {
-      throw refusalError(SETTINGS_MISSING_REFUSAL, {
-        message: error.message,
-        example: error.example,
-        missing: error.missing,
-      });
-    }
-    if (error instanceof IdpProviderUnknownError) {
-      throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
-        message: error.message,
-        known: error.known.join(", "),
-      });
-    }
-    if (error) {
+    try {
+      return {
+        choice: ProviderChoice.fromFlags(needs.flags, {
+          interactive: !this.deps.nonInteractive && !this.deps.dryRun,
+        }),
+      };
+    } catch (error) {
+      if (error instanceof IdpSettingRefusedError) {
+        throw refusalError(SETTING_REFUSED_REFUSAL, {
+          message: error.message,
+          flag: error.flag,
+        });
+      }
+      if (error instanceof IdpSettingsConflictError) {
+        throw refusalError(SETTINGS_CONFLICT_REFUSAL, {
+          message: error.message,
+          provider: ENABLE_FLAG_NAMES.provider,
+          custom: CUSTOM_PROVIDER,
+          them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
+          flags: error.given,
+        });
+      }
+      if (error instanceof IdpSettingsMissingError) {
+        throw refusalError(SETTINGS_MISSING_REFUSAL, {
+          message: error.message,
+          example: error.example,
+          missing: error.missing,
+        });
+      }
+      if (error instanceof IdpProviderUnknownError) {
+        throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
+          message: error.message,
+          known: error.known.join(", "),
+        });
+      }
       throw error;
     }
-
-    return {
-      choice,
-    };
   }
 }

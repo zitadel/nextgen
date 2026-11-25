@@ -9,7 +9,6 @@ import {
 } from "@/lib/idp";
 import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
-import { tryCatch } from "@/lib/try-catch";
 import { WizardStep } from "@/lib/wizard";
 import {
   Connection,
@@ -125,30 +124,35 @@ export class PlanChange extends WizardStep<
     needs: Needs,
   ): Promise<Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">> {
     const candidate = Connection.forProvider(needs.provider, needs.target.schema);
-    const [error, preview] = tryCatch(() => {
-      return needs.target.config.connections.enable(needs.target.schema, candidate, needs.options);
-    });
-    if (error instanceof ZitadelConfigFlowsUncheckedError) {
-      throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
-        message: error.message,
-        details: error.details ?? null,
-      });
-    }
-    if (error instanceof ZitadelConfigEditMethodInUseError) {
-      throw refusalError(EDIT_METHOD_IN_USE_REFUSAL, {
-        message: error.message,
-        hint: error.hint ?? "",
-        details: error.details ?? null,
-      });
-    }
-    if (error instanceof ZitadelConfigEditBreaksFlowsError) {
-      throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
-        message: error.message,
-        hint: error.hint ?? "",
-        details: error.details ?? null,
-      });
-    }
-    if (error) {
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let preview: ReturnType<typeof needs.target.config.connections.enable>;
+    try {
+      preview = needs.target.config.connections.enable(
+        needs.target.schema,
+        candidate,
+        needs.options,
+      );
+    } catch (error) {
+      if (error instanceof ZitadelConfigFlowsUncheckedError) {
+        throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof ZitadelConfigEditMethodInUseError) {
+        throw refusalError(EDIT_METHOD_IN_USE_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof ZitadelConfigEditBreaksFlowsError) {
+        throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+          details: error.details ?? null,
+        });
+      }
       throw error;
     }
     const loopback = loopbackIssuerWarning(

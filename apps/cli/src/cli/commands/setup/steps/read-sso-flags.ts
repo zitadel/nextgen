@@ -15,7 +15,6 @@ import {
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
 import { andTheRest, pipedFrom } from "@/lib/suggestion";
-import { tryCatch } from "@/lib/try-catch";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
@@ -147,44 +146,46 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: undefined,
       };
     }
-    const [error, selection] = tryCatch(
-      selectionFromFlags,
-      flags.sso,
-      flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
-        ? await askCustomSettings(customValues, this.deps.ask)
-        : customValues,
-      SETUP_FLAG_NAMES,
-      SSO_CUSTOM_EXAMPLE,
-    );
-    if (error instanceof IdpSettingRefusedError) {
-      throw refusalError(SETTING_REFUSED_REFUSAL, {
-        message: error.message,
-        flag: error.flag,
-      });
-    }
-    if (error instanceof IdpSettingsConflictError) {
-      throw refusalError(SETTINGS_CONFLICT_REFUSAL, {
-        message: error.message,
-        provider: SETUP_FLAG_NAMES.provider,
-        custom: CUSTOM_PROVIDER,
-        them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
-        flags: error.given,
-      });
-    }
-    if (error instanceof IdpSettingsMissingError) {
-      throw refusalError(SETTINGS_MISSING_REFUSAL, {
-        message: error.message,
-        example: error.example,
-        missing: error.missing,
-      });
-    }
-    if (error instanceof IdpProviderUnknownError) {
-      throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
-        message: error.message,
-        known: error.known.join(", "),
-      });
-    }
-    if (error) {
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let selection: ReturnType<typeof selectionFromFlags>;
+    try {
+      selection = selectionFromFlags(
+        flags.sso,
+        flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
+          ? await askCustomSettings(customValues, this.deps.ask)
+          : customValues,
+        SETUP_FLAG_NAMES,
+        SSO_CUSTOM_EXAMPLE,
+      );
+    } catch (error) {
+      if (error instanceof IdpSettingRefusedError) {
+        throw refusalError(SETTING_REFUSED_REFUSAL, {
+          message: error.message,
+          flag: error.flag,
+        });
+      }
+      if (error instanceof IdpSettingsConflictError) {
+        throw refusalError(SETTINGS_CONFLICT_REFUSAL, {
+          message: error.message,
+          provider: SETUP_FLAG_NAMES.provider,
+          custom: CUSTOM_PROVIDER,
+          them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
+          flags: error.given,
+        });
+      }
+      if (error instanceof IdpSettingsMissingError) {
+        throw refusalError(SETTINGS_MISSING_REFUSAL, {
+          message: error.message,
+          example: error.example,
+          missing: error.missing,
+        });
+      }
+      if (error instanceof IdpProviderUnknownError) {
+        throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
+          message: error.message,
+          known: error.known.join(", "),
+        });
+      }
       throw error;
     }
     const loopback = loopbackIssuerWarning(selection);

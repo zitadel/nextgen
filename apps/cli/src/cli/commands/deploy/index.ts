@@ -299,54 +299,16 @@ export default class Deploy extends Telemetered(
   protected async preview({ flags }: Admitted<typeof Deploy>): Promise<CommandResult> {
     const publisher = await this.service(Publisher);
     this.annotate({ stage: "validation" });
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let prepared: Awaited<ReturnType<Publisher["prepare"]>>;
     try {
-      const prepared = await publisher.prepare({
+      prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "deploy",
         dryRun: true,
         compare: true,
       });
-      this.annotate({ stage: undefined });
-      const diff = this.said(prepared);
-      const question = await this.lockoutQuestion(prepared.lockouts);
-      if (question !== undefined && this.nonInteractive && !this.force) {
-        throw new ZitadelError(
-          "E_CONFIRMATION_REQUIRED",
-          `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
-          {
-            hint: confirmationHint(question),
-            details: { question },
-            nextCommands: [await this.again("deploy", { with: { dryRun: true, force: true } })],
-          },
-        );
-      }
-      const { resourceCount } = prepared;
-      this.annotate({ resources: resourceCount });
-      const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
-      const result = dryRunResult({
-        verb: "deploy",
-        topic: "release",
-        noun: resources,
-        next: await this.again("deploy", {
-          without: ["dryRun"],
-          with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
-        }),
-      });
-
-      return {
-        ...result,
-        data: {
-          ...(result.data as object),
-          resources: resourceCount,
-          targets: "primary",
-          ...prepared.report,
-        },
-        summary: {
-          ...result.summary,
-          lines: diff,
-        },
-      };
     } catch (error) {
       if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
         throw refusalError(
@@ -498,6 +460,46 @@ export default class Deploy extends Telemetered(
       }
       throw error;
     }
+    this.annotate({ stage: undefined });
+    const diff = this.said(prepared);
+    const question = await this.lockoutQuestion(prepared.lockouts);
+    if (question !== undefined && this.nonInteractive && !this.force) {
+      throw new ZitadelError(
+        "E_CONFIRMATION_REQUIRED",
+        `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
+        {
+          hint: confirmationHint(question),
+          details: { question },
+          nextCommands: [await this.again("deploy", { with: { dryRun: true, force: true } })],
+        },
+      );
+    }
+    const { resourceCount } = prepared;
+    this.annotate({ resources: resourceCount });
+    const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
+    const result = dryRunResult({
+      verb: "deploy",
+      topic: "release",
+      noun: resources,
+      next: await this.again("deploy", {
+        without: ["dryRun"],
+        with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
+      }),
+    });
+
+    return {
+      ...result,
+      data: {
+        ...(result.data as object),
+        resources: resourceCount,
+        targets: "primary",
+        ...prepared.report,
+      },
+      summary: {
+        ...result.summary,
+        lines: diff,
+      },
+    };
   }
 
   /**
@@ -536,131 +538,16 @@ export default class Deploy extends Telemetered(
     const publisher = new Publisher(client, projectId);
     await this.requirePrimaryOrigin(publisher, projectId, environment);
     this.annotate({ stage: "validation" });
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let prepared: Awaited<ReturnType<Publisher["prepare"]>>;
     try {
-      const prepared = await publisher.prepare({
+      prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "deploy",
         dryRun: false,
         compare: true,
       });
-      this.annotate({ stage: undefined });
-      const diff = this.said(prepared);
-      const question = await this.lockoutQuestion(prepared.lockouts);
-      if (question !== undefined) {
-        const consent = await this.consent({
-          verb: "deploy",
-          name: LOCKOUT_ACTION,
-          message: question,
-        });
-        if (consent === undefined) {
-          return this.cancelled("deploy");
-        }
-      }
-      const { resourceCount } = prepared;
-      this.annotate({ resources: resourceCount });
-      const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
-
-      if (prepared.gitDirty) {
-        warnings.report(
-          "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
-        );
-      }
-
-      const { release, publication } = await publisher.deploy(
-        {
-          prepared,
-          message,
-        },
-        (stage) => {
-          this.annotate({ stage });
-        },
-      );
-      switch (publication.outcome) {
-        case "revoked": {
-          throw new ZitadelError(
-            "E_CONFLICT",
-            `This content was already released as ${release.id}, which is revoked`,
-            {
-              hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-              details: {
-                release_id: release.id,
-                content_hash: release.content_hash,
-              },
-            },
-          );
-        }
-        case "raced": {
-          const again = await this.again("deploy", {
-            without: ["dryRun"],
-            with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
-          });
-
-          throw new ZitadelError(
-            "E_CONFLICT",
-            "Another deploy changed the targets since this one was prepared",
-            {
-              hint: `Rerun ${again}; it will build and deploy against the current state.`,
-              details:
-                publication.current === undefined
-                  ? undefined
-                  : { current_deployment: publication.current },
-              nextCommands: [
-                this.suggest({
-                  id: "deployment:list",
-                  flags: { live: true },
-                }),
-              ],
-            },
-          );
-        }
-        case "deployed": {
-          break;
-        }
-      }
-      const { deployment } = publication;
-      this.annotate({
-        stage: undefined,
-        changed_configuration_types: prepared.changedConfiguration,
-      });
-
-      const servedOrigins = deployment.origins;
-      this.annotate({ origin_count: servedOrigins.length });
-
-      const title = `Deployed ${resources}`;
-      const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
-      const live =
-        servedOrigins.length > 0
-          ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
-              servedOrigins.map((origin) => {
-                return escapeControlCharacters(origin);
-              }),
-            )}.`
-          : `${released}.`;
-
-      return {
-        status: "ok",
-        data: {
-          title,
-          release_id: release.id,
-          content_hash: release.content_hash,
-          deployment_id: deployment.id,
-          resources: resourceCount,
-          origins: servedOrigins,
-          ...prepared.report,
-        },
-        summary: {
-          title,
-          sections: [],
-          lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
-        },
-        next: {
-          commands: [
-            this.suggest({ id: "deployment:list" }),
-            ...(prepared.gitDirty ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
-          ],
-        },
-      };
     } catch (error) {
       if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
         throw refusalError(
@@ -812,6 +699,123 @@ export default class Deploy extends Telemetered(
       }
       throw error;
     }
+    this.annotate({ stage: undefined });
+    const diff = this.said(prepared);
+    const question = await this.lockoutQuestion(prepared.lockouts);
+    if (question !== undefined) {
+      const consent = await this.consent({
+        verb: "deploy",
+        name: LOCKOUT_ACTION,
+        message: question,
+      });
+      if (consent === undefined) {
+        return this.cancelled("deploy");
+      }
+    }
+    const { resourceCount } = prepared;
+    this.annotate({ resources: resourceCount });
+    const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
+
+    if (prepared.gitDirty) {
+      warnings.report(
+        "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
+      );
+    }
+
+    const { release, publication } = await publisher.deploy(
+      {
+        prepared,
+        message,
+      },
+      (stage) => {
+        this.annotate({ stage });
+      },
+    );
+    switch (publication.outcome) {
+      case "revoked": {
+        throw new ZitadelError(
+          "E_CONFLICT",
+          `This content was already released as ${release.id}, which is revoked`,
+          {
+            hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
+            details: {
+              release_id: release.id,
+              content_hash: release.content_hash,
+            },
+          },
+        );
+      }
+      case "raced": {
+        const again = await this.again("deploy", {
+          without: ["dryRun"],
+          with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
+        });
+
+        throw new ZitadelError(
+          "E_CONFLICT",
+          "Another deploy changed the targets since this one was prepared",
+          {
+            hint: `Rerun ${again}; it will build and deploy against the current state.`,
+            details:
+              publication.current === undefined
+                ? undefined
+                : { current_deployment: publication.current },
+            nextCommands: [
+              this.suggest({
+                id: "deployment:list",
+                flags: { live: true },
+              }),
+            ],
+          },
+        );
+      }
+      case "deployed": {
+        break;
+      }
+    }
+    const { deployment } = publication;
+    this.annotate({
+      stage: undefined,
+      changed_configuration_types: prepared.changedConfiguration,
+    });
+
+    const servedOrigins = deployment.origins;
+    this.annotate({ origin_count: servedOrigins.length });
+
+    const title = `Deployed ${resources}`;
+    const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
+    const live =
+      servedOrigins.length > 0
+        ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
+            servedOrigins.map((origin) => {
+              return escapeControlCharacters(origin);
+            }),
+          )}.`
+        : `${released}.`;
+
+    return {
+      status: "ok",
+      data: {
+        title,
+        release_id: release.id,
+        content_hash: release.content_hash,
+        deployment_id: deployment.id,
+        resources: resourceCount,
+        origins: servedOrigins,
+        ...prepared.report,
+      },
+      summary: {
+        title,
+        sections: [],
+        lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
+      },
+      next: {
+        commands: [
+          this.suggest({ id: "deployment:list" }),
+          ...(prepared.gitDirty ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
+        ],
+      },
+    };
   }
 
   /**

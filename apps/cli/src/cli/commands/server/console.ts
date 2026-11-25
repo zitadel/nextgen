@@ -341,39 +341,12 @@ export default class Console extends Telemetered(
       };
     }
 
-    const { admin } = target;
+    const { localDir, admin } = target;
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let signInUrl: string;
     try {
-      const serverUrl = await this.serverInThisFolder().runningUrl();
-      const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
-
-      this.debug(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
-      this.debug(escapeControlCharacters(signInUrl));
-      const skipLaunch = flags.noOpen || this.nonInteractive;
-      const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
-
-      const title = "Local console sign-in link";
-
-      return {
-        status: "ok",
-        data: {
-          title,
-          signed_in_as: admin.email,
-          sign_in_url: signInUrl,
-          browser_opened: opened,
-        },
-        summary: {
-          title,
-          sections: [
-            section(undefined, ["Signed in as", escapeControlCharacters(admin.email)]),
-            section(undefined, ["Link", escapeControlCharacters(signInUrl)]),
-          ],
-        },
-        next: {
-          actions: [
-            `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
-          ],
-        },
-      };
+      const serverUrl = await this.serverInThisFolder(localDir).runningUrl();
+      signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
     } catch (error) {
       if (error instanceof LocalServerNotRunningError) {
         throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
@@ -426,6 +399,35 @@ export default class Console extends Telemetered(
       }
       throw error;
     }
+
+    this.debug(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
+    this.debug(escapeControlCharacters(signInUrl));
+    const skipLaunch = flags.noOpen || this.nonInteractive;
+    const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
+
+    const title = "Local console sign-in link";
+
+    return {
+      status: "ok",
+      data: {
+        title,
+        signed_in_as: admin.email,
+        sign_in_url: signInUrl,
+        browser_opened: opened,
+      },
+      summary: {
+        title,
+        sections: [
+          section(undefined, ["Signed in as", escapeControlCharacters(admin.email)]),
+          section(undefined, ["Link", escapeControlCharacters(signInUrl)]),
+        ],
+      },
+      next: {
+        actions: [
+          `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
+        ],
+      },
+    };
   }
 
   /**

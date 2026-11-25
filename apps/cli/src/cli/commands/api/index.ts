@@ -448,10 +448,13 @@ export default class Api extends Telemetered(
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
-    const response = await (flags.paginate
-      ? operationService.callAll(request)
-      : operationService.call(request)
-    ).catch((error: unknown) => {
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let response: Awaited<ReturnType<typeof operationService.call>>;
+    try {
+      response = await (flags.paginate
+        ? operationService.callAll(request)
+        : operationService.call(request));
+    } catch (error) {
       if (error instanceof BackendUnauthorizedError && operation.auth === "secret") {
         throw new ZitadelError("E_AUTH", error.message, {
           hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
@@ -461,7 +464,7 @@ export default class Api extends Telemetered(
         });
       }
       throw error;
-    });
+    }
 
     if (response.body === undefined) {
       return {

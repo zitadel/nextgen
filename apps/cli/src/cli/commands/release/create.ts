@@ -218,27 +218,16 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
    */
   private async prepared(dryRun: boolean) {
     const publisher = await this.service(Publisher);
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let prepared: Awaited<ReturnType<Publisher["prepare"]>>;
     try {
-      const prepared = await publisher.prepare({
+      prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "deploy",
         dryRun,
         compare: false,
       });
-      for (const warning of prepared.warnings) {
-        warnings.report(warning);
-      }
-      this.narrate(prepared.notices);
-      const diff = prepared.notices.flatMap((notice, at) => {
-        return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
-      });
-
-      return {
-        publisher,
-        prepared,
-        diff,
-      };
     } catch (error) {
       if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
         throw refusalError(
@@ -390,5 +379,18 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
       }
       throw error;
     }
+    for (const warning of prepared.warnings) {
+      warnings.report(warning);
+    }
+    this.narrate(prepared.notices);
+    const diff = prepared.notices.flatMap((notice, at) => {
+      return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
+    });
+
+    return {
+      publisher,
+      prepared,
+      diff,
+    };
   }
 }

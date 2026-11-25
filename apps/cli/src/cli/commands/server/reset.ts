@@ -4,8 +4,11 @@ import {
   LocalServerPermitMismatchError,
   LocalServerProcessesStopError,
   LocalServerProcessesUnlistableError,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
   LocalServerStopError,
 } from "@/lib/server";
+import { Cmd } from "@/lib/cmd";
 import type { CommandResult } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Fact, section } from "@/lib/ui";
@@ -61,6 +64,33 @@ const ORPHANS_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a reset is refused when the runtime record of this folder is not in the shape it is written in. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a reset is refused when the runtime record of this folder cannot be read. */
+const RECORD_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
   details: "{details}",
 } as const satisfies Refusal;
 
@@ -162,6 +192,19 @@ export default class Reset extends Telemetered(
               details: error.details ?? null,
             });
           }
+          if (error instanceof LocalServerRecordMalformedError) {
+            throw refusalError(RECORD_MALFORMED_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          if (error instanceof LocalServerRecordUnreadableError) {
+            throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+              path: Cmd.quote(error.path),
+            });
+          }
           throw error;
         }
         const title = "Local Zitadel server runtime reset";
@@ -187,7 +230,26 @@ export default class Reset extends Telemetered(
    * @returns The target as the result describes it, and the line naming what runs the server.
    */
   private async targeted(): Promise<{ target: ResetTarget; owner: Fact }> {
-    const record = await this.serverInThisFolder().record();
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let record: Awaited<ReturnType<ReturnType<typeof this.serverInThisFolder>["record"]>>;
+    try {
+      record = await this.serverInThisFolder().record();
+    } catch (error) {
+      if (error instanceof LocalServerRecordMalformedError) {
+        throw refusalError(RECORD_MALFORMED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+          path: Cmd.quote(error.path),
+        });
+      }
+      throw error;
+    }
 
     if (record !== undefined && record.backend === "binary") {
       return {

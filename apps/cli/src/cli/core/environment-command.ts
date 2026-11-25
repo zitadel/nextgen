@@ -418,28 +418,16 @@ export abstract class EnvironmentCommand extends BaseCommand {
       interactive: !this.nonInteractive && !this.meta.dryRun && options.prompt !== false,
       ask: this.ui.questions(),
     };
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let server: string;
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let projectId: string;
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let token: string;
     try {
-      const server = await environment.requireInteractive("ZITADEL_URL", ask);
-      const projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
-      const token = await environment.requireInteractive(CREDENTIALS[credential], ask);
-      this.ui.ranAgainst(projectId, server);
-
-      return {
-        client: createZitadelClient({
-          userAgent: Runtime.current().userAgent(),
-          baseUrl: server,
-          token,
-          signal: this.signal,
-          ...(options.timeoutMs === undefined
-            ? {}
-            : {
-                timeoutMs: options.timeoutMs,
-              }),
-        }),
-        projectId,
-        server,
-        environment,
-      };
+      server = await environment.requireInteractive("ZITADEL_URL", ask);
+      projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
+      token = await environment.requireInteractive(CREDENTIALS[credential], ask);
     } catch (error) {
       if (error instanceof EnvironmentValueUnboundError) {
         // Run in the directory this run addressed, which need not be the
@@ -488,6 +476,24 @@ export abstract class EnvironmentCommand extends BaseCommand {
       }
       throw error;
     }
+    this.ui.ranAgainst(projectId, server);
+
+    return {
+      client: createZitadelClient({
+        userAgent: Runtime.current().userAgent(),
+        baseUrl: server,
+        token,
+        signal: this.signal,
+        ...(options.timeoutMs === undefined
+          ? {}
+          : {
+              timeoutMs: options.timeoutMs,
+            }),
+      }),
+      projectId,
+      server,
+      environment,
+    };
   }
 }
 

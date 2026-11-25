@@ -3,7 +3,13 @@ import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { LocalRuntime, StartedServer, ZitadelRuntime } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
+  StartedServer,
+  ZitadelRuntime,
+} from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
 import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
@@ -47,7 +53,35 @@ import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Telemetered } from "@/cli/telemetry/telemetered";
+
+/** How a doctor run is refused when the runtime record of this folder is not in the shape it is written in. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a doctor run is refused when the runtime record of this folder cannot be read. */
+const RECORD_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
+  details: "{details}",
+} as const satisfies Refusal;
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -729,7 +763,26 @@ export default class Doctor extends Telemetered(
     ctx: CheckContext,
   ): Promise<Examination> {
     const { port, hostedServer, cwd } = await this.checks(flags, this.cwd);
-    const nearest = await this.started.of(cwd);
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let nearest: Awaited<ReturnType<typeof this.started.of>>;
+    try {
+      nearest = await this.started.of(cwd);
+    } catch (error) {
+      if (error instanceof LocalServerRecordMalformedError) {
+        throw refusalError(RECORD_MALFORMED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+          path: Cmd.quote(error.path),
+        });
+      }
+      throw error;
+    }
     const existingRuntime = nearest?.runtime;
     const parentRuntimeDir =
       nearest !== undefined && nearest.dir !== this.cwd ? nearest.dir : undefined;

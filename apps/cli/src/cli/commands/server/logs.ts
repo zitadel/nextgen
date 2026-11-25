@@ -176,46 +176,10 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
         };
       }
     } else {
+      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+      let logged: Awaited<ReturnType<typeof server.logs>>;
       try {
-        const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
-        const shown = lines.drawn(Output.color);
-        const title = "Local Zitadel server logs";
-
-        if (runtime.backend === "binary") {
-          return {
-            status: "ok",
-            data: {
-              title,
-              runtime: {
-                backend: runtime.backend,
-                pid: runtime.pid,
-                log_path: runtime.log_path,
-              },
-              logs: lines.text(),
-            },
-            pretty: painted(shown.join("\n")),
-            summary: {
-              title,
-              sections: [],
-              lines: shown,
-            },
-          };
-        } else {
-          return {
-            status: "ok",
-            data: {
-              title,
-              runtime: { backend: runtime.backend, container_name: runtime.container_name },
-              logs: lines.text(),
-            },
-            pretty: painted(shown.join("\n")),
-            summary: {
-              title,
-              sections: [],
-              lines: shown,
-            },
-          };
-        }
+        logged = await server.logs({ tail: flags.tail, level: flags.level });
       } catch (error) {
         if (error instanceof LocalServerNotStartedError) {
           throw refusalError(RUNTIME_NOT_STARTED_REFUSAL, {
@@ -229,6 +193,45 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
           });
         }
         throw error;
+      }
+      const { runtime, lines } = logged;
+      const shown = lines.drawn(Output.color);
+      const title = "Local Zitadel server logs";
+
+      if (runtime.backend === "binary") {
+        return {
+          status: "ok",
+          data: {
+            title,
+            runtime: {
+              backend: runtime.backend,
+              pid: runtime.pid,
+              log_path: runtime.log_path,
+            },
+            logs: lines.text(),
+          },
+          pretty: painted(shown.join("\n")),
+          summary: {
+            title,
+            sections: [],
+            lines: shown,
+          },
+        };
+      } else {
+        return {
+          status: "ok",
+          data: {
+            title,
+            runtime: { backend: runtime.backend, container_name: runtime.container_name },
+            logs: lines.text(),
+          },
+          pretty: painted(shown.join("\n")),
+          summary: {
+            title,
+            sections: [],
+            lines: shown,
+          },
+        };
       }
     }
   }

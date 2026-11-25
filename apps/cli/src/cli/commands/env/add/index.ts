@@ -572,44 +572,46 @@ export default class EnvAdd extends Telemetered(
       path,
     };
     const givenServer = await this.givenServer();
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let config: Awaited<ReturnType<ReturnType<typeof Project.at>["config"]>>;
     try {
-      const config = await Project.at(cwd).config();
-      const frameworkId = config.frameworkId;
-      const publicVariable =
-        typeof frameworkId === "string"
-          ? PUBLIC_PROJECT_ID_VARIABLE[frameworkId as keyof typeof PUBLIC_PROJECT_ID_VARIABLE]
-          : undefined;
-
-      const server =
-        givenServer ??
-        (await this.askServer(await this.again("env:add", { with: { server: SERVER } })));
-
-      const appUrl =
-        flags.appUrl ??
-        (nonInteractive
-          ? undefined
-          : await this.ask.text({
-              name: "app URL",
-              message: "What URL is your app served from? You can leave this empty to skip it.",
-              flag: "--app-url",
-              placeholder: "https://app.acme.com",
-              parse: readAppUrl,
-            }));
-      const issuer = appUrl === undefined ? undefined : new URL(appUrl).origin;
-
-      return {
-        environment,
-        server,
-        issuer,
-        frameworkId,
-        publicVariable,
-      };
+      config = await Project.at(cwd).config();
     } catch (error) {
       if (error instanceof ProjectConfigMissingError) {
         throw refusalError(NO_CONFIG_REFUSAL, {});
       }
       throw error;
     }
+    const frameworkId = config.frameworkId;
+    const publicVariable =
+      typeof frameworkId === "string"
+        ? PUBLIC_PROJECT_ID_VARIABLE[frameworkId as keyof typeof PUBLIC_PROJECT_ID_VARIABLE]
+        : undefined;
+
+    const server =
+      givenServer ??
+      (await this.askServer(await this.again("env:add", { with: { server: SERVER } })));
+
+    const appUrl =
+      flags.appUrl ??
+      (nonInteractive
+        ? undefined
+        : await this.ask.text({
+            name: "app URL",
+            message: "What URL is your app served from? You can leave this empty to skip it.",
+            flag: "--app-url",
+            placeholder: "https://app.acme.com",
+            parse: readAppUrl,
+          }));
+    const issuer = appUrl === undefined ? undefined : new URL(appUrl).origin;
+
+    return {
+      environment,
+      server,
+      issuer,
+      frameworkId,
+      publicVariable,
+    };
   }
 
   /**

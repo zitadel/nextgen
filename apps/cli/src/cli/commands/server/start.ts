@@ -416,93 +416,10 @@ export default class Start extends Telemetered(
   protected async apply({ flags }: Admitted<typeof Start>): Promise<CommandResult> {
     const { server, request } = await this.planned(flags);
     const retry = await this.again("start", {});
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let started: Awaited<ReturnType<typeof server.launch>>;
     try {
-      const { runtime: record, alreadyRunning } = await server.launch(request);
-      this.meta = { ...this.meta, source: record.server_url };
-
-      const title = alreadyRunning
-        ? "Local Zitadel server is already running"
-        : "Local Zitadel server is ready";
-      const urls = {
-        api: record.server_url,
-        console: `${record.server_url}/ui/console/`,
-      };
-      const next: NextSteps<SuggestedCommand> = {
-        actions: [
-          "Create an app with authentication. Run setup in this directory or a subdirectory.",
-          "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-          new Guidance(this.suggest).serverLog(),
-        ],
-        commands: [
-          this.suggest({
-            id: "setup",
-            flags: { server: "local" },
-          }),
-        ],
-      };
-
-      if (record.backend === "binary") {
-        return {
-          status: "ok",
-          data: {
-            title,
-            runtime: {
-              backend: "binary",
-              pid: record.pid,
-              log_path: record.log_path,
-              server_package: record.server_package,
-              server_version: record.server_version,
-              port: record.port,
-              data_dir: record.data_dir,
-              env: record.env ?? LocalRuntime.NO_ENV,
-            },
-            urls,
-          },
-          summary: {
-            title,
-            sections: [
-              section(
-                undefined,
-                ["Process", String(record.pid)],
-                ["API", urls.api],
-                ["Console", urls.console],
-                ["Data", record.data_dir],
-              ),
-            ],
-          },
-          next,
-        };
-      } else {
-        return {
-          status: "ok",
-          data: {
-            title,
-            runtime: {
-              backend: "docker",
-              container_name: record.container_name,
-              container_id: record.container_id,
-              image: record.image,
-              port: record.port,
-              data_dir: record.data_dir,
-              env: record.env ?? LocalRuntime.NO_ENV,
-            },
-            urls,
-          },
-          summary: {
-            title,
-            sections: [
-              section(
-                undefined,
-                ["Container", record.container_name],
-                ["API", urls.api],
-                ["Console", urls.console],
-                ["Data", record.data_dir],
-              ),
-            ],
-          },
-          next,
-        };
-      }
+      started = await server.launch(request);
     } catch (error) {
       if (error instanceof LocalServerDockerMissingError) {
         throw refusalError(
@@ -674,6 +591,92 @@ export default class Start extends Telemetered(
         });
       }
       throw error;
+    }
+    const { runtime: record, alreadyRunning } = started;
+    this.meta = { ...this.meta, source: record.server_url };
+
+    const title = alreadyRunning
+      ? "Local Zitadel server is already running"
+      : "Local Zitadel server is ready";
+    const urls = {
+      api: record.server_url,
+      console: `${record.server_url}/ui/console/`,
+    };
+    const next: NextSteps<SuggestedCommand> = {
+      actions: [
+        "Create an app with authentication. Run setup in this directory or a subdirectory.",
+        "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
+        new Guidance(this.suggest).serverLog(),
+      ],
+      commands: [
+        this.suggest({
+          id: "setup",
+          flags: { server: "local" },
+        }),
+      ],
+    };
+
+    if (record.backend === "binary") {
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "binary",
+            pid: record.pid,
+            log_path: record.log_path,
+            server_package: record.server_package,
+            server_version: record.server_version,
+            port: record.port,
+            data_dir: record.data_dir,
+            env: record.env ?? LocalRuntime.NO_ENV,
+          },
+          urls,
+        },
+        summary: {
+          title,
+          sections: [
+            section(
+              undefined,
+              ["Process", String(record.pid)],
+              ["API", urls.api],
+              ["Console", urls.console],
+              ["Data", record.data_dir],
+            ),
+          ],
+        },
+        next,
+      };
+    } else {
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "docker",
+            container_name: record.container_name,
+            container_id: record.container_id,
+            image: record.image,
+            port: record.port,
+            data_dir: record.data_dir,
+            env: record.env ?? LocalRuntime.NO_ENV,
+          },
+          urls,
+        },
+        summary: {
+          title,
+          sections: [
+            section(
+              undefined,
+              ["Container", record.container_name],
+              ["API", urls.api],
+              ["Console", urls.console],
+              ["Data", record.data_dir],
+            ),
+          ],
+        },
+        next,
+      };
     }
   }
 

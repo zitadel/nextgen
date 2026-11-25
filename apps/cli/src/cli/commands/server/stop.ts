@@ -243,152 +243,112 @@ export default class Stop extends Telemetered(
    * @returns The result of the run.
    */
   protected async apply({ flags }: Admitted<typeof Stop>): Promise<CommandResult> {
-    try {
-      if (flags.all) {
-        const sweep = await LocalRuntime.stopAll(this.localServers());
-        if (!sweep.supported) {
-          const title = "Managed local runtime process discovery is unavailable";
-
-          return {
-            status: "ok",
-            data: {
-              title,
-              sweep: {
-                supported: false,
-                error: sweep.error,
-                stopped: [],
-              },
-            },
-            summary: {
-              title,
-              sections: [section(undefined, ["Error", sweep.error ?? "unknown"])],
-            },
-            warnings: ["managed-runtime-processes: discovery unavailable"],
-          };
-        }
-
-        if (sweep.results.length === 0) {
-          return {
-            status: "ok",
-            data: {
-              title: "No host-wide managed local runtime processes found",
-              sweep: {
-                supported: true,
-                scope: "host",
-                count: 0,
-                results: sweep.results,
-              },
-            },
-            summary: {
-              title: "No host-wide managed local runtime processes found",
-              sections: [section(undefined)],
-            },
-          };
-        } else {
-          const stopped: Fact[] = sweep.results.map((result): Fact => {
-            return ["Process", String(result.process.pid)];
+    if (flags.all) {
+      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+      let sweep: Awaited<ReturnType<typeof LocalRuntime.stopAll>>;
+      try {
+        sweep = await LocalRuntime.stopAll(this.localServers());
+      } catch (error) {
+        if (error instanceof LocalServerProcessesStopError) {
+          throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
           });
-
-          return {
-            status: "ok",
-            data: {
-              title: "Host-wide managed local runtime processes stopped",
-              sweep: {
-                supported: true,
-                scope: "host",
-                count: sweep.results.length,
-                results: sweep.results,
-              },
-            },
-            summary: {
-              title: "Host-wide managed local runtime processes stopped",
-              sections: [section(undefined, ...stopped)],
-            },
-          };
         }
+        if (error instanceof LocalServerProcessesUnlistableError) {
+          throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerStopError) {
+          throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerRecordMalformedError) {
+          throw refusalError(RECORD_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerRecordUnreadableError) {
+          throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: Cmd.quote(error.path),
+          });
+        }
+        throw error;
+      }
+      if (!sweep.supported) {
+        const title = "Managed local runtime process discovery is unavailable";
+
+        return {
+          status: "ok",
+          data: {
+            title,
+            sweep: {
+              supported: false,
+              error: sweep.error,
+              stopped: [],
+            },
+          },
+          summary: {
+            title,
+            sections: [section(undefined, ["Error", sweep.error ?? "unknown"])],
+          },
+          warnings: ["managed-runtime-processes: discovery unavailable"],
+        };
       }
 
-      const server = this.serverInThisFolder();
-      const record = await server.record();
-
-      if (record !== undefined && record.backend === "binary") {
-        const facts: Fact[] = [
-          ["Runtime", "binary"],
-          ["Process", String(record.pid)],
-          ["Data", record.data_dir],
-        ];
-        const { stopped, outcome } = await server.stop();
-        const title = this.stoppedTitle(stopped);
-
+      if (sweep.results.length === 0) {
         return {
           status: "ok",
           data: {
-            title,
-            runtime: {
-              backend: "binary",
-              pid: record.pid,
-              log_path: record.log_path,
-              stop_result: outcome,
-              data_preserved: true,
-              data_dir: record.data_dir,
+            title: "No host-wide managed local runtime processes found",
+            sweep: {
+              supported: true,
+              scope: "host",
+              count: 0,
+              results: sweep.results,
             },
           },
           summary: {
-            title,
-            sections: [section(undefined, ...facts)],
-          },
-        };
-      } else if (record !== undefined) {
-        const facts: Fact[] = [
-          ["Runtime", "docker"],
-          ["Container", record.container_name],
-          ["Data", record.data_dir],
-        ];
-        const { stopped } = await server.stop();
-        const title = this.stoppedTitle(stopped);
-
-        return {
-          status: "ok",
-          data: {
-            title,
-            runtime: {
-              backend: "docker",
-              container_name: record.container_name,
-              data_preserved: true,
-              data_dir: record.data_dir,
-            },
-          },
-          summary: {
-            title,
-            sections: [section(undefined, ...facts)],
+            title: "No host-wide managed local runtime processes found",
+            sections: [section(undefined)],
           },
         };
       } else {
-        const containerName = server.containerName();
-        const facts: Fact[] = [
-          ["Runtime", "missing"],
-          ["Container", containerName],
-        ];
-        const { stopped } = await server.stop();
-        const title = this.stoppedTitle(stopped);
+        const stopped: Fact[] = sweep.results.map((result): Fact => {
+          return ["Process", String(result.process.pid)];
+        });
 
         return {
           status: "ok",
           data: {
-            title,
-            runtime: {
-              backend: "missing",
-              container_name: containerName,
-              data_preserved: true,
-              data_dir: undefined,
+            title: "Host-wide managed local runtime processes stopped",
+            sweep: {
+              supported: true,
+              scope: "host",
+              count: sweep.results.length,
+              results: sweep.results,
             },
           },
           summary: {
-            title,
-            sections: [section(undefined, ...facts)],
+            title: "Host-wide managed local runtime processes stopped",
+            sections: [section(undefined, ...stopped)],
           },
         };
       }
+    }
+
+    const server = this.serverInThisFolder();
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let record: Awaited<ReturnType<typeof server.record>>;
+    try {
+      record = await server.record();
     } catch (error) {
       if (error instanceof LocalServerProcessesStopError) {
         throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
@@ -422,6 +382,199 @@ export default class Stop extends Telemetered(
         });
       }
       throw error;
+    }
+
+    if (record !== undefined && record.backend === "binary") {
+      const facts: Fact[] = [
+        ["Runtime", "binary"],
+        ["Process", String(record.pid)],
+        ["Data", record.data_dir],
+      ];
+      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+      let result: Awaited<ReturnType<typeof server.stop>>;
+      try {
+        result = await server.stop();
+      } catch (error) {
+        if (error instanceof LocalServerProcessesStopError) {
+          throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerProcessesUnlistableError) {
+          throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerStopError) {
+          throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerRecordMalformedError) {
+          throw refusalError(RECORD_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerRecordUnreadableError) {
+          throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: Cmd.quote(error.path),
+          });
+        }
+        throw error;
+      }
+      const { stopped, outcome } = result;
+      const title = this.stoppedTitle(stopped);
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "binary",
+            pid: record.pid,
+            log_path: record.log_path,
+            stop_result: outcome,
+            data_preserved: true,
+            data_dir: record.data_dir,
+          },
+        },
+        summary: {
+          title,
+          sections: [section(undefined, ...facts)],
+        },
+      };
+    } else if (record !== undefined) {
+      const facts: Fact[] = [
+        ["Runtime", "docker"],
+        ["Container", record.container_name],
+        ["Data", record.data_dir],
+      ];
+      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+      let result: Awaited<ReturnType<typeof server.stop>>;
+      try {
+        result = await server.stop();
+      } catch (error) {
+        if (error instanceof LocalServerProcessesStopError) {
+          throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerProcessesUnlistableError) {
+          throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerStopError) {
+          throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerRecordMalformedError) {
+          throw refusalError(RECORD_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerRecordUnreadableError) {
+          throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: Cmd.quote(error.path),
+          });
+        }
+        throw error;
+      }
+      const { stopped } = result;
+      const title = this.stoppedTitle(stopped);
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "docker",
+            container_name: record.container_name,
+            data_preserved: true,
+            data_dir: record.data_dir,
+          },
+        },
+        summary: {
+          title,
+          sections: [section(undefined, ...facts)],
+        },
+      };
+    } else {
+      const containerName = server.containerName();
+      const facts: Fact[] = [
+        ["Runtime", "missing"],
+        ["Container", containerName],
+      ];
+      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+      let result: Awaited<ReturnType<typeof server.stop>>;
+      try {
+        result = await server.stop();
+      } catch (error) {
+        if (error instanceof LocalServerProcessesStopError) {
+          throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerProcessesUnlistableError) {
+          throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerStopError) {
+          throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerRecordMalformedError) {
+          throw refusalError(RECORD_MALFORMED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerRecordUnreadableError) {
+          throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            path: Cmd.quote(error.path),
+          });
+        }
+        throw error;
+      }
+      const { stopped } = result;
+      const title = this.stoppedTitle(stopped);
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "missing",
+            container_name: containerName,
+            data_preserved: true,
+            data_dir: undefined,
+          },
+        },
+        summary: {
+          title,
+          sections: [section(undefined, ...facts)],
+        },
+      };
     }
   }
 
