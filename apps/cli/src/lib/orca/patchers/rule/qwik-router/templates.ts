@@ -5,7 +5,8 @@ import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 // Enforce the dark surface the Zitadel widgets are designed for, so pages never
 // follow the OS light/dark setting.
-const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark";
+const WIDGET_WRAP =
+  "position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark";
 
 /**
  * `src/routes/plugin@nextgen.ts` — the Qwik Router root `onRequest` plugin.
