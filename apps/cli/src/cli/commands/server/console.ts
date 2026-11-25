@@ -42,14 +42,12 @@ const NO_LOCAL_ADMIN_REFUSAL = {
 /** How an environment name that cannot be used in a path is refused. */
 const NAME_INVALID_REFUSAL = {
   message: "{message}",
-  hint: "{hint} Pass a safe --env or set ZITADEL_ENV.",
+  hint: "Pass a safe --env or set ZITADEL_ENV.",
 } as const satisfies Refusal;
 
 /** How a server address that is not a URL is refused. */
 const SERVER_INVALID_REFUSAL = {
   message: "{message}",
-  hint: "Fix or remove ZITADEL_URL in {source}; it must be a URL such as {example}.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a run is refused when no local server was started in the folder or a parent. */
@@ -197,15 +195,11 @@ export default class Console extends Telemetered(
         if (error instanceof EnvironmentNameInvalidError) {
           throw refusalError(NAME_INVALID_REFUSAL, {
             message: error.message,
-            hint: error.hint ?? "",
           });
         }
         if (error instanceof EnvironmentServerInvalidError) {
           throw refusalError(SERVER_INVALID_REFUSAL, {
             message: error.message,
-            source: error.source,
-            example: error.example,
-            details: error.details ?? null,
           });
         }
         if (error instanceof LocalServerNotRunningError) {

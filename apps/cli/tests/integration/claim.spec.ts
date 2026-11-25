@@ -132,22 +132,9 @@ describe("claim", () => {
           command: "claim",
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
-          message: "ZITADEL_PROJECT_ID is not set for the development environment",
-          hint: `Consulted, in order: --server, process environment, .env.development.local, .env.local, .env.development, .env, .zitadel/secret. Set ZITADEL_PROJECT_ID in .env.development.local or the process environment, or run ${expectedPublicCliCommand("env add development")}.`,
+          message:
+            "ZITADEL_PROJECT_ID is not set for the development environment. Consulted, in order: --server, process environment, .env.development.local, .env.local, .env.development, .env, .zitadel/secret. Set ZITADEL_PROJECT_ID in .env.development.local or the process environment.",
           next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
-          details: {
-            environment: "development",
-            variable: "ZITADEL_PROJECT_ID",
-            consulted: [
-              "--server",
-              "process environment",
-              ".env.development.local",
-              ".env.local",
-              ".env.development",
-              ".env",
-              ".zitadel/secret",
-            ],
-          },
         });
       });
 

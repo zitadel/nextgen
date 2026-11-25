@@ -77,7 +77,7 @@ const CONSULTED = [
 /**
  * How the refusal tells the developer to give the project an id.
  */
-const NOT_SET_UP_HINT = `Consulted, in order: ${CONSULTED.join(", ")}. Set ZITADEL_PROJECT_ID in .env.development.local or the process environment, or run ${expectedPublicCliCommand("env add development")}.`;
+const NOT_SET_UP_HINT = `Consulted, in order: ${CONSULTED.join(", ")}. Set ZITADEL_PROJECT_ID in .env.development.local or the process environment.`;
 
 /**
  * What the envelope says of a directory with no local server started in it.
@@ -104,14 +104,8 @@ describe("the cli", () => {
           command: "deploy",
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
-          message: "ZITADEL_PROJECT_ID is not set for the development environment",
-          hint: NOT_SET_UP_HINT,
+          message: `ZITADEL_PROJECT_ID is not set for the development environment. ${NOT_SET_UP_HINT}`,
           next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
-          details: {
-            environment: "development",
-            variable: "ZITADEL_PROJECT_ID",
-            consulted: CONSULTED,
-          },
         });
       });
     });
@@ -129,14 +123,8 @@ describe("the cli", () => {
           command: "deploy",
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
-          message: "ZITADEL_PROJECT_ID is not set for the development environment",
-          hint: NOT_SET_UP_HINT,
+          message: `ZITADEL_PROJECT_ID is not set for the development environment. ${NOT_SET_UP_HINT}`,
           next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
-          details: {
-            environment: "development",
-            variable: "ZITADEL_PROJECT_ID",
-            consulted: CONSULTED,
-          },
         });
       });
     });
@@ -154,14 +142,8 @@ describe("the cli", () => {
           command: "deploy",
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
-          message: "ZITADEL_PROJECT_ID is not set for the development environment",
-          hint: NOT_SET_UP_HINT,
+          message: `ZITADEL_PROJECT_ID is not set for the development environment. ${NOT_SET_UP_HINT}`,
           next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
-          details: {
-            environment: "development",
-            variable: "ZITADEL_PROJECT_ID",
-            consulted: CONSULTED,
-          },
         });
       });
     });
@@ -180,14 +162,8 @@ describe("the cli", () => {
           command: "deploy",
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
-          message: "ZITADEL_PROJECT_ID is not set for the development environment",
-          hint: NOT_SET_UP_HINT,
+          message: `ZITADEL_PROJECT_ID is not set for the development environment. ${NOT_SET_UP_HINT}`,
           next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
-          details: {
-            environment: "development",
-            variable: "ZITADEL_PROJECT_ID",
-            consulted: CONSULTED,
-          },
         });
       });
 

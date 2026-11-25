@@ -370,21 +370,8 @@ describe("api", () => {
           command: "api",
           source: "",
           code: "E_VALIDATION",
-          message: "ZITADEL_URL is not set for the development environment",
-          hint: "Consulted, in order: --server, process environment, .env.development.local, .env.local, .env.development, .env, .zitadel/secret. Set ZITADEL_URL in .env.development.local or the process environment.",
-          details: {
-            environment: "development",
-            variable: "ZITADEL_URL",
-            consulted: [
-              "--server",
-              "process environment",
-              ".env.development.local",
-              ".env.local",
-              ".env.development",
-              ".env",
-              ".zitadel/secret",
-            ],
-          },
+          message:
+            "ZITADEL_URL is not set for the development environment. Consulted, in order: --server, process environment, .env.development.local, .env.local, .env.development, .env, .zitadel/secret. Set ZITADEL_URL in .env.development.local or the process environment.",
         });
       });
 

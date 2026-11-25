@@ -373,7 +373,7 @@ describe("EnvironmentCommand.connect", () => {
     await expect(
       new ProjectProbe(["--cwd", dir, "--env-file", join(dir, "ci.env")], config).probe(),
     ).rejects.toMatchObject({
-      hint: expect.stringContaining("Set ZITADEL_PROJECT_ID in"),
+      message: expect.stringContaining("Set ZITADEL_PROJECT_ID in"),
       nextCommands: undefined,
     });
   });
@@ -387,7 +387,7 @@ describe("EnvironmentCommand.connect", () => {
     await expect(
       new ProjectProbe(["--cwd", dir, "--env", "production"], config).probe(),
     ).rejects.toMatchObject({
-      hint: expect.stringContaining("Set ZITADEL_PROJECT_SECRET in .env.production.local"),
+      message: expect.stringContaining("Set ZITADEL_PROJECT_SECRET in .env.production.local"),
       nextCommands: undefined,
     });
   });

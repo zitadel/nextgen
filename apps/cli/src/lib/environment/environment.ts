@@ -238,6 +238,11 @@ export class Environment {
       return resolved.value;
     }
     const name = this.name.value;
+    const consulted = `Consulted, in order: ${this.consulted
+      .map((entry) => {
+        return entry.source;
+      })
+      .join(", ")}.`;
     // The file to set the value in. An --env-file run reads that file; an
     // environment already bound by `env add` has its `.env.<name>.local`. Only
     // an environment with no project at all is pointed at `env add` (or
@@ -252,26 +257,13 @@ export class Environment {
     const file = this.envFile ?? (bound ? boundFile : undefined);
     const unbound = file === undefined && this.values.ZITADEL_PROJECT_ID === undefined;
     if (unbound) {
-      throw new EnvironmentValueUnboundError(`${key} is not set for the ${name} environment`, {
-        key,
-        environment: name,
-        consulted: this.consulted.map((entry) => {
-          return entry.source;
-        }),
-        boundFile,
-        cwd: this.cwd,
-      });
+      throw new EnvironmentValueUnboundError(
+        `${key} is not set for the ${name} environment. ${consulted} Set ${key} in ${boundFile} or the process environment.`,
+      );
     }
-    throw new EnvironmentValueMissingError(`${key} is not set for the ${name} environment`, {
-      key,
-      environment: name,
-      consulted: this.consulted.map((entry) => {
-        return entry.source;
-      }),
-      file,
-      boundFile,
-      cwd: this.cwd,
-    });
+    throw new EnvironmentValueMissingError(
+      `${key} is not set for the ${name} environment. ${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.`,
+    );
   }
 
   /**
@@ -344,12 +336,8 @@ export class Environment {
       return servers.origin(value);
     } catch (error) {
       throw new EnvironmentServerInvalidError(
-        `ZITADEL_URL from ${source} is not a valid server: ${value}`,
-        source,
-        SERVER,
-        {
-          ...(error instanceof Error ? { details: { cause: error.message } } : {}),
-        },
+        `ZITADEL_URL from ${source} is not a valid server: ${value}; it must be a URL such as ${SERVER}`,
+        error,
       );
     }
   }

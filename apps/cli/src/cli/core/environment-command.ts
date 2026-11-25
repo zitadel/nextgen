@@ -38,28 +38,22 @@ const SOURCES_CONFLICT_REFUSAL = {
 /** How an environment name that cannot be used in a path is refused. */
 const NAME_INVALID_REFUSAL = {
   message: "{message}",
-  hint: "{hint} Pass a safe --env or set ZITADEL_ENV.",
+  hint: "Pass a safe --env or set ZITADEL_ENV.",
 } as const satisfies Refusal;
 
 /** How a server address that is not a URL is refused. */
 const SERVER_INVALID_REFUSAL = {
   message: "{message}",
-  hint: "Fix or remove ZITADEL_URL in {source}; it must be a URL such as {example}.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a value set in no source is refused when its environment has a project to add it to. */
 const VALUE_MISSING_REFUSAL = {
   message: "{message}",
-  hint: "{hint} Set {key} in {file} or the process environment.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a value set in no source is refused when its environment has no project at all. */
 const VALUE_MISSING_UNBOUND_REFUSAL = {
   message: "{message}",
-  hint: "{hint} Set {key} in {boundFile} or the process environment, or run `zitadel env add {environment}`.",
-  details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
 
@@ -208,15 +202,11 @@ export abstract class EnvironmentCommand extends BaseCommand {
       if (error instanceof EnvironmentNameInvalidError) {
         throw refusalError(NAME_INVALID_REFUSAL, {
           message: error.message,
-          hint: error.hint ?? "",
         });
       }
       if (error instanceof EnvironmentServerInvalidError) {
         throw refusalError(SERVER_INVALID_REFUSAL, {
           message: error.message,
-          source: error.source,
-          example: error.example,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerNotRunningError) {
@@ -393,11 +383,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
           VALUE_MISSING_UNBOUND_REFUSAL,
           {
             message: error.message,
-            hint: error.hint ?? "",
-            key: error.key,
-            boundFile: error.boundFile,
-            environment: error.environment,
-            details: error.details ?? null,
           },
           {
             next:
@@ -419,10 +404,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
       if (error instanceof EnvironmentValueMissingError) {
         throw refusalError(VALUE_MISSING_REFUSAL, {
           message: error.message,
-          hint: error.hint ?? "",
-          key: error.key,
-          file: error.file ?? error.boundFile,
-          details: error.details ?? null,
         });
       }
       throw error;

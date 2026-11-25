@@ -26,15 +26,11 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 /** How a value set in no source is refused when its environment has a project to add it to. */
 const VALUE_MISSING_REFUSAL = {
   message: "{message}",
-  hint: "{hint} Set {key} in {file} or the process environment.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a value set in no source is refused when its environment has no project at all. */
 const VALUE_MISSING_UNBOUND_REFUSAL = {
   message: "{message}",
-  hint: "{hint} Set {key} in {boundFile} or the process environment, or run `zitadel env add {environment}`.",
-  details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
 
@@ -452,11 +448,6 @@ export default class Claim extends Telemetered(ChangeCommand) {
           VALUE_MISSING_UNBOUND_REFUSAL,
           {
             message: error.message,
-            hint: error.hint ?? "",
-            key: error.key,
-            boundFile: error.boundFile,
-            environment: error.environment,
-            details: error.details ?? null,
           },
           {
             next:
@@ -478,10 +469,6 @@ export default class Claim extends Telemetered(ChangeCommand) {
       if (error instanceof EnvironmentValueMissingError) {
         throw refusalError(VALUE_MISSING_REFUSAL, {
           message: error.message,
-          hint: error.hint ?? "",
-          key: error.key,
-          file: error.file ?? error.boundFile,
-          details: error.details ?? null,
         });
       }
       throw error;
