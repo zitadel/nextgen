@@ -17,8 +17,10 @@ from its users, and how the server enforces it.
 ## Context
 
 Customers do not all need the same authentication from their users. They might
-need multi-factor authentication (MFA) from every user of a project, only from the administrators of their app, 
-or let their users sign in with a password and ask them to verify again before a sensitive action, such as updating payment details.
+need multi-factor authentication (MFA) from every user of a project, only from
+the administrators of their app, or let their users sign in with a password and
+ask them to verify again before a sensitive action, such as updating payment
+details.
 
 All of these cases require reading the requirement, comparing it against the
 user's completed checks, and prompting only for the checks that are missing.
@@ -84,8 +86,9 @@ comparison and the requirement that it compares in each situation.
 | **Sensitive action**  | App sends `acr_values`, `max_age`, or both.                            | Policy + Request ([§4.2](#42-step-up-and-reauthentication-sensitive-actions))           |
 | **Method management** | User's session requests a change to their own methods.                 | Policy + fresh checks in the same attempt ([§4.6](#46-changing-authentication-methods)) |
 
-- **Two-point evaluation:** The server evaluates at attempt **creation** (to
-  find missing checks) and again at **completion**.
+- **When the server evaluates:** At attempt creation, to find the missing
+  checks, after each completed check, to update the list, and at completion, to
+  enforce the requirement.
 - **Age at completion:** A check's age is measured when the attempt completes.
   Because an attempt can stay open for 15 minutes, a check that was fresh at
   creation may expire before completion and need to be repeated.
@@ -110,13 +113,13 @@ yet is listed under [Open questions](#open-questions).
 
 ### 2. Policy Configuration
 
-Requirements express **expected proof**, not specific methods. User schemas
-define available methods via `x-auth-methods`, so enabling a new method requires
-no policy change. Enrollment and sign-in read from the same schema, so they
-agree on which methods a user can use. Enrolling a method does not remove an
-existing sign-in option, because the server compares the proof with the
-requirement and not with a list of methods
-([#3166](https://github.com/zitadel/nextgen/issues/3166)).
+A requirement says what the proof must show, such as two different factor types.
+It does not list methods. The methods a user can use come from the user schema
+(`x-auth-methods`), so enabling a new method requires no policy change.
+Enrollment and sign-in read from the same schema, so they agree on which methods
+a user can use. Enrolling a method does not remove an existing sign-in option,
+because the server compares the proof with the requirement and not with a list
+of methods ([#3166](https://github.com/zitadel/nextgen/issues/3166)).
 
 Each method proves a fixed factor type.
 
@@ -188,12 +191,9 @@ The following rules apply to the settings:
 
 An attempt returns `required_factors`, the list of methods that the user can
 complete next. After each completed method, the server re-evaluates and returns
-an updated list until the attempt is `completed`. Because users complete one
-method at a time, the list does not need to describe the combinations of methods
-that satisfy a requirement.
-
-`required_factors` already exists in the session API, described as the methods
-the policy requires to complete the attempt
+an updated list until the attempt is `completed`. `required_factors` already
+exists in the session API, described as the methods the policy requires to
+complete the attempt
 (`api/openapi/endpoints/auth_attempts/auth-attempt-response.yaml`). The server
 returns an empty list on every attempt today (`IsCompleted` in
 `internal/domain/auth_attempt.go`), so the new meaning does not break a client.
@@ -217,7 +217,7 @@ enrolled methods:
   accepted.
 - **No standalone codes:** TOTP codes, SMS codes, and recovery codes are
   accepted only after another check (e.g., password), with appropriate
-  rate-limits for failed checks per user and method per
+  rate-limits for failed checks per user and method as defined in
   [ADR 078](078-abuse-prevention-in-layers.md#3-layer-2-guards-are-built-in-and-always-on).
 - **Uniform failures:** Checking an unenrolled method (e.g., password or TOTP)
   returns the same error and takes the same time as an incorrect credential.
@@ -258,9 +258,11 @@ methods before completion:
   one app keeps access until the session expires. A token refresh is not
   evaluated either, so `max_age_seconds` does not limit how long an app that
   refreshes its tokens keeps access ([Open question 3](#open-questions)).
-- With the session API, the server evaluates a session only when the app creates
-  an attempt on it (`POST /auth_attempts` with `session_id`). An app that only
-  reads the session is not evaluated ([Open question 3](#open-questions)).
+- With the session API, the server evaluates an existing session when the app
+  starts a new attempt for it (`POST /auth_attempts` with `session_id`). Reading
+  the session (`getSession`) does not evaluate it. After a stricter policy is
+  deployed, a session that satisfied the old policy therefore keeps access until
+  the app starts a new attempt for it ([Open question 3](#open-questions)).
 
 #### 4.2 Step-Up and Reauthentication (Sensitive Actions)
 
@@ -285,6 +287,7 @@ The following rules apply to the values:
 - `acr_values` and `max_age` can be combined. `max_age=0` and `prompt=login` are
   equivalent
   ([OpenID Connect Core §3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest)).
+  With either, the user completes the required checks again in the same session.
 
 **Refused requests:** The server refuses a request if:
 
@@ -306,24 +309,25 @@ recommends for access tokens. With `prompt=none`, insufficient proof returns
 
 **Reporting the result:**
 
-- **OIDC / OAuth tokens:** Access tokens (and ID tokens for OIDC) include two
-  claims. A refreshed token keeps both:
+- **OIDC / OAuth tokens:** Access tokens, and ID tokens for OIDC, carry the
+  claims `acr` and `auth_time`. A token refresh does not change their values,
+  because the user does not authenticate again.
   [RFC 9470 §6.1](https://www.rfc-editor.org/rfc/rfc9470#section-6.1) states
   this for an access token, and
   [OpenID Connect Core §12.2](https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse)
-  requires it for `auth_time` in an ID token. The claims are:
+  requires it for `auth_time` in an ID token.
   - `acr`: First value from `acr_values` satisfied by the proof (omitted if
     `acr_values` was not requested).
-  - `auth_time`: The server reports the most recent time it can for the proof.
-    Each set of checks that satisfies the requirement is as old as its oldest
-    check. The server takes the set that is least old, and `auth_time` is the
-    time of the oldest check in that set. A session under `mfa` with a password
-    from two hours ago, a TOTP code from one minute ago and a UV passkey from
-    five minutes ago therefore gets an `auth_time` of five minutes ago: the
-    passkey alone satisfies `mfa`, while the password with the TOTP code is two
-    hours old. Without a policy or `acr_values`, the requirement is one
-    completed method ([§2](#2-policy-configuration)), so `auth_time` is the time
-    of the newest check.
+  - `auth_time`: A set of checks that satisfies the requirement counts from its
+    oldest check, because every check in the set must be within an age limit.
+    When several sets satisfy the requirement, the server reports the most
+    recent set. For example, a session under `mfa` has a password from two hours
+    ago, a TOTP code from one minute ago and a UV passkey from five minutes ago.
+    The password with the TOTP code counts as two hours old, because of the
+    password. The passkey alone also satisfies `mfa` and is five minutes old.
+    `auth_time` is therefore five minutes ago. Without a policy or `acr_values`,
+    the requirement is one completed method ([§2](#2-policy-configuration)), so
+    `auth_time` is the time of the newest check.
 
 - **Mandatory app validation:** Because authorization parameters transit the
   browser and can be tampered with, the app/API must verify `acr`, and compare
@@ -348,15 +352,17 @@ credentials through the following rules:
 
 1. Before enrolling a method, existing users must complete, in the same attempt,
    at least one check and one check for every factor type they have enrolled
-   (such as both a password and TOTP). Older session checks do not count. A user
-   who has a passkey must verify with a passkey using user verification; a
-   password and an SMS code are not enough
-   ([#3202](https://github.com/zitadel/nextgen/issues/3202)). A user whose
-   passkey cannot do user verification needs admin-authorized enrollment, and a
-   lost passkey follows [§4.4](#44-account-recovery) (see [Risks](#risks)). Once
-   enrolled, the new method counts toward the requirement in the same attempt,
-   and a passkey counts as two factor types only if its registration has the UV
-   flag set.
+   (such as both a password and TOTP). Older session checks do not count.
+   - **Users with a passkey:** They must verify with a passkey using user
+     verification; a password and an SMS code are not enough
+     ([#3202](https://github.com/zitadel/nextgen/issues/3202)).
+   - **Passkey without user verification:** The user needs admin-authorized
+     enrollment.
+   - **Lost passkey:** The user follows [§4.4](#44-account-recovery) (see
+     [Risks](#risks)).
+   - **After enrollment:** The new method counts toward the requirement in the
+     same attempt, and a passkey counts as two factor types only if its
+     registration has the UV flag set.
 2. No prior check is required when enrolling during account creation.
 3. Users with no method and no external sign-in cannot self-enroll under any
    policy (or without one). An administrator issues a single-use, time-limited,
@@ -473,7 +479,8 @@ session, and the following rules apply to it:
    - Users who have only an external sign-in sign in through the provider again
      ([§4.5](#45-external-sign-in), rule 5).
 
-2. Add or remove requests arriving before these checks are complete are refused.
+2. Requests to add/remove that arrive before these checks are complete are
+   refused.
 3. Recovery checks cannot authorize method changes, except for replacing a lost
    method under [Account Recovery](#44-account-recovery).
 4. Enrolling the first method of a factor type follows `first_enrollment`,
@@ -498,10 +505,13 @@ event, with who performed it and when
 
 ## Risks
 
-1. **Age limits shorter than attempt lifetime:** Because in-attempt checks
-   satisfy the attempt's age limit and attempts can stay open for 15 minutes, a
-   60-second limit can accept a check up to 15 minutes old. Exact enforcement
-   relies on the app validating `auth_time`
+1. **Age limits shorter than attempt lifetime:** A check completed during an
+   attempt counts as within that attempt's age limit
+   ([§2](#2-policy-configuration)), and an attempt can stay open for 15 minutes.
+   With a 60-second limit, a user can enter a password, complete the second
+   check 14 minutes later, and the server accepts the password. The token still
+   carries the password's time in `auth_time`, so an app that needs the limit to
+   hold exactly must compare `auth_time` with its own limit
    ([§4.2](#42-step-up-and-reauthentication-sensitive-actions)).
 2. **Enrollment is the weakest link:** Proof of `mfa` or `phishing_resistant`
    confirms which methods were used, not who enrolled them.
