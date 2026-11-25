@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BackendConflictError, BackendForbiddenError } from "@/lib/backend/errors";
+import { BackendConflictError, BackendForbiddenError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
 import { Output } from "@/lib/ui";

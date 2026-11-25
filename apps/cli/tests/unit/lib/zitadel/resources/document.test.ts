@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ZitadelConfigFileBrokenError, ZitadelConfigEditRefusedError } from "@/lib/zitadel/errors";
+import { ZitadelConfigFileBrokenError, ZitadelConfigEditRefusedError } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,

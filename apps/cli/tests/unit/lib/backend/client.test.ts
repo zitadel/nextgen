@@ -9,7 +9,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { connectionOf, REQUEST_TIMEOUT_MS, translateFailure } from "@/lib/backend/client";
-import { BackendRejectedError } from "@/lib/backend/errors";
+import { BackendRejectedError } from "@/lib/backend";
 
 const signal = new AbortController().signal;
 

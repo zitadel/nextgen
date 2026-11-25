@@ -1,12 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import { responseFailure } from "@/lib/backend";
-import { GitError } from "@/lib/git/errors";
+import { GitError } from "@/lib/git";
+import {
+  OrcaFrameworkMissingError,
+  OrcaFrameworkUnsupportedError,
+  OrcaInternalError,
+  OrcaPatchFileConflictError,
+  OrcaPatchFileMissingError,
+  OrcaPatchFileUnsupportedError,
+  OrcaRendererError,
+  OrcaScaffoldBlockedError,
+} from "@/lib/orca";
 import {
   BackendForbiddenError,
   BackendUnauthorizedError,
   BackendUnavailableError,
-} from "@/lib/backend/errors";
+} from "@/lib/backend";
 import {
   ERROR_CATEGORIES,
   EXIT_CODES,
@@ -731,5 +741,63 @@ describe("isCategorized", () => {
 
   it("refuses a value that is not an error", () => {
     expect(isCategorized({ category: "validation" })).toBe(false);
+  });
+});
+
+describe("toZitadelError for an orca failure", () => {
+  it.each([
+    ["no app", new OrcaFrameworkMissingError("why"), "E_FRAMEWORK_NOT_DETECTED"],
+    [
+      "a framework with no detector",
+      new OrcaFrameworkUnsupportedError("unknown", "why"),
+      "E_FRAMEWORK_NOT_DETECTED",
+    ],
+    [
+      "an unsupported layout",
+      new OrcaFrameworkUnsupportedError("layout", "why"),
+      "E_UNSUPPORTED_PROJECT_SHAPE",
+    ],
+    [
+      "an outdated app",
+      new OrcaFrameworkUnsupportedError("outdated", "why"),
+      "E_UNSUPPORTED_PROJECT_SHAPE",
+    ],
+    ["another framework", new OrcaFrameworkUnsupportedError("mismatch", "why"), "E_CONFLICT"],
+    ["an occupied directory", new OrcaScaffoldBlockedError("occupied", "why"), "E_CONFLICT"],
+    ["a Node too old", new OrcaScaffoldBlockedError("node", "why"), "E_VALIDATION"],
+    ["a missing command", new OrcaScaffoldBlockedError("command", "why"), "E_VALIDATION"],
+    ["a missing file", new OrcaPatchFileMissingError("why"), "E_NOT_FOUND"],
+    ["a conflicting file", new OrcaPatchFileConflictError("why"), "E_CONFLICT"],
+    ["an unsupported file", new OrcaPatchFileUnsupportedError("why"), "E_VALIDATION"],
+    ["an unknown renderer", new OrcaRendererError("unknown", "why"), "E_VALIDATION"],
+    ["a pending renderer", new OrcaRendererError("pending", "why"), "E_NOT_IMPLEMENTED"],
+    ["a bug", new OrcaInternalError("why"), "E_VALIDATION"],
+  ])("reports %s with its code", (_name, error, code) => {
+    expect(toZitadelError(error)).toMatchObject({ code, message: "why" });
+  });
+
+  it("words what to do next with the CLI's own flags", () => {
+    expect(toZitadelError(new OrcaFrameworkMissingError("why")).hint).toContain("--cwd");
+    expect(
+      toZitadelError(
+        new OrcaFrameworkUnsupportedError("mismatch", "why", {
+          details: { requested: "react", detected: "next", requestedName: "React" },
+        }),
+      ).hint,
+    ).toContain("--framework next");
+    expect(toZitadelError(new OrcaScaffoldBlockedError("occupied", "why")).hint).toContain(
+      "--force",
+    );
+    expect(toZitadelError(new OrcaRendererError("pending", "why")).hint).toContain("--renderer");
+  });
+
+  it("says whether replacing files would resolve a conflict", () => {
+    expect(
+      toZitadelError(new OrcaPatchFileConflictError("why", { force: "replaces" })).hint,
+    ).toContain("Rerun with --force");
+    expect(
+      toZitadelError(new OrcaPatchFileConflictError("why", { force: "useless" })).hint,
+    ).toContain("can't fix this");
+    expect(toZitadelError(new OrcaPatchFileConflictError("why")).hint).toBeUndefined();
   });
 });

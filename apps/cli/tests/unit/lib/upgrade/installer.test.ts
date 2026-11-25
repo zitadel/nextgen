@@ -5,7 +5,7 @@ import { afterEach, describe, expect } from "vitest";
 
 import { PM } from "@/lib/pm";
 import { Dependencies } from "@/lib/upgrade/dependencies";
-import { InstallError } from "@/lib/upgrade/errors";
+import { InstallError } from "@/lib/upgrade";
 import { PackageInstaller, type PlannedInstall } from "@/lib/upgrade/installer";
 import { UpgradePlan } from "@/lib/upgrade/plan";
 import { Release } from "@/lib/upgrade/release";

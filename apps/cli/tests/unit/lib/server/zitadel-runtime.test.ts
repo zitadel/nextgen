@@ -12,7 +12,7 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/server/local/runtime";
-import { LocalServerDockerMissingError, LocalServerPortBusyError } from "@/lib/server/errors";
+import { LocalServerDockerMissingError, LocalServerPortBusyError } from "@/lib/server";
 import {
   DestroyPermit,
   LocalRuntime,

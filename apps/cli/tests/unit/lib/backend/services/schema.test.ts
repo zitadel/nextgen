@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { responseFailure } from "@/lib/backend/client";
-import { BackendNotFoundError } from "@/lib/backend/errors";
+import { BackendNotFoundError } from "@/lib/backend";
 import { SchemaService } from "@/lib/backend/services/schema";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 

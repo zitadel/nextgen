@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendError } from "@/lib/backend/errors";
+import { BackendError } from "@/lib/backend";
 import { ClaimService } from "@/lib/backend/services/claim";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 

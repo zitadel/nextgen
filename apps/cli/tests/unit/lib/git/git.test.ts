@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GitBinaryMissingError, GitCommandFailedError } from "@/lib/git/errors";
+import { GitBinaryMissingError, GitCommandFailedError } from "@/lib/git";
 import { Git, GitResult } from "@/lib/git/git";
 import { GitScratch, isolateGit, write } from "@tests/helpers/git-repo";
 

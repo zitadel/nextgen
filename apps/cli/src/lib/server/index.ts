@@ -1,18 +1,25 @@
 export { AdminSession } from "./admin-session";
 export {
   LocalServerAdminError,
+  type LocalServerAdminReason,
   LocalServerBinaryError,
+  type LocalServerBinaryReason,
   LocalServerBusyError,
   LocalServerDockerMissingError,
   LocalServerDownError,
+  type LocalServerDownReason,
   LocalServerError,
+  type LocalServerErrorOptions,
   LocalServerFileError,
+  type LocalServerFileReason,
   LocalServerInternalError,
   LocalServerMalformedError,
+  type LocalServerMalformedReason,
   LocalServerPortBusyError,
   LocalServerPortFullError,
   LocalServerStartError,
   LocalServerStopError,
+  type LocalServerStopReason,
 } from "./errors";
 export { DestroyPermit } from "./local/destroy-permit";
 export type { EnvSummary, ResolvedEnv } from "./local/env-vars";

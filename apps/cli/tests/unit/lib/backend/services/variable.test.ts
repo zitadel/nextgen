@@ -8,7 +8,7 @@ import {
   BackendForbiddenError,
   BackendNotFoundError,
   BackendUnauthorizedError,
-} from "@/lib/backend/errors";
+} from "@/lib/backend";
 import {
   Variable,
   VariableRemoval,

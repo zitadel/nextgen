@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendForbiddenError, BackendNotFoundError } from "@/lib/backend/errors";
+import { BackendForbiddenError, BackendNotFoundError } from "@/lib/backend";
 import { UserService } from "@/lib/backend/services/user";
 import { fakeClient } from "@tests/helpers/fake-client";
 

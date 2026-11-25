@@ -4,7 +4,7 @@ import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { BackendConflictError, BackendForbiddenError } from "@/lib/backend/errors";
+import { BackendConflictError, BackendForbiddenError } from "@/lib/backend";
 import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";

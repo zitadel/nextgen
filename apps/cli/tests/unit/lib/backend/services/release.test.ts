@@ -1,7 +1,7 @@
 import { RevokeRelease409DetailsOriginsItemKind } from "@zitadel/api/generated/model";
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendConflictError } from "@/lib/backend/errors";
+import { BackendConflictError } from "@/lib/backend";
 import { ReleaseService } from "@/lib/backend/services/release";
 import { fakeClient } from "@tests/helpers/fake-client";
 import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
