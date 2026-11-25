@@ -12,7 +12,7 @@ const LIBRARY = join(import.meta.dirname, "../../../../src/lib/upgrade");
  * CLI. This checks direct imports only.
  */
 const ALLOWED =
-  /^(\.\/|node:|semver$|execa$|@\/lib\/(ci|errors|fs|json|pm|telemetry\/identity|ui\/output)$)/;
+  /^(\.\/|node:|semver$|execa$|@\/lib\/(ci|fs|json|pm|telemetry\/identity|ui\/output)$)/;
 
 /** Every module a source imports: `from "x"`, `import "x"` and `import("x")`. */
 function importsIn(source: string): string[] {
@@ -25,7 +25,9 @@ describe("lib/upgrade", () => {
   it("imports only itself, node, its two libraries and the utilities it is allowed", () => {
     const offending = readdirSync(LIBRARY).flatMap((file) => {
       return importsIn(readFileSync(join(LIBRARY, file), "utf8"))
-        .filter((source) => !ALLOWED.test(source))
+        .filter(
+          (source) => !ALLOWED.test(source) && !(file === "errors.ts" && source === "@/lib/errors"),
+        )
         .map((source) => `${file} imports ${source}`);
     });
 

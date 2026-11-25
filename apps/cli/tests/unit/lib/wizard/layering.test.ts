@@ -1,3 +1,5 @@
+import { posix } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { importsUnder } from "@tests/helpers/source-imports";
@@ -10,7 +12,7 @@ describe("lib/wizard layering", () => {
       return (
         !entry.target.startsWith("lib/wizard/") &&
         entry.target !== "lib/wizard" &&
-        entry.target !== "lib/errors"
+        !(entry.target === "lib/errors" && entry.file === posix.join("lib/wizard", "errors.ts"))
       );
     });
 
