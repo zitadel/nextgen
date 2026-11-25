@@ -1,6 +1,7 @@
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
+  ProxyRoute,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -13,6 +14,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxyRoute,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -169,8 +171,15 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
       return;
     }
 
-    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url, proxyPath, urlObj, projectId, proxyTimeoutMs);
+    const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+    // An OAuth issuer that is not this app's project: the app answers, so its
+    // origin never serves another project's issuer.
+    if (route?.refused) {
+      setResponseStatus(event, 404);
+      return "Not Found";
+    }
+    if (route) {
+      return proxyRequest(event, url, route, urlObj, projectId, proxyTimeoutMs);
     }
 
     return handleAuth(event, {
@@ -190,7 +199,7 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
+ * Forwards a request the proxy handles to the upstream auth backend and streams
  * the response back, including its `Set-Cookie` headers. Hop-by-hop headers are
  * stripped in both directions, and the session cookie travels under this
  * project's name in the browser and the server's name upstream
@@ -198,7 +207,7 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
  *
  * @param event      - The current H3 event.
  * @param authUrl    - Base URL of the auth backend.
- * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
+ * @param route      - Where the request goes ({@link proxyRoute}).
  * @param url        - The parsed request URL.
  * @param projectId  - The project this app signs its users in to.
  * @returns The upstream response body stream.
@@ -206,12 +215,12 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
 async function proxyRequest(
   event: H3Event,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   url: URL,
   projectId: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<ReadableStream<Uint8Array> | null> {
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = getMethod(event);
@@ -222,6 +231,9 @@ async function proxyRequest(
     rawBody !== undefined && rawBody.byteLength > 0 ? new Uint8Array(rawBody) : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,

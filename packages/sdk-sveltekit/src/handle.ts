@@ -2,6 +2,7 @@ import type { RequestEvent } from "@sveltejs/kit";
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
+  ProxyRoute,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -12,6 +13,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxyRoute,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -116,20 +118,20 @@ function buildUpstreamHeaders(event: RequestEvent): Headers {
  *
  * @param event     - The current SvelteKit request event.
  * @param authUrl   - Base URL of the auth backend.
- * @param proxyPath - The path prefix being proxied (e.g. `"/__nextgen"`).
+ * @param route     - Where the request goes ({@link proxyRoute}).
  * @param projectId - The project this app signs its users in to.
  * @returns The proxied upstream `Response`.
  */
 async function proxyRequest(
   event: RequestEvent,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const { url } = event;
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = event.request.method;
@@ -140,6 +142,9 @@ async function proxyRequest(
   const body = hasBody ? await event.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,
@@ -385,8 +390,14 @@ export function createNextgenHandle(
       return resolve(event);
     }
 
-    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url, proxyPath, projectId, projectSecret, proxyTimeoutMs);
+    const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+    // An OAuth issuer that is not this app's project: the app answers, so its
+    // origin never serves another project's issuer.
+    if (route?.refused) {
+      return new Response("Not Found", { status: 404 });
+    }
+    if (route) {
+      return proxyRequest(event, url, route, projectId, projectSecret, proxyTimeoutMs);
     }
 
     return handleAuth(event, resolve, {

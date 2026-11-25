@@ -1,5 +1,9 @@
 import type { ZitadelProject } from "@zitadel/api/config";
-import type { NextgenMiddlewareOptions, ResolveSessionOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  NextgenMiddlewareOptions,
+  ProxyRoute,
+  ResolveSessionOptions,
+} from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 import type { NextRequest } from "next/server";
 
@@ -9,6 +13,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxyRoute,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -125,8 +130,14 @@ export async function nextgenMiddleware(
     return NextResponse.next();
   }
 
-  if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, url, proxyPath, projectId, proxyTimeoutMs);
+  const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+  // An OAuth issuer that is not this app's project: the app answers, so its
+  // origin never serves another project's issuer.
+  if (route?.refused) {
+    return new Response("Not Found", { status: 404 });
+  }
+  if (route) {
+    return proxyRequest(req, url, route, projectId, proxyTimeoutMs);
   }
 
   return handleAuth(req, {
@@ -145,7 +156,7 @@ export async function nextgenMiddleware(
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
+ * Forwards a request the proxy handles to the upstream auth backend and streams
  * the response back, stripping hop-by-hop headers in both directions. The
  * session cookie travels under this project's name in the browser and the
  * server's name upstream ({@link proxySessionCookies}).
@@ -159,19 +170,19 @@ export async function nextgenMiddleware(
  *
  * @param req        - The incoming edge request.
  * @param authUrl    - Base URL of the auth backend.
- * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
+ * @param route      - Where the request goes ({@link proxyRoute}).
  * @param projectId  - The project this app signs its users in to.
  * @returns The proxied upstream `Response`.
  */
 async function proxyRequest(
   req: NextRequest,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   projectId: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const url = new URL(req.url);
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const upstreamHeaders = new Headers();
@@ -198,6 +209,10 @@ async function proxyRequest(
 
   if (!upstreamHeaders.has("x-forwarded-proto")) {
     upstreamHeaders.set("x-forwarded-proto", url.protocol.replace(":", ""));
+  }
+
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
   }
 
   const sessionCookies = proxySessionCookies(

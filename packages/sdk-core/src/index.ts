@@ -11,6 +11,7 @@ export {
   matchesRoutes,
   filterResponseHeaders,
   requiresProjectSecret,
+  proxyRoute,
   checkOpaqueSessionToken,
   validateOpaqueSessionToken,
   jwtNamesProject,
@@ -34,6 +35,8 @@ export type {
   ProxiedRequest,
   ProxiedAnswer,
   ProxiedSessionCookies,
+  ProxyRoute,
+  ProxyRouteOptions,
   ProxyUpstream,
   BrowserRequest,
 } from "./middleware.js";

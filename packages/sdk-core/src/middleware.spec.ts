@@ -14,6 +14,7 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   jwtNamesProject,
+  proxyRoute,
   proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
@@ -269,6 +270,80 @@ describe("a compressed upstream answer", () => {
     expect(proxied.headers.has("content-length")).toBe(false);
     expect(proxied.headers.get("content-type")).toBe("application/json");
     expect(await proxied.json()).toEqual(exchanged);
+  });
+});
+
+describe("proxyRoute", () => {
+  const options = { proxyPath: "/__nextgen", projectId: "proj_app", loginPath: "/login" };
+  const METADATA = "/.well-known/oauth-authorization-server";
+
+  it("sends a path under the proxy path to the server without the prefix", () => {
+    expect(proxyRoute("/__nextgen/api/v1/flows", options)).toMatchObject({
+      path: "/api/v1/flows",
+      refused: false,
+    });
+    expect(proxyRoute("/__nextgen", options)).toMatchObject({ path: "", refused: false });
+  });
+
+  it("leaves every other path to the app", () => {
+    expect(proxyRoute("/", options)).toBeUndefined();
+    expect(proxyRoute("/__nextgen-evil/resource", options)).toBeUndefined();
+    expect(proxyRoute("/.well-known/openid-configuration", options)).toBeUndefined();
+    expect(proxyRoute(METADATA, options)).toBeUndefined();
+    expect(proxyRoute(`${METADATA}/__nextgen/oauthx/proj_app`, options)).toBeUndefined();
+  });
+
+  it("forwards this project's OAuth issuer and what lies under it", () => {
+    for (const path of [
+      "/oauth/proj_app",
+      "/oauth/proj_app/authorize",
+      "/oauth/proj_app/.well-known/openid-configuration",
+    ]) {
+      expect(proxyRoute(`/__nextgen${path}`, options)).toMatchObject({ path, refused: false });
+    }
+  });
+
+  it.each([
+    ["another project's issuer", "/__nextgen/oauth/proj_other/authorize"],
+    ["a project whose id starts with this one's", "/__nextgen/oauth/proj_app2/authorize"],
+    ["the platform project's issuer", "/__nextgen/oauth"],
+    ["the platform project's endpoints", "/__nextgen/oauth/authorize"],
+    ["another project's metadata", `${METADATA}/__nextgen/oauth/proj_other`],
+    ["the platform project's metadata", `${METADATA}/__nextgen/oauth`],
+    ["a path under this project's metadata", `${METADATA}/__nextgen/oauth/proj_app/more`],
+  ])("refuses %s", (_name, pathname) => {
+    expect(proxyRoute(pathname, options)?.refused).toBe(true);
+  });
+
+  it("maps this project's issuer metadata onto the server's path", () => {
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, options)).toMatchObject({
+      path: `${METADATA}/oauth/proj_app`,
+      refused: false,
+    });
+  });
+
+  it("refuses every OAuth path when the app has no project", () => {
+    const anonymous = { ...options, projectId: undefined };
+    expect(proxyRoute("/__nextgen/oauth/proj_app/authorize", anonymous)?.refused).toBe(true);
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, anonymous)?.refused).toBe(true);
+    expect(proxyRoute("/__nextgen/api/v1/flows", anonymous)?.refused).toBe(false);
+  });
+
+  it("follows a proxy path of the app's own", () => {
+    const custom = { ...options, proxyPath: "/auth" };
+    expect(proxyRoute(`${METADATA}/auth/oauth/proj_app`, custom)).toMatchObject({
+      path: `${METADATA}/oauth/proj_app`,
+      refused: false,
+      headers: { "x-forwarded-prefix": "/auth" },
+    });
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, custom)).toBeUndefined();
+  });
+
+  it("names the proxy path and the login page's path in the headers", () => {
+    expect(
+      proxyRoute("/__nextgen/api/v1/flows", { ...options, loginPath: "/signin?from=app#top" })
+        ?.headers,
+    ).toEqual({ "x-forwarded-prefix": "/__nextgen", "x-zitadel-login-path": "/signin" });
   });
 });
 

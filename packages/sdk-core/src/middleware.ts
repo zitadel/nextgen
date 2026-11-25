@@ -162,6 +162,106 @@ export function requiresProjectSecret(method: string, pathname: string): boolean
   return method.toUpperCase() === "POST" && operationPath(pathname) === "/sessions/exchange";
 }
 
+// ─── Proxy routing ───────────────────────────────────────────────────────────
+
+/**
+ * The root path RFC 8414 §3.1 puts an issuer's metadata under: the issuer's
+ * own path follows it.
+ */
+const AUTHORIZATION_SERVER_METADATA = "/.well-known/oauth-authorization-server";
+
+/** The path every OAuth issuer of the server lives under, before its project id. */
+const OAUTH_PREFIX = "/oauth";
+
+/** What decides where the proxy sends a request. */
+export interface ProxyRouteOptions {
+  /** The path prefix the app proxies, e.g. `"/__nextgen"`. */
+  readonly proxyPath: string;
+  /** The project this app signs its users in to. */
+  readonly projectId: string | undefined;
+  /** The app's login page, a path starting with a single `/`. */
+  readonly loginPath: string;
+}
+
+/** Where a request the proxy handles goes. */
+export interface ProxyRoute {
+  /**
+   * The path on the server, e.g. `/api/v1/flows`. Empty for a request to the
+   * proxy path itself.
+   */
+  readonly path: string;
+  /**
+   * The proxy answers `404` itself and forwards nothing: the path names an
+   * OAuth issuer that is not this app's project.
+   */
+  readonly refused: boolean;
+  /**
+   * Headers that tell the server how the request reached the app. Set them on
+   * the request to the server, replacing whatever the client sent under those
+   * names:
+   *
+   * - `x-forwarded-prefix`: the proxy path. The server builds the OAuth issuer
+   *   from it, and the issuer must equal the URL the client fetched
+   *   (RFC 8414 §3.3).
+   * - `x-zitadel-login-path`: the app's login page, where the server sends an
+   *   authorization request (ADR 081 §7). Only the path of `loginPath` goes:
+   *   the server accepts no query or fragment.
+   */
+  readonly headers: Readonly<Record<string, string>>;
+}
+
+/** Whether `path` is `prefix` or lies under it. */
+function isUnder(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/**
+ * Where the proxy sends a request, or `undefined` when the request is not
+ * the proxy's.
+ *
+ * - A path under `proxyPath` goes to the server without the prefix.
+ * - The RFC 8414 metadata of the project's OAuth issuer sits outside the
+ *   prefix. The issuer is `{origin}{proxyPath}/oauth/{projectId}`, so a client
+ *   reads its metadata at
+ *   `/.well-known/oauth-authorization-server{proxyPath}/oauth/{projectId}`,
+ *   which goes to the server's
+ *   `/.well-known/oauth-authorization-server/oauth/{projectId}`. OpenID
+ *   Connect Discovery needs no mapping: it sits under the issuer, and so
+ *   under `proxyPath`.
+ * - An OAuth path of another project, or of any when the app has no project,
+ *   is refused. The server takes the issuer's origin from the forwarded
+ *   headers, so an app that forwarded another project's issuer would lend
+ *   that project its origin. The platform project's issuer, `/oauth` itself,
+ *   is never reached through an app either.
+ *
+ * @param pathname - The request's path.
+ * @param options  - The app's proxy path, project and login page.
+ */
+export function proxyRoute(pathname: string, options: ProxyRouteOptions): ProxyRoute | undefined {
+  const { proxyPath, projectId, loginPath } = options;
+  const headers = {
+    "x-forwarded-prefix": proxyPath,
+    "x-zitadel-login-path": loginPath.split(/[?#]/, 1)[0] ?? loginPath,
+  };
+  const ownIssuer = projectId ? `${OAUTH_PREFIX}/${projectId}` : undefined;
+  if (isUnder(pathname, proxyPath)) {
+    const path = pathname.slice(proxyPath.length);
+    const refused =
+      isUnder(path, OAUTH_PREFIX) && (ownIssuer === undefined || !isUnder(path, ownIssuer));
+    return { path, refused, headers };
+  }
+  const issuers = `${AUTHORIZATION_SERVER_METADATA}${proxyPath}${OAUTH_PREFIX}`;
+  if (isUnder(pathname, issuers)) {
+    const issuer = `${OAUTH_PREFIX}${pathname.slice(issuers.length)}`;
+    return {
+      path: `${AUTHORIZATION_SERVER_METADATA}${issuer}`,
+      refused: issuer !== ownIssuer,
+      headers,
+    };
+  }
+  return undefined;
+}
+
 // ─── Response header filtering ───────────────────────────────────────────────
 
 /**
@@ -851,7 +951,11 @@ export type NextgenMiddlewareOptions = {
    *
    * Sign-in with an external provider currently requires the default: the
    * provider returns to `/__nextgen/idp/{slug}/callback`, which is proxied only under
-   * the default prefix.
+   * the default prefix. So does the project's OAuth issuer,
+   * `{origin}/__nextgen/oauth/{projectId}`: the proxy also serves its metadata
+   * at `/.well-known/oauth-authorization-server/__nextgen/oauth/{projectId}`,
+   * and answers `404` for an OAuth path of any other project
+   * ({@link proxyRoute}).
    * @default "/__nextgen"
    */
   proxyPath?: string;
@@ -883,6 +987,9 @@ export type NextgenMiddlewareOptions = {
    * Pathname to redirect unauthenticated users to.
    * A `next` query parameter carries the requested path and query string,
    * where `<zitadel-login>` returns after sign-in.
+   *
+   * The proxy tells the server this path on every request, without its query,
+   * and the server sends an OAuth authorization request there.
    * @default "/login"
    */
   loginPath?: string;

@@ -1,6 +1,7 @@
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
+  ProxyRoute,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -11,6 +12,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxyRoute,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -124,7 +126,7 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend and returns the
+ * Forwards a request the proxy handles to the upstream auth backend and returns the
  * upstream response, including its `Set-Cookie` headers. Hop-by-hop headers are
  * stripped in both directions, a `location` is kept only as a redirect onto this
  * app, and the session cookie travels under this project's name in the browser
@@ -133,12 +135,12 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
 async function proxyResponse(
   ev: QwikRequestEvent,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
-  const suffix = ev.url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${ev.url.search}`;
 
   const method = ev.request.method;
@@ -146,6 +148,9 @@ async function proxyResponse(
   const body = hasBody ? await ev.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(ev);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,
@@ -367,8 +372,15 @@ export function createNextgenOnRequest(
       return;
     }
 
-    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      ev.send(await proxyResponse(ev, url, proxyPath, projectId, projectSecret, proxyTimeoutMs));
+    const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+    // An OAuth issuer that is not this app's project: the app answers, so its
+    // origin never serves another project's issuer.
+    if (route?.refused) {
+      ev.send(new Response("Not Found", { status: 404 }));
+      return;
+    }
+    if (route) {
+      ev.send(await proxyResponse(ev, url, route, projectId, projectSecret, proxyTimeoutMs));
       return;
     }
 
