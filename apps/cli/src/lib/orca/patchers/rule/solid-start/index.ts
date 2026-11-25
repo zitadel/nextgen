@@ -136,7 +136,7 @@ export class SolidStartPatcher extends AbstractRulePatcher {
     return {
       title: "SolidStart integration",
       detail:
-        "Wrote src/middleware.ts (@zitadel/sdk-solid-start) plus landing/login/register/profile routes using @zitadel/sdk-solid components and wired the middleware via solidStart({ middleware }) in vite.config.*.",
+        "Wrote src/middleware.ts (@zitadel/sdk-solid-start) plus landing/login/register/profile routes that import the widgets from @zitadel/sdk-solid-start/components and wired the middleware via solidStart({ middleware }) in vite.config.*.",
     };
   }
 }

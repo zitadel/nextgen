@@ -10,7 +10,7 @@ pnpm add @zitadel/sdk-angular@latest
 
 ## Requirements
 
-Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`.
+Peer dependencies: `@angular/core` and `@angular/common`, both `>=19`, the first release where signal inputs and `output()` are stable. The components use `input()` and `output()`, so you bind them with the same template syntax as any input and output.
 
 Edge support follows Angular's own: its server rendering targets Node, and the application builder produces a bundle without Node APIs only through the experimental `ssr.platform: "neutral"` option. In an Angular 22.2.3 app built with that option and `conditions: ["workerd", "browser"]`, the three wrappers bundle, load and server-render inside the `edge-runtime` VM, each as its custom element tag with its attributes. The package's tests cover the built package in that VM with the Angular linker applied, as a consumer's build applies it: they load it without a DOM, render each widget by its tag name, and check the attributes written into the login markup and that `lang` is left out when unset. Without those `conditions` the build stops while extracting routes with `document is not defined`, because the components root then loads Lit. The builder applies `conditions` to the browser bundle too, and the edge build of `@zitadel/components` registers no elements, so that bundle does not register the widgets; the browser side of an edge deployment has not been verified.
 
@@ -53,7 +53,7 @@ The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSess
 
 ## Widget props and events
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below as signal inputs (`input()`), spelled the same in every SPA SDK. An unset prop keeps the widget's own default. The exported `ZitadelLoginProps`, `ZitadelLogoutProps` and `ZitadelSessionProps` types describe these inputs only, and a unit test fails when they and a component's inputs differ.
 
 | Prop | Type | Default | Widgets | Description |
 | --- | --- | --- | --- | --- |
@@ -75,9 +75,9 @@ The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSess
 | `locales` | `Record<string, Partial<Record<string, string>>>` | unset | Login | Copy overrides merged over the builtin dictionaries, keyed by primary language subtag, for example `{ en: { "identifier.title": "Welcome back" } }`. |
 | `lang` | `string` | browser language | Login | BCP-47 language override. |
 
-Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
+Each widget event is an Angular output (`output()`) named in the last column, which emits the event's `detail` payload. There are no callback props.
 
-| Widget event | Fires when | Detail | Widgets | Callback |
+| Widget event | Fires when | Detail | Widgets | Output |
 | --- | --- | --- | --- | --- |
 | `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `(flowStep)` |
 | `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `(flowInput)` |

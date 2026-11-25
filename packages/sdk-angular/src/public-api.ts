@@ -7,6 +7,11 @@ import "@zitadel/components";
 export { ZitadelLogin } from "./lib/zitadel-login.component.js";
 export { ZitadelLogout } from "./lib/zitadel-logout.component.js";
 export { ZitadelSession } from "./lib/zitadel-session.component.js";
+export type {
+  ZitadelLoginProps,
+  ZitadelLogoutProps,
+  ZitadelSessionProps,
+} from "./lib/types.js";
 export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
 export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";
 // The shared SPA widget types, named one by one so the public surface is a
@@ -21,9 +26,6 @@ export type {
   ZitadelFlowInputDetail,
   ZitadelFlowRedirectDetail,
   ZitadelFlowStepDetail,
-  ZitadelLoginProps,
-  ZitadelLogoutProps,
-  ZitadelSessionProps,
   ZitadelSignoutDetail,
 } from "@zitadel/sdk-core/types";
 

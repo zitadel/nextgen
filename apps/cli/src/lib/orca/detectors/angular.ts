@@ -11,7 +11,7 @@ import { enforceVersionFloor } from "./version-floor";
  * is Vite-based but configured via `angular.json` + a `proxy.conf.cjs`, not a
  * `vite.config.ts` — handled by the Angular patcher.
  *
- * The managed templates use Angular 17+ control flow (`@if`), so a project
+ * The SDK components use signal inputs and outputs, stable from Angular 19, so a project
  * below the declared floor fails fast with `E_UNSUPPORTED_PROJECT_SHAPE` instead of scaffolding files
  * that won't compile.
  */
@@ -19,7 +19,7 @@ export class AngularDetector implements Detector {
   readonly framework = "angular";
   readonly displayName = "Angular";
   readonly versionPackage = "@angular/core";
-  readonly versionFloor = "17";
+  readonly versionFloor = "19";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => {

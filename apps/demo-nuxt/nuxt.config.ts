@@ -1,5 +1,5 @@
 export default defineNuxtConfig({
-  buildDir: process.env.NEXTGEN_NUXT_BUILD_DIR ?? ".nuxt",
+  buildDir: process.env.ZITADEL_NUXT_BUILD_DIR ?? ".nuxt",
   modules: ["@zitadel/sdk-nuxt/module"],
   // Otherwise Nuxt asks for telemetry consent whenever its output is a
   // terminal, and turbo runs tasks in one it never answers: `build` and
@@ -28,7 +28,6 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      nextgenProxyPath: "/__nextgen",
       zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo",
     },
   },

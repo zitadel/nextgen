@@ -470,7 +470,7 @@ describe("props that become unset restore the element's defaults", () => {
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session)!;
     expect(el[prop]).toBe(given);
 
-    await rerender({ inputs: { [prop]: undefined } });
+    await rerender({ inputs: { [prop]: undefined }, partialUpdate: true });
 
     expect(el[prop]).toBe(expected);
   });
@@ -488,7 +488,7 @@ describe("props that become unset restore the element's defaults", () => {
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login)!;
     expect(el[prop]).toBe(given);
 
-    await rerender({ inputs: { [prop]: undefined } });
+    await rerender({ inputs: { [prop]: undefined }, partialUpdate: true });
 
     expect(el[prop]).toBe(expected);
   });
@@ -500,7 +500,7 @@ describe("props that become unset restore the element's defaults", () => {
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout)!;
     expect(el.theme).toBe("light");
 
-    await rerender({ inputs: { theme: undefined } });
+    await rerender({ inputs: { theme: undefined }, partialUpdate: true });
 
     expect(el.theme).toBe("");
   });

@@ -41,6 +41,7 @@ afterEach(() => {
 async function install(
   app: {
     zitadel?: Record<string, unknown>;
+    nextgen?: Record<string, unknown>;
     publicRuntimeConfig?: Record<string, unknown>;
     envLocal?: string;
     dev?: boolean;
@@ -51,13 +52,48 @@ async function install(
   }
   const runtimeConfig = { public: { ...app.publicRuntimeConfig } };
   const nuxt = {
-    options: { rootDir, dev: app.dev ?? false, zitadel: app.zitadel ?? {}, runtimeConfig },
+    options: {
+      rootDir,
+      dev: app.dev ?? false,
+      zitadel: app.zitadel ?? {},
+      ...(app.nextgen === undefined ? {} : { nextgen: app.nextgen }),
+      runtimeConfig,
+    },
   };
   await zitadelModule({}, nuxt as unknown as Nuxt);
   return runtimeConfig as unknown as ModuleRuntimeConfig;
 }
 
 describe("@zitadel/sdk-nuxt module", () => {
+  describe("an app that still uses the old nextgen names", () => {
+    it("refuses the old `nextgen` key in nuxt.config.ts instead of ignoring protectedRoutes", async () => {
+      await expect(install({ nextgen: { protectedRoutes: ["/admin"] } })).rejects.toThrow(
+        "the `nextgen` key in nuxt.config.ts is now `zitadel`",
+      );
+    });
+
+    it("refuses a NUXT_NEXTGEN_* variable and names its replacement", async () => {
+      vi.stubEnv("NUXT_NEXTGEN_PROTECTED_ROUTES", "/admin");
+
+      await expect(install()).rejects.toThrow(
+        "NUXT_NEXTGEN_PROTECTED_ROUTES is now NUXT_ZITADEL_PROTECTED_ROUTES",
+      );
+    });
+
+    it("refuses the old public runtime settings", async () => {
+      await expect(install({ publicRuntimeConfig: { nextgenProxyPath: "/auth" } })).rejects.toThrow(
+        "runtimeConfig.public.nextgenProxyPath is now runtimeConfig.public.zitadelProxyPath",
+      );
+      await expect(install({ publicRuntimeConfig: { nextgenApiBase: "/auth" } })).rejects.toThrow(
+        "runtimeConfig.public.nextgenApiBase is now runtimeConfig.public.zitadelApiBase",
+      );
+    });
+
+    it("installs when the app uses the new names", async () => {
+      await expect(install({ zitadel: { protectedRoutes: ["/admin"] } })).resolves.toBeDefined();
+    });
+  });
+
   it("hands a custom proxyPath to the server middleware and to the widgets", async () => {
     const runtime = await install({ zitadel: { proxyPath: "/auth" } });
 

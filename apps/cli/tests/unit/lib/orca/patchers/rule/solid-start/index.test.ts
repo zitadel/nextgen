@@ -57,6 +57,9 @@ describe("SolidStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login.tsx")).toContain(
       "@zitadel/sdk-solid-start/components",
     );
+    expect(plan.summary.map((entry) => entry.detail).join(" ")).toContain(
+      "@zitadel/sdk-solid-start/components",
+    );
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("ZitadelLogin");
     // The widget registers Lit custom elements (customElements.define) at import
     // time, which crashes SSR. It must be loaded via SolidStart's clientOnly, not

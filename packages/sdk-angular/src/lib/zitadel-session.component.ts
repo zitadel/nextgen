@@ -2,14 +2,7 @@ import type { ElementRef } from "@angular/core";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
-import {
-  Component,
-  CUSTOM_ELEMENTS_SCHEMA,
-  EventEmitter,
-  Input,
-  Output,
-  ViewChild,
-} from "@angular/core";
+import { Component, CUSTOM_ELEMENTS_SCHEMA, input, output, viewChild } from "@angular/core";
 
 import type { ZitadelProject } from "@zitadel/sdk-core/config";
 
@@ -24,6 +17,10 @@ import "@zitadel/components";
  * and the component re-emits its detail on {@link ZitadelSession.signout}. The underlying
  * element is reachable through {@link ZitadelSession.element}.
  *
+ * Every input is a signal input declared with `input()`, and the event is an output declared with
+ * `output()`, so the component needs Angular 19 or later. The inputs are exactly the keys of
+ * {@link ZitadelSessionProps}.
+ *
  * @example
  * ```html
  * <zitadel-auth-session [project]="project" postSignOutUrl="/login" (signout)="onSignout($event)"
@@ -36,18 +33,18 @@ import "@zitadel/components";
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<zitadel-session
     #el
-    [project]="project"
-    [projectId]="projectId"
-    [proxyPath]="proxyPath"
-    [attr.project-id]="project?.projectId ?? projectId ?? null"
-    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
-    [attr.url]="project?.url ?? null"
-    [attr.post-sign-out-url]="postSignOutUrl"
-    [attr.heading]="heading"
-    [attr.logout-label]="logoutLabel"
-    [attr.variant]="variant ?? null"
-    [attr.theme]="theme ?? null"
-    [suppressHeader]="suppressHeader"
+    [project]="project()"
+    [projectId]="projectId()"
+    [proxyPath]="proxyPath()"
+    [attr.project-id]="project()?.projectId ?? projectId() ?? null"
+    [attr.proxy-path]="project()?.proxyPath ?? proxyPath() ?? null"
+    [attr.url]="project()?.url ?? null"
+    [attr.post-sign-out-url]="postSignOutUrl()"
+    [attr.heading]="heading()"
+    [attr.logout-label]="logoutLabel()"
+    [attr.variant]="variant() ?? null"
+    [attr.theme]="theme() ?? null"
+    [suppressHeader]="suppressHeader()"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-session>`,
 })
@@ -67,7 +64,7 @@ export class ZitadelSession {
    * <zitadel-auth-session [project]="project" />
    * ```
    */
-  @Input() project?: ZitadelProject;
+  readonly project = input<ZitadelProject>();
   /**
    * The id of the project the widget works with.
    *
@@ -80,7 +77,7 @@ export class ZitadelSession {
    * <zitadel-auth-session projectId="123456789" />
    * ```
    */
-  @Input() projectId?: string;
+  readonly projectId = input<string>();
   /**
    * The same-origin proxy path the widget calls instead of the Zitadel API directly.
    *
@@ -96,7 +93,7 @@ export class ZitadelSession {
    * <zitadel-auth-session proxyPath="/auth-proxy" />
    * ```
    */
-  @Input() proxyPath?: string;
+  readonly proxyPath = input<string>();
   /**
    * The URL the widget navigates to after sign-out.
    *
@@ -109,7 +106,7 @@ export class ZitadelSession {
    * <zitadel-auth-session postSignOutUrl="/login" />
    * ```
    */
-  @Input() postSignOutUrl?: string;
+  readonly postSignOutUrl = input<string>();
   /**
    * The heading text of the card.
    *
@@ -121,7 +118,7 @@ export class ZitadelSession {
    * <zitadel-auth-session heading="Current account" />
    * ```
    */
-  @Input() heading?: string;
+  readonly heading = input<string>();
   /**
    * The label of the sign-out action.
    *
@@ -133,7 +130,7 @@ export class ZitadelSession {
    * <zitadel-auth-session logoutLabel="Leave" />
    * ```
    */
-  @Input() logoutLabel?: string;
+  readonly logoutLabel = input<string>();
   /**
    * The surface variant of the widget.
    *
@@ -149,7 +146,7 @@ export class ZitadelSession {
    * <zitadel-auth-session variant="page" />
    * ```
    */
-  @Input() variant?: "widget" | "page";
+  readonly variant = input<"widget" | "page">();
   /**
    * The colour mode of the widget.
    *
@@ -162,7 +159,7 @@ export class ZitadelSession {
    * <zitadel-auth-session theme="dark" />
    * ```
    */
-  @Input() theme?: "light" | "dark" | "auto";
+  readonly theme = input<"light" | "dark" | "auto">();
   /**
    * Whether the widget hides its own heading block.
    *
@@ -176,7 +173,7 @@ export class ZitadelSession {
    * <zitadel-auth-session [suppressHeader]="true" />
    * ```
    */
-  @Input() suppressHeader?: boolean;
+  readonly suppressHeader = input<boolean>();
   /**
    * Emits the `zitadel-signout` detail when the user signs out.
    *
@@ -188,9 +185,9 @@ export class ZitadelSession {
    * <zitadel-auth-session (signout)="onSignout($event)" />
    * ```
    */
-  @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
+  readonly signout = output<ZitadelSignoutDetail>();
 
-  @ViewChild("el") private elementRef?: ElementRef<ZitadelSessionElement>;
+  private readonly elementRef = viewChild<ElementRef<ZitadelSessionElement>>("el");
 
   /**
    * The underlying `<zitadel-auth-session>` custom element, or `null` before the view is
@@ -200,7 +197,7 @@ export class ZitadelSession {
    * an extra listener. It is `null` until Angular has rendered the template.
    */
   get element(): ZitadelSessionElement | null {
-    return this.elementRef?.nativeElement ?? null;
+    return this.elementRef()?.nativeElement ?? null;
   }
 
   /**

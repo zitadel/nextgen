@@ -58,6 +58,9 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain(
       "@zitadel/sdk-sveltekit/components",
     );
+    expect(plan.summary.map((entry) => entry.detail).join(" ")).toContain(
+      "@zitadel/sdk-sveltekit/components",
+    );
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("ZitadelLogin");
   });
 

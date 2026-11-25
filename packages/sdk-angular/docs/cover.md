@@ -1,4 +1,4 @@
-Angular components for the Zitadel sign-in UI, for client-side single-page apps. Each component wraps one of the Zitadel web components (`<zitadel-login>`, `<zitadel-logout>`, `<zitadel-session>`) so that you can bind inputs and outputs the Angular way instead of driving a custom element by hand. It is for Angular 17 and later apps that talk to Zitadel through a same-origin proxy.
+Angular components for the Zitadel sign-in UI, for client-side single-page apps. Each component wraps one of the Zitadel web components (`<zitadel-login>`, `<zitadel-logout>`, `<zitadel-session>`) so that you can bind inputs and outputs the Angular way instead of driving a custom element by hand. It is for Angular 19 and later apps, because the inputs are signal inputs (`input()`) and the events are `output()` outputs, which Angular 19 made stable. You bind them in templates exactly as before that talk to Zitadel through a same-origin proxy.
 
 ## Main components
 
@@ -9,13 +9,13 @@ Angular components for the Zitadel sign-in UI, for client-side single-page apps.
 - {@link getApi} and {@link getZitadelConfig} are the same functions every other SDK exports: the typed API client for a project handle, and the handle registered by {@link configureZitadel}.
 - `businessLocales` is the business copy overlay of `@zitadel/components`, re-exported so a scaffolded app can pass it as `locales` without depending on that package directly.
 
-The types for the props, the event details and the handlers are listed under the package's type aliases and interfaces, for example {@link ZitadelProject}, {@link ZitadelConfig} and {@link ZitadelFlowPurpose}.
+The types for the props, the event details and the handlers are listed under the package's type aliases and interfaces, for example {@link ZitadelProject}, {@link ZitadelConfig} and {@link ZitadelFlowPurpose}. {@link ZitadelLoginProps}, {@link ZitadelLogoutProps} and {@link ZitadelSessionProps} describe each component's inputs only; the events are outputs.
 
 ## How it works
 
 The wrappers are standalone, compiled Angular components, not dynamic ones: there is no NgModule or provider to register, and each template is fixed at build time. A template renders the real custom element under `CUSTOM_ELEMENTS_SCHEMA`, which is why the selectors are `zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session` and not the element names.
 
-Configuration reaches the element two ways. The `project` handle, `projectId`, `proxyPath`, `locales` and the boolean options are bound as DOM properties. `project-id`, `proxy-path`, `url`, `purpose`, `flow-name`, `post-sign-in-url`, `resume-flow-id`, `variant`, `theme` and `lang` (login) are also bound as attributes, so server-rendered markup carries them before hydration. Properties and callbacks are not in the server markup. The widget's `zitadel-*` events are re-emitted as Angular outputs (`flowStep`, `flowInput`, `flowComplete`, `flowRedirect`, `flowError`, `signout`) carrying the event's `detail`. The underlying element is available from each component's `element` getter.
+Configuration reaches the element two ways. The inputs are declared with `input()`. The `project` handle, `projectId`, `proxyPath`, `locales` and the boolean options are bound as DOM properties. `project-id`, `proxy-path`, `url`, `purpose`, `flow-name`, `post-sign-in-url`, `resume-flow-id`, `variant`, `theme` and `lang` (login) are also bound as attributes, so server-rendered markup carries them before hydration. Properties and callbacks are not in the server markup. The widget's `zitadel-*` events are re-emitted as Angular outputs (`flowStep`, `flowInput`, `flowComplete`, `flowRedirect`, `flowError`, `signout`), declared with `output()`, carrying the event's `detail`. The underlying element is available from each component's `element` getter.
 
 Importing the package registers the custom elements, but only in a browser. The element definitions exist only there; on the server the tags are plain unknown elements until the browser upgrades them. Mount the login widget on the client only, after hydration, or use a raw `<zitadel-login>` with `project-id` and `proxy-path` attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
 

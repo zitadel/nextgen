@@ -87,6 +87,12 @@ from a `./components` entry:
 | `sdk-solid-start` | `sdk-solid` |
 | `sdk-nuxt` | `sdk-vue` |
 
+`sdk-tanstack-start` is the one SDK whose `./components` entry does not re-export
+the three components as they are: TanStack Start renders on the server and then
+hydrates, so it wraps `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` in a
+client-only wrapper, and re-exports only the types and `businessLocales` by name.
+Its `configureZitadel` is in `./client`.
+
 The reasons, so that nobody removes the re-export as redundant:
 
 - **One import path for an app.** An app that imports from the framework SDK
@@ -134,6 +140,21 @@ Rules that follow:
   every other SDK. Their template selectors are `zitadel-auth-login`,
   `zitadel-auth-logout` and `zitadel-auth-session`, because `zitadel-login` and
   its siblings are the widgets' own element names.
+- **Angular uses signal inputs and outputs, and needs Angular 19 or newer.**
+  The components declare `input()` and `output()`, which are stable from
+  Angular 19, in place of `@Input()` and `@Output()`. Templates do not change
+  (`[project]="project"`, `(flowComplete)="track($event)"`). The widgets' shared
+  config fields are the inputs, one for one, and the shared event handlers are
+  the outputs, so Angular's `ZitadelLoginProps`, `ZitadelLogoutProps` and
+  `ZitadelSessionProps` are the inputs only: Angular has no `onFlowStep`
+  callback prop to put in them. A spec in `sdk-angular` fails when a component's
+  inputs and its Props type differ.
+- **Angular uses the shared `configureZitadel`.** `sdk-angular` used to keep a
+  local copy, because ng-packagr could not resolve the subpath-only exports of
+  `@zitadel/api`. The package now builds with `vite` and `ngc` and imports
+  `@zitadel/sdk-core/config` like every other SDK, so the constraint is gone and
+  the function is the shared one: it registers the project once, and a later
+  call with different values logs a warning and returns the first handle.
 - **Nothing is re-exported by barrel.** An SDK names what it exports
   (`export type { … }`), never `export type *` or `export *` from another
   package. The helpers of `@zitadel/sdk-core/types` (`widgetTags`,
@@ -175,6 +196,9 @@ Rules that follow:
 | the `@zitadel/sdk-tanstack-start/react` widget entry | `@zitadel/sdk-tanstack-start/components`, the name every meta-framework SDK uses |
 | `createNextgenHandle`, `createNextgenOnRequest`, `createNextgenRequestMiddleware`, `createNextgenMiddleware`, `nextgenMiddleware`, `handleNextgenRequest` | `createZitadelHandle`, `createZitadelOnRequest`, `createZitadelRequestMiddleware`, `createZitadelMiddleware`, `zitadelMiddleware`, `handleZitadelRequest` |
 | `NextgenSession` | `ZitadelAuthSession` (`ZitadelSession` is the widget) |
+| `ZitadelLoginProps`, `ZitadelLogoutProps`, `ZitadelSessionProps` of `sdk-angular`, which were the callback props of `sdk-core` | the inputs of each component only |
+| `@Input()` and `@Output()` in `sdk-angular`, peers `@angular/core` and `@angular/common` `>=17` | `input()` and `output()`, peers `>=19` |
+| the local `configureZitadel` of `sdk-angular` | the shared one from `@zitadel/sdk-core/config` |
 | `NextgenMiddlewareOptions`, `NextgenProvider`, `NextgenHandle`, `NextgenRequestOptions`, `NextgenRequestDecision` | `ZitadelMiddlewareOptions`, `ZitadelProvider`, `ZitadelHandle`, `ZitadelRequestOptions`, `ZitadelRequestDecision` |
 | the `x-nextgen-auth-token` header, `nextgenAuth` on the request context, the Nuxt `nextgen` configuration key and `NUXT_NEXTGEN_*` variables, the `plugin@nextgen.ts` Qwik route | `x-zitadel-auth-token`, `zitadelAuth`, `zitadel`, `NUXT_ZITADEL_*`, `plugin@zitadel.ts` |
 | the legacy `__nextgen_session` cookie handling in `sdk-core` | removed; the server already refuses that name |

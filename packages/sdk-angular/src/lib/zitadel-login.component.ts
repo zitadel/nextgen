@@ -9,14 +9,7 @@ import type {
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
 
-import {
-  Component,
-  CUSTOM_ELEMENTS_SCHEMA,
-  EventEmitter,
-  Input,
-  Output,
-  ViewChild,
-} from "@angular/core";
+import { Component, CUSTOM_ELEMENTS_SCHEMA, input, output, viewChild } from "@angular/core";
 
 import type { ZitadelProject } from "@zitadel/sdk-core/config";
 
@@ -46,6 +39,10 @@ import "@zitadel/components";
  * until the browser upgrades it, so mount the component on the client after hydration. A widget
  * that starts before its configuration arrives shows an error instead of the flow.
  *
+ * Every input is a signal input declared with `input()`, and every event is an output declared with
+ * `output()`, so the component needs Angular 19 or later. Templates bind them as they bind any
+ * input and output. The inputs are exactly the keys of {@link ZitadelLoginProps}.
+ *
  * The underlying custom element is reachable through {@link ZitadelLogin.element}, the
  * Angular counterpart of a React ref.
  *
@@ -67,23 +64,23 @@ import "@zitadel/components";
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<zitadel-login
     #el
-    [project]="project"
-    [projectId]="projectId"
-    [proxyPath]="proxyPath"
-    [attr.project-id]="project?.projectId ?? projectId ?? null"
-    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
-    [attr.url]="project?.url ?? null"
-    [locales]="locales"
-    [attr.lang]="lang ?? null"
-    [attr.purpose]="purpose"
-    [attr.flow-name]="flowName"
-    [attr.post-sign-in-url]="postSignInUrl"
-    [forcePostSignInUrl]="forcePostSignInUrl"
-    [attr.resume-flow-id]="resumeFlowId"
-    [attr.variant]="variant ?? null"
-    [attr.theme]="theme ?? null"
-    [suppressHeader]="suppressHeader"
-    [suppressPasswordToggle]="suppressPasswordToggle"
+    [project]="project()"
+    [projectId]="projectId()"
+    [proxyPath]="proxyPath()"
+    [attr.project-id]="project()?.projectId ?? projectId() ?? null"
+    [attr.proxy-path]="project()?.proxyPath ?? proxyPath() ?? null"
+    [attr.url]="project()?.url ?? null"
+    [locales]="locales()"
+    [attr.lang]="lang() ?? null"
+    [attr.purpose]="purpose()"
+    [attr.flow-name]="flowName()"
+    [attr.post-sign-in-url]="postSignInUrl()"
+    [forcePostSignInUrl]="forcePostSignInUrl()"
+    [attr.resume-flow-id]="resumeFlowId()"
+    [attr.variant]="variant() ?? null"
+    [attr.theme]="theme() ?? null"
+    [suppressHeader]="suppressHeader()"
+    [suppressPasswordToggle]="suppressPasswordToggle()"
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
     (zitadel-flow-complete)="onFlowComplete($event)"
@@ -107,7 +104,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login [project]="project" />
    * ```
    */
-  @Input() project?: ZitadelProject;
+  readonly project = input<ZitadelProject>();
   /**
    * The id of the project the widget works with.
    *
@@ -120,7 +117,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login projectId="123456789" />
    * ```
    */
-  @Input() projectId?: string;
+  readonly projectId = input<string>();
   /**
    * The same-origin proxy path the widget calls instead of the Zitadel API directly.
    *
@@ -136,7 +133,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login proxyPath="/auth-proxy" />
    * ```
    */
-  @Input() proxyPath?: string;
+  readonly proxyPath = input<string>();
   /**
    * The kind of flow the widget starts.
    *
@@ -151,7 +148,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login purpose="register" />
    * ```
    */
-  @Input() purpose: ZitadelFlowPurpose = "login";
+  readonly purpose = input<ZitadelFlowPurpose | undefined>("login");
   /**
    * The name of the flow definition to run.
    *
@@ -164,7 +161,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login flowName="partner-login" />
    * ```
    */
-  @Input() flowName?: string;
+  readonly flowName = input<string>();
   /**
    * The URL the widget navigates to after a completed sign-in.
    *
@@ -182,7 +179,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login postSignInUrl="/dashboard" />
    * ```
    */
-  @Input() postSignInUrl?: string;
+  readonly postSignInUrl = input<string>();
   /**
    * Whether the widget always navigates to {@link ZitadelLogin.postSignInUrl}, even when
    * the page's `next` query parameter names a path.
@@ -197,7 +194,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login postSignInUrl="/home" [forcePostSignInUrl]="true" />
    * ```
    */
-  @Input() forcePostSignInUrl?: boolean;
+  readonly forcePostSignInUrl = input<boolean>();
   /**
    * The id of an existing flow to resume instead of starting a new one.
    *
@@ -211,7 +208,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login [resumeFlowId]="flowId" />
    * ```
    */
-  @Input() resumeFlowId?: string | null;
+  readonly resumeFlowId = input<string | null>();
   /**
    * Copy overrides merged over the built-in dictionaries, keyed by primary language subtag.
    *
@@ -224,7 +221,7 @@ export class ZitadelLogin {
    * locales = { en: { "identifier.title": "Welcome back" } };
    * ```
    */
-  @Input() locales?: Record<string, Partial<Record<string, string>>>;
+  readonly locales = input<Record<string, Partial<Record<string, string>>>>();
   /**
    * The BCP 47 language the widget renders in.
    *
@@ -236,7 +233,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login lang="de" />
    * ```
    */
-  @Input() lang?: string;
+  readonly lang = input<string>();
   /**
    * The surface variant of the widget.
    *
@@ -252,7 +249,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login variant="page" />
    * ```
    */
-  @Input() variant?: "widget" | "page";
+  readonly variant = input<"widget" | "page">();
   /**
    * The colour mode of the widget.
    *
@@ -266,7 +263,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login theme="dark" />
    * ```
    */
-  @Input() theme?: "light" | "dark" | "auto";
+  readonly theme = input<"light" | "dark" | "auto">();
   /**
    * Whether the widget hides its own heading block.
    *
@@ -281,7 +278,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login [suppressHeader]="true" />
    * ```
    */
-  @Input() suppressHeader?: boolean;
+  readonly suppressHeader = input<boolean>();
   /**
    * Whether the widget hides the show and hide button on password fields.
    *
@@ -297,7 +294,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login [suppressPasswordToggle]="true" />
    * ```
    */
-  @Input() suppressPasswordToggle?: boolean;
+  readonly suppressPasswordToggle = input<boolean>();
   /**
    * Emits the `zitadel-flow-step` detail each time the widget shows a step, the first one included.
    *
@@ -308,7 +305,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login (flowStep)="onStep($event)" />
    * ```
    */
-  @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
+  readonly flowStep = output<ZitadelFlowStepDetail>();
   /**
    * Emits the `zitadel-flow-input` detail when the visitor edits a field.
    *
@@ -322,7 +319,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login (flowInput)="onInput($event)" />
    * ```
    */
-  @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
+  readonly flowInput = output<ZitadelFlowInputDetail>();
   /**
    * Emits the `zitadel-flow-complete` detail when the flow reaches a terminal step.
    *
@@ -335,7 +332,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login (flowComplete)="onComplete($event)" />
    * ```
    */
-  @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();
+  readonly flowComplete = output<ZitadelFlowCompleteDetail>();
 
   /**
    * Emits the `zitadel-flow-redirect` detail when the widget hands the browser to an identity
@@ -349,7 +346,7 @@ export class ZitadelLogin {
    * <zitadel-auth-login (flowRedirect)="onRedirect($event)" />
    * ```
    */
-  @Output() flowRedirect = new EventEmitter<ZitadelFlowRedirectDetail>();
+  readonly flowRedirect = output<ZitadelFlowRedirectDetail>();
   /**
    * Emits the `zitadel-flow-error` detail when the flow reports an error.
    *
@@ -360,9 +357,9 @@ export class ZitadelLogin {
    * <zitadel-auth-login (flowError)="onError($event)" />
    * ```
    */
-  @Output() flowError = new EventEmitter<ZitadelFlowErrorDetail>();
+  readonly flowError = output<ZitadelFlowErrorDetail>();
 
-  @ViewChild("el") private elementRef?: ElementRef<ZitadelLoginElement>;
+  private readonly elementRef = viewChild<ElementRef<ZitadelLoginElement>>("el");
 
   /**
    * The underlying `<zitadel-auth-login>` custom element, or `null` before the view is initialized.
@@ -371,7 +368,7 @@ export class ZitadelLogin {
    * an extra listener. It is `null` until Angular has rendered the template.
    */
   get element(): ZitadelLoginElement | null {
-    return this.elementRef?.nativeElement ?? null;
+    return this.elementRef()?.nativeElement ?? null;
   }
 
   /**

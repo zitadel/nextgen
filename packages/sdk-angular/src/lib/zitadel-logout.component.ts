@@ -2,14 +2,7 @@ import type { ElementRef } from "@angular/core";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
-import {
-  Component,
-  CUSTOM_ELEMENTS_SCHEMA,
-  EventEmitter,
-  Input,
-  Output,
-  ViewChild,
-} from "@angular/core";
+import { Component, CUSTOM_ELEMENTS_SCHEMA, input, output, viewChild } from "@angular/core";
 
 import type { ZitadelProject } from "@zitadel/sdk-core/config";
 
@@ -24,6 +17,10 @@ import "@zitadel/components";
  * detail on {@link ZitadelLogout.signout}. The underlying element is reachable through
  * {@link ZitadelLogout.element}.
  *
+ * Every input is a signal input declared with `input()`, and the event is an output declared with
+ * `output()`, so the component needs Angular 19 or later. The inputs are exactly the keys of
+ * {@link ZitadelLogoutProps}.
+ *
  * @example
  * ```html
  * <zitadel-auth-logout [project]="project" postSignOutUrl="/login" (signout)="onSignout($event)" />
@@ -35,14 +32,14 @@ import "@zitadel/components";
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<zitadel-logout
     #el
-    [project]="project"
-    [projectId]="projectId"
-    [proxyPath]="proxyPath"
-    [attr.project-id]="project?.projectId ?? projectId ?? null"
-    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
-    [attr.url]="project?.url ?? null"
-    [attr.post-sign-out-url]="postSignOutUrl"
-    [attr.theme]="theme ?? null"
+    [project]="project()"
+    [projectId]="projectId()"
+    [proxyPath]="proxyPath()"
+    [attr.project-id]="project()?.projectId ?? projectId() ?? null"
+    [attr.proxy-path]="project()?.proxyPath ?? proxyPath() ?? null"
+    [attr.url]="project()?.url ?? null"
+    [attr.post-sign-out-url]="postSignOutUrl()"
+    [attr.theme]="theme() ?? null"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-logout>`,
 })
@@ -62,7 +59,7 @@ export class ZitadelLogout {
    * <zitadel-auth-logout [project]="project" />
    * ```
    */
-  @Input() project?: ZitadelProject;
+  readonly project = input<ZitadelProject>();
   /**
    * The id of the project the widget works with.
    *
@@ -75,7 +72,7 @@ export class ZitadelLogout {
    * <zitadel-auth-logout projectId="123456789" />
    * ```
    */
-  @Input() projectId?: string;
+  readonly projectId = input<string>();
   /**
    * The same-origin proxy path the widget calls instead of the Zitadel API directly.
    *
@@ -91,7 +88,7 @@ export class ZitadelLogout {
    * <zitadel-auth-logout proxyPath="/auth-proxy" />
    * ```
    */
-  @Input() proxyPath?: string;
+  readonly proxyPath = input<string>();
   /**
    * The URL the widget navigates to after sign-out.
    *
@@ -104,7 +101,7 @@ export class ZitadelLogout {
    * <zitadel-auth-logout postSignOutUrl="/login" />
    * ```
    */
-  @Input() postSignOutUrl?: string;
+  readonly postSignOutUrl = input<string>();
   /**
    * The colour mode of the widget.
    *
@@ -116,7 +113,7 @@ export class ZitadelLogout {
    * <zitadel-auth-logout theme="dark" />
    * ```
    */
-  @Input() theme?: "light" | "dark" | "auto";
+  readonly theme = input<"light" | "dark" | "auto">();
   /**
    * Emits the `zitadel-signout` detail when the user signs out.
    *
@@ -128,9 +125,9 @@ export class ZitadelLogout {
    * <zitadel-auth-logout (signout)="onSignout($event)" />
    * ```
    */
-  @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
+  readonly signout = output<ZitadelSignoutDetail>();
 
-  @ViewChild("el") private elementRef?: ElementRef<ZitadelLogoutElement>;
+  private readonly elementRef = viewChild<ElementRef<ZitadelLogoutElement>>("el");
 
   /**
    * The underlying `<zitadel-auth-logout>` custom element, or `null` before the view is
@@ -140,7 +137,7 @@ export class ZitadelLogout {
    * an extra listener. It is `null` until Angular has rendered the template.
    */
   get element(): ZitadelLogoutElement | null {
-    return this.elementRef?.nativeElement ?? null;
+    return this.elementRef()?.nativeElement ?? null;
   }
 
   /**

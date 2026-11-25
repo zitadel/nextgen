@@ -140,7 +140,7 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
     return {
       title: "Qwik Router integration",
       detail:
-        "Wrote src/routes/plugin@zitadel.ts (@zitadel/sdk-qwik-router onRequest) plus landing/login/register/profile routes using @zitadel/sdk-qwik.",
+        "Wrote src/routes/plugin@zitadel.ts (@zitadel/sdk-qwik-router onRequest) plus landing/login/register/profile routes that import the widgets from @zitadel/sdk-qwik-router/components.",
     };
   }
 }

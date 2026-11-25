@@ -52,6 +52,9 @@ describe("QwikRouterPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain(
       "@zitadel/sdk-qwik-router/components",
     );
+    expect(plan.summary.map((entry) => entry.detail).join(" ")).toContain(
+      "@zitadel/sdk-qwik-router/components",
+    );
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("ZitadelLogin");
   });
 

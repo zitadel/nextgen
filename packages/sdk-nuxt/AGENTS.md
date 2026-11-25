@@ -3,22 +3,12 @@
 The SDK rules: [`../AGENTS.md`](../AGENTS.md). The public API standard:
 [ADR 090](../../docs/adrs/090-sdk-public-api-standard.md).
 
-## This package re-exports the widgets of `@zitadel/sdk-vue`
+## Widgets come from `@zitadel/sdk-vue`
 
-- **Keep the re-export.** `src/components.ts` exports the widget components, their props
-  types, the six event detail types, the three flow types, `businessLocales`
-  and `configureZitadel` from `@zitadel/sdk-vue`, by name and never
-  `export *`. It looks redundant because the same names exist in
-  `sdk-vue`; it is deliberate, and removing it is a regression.
-- **Why.** An app imports everything for nuxt from one package, a widget can
-  move between packages without breaking an app, and this SDK's reference
-  shows the same names as its siblings'. The full reasoning:
-  [ADR 090](../../docs/adrs/090-sdk-public-api-standard.md#widgets-come-through-the-framework-sdk).
-- **Keep it out of the server entries.** Widgets belong to the components
-  entry only; `./server` and `./client` load on edge runtimes and must not
-  pull the widget package.
-- **`@zitadel/sdk-vue` is a runtime `dependency`, not a peer**, and this
-  package's `build` and `dev` turbo tasks depend on its build.
-- **Change the two together.** A widget name added to or removed from
-  `sdk-vue` changes `src/components.ts` and `public-api.json` in the same change;
+- Keep `src/components.ts` re-exporting the widgets, their types, `businessLocales` and
+  `configureZitadel` of `@zitadel/sdk-vue` by name; never `export *`, never drop it as redundant.
+- The reasons are in [ADR 090](../../docs/adrs/090-sdk-public-api-standard.md#widgets-come-through-the-framework-sdk); read them before changing it.
+- Keep widgets out of `./server` and `./client`: those entries load on edge runtimes.
+- Keep `@zitadel/sdk-vue` a runtime `dependency` (not a peer) that builds first.
+- Change `src/components.ts` and `public-api.json` with any widget name change in `sdk-vue`;
   `sdk-core`'s contract spec fails on a missing name.

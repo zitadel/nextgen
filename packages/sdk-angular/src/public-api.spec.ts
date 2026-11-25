@@ -28,8 +28,8 @@ describe("package manifest", () => {
 
   it("declares its supported peer ranges", () => {
     expect(manifest.peerDependencies).toEqual({
-      "@angular/common": ">=17",
-      "@angular/core": ">=17",
+      "@angular/common": ">=19",
+      "@angular/core": ">=19",
     });
   });
 });

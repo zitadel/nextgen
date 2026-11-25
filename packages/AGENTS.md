@@ -36,7 +36,8 @@ change needs a changeset, and the whole train versions together.
   `sdk-tanstack-start` re-export `sdk-react`, `sdk-sveltekit` re-exports
   `sdk-svelte`, `sdk-qwik-router` re-exports `sdk-qwik`, `sdk-solid-start`
   re-exports `sdk-solid` and `sdk-nuxt` re-exports `sdk-vue`, from a
-  `./components` entry (kind `widgets`), by name and never `export *`. It looks
+  `./components` entry (kind `widgets`), by name and never `export *` (TanStack Start wraps the
+  three components so they mount in the browser only, and re-exports the rest). It looks
   redundant, because the widgets also exist in the UI SDK, and it is deliberate:
   an app imports everything for its framework from one package, a widget can
   move between packages without breaking an app, and the references of the
@@ -111,7 +112,7 @@ may have nothing else to read. Rules for those comments:
 - **Link a name only where every SDK that shows the comment exports it.**
   Otherwise write it as a plain literal; TypeDoc fails on a dead link.
 - **Build the references with `pnpm run docs:api`** at the root. It must print
-  no warning. Each SDK's `typedoc.json` differs from the others only in its
+  no warning, and CI runs it (the root `ci` script), so a warning fails the PR. Each SDK's `typedoc.json` differs from the others only in its
   `name` and `entryPoints` (Svelte also in `tsconfig`, because TypeDoc cannot
   read `.svelte`); shared options live in the root `typedoc.base.json`.
 - **Describe a change to an SDK's exports in its `public-api.json`** and in

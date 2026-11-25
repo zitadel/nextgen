@@ -156,7 +156,7 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     return {
       title: "SvelteKit integration",
       detail:
-        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle), declared its settings in src/env.ts, plus layout and landing/login/register/profile routes using @zitadel/sdk-svelte.",
+        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle), declared its settings in src/env.ts, plus layout and landing/login/register/profile routes that import the widgets from @zitadel/sdk-sveltekit/components.",
     };
   }
 }

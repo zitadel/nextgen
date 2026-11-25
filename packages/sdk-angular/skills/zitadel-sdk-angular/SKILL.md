@@ -22,7 +22,7 @@ The `zitadel` CLI scaffolds a *fresh* Angular app
 (`npx @zitadel/cli@latest setup --framework angular`) with this SDK already wired in. In an
 **existing** Angular app it writes the root component to `src/app/app.ts`, and
 stops with `E_CONFLICT` when the app has one there, or when `src/main.ts`
-bootstraps a root from another file (Angular 17–19's
+bootstraps a root from another file (Angular 19's
 `src/app/app.component.ts`). When setup stops, follow this skill to install the
 package and wire the components in manually.
 
@@ -32,7 +32,7 @@ package and wire the components in manually.
 npm install @zitadel/sdk-angular@latest
 ```
 
-Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
+Peer dependencies: `@angular/core` and `@angular/common`, both `>=19` (signal `input()` and `output()` are stable from 19). Requires TypeScript ≥ 5.0 (the published types use `export type *`).
 
 ## Integrate
 
@@ -83,7 +83,7 @@ The components are **standalone** — import them directly into a component's
 
 ## Widget props and events
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default. They are signal inputs, bound in templates the usual way.
 
 | Prop | Type | Default | Widgets | Description |
 | --- | --- | --- | --- | --- |
@@ -107,7 +107,7 @@ The components are **standalone** — import them directly into a component's
 
 Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
 
-| Widget event | Fires when | Detail | Widgets | Callback |
+| Widget event | Fires when | Detail | Widgets | Output |
 | --- | --- | --- | --- | --- |
 | `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `(flowStep)` |
 | `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `(flowInput)` |
@@ -132,8 +132,8 @@ exact names, inputs, and props, treat the installed package as authoritative:
 - The TypeScript types / exports (`node_modules/@zitadel/sdk-angular/dist/types/public-api.d.ts`)
   — the exported symbols (`ZitadelLogin`, `ZitadelLogout`,
   `ZitadelSession`, `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelConfig`,
-  `ZitadelProject`, `businessLocales`) and every component `@Input()` /
-  `@Output()`. Read them before using an input you are unsure of.
+  `ZitadelProject`, `businessLocales`) and every component `input()` and
+  `output()`. Read them before using an input you are unsure of.
 
 ## Gotchas
 

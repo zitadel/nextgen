@@ -1091,6 +1091,21 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       expect(served.headers.get("set-cookie")).toBeNull();
     });
 
+    // The name from before the project-named cookie is no credential and no source of one.
+    it("reads no session from the old __nextgen_session cookies", async () => {
+      const calls = captureFetch();
+
+      const served = await serve(
+        `${ORIGIN}/admin`,
+        { headers: { cookie: `__nextgen_session=old; __nextgen_session_${PROJECT}=old` } },
+        OPTIONS,
+      );
+
+      expect(served.status).toBe(302);
+      expect(calls).toHaveLength(0);
+      expect(served.headers.getSetCookie()).toEqual([]);
+    });
+
     // Any sibling host can plant an unprefixed cookie, and an https app never
     // sets one.
     it("reads no unprefixed session cookie over https", async () => {
