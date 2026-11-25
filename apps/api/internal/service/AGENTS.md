@@ -46,3 +46,12 @@ Authority (do not duplicate payload rules or the catalog table here):
   an index range, or as `match`. Never add it to a list's WHERE on its own.
 - A filter that must always fill its pages needs an index ending in
   `(created_at, id)` on all three dialects, pinned in `TestListEvents_FilterPlans`.
+
+## Background jobs
+
+- `JobStatements` is storage-only on `AllStatements`. The shared `jobs.Engine`
+  owns `RegisterWorker`, poll / `RunDueOnce`, and Take/Complete txs
+  ([ADR 065](../../../../docs/adrs/065-background-jobs.md)).
+- Product code Enqueues inside the caller’s write transaction. Boot calls
+  `SetPeriodic` from server config. Handlers that emit Path B use the system
+  actor. Guide: [`docs/design/jobs/`](../../../../docs/design/jobs/README.md).
