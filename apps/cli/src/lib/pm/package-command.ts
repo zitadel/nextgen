@@ -3,11 +3,7 @@ import { execa } from "execa";
 import { Cmd } from "@/lib/cmd";
 import { Output } from "@/lib/ui/output";
 
-import {
-  PmCommandFailedError,
-  PmCommandNotPermittedError,
-  PmCommandNotStartedError,
-} from "./errors";
+import { PmCommandFailedError, PmCommandNotPermittedError } from "./errors";
 import type { PMName } from "./pm";
 
 /**
@@ -132,7 +128,6 @@ export class PackageCommand {
    * off the terminal altogether.
    *
    * @param options - Where and how it runs.
-   * @throws {@link PmCommandNotStartedError} When the program or its directory is not there.
    * @throws {@link PmCommandNotPermittedError} When the operating system refuses to run it.
    * @throws {@link PmCommandFailedError} When the command cannot start otherwise or exits non-zero.
    */
@@ -158,29 +153,19 @@ export class PackageCommand {
     const result = await subprocess;
     if (result.code !== undefined && result.exitCode === undefined) {
       const message = result.originalMessage ?? result.message ?? "";
-      if (result.code === "ENOENT") {
-        throw new PmCommandNotStartedError(message, result.code);
-      }
       if (result.code === "EACCES" || result.code === "EPERM") {
-        throw new PmCommandNotPermittedError(message, result.code);
+        throw new PmCommandNotPermittedError(`Permission denied: ${message}`);
       }
-      throw new PmCommandFailedError(message, {
-        exit: result.code,
-      });
+      throw new PmCommandFailedError(message);
     }
     if (result.failed) {
       const detail = result.signal
         ? `signal ${result.signal}`
         : `exit ${String(result.exitCode ?? 1)}`;
-      throw new PmCommandFailedError(`${this.display} failed with ${detail}`, {
-        exit: result.exitCode ?? 1,
-        signal: result.signal ?? null,
-        ...(capture
-          ? {
-              output: String(result.all ?? ""),
-            }
-          : {}),
-      });
+      throw new PmCommandFailedError(
+        `${this.display} failed with ${detail}`,
+        capture ? String(result.all ?? "") : undefined,
+      );
     }
   }
 }

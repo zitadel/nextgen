@@ -59,9 +59,10 @@ export class Manifest {
     try {
       return new Manifest(parseJsonObject(text, path) as PackageJson);
     } catch (error) {
-      throw new PmManifestInvalidError(path, {
-        cause: error,
-      });
+      throw new PmManifestInvalidError(
+        error instanceof Error ? error.message : `Cannot read ${path} as a package.json`,
+        error,
+      );
     }
   }
 
@@ -90,9 +91,10 @@ export class Manifest {
         ? undefined
         : new Manifest(parseJsonObject(text, path) as PackageJson);
     } catch (error) {
-      throw new PmManifestInvalidError(path, {
-        cause: error,
-      });
+      throw new PmManifestInvalidError(
+        error instanceof Error ? error.message : `Cannot read ${path} as a package.json`,
+        error,
+      );
     }
   }
 }

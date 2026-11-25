@@ -1,7 +1,13 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { log, warnings, type BoxAction } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
-import { type DependencyInstall, type InstallContext, PM, type Runner } from "@/lib/pm";
+import {
+  type DependencyInstall,
+  type InstallContext,
+  PM,
+  PmCommandFailedError,
+  type Runner,
+} from "@/lib/pm";
 import { Guidance, suggestedCommandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { WizardStep } from "@/lib/wizard";
 
@@ -149,9 +155,7 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
                   ? {
                       name: error.name,
                       message: error.message,
-                      code:
-                        ("exit" in error ? error.exit : undefined) ??
-                        ("code" in error ? error.code : undefined),
+                      code: "code" in error ? error.code : undefined,
                     }
                   : {
                       message: String(error),
@@ -193,10 +197,7 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         if (this.deps.signal.aborted) {
           throw this.deps.signal.reason;
         }
-        const output =
-          typeof error === "object" && error !== null && "output" in error
-            ? error.output
-            : undefined;
+        const output = error instanceof PmCommandFailedError ? error.output : undefined;
         warnings.report(
           `${suggestedCommandOf(command.inDirectory(flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${
             typeof output === "string" && output.trim() !== ""

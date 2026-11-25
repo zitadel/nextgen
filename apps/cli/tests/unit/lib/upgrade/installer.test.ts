@@ -90,7 +90,7 @@ describe("PackageInstaller.install", () => {
     expect(error).toBeInstanceOf(UpgradeInstallFailedError);
     expect(error).toMatchObject({
       cause: {
-        exit: 3,
+        message: expect.stringContaining("exit 3"),
       },
     });
   });
