@@ -19,16 +19,7 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
     host = document.createElement("div");
     document.body.appendChild(host);
     await cdp().send("WebAuthn.enable");
-    ({ authenticatorId } = await cdp().send("WebAuthn.addVirtualAuthenticator", {
-      options: {
-        protocol: "ctap2",
-        transport: "internal",
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-        automaticPresenceSimulation: true,
-      },
-    }));
+    authenticatorId = await addAuthenticator();
   });
 
   afterEach(async () => {
@@ -39,6 +30,23 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
       host.remove();
     }
   });
+
+  async function addAuthenticator(
+    overrides: Record<string, boolean | string> = {},
+  ): Promise<string> {
+    const added = await cdp().send("WebAuthn.addVirtualAuthenticator", {
+      options: {
+        protocol: "ctap2",
+        transport: "internal",
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+        ...overrides,
+      },
+    });
+    return added.authenticatorId;
+  }
 
   function create(props: Partial<ZlPasskey> = {}): ZlPasskey {
     const el = document.createElement("zl-passkey") as ZlPasskey;
@@ -180,13 +188,12 @@ describe("<zl-passkey> virtual authenticator (chromium)", () => {
 
   it("signs in with a u2f security key over usb", async () => {
     const platformAuthenticatorId = authenticatorId;
-    ({ authenticatorId } = await cdp().send("WebAuthn.addVirtualAuthenticator", {
-      options: {
-        protocol: "u2f",
-        transport: "usb",
-        automaticPresenceSimulation: true,
-      },
-    }));
+    authenticatorId = await addAuthenticator({
+      protocol: "u2f",
+      transport: "usb",
+      hasResidentKey: false,
+      hasUserVerification: false,
+    });
     await cdp().send("WebAuthn.removeVirtualAuthenticator", {
       authenticatorId: platformAuthenticatorId,
     });

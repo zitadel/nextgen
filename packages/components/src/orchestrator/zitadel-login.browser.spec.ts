@@ -1023,13 +1023,11 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
     await cdp().send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false });
     setup([passkeyRegisterStep]);
     const element = mount();
+    const root = element.shadowRoot!;
 
-    const alert = await waitFor(
-      () => element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]"),
-      5000,
-    );
+    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"), 5000);
     expect(alert.textContent).toContain("The passkey prompt was closed before completing.");
-    expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+    expect(root.querySelector("zl-passkey")).toBeNull();
     expect(
       stub.calls.filter((call) => call.init?.method === "POST" && call.url.includes("/submit")),
     ).toHaveLength(0);
@@ -1042,20 +1040,18 @@ describe("<zitadel-login> passkey ceremony (chromium)", () => {
     });
     setup([passkeyRegisterStep]);
     const element = mount();
+    const root = element.shadowRoot!;
 
     const cancel = await waitFor(
-      () => element.shadowRoot?.querySelector('zl-button[data-testid="zitadel-passkey-cancel"]'),
+      () => root.querySelector('zl-button[data-testid="zitadel-passkey-cancel"]'),
       5000,
     );
     const inner = await waitFor(() => (cancel as HTMLElement).shadowRoot?.querySelector("button"));
     (inner as HTMLButtonElement).click();
 
-    const alert = await waitFor(
-      () => element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]"),
-      5000,
-    );
+    const alert = await waitFor(() => root.querySelector("zl-alert[data-zl-step-error]"), 5000);
     expect(alert.textContent).toContain("The passkey prompt was closed before completing.");
-    expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+    expect(root.querySelector("zl-passkey")).toBeNull();
     expect(
       stub.calls.filter((call) => call.init?.method === "POST" && call.url.includes("/submit")),
     ).toHaveLength(0);
