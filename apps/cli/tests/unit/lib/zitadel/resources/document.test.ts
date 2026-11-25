@@ -303,7 +303,9 @@ describe("ConfigDocument.parseFile", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
-    expect(error).toMatchObject({ problems: [{ path: PATH }] });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${PATH}:`),
+    });
   });
 });
 

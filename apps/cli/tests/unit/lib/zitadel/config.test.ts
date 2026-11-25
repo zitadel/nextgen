@@ -272,7 +272,9 @@ describe("ZitadelConfig.load", () => {
       return ZitadelConfig.load(store);
     });
 
-    expect(error).toMatchObject({ message: expect.stringContaining(`${BROKEN_SCHEMA}:`) });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${BROKEN_SCHEMA}:`),
+    });
   });
 
   it("refuses a file that could not be parsed, naming it", async () => {
@@ -283,7 +285,9 @@ describe("ZitadelConfig.load", () => {
       return ZitadelConfig.load(store);
     });
 
-    expect(error).toMatchObject({ message: expect.stringContaining(`${path}:`) });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${path}:`),
+    });
   });
 
   it("leaves a broken policy test file to the command that runs it", async () => {

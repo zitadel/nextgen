@@ -284,7 +284,9 @@ describe("assertFlowsIntact", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-    expect(error).toMatchObject({ message: expect.stringContaining(`${FLOW_PATH}:`) });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${FLOW_PATH}:`),
+    });
   });
 
   it("refuses a structurally broken flow as unchecked rather than unaffected", () => {
@@ -323,7 +325,9 @@ describe("assertFlowsIntact", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-    expect(error).toMatchObject({ message: expect.stringContaining(`${FLOW_PATH}:`) });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${FLOW_PATH}:`),
+    });
   });
 
   it("breaks nothing with an edit that writes nothing, even beside a broken flow", () => {

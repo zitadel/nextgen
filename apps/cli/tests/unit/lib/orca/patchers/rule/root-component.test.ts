@@ -162,10 +162,14 @@ describe("assertMountsRootComponent", () => {
 
     await expect(
       assertMountsRootComponent(rootRelative, "src/main.jsx", REACT_ROOT),
-    ).rejects.toMatchObject({ message: expect.stringContaining("mounts src/Root.jsx,") });
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("mounts src/Root.jsx,"),
+    });
     await expect(
       assertMountsRootComponent(aliased, "src/main.jsx", REACT_ROOT),
-    ).rejects.toMatchObject({ message: expect.stringContaining("mounts src/shell/Root.jsx,") });
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("mounts src/shell/Root.jsx,"),
+    });
   });
 
   // A TypeScript entry may import `./App.js` and get `App.tsx`.
@@ -302,7 +306,9 @@ export default app
 
     await expect(
       assertMountsRootComponent(constructed, "src/main.js", svelte),
-    ).rejects.toMatchObject({ message: expect.stringContaining("mounts src/Shell.svelte,") });
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("mounts src/Shell.svelte,"),
+    });
     await expect(assertMountsRootComponent(unrelated, "src/main.js", svelte)).resolves.toBe(
       undefined,
     );

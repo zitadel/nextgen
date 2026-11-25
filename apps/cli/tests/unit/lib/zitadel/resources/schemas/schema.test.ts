@@ -166,7 +166,9 @@ describe("UserSchema.of", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
-    expect(error).toMatchObject({ problems: [expect.objectContaining({ path: PATH })] });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${PATH}:`),
+    });
   });
 });
 
