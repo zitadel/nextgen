@@ -2,13 +2,12 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import {
-  type LocalServerDockerMissingError,
-  LocalServerError,
   LocalRuntime,
-  type LocalServerPortBusyError,
-  type LocalServerPortFullError,
-  type LocalServerStartError,
-  type LocalServerStopError,
+  LocalServerDockerMissingError,
+  LocalServerPortBusyError,
+  LocalServerPortFullError,
+  LocalServerStartError,
+  LocalServerStopError,
 } from "@/lib/server";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
@@ -19,7 +18,6 @@ import { relatedFlags } from "@/lib/suggestion/relations";
 import { section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { Previewable } from "@/cli/core/previewable";
-import type { ServerRecord } from "@/lib/server/local/internal/lifecycle";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
@@ -27,17 +25,6 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 
 const MIN_PORT = 1;
 const MAX_PORT = 65_535;
-
-/**
- * Turns a failure of starting the server into the refusal the CLI reports.
- *
- * @remarks
- * Written as a method type so each entry of the table below takes the class
- * its key names, which the key guarantees it is given.
- */
-type Refuse = {
-  refuse(error: LocalServerError): Promise<Error>;
-}["refuse"];
 
 /**
  * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
@@ -295,91 +282,6 @@ export default class Start extends Telemetered(
   }
 
   /**
-   * How each failure of starting the server is refused, by the class that names it.
-   *
-   * @param retry - This command again, for the refusals that offer it.
-   * @returns The refusal for each class, which the class's name finds.
-   */
-  private refusals(retry: SuggestedCommand): Readonly<Record<string, Refuse>> {
-    return {
-      LocalServerDockerMissingError: (error: LocalServerDockerMissingError) => {
-        return Promise.resolve(
-          refusalError(
-            DOCKER_UNAVAILABLE_REFUSAL,
-            { detail: error.detail },
-            {
-              check: shellCommand("docker", "version"),
-              retry,
-            },
-          ),
-        );
-      },
-      LocalServerPortBusyError: async (error: LocalServerPortBusyError) => {
-        const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
-          return port !== error.port;
-        });
-
-        return refusalError(
-          PORT_IN_USE_REFUSAL,
-          {
-            port: error.port,
-            url: LocalRuntime.urlOf(error.port),
-            listeners: await this.machine().listeners(error.port, { timeoutMs: 5000 }),
-          },
-          {
-            alternate: this.suggest({
-              id: "start",
-              flags: { port: alternatePort },
-            }),
-          },
-        );
-      },
-      LocalServerPortFullError: (error: LocalServerPortFullError) => {
-        return Promise.resolve(
-          refusalError(NO_FREE_PORT_REFUSAL, {
-            message: error.message,
-            first: error.firstPort,
-          }),
-        );
-      },
-      LocalServerStartError: (error: LocalServerStartError<ServerRecord>) => {
-        const details = {
-          ...error.details,
-          server_url: error.record.server_url,
-          log_tail: error.logTail || undefined,
-        };
-        const reason = NOT_READY_REASONS[error.reason];
-
-        if (error.cleanup.status === "failed") {
-          return Promise.resolve(
-            refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
-              message: reason.message,
-              details,
-              stop: error.cleanup,
-            }),
-          );
-        }
-
-        return Promise.resolve(
-          refusalError(SERVER_NOT_READY_REFUSAL, {
-            message: reason.message,
-            hint: reason.hint,
-            details,
-          }),
-        );
-      },
-      LocalServerStopError: (error: LocalServerStopError<ServerRecord>) => {
-        return Promise.resolve(
-          refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
-            runtime: error.record ?? null,
-            stop: error.outcome ?? null,
-          }),
-        );
-      },
-    };
-  }
-
-  /**
    * Starts the local server, or says it is already running, and reports the
    * server that is running either way.
    *
@@ -391,13 +293,84 @@ export default class Start extends Telemetered(
     const retry = await this.again("start", {});
     const { runtime: record, alreadyRunning } = await server
       .launch(request)
-      .catch(async (error: unknown) => {
-        const refuse =
-          error instanceof LocalServerError ? this.refusals(retry)[error.name] : undefined;
-        if (!(error instanceof LocalServerError) || refuse === undefined) {
-          throw error;
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerDockerMissingError) {
+          throw refusalError(
+            DOCKER_UNAVAILABLE_REFUSAL,
+            { detail: error.detail },
+            {
+              check: shellCommand("docker", "version"),
+              retry,
+            },
+          );
         }
-        throw await refuse(error);
+        throw error;
+      })
+      .catch(async (error: unknown) => {
+        if (error instanceof LocalServerPortBusyError) {
+          const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
+            return port !== error.port;
+          });
+
+          throw refusalError(
+            PORT_IN_USE_REFUSAL,
+            {
+              port: error.port,
+              url: LocalRuntime.urlOf(error.port),
+              listeners: await this.machine().listeners(error.port, { timeoutMs: 5000 }),
+            },
+            {
+              alternate: this.suggest({
+                id: "start",
+                flags: { port: alternatePort },
+              }),
+            },
+          );
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerPortFullError) {
+          throw refusalError(NO_FREE_PORT_REFUSAL, {
+            message: error.message,
+            first: error.firstPort,
+          });
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerStartError) {
+          const details = {
+            ...error.details,
+            server_url: error.record.server_url,
+            log_tail: error.logTail || undefined,
+          };
+          const reason = NOT_READY_REASONS[error.reason];
+
+          if (error.cleanup.status === "failed") {
+            throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+              message: reason.message,
+              details,
+              stop: error.cleanup,
+            });
+          } else {
+            throw refusalError(SERVER_NOT_READY_REFUSAL, {
+              message: reason.message,
+              hint: reason.hint,
+              details,
+            });
+          }
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerStopError) {
+          throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
+            runtime: error.record ?? null,
+            stop: error.outcome ?? null,
+          });
+        }
+        throw error;
       });
     this.meta = { ...this.meta, source: record.server_url };
 
