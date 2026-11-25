@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { listListeningTcpListeners, type Run } from "@/lib/server/local/ports";
+import { listListeningTcpListeners, type Run, workingDirectories } from "@/lib/server/local/ports";
 
 /**
  * A machine whose `lsof` prints `stdout`.
@@ -109,5 +109,58 @@ describe("listListeningTcpListeners", () => {
 
     const listeners = await listListeningTcpListeners({ run });
     expect(listeners.map((l) => l.port)).toEqual([80]);
+  });
+});
+
+describe("workingDirectories", () => {
+  it("reads each process's folder from lsof -F n output", async () => {
+    const run = lsofSaying(
+      ["p4242", "fcwd", "n/Users/me/app", "p4343", "fcwd", "n/Users/me/other app", ""].join("\n"),
+    );
+
+    await expect(workingDirectories([4242, 4343], { run })).resolves.toEqual(
+      new Map([
+        [4242, "/Users/me/app"],
+        [4343, "/Users/me/other app"],
+      ]),
+    );
+  });
+
+  it("asks lsof for the folders of those processes only", async () => {
+    const asked: (readonly string[])[] = [];
+    const run: Run = async (_program, args) => {
+      asked.push(args);
+      return { stdout: "" };
+    };
+
+    await workingDirectories([4242, 4343], { run });
+
+    expect(asked).toEqual([["-a", "-p", "4242,4343", "-d", "cwd", "-F", "n"]]);
+  });
+
+  it("runs nothing for no processes", async () => {
+    const asked: (readonly string[])[] = [];
+    const run: Run = async (_program, args) => {
+      asked.push(args);
+      return { stdout: "" };
+    };
+
+    await workingDirectories([], { run });
+
+    expect(asked).toEqual([]);
+  });
+
+  it("leaves out a process lsof names no folder for", async () => {
+    const run = lsofSaying(["p4242", "fcwd", "p4343", "fcwd", "n/Users/me/app", ""].join("\n"));
+
+    await expect(workingDirectories([4242, 4343], { run })).resolves.toEqual(
+      new Map([[4343, "/Users/me/app"]]),
+    );
+  });
+
+  it("knows no folder when lsof fails", async () => {
+    const run = lsofFailingWith(Object.assign(new Error("spawn lsof ENOENT"), { code: "ENOENT" }));
+
+    await expect(workingDirectories([4242], { run })).resolves.toEqual(new Map());
   });
 });
