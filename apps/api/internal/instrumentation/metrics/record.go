@@ -43,6 +43,14 @@ type instruments struct {
 	flowTransitions    metric.Int64Counter
 	auditDuration      metric.Float64Histogram
 	auditEvents        metric.Int64Counter
+
+	jobsTaken           metric.Int64Counter
+	jobsCompleted       metric.Int64Counter
+	jobsFailed          metric.Int64Counter
+	jobsDead            metric.Int64Counter
+	jobsExpired         metric.Int64Counter
+	jobsPerformDuration metric.Float64Histogram
+	jobsTakeLag         metric.Float64Histogram
 }
 
 func mustInstruments(m metric.Meter) *instruments {
@@ -93,18 +101,25 @@ func newInstruments(m metric.Meter) (*instruments, error) {
 	}
 
 	in := &instruments{
-		meter:              m,
-		operationDuration:  duration(DBOperationDuration),
-		connectionCount:    observable(DBConnectionCount, "{connection}"),
-		connectionMax:      observable(DBConnectionMax, "{connection}"),
-		credentialDuration: duration(CredentialValidationDuration),
-		revocationChecks:   counter(TokenRevocationChecks, "{check}"),
-		passwordDuration:   duration(PasswordVerificationDuration),
-		authOutcomes:       counter(AuthAttemptOutcomes, "{proof}"),
-		keyChainDuration:   duration(KeyChainResolutionDuration),
-		flowTransitions:    counter(FlowStepTransitions, "{transition}"),
-		auditDuration:      duration(AuditInsertDuration),
-		auditEvents:        counter(AuditEventsWritten, "{event}"),
+		meter:               m,
+		operationDuration:   duration(DBOperationDuration),
+		connectionCount:     observable(DBConnectionCount, "{connection}"),
+		connectionMax:       observable(DBConnectionMax, "{connection}"),
+		credentialDuration:  duration(CredentialValidationDuration),
+		revocationChecks:    counter(TokenRevocationChecks, "{check}"),
+		passwordDuration:    duration(PasswordVerificationDuration),
+		authOutcomes:        counter(AuthAttemptOutcomes, "{proof}"),
+		keyChainDuration:    duration(KeyChainResolutionDuration),
+		flowTransitions:     counter(FlowStepTransitions, "{transition}"),
+		auditDuration:       duration(AuditInsertDuration),
+		auditEvents:         counter(AuditEventsWritten, "{event}"),
+		jobsTaken:           counter(JobsTaken, "{job}"),
+		jobsCompleted:       counter(JobsCompleted, "{job}"),
+		jobsFailed:          counter(JobsFailed, "{job}"),
+		jobsDead:            counter(JobsDead, "{job}"),
+		jobsExpired:         counter(JobsExpired, "{job}"),
+		jobsPerformDuration: duration(JobsPerformDuration),
+		jobsTakeLag:         duration(JobsTakeLag),
 	}
 	if err != nil {
 		return nil, err
@@ -256,4 +271,43 @@ func RecordAuditEvents(ctx context.Context, eventType string, n int) {
 		return
 	}
 	global.auditEvents.Add(ctx, int64(n), metric.WithAttributes(EventTypeKey.String(eventType)))
+}
+
+func jobNameAttr(name string) metric.MeasurementOption {
+	return metric.WithAttributes(JobNameKey.String(name))
+}
+
+// RecordJobTaken counts one job leased for Perform.
+func RecordJobTaken(ctx context.Context, name string) {
+	global.jobsTaken.Add(ctx, 1, jobNameAttr(name))
+}
+
+// RecordJobCompleted counts one successful Complete after Perform.
+func RecordJobCompleted(ctx context.Context, name string) {
+	global.jobsCompleted.Add(ctx, 1, jobNameAttr(name))
+}
+
+// RecordJobFailed counts one Fail after Perform returned an error.
+func RecordJobFailed(ctx context.Context, name string) {
+	global.jobsFailed.Add(ctx, 1, jobNameAttr(name))
+}
+
+// RecordJobDead counts one queued job Fail moved to dead.
+func RecordJobDead(ctx context.Context, name string) {
+	global.jobsDead.Add(ctx, 1, jobNameAttr(name))
+}
+
+// RecordJobExpired counts one DeadOnTake expiry (past not_after, no Perform).
+func RecordJobExpired(ctx context.Context, name string) {
+	global.jobsExpired.Add(ctx, 1, jobNameAttr(name))
+}
+
+// RecordJobPerformDuration records how long one handler Perform took.
+func RecordJobPerformDuration(ctx context.Context, name string, d time.Duration) {
+	global.jobsPerformDuration.Record(ctx, d.Seconds(), jobNameAttr(name))
+}
+
+// RecordJobTakeLag records wall time from run_at until Take leased the job.
+func RecordJobTakeLag(ctx context.Context, name string, d time.Duration) {
+	global.jobsTakeLag.Record(ctx, d.Seconds(), jobNameAttr(name))
 }

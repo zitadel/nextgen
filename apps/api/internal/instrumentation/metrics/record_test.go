@@ -33,6 +33,13 @@ func TestCatalogue_MatchesWhatIsRecorded(t *testing.T) {
 	metrics.RecordFlowTransition(ctx, metrics.FlowSubmit, metrics.FlowStep)
 	metrics.RecordAuditInsert(ctx, metrics.AuditEvent, time.Millisecond)
 	metrics.RecordAuditEvents(ctx, "auth.token.revoked", 1)
+	metrics.RecordJobTaken(ctx, "sessions.gc")
+	metrics.RecordJobCompleted(ctx, "sessions.gc")
+	metrics.RecordJobFailed(ctx, "sessions.gc")
+	metrics.RecordJobDead(ctx, "sessions.gc")
+	metrics.RecordJobExpired(ctx, "sessions.gc")
+	metrics.RecordJobPerformDuration(ctx, "sessions.gc", time.Millisecond)
+	metrics.RecordJobTakeLag(ctx, "sessions.gc", time.Millisecond)
 	unregister := metrics.RegisterPool(metrics.PoolSQLite, func() metrics.PoolStats {
 		return metrics.PoolStats{Used: 1, Idle: 2, Max: 3}
 	})
