@@ -4,7 +4,7 @@ import { parseEnv } from "node:util";
 
 import { describe, expect } from "vitest";
 
-import { Project, ProjectEnvValueMultilineError } from "@/lib/project";
+import { Project, ProjectEnvValueError } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
 /** The name of the env file each test writes in its directory. */
@@ -59,14 +59,14 @@ describe("Project.envFile", () => {
     const path = join(dir, ENV_FILE);
 
     const appended = Project.envFile(path).append("ZITADEL_PROJECT_SECRET", "a\nb");
-    await expect(appended).rejects.toBeInstanceOf(ProjectEnvValueMultilineError);
+    await expect(appended).rejects.toBeInstanceOf(ProjectEnvValueError);
     await expect(appended).rejects.toMatchObject({
-      key: "ZITADEL_PROJECT_SECRET",
+      message: expect.stringContaining("ZITADEL_PROJECT_SECRET"),
     });
     await expect(readFile(path, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
 
     await expect(
       Project.envFile(path).write({ ZITADEL_PROJECT_SECRET: "line\rbreak" }),
-    ).rejects.toBeInstanceOf(ProjectEnvValueMultilineError);
+    ).rejects.toBeInstanceOf(ProjectEnvValueError);
   });
 });

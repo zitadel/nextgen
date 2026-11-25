@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { Project, ProjectConfigMissingError, ProjectMalformedError } from "@/lib/project";
+import { Project, ProjectConfigMissingError } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
 
 async function makeTempDir(): Promise<string> {
@@ -37,7 +37,6 @@ describe("Project.config", () => {
       expect(error).toBeInstanceOf(ProjectConfigMissingError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        hint: "Set the project up first.",
       });
       expect(error).toHaveProperty(
         "message",
@@ -46,12 +45,12 @@ describe("Project.config", () => {
     }
   });
 
-  it("reports malformed JSON as a malformed file, not a missing one", async () => {
+  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async () => {
     const cwd = await makeTempDir();
     await writeFile(join(cwd, "zitadel.json"), "{ not valid json");
 
     await expect(Project.at(cwd).config()).rejects.toThrow();
-    await expect(Project.at(cwd).config()).rejects.toBeInstanceOf(ProjectMalformedError);
+    await expect(Project.at(cwd).config()).rejects.not.toBeInstanceOf(ProjectConfigMissingError);
   });
 
   it("rejects a non-object JSON root via parseJsonObject", async () => {

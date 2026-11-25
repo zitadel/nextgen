@@ -69,54 +69,38 @@ export class ProjectSecret {
 
   /**
    * Reads, parses and structurally validates `.zitadel/secret`. A missing file
-   * and one that is not a complete secret are failures of their own; any
-   * other error (the operating system refusing the read) propagates unchanged.
+   * is a {@link ProjectSecretMissingError}; a present-but-incomplete file is a
+   * {@link ProjectMalformedError}.
    *
    * @param cwd - The project's directory.
    * @returns The secret.
    * @throws {@link ProjectSecretMissingError} When there is no secret.
-   * @throws {@link ProjectMalformedError} When the file is not JSON or
-   *   lacks a required field.
+   * @throws {@link ProjectMalformedError} When the file lacks a required field.
    */
   static async read(cwd: string): Promise<ProjectSecret> {
     try {
-      const text = await readFile(join(cwd, PATH), "utf8");
-      try {
-        const secret = parseJsonObject(text, PATH);
-        if (
-          typeof secret.project_id !== "string" ||
-          typeof secret.project_secret !== "string" ||
-          typeof secret.preview_secret !== "string" ||
-          !Array.isArray(secret.preview_origins)
-        ) {
-          throw new ProjectMalformedError(".zitadel/secret is missing required fields");
-        }
-        // primary_origins was added with kinded origins; older secrets only have
-        // preview_origins. A missing array reads as empty so doctor --fix can
-        // still rebuild from the rest of the file.
-        if (secret.primary_origins === undefined) {
-          secret.primary_origins = [];
-        }
-        if (!Array.isArray(secret.primary_origins)) {
-          throw new ProjectMalformedError(".zitadel/secret is missing required fields");
-        }
-        return new ProjectSecret(cwd, secret as ProjectSecretData);
-      } catch (error) {
-        if (error instanceof ProjectMalformedError) {
-          throw error;
-        }
-        throw new ProjectMalformedError(
-          error instanceof Error ? error.message : ".zitadel/secret is malformed",
-          {
-            cause: error,
-          },
-        );
+      const secret = parseJsonObject(await readFile(join(cwd, PATH), "utf8"), PATH);
+      if (
+        typeof secret.project_id !== "string" ||
+        typeof secret.project_secret !== "string" ||
+        typeof secret.preview_secret !== "string" ||
+        !Array.isArray(secret.preview_origins)
+      ) {
+        throw new ProjectMalformedError(".zitadel/secret is missing required fields");
       }
+      // primary_origins was added with kinded origins; older secrets only have
+      // preview_origins. A missing array reads as empty so doctor --fix can
+      // still rebuild from the rest of the file.
+      if (secret.primary_origins === undefined) {
+        secret.primary_origins = [];
+      }
+      if (!Array.isArray(secret.primary_origins)) {
+        throw new ProjectMalformedError(".zitadel/secret is missing required fields");
+      }
+      return new ProjectSecret(cwd, secret as ProjectSecretData);
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
-        throw new ProjectSecretMissingError({
-          cause: error,
-        });
+        throw new ProjectSecretMissingError(".zitadel/secret was not found", error);
       }
       throw error;
     }

@@ -2,7 +2,7 @@ import { parseEnv } from "node:util";
 
 import { readIfExists } from "@/lib/fs";
 
-import { ProjectEnvValueMultilineError, ProjectEnvValueUnquotableError } from "./errors";
+import { ProjectEnvValueError } from "./errors";
 import { SecretFile } from "./secret-file";
 
 /**
@@ -60,13 +60,12 @@ export class EnvFile {
    * @param key - The variable.
    * @param value - Its value.
    * @returns The line, without its line break.
-   * @throws {@link ProjectEnvValueMultilineError} When the value has a line break.
-   * @throws {@link ProjectEnvValueUnquotableError} When no quoting reads it back
-   *   unchanged.
+   * @throws {@link ProjectEnvValueError} When the value has a line break, or no
+   *   quoting reads it back unchanged.
    */
   static line(key: string, value: string): string {
     if (/[\n\r]/.test(value)) {
-      throw new ProjectEnvValueMultilineError(key);
+      throw new ProjectEnvValueError(`Cannot persist ${key}: its value contains a line break.`);
     }
     // Written as the first form the reader gives back unchanged: bare, then
     // single- then double-quoted. A bare `#` starts a comment and a bare quote
@@ -84,7 +83,9 @@ export class EnvFile {
       );
     });
     if (faithful === undefined) {
-      throw new ProjectEnvValueUnquotableError(key);
+      throw new ProjectEnvValueError(
+        `Cannot persist ${key}: no .env quoting reads its value back unchanged.`,
+      );
     }
     return faithful;
   }
@@ -95,9 +96,8 @@ export class EnvFile {
    * the whole write rather than corrupting the file.
    *
    * @param values - Each variable and its value.
-   * @throws {@link ProjectEnvValueMultilineError} When a value has a line break.
-   * @throws {@link ProjectEnvValueUnquotableError} When no quoting reads a value
-   *   back unchanged.
+   * @throws {@link ProjectEnvValueError} When a value has a line break, or no
+   *   quoting reads it back unchanged.
    */
   async write(values: Record<string, string>): Promise<void> {
     const body = `${Object.entries(values)

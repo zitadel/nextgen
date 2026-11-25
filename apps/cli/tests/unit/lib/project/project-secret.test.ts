@@ -41,7 +41,6 @@ describe("Project.secret", () => {
       expect(error).toBeInstanceOf(ProjectSecretMissingError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        hint: expect.stringContaining("The project secret can be restored"),
       });
       expect(error).toHaveProperty(
         "message",
@@ -55,6 +54,7 @@ describe("Project.secret", () => {
     const { project_secret: _omit, ...partial } = VALID_SECRET;
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(partial));
 
+    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectMalformedError);
     await expect(Project.at(cwd).secret()).rejects.toThrow(
       ".zitadel/secret is missing required fields",
     );
@@ -83,12 +83,14 @@ describe("Project.secret", () => {
     });
   });
 
-  it("reports malformed JSON as a malformed file, not a missing one", async ({ dir: cwd }) => {
+  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/secret"), "{ broken");
 
     await expect(Project.at(cwd).secret()).rejects.toThrow();
-    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectMalformedError);
+    await expect(Project.at(cwd).secret()).rejects.not.toBeInstanceOf(ProjectSecretMissingError);
   });
 });
 
