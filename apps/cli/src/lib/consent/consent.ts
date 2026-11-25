@@ -1,8 +1,9 @@
 import { allowDestructive, type ZitadelClient } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { Confirmer } from "@/lib/ui/questions";
+
+import { ConsentInternalError, ConsentRequiredError } from "./errors";
 
 /**
  * What a destructive command does, as one word. It is the stable token of the
@@ -44,7 +45,7 @@ export type Gate = Readonly<{
   /**
    * Refuses in place of the default "Cannot … without --force" when nobody
    * can be asked and `--force` was not given, for a refusal that says more.
-   * It throws an `E_CONFIRMATION_REQUIRED` too, or {@link Consent.isRefusal} misses it.
+   * Whatever it throws is a refusal, which {@link Consent.isRefusal} knows.
    */
   refuse?: () => never;
 }>;
@@ -95,10 +96,10 @@ export class Consent {
 
   /**
    * Ask for consent. `--force` gives it without asking; with nobody to ask
-   * and no `--force` the gate refuses (an `E_CONFIRMATION_REQUIRED` naming
-   * `--force`, which only a person may agree to);
+   * and no `--force` the gate refuses (a {@link ConsentRequiredError}, which
+   * only a person may agree to);
    * otherwise the person is asked, and `undefined` is their no. Ctrl-C
-   * throws `E_CANCELLED`, as every prompt does.
+   * cancels the run, as every prompt does.
    *
    * A dry run must answer before asking: it is a bug to ask during one, and
    * it throws rather than hand a dry run the means to change anything.
@@ -106,17 +107,19 @@ export class Consent {
    * @param gate - What is being confirmed and how it refuses.
    * @param session - Who can answer, and whether the run may change anything.
    * @returns The consent, or `undefined` when the person said no.
-   * @throws {ZitadelError} `E_CONFIRMATION_REQUIRED` when nobody can be asked
-   * and `--force` was not given, or `E_CANCELLED` on Ctrl-C.
-   * @throws {Error} When a dry run asks.
+   * @throws {@link ConsentRequiredError} When nobody can be asked and
+   * `--force` was not given, unless the gate refuses in its own way.
+   * @throws {@link ConsentInternalError} When a dry run asks.
    */
   static async request(gate: Gate, session: ConsentSession): Promise<Consent | undefined> {
     if (session.dryRun) {
-      throw new Error(`A dry run asked for consent to ${gate.name}`);
+      throw new ConsentInternalError(`A dry run asked for consent to ${gate.name}`);
     }
+    const nobodyCanAnswer = !session.force && !session.interactive;
     try {
-      if (!session.force && !session.interactive) {
+      if (nobodyCanAnswer) {
         gate.refuse?.();
+        throw new ConsentRequiredError(gate.name, gate.message, gate.retry);
       }
       const agreed = await (session.confirmer ?? Ui.asker(session)).confirm({
         name: gate.name,
@@ -132,7 +135,7 @@ export class Consent {
       granted.add(consent);
       return consent;
     } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_CONFIRMATION_REQUIRED") {
+      if (nobodyCanAnswer && typeof error === "object" && error !== null) {
         refusals.add(error);
       }
       throw error;
@@ -143,11 +146,11 @@ export class Consent {
    * Throws unless `value` is a `Consent` {@link Consent.request} made.
    *
    * @param value - What claims to be a consent.
-   * @throws {Error} When `value` is not one {@link Consent.request} made.
+   * @throws {@link ConsentInternalError} When `value` is not one {@link Consent.request} made.
    */
   static assert(value: unknown): asserts value is Consent {
     if (typeof value !== "object" || value === null || !granted.has(value)) {
-      throw new Error("A destructive operation ran without consent");
+      throw new ConsentInternalError("A destructive operation ran without consent");
     }
   }
 
@@ -168,7 +171,7 @@ export class Consent {
    *
    * @param client - The client to unlock.
    * @returns The client with its destructive operations.
-   * @throws {Error} When this is not a consent {@link Consent.request} made.
+   * @throws {@link ConsentInternalError} When this is not a consent {@link Consent.request} made.
    */
   unlock(client: ZitadelClient): ZitadelClient {
     Consent.assert(this);

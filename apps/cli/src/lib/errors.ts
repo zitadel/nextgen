@@ -1,6 +1,7 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
 import { BackendError, BackendUnavailableError, type BackendUnavailableReason } from "./backend";
+import { ConsentRequiredError } from "./consent";
 import { isObject } from "./json";
 import type { Suggested } from "./suggestion";
 import {
@@ -550,6 +551,16 @@ export function toZitadelError(error: unknown): ZitadelError {
       ...(hint === undefined ? {} : { hint }),
       ...(nextCommands === undefined ? {} : { nextCommands }),
       details: error.details ?? { original: pickErrorShape(error) },
+    });
+  }
+
+  // Consent that nobody can give: the hint puts the question to a person, and
+  // the command to run again once they agree comes from the gate.
+  if (error instanceof ConsentRequiredError) {
+    return new ZitadelError("E_CONFIRMATION_REQUIRED", error.message, {
+      hint: confirmationHint(error.question),
+      ...(error.retry === undefined ? {} : { nextCommands: [error.retry] }),
+      details: error.details ?? { question: error.question },
     });
   }
 
