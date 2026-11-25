@@ -390,20 +390,23 @@ describe("a proxied redirect", () => {
     });
     await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
     const { port } = backend.address() as AddressInfo;
-    let served: Response | undefined;
+    let status = 0;
+    let location: string | null = null;
 
     try {
-      served = await serve(
+      const served = await serve(
         "http://localhost:3000/__nextgen/ping",
         {},
         { url: `http://127.0.0.1:${port}` },
       );
+      status = served.status;
+      location = served.headers.get("location");
     } finally {
       await new Promise((resolve) => backend.close(resolve));
     }
 
-    expect(served?.status).toBe(302);
-    expect(served?.headers.get("location")).toBe("http://localhost:3000/evil.example/x?a=1");
+    expect(status).toBe(302);
+    expect(location).toBe("http://localhost:3000/evil.example/x?a=1");
   });
 });
 
