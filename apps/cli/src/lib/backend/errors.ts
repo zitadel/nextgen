@@ -74,6 +74,18 @@ export class BackendError extends Error implements Categorized {
   }
 
   /**
+   * Whether the server will not show the caller what it asked for: it is not
+   * there (`404`) or the credential may not read it (`403`). A caller that can
+   * carry on without the answer tolerates this and nothing else; a refused
+   * credential (`401`) is not it.
+   *
+   * @returns True for a miss or a refusal of permission.
+   */
+  get withheld(): boolean {
+    return false;
+  }
+
+  /**
    * The server's stable machine-readable error code, such as `dep.conflict`.
    *
    * @remarks
@@ -143,6 +155,10 @@ export class BackendNotFoundError extends BackendError {
       ];
     }
     return [message, options];
+  }
+
+  override get withheld(): boolean {
+    return true;
   }
 }
 
@@ -228,6 +244,10 @@ export class BackendForbiddenError extends BackendError {
 
   constructor(message: string, options: BackendErrorOptions = {}) {
     super(message, options, "denied");
+  }
+
+  override get withheld(): boolean {
+    return true;
   }
 }
 

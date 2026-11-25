@@ -108,3 +108,15 @@ describe("the backend errors' codes, hints and details", () => {
     expect(error.details).toEqual({ url: "http://x", reason });
   });
 });
+
+describe("BackendError.withheld", () => {
+  it.each([
+    ["a miss", new BackendNotFoundError("gone"), true],
+    ["a refusal of permission", new BackendForbiddenError("not allowed"), true],
+    ["a rejected credential", new BackendUnauthorizedError("who are you"), false],
+    ["a conflict", new BackendConflictError("raced"), false],
+    ["a failure nothing names", new BackendError("odd"), false],
+  ])("is %s: %s", (_name, error, withheld) => {
+    expect(error.withheld).toBe(withheld);
+  });
+});
