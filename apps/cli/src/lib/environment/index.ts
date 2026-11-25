@@ -11,3 +11,15 @@ export type {
 } from "./types";
 export { Dotenv } from "./dotenv";
 export { Environment } from "./environment";
+export {
+  EnvironmentError,
+  EnvironmentFileMissingError,
+  EnvironmentInvalidError,
+  EnvironmentValueMissingError,
+} from "./errors";
+export type {
+  EnvironmentErrorOptions,
+  EnvironmentInvalidOptions,
+  EnvironmentInvalidReason,
+  EnvironmentValueMissingOptions,
+} from "./errors";

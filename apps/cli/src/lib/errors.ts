@@ -2,6 +2,12 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 
 import { BackendError, BackendUnavailableError, type BackendUnavailableReason } from "./backend";
 import { ConsentRequiredError } from "./consent";
+import {
+  EnvironmentError,
+  EnvironmentFileMissingError,
+  EnvironmentInvalidError,
+  EnvironmentValueMissingError,
+} from "./environment";
 import { isObject } from "./json";
 import type { Suggested } from "./suggestion";
 import {
@@ -390,6 +396,66 @@ function publishErrorAdvice(error: PublishError): {
   return {};
 }
 
+/**
+ * What to do about a failure to resolve the environment, worded with the CLI's
+ * commands and flags, which the library leaves out.
+ *
+ * @param error - The failure.
+ * @returns The advice and the commands to run next, each left out when there
+ *   is none.
+ */
+function environmentErrorAdvice(error: EnvironmentError): {
+  hint?: string;
+  nextCommands?: readonly Suggested[];
+} {
+  if (error instanceof EnvironmentInvalidError) {
+    if (error.reason === "both-sources") {
+      return {
+        hint: "--env picks the .env.<name>.local files; --env-file names one file outright.",
+      };
+    }
+
+    if (error.reason === "name") {
+      return {
+        hint:
+          `The ${error.source} environment name may use only letters, digits, dot, dash ` +
+          'and underscore, may not contain "..", and may not be `local` or end in `.local`. ' +
+          "Pass a safe --env or set ZITADEL_ENV.",
+      };
+    }
+
+    return {
+      hint: `Fix or remove ZITADEL_URL in ${error.source}; it must be a URL such as ${error.example}.`,
+    };
+  }
+
+  if (error instanceof EnvironmentValueMissingError) {
+    const { key, file, boundFile, unbound, environment } = error;
+    const consulted = `Consulted, in order: ${error.consulted.join(", ")}.`;
+
+    if (!unbound) {
+      return {
+        hint: `${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.`,
+      };
+    }
+
+    // Run in the directory this run addressed, which need not be the shell's:
+    // `setup` and `env add` both write their files there.
+    const elsewhere = error.cwd === process.cwd() ? {} : { cwd: error.cwd };
+
+    return {
+      hint: `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${environment}\`.`,
+      nextCommands: [
+        environment === "development"
+          ? { id: "setup", flags: elsewhere }
+          : { id: "env:add", args: { name: environment }, flags: elsewhere },
+      ],
+    };
+  }
+
+  return {};
+}
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
@@ -552,6 +618,25 @@ export function toZitadelError(error: unknown): ZitadelError {
       ...(nextCommands === undefined ? {} : { nextCommands }),
       details: error.details ?? { original: pickErrorShape(error) },
     });
+  }
+
+  // Resolving the environment: the library says what is wrong, and the advice
+  // names the commands and flags that fix it. A missing file keeps the code it
+  // always had, until the codes are decided.
+  if (error instanceof EnvironmentError) {
+    const { hint, nextCommands } = environmentErrorAdvice(error);
+
+    return new ZitadelError(
+      error instanceof EnvironmentFileMissingError
+        ? "E_VALIDATION"
+        : CATEGORY_CODES[error.category],
+      error.message,
+      {
+        ...(hint === undefined ? {} : { hint }),
+        ...(nextCommands === undefined ? {} : { nextCommands }),
+        ...(error.details === undefined ? {} : { details: error.details }),
+      },
+    );
   }
 
   // Consent that nobody can give: the hint puts the question to a person, and

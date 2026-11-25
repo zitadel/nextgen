@@ -1,6 +1,6 @@
-import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
 
+import { EnvironmentInvalidError } from "./errors";
 import type { Resolved } from "./types";
 
 /** The environment names a platform build announces, by the variable it sets. */
@@ -76,16 +76,13 @@ export class EnvironmentName implements Resolved {
    * @param env - The process environment.
    * @param flag - The `--env` flag, when given.
    * @returns The name, and the source that named it.
-   * @throws {ZitadelError} `E_VALIDATION` when the name is not usable in a path.
+   * @throws {@link EnvironmentInvalidError} When the name is not usable in a path.
    */
   static resolve(env: NodeJS.ProcessEnv, flag?: string): EnvironmentName {
     const name = new EnvironmentName(EnvironmentName.detect(env, flag));
     if (!EnvironmentName.isValid(name.value)) {
-      throw new ZitadelError("E_VALIDATION", `${name.value} is not a valid environment name`, {
-        hint:
-          `The ${name.source} environment name may use only letters, digits, dot, dash ` +
-          'and underscore, may not contain "..", and may not be `local` or end in `.local`. ' +
-          "Pass a safe --env or set ZITADEL_ENV.",
+      throw new EnvironmentInvalidError("name", `${name.value} is not a valid environment name`, {
+        source: name.source,
       });
     }
     return name;

@@ -6,7 +6,13 @@ import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { Environment } from "@/lib/environment";
+import {
+  Environment,
+  EnvironmentFileMissingError,
+  EnvironmentInvalidError,
+  EnvironmentValueMissingError,
+} from "@/lib/environment";
+import { toZitadelError } from "@/lib/errors";
 import { ZitadelRuntime } from "@/lib/server";
 import type { Questions } from "@/lib/ui";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -17,6 +23,28 @@ vi.mock("@clack/prompts", () => ({
   isCancel: (value: unknown) => typeof value === "symbol",
   cancel: vi.fn(),
 }));
+
+/**
+ * What a rejection is as the CLI reports it.
+ *
+ * @param pending - What is expected to reject.
+ * @returns The same promise, rejecting with the CLI's error.
+ */
+function reported(pending: Promise<unknown>): Promise<unknown> {
+  return pending.catch((error: unknown) => {
+    throw toZitadelError(error);
+  });
+}
+
+/**
+ * What a call throws as the CLI reports it.
+ *
+ * @param run - What is expected to throw.
+ * @returns The CLI's error.
+ */
+function reportedBy(run: () => unknown): unknown {
+  return toZitadelError(thrownBy(run));
+}
 
 /**
  * The asker the command would hand in, answering with `answer`. It records
@@ -310,13 +338,15 @@ describe("Environment.resolve", () => {
     it("refuses a server that is not an http(s) URL", async ({ dir }) => {
       await write(dir, ".env.development.local", { ZITADEL_URL: "ftp://file.example" });
 
-      await expect(resolve(dir)).rejects.toMatchObject({ code: "E_VALIDATION" });
+      await expect(resolve(dir)).rejects.toBeInstanceOf(EnvironmentInvalidError);
+      await expect(reported(resolve(dir))).rejects.toMatchObject({ code: "E_VALIDATION" });
     });
 
     it("names the file a malformed server came from", async ({ dir }) => {
       await write(dir, ".env", { ZITADEL_URL: "localhost:8080" });
 
       await expect(resolve(dir)).rejects.toMatchObject({
+        reason: "server-url",
         message: expect.stringContaining("ZITADEL_URL from .env"),
       });
     });
@@ -334,7 +364,7 @@ describe("Environment.resolve", () => {
       await write(dir, "staging.env", { ZITADEL_PROJECT_ID: "proj_file" });
 
       await expect(
-        resolve(dir, { envName: "staging", envFile: "staging.env" }),
+        reported(resolve(dir, { envName: "staging", envFile: "staging.env" })),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("--env-file"),
@@ -342,31 +372,37 @@ describe("Environment.resolve", () => {
     });
 
     it("refuses an --env-file that does not exist", async ({ dir }) => {
-      await expect(resolve(dir, { envFile: "missing.env" })).rejects.toMatchObject({
+      await expect(resolve(dir, { envFile: "missing.env" })).rejects.toBeInstanceOf(
+        EnvironmentFileMissingError,
+      );
+      await expect(reported(resolve(dir, { envFile: "missing.env" }))).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("missing.env"),
       });
     });
 
     it("refuses an environment name that would escape the project directory", async ({ dir }) => {
-      await expect(resolve(dir, { envName: "../evil" })).rejects.toMatchObject({
+      await expect(resolve(dir, { envName: "../evil" })).rejects.toBeInstanceOf(
+        EnvironmentInvalidError,
+      );
+      await expect(reported(resolve(dir, { envName: "../evil" }))).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("valid environment name"),
       });
-      await expect(resolve(dir, { env: { ZITADEL_ENV: "a/b" } })).rejects.toMatchObject({
-        code: "E_VALIDATION",
-      });
-      await expect(resolve(dir, { envName: "a..b" })).rejects.toMatchObject({
-        code: "E_VALIDATION",
-      });
+      await expect(resolve(dir, { env: { ZITADEL_ENV: "a/b" } })).rejects.toBeInstanceOf(
+        EnvironmentInvalidError,
+      );
+      await expect(resolve(dir, { envName: "a..b" })).rejects.toBeInstanceOf(
+        EnvironmentInvalidError,
+      );
     });
 
     it.for(["local", "staging.local"])(
       "refuses %s, whose files are another environment's",
       async (name, { dir }) => {
-        await expect(resolve(dir, { envName: name })).rejects.toMatchObject({
-          code: "E_VALIDATION",
-        });
+        await expect(resolve(dir, { envName: name })).rejects.toBeInstanceOf(
+          EnvironmentInvalidError,
+        );
       },
     );
 
@@ -412,7 +448,11 @@ describe("Environment.require", () => {
   it("names the environment, the variable and every source consulted", async ({ dir }) => {
     const environment = await resolve(dir, { envName: "production" });
 
-    const thrown = thrownBy(() => environment.require("ZITADEL_PROJECT_ID"));
+    const thrown = reportedBy(() => environment.require("ZITADEL_PROJECT_ID"));
+
+    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_ID"))).toBeInstanceOf(
+      EnvironmentValueMissingError,
+    );
 
     expect(thrown).toMatchObject({ code: "E_VALIDATION" });
     expect((thrown as Error).message).toBe(
@@ -433,25 +473,21 @@ describe("Environment.require", () => {
     const development = await resolve(dir);
     const production = await resolve(dir, { envName: "production" });
 
-    expect(() => development.require("ZITADEL_URL")).toThrow(
-      expect.objectContaining({ nextCommands: [{ id: "setup", flags: { cwd: dir } }] }),
-    );
-    expect(() => production.require("ZITADEL_URL")).toThrow(
-      expect.objectContaining({
-        nextCommands: [{ id: "env:add", args: { name: "production" }, flags: { cwd: dir } }],
-      }),
-    );
+    expect(reportedBy(() => development.require("ZITADEL_URL"))).toMatchObject({
+      nextCommands: [{ id: "setup", flags: { cwd: dir } }],
+    });
+    expect(reportedBy(() => production.require("ZITADEL_URL"))).toMatchObject({
+      nextCommands: [{ id: "env:add", args: { name: "production" }, flags: { cwd: dir } }],
+    });
   });
 
   it("points an --env-file run at that file", async ({ dir }) => {
     await write(dir, "ci.env", { ZITADEL_URL: "https://ci.example" });
     const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
-    expect(() => environment.require("ZITADEL_PROJECT_ID")).toThrow(
-      expect.objectContaining({
-        hint: expect.stringContaining("Set ZITADEL_PROJECT_ID in ci.env"),
-      }),
-    );
+    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
+      hint: expect.stringContaining("Set ZITADEL_PROJECT_ID in ci.env"),
+    });
   });
 
   it("never sends an --env-file run to setup, which would create a new project", async ({
@@ -460,21 +496,19 @@ describe("Environment.require", () => {
     await write(dir, "ci.env", { ZITADEL_URL: "https://ci.example" });
     const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
-    expect(() => environment.require("ZITADEL_PROJECT_ID")).toThrow(
-      expect.objectContaining({ nextCommands: undefined }),
-    );
+    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
+      nextCommands: undefined,
+    });
   });
 
   it("points an environment env add already bound at its own file", async ({ dir }) => {
     await write(dir, ".env.production.local", { ZITADEL_PROJECT_ID: "proj_production" });
     const environment = await resolve(dir, { envName: "production" });
 
-    expect(() => environment.require("ZITADEL_PROJECT_SECRET")).toThrow(
-      expect.objectContaining({
-        hint: expect.stringContaining("Set ZITADEL_PROJECT_SECRET in .env.production.local"),
-        nextCommands: undefined,
-      }),
-    );
+    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toMatchObject({
+      hint: expect.stringContaining("Set ZITADEL_PROJECT_SECRET in .env.production.local"),
+      nextCommands: undefined,
+    });
   });
 
   it("sends no one to env add when the process environment already names the project", async ({
@@ -485,19 +519,17 @@ describe("Environment.require", () => {
       env: { ZITADEL_PROJECT_ID: "proj_ci" },
     });
 
-    expect(() => environment.require("ZITADEL_PROJECT_SECRET")).toThrow(
-      expect.objectContaining({ nextCommands: undefined }),
-    );
+    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toMatchObject({
+      nextCommands: undefined,
+    });
   });
 
   it("runs the env add it suggests in the directory this run addressed", async ({ dir }) => {
     const environment = await resolve(dir, { envName: "staging" });
 
-    expect(() => environment.require("ZITADEL_PROJECT_ID")).toThrow(
-      expect.objectContaining({
-        nextCommands: [{ id: "env:add", args: { name: "staging" }, flags: { cwd: dir } }],
-      }),
-    );
+    expect(reportedBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
+      nextCommands: [{ id: "env:add", args: { name: "staging" }, flags: { cwd: dir } }],
+    });
   });
 
   it("returns the value when it resolved", async ({ dir }) => {
@@ -518,7 +550,7 @@ describe("Environment.requireInteractive", () => {
         interactive: false,
         ask,
       }),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    ).rejects.toBeInstanceOf(EnvironmentValueMissingError);
     expect(ask.text).not.toHaveBeenCalled();
   });
 
