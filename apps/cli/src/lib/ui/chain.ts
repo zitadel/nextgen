@@ -1,10 +1,9 @@
 import { intro, log, note, outro } from "@clack/prompts";
 import pc from "picocolors";
 
-import { CANCELLED, PromptCancelled, ZitadelError } from "@/lib/errors";
+import { CANCELLED, isCancellation } from "@/lib/errors";
 
 import type { Audience } from "./audience";
-import { Asker } from "./asker";
 import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";
 import { log as logger } from "./log";
@@ -13,7 +12,7 @@ import { Output } from "./output";
 import type { Narratable } from "./log-printer";
 import type { Presentation } from "./presentation";
 import { type Drawing, Progress, type Report, type Step } from "./progress";
-import type { Confirmer, Questions } from "./questions";
+import type { PromptSession } from "./prompter";
 import { DrawnSpinner, QuietSpinner, type Spinner } from "./spinner";
 import type { Summary } from "./summary";
 import { Where } from "./where";
@@ -30,7 +29,7 @@ import { Where } from "./where";
  * non-interactive {@link Audience} nothing is drawn at all; either way
  * narration falls back to plain lines.
  *
- * A command never opens or closes it: it asks ({@link Chain.questions}), notes
+ * A command never opens or closes it: it asks ({@link Chain.session}), notes
  * what the person must act on, reports its work, and the base command closes
  * the chain on the result the command returned.
  */
@@ -45,10 +44,23 @@ export class Chain implements Drawing, Narratable {
   private readonly audience: Audience;
   private readonly presentation: Presentation;
   private readonly progress = new Progress(this);
+  /** Whether a wizard's prompt was walked away from, which closed the chain itself. */
+  private promptCancelled = false;
+  private readonly abortRun: ((reason: DOMException) => void) | undefined;
 
-  constructor(audience: Audience, presentation: Presentation = "wizard") {
+  /**
+   * @param audience - Who is watching.
+   * @param presentation - Which of the two shapes the command draws.
+   * @param abortRun - Aborts the run's signal, for a prompt the person walks away from.
+   */
+  constructor(
+    audience: Audience,
+    presentation: Presentation = "wizard",
+    abortRun?: (reason: DOMException) => void,
+  ) {
     this.audience = audience;
     this.presentation = presentation;
+    this.abortRun = abortRun;
   }
 
   /** Whether this command's output is a chain at all. See {@link Presentation}. */
@@ -209,11 +221,7 @@ export class Chain implements Drawing, Narratable {
    * leaving a run that failed showing nothing but its closing line.
    */
   abort(error: unknown): void {
-    if (
-      !(error instanceof ZitadelError && error.code === "E_CANCELLED") ||
-      !this.audience.interactive ||
-      this.ended
-    ) {
+    if (!isCancellation(error) || !this.audience.interactive || this.ended) {
       return;
     }
     DrawnSpinner.clearAll();
@@ -222,7 +230,7 @@ export class Chain implements Drawing, Narratable {
       process.stdout.write(`\n${pc.red(CANCELLED)}\n`);
       return;
     }
-    if (error instanceof PromptCancelled || !this.opened) {
+    if (this.promptCancelled || !this.opened) {
       return;
     }
     this.ended = true;
@@ -242,17 +250,19 @@ export class Chain implements Drawing, Narratable {
   }
 
   /**
-   * The questions, asked the way this command presents itself. A wizard's
-   * are drawn in its chain: each one opens the chain before its prompt and
-   * leaves the blank guide line it needs after it. A normal command's are the
-   * same prompts without the guide, which open nothing and space nothing.
+   * What the question engine asks with, the way this command presents itself.
+   * A wizard's questions are drawn in its chain: each one opens the chain
+   * before its prompt and leaves the blank guide line it needs after it. A
+   * normal command's are the same prompts without the guide, which open
+   * nothing and space nothing.
    *
-   * The command's `--force` reaches only the destructive confirmation
-   * ({@link Confirmer}); every other question is asked.
+   * The command's `--force` reaches only the destructive confirmation; every
+   * other question is asked.
+   *
+   * @param audience - Who can answer, when that is not the run's own audience.
+   * @returns The session to ask with.
    */
-  questions(
-    audience: Pick<Audience, "interactive" | "force"> = this.audience,
-  ): Questions & Confirmer {
+  session(audience: Pick<Audience, "interactive" | "force"> = this.audience): PromptSession {
     const shown = (): void => {
       try {
         this.promptListener?.();
@@ -263,10 +273,11 @@ export class Chain implements Drawing, Narratable {
     const session = {
       interactive: audience.interactive,
       force: audience.force,
+      ...(this.abortRun === undefined ? {} : { abort: this.abortRun }),
     };
 
     return this.presentation === "plain"
-      ? Asker.for({
+      ? {
           ...session,
           guide: false,
           around: async (draw) => {
@@ -278,8 +289,8 @@ export class Chain implements Drawing, Narratable {
               resume();
             }
           },
-        })
-      : Asker.for({
+        }
+      : {
           ...session,
           around: async (draw) => {
             shown();
@@ -287,12 +298,16 @@ export class Chain implements Drawing, Narratable {
             this.open();
             try {
               return await draw();
+            } catch (error) {
+              // A wizard's prompt that is walked away from has closed the chain itself.
+              this.promptCancelled = isCancellation(error);
+              throw error;
             } finally {
               this.answered();
               resume();
             }
           },
-        });
+        };
   }
 
   say(text: string): void {

@@ -22,16 +22,15 @@ import type { ZitadelError } from "@/lib/errors";
 
 import { clackInputImports } from "@tests/helpers/clack-imports";
 import { sourceFiles } from "@tests/helpers/source-files";
-import { Asker, type Session } from "@/lib/ui/asker";
+import { Asker, type Session } from "@/cli/core/asker";
 import { FlatOutput } from "@/lib/ui/flat-output";
-import { PromptCancelled } from "@/lib/errors";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 /** Renders the commands these questions suggest, as a run does. */
 const suggest = aSuggest();
 
 /** The files that are the question engine, the only ones that name a kind. */
-const ENGINE = ["lib/ui/asker.ts", "lib/ui/prompter.ts"];
+const ENGINE = ["cli/core/asker.ts", "lib/ui/prompter.ts"];
 
 const SRC = join(import.meta.dirname, "../../../../src");
 
@@ -593,15 +592,14 @@ describe("Asker", () => {
       ],
     ];
 
-    it.each(prompts)("throws E_CANCELLED from %s", async (_kind, prompt, question) => {
+    it.each(prompts)("throws an AbortError from %s", async (_kind, prompt, question) => {
       // A cancel is the person's decision, not a value that failed to parse,
       // so it exits 130 like Ctrl-C anywhere else.
       vi.mocked(isCancel).mockReturnValue(true);
       (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce(Symbol("cancel"));
 
       await expect(question()).rejects.toMatchObject({
-        code: "E_CANCELLED",
-        exitCode: 130,
+        name: "AbortError",
         message: "Cancelled by user",
       });
     });
@@ -760,16 +758,11 @@ describe("Asker", () => {
       };
 
       it.each(kinds)(
-        "throws a plain E_CANCELLED from %s without the guide",
+        "throws an AbortError from %s without the guide",
         async (_kind, prompt, act) => {
           const error = await cancelled(prompt(false), act, { ...ask, guide: false });
 
-          expect(error).toMatchObject({
-            code: "E_CANCELLED",
-            exitCode: 130,
-            message: "Cancelled by user",
-          });
-          expect(error).not.toBeInstanceOf(PromptCancelled);
+          expect(error).toMatchObject({ name: "AbortError", message: "Cancelled by user" });
         },
       );
 
@@ -799,12 +792,26 @@ describe("Asker", () => {
         expect(cancel).not.toHaveBeenCalled();
       });
 
-      it.each(kinds)(
-        "throws PromptCancelled from %s with the guide",
-        async (_kind, prompt, act) => {
-          const error = await cancelled(prompt(true), act, { ...ask, guide: true });
+      it.each(kinds)("throws an AbortError from %s with the guide", async (_kind, prompt, act) => {
+        const error = await cancelled(prompt(true), act, { ...ask, guide: true });
 
-          expect(error).toBeInstanceOf(PromptCancelled);
+        expect(error).toMatchObject({ name: "AbortError" });
+      });
+
+      it.each(kinds)(
+        "aborts the run's signal with it when %s is cancelled",
+        async (_kind, prompt, act) => {
+          const controller = new AbortController();
+
+          const error = await cancelled(prompt(true), act, {
+            ...ask,
+            guide: true,
+            abort: (reason) => {
+              controller.abort(reason);
+            },
+          });
+
+          expect(controller.signal.reason).toBe(error);
         },
       );
     });
@@ -828,7 +835,7 @@ describe("the source tree", () => {
 
   // The typed methods are the whole point: a command names the question it is
   // asking by the method it calls, so there is no kind string left to get
-  // wrong. Only the engine (`lib/ui/asker.ts`, `lib/ui/prompter.ts`) writes one, because it is the engine behind all
+  // wrong. Only the engine (`cli/core/asker.ts`, `lib/ui/prompter.ts`) writes one, because it is the engine behind all
   // five and takes the kind as an argument.
   it("names no question by a kind string outside the engine", async () => {
     const tagged: string[] = [];

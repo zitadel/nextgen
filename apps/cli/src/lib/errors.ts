@@ -216,18 +216,6 @@ export class ZitadelError extends Error {
 }
 
 /**
- * A prompt the person walked away from. A drawn prompt closes its own chain
- * when that happens, so whoever ends the run needs to tell this from any
- * other cancellation, which leaves the chain open: the class says so, where a
- * match on the message would break the day the message is reworded.
- */
-export class PromptCancelled extends ZitadelError {
-  constructor() {
-    super("E_CANCELLED", "Cancelled by user");
-  }
-}
-
-/**
  * The code each {@link ErrorCategory} is reported with.
  *
  * @remarks
@@ -657,6 +645,12 @@ export function toZitadelError(error: unknown): ZitadelError {
     return error;
   }
 
+  // The run being stopped, by a prompt walked away from or by anything else
+  // that aborts, is the person's decision and not a failure.
+  if (isAbortError(error)) {
+    return new ZitadelError("E_CANCELLED", "Cancelled by user");
+  }
+
   if (error instanceof BackendError) {
     return fromBackendError(error);
   }
@@ -979,6 +973,18 @@ function resourceLine(item: unknown): string | undefined {
 }
 
 /**
+ * Whether `error` is an `AbortError`: the platform's way to say an operation
+ * was stopped, which is what the run's signal rejects with and what a prompt
+ * the person walked away from throws.
+ *
+ * @param error - Whatever was caught.
+ * @returns True for an error named `AbortError`.
+ */
+export function isAbortError(error: unknown): error is Error {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+/**
  * Whether `error` is the run being cancelled, which a caller that swallows
  * failures must still let through: the person asked the command to stop, so a
  * best-effort read that failed because of it has nothing to report, and
@@ -986,11 +992,15 @@ function resourceLine(item: unknown): string | undefined {
  * finished. The counterpart of `isRefusal`, for the other failure nothing may
  * turn into an outcome.
  *
- * `Interruptible` aborts the run's signal with this error, so every request
- * bound to it rejects with it.
+ * `Interruptible` aborts the run's signal with an `AbortError`, so every
+ * request bound to it rejects with that; the `E_CANCELLED` error is the
+ * boundary's own report of it, and counts too.
+ *
+ * @param error - Whatever was caught.
+ * @returns True for an `AbortError` or an `E_CANCELLED` error.
  */
 export function isCancellation(error: unknown): boolean {
-  return error instanceof ZitadelError && error.code === "E_CANCELLED";
+  return isAbortError(error) || (error instanceof ZitadelError && error.code === "E_CANCELLED");
 }
 
 /**

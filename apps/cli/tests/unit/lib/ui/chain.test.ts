@@ -1,7 +1,8 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, describe, expect } from "vitest";
 
-import { PromptCancelled, ZitadelError } from "@/lib/errors";
+import { Asker } from "@/cli/core";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
 import { Chain } from "@/lib/ui/chain";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { GUIDE, MARK } from "@/lib/ui/marks";
@@ -175,16 +176,19 @@ describe("Chain", () => {
     expect(printed(terminal)).toContain("└  Could not remove the origin");
   });
 
-  it("stays quiet when the person cancelled, because the prompt already said so", ({
-    terminal,
-  }) => {
+  it("stays quiet when the person cancelled, because the prompt already said so", async () => {
+    const person = answering(undefined);
     const chain = watching();
     chain.describe("Removing an origin");
-    chain.narrate("i", "asked");
+    const cancelled = await asTerminal(() => {
+      return Asker.for(chain.session()).yesNo({ name: "remove it", message: "Remove it?" });
+    }).catch((error: unknown) => error);
 
-    chain.abort(new PromptCancelled());
+    const asked = printed(person);
 
-    expect(printed(terminal)).not.toContain("└");
+    chain.abort(toZitadelError(cancelled));
+
+    expect(printed(person)).toBe(asked);
   });
 
   it("closes the chain for a cancellation that was not a prompt's, whatever it says", ({
@@ -355,7 +359,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     const running = aSpinnerRunning(clock, chain, "Deploying");
 
     await asTerminal(() => {
-      return chain.questions().yesNo({ name: "deploy it", message: "Deploy it now?" });
+      return Asker.for(chain.session()).yesNo({ name: "deploy it", message: "Deploy it now?" });
     });
     clock.advance(FRAME);
 
@@ -377,9 +381,9 @@ describe("a normal command's chain, which is no chain at all", () => {
 
       await expect(
         asTerminal(() => {
-          return chain.questions().yesNo({ name: "deploy it", message: "Deploy it now?" });
+          return Asker.for(chain.session()).yesNo({ name: "deploy it", message: "Deploy it now?" });
         }),
-      ).rejects.toMatchObject({ code: "E_CANCELLED" });
+      ).rejects.toMatchObject({ name: "AbortError" });
       clock.advance(FRAME);
 
       const shown = printed(person);
@@ -403,7 +407,7 @@ describe("a normal command's chain, which is no chain at all", () => {
       });
 
       await asTerminal(async () => {
-        await chain.questions().text({
+        await Asker.for(chain.session()).text({
           name: "name",
           message: "What is the name?",
           given: "from a flag",
@@ -411,7 +415,7 @@ describe("a normal command's chain, which is no chain at all", () => {
             return { ok: true, value: raw };
           },
         });
-        await chain.questions().yesNo({ name: "deploy it", message: "Deploy it now?" });
+        await Asker.for(chain.session()).yesNo({ name: "deploy it", message: "Deploy it now?" });
       });
 
       expect(drawn).toEqual(["prompt"]);
@@ -460,7 +464,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     const run = (force: boolean, person: Person) => async () => {
       const chain = new Chain({ interactive: true, force }, "plain");
       removing(chain);
-      await chain.questions().confirm({
+      await Asker.for(chain.session()).confirm({
         name: "remove the variable",
         message: "Remove B from the project?",
       });
@@ -484,7 +488,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     const person = answering(true);
 
     await asTerminal(() =>
-      normally().questions().confirm({
+      Asker.for(normally().session()).confirm({
         name: "remove the variable",
         message: "Remove B from the project?",
       }),
@@ -498,7 +502,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     const person = answering(true);
 
     await asTerminal(() =>
-      watching().questions().confirm({
+      Asker.for(watching().session()).confirm({
         name: "remove the variable",
         message: "Remove B from the project?",
       }),

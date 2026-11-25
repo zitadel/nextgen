@@ -3,6 +3,7 @@ import { type Interfaces, Flags } from "@oclif/core";
 import { Consent, type Gate } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
 
+import { Asker } from "./asker";
 import type { BaseCommand } from "./base";
 import type { EFFECT } from "./effect";
 import type { CommandResult } from "./types";
@@ -156,7 +157,7 @@ export function Destructive<
 
       return Consent.request(retried, {
         ...session,
-        confirmer: this.ui.confirmer(session),
+        confirmer: Asker.for(this.ui.session(session)),
       });
     }
   }

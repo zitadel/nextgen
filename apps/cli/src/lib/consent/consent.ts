@@ -1,5 +1,4 @@
 import { allowDestructive, type ZitadelClient } from "@/lib/backend";
-import { Ui } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { Confirmer } from "@/lib/ui/questions";
 
@@ -60,10 +59,9 @@ export type ConsentSession = Readonly<{
   /**
    * What asks the person, drawn the way the command presents itself. It also
    * answers for `--force` and refuses when nobody can be asked, so the gate
-   * and the question cannot disagree about either. A caller with no command
-   * to draw for leaves it out and gets the wizard's prompt.
+   * and the question cannot disagree about either.
    */
-  confirmer?: Confirmer;
+  confirmer: Confirmer;
 }>;
 
 /** Refusals {@link Consent.request} threw, so a best-effort caller can let them through. */
@@ -121,7 +119,7 @@ export class Consent {
         gate.refuse?.();
         throw new ConsentRequiredError(gate.name, gate.message, gate.retry);
       }
-      const agreed = await (session.confirmer ?? Ui.asker(session)).confirm({
+      const agreed = await session.confirmer.confirm({
         name: gate.name,
         message: gate.message,
         retry: gate.retry,

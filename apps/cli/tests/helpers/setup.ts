@@ -2,6 +2,7 @@ import type { LocalMachine } from "@/lib/server";
 import { FakeMachine } from "@tests/helpers/local-machine";
 import type { SetupServices } from "@/cli/commands/setup/shared";
 import { Ui } from "@/lib/ui";
+import { Asker } from "@/cli/core";
 import { write } from "@tests/helpers/git-repo";
 import { parseJson } from "@tests/helpers/run-cli";
 import { aSuggest } from "@tests/helpers/suggestions";
@@ -61,7 +62,7 @@ export function aPromptDeps(
 > {
   const audience = { interactive: true, force: false };
   return {
-    ask: Ui.asker(audience),
+    ask: Asker.for(audience),
     cwd,
     dryRun: false,
     machine,

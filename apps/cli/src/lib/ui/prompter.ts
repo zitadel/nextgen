@@ -2,7 +2,7 @@ import type { Writable } from "node:stream";
 import { cancel, confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 import type { Parsed } from "@zitadel/config/idp";
 
-import { CANCELLED, PromptCancelled, ZitadelError } from "@/lib/errors";
+import { CANCELLED } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
@@ -47,7 +47,7 @@ export type Validate = (value: string | undefined) => string | undefined;
  * one undecorated line with the answer typed on it. A command picks neither —
  * it asks `this.ask`, and its presentation decides which of these answers.
  *
- * Every method either answers or throws `E_CANCELLED`, so a command never
+ * Every method either answers or throws an `AbortError`, so a command never
  * carries on with a missing answer.
  */
 export interface Prompter {
@@ -59,6 +59,42 @@ export interface Prompter {
 }
 
 /**
+ * How a prompt is drawn, and what a cancelled one does to the run.
+ */
+export type Prompting = {
+  /**
+   * Whether a prompt is drawn with clack's guide, the gray `│` down its left
+   * side. A wizard's questions sit inside its chain and carry it; a normal
+   * command's are the same prompts with nothing beside them.
+   */
+  guide?: boolean;
+  /**
+   * Draws a prompt between the caller's own steps: what it does before `draw`
+   * opens the chain the prompt belongs to, and what it does once `draw`
+   * settles, answered or not, spaces what follows it.
+   *
+   * @typeParam T - What the prompt resolves to.
+   */
+  around?: <T>(draw: () => Promise<T>) => Promise<T>;
+  /**
+   * Aborts the run's signal. A prompt the person walks away from calls it with
+   * the `AbortError` it then throws.
+   */
+  abort?: (reason: DOMException) => void;
+};
+
+/**
+ * Who can answer, and how a prompt is drawn: what a chain gives the question
+ * engine to ask with.
+ */
+export type PromptSession = Prompting & {
+  /** Whether a person is at a terminal to be asked. */
+  interactive: boolean;
+  /** The command's `--force`: it answers a `confirm` without asking. */
+  force: boolean;
+};
+
+/**
  * Clack's prompts, the only ones the CLI draws. A wizard draws them inside its
  * chain: the question against a mark, the answer in the guide under it, and
  * `└  Cancelled` when the person walks away. A normal command draws the same
@@ -67,12 +103,15 @@ export interface Prompter {
  */
 export class DrawnPrompter implements Prompter {
   private readonly guide: boolean;
+  private readonly abort: ((reason: DOMException) => void) | undefined;
 
   /**
    * @param guide - Whether the prompts are drawn with clack's guide beside them.
+   * @param abort - Aborts the run's signal when the person walks away from a prompt.
    */
-  constructor(guide: boolean) {
+  constructor(guide: boolean, abort?: (reason: DOMException) => void) {
     this.guide = guide;
+    this.abort = abort;
   }
 
   /**
@@ -81,8 +120,7 @@ export class DrawnPrompter implements Prompter {
    * @param question - What is asked.
    * @param validate - Refuses an answer as it is typed.
    * @returns What was typed.
-   * @throws {PromptCancelled} When the person walks away from a wizard's prompt.
-   * @throws {ZitadelError} `E_CANCELLED` when they walk away from a normal one.
+   * @throws An `AbortError` when the person walks away from the prompt.
    */
   async text(question: AnyQuestion, validate: Validate): Promise<string> {
     return this.answered(
@@ -102,8 +140,7 @@ export class DrawnPrompter implements Prompter {
    * @param question - What is asked.
    * @param validate - Refuses an answer as it is typed.
    * @returns What was typed.
-   * @throws {PromptCancelled} When the person walks away from a wizard's prompt.
-   * @throws {ZitadelError} `E_CANCELLED` when they walk away from a normal one.
+   * @throws An `AbortError` when the person walks away from the prompt.
    */
   async secret(question: AnyQuestion, validate: Validate): Promise<string> {
     return this.answered(
@@ -120,8 +157,7 @@ export class DrawnPrompter implements Prompter {
    *
    * @param question - What is asked, with its options.
    * @returns The chosen option's value.
-   * @throws {PromptCancelled} When the person walks away from a wizard's prompt.
-   * @throws {ZitadelError} `E_CANCELLED` when they walk away from a normal one.
+   * @throws An `AbortError` when the person walks away from the prompt.
    */
   async select(question: AnyQuestion): Promise<unknown> {
     return this.chosen(
@@ -139,8 +175,7 @@ export class DrawnPrompter implements Prompter {
    *
    * @param question - What is asked, with its options.
    * @returns The chosen options' values.
-   * @throws {PromptCancelled} When the person walks away from a wizard's prompt.
-   * @throws {ZitadelError} `E_CANCELLED` when they walk away from a normal one.
+   * @throws An `AbortError` when the person walks away from the prompt.
    */
   async multiselect(question: AnyQuestion): Promise<unknown[]> {
     return this.chosen(
@@ -160,8 +195,7 @@ export class DrawnPrompter implements Prompter {
    *
    * @param question - What is asked.
    * @returns Whether the answer is yes.
-   * @throws {PromptCancelled} When the person walks away from a wizard's prompt.
-   * @throws {ZitadelError} `E_CANCELLED` when they walk away from a normal one.
+   * @throws An `AbortError` when the person walks away from the prompt.
    */
   async confirm(question: AnyQuestion): Promise<boolean> {
     const initialValue = (question.initialValue as boolean | undefined) ?? false;
@@ -227,18 +261,20 @@ export class DrawnPrompter implements Prompter {
    *
    * @param answer - What the prompt returned.
    * @returns The answer, when there is one.
-   * @throws {PromptCancelled} When a wizard's prompt was cancelled.
-   * @throws {ZitadelError} `E_CANCELLED` when a normal command's was.
+   * @throws An `AbortError`, after the run's signal is aborted with it, when the prompt was
+   *   cancelled.
    */
   private chosen<T>(answer: T | symbol): T {
     if (isCancel(answer)) {
       if (!this.guide) {
         // The prompt's last frame would otherwise stay on screen as if answered.
         FlatOutput.of(process.stdout).erase();
-        throw new ZitadelError("E_CANCELLED", "Cancelled by user");
+      } else {
+        cancel(CANCELLED);
       }
-      cancel(CANCELLED);
-      throw new PromptCancelled();
+      const reason = new DOMException("Cancelled by user", "AbortError");
+      this.abort?.(reason);
+      throw reason;
     }
     return answer as T;
   }

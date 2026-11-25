@@ -203,7 +203,7 @@
   read, but a message or a box line never may: prose drops the selector
   (`tests/unit/cli/core/environment-flags.test.ts`).
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
-  (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
+  (`src/lib/ui/questions.ts`, engine in `src/cli/core/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
   kind of question and no `kind` string: a unit test fails on a clack import
   elsewhere and on a `kind:` question outside the engine.

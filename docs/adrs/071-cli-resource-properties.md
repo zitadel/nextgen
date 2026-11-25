@@ -343,7 +343,7 @@ not only the first.
 
 - **When it may prompt**, on a terminal and without `--non-interactive`, it asks
   for each one through `input`
-  ([`apps/cli/src/lib/ui/asker.ts`](../../apps/cli/src/lib/ui/asker.ts)) in schema
+  ([`apps/cli/src/cli/core/asker.ts`](../../apps/cli/src/cli/core/asker.ts)) in schema
   order. An enum is a select, a boolean a confirm, and a string is text that
   its pattern checks as it is typed. This is the "command-driven with optional
   interaction" model of the draft

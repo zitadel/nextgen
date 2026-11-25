@@ -171,6 +171,9 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
       force: false,
     },
     this.presentation(),
+    (reason) => {
+      this.abortRun(reason);
+    },
   );
 
   /**
@@ -557,6 +560,9 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
         force: this.meta.force,
       },
       this.presentation(),
+      (reason) => {
+        this.abortRun(reason);
+      },
     );
     this.ui.describe(
       (this.constructor as typeof BaseCommand).heading ??
@@ -679,16 +685,14 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
     }
     const known = early?.meta ?? this.meta;
     const meta: GlobalOptions = { ...known, command: this.id ?? known.command };
-    const reason: unknown = this.signal.reason;
-    const cancelled =
-      this.signal.aborted && reason instanceof ZitadelError && reason.code === "E_CANCELLED";
+    const cancelled = this.cancellation;
     const help =
       this.config.findCommand(meta.command) === undefined
         ? commandOf(["--help"], meta.cliVersion)
         : this.suggest(helpOf(meta.command));
     const failure = new Failure(
       this.suggestions.renderedFailure(
-        cancelled ? reason : toZitadelError(Failure.advised(error, meta.cwd)),
+        cancelled ?? toZitadelError(Failure.advised(error, meta.cwd)),
       ),
       meta,
       help,

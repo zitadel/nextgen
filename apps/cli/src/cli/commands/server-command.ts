@@ -1,6 +1,6 @@
 import type { ServerAddresses } from "@/lib/environment";
 import { serverFlag } from "@/cli/core/flags";
-import type { BaseCommand } from "@/cli/core";
+import { Asker, type BaseCommand } from "@/cli/core";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import {
   LocalRuntime,
@@ -141,7 +141,7 @@ export function ChoosingServerCommand<
      * @throws {ZitadelError} When the answer is not a server, or no one can be asked.
      */
     protected async askServer(retry: SuggestedCommand): Promise<string> {
-      return this.ui.questions().text({
+      return Asker.for(this.ui.session()).text({
         name: "server",
         message: "What is the URL of your Zitadel server?",
         flag: "--server",

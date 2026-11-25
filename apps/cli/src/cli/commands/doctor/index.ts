@@ -9,7 +9,7 @@ import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { Environment } from "@/lib/environment";
-import { errorMessage, toZitadelError, ZitadelError } from "@/lib/errors";
+import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
 import { Output, warnings as invocationWarnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
@@ -769,7 +769,7 @@ export default class Doctor extends Telemetered(
         try {
           await check.fix(ctx);
         } catch (error) {
-          if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
+          if (isCancellation(error)) {
             throw error;
           }
           if (Consent.isRefusal(error)) {

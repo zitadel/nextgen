@@ -12,6 +12,7 @@ import { CANCEL_SYMBOL, confirm, isCancel } from "@clack/prompts";
 import { createZitadelClient } from "@/lib/backend";
 import { Consent, ConsentInternalError, ConsentRequiredError, type Gate } from "@/lib/consent";
 import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { aConsentSession } from "@tests/helpers/consent";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 /** Renders the commands these questions suggest, as a run does. */
@@ -27,9 +28,9 @@ const GATE: Gate = {
 };
 /** A client as every command gets one; nothing here sends a request. */
 const aClient = () => createZitadelClient({ signal, baseUrl: "http://localhost:8080" });
-const asked = { interactive: true, force: false, dryRun: false };
-const forced = { interactive: false, force: true, dryRun: false };
-const scripted = { interactive: false, force: false, dryRun: false };
+const asked = aConsentSession({ interactive: true, force: false, dryRun: false });
+const forced = aConsentSession({ interactive: false, force: true, dryRun: false });
+const scripted = aConsentSession({ interactive: false, force: false, dryRun: false });
 
 /** What a refused request threw. */
 const refusalOf = (session: typeof scripted, gate: Gate = GATE) =>
@@ -106,11 +107,11 @@ describe("Consent", () => {
       );
     });
 
-    it("fails with E_CANCELLED on Ctrl-C", async () => {
+    it("fails with an AbortError on Ctrl-C", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(CANCEL_SYMBOL);
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
-      await expect(Consent.request(GATE, asked)).rejects.toMatchObject({ code: "E_CANCELLED" });
+      await expect(Consent.request(GATE, asked)).rejects.toMatchObject({ name: "AbortError" });
     });
   });
 

@@ -10,6 +10,7 @@ import { it } from "@tests/fixtures";
 import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import type { ZitadelClient } from "@/lib/backend";
 import { Consent } from "@/lib/consent";
+import { aConsentSession } from "@tests/helpers/consent";
 import { CREDENTIALS } from "@/cli/core/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/cli/core/environment-command";
 import type { ConnectOptions } from "@/cli/core/types";
@@ -207,7 +208,7 @@ describe("EnvironmentCommand.service", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
     const consent = await Consent.request(
       { verb: "remove", name: "remove it", message: "Remove it?" },
-      { interactive: false, force: true, dryRun: false },
+      aConsentSession({ interactive: false, force: true, dryRun: false }),
     );
     if (consent === undefined) {
       throw new Error("consent was not given");
@@ -226,7 +227,7 @@ describe("EnvironmentCommand.service", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
     const consent = await Consent.request(
       { verb: "remove", name: "remove it", message: "Remove it?" },
-      { interactive: false, force: true, dryRun: false },
+      aConsentSession({ interactive: false, force: true, dryRun: false }),
     );
     if (consent === undefined) {
       throw new Error("consent was not given");
@@ -247,7 +248,7 @@ describe("EnvironmentCommand.projectOnServer", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
     const consent = await Consent.request(
       { verb: "remove", name: "remove it", message: "Remove it?" },
-      { interactive: false, force: true, dryRun: false },
+      aConsentSession({ interactive: false, force: true, dryRun: false }),
     );
     if (consent === undefined) {
       throw new Error("consent was not given");

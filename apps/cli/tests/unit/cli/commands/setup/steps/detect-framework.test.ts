@@ -8,8 +8,8 @@ import { isCancel, select } from "@clack/prompts";
 
 import type { SetupFlags } from "@/cli/commands/setup";
 import { DetectFramework } from "@/cli/commands/setup/steps/detect-framework";
-import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
+import { Asker } from "@/cli/core";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -32,7 +32,7 @@ const AUDIENCE = { interactive: true, force: false };
  */
 function detectIn(cwd: string) {
   return new DetectFramework({
-    ask: Ui.asker(AUDIENCE),
+    ask: Asker.for(AUDIENCE),
     cwd,
     env: {},
     force: false,
@@ -67,16 +67,14 @@ describe("DetectFramework", () => {
       );
     });
 
-    it("refuses with E_CANCELLED on Ctrl-C", async ({ dir }) => {
+    it("aborts with an AbortError on Ctrl-C", async ({ dir }) => {
       vi.mocked(select).mockResolvedValueOnce(CANCEL);
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
       const error = await rejectionOf(() => {
         return detectIn(dir);
       });
-
-      expect(error).toBeInstanceOf(ZitadelError);
-      expect(error).toMatchObject({ code: "E_CANCELLED" });
+      expect(error).toMatchObject({ name: "AbortError" });
     });
   });
 });

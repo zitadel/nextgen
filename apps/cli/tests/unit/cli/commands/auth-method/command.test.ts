@@ -12,6 +12,7 @@ import AuthMethodPasskeyEnable from "@/cli/commands/auth-method/passkey/enable";
 import AuthMethodPasswordEnable from "@/cli/commands/auth-method/password/enable";
 import AuthMethodSsoDisable from "@/cli/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
+import { aConsentSession } from "@tests/helpers/consent";
 import { ZitadelError } from "@/lib/errors";
 
 import {
@@ -733,7 +734,7 @@ describe("AuthMethodCommand.write", () => {
     const change = read.config.schemas.disable(read.schema, "passkey", { force: true });
     const consent = await Consent.request(
       { verb: "disable", name: "disable passkey", message: "Disable passkey?" },
-      { interactive: false, force: true, dryRun: false },
+      aConsentSession({ interactive: false, force: true, dryRun: false }),
     );
 
     await writer.writeChange(read, change, consent);

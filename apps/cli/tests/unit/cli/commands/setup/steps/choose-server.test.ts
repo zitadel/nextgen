@@ -12,7 +12,7 @@ import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
 import { FakeMachine } from "@tests/helpers/local-machine";
-import { Ui } from "@/lib/ui";
+import { Asker } from "@/cli/core";
 import { it } from "@tests/fixtures";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -57,7 +57,7 @@ const APP_DIR = "/tmp/app";
 /**
  * How the wizard asks: interactively, without `--force`.
  */
-const ask = Ui.asker({ interactive: true, force: false });
+const ask = Asker.for({ interactive: true, force: false });
 
 /**
  * The boxes a prompt drew, as setup's own context would have drawn them.

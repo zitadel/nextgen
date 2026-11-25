@@ -2,7 +2,9 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, describe, expect } from "vitest";
 
 import { log } from "@/lib/ui";
-import { PromptCancelled, ZitadelError } from "@/lib/errors";
+import { Asker } from "@/cli/core";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { Ui } from "@/lib/ui/ui";
 import { it } from "@tests/unit/lib/ui/at-terminal";
@@ -27,22 +29,23 @@ describe("Ui", () => {
       const ui = watched();
       ui.describe("Removing an origin");
 
-      await ui.questions().yesNo({ name: "remove the origin", message: "Remove it?" });
+      await Asker.for(ui.session()).yesNo({ name: "remove the origin", message: "Remove it?" });
 
       expect(printed(person)).toContain("┌  Removing an origin");
     });
 
     it("is never asked when nobody is watching", async ({ terminal }) => {
       await expect(
-        scripted().questions().yesNo({ name: "remove the origin", message: "Remove it?" }),
+        Asker.for(scripted().session()).yesNo({ name: "remove the origin", message: "Remove it?" }),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
       expect(printed(terminal)).toBe("");
     });
 
     it("lets the command's --force answer a destructive confirmation", async ({ terminal }) => {
-      const answer = await forced()
-        .confirmer()
-        .confirm({ name: "remove the origin", message: "Remove it?" });
+      const answer = await Asker.for(forced().session()).confirm({
+        name: "remove the origin",
+        message: "Remove it?",
+      });
 
       expect(answer).toBe(true);
       expect(printed(terminal)).toBe("");
@@ -51,9 +54,10 @@ describe("Ui", () => {
     it("asks a plain yes or no anyway, whatever the command's --force means", async () => {
       const person = answering(false);
 
-      const answer = await forced()
-        .questions()
-        .yesNo({ name: "scaffold the app", message: "Scaffold?" });
+      const answer = await Asker.for(forced().session()).yesNo({
+        name: "scaffold the app",
+        message: "Scaffold?",
+      });
 
       expect(answer).toBe(false);
       expect(person.asked()).toEqual(["Scaffold?"]);
@@ -61,16 +65,19 @@ describe("Ui", () => {
   });
 
   describe("a run that never finished", () => {
-    it("stays quiet when the person cancelled, because the prompt already said so", ({
-      terminal,
-    }) => {
+    it("stays quiet when the person cancelled, because the prompt already said so", async () => {
+      const person = answering(undefined);
       const ui = watched();
       ui.describe("Listing origins");
-      ui.say("something happened");
+      const cancelled = await asTerminal(() => {
+        return Asker.for(ui.session()).yesNo({ name: "list them", message: "List them?" });
+      }).catch((error: unknown) => error);
 
-      ui.stop(new PromptCancelled());
+      const asked = printed(person);
 
-      expect(printed(terminal)).not.toContain("└");
+      ui.stop(toZitadelError(cancelled));
+
+      expect(printed(person)).toBe(asked);
     });
 
     it("closes the chain when the person interrupted the work", ({ terminal }) => {

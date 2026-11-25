@@ -12,7 +12,8 @@ import { ChooseSocialSignIn } from "@/cli/commands/setup/steps/choose-social-sig
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
-import { Ui, warnings } from "@/lib/ui";
+import { warnings } from "@/lib/ui";
+import { Asker } from "@/cli/core";
 import { FakeMachine } from "@tests/helpers/local-machine";
 import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
 import { aSuggest } from "@tests/helpers/suggestions";
@@ -77,7 +78,7 @@ const QUESTIONS = {
 /**
  * How the wizard asks: interactively, without `--force`.
  */
-const ask = Ui.asker({ interactive: true, force: false });
+const ask = Asker.for({ interactive: true, force: false });
 
 /**
  * The boxes a prompt drew, as setup's own context would have drawn them.
@@ -859,7 +860,7 @@ describe("ChooseSocialSignIn", () => {
     });
   });
 
-  it("refuses with E_CANCELLED on Ctrl-C at the provider question", async () => {
+  it("aborts with an AbortError on Ctrl-C at the provider question", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce(CANCEL_SYMBOL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
@@ -867,8 +868,7 @@ describe("ChooseSocialSignIn", () => {
       return new ChooseSocialSignIn(aPromptDeps(undefined, machine)).ask(setupAnswers(), CONTEXT);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
-    expect(error).toMatchObject({ code: "E_CANCELLED" });
+    expect(error).toMatchObject({ name: "AbortError" });
   });
 });
 

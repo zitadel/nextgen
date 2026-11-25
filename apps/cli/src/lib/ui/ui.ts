@@ -1,11 +1,10 @@
 import type { Audience } from "./audience";
-import { Asker, type Session } from "./asker";
 import { Box } from "./box";
 import { Chain } from "./chain";
 import { LogPrinter } from "./log-printer";
 import type { Presentation } from "./presentation";
 import type { Report, Step } from "./progress";
-import type { Confirmer, Questions } from "./questions";
+import type { PromptSession } from "./prompter";
 import type { Spinner } from "./spinner";
 import type { Summary } from "./summary";
 
@@ -55,18 +54,6 @@ export class Ui {
   private handedOver = false;
 
   /**
-   * Questions answered from a session instead of from a run's audience, for
-   * a caller that has no chain: a test, or a library handed its own session.
-   * A command reaches its questions as `this.ask`.
-   *
-   * @param session - Who can answer, and how a prompt is drawn.
-   * @returns The questions, bound to the session.
-   */
-  static asker(session: Session): Questions & Confirmer {
-    return Asker.for(session);
-  }
-
-  /**
    * Wraps content to the terminal so a frame drawn around it never exceeds the
    * window, for a caller that draws a frame of its own.
    *
@@ -78,8 +65,17 @@ export class Ui {
     return Box.at(columns).wrap(message);
   }
 
-  constructor(audience: Audience, presentation: Presentation = "wizard") {
-    this.chain = new Chain(audience, presentation);
+  /**
+   * @param audience - Who is watching.
+   * @param presentation - Which of the two shapes the command draws.
+   * @param abortRun - Aborts the run's signal, for a prompt the person walks away from.
+   */
+  constructor(
+    audience: Audience,
+    presentation: Presentation = "wizard",
+    abortRun?: (reason: DOMException) => void,
+  ) {
+    this.chain = new Chain(audience, presentation, abortRun);
     this.printer = new LogPrinter(this.chain);
   }
 
@@ -104,16 +100,17 @@ export class Ui {
   }
 
   /**
-   * The questions this command may ask, drawn inside its chain. A command
-   * reaches them as `this.ask` (`Promptable`). When nobody is there they are
-   * answered from flags and piped stdin only and nothing is drawn, so `--json`
-   * stays one envelope.
+   * What the question engine asks with: its prompts drawn inside this
+   * command's chain, with this run's interactivity (`--non-interactive`,
+   * `--json`, no terminal) and `--force` already filled in. When nobody is
+   * there the questions are answered from flags and piped stdin only and
+   * nothing is drawn, so `--json` stays one envelope.
    *
-   * None of them is answered by `--force`: that answers a destructive
-   * confirmation alone, which is {@link confirmer}'s.
+   * @param session - Who can answer, when that is not the run's own audience.
+   * @returns The session to ask with.
    */
-  questions(): Questions {
-    return this.chain.questions();
+  session(session?: { interactive: boolean; force: boolean }): PromptSession {
+    return this.chain.session(session);
   }
 
   /**
@@ -123,15 +120,6 @@ export class Ui {
    */
   onPrompt(listener: () => void): void {
     this.chain.listenToPrompts(listener);
-  }
-
-  /**
-   * The one question `--force` answers, which is whether a destructive action
-   * may go ahead. Only `Consent.request` asks it: it is not among
-   * {@link questions}, so a command cannot get a boolean for it.
-   */
-  confirmer(session?: { interactive: boolean; force: boolean }): Confirmer {
-    return this.chain.questions(session);
   }
 
   /**
