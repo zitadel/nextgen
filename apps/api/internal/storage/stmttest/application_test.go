@@ -367,7 +367,7 @@ func TestApplicationStatements_IdempotencyKeys(t *testing.T) {
 			assert.True(t, got.ExpiresAt.Equal(key.ExpiresAt))
 
 			again := newKey(projectID, key.KeyHash, now, now.Add(time.Hour))
-			assert.ErrorIs(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), again),new(database.UniqueError), "a live record is not replaced")
+			assert.ErrorIs(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), again), new(database.UniqueError), "a live record is not replaced")
 		})
 
 		t.Run("an expired record is not returned and a create replaces it", func(t *testing.T) {
