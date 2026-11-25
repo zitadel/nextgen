@@ -1,6 +1,6 @@
 import { execa } from "execa";
 
-import { LocalServerDockerFailedError } from "@/lib/server/errors";
+import { LocalServerInvalidError } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 
 import {
@@ -243,9 +243,13 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     }
 
     const args = ["manifest", "inspect", image];
-    const result = await runDocker(args).catch((error: unknown) => {
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let result: DockerResult;
+    try {
+      result = await runDocker(args);
+    } catch (error) {
       throw dockerError(`Inspect Docker image ${image}`, error);
-    });
+    }
     if (result.status === 0) {
       return "remote";
     }
@@ -429,9 +433,13 @@ async function requireDocker(
   action: string,
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  const result = await runDocker(args, env).catch((error: unknown) => {
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let result: DockerResult;
+  try {
+    result = await runDocker(args, env);
+  } catch (error) {
     throw dockerError(action, error);
-  });
+  }
   if (result.status !== 0) {
     throw dockerError(action, result);
   }
@@ -443,9 +451,13 @@ async function requireDocker(
  */
 async function imageExists(image: string): Promise<boolean> {
   const args = ["image", "inspect", image];
-  const result = await runDocker(args).catch((error: unknown) => {
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let result: DockerResult;
+  try {
+    result = await runDocker(args);
+  } catch (error) {
     throw dockerError(`Inspect Docker image ${image}`, error);
-  });
+  }
   return result.status === 0;
 }
 
@@ -463,13 +475,13 @@ async function ensureImage(image: string): Promise<"local" | "pulled"> {
 /**
  * Wraps a failed `docker` call, keeping what it printed for whoever is debugging.
  */
-function dockerError(action: string, cause: unknown): LocalServerDockerFailedError {
+function dockerError(action: string, cause: unknown): LocalServerInvalidError {
   if (cause && typeof cause === "object" && "stderr" in cause) {
-    return new LocalServerDockerFailedError(
+    return new LocalServerInvalidError(
       `${action} failed: ${String((cause as { stderr?: unknown }).stderr)}`,
       cause,
     );
   } else {
-    return new LocalServerDockerFailedError(`${action} failed`, cause);
+    return new LocalServerInvalidError(`${action} failed`, cause);
   }
 }

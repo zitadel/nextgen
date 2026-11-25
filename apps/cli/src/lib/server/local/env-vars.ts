@@ -19,7 +19,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
-import { LocalServerEnvUnreadableError } from "@/lib/server/errors";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerInvalidError } from "@/lib/server/errors";
 import { isObject } from "@/lib/json";
 
 /** Highest priority first. */
@@ -93,14 +94,15 @@ export const loadEnvFiles = async (
 };
 
 const readEnvFile = async (path: string): Promise<Readonly<Record<string, string>>> => {
-  const contents = await readFile(path, "utf8").catch((error: unknown) => {
+  // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
+  let contents: string;
+  try {
+    contents = await readFile(path, "utf8");
+  } catch (error) {
     if (isObject(error) && error.code === "ENOENT") {
-      return undefined;
+      return {};
     }
-    throw new LocalServerEnvUnreadableError(`Cannot read ${path}`, error);
-  });
-  if (contents === undefined) {
-    return {};
+    throw new LocalServerInvalidError(`Cannot read ${path}: ${errorMessage(error)}`, error);
   }
   // parseEnv types values as possibly-undefined (it never emits them); drop them for the string map.
   return Object.fromEntries(

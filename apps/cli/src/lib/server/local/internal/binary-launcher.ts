@@ -10,7 +10,8 @@ import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 import { execa } from "execa";
 import pWaitFor from "p-wait-for";
 
-import { LocalServerBinaryBlockedError, LocalServerBinaryMissingError } from "@/lib/server/errors";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerInvalidError } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/server/local/runtime";
@@ -239,7 +240,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     }
   }
 
-  /** The bundled server version, or a `LocalServerBinaryMissingError`. */
+  /** The bundled server version, or a `LocalServerInvalidError`. */
   static assertAvailable(): string {
     return BinaryLauncher.available(() => {
       if (!process.env[COMMAND_ENV]) {
@@ -254,7 +255,10 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return find();
     } catch (error) {
-      throw new LocalServerBinaryMissingError("Zitadel server npm package is not available", error);
+      throw new LocalServerInvalidError(
+        `Zitadel server npm package is not available: ${errorMessage(error)}`,
+        error,
+      );
     }
   }
 
@@ -521,7 +525,10 @@ async function spawned(child: ReturnType<typeof spawn>): Promise<number> {
     child.unref();
     return pid;
   } catch (error) {
-    throw new LocalServerBinaryBlockedError("The Zitadel server could not be started", error);
+    throw new LocalServerInvalidError(
+      `The Zitadel server could not be started: ${errorMessage(error)}`,
+      error,
+    );
   }
 }
 

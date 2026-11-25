@@ -1,11 +1,7 @@
 import { apiBaseUrl, request } from "@/lib/backend/transport";
 
 import { createZitadelClient, AuthAttemptService } from "@/lib/backend";
-import {
-  LocalServerAdminPlatformMissingError,
-  LocalServerAdminRejectedError,
-  LocalServerAdminSessionError,
-} from "@/lib/server/errors";
+import { LocalServerDeniedError, LocalServerInvalidError } from "@/lib/server/errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 
@@ -96,9 +92,7 @@ export async function adminSessionCookie(
       });
     });
   if (!res.ok || !cookie) {
-    throw new LocalServerAdminSessionError(
-      `Local admin session exchange failed (${String(res.status)})`,
-    );
+    throw new LocalServerDeniedError(`Local admin session exchange failed (${String(res.status)})`);
   }
   return cookie;
 }
@@ -114,8 +108,8 @@ async function signIn(
 ): Promise<{ handoffToken: string; publishableKey: string }> {
   const runtime = await readPlatformRuntime(serverUrl, REQUEST_TIMEOUT_MS);
   if (!runtime) {
-    throw new LocalServerAdminPlatformMissingError(
-      "The local server does not host the platform project, so the local admin cannot sign in",
+    throw new LocalServerInvalidError(
+      `The local server at ${serverUrl} does not host the platform project, so the local admin cannot sign in`,
     );
   }
   const client = createZitadelClient({
@@ -165,6 +159,6 @@ async function signIn(
  * deletes local data, so it stays a hint a person reads, never a next command
  * an agent runs.
  */
-function adminNotFound(): LocalServerAdminRejectedError {
-  return new LocalServerAdminRejectedError("The local server could not find the local admin");
+function adminNotFound(): LocalServerDeniedError {
+  return new LocalServerDeniedError("The local server could not find the local admin");
 }

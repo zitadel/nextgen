@@ -4,6 +4,7 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
+import { errorMessage } from "@/lib/errors";
 import {
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
@@ -280,7 +281,10 @@ async function isOwnFile(path: string): Promise<boolean> {
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
       return false;
     }
-    throw new LocalServerRecordUnreadableError(`${path} cannot be read`, error);
+    throw new LocalServerRecordUnreadableError(
+      `${path} cannot be read: ${errorMessage(error)}`,
+      error,
+    );
   }
 }
 
@@ -340,10 +344,7 @@ export async function readNearestRuntimeMetadata(
   }
   const runtime = await readRuntimeMetadata(dir);
   if (runtime) {
-    return {
-      dir,
-      runtime,
-    };
+    return { dir, runtime };
   } else {
     return undefined;
   }
@@ -370,7 +371,7 @@ export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
   }
 
   const parsed = parseJsonObject(raw, LOCAL_RUNTIME_FILE);
-  return normalizeRuntimeMetadata(parsed);
+  return normalizeRuntimeMetadata(parsed, cwd);
 }
 
 export async function writeRuntimeMetadata(cwd: string, metadata: RuntimeMetadata): Promise<void> {
@@ -425,9 +426,11 @@ export function localServerNotRunning(
   serverUrl?: string,
 ): LocalServerNotRespondingError | LocalServerNotRunningError {
   if (serverUrl) {
-    return new LocalServerNotRespondingError(serverUrl);
+    return new LocalServerNotRespondingError(
+      `Local Zitadel server is not running; no healthy server responded at ${serverUrl}`,
+    );
   } else {
-    return new LocalServerNotRunningError();
+    return new LocalServerNotRunningError("Local Zitadel server is not running");
   }
 }
 
@@ -448,7 +451,10 @@ async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   }
 }
 
-function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetadata {
+function normalizeRuntimeMetadata(
+  input: Record<string, unknown>,
+  directory: string,
+): RuntimeMetadata {
   if (
     input.schema_version !== 1 ||
     typeof input.port !== "number" ||
@@ -459,7 +465,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
   ) {
-    throw malformedRuntime();
+    throw malformedRuntime(directory);
   }
 
   const backend = [input.backend, "docker"].find((value) => {
@@ -486,7 +492,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
       typeof input.server_package !== "string" ||
       typeof input.server_version !== "string"
     ) {
-      throw malformedRuntime();
+      throw malformedRuntime(directory);
     }
     return {
       ...base,
@@ -505,7 +511,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.container_id !== "string" ||
     typeof input.image !== "string"
   ) {
-    throw malformedRuntime();
+    throw malformedRuntime(directory);
   }
   return {
     ...base,
@@ -597,6 +603,6 @@ function explicitUrlPort(value: string): number | undefined {
   }
 }
 
-function malformedRuntime(): LocalServerRecordMalformedError {
-  return new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
+function malformedRuntime(directory: string): LocalServerRecordMalformedError {
+  return new LocalServerRecordMalformedError(`${join(directory, LOCAL_RUNTIME_FILE)} is malformed`);
 }

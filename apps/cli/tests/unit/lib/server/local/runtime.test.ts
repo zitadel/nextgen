@@ -109,7 +109,7 @@ describe("local server runtime metadata", () => {
 
     await expect(readRuntimeMetadata(cwd)).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: `${LOCAL_RUNTIME_FILE} is malformed`,
+      message: `${paths.runtimeFile} is malformed`,
     });
   });
 

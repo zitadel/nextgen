@@ -177,7 +177,9 @@ async function acquireLock(lockFile: string, options: LockOptions): Promise<() =
       return release;
     }
     if (clock.now() >= deadline) {
-      throw new LocalServerBusyError(lockFile, await readOwner(lockFile));
+      throw new LocalServerBusyError(
+        `Another \`zitadel start\` is still running in this directory; delete ${lockFile} if no start is running`,
+      );
     }
     await clock.wait(pollMs);
   }

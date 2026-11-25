@@ -6,10 +6,8 @@ import { join } from "node:path";
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
-import {
-  LocalServerAdminFileMalformedError,
-  LocalServerAdminUnreadableError,
-} from "@/lib/server/errors";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerInvalidError } from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
 import {
@@ -76,22 +74,29 @@ export async function findLocalAdminFor(
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {
-  const raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8").catch((error: unknown) => {
+  // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
+  let raw: string | undefined;
+  try {
+    raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
+  } catch (error) {
     // Only a missing file means `start` never created the admin. A file that
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw new LocalServerAdminUnreadableError(`${LOCAL_ADMIN_FILE} cannot be read`, error);
-  });
+    throw new LocalServerInvalidError(
+      `${join(cwd, LOCAL_ADMIN_FILE)} cannot be read: ${errorMessage(error)}`,
+      error,
+    );
+  }
   if (raw === undefined) return undefined;
 
   try {
     const parsed: unknown = JSON.parse(raw);
     if (isLocalAdmin(parsed)) return parsed;
   } catch (error) {
-    throw malformedAdminFile(error);
+    throw malformedAdminFile(cwd, error);
   }
-  throw malformedAdminFile();
+  throw malformedAdminFile(cwd);
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {
@@ -111,11 +116,14 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
  * could never sign in. Removing the file and resetting the data lets the next
  * start mint a fresh credential and import it.
  */
-function malformedAdminFile(cause?: unknown): LocalServerAdminFileMalformedError {
+function malformedAdminFile(cwd: string, cause?: unknown): LocalServerInvalidError {
   if (cause) {
-    return new LocalServerAdminFileMalformedError(`${LOCAL_ADMIN_FILE} is malformed`, cause);
+    return new LocalServerInvalidError(
+      `${join(cwd, LOCAL_ADMIN_FILE)} is malformed: ${errorMessage(cause)}`,
+      cause,
+    );
   } else {
-    return new LocalServerAdminFileMalformedError(`${LOCAL_ADMIN_FILE} is malformed`);
+    return new LocalServerInvalidError(`${join(cwd, LOCAL_ADMIN_FILE)} is malformed`);
   }
 }
 

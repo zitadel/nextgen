@@ -294,31 +294,36 @@ export class Lifecycle<R extends ServerRecord> {
       preferred,
       this.options.firstPort,
     );
-    const record = await this.launchAndWait(claim.port)
-      .catch(async (error: unknown) => {
-        // Someone else took the port between claiming it and binding it (a
-        // process outside our claims, or a Docker publish that failed). The
-        // choice was automatic, so the next port is tried. A server that failed
-        // with its port still free crashed, and says so instead of being retried.
-        if (
+    // biome-ignore lint/plugin: assigned inside the try that guards the launch, read after it
+    let record: Launched<R> | undefined;
+    try {
+      record = await this.launchAndWait(claim.port);
+    } catch (error) {
+      // Someone else took the port between claiming it and binding it (a
+      // process outside our claims, or a Docker publish that failed). The
+      // choice was automatic, so the next port is tried. A server that failed
+      // with its port still free crashed, and says so instead of being retried.
+      if (
+        !(
           requested === undefined &&
           attempt < PORT_RACE_RETRIES &&
           !(error instanceof LocalServerStopError) &&
           !(error instanceof LocalServerStartCleanupFailedError) &&
           !(error instanceof LocalServerStartTimeoutError) &&
           !(await this.deps.ports.isFree(claim.port))
-        ) {
-          return undefined;
-        }
+        )
+      ) {
         throw error;
-      })
-      .finally(async () => {
-        // A claim that cannot be removed is a file whose owner is gone, which
-        // the next start takes over; it must not hide how this start ended.
-        await claim.release().catch(() => {
-          return undefined;
-        });
-      });
+      }
+    } finally {
+      // A claim that cannot be removed is a file whose owner is gone, which
+      // the next start takes over; it must not hide how this start ended.
+      try {
+        await claim.release();
+      } catch {
+        // Ignored on purpose, as above.
+      }
+    }
     if (record === undefined) {
       return this.launchOnFreePort(requested, claim.port + 1, attempt + 1);
     }
@@ -451,9 +456,13 @@ export class Lifecycle<R extends ServerRecord> {
     LocalServerStartExitedError | LocalServerStartTimeoutError | LocalServerStartCleanupFailedError
   > {
     // The log goes first: cleaning up may remove it with the server.
-    const logTail = await this.deps.launcher.logTail?.(record, 40).catch(() => {
-      return undefined;
-    });
+    // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
+    let logTail: string | undefined;
+    try {
+      logTail = await this.deps.launcher.logTail?.(record, 40);
+    } catch {
+      logTail = undefined;
+    }
     const outcome = await this.terminateQuietly(record);
     const logged = logTail ? `\nThe server logged:\n${logTail}` : "";
 
@@ -513,7 +522,9 @@ export async function claimFreePort(
     }
     await release();
   }
-  throw new LocalServerPortFullError(first, Math.min(first + PORT_SEARCH_RANGE - 1, MAX_PORT));
+  throw new LocalServerPortFullError(
+    `No free port from ${String(first)} to ${String(Math.min(first + PORT_SEARCH_RANGE - 1, MAX_PORT))}`,
+  );
 }
 
 export function serverUrlFor(port: number): string {

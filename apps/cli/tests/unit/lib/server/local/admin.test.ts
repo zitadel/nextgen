@@ -131,7 +131,7 @@ describe("local admin", () => {
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      name: "LocalServerAdminFileMalformedError",
+      name: "LocalServerInvalidError",
     });
   });
 
@@ -146,7 +146,7 @@ describe("local admin", () => {
       try {
         await expect(ensureLocalAdmin(cwd)).rejects.toMatchObject({
           code: "E_VALIDATION",
-          name: "LocalServerAdminUnreadableError",
+          name: "LocalServerInvalidError",
           message: expect.stringMatching(/cannot be read/),
         });
       } finally {

@@ -146,7 +146,7 @@ describe("local server binary helpers", () => {
 
     await expect(launching).rejects.toMatchObject({
       code: "E_VALIDATION",
-      name: "LocalServerBinaryBlockedError",
+      name: "LocalServerInvalidError",
     });
   });
 
@@ -180,7 +180,7 @@ describe("local server binary helpers", () => {
 
     await expect(launching).rejects.toMatchObject({
       code: "E_VALIDATION",
-      name: "LocalServerBinaryMissingError",
+      name: "LocalServerInvalidError",
     });
     resolver.missing = false;
   });

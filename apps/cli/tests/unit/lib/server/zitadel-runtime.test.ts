@@ -298,7 +298,7 @@ describe("LocalRuntime", () => {
         }).reset(DestroyPermit.forFolder(cwd)),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
-        name: "LocalServerOrphansStopError",
+        name: "LocalServerStopError",
       });
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
@@ -317,7 +317,7 @@ describe("LocalRuntime", () => {
         }).reset(DestroyPermit.forFolder(cwd)),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
-        name: "LocalServerProcessesUnlistableError",
+        name: "LocalServerInvalidError",
       });
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
@@ -392,7 +392,7 @@ describe("LocalRuntime", () => {
       await expect(at(dir).logs({ tail: 10 })).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: "Local Zitadel runtime has not been started",
-        name: "LocalServerNotStartedError",
+        name: "LocalServerInvalidError",
       });
     });
 
@@ -554,7 +554,7 @@ describe("LocalRuntime", () => {
       await expect(LocalRuntime.resolveUrl(app, answeringAt())).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
         name: "LocalServerNotRespondingElsewhereError",
-        serverUrl: url,
+        message: expect.stringContaining(url),
         directory: cwd,
       });
     });
@@ -732,7 +732,7 @@ describe("LocalRuntime launch", () => {
 
     await expect(at(dir, { docker }).launch(request({}))).rejects.toMatchObject({
       name: "LocalServerDockerMissingError",
-      detail: "daemon is down",
+      message: "Docker is not reachable: daemon is down",
     });
   });
 
@@ -844,7 +844,7 @@ describe("ZitadelRuntime.resolve", () => {
       ZitadelRuntime.resolve({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
-      name: "LocalServerUrlInvalidError",
+      name: "LocalServerInvalidError",
     });
   });
 
@@ -853,7 +853,7 @@ describe("ZitadelRuntime.resolve", () => {
       ZitadelRuntime.resolve({ cwd: dir, serverFlag: "not a url" }),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
-      name: "LocalServerUrlInvalidError",
+      name: "LocalServerInvalidError",
     });
   });
 
