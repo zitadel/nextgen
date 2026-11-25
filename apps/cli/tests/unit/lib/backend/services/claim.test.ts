@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendError } from "@/lib/backend";
+import {
+  BackendClaimChallengeNotFoundError,
+  BackendClaimWindowExpiredError,
+  BackendConflictError,
+  type BackendError,
+  BackendGoneError,
+  BackendTooManyRequestsError,
+  BackendUnavailableError,
+} from "@/lib/backend";
 import { ClaimService } from "@/lib/backend/services/claim";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
@@ -10,8 +18,13 @@ function service(stubs: ClientStubs): ClaimService {
 }
 
 /** A failure the server answered with, as the client translated it. */
-function refusal(status: number, code?: string, details?: unknown): BackendError {
-  return new BackendError("refused", {
+function refusal(
+  Made: new (message: string, options: { status: number; body: unknown }) => BackendError,
+  status: number,
+  code?: string,
+  details?: unknown,
+): BackendError {
+  return new Made("refused", {
     status,
     body: {
       ...(code === undefined ? {} : { code }),
@@ -35,7 +48,7 @@ describe("ClaimService.start", () => {
     await expect(
       service({
         createProjectClaim: async () => {
-          throw refusal(410, "proj.claim_window_expired");
+          throw refusal(BackendClaimWindowExpiredError, 410, "proj.claim_window_expired");
         },
       }).start(),
     ).resolves.toEqual({ outcome: "window-expired" });
@@ -45,7 +58,7 @@ describe("ClaimService.start", () => {
     await expect(
       service({
         createProjectClaim: async () => {
-          throw refusal(409, "proj.already_claimed", {
+          throw refusal(BackendConflictError, 409, "proj.already_claimed", {
             team_id: "team_1",
             dashboard_url: "https://cloud.zitadel.com/team_1",
           });
@@ -62,7 +75,7 @@ describe("ClaimService.start", () => {
     await expect(
       service({
         createProjectClaim: async () => {
-          throw refusal(409, "proj.already_claimed");
+          throw refusal(BackendConflictError, 409, "proj.already_claimed");
         },
       }).start(),
     ).rejects.toMatchObject({ status: 409 });
@@ -101,7 +114,7 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getProjectClaimStatus: async () => {
-          throw refusal(410, "proj.claim_window_expired");
+          throw refusal(BackendClaimWindowExpiredError, 410, "proj.claim_window_expired");
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "window-expired" });
@@ -111,7 +124,7 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getProjectClaimStatus: async () => {
-          throw refusal(410);
+          throw refusal(BackendGoneError, 410);
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "expired" });
@@ -121,7 +134,7 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getProjectClaimStatus: async () => {
-          throw refusal(404, "claim_challenge.not_found");
+          throw refusal(BackendClaimChallengeNotFoundError, 404, "claim_challenge.not_found");
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "not-found" });
@@ -131,7 +144,7 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getProjectClaimStatus: async () => {
-          throw refusal(429);
+          throw refusal(BackendTooManyRequestsError, 429);
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "pending" });
@@ -141,7 +154,7 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getProjectClaimStatus: async () => {
-          throw refusal(500);
+          throw refusal(BackendUnavailableError, 500);
         },
       }).status("clm_1"),
     ).rejects.toMatchObject({ status: 500 });

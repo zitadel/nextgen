@@ -8,7 +8,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { isCancelled, pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { BackendConflictError } from "@/lib/backend/errors";
+import { BackendConflictError, BackendReleaseRevokedError } from "@/lib/backend/errors";
 
 import { OriginService } from "./origin";
 import { Variable } from "./variable";
@@ -560,13 +560,13 @@ export class DeploymentService extends ApiService {
         deployment,
       };
     } catch (error) {
-      if (!(error instanceof BackendConflictError)) {
-        throw error;
-      }
-      if (error.serverCode === "rel.revoked") {
+      if (error instanceof BackendReleaseRevokedError) {
         return {
           outcome: "revoked",
         };
+      }
+      if (!(error instanceof BackendConflictError)) {
+        throw error;
       }
       // The conflict is the answer; naming the deployment that won it is the
       // report. A read that fails here leaves the winner unnamed rather than

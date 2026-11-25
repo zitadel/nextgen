@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendError } from "@/lib/backend";
+import { BackendProofRejectedError, BackendUnavailableError } from "@/lib/backend";
 import { AuthAttemptService } from "@/lib/backend/services/auth-attempt";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
@@ -73,8 +73,8 @@ describe("AuthAttemptService.prove", () => {
   });
 
   it("answers a rejected proof as an outcome, carrying the server's failure", async () => {
-    const cause = new BackendError("refused", {
-      status: 401,
+    const cause = new BackendProofRejectedError("refused", {
+      status: 409,
       body: { code: "att.proof_rejected" },
     });
 
@@ -88,7 +88,7 @@ describe("AuthAttemptService.prove", () => {
   it("raises any failure that is not a rejected proof", async () => {
     await expect(
       proving(async () => {
-        throw new BackendError("broken", { status: 500 });
+        throw new BackendUnavailableError("broken", { status: 500 });
       }).prove("att_1", "password", { password: "hunter2" }),
     ).rejects.toMatchObject({ status: 500 });
   });

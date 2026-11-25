@@ -258,7 +258,6 @@ describe("OperationService.callAll", () => {
       sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]), signal),
     ).rejects.toMatchObject({
       message: 'Unexpected list response: missing "passkeys" array',
-      details: { response: { next_page_token: "" } },
     });
   });
 
@@ -431,7 +430,7 @@ describe("Operation.named", () => {
   it("suggests the operation a typo meant", () => {
     expect(() => Operation.named("querUsers")).toThrow(
       expect.objectContaining({
-        hint: expect.stringContaining("queryUsers"),
+        message: expect.stringContaining("did you mean queryUsers"),
       }),
     );
   });

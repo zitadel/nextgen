@@ -104,22 +104,19 @@ function resolveTarget(ref: string, method?: string): Target {
     return Operation.named(ref, method);
   } catch (error) {
     if (error instanceof BackendOperationUnknownError) {
-      const hint = ref.startsWith("/")
-        ? "List the paths with `zitadel api ls`."
-        : error.hint === undefined
-          ? "List them with `zitadel api ls`, or give a path such as /users/query."
-          : `${error.hint} List them all with \`zitadel api ls\`.`;
       throw refusalError(OPERATION_UNKNOWN_REFUSAL, {
         message: error.message,
-        hint,
+        hint: ref.startsWith("/")
+          ? "List the paths with `zitadel api ls`."
+          : "List them with `zitadel api ls`, or give a path such as /users/query.",
       });
     }
     if (error instanceof BackendOperationAmbiguousError) {
       throw refusalError(OPERATION_AMBIGUOUS_REFUSAL, {
         message: error.message,
         hint: ref.startsWith("/")
-          ? `Pass -X with one of ${error.hint}.`
-          : `Leave out -X, or pass -X ${error.hint}.`,
+          ? "Pass -X with one of the methods the path takes."
+          : "Leave out -X, or pass -X with the method the operation has.",
       });
     }
     throw error;

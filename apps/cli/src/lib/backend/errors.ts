@@ -12,10 +12,6 @@ export type BackendErrorOptions = Readonly<{
   body?: unknown;
   /** The server's ID for the request, which finds it in the server's logs. */
   requestId?: string | undefined;
-  /** What to do about it, when the backend knows. */
-  hint?: string | undefined;
-  /** Structured facts about the failure. */
-  details?: unknown;
   /** The failure this one was made from. */
   cause?: unknown;
 }>;
@@ -27,21 +23,19 @@ export type BackendErrorOptions = Readonly<{
  * @remarks
  * Raised for two kinds of failure alike: an answer the server refused with
  * (it carries the status, the URL and the body), and a request the backend
- * itself would not make (it carries only a message and a hint).
+ * itself would not make (it carries only a message).
  */
-export class BackendError extends Error {
-  /** The kind of failure; `unknown` for a failure no subclass names. */
-  readonly category: ErrorCategory = "unknown";
+export abstract class BackendError extends Error {
+  /** The kind of failure; a subclass states its own. */
+  abstract readonly category: ErrorCategory;
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
-  /** The stable product code the failure is reported with. */
-  readonly code: ZitadelErrorCode = "E_VALIDATION";
+  abstract readonly retryable: boolean;
+  /** The stable product code the failure is reported with; a subclass states its own. */
+  abstract readonly code: ZitadelErrorCode;
   readonly status: number | undefined;
   readonly url: string | undefined;
   readonly body: unknown;
   readonly requestId: string | undefined;
-  readonly hint: string | undefined;
-  readonly details: unknown;
 
   constructor(message: string, options: BackendErrorOptions = {}) {
     super(message, {
@@ -52,8 +46,6 @@ export class BackendError extends Error {
     this.url = options.url;
     this.body = options.body;
     this.requestId = options.requestId;
-    this.hint = options.hint;
-    this.details = options.details;
   }
 
   /**
@@ -88,6 +80,55 @@ export class BackendConflictError extends BackendError {
 
 /** The server rejected the request as wrong: a `400` or `422`, or an origin it refuses. */
 export class BackendRejectedError extends BackendError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** The server answered that what was asked for is gone: a `410`. */
+export class BackendGoneError extends BackendNotFoundError {
+  override readonly category = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+}
+
+/** The claim window of a project closed: a `410` naming `proj.claim_window_expired`. */
+export class BackendClaimWindowExpiredError extends BackendGoneError {
+  override readonly category = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+}
+
+/** The claim link is not known to the server: a `404` naming `claim_challenge.not_found`. */
+export class BackendClaimChallengeNotFoundError extends BackendNotFoundError {
+  override readonly category = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+}
+
+/** The release was revoked and can never be served: a `409` naming `rel.revoked`. */
+export class BackendReleaseRevokedError extends BackendConflictError {
+  override readonly category = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+}
+
+/** The release is still served by an origin: a `409` naming `rel.in_use`. */
+export class BackendReleaseInUseError extends BackendConflictError {
+  override readonly category = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+}
+
+/** The proof of an authentication attempt was wrong: a `409` naming `att.proof_rejected`. */
+export class BackendProofRejectedError extends BackendConflictError {
+  override readonly category = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+}
+
+/** The request did not say what it must: a rejection naming `req.invalid`. */
+export class BackendRequestInvalidError extends BackendRejectedError {
   override readonly category = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
@@ -158,4 +199,11 @@ export class BackendUnavailableError extends BackendError {
     super(message, options);
     this.reason = options.reason;
   }
+}
+
+/** The server asked the caller to come back later: a `429`. */
+export class BackendTooManyRequestsError extends BackendUnavailableError {
+  override readonly category = "unavailable";
+  override readonly retryable: boolean = true;
+  override readonly code: ZitadelErrorCode = "E_NETWORK";
 }

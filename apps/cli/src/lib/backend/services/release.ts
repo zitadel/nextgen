@@ -13,7 +13,7 @@ import { z } from "zod";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
-import { BackendConflictError } from "@/lib/backend/errors";
+import { BackendConflictError, BackendReleaseInUseError } from "@/lib/backend/errors";
 
 /**
  * One origin that serves a release.
@@ -140,14 +140,7 @@ export class ReleaseService extends ApiService {
     });
     if (release.revoked_at) {
       throw new BackendConflictError(
-        `This content was already released as ${release.id}, which is revoked`,
-        {
-          hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
-          details: {
-            release_id: release.id,
-            content_hash: release.content_hash,
-          },
-        },
+        `This content was already released as ${release.id}, which is revoked and can never be served again; change the configuration so it builds a new release`,
       );
     }
     return release;
@@ -170,7 +163,7 @@ export class ReleaseService extends ApiService {
       });
       return { outcome: "revoked", release };
     } catch (error) {
-      if (error instanceof BackendConflictError && error.serverCode === "rel.in_use") {
+      if (error instanceof BackendReleaseInUseError) {
         const served = InUseBody.safeParse(error.body);
         if (served.success) {
           return { outcome: "in-use", origins: served.data.details.origins };

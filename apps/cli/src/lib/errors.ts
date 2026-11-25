@@ -1,23 +1,11 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import {
-  BackendConflictError,
-  BackendError,
-  BackendForbiddenError,
-  BackendNotFoundError,
-  BackendUnauthorizedError,
-  BackendUnavailableError,
-  type UnavailableReason,
-} from "./backend";
-import { ConsentError } from "./consent";
-import { EnvironmentError } from "./environment";
+import { BackendError, BackendUnavailableError, type UnavailableReason } from "./backend";
 import { GitError } from "./git";
-import { IdpError } from "./idp";
 import { isObject } from "./json";
 import { OrcaError } from "./orca";
 import { PmError } from "./pm";
 import { ProjectError } from "./project";
-import { PublishError } from "./publish";
 import type { Suggested } from "./suggestion";
 import { SyncError } from "./sync";
 import { UpgradeError } from "./upgrade";
@@ -338,34 +326,6 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(error.code, error.message);
   }
 
-  if (error instanceof IdpError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof PublishError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof ConsentError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof EnvironmentError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
   if (error instanceof GitError) {
     return new ZitadelError(error.code, error.message, {
       hint: error.hint,
@@ -458,21 +418,7 @@ function fromBackendError(error: BackendError): ZitadelError {
     });
   }
   if (error.status === undefined || error.url === undefined) {
-    const code: ZitadelErrorCode =
-      error instanceof BackendNotFoundError
-        ? "E_NOT_FOUND"
-        : error instanceof BackendConflictError
-          ? "E_CONFLICT"
-          : error instanceof BackendUnauthorizedError || error instanceof BackendForbiddenError
-            ? "E_AUTH"
-            : error instanceof BackendUnavailableError
-              ? "E_NETWORK"
-              : "E_VALIDATION";
-
-    return new ZitadelError(code, error.message, {
-      ...(error.hint === undefined ? {} : { hint: error.hint }),
-      ...(error.details === undefined ? {} : { details: error.details }),
-    });
+    return new ZitadelError(error.code, error.message);
   }
   // `401`/`403` → bad or missing project secret; `404` → something is
   // missing (see below); `5xx` → transport or server fault; everything

@@ -7,12 +7,20 @@ import { destructiveOperations } from "@zitadel/api/generated/operations";
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import {
+  BackendClaimChallengeNotFoundError,
+  BackendClaimWindowExpiredError,
   BackendConflictError,
   type BackendError,
   BackendForbiddenError,
+  BackendGoneError,
   BackendInternalError,
   BackendNotFoundError,
+  BackendProofRejectedError,
   BackendRejectedError,
+  BackendReleaseInUseError,
+  BackendReleaseRevokedError,
+  BackendRequestInvalidError,
+  BackendTooManyRequestsError,
   BackendUnauthorizedError,
   BackendUnavailableError,
 } from "./errors";
@@ -42,8 +50,27 @@ function refusalOf(error: ApiError): BackendError {
   // A 410 is gone rather than never there — the claim window that closed, the
   // flow that already completed — but either way what was asked for is not
   // there, and neither is a request to correct and send again.
-  if (error.status === 404 || error.status === 410) {
+  const code = apiErrorCode(error);
+  if (error.status === 410 && code === "proj.claim_window_expired") {
+    return new BackendClaimWindowExpiredError(message, options);
+  }
+  if (error.status === 410) {
+    return new BackendGoneError(message, options);
+  }
+  if (error.status === 404 && code === "claim_challenge.not_found") {
+    return new BackendClaimChallengeNotFoundError(message, options);
+  }
+  if (error.status === 404) {
     return new BackendNotFoundError(message, options);
+  }
+  if (error.status === 409 && code === "rel.revoked") {
+    return new BackendReleaseRevokedError(message, options);
+  }
+  if (error.status === 409 && code === "rel.in_use") {
+    return new BackendReleaseInUseError(message, options);
+  }
+  if (error.status === 409 && code === "att.proof_rejected") {
+    return new BackendProofRejectedError(message, options);
   }
   if (error.status === 409) {
     return new BackendConflictError(message, options);
@@ -51,14 +78,20 @@ function refusalOf(error: ApiError): BackendError {
   if (error.status === 401) {
     return new BackendUnauthorizedError(message, options);
   }
-  if (error.status === 403 && apiErrorCode(error) !== "proj.origin_not_allowed") {
+  if (error.status === 403 && code !== "proj.origin_not_allowed") {
     return new BackendForbiddenError(message, options);
   }
   // Too many requests: the server is telling the caller to come back, not that
   // the request was wrong, so it joins the failures a caller may retry rather
   // than the ones it must fix.
-  if (error.status === 429 || error.status >= 500) {
+  if (error.status === 429) {
+    return new BackendTooManyRequestsError(message, options);
+  }
+  if (error.status >= 500) {
     return new BackendUnavailableError(message, options);
+  }
+  if (code === "req.invalid") {
+    return new BackendRequestInvalidError(message, options);
   }
   return new BackendRejectedError(message, options);
 }

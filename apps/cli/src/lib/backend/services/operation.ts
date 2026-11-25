@@ -252,10 +252,7 @@ export class Operation {
       const operation = Operation.byId(ref);
       if (wanted !== undefined && wanted !== operation.method) {
         throw new BackendOperationAmbiguousError(
-          `${operation.id} is ${operation.method} ${operation.path}, not ${wanted}`,
-          {
-            hint: operation.method,
-          },
+          `${operation.id} is ${operation.method} ${operation.path}, not ${wanted}; it takes ${operation.method}`,
         );
       }
       return {
@@ -349,9 +346,11 @@ export class Operation {
       .map((candidate) => {
         return candidate.id;
       });
-    throw new BackendOperationUnknownError(`No operation is called ${ref}`, {
-      hint: near.length > 0 ? `Did you mean ${near.slice(0, 5).join(", ")}?` : undefined,
-    });
+    throw new BackendOperationUnknownError(
+      near.length > 0
+        ? `No operation is called ${ref}; did you mean ${near.slice(0, 5).join(", ")}?`
+        : `No operation is called ${ref}`,
+    );
   }
 
   /**
@@ -403,9 +402,6 @@ export class Operation {
         method === undefined
           ? `${template.record.path} takes ${offered}; say which with -X`
           : `${template.record.path} takes ${offered}, not ${method}`,
-        {
-          hint: offered,
-        },
       );
     }
     return {
@@ -491,11 +487,6 @@ export class OperationService extends ApiService {
         } catch (problem) {
           throw new BackendRejectedError(
             problem instanceof Error ? problem.message : String(problem),
-            {
-              details: {
-                response: response.raw,
-              },
-            },
           );
         }
       },
