@@ -15,6 +15,13 @@ rolled back on its host, or when a browser tab still runs an older build of
 the app. For example, a new release adds a required field to the sign-up step,
 and an older build of the app does not know how to show it.
 
+Zitadel already protects a sign-in once it has started. When a flow starts,
+its state (the encrypted flow cookie) and its authentication attempt record
+the deployment and release that served it, and every later step runs on that
+same deployment. A release deployed in the middle of a sign-in does not change
+it. What this does not cover is the start: each new sign-in gets the newest
+release, whichever build of the app starts it.
+
 Hosts solve the same problem for the app's own backend. Vercel's
 [skew protection](https://vercel.com/docs/skew-protection) keeps an older
 client talking to the deployment it was built with, by sending that
@@ -51,7 +58,7 @@ A build of the app can pin the release it was built against.
 - A pinned request without an `Origin` is refused too. Without a pin, such a
   request gets the project's newest deployment; with one, that would silently
   serve a different release than the one asked for.
-- The rest of the sign-in stays on the same release, as it does today.
+- The rest of the sign-in stays on the pinned release: the flow state records it, as it records any release today.
 
 A pinned sign-in start:
 
