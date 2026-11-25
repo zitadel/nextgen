@@ -313,7 +313,6 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
         throw new ZitadelError("E_CONFLICT", error.message, {
           hint: "Rerun with --force to replace it, or edit the existing file directly.",
           nextCommands: [await this.again("branding:eject", { with: { design, force: true } })],
-          details: error.details,
         });
       }
       throw error;

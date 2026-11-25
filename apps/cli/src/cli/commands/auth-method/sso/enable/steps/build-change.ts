@@ -10,8 +10,7 @@ import { type Refusal, refusalError } from "@/cli/core/refusal";
  */
 const EDIT_BREAKS_FLOWS_REFUSAL = {
   message: "{message}",
-  hint: "{hint}",
-  details: "{details}",
+  hint: "Fix the steps named above, then run the command again.",
 } as const satisfies Refusal;
 
 /**
@@ -20,7 +19,6 @@ const EDIT_BREAKS_FLOWS_REFUSAL = {
 const FLOWS_UNCHECKED_REFUSAL = {
   message: "{message}",
   hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
-  details: "{details}",
   next: [
     {
       id: "deploy",
@@ -81,14 +79,11 @@ export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
       if (error instanceof ZitadelConfigFlowsUncheckedError) {
         throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof ZitadelConfigEditBreaksFlowsError) {
         throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
           message: error.message,
-          hint: error.hint ?? "",
-          details: error.details ?? null,
         });
       }
       throw error;

@@ -870,18 +870,15 @@ export function setupRefusal(
   if (error.path === PasswordPolicy.PATH) {
     return new ZitadelError("E_CONFLICT", error.message, {
       hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
-      details: error.details,
     });
   }
   if (error.path === SignupPolicy.PATH) {
     return new ZitadelError("E_CONFLICT", error.message, {
       hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
-      details: error.details,
     });
   }
   return new ZitadelError("E_CONFLICT", error.message, {
     hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
-    details: error.details,
   });
 }
 

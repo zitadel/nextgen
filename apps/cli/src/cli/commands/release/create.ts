@@ -30,7 +30,6 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 const DEPLOY_EMPTY_REFUSAL = {
   message: "{message}",
   hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a configuration with errors in it is refused. */
@@ -374,7 +373,6 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
       if (error instanceof ZitadelConfigDeployEmptyError) {
         throw refusalError(DEPLOY_EMPTY_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       throw error;
