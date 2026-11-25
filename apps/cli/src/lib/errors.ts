@@ -1,15 +1,9 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
 import { BackendError, BackendUnavailableError, type UnavailableReason } from "./backend";
-import { GitError } from "./git";
 import { isObject } from "./json";
 import { OrcaError } from "./orca";
-import { PmError } from "./pm";
-import { ProjectError } from "./project";
 import type { Suggested } from "./suggestion";
-import { SyncError } from "./sync";
-import { UpgradeError } from "./upgrade";
-import { WizardError } from "./wizard";
 
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
@@ -301,8 +295,7 @@ export function failureText(message: string): FailureText {
  *
  * @remarks
  * A {@link ZitadelError} is returned as it is, and an error a package raised
- * on purpose is reported with the `code`, `hint` and `details` its package base
- * carries. What is left is errno, Zod-like and plain errors, which are reported
+ * on purpose is reported with the `code` its class states. What is left is errno, Zod-like and plain errors, which are reported
  * as `E_VALIDATION` unless errno says more, with the original shape under
  * `details` for debugging without leaking it into the message.
  *
@@ -324,48 +317,6 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof ZitadelLibError) {
     return new ZitadelError(error.code, error.message);
-  }
-
-  if (error instanceof GitError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof PmError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof ProjectError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof SyncError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof UpgradeError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
-  }
-
-  if (error instanceof WizardError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
   }
 
   if (isErrnoException(error)) {

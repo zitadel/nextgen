@@ -349,7 +349,7 @@
   `src/lib/backend/client.ts`.
 - Write every hint and next command in the catching command's `*_REFUSAL`.
 - Spread the error into the refusal's values so no property is dropped.
-- Use no `as`, `!`, `any`, `tryCatch` or lookup table for errors; duplicate
+- Use no `as`, `!`, `any` or lookup table for errors; duplicate
   instead.
 - Let an error nobody anticipated bubble up unwrapped; utilities throw plain
   `Error`s.
