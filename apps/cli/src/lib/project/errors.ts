@@ -1,5 +1,5 @@
 import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { Categorized, ErrorCategory, Suggested, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * What a project failure carries beyond its message.
@@ -14,6 +14,11 @@ export type ProjectErrorOptions = {
    * Structured facts about the failure, for a `--json` reader.
    */
   readonly details?: Readonly<Record<string, unknown>> | undefined;
+
+  /**
+   * What to run next, as suggestion objects the failure handler renders.
+   */
+  readonly nextCommands?: readonly Suggested[] | undefined;
 
   /**
    * The error that caused this one.
@@ -56,6 +61,12 @@ export class ProjectError extends Error implements Categorized {
   readonly details: Readonly<Record<string, unknown>> | undefined;
 
   /**
+   * What to run next, as suggestion objects the failure handler renders with the
+   * run's scope.
+   */
+  readonly nextCommands: readonly Suggested[] | undefined;
+
+  /**
    * Make a project failure.
    *
    * @param message - What went wrong.
@@ -66,6 +77,7 @@ export class ProjectError extends Error implements Categorized {
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
+    this.nextCommands = options.nextCommands;
   }
 }
 
@@ -74,6 +86,23 @@ export class ProjectError extends Error implements Categorized {
  * and `secret` is `.zitadel/secret`.
  */
 export type ProjectFile = "config" | "secret";
+
+/** What to do about the secret file, which `doctor --fix` restores from the development env file. */
+const RESTORE_SECRET = {
+  hint: "Restore the project secret from .env.development.local.",
+  nextCommands: [{ id: "doctor", flags: { fix: true } }],
+} as const satisfies ProjectErrorOptions;
+
+/** What to do about a project with no configuration file. */
+const SET_UP_FIRST = {
+  hint: "Set the project up first.",
+  nextCommands: [{ id: "setup" }],
+} as const satisfies ProjectErrorOptions;
+
+/** What to do about a configuration file that cannot be read. */
+const FIX_CONFIG = {
+  hint: "Fix zitadel.json, which is the project's committed configuration.",
+} as const satisfies ProjectErrorOptions;
 
 /**
  * A file the project is meant to have is not there.
@@ -100,7 +129,7 @@ export class ProjectFileMissingError extends ProjectError {
    * @param options - What to do about it, the facts behind it, and its cause.
    */
   constructor(file: ProjectFile, message: string, options: ProjectErrorOptions = {}) {
-    super(message, options);
+    super(message, { ...options, ...(file === "secret" ? RESTORE_SECRET : SET_UP_FIRST) });
     this.file = file;
   }
 }
@@ -126,7 +155,7 @@ export class ProjectFileMalformedError extends ProjectError {
    * @param options - What to do about it, the facts behind it, and its cause.
    */
   constructor(file: ProjectFile, message: string, options: ProjectErrorOptions = {}) {
-    super(message, options);
+    super(message, { ...options, ...(file === "secret" ? RESTORE_SECRET : FIX_CONFIG) });
     this.file = file;
   }
 }

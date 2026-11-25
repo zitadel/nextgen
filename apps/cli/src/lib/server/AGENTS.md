@@ -94,11 +94,11 @@ name or an address.
 ## Errors
 
 Every failure of the package is a `LocalServerError`, defined with its
-subclasses in `errors.ts`: a category, a message and the facts behind it, never
-a hint or a next command. The commands say what to do about each one
-(`src/lib/suggestion/local-server-advice.ts`, applied by `BaseCommand`), and
-`start` words its own refusals from the lifecycle's errors
-(`LocalServerDockerMissingError`, `LocalServerPortBusyError`,
+subclasses in `errors.ts`: a category, a message, the facts behind it, a hint
+that names no command or flag, and `nextCommands`, the `{ id, ... }` suggestion
+objects the failure handler renders with the run's scope (a `cwd` that is the
+run's own folder is left out). `start` words its own refusals from the
+lifecycle's errors (`LocalServerDockerMissingError`, `LocalServerPortBusyError`,
 `LocalServerPortFullError`, `LocalServerStartError`, `LocalServerStopError`) in
 `src/cli/commands/server/start.ts`. A `docker` call that ran and failed is a
 plain `Error` carrying its command and stderr. The boundary

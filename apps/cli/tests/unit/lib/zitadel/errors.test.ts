@@ -391,7 +391,7 @@ describe("ZitadelConfigFileUnreadableError", () => {
   it("is a conflict when a file stands where a directory is expected", () => {
     expect(
       new ZitadelConfigFileUnreadableError("wrong-kind", "x cannot be read (ENOTDIR)"),
-    ).toMatchObject({ category: "conflict", reason: "wrong-kind" });
+    ).toMatchObject({ category: "conflict", reason: "wrong-kind", code: "E_VALIDATION" });
   });
 });
 

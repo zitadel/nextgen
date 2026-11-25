@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   describeWrittenFile,
   type Fact,
+  patchRefusal,
   relativeDisplayPath as relativeDisplay,
   type SetupServices,
 } from "@/cli/commands/setup/shared";
@@ -131,7 +132,7 @@ export class PatchApp extends WizardStep<
       .catch(async (error: unknown) => {
         await this.rollBack(envFilesBefore);
         patching.fail();
-        throw error;
+        throw patchRefusal(error);
       });
     for (const file of patched.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.deps.cwd, file), this.deps.dryRun);

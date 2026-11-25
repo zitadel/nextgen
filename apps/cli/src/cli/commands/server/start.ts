@@ -28,20 +28,16 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 const MIN_PORT = 1;
 const MAX_PORT = 65_535;
 
-/** Turns a failure of starting the server into the refusal the CLI reports. */
-type Refuse = (error: LocalServerError) => Promise<Error>;
-
 /**
- * A {@link Refuse} for one class, which the table key guarantees it is given.
+ * Turns a failure of starting the server into the refusal the CLI reports.
  *
- * @param refuse - Refuses the class.
- * @returns The refusal the table holds.
+ * @remarks
+ * Written as a method type so each entry of the table below takes the class
+ * its key names, which the key guarantees it is given.
  */
-function refusing<T extends LocalServerError>(refuse: (error: T) => Promise<Error>): Refuse {
-  return (error) => {
-    return refuse(error as T);
-  };
-}
+type Refuse = {
+  refuse(error: LocalServerError): Promise<Error>;
+}["refuse"];
 
 /**
  * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
@@ -306,7 +302,7 @@ export default class Start extends Telemetered(
    */
   private refusals(retry: SuggestedCommand): Readonly<Record<string, Refuse>> {
     return {
-      LocalServerDockerMissingError: refusing((error: LocalServerDockerMissingError) => {
+      LocalServerDockerMissingError: (error: LocalServerDockerMissingError) => {
         return Promise.resolve(
           refusalError(
             DOCKER_UNAVAILABLE_REFUSAL,
@@ -317,8 +313,8 @@ export default class Start extends Telemetered(
             },
           ),
         );
-      }),
-      LocalServerPortBusyError: refusing(async (error: LocalServerPortBusyError) => {
+      },
+      LocalServerPortBusyError: async (error: LocalServerPortBusyError) => {
         const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
           return port !== error.port;
         });
@@ -337,16 +333,16 @@ export default class Start extends Telemetered(
             }),
           },
         );
-      }),
-      LocalServerPortFullError: refusing((error: LocalServerPortFullError) => {
+      },
+      LocalServerPortFullError: (error: LocalServerPortFullError) => {
         return Promise.resolve(
           refusalError(NO_FREE_PORT_REFUSAL, {
             message: error.message,
             first: error.firstPort,
           }),
         );
-      }),
-      LocalServerStartError: refusing((error: LocalServerStartError<ServerRecord>) => {
+      },
+      LocalServerStartError: (error: LocalServerStartError<ServerRecord>) => {
         const details = {
           ...error.details,
           server_url: error.record.server_url,
@@ -371,15 +367,15 @@ export default class Start extends Telemetered(
             details,
           }),
         );
-      }),
-      LocalServerStopError: refusing((error: LocalServerStopError<ServerRecord>) => {
+      },
+      LocalServerStopError: (error: LocalServerStopError<ServerRecord>) => {
         return Promise.resolve(
           refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
             runtime: error.record ?? null,
             stop: error.outcome ?? null,
           }),
         );
-      }),
+      },
     };
   }
 

@@ -1,5 +1,5 @@
 import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { Categorized, ErrorCategory, Suggested, ZitadelErrorCode } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
@@ -15,6 +15,11 @@ export type ConsentErrorOptions = {
    * Structured facts about the failure, for a `--json` reader.
    */
   readonly details?: Readonly<Record<string, unknown>> | undefined;
+
+  /**
+   * What to run next, as suggestion objects the failure handler renders.
+   */
+  readonly nextCommands?: readonly Suggested[] | undefined;
 
   /**
    * The error that caused this one.
@@ -55,6 +60,12 @@ export class ConsentError extends Error implements Categorized {
   readonly details: Readonly<Record<string, unknown>> | undefined;
 
   /**
+   * What to run next, as suggestion objects the failure handler renders with the
+   * run's scope.
+   */
+  readonly nextCommands: readonly Suggested[] | undefined;
+
+  /**
    * Make a consent failure.
    *
    * @param message - What went wrong.
@@ -65,6 +76,7 @@ export class ConsentError extends Error implements Categorized {
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
+    this.nextCommands = options.nextCommands;
   }
 }
 
@@ -101,7 +113,9 @@ export class ConsentRequiredError extends ConsentError {
    */
   constructor(action: string, question: string, retry?: SuggestedCommand) {
     super(`Cannot ${action} without --force in non-interactive mode`, {
+      hint: question,
       details: { question },
+      nextCommands: retry === undefined ? undefined : [retry],
     });
     this.question = question;
     this.retry = retry;

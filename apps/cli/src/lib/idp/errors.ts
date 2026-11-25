@@ -105,6 +105,24 @@ export type IdpSettingFacts = {
 };
 
 /**
+ * What to do about a refused provider or setting, by why, worded with the
+ * names the caller gave the settings.
+ */
+const SETTING_HINTS: Record<IdpSettingReason, (facts: IdpSettingFacts) => string> = {
+  invalid: (facts) => {
+    return `Fix ${facts.field} and run the command again.`;
+  },
+  conflicting: (facts) => {
+    const count = facts.given?.length ?? 0;
+
+    return `Add ${facts.providerField} custom, or remove ${new Intl.PluralRules("en").select(count) === "one" ? "it" : "them"}.`;
+  },
+  missing: (facts) => {
+    return `Describe the connection, e.g. ${facts.example}`;
+  },
+};
+
+/**
  * The settings given for a provider cannot be used.
  */
 export class IdpSettingInvalidError extends IdpError {
@@ -135,7 +153,7 @@ export class IdpSettingInvalidError extends IdpError {
     facts: IdpSettingFacts,
     options: IdpErrorOptions = {},
   ) {
-    super(message, options);
+    super(message, { ...options, hint: SETTING_HINTS[reason](facts) });
     this.reason = reason;
     this.facts = facts;
   }

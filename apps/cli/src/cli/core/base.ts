@@ -244,6 +244,9 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
     scope: () => {
       return this.scope();
     },
+    cwd: () => {
+      return this.meta.cwd;
+    },
   });
 
   /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */
@@ -691,9 +694,7 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
         ? commandOf(["--help"], meta.cliVersion)
         : this.suggest(helpOf(meta.command));
     const failure = new Failure(
-      this.suggestions.renderedFailure(
-        cancelled ?? toZitadelError(Failure.advised(error, meta.cwd)),
-      ),
+      this.suggestions.renderedFailure(cancelled ?? toZitadelError(error)),
       meta,
       help,
     );

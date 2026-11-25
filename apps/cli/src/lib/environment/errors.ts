@@ -1,5 +1,5 @@
 import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { Categorized, ErrorCategory, Suggested, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * What an environment failure carries beyond its message.
@@ -14,6 +14,11 @@ export type EnvironmentErrorOptions = {
    * Structured facts about the failure, for a `--json` reader.
    */
   readonly details?: Readonly<Record<string, unknown>> | undefined;
+
+  /**
+   * What to run next, as suggestion objects the failure handler renders.
+   */
+  readonly nextCommands?: readonly Suggested[] | undefined;
 
   /**
    * The error that caused this one.
@@ -55,6 +60,12 @@ export class EnvironmentError extends Error implements Categorized {
   readonly details: Readonly<Record<string, unknown>> | undefined;
 
   /**
+   * What to run next, as suggestion objects the failure handler renders with the
+   * run's scope.
+   */
+  readonly nextCommands: readonly Suggested[] | undefined;
+
+  /**
    * Make an environment failure.
    *
    * @param message - What went wrong.
@@ -65,6 +76,7 @@ export class EnvironmentError extends Error implements Categorized {
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
+    this.nextCommands = options.nextCommands;
   }
 }
 
@@ -89,6 +101,25 @@ export type EnvironmentInvalidOptions = EnvironmentErrorOptions & {
    * A well-formed value of the same kind, to show.
    */
   readonly example?: string | undefined;
+};
+
+/** What to do about an invalid input, by why, in words that name no flag. */
+const INVALID_HINTS: Record<
+  EnvironmentInvalidReason,
+  (options: EnvironmentInvalidOptions) => string
+> = {
+  "both-sources": () => {
+    return "An environment is named by its name or by a file, not both.";
+  },
+  name: (options) => {
+    return (
+      `The ${options.source} environment name may use only letters, digits, dot, dash ` +
+      'and underscore, may not contain "..", and may not be `local` or end in `.local`.'
+    );
+  },
+  "server-url": (options) => {
+    return `Fix or remove ZITADEL_URL in ${options.source}; it must be a URL such as ${options.example}.`;
+  },
 };
 
 /**
@@ -125,7 +156,7 @@ export class EnvironmentInvalidError extends EnvironmentError {
     message: string,
     options: EnvironmentInvalidOptions = {},
   ) {
-    super(message, options);
+    super(message, { ...options, hint: INVALID_HINTS[reason](options) });
     this.reason = reason;
     this.source = options.source;
     this.example = options.example;
@@ -250,12 +281,26 @@ export class EnvironmentValueMissingError extends EnvironmentError {
    * @param options - The variable, the environment and where it was looked for.
    */
   constructor(options: EnvironmentValueMissingOptions) {
+    const consulted = `Consulted, in order: ${options.consulted.join(", ")}.`;
+    // Run in the directory this run addressed, which need not be the shell's:
+    // `setup` and `env add` both write their files there.
+    const elsewhere = options.cwd === process.cwd() ? {} : { cwd: options.cwd };
     super(`${options.key} is not set for the ${options.environment} environment`, {
+      hint: options.unbound
+        ? `${consulted} Set ${options.key} in ${options.boundFile} or the process environment.`
+        : `${consulted} Set ${options.key} in ${options.file ?? `${options.boundFile} or the process environment`}${options.file === undefined ? "" : " or the process environment"}.`,
       details: {
         environment: options.environment,
         variable: options.key,
         consulted: options.consulted,
       },
+      nextCommands: options.unbound
+        ? [
+            options.environment === "development"
+              ? { id: "setup", flags: elsewhere }
+              : { id: "env:add", args: { name: options.environment }, flags: elsewhere },
+          ]
+        : undefined,
     });
     this.key = options.key;
     this.environment = options.environment;

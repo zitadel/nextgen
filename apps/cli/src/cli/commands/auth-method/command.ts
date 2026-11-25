@@ -1,6 +1,5 @@
 import type { Interfaces } from "@oclif/core";
 
-import { reported } from "@/cli/core/advice";
 import { CUSTOM_PROVIDER, IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { environmentFlags } from "@/cli/core/environment-flags";
@@ -208,9 +207,7 @@ export async function readSchemaTarget(input: {
       url: String(schema.body.url),
     });
   }
-  const published = await publishedIds(input.cwd, [schema.path]).catch((error: unknown) => {
-    throw reported(error);
-  });
+  const published = await publishedIds(input.cwd, [schema.path]);
   const config = loaded.withOptions({ published }).refuseBroken(store);
   const schemaFlag = config.schemas.nameUniquely(schema);
   return {

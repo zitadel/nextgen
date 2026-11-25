@@ -1,6 +1,6 @@
+import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
-import { reported } from "@/cli/core/advice";
 import {
   PublishConfigInvalidError,
   PublishConnectionError,
@@ -42,7 +42,7 @@ describe("the publish errors", () => {
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
     expect(error).toBeInstanceOf(PublishError);
     expect(error.category).toBe(category);
-    expect(reported(error).code).toBe(code);
+    expect(toZitadelError(error).code).toBe(code);
   });
 
   it("keeps its findings as the issues a --json reader sees", () => {
@@ -53,7 +53,7 @@ describe("the publish errors", () => {
       refusedKey: false,
     });
 
-    expect(reported(error).details).toEqual({ issues: findings });
+    expect(toZitadelError(error).details).toEqual({ issues: findings });
   });
 
   it("words the hint of a literal secret with the command that publishes one", () => {
@@ -63,7 +63,7 @@ describe("the publish errors", () => {
       refusedKey: true,
     });
 
-    expect(reported(error)).toMatchObject({
+    expect(toZitadelError(error)).toMatchObject({
       hint: expect.stringContaining("A key a newer Zitadel server added"),
       nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
     });
@@ -77,18 +77,18 @@ describe("the publish errors", () => {
       mode: "preview",
     });
 
-    expect(reported(error).nextCommands).toEqual([
+    expect(toZitadelError(error).nextCommands).toEqual([
       { id: "variable:set", args: { name: "ID" }, flags: { secret: false, preview: true } },
     ]);
   });
 
-  it("keeps the hint of the library free of command names", () => {
+  it("keeps the hint of a wrong-kind variable free of flags", () => {
     const error = new PublishConnectionError("wrong-kind", "kind", {
       file: "a.json",
       variable: "X",
     });
 
-    expect(error.hint).toBeUndefined();
+    expect(error.hint).not.toContain("--");
   });
 });
 

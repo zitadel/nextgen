@@ -1,9 +1,8 @@
+import { Cmd } from "@/lib/cmd";
 import { isObject } from "@/lib/json";
-import { interpolate, type Refusal, refusalError } from "@/cli/core/refusal";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import { LocalServerDownError, ZitadelRuntime } from "@/lib/server";
-import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
-import { Cmd } from "@/lib/cmd";
 import { resolve } from "node:path";
 import { WizardStep } from "@/lib/wizard";
 
@@ -134,7 +133,6 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
       if (!(error instanceof LocalServerDownError)) {
         throw error;
       }
-      const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.reason];
       const details = isObject(error.details) ? error.details : {};
       const { directory } = details;
       const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
@@ -142,19 +140,12 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
       if (elsewhere) {
         startFlags.cwd = directory;
       }
-      const text = [elsewhere && advice.elsewhere, advice.hint].find((candidate) => {
-        return typeof candidate === "string";
-      });
-      const hint = interpolate(text ?? advice.hint, {
-        ...details,
-        ...(elsewhere && { directory: Cmd.quote(directory) }),
-      });
       const retry = retryOptionsFromFlags(flags);
       const recovery = ssoRecovery(retry, suggest);
       throw refusalError(
         NO_LOCAL_SERVER_REFUSAL,
         {
-          reason: `${hint} `,
+          reason: `${error.hint ?? ""}${elsewhere ? ` It was started in ${Cmd.quote(directory)}.` : ""} `,
           scripting:
             retry.sso && retry.sso.length > 0
               ? "The rerun asks for the client id and secret, because a command carries neither. " +

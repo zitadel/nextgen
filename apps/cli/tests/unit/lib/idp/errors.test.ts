@@ -1,6 +1,6 @@
+import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
-import { reported } from "@/cli/core/advice";
 import { IdpError, IdpProviderUnknownError, IdpSettingInvalidError } from "@/lib/idp";
 
 describe("the identity-provider errors", () => {
@@ -15,16 +15,18 @@ describe("the identity-provider errors", () => {
   });
 
   it("reports an unknown provider with the code it always had", () => {
-    expect(reported(new IdpProviderUnknownError("okta", ["google", "custom"]))).toMatchObject({
-      code: "E_VALIDATION",
-      hint: "Use one of google, custom.",
-    });
+    expect(toZitadelError(new IdpProviderUnknownError("okta", ["google", "custom"]))).toMatchObject(
+      {
+        code: "E_VALIDATION",
+        hint: "Use one of google, custom.",
+      },
+    );
   });
 
   it("words the advice for a refused setting with the flag it came from", () => {
     const error = new IdpSettingInvalidError("invalid", "--slug: bad", { field: "--slug" });
 
-    expect(reported(error).hint).toBe("Fix --slug and run the command again.");
+    expect(toZitadelError(error).hint).toBe("Fix --slug and run the command again.");
   });
 
   it("words the advice for settings that do not belong with the provider flag", () => {
@@ -33,17 +35,19 @@ describe("the identity-provider errors", () => {
       providerField: "--provider",
     });
 
-    expect(reported(error).hint).toBe("Add --provider custom, or remove it.");
+    expect(toZitadelError(error).hint).toBe("Add --provider custom, or remove it.");
   });
 
   it("words the advice for a missing setting with the example", () => {
     const error = new IdpSettingInvalidError("missing", "bad", { example: "--provider custom" });
 
-    expect(reported(error).hint).toBe("Describe the connection, e.g. --provider custom");
+    expect(toZitadelError(error).hint).toBe("Describe the connection, e.g. --provider custom");
   });
 
-  it("keeps the library's hint free of flags", () => {
-    expect(new IdpSettingInvalidError("invalid", "bad", { field: "--slug" }).hint).toBeUndefined();
+  it("words the hint with the names the caller gave the settings", () => {
+    expect(new IdpSettingInvalidError("invalid", "bad", { field: "slug" }).hint).toBe(
+      "Fix slug and run the command again.",
+    );
   });
 });
 

@@ -1,9 +1,8 @@
 import { type Interfaces, Flags } from "@oclif/core";
 
-import { Consent, type Gate } from "@/lib/consent";
-import { CANCELLED } from "@/lib/errors";
+import { Consent, ConsentRequiredError, type Gate } from "@/lib/consent";
+import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
 
-import { advised } from "./advice";
 import { Asker } from "./asker";
 import type { BaseCommand } from "./base";
 import type { EFFECT } from "./effect";
@@ -160,7 +159,15 @@ export function Destructive<
         ...session,
         confirmer: Asker.for(this.ui.session(session)),
       }).catch((error: unknown) => {
-        throw advised(error);
+        if (!(error instanceof ConsentRequiredError)) {
+          throw error;
+        }
+        throw new ZitadelError(error.code, error.message, {
+          hint: confirmationHint(error.question),
+          nextCommands: error.nextCommands,
+          details: error.details,
+          cause: error,
+        });
       });
     }
   }

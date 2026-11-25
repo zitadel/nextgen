@@ -1,6 +1,5 @@
 import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 
-import { reported } from "@/cli/core/advice";
 import { askCustomSettings, type Fact, type SetupServices } from "@/cli/commands/setup/shared";
 import {
   customExample,
@@ -174,10 +173,6 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
     provider: string,
     given: ReturnType<typeof customFlagValues>,
   ): ReturnType<typeof selectionFromFlags> {
-    try {
-      return selectionFromFlags(provider, given, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
-    } catch (error) {
-      throw reported(error);
-    }
+    return selectionFromFlags(provider, given, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
   }
 }

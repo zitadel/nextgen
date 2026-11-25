@@ -1,9 +1,9 @@
+import { toZitadelError } from "@/lib/errors";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { reported } from "@/cli/core/advice";
 import { Project, ProjectFileMalformedError, ProjectFileMissingError } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
@@ -40,10 +40,10 @@ describe("Project.secret", () => {
       expect.unreachable("expected ProjectSecret.read to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ProjectFileMissingError);
-      const zerr = reported(error);
+      const zerr = toZitadelError(error);
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain(".zitadel/secret was not found");
-      expect(zerr.hint).toContain("zitadel doctor --fix");
+      expect(zerr.hint).toContain("Restore the project secret");
       expect(zerr.nextCommands).toEqual([{ id: "doctor", flags: { fix: true } }]);
     }
   });

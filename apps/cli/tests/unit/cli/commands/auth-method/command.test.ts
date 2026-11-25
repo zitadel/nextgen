@@ -1,3 +1,4 @@
+import { SyncStateMalformedError } from "@/lib/sync";
 import { mkdir } from "node:fs/promises";
 import { runCommand } from "@tests/helpers/run-cli";
 import { join } from "node:path";
@@ -1162,7 +1163,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(SyncStateMalformedError);
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
   });

@@ -1,6 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca, OrcaFrameworkError } from "@/lib/orca";
+import { createOrca, OrcaFrameworkError, type OrcaFrameworkReason } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
@@ -10,6 +10,59 @@ import {
   type SetupServices,
   setupRetryFlags,
 } from "@/cli/commands/setup/shared";
+
+/**
+ * What setup adds to the hint of a framework it cannot use, where it names the
+ * flags it takes, by why.
+ */
+const FRAMEWORK_ADVICE: Record<
+  OrcaFrameworkReason,
+  (error: OrcaFrameworkError) => string | undefined
+> = {
+  none: () => {
+    return "Pass --cwd <path-to-app> to point setup at your app.";
+  },
+  unknown: () => {
+    return undefined;
+  },
+  layout: () => {
+    return undefined;
+  },
+  outdated: () => {
+    return undefined;
+  },
+  mismatch: (error) => {
+    const { requested, detected, requestedName } = error.details ?? {};
+
+    return (
+      `Rerun setup without --framework, or with --framework ${String(detected)}, to set up this ` +
+      `app, or point --cwd at the ${String(requestedName ?? requested)} app you meant. Setup never ` +
+      "scaffolds a new app over one it detects, --force or not."
+    );
+  },
+};
+
+/**
+ * A framework failure with what setup says of the flags added to its hint.
+ *
+ * @param error - What detecting the framework threw.
+ * @returns The refusal setup reports, or `error` as it was when it has nothing to add.
+ */
+function frameworkRefusal(error: unknown): unknown {
+  if (!(error instanceof OrcaFrameworkError)) {
+    return error;
+  }
+  const after = FRAMEWORK_ADVICE[error.reason](error);
+  if (after === undefined) {
+    return error;
+  }
+
+  return new ZitadelError(error.code, error.message, {
+    hint: [error.hint, after].filter(Boolean).join(" "),
+    details: error.details,
+    cause: error,
+  });
+}
 
 /**
  * The framework a rerun is told to scaffold when the available ones include it.
@@ -116,7 +169,7 @@ export class DetectFramework extends WizardStep<
       .catch(async (error) => {
         if (!(error instanceof OrcaFrameworkError && error.scaffoldable)) {
           detecting.fail();
-          throw error;
+          throw frameworkRefusal(error);
         }
         const target = await orca.inspectScaffoldTarget(this.deps.cwd);
         if (!target.scaffoldable && !this.deps.force) {

@@ -1,8 +1,13 @@
 import { createZitadelClient } from "@/lib/backend";
 import type { Consent } from "@/lib/consent";
-import { Environment, type ServerAddresses } from "@/lib/environment";
+import {
+  Environment,
+  EnvironmentInvalidError,
+  type EnvironmentInvalidReason,
+  type ServerAddresses,
+} from "@/lib/environment";
+import { ZitadelError } from "@/lib/errors";
 import { resolveCwd } from "@/lib/paths";
-import { advised } from "./advice";
 import { Asker } from "./asker";
 import { BaseCommand, type Facts, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
@@ -13,6 +18,16 @@ import type { Connection, ConnectOptions, GlobalOptions } from "./types";
 export type { Connection } from "./types";
 
 import { Runtime } from "@/lib/runtime";
+
+/**
+ * What to add to the hint of an environment that cannot be used, where it
+ * names the flags and the variable this command takes it from.
+ */
+const ENVIRONMENT_FLAG_ADVICE: Readonly<Record<EnvironmentInvalidReason, string | undefined>> = {
+  "both-sources": "--env picks the .env.<name>.local files; --env-file names one file outright.",
+  name: "Pass a safe --env or set ZITADEL_ENV.",
+  "server-url": undefined,
+};
 
 /**
  * A command that talks to a project. The server, the project and the
@@ -88,7 +103,13 @@ export abstract class EnvironmentCommand extends BaseCommand {
       envName: text(flags.env),
       envFile: text(flags.envFile),
     }).catch((error: unknown) => {
-      throw advised(error);
+      if (!(error instanceof EnvironmentInvalidError)) {
+        throw error;
+      }
+      throw new ZitadelError(error.code, error.message, {
+        hint: [error.hint, ENVIRONMENT_FLAG_ADVICE[error.reason]].filter(Boolean).join(" "),
+        details: error.details,
+      });
     });
 
     return super.toMeta(given, {
@@ -199,9 +220,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
       ask: Asker.for(this.ui.session()),
     };
     const required = async (key: Parameters<typeof environment.requireInteractive>[0]) => {
-      return environment.requireInteractive(key, ask).catch((error: unknown) => {
-        throw advised(error);
-      });
+      return environment.requireInteractive(key, ask);
     };
     const server = await required("ZITADEL_URL");
     const projectId = await required("ZITADEL_PROJECT_ID");

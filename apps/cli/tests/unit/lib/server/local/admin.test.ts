@@ -132,7 +132,7 @@ describe("local admin", () => {
     expect(error).toMatchObject({
       name: "LocalServerMalformedError",
       reason: "admin",
-      hint: undefined,
+      nextCommands: expect.arrayContaining([{ id: "start", flags: { cwd } }]),
     });
   });
 

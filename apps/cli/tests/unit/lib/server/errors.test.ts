@@ -110,12 +110,118 @@ describe("the local server errors' codes", () => {
   });
 
   it.each([
-    [new LocalServerDownError("not-responding", {}), "not-responding"],
-    [new LocalServerMalformedError("url", "why"), undefined],
-    [new LocalServerStopError("processes", "why"), "processes-did-not-stop"],
-    [new LocalServerPortBusyError(8080), "port-in-use"],
-  ] as const)("names the advice that fits %#", (error, advice) => {
-    expect(error.advice).toBe(advice);
+    [
+      "a server nobody started",
+      new LocalServerDownError("not-running", {}),
+      "No local server has been started in this directory or a parent.",
+      [{ id: "start", flags: {} }],
+    ],
+    [
+      "a server that does not answer",
+      new LocalServerDownError("not-responding", {
+        server_url: "http://localhost:8080",
+        directory: "/app",
+      }),
+      "No healthy local server responded at http://localhost:8080.",
+      [{ id: "start", flags: { cwd: "/app" } }],
+    ],
+    [
+      "a malformed record",
+      new LocalServerMalformedError("record", "bad", { details: { directory: "/my dir" } }),
+      "Reset the local runtime, then start it again.",
+      [
+        { id: "reset", flags: { force: true, cwd: "/my dir" } },
+        { id: "start", flags: { cwd: "/my dir" } },
+      ],
+    ],
+    [
+      "a malformed admin file",
+      new LocalServerMalformedError("admin", "bad", { details: { path: "/my dir/admin.json" } }),
+      expect.stringContaining("Delete '/my dir/admin.json' and reset the local runtime"),
+      [
+        "rm '/my dir/admin.json'",
+        { id: "reset", flags: { force: true } },
+        { id: "start", flags: {} },
+      ],
+    ],
+    [
+      "an address that is malformed",
+      new LocalServerMalformedError("url", "bad", { hint: "Use a URL." }),
+      "Use a URL.",
+      undefined,
+    ],
+    [
+      "a file it cannot read",
+      new LocalServerFileError("unreadable", "bad", { details: { path: "/p/admin.json" } }),
+      "Check that /p/admin.json and its directory are readable by you.",
+      undefined,
+    ],
+    [
+      "a file in the way",
+      new LocalServerFileError("blocked", "bad", { details: { path: "/p/data" } }),
+      "Move or delete /p/data: something is in the way of the local data directory.",
+      undefined,
+    ],
+    [
+      "a start in progress",
+      new LocalServerBusyError({ lock_file: "/p/start.lock" }),
+      "Wait for it to finish, or delete /p/start.lock if no start is running.",
+      undefined,
+    ],
+    [
+      "an admin the server does not know",
+      new LocalServerAdminError("rejected", "bad"),
+      expect.stringContaining("Check the server log first"),
+      [{ id: "logs" }],
+    ],
+    [
+      "a platform project that is missing",
+      new LocalServerAdminError("platform-missing", "bad"),
+      "Stop it, then start it again so it boots with the platform project and the local admin.",
+      [{ id: "stop" }, { id: "start" }],
+    ],
+    [
+      "a Docker that is not reachable",
+      new LocalServerDockerMissingError("no daemon"),
+      expect.stringContaining("Docker is required only for the managed local runtime."),
+      [{ id: "doctor" }],
+    ],
+    [
+      "a held port",
+      new LocalServerPortBusyError(8080),
+      "Stop whatever holds the port, or start on another one.",
+      undefined,
+    ],
+    [
+      "a server that did not start",
+      new LocalServerStartError(
+        "timeout",
+        { port: 1, server_url: "http://x" },
+        { status: "stopped" },
+        {},
+      ),
+      expect.stringContaining("Read the server log"),
+      [{ id: "logs" }, { id: "start" }],
+    ],
+    [
+      "processes that cannot be listed",
+      new LocalServerStopError("unlistable", "no ps"),
+      expect.stringContaining("this machine cannot list its processes"),
+      undefined,
+    ],
+  ])("carries the hint and next commands for %s", (_name, error, hint, nextCommands) => {
+    expect(error.hint).toEqual(hint);
+    expect(error.nextCommands).toEqual(nextCommands);
+  });
+
+  it.each([
+    ["missing", "Reinstall @zitadel/cli"],
+    ["blocked", "Check that the server binary exists"],
+  ] as const)("tells a %s server program to reinstall the CLI", (reason, hint) => {
+    const error = new LocalServerBinaryError(reason, "gone");
+
+    expect(error.hint).toContain(hint);
+    expect(error.nextCommands).toEqual([expect.stringContaining("@zitadel/cli@latest")]);
   });
 
   it("says a server that would not stop did not lose its port", () => {

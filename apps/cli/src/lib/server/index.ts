@@ -14,7 +14,6 @@ export {
   type LocalServerFileReason,
   LocalServerInternalError,
   LocalServerMalformedError,
-  type LocalServerAdviceKey,
   type LocalServerMalformedReason,
   LocalServerPortBusyError,
   LocalServerPortFullError,

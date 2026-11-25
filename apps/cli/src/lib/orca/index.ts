@@ -197,7 +197,9 @@ export class Orca {
         }
       }
     }
-    throw new OrcaFrameworkError("none", "Could not detect a supported app framework");
+    throw new OrcaFrameworkError("none", "Could not detect a supported app framework", {
+      hint: "Run it from your app project directory, or from an empty directory to scaffold a new app.",
+    });
   }
 
   /**

@@ -1,5 +1,5 @@
 import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { Categorized, ErrorCategory, Suggested, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * What a publish failure carries beyond its message.
@@ -14,6 +14,11 @@ export type PublishErrorOptions = {
    * Structured facts about the failure, for a `--json` reader.
    */
   readonly details?: Readonly<Record<string, unknown>> | undefined;
+
+  /**
+   * What to run next, as suggestion objects the failure handler renders.
+   */
+  readonly nextCommands?: readonly Suggested[] | undefined;
 
   /**
    * The error that caused this one.
@@ -55,6 +60,12 @@ export class PublishError extends Error implements Categorized {
   readonly details: Readonly<Record<string, unknown>> | undefined;
 
   /**
+   * What to run next, as suggestion objects the failure handler renders with the
+   * run's scope.
+   */
+  readonly nextCommands: readonly Suggested[] | undefined;
+
+  /**
    * Make a publish failure.
    *
    * @param message - What went wrong.
@@ -65,6 +76,7 @@ export class PublishError extends Error implements Categorized {
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
+    this.nextCommands = options.nextCommands;
   }
 }
 
@@ -133,9 +145,18 @@ export class PublishConfigInvalidError extends PublishError {
    * @param options - The findings and what they say about the fix.
    */
   constructor(message: string, options: PublishConfigInvalidOptions) {
+    const fix = options.literalSecret
+      ? 'Publish a secret with the command below and reference it as "${{ NAME }}".'
+      : "Fix the files named above and rerun; no changes were made.";
     super(message, {
       ...options,
+      hint: options.refusedKey
+        ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
+        : fix,
       details: options.details ?? { issues: options.findings },
+      nextCommands: options.literalSecret
+        ? [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }]
+        : undefined,
     });
     this.findings = options.findings;
     this.literalSecret = options.literalSecret;
@@ -179,6 +200,32 @@ export type PublishConnectionOptions = PublishErrorOptions & {
    * Which kind of publish was refused.
    */
   readonly mode?: "deploy" | "preview" | undefined;
+};
+
+/** What to do about a refused connection, by why: the hint and the command that publishes the variable. */
+const CONNECTION_ADVICE: Record<
+  PublishConnectionReason,
+  (wantsSecret: boolean, publish: Suggested) => PublishErrorOptions
+> = {
+  "shared-variable": () => {
+    return {
+      hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+    };
+  },
+  "wrong-kind": (wantsSecret, publish) => {
+    return {
+      hint: wantsSecret
+        ? "The client secret must be a secret variable: publish it with the command below."
+        : "The client id must be a plain variable the engine can read back: publish it as a plain variable with the command below.",
+      nextCommands: [publish],
+    };
+  },
+  "missing-variable": (_wantsSecret, publish) => {
+    return {
+      hint: "Publish it with the command below, then deploy again.",
+      nextCommands: [publish],
+    };
+  },
 };
 
 /**
@@ -231,7 +278,16 @@ export class PublishConnectionError extends PublishError {
    * @param options - The connection, the variable and the facts behind them.
    */
   constructor(reason: PublishConnectionReason, message: string, options: PublishConnectionOptions) {
-    super(message, options);
+    const wantsSecret = options.field === "client_secret";
+    const publish: Suggested = {
+      id: "variable:set",
+      args: { name: options.variable },
+      flags: { secret: wantsSecret, preview: options.mode === "preview" },
+    };
+    super(message, {
+      ...options,
+      ...CONNECTION_ADVICE[reason](wantsSecret, publish),
+    });
     this.reason = reason;
     this.category = reason === "missing-variable" ? "conflict" : "invalid";
     this.file = options.file;

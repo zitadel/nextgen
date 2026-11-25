@@ -2,6 +2,8 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 
 import type { Suggested } from "./suggestion";
 
+export type { Suggested };
+
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
  *
@@ -67,6 +69,12 @@ export interface Categorized {
   readonly hint?: string | undefined;
   /** Structured facts about the failure, for a `--json` reader. */
   readonly details?: unknown;
+  /**
+   * What to run next, as `{ id, ... }` suggestion objects the failure handler
+   * renders with the run's scope, so a package says which command without
+   * knowing how this run spells it.
+   */
+  readonly nextCommands?: readonly Suggested[] | undefined;
 }
 
 /** What an error a package raises carries, for the boundary to report it. */
@@ -308,6 +316,7 @@ export function toZitadelError(error: unknown): ZitadelError {
   if (isLibError(error)) {
     return new ZitadelError(error.code, error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
+      ...(error.nextCommands === undefined ? {} : { nextCommands: error.nextCommands }),
       ...(error.details === undefined ? {} : { details: error.details }),
     });
   }

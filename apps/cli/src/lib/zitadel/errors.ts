@@ -1,7 +1,7 @@
 import type { ProviderSelection } from "@zitadel/config/idp";
 
 import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { Categorized, ErrorCategory, Suggested, ZitadelErrorCode } from "@/lib/errors";
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { JsonObject } from "@/lib/zitadel/types";
@@ -19,6 +19,11 @@ export type ZitadelConfigErrorOptions = {
    * Structured facts about the failure, for a `--json` reader.
    */
   readonly details?: JsonObject | undefined;
+
+  /**
+   * What to run next, as suggestion objects the failure handler renders.
+   */
+  readonly nextCommands?: readonly Suggested[] | undefined;
 };
 
 /**
@@ -54,6 +59,12 @@ export class ZitadelConfigError extends Error implements Categorized {
   readonly details: JsonObject | undefined;
 
   /**
+   * What to run next, as suggestion objects the failure handler renders with the
+   * run's scope.
+   */
+  readonly nextCommands: readonly Suggested[] | undefined;
+
+  /**
    * Make a configuration failure.
    *
    * @param message - What went wrong.
@@ -64,6 +75,7 @@ export class ZitadelConfigError extends Error implements Categorized {
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
+    this.nextCommands = options.nextCommands;
   }
 }
 
@@ -557,11 +569,13 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
       }
       return { path: item.path, rule: issue.rule, message: issue.message, step: issue.step };
     });
+    const dryRun = input.dryRun ?? false;
     super([input.heading, ...listed].join("\n"), {
       hint: input.hint,
       details: ZitadelConfigEditBreaksFlowsError.detailsOf(input, issues),
+      nextCommands: dryRun ? [{ id: "deploy", flags: { dryRun: true } }] : undefined,
     });
-    this.dryRun = input.dryRun ?? false;
+    this.dryRun = dryRun;
   }
 
   /**
@@ -650,6 +664,11 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
 export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
   override readonly category: ErrorCategory;
   override readonly retryable: boolean = false;
+
+  /** The stable product code: a file where a directory is expected keeps the code it always had. */
+  override get code(): ZitadelErrorCode {
+    return this.reason === "wrong-kind" ? "E_VALIDATION" : super.code;
+  }
 
   /** Why it cannot be read: the permission is refused, or it is the wrong kind of entry. */
   readonly reason: "denied" | "wrong-kind";
