@@ -93,12 +93,11 @@ name or an address.
 
 ## Errors
 
-Every failure of the package is a `LocalServerError` subclass in `errors.ts`;
-the commands that catch a class word it with their own refusal and next
-commands.
-
-`reset` takes a `DestroyPermit`, not `Consent`; the package says what it is doing through a `progress` callback the
-command gives it, not through `log`.
+Every failure of the package is a `LocalServerError` subclass in `errors.ts`,
+a message and the fixed `category`, `retryable` and `code`. The commands that
+catch a class word it with their own refusal and next commands. `reset` takes a
+`DestroyPermit`, not `Consent`; the package says what it is doing through a
+`progress` callback the command gives it, not through `log`.
 
 Still open: the helper methods on `LocalRuntime` delegate to functions in
 `local/runtime.ts`, and `zitadel-runtime.ts` is one large file. The seams that
