@@ -2,7 +2,10 @@ import { isDeepStrictEqual } from "node:util";
 
 import { Change } from "@/lib/zitadel/change";
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
-import { ConflictError, InvalidHandleError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigResourceClashError,
+  ZitadelConfigHandleInvalidError,
+} from "@/lib/zitadel/errors";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { DocumentKind } from "@/lib/zitadel/resources/document";
 import { CONFIG_DIRECTORIES, type ConfigDirectory, type JsonObject } from "@/lib/zitadel/types";
@@ -222,9 +225,9 @@ export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
    *
    * @param handle - The handle.
    * @returns The project-relative path.
-   * @throws {@link ConflictError} When more than one broken file holds the
+   * @throws {@link ZitadelConfigResourceClashError} When more than one broken file holds the
    *   handle and no document does.
-   * @throws {@link InvalidHandleError} When no file holds the handle and it is
+   * @throws {@link ZitadelConfigHandleInvalidError} When no file holds the handle and it is
    *   not a single safe path segment, so a file named after it would not be
    *   read back.
    */
@@ -238,7 +241,7 @@ export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
       const paths = holders.map((file) => {
         return file.path;
       });
-      throw new ConflictError(
+      throw new ZitadelConfigResourceClashError(
         `${new Intl.ListFormat("en", { type: "conjunction" }).format(paths)} both hold ${handle}`,
         {
           hint: "Remove or fix all but one of them, then run the command again.",
@@ -251,7 +254,7 @@ export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
       return holder.path;
     }
     if (!SAFE_HANDLE.test(handle) || handle === "." || handle === "..") {
-      throw new InvalidHandleError(handle);
+      throw new ZitadelConfigHandleInvalidError(handle);
     }
     return `${this.directory}/${handle}.json`;
   }
@@ -272,9 +275,9 @@ export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
    * @param handle - The handle the release pins it by.
    * @param revision - The body as the server answered it.
    * @returns The change.
-   * @throws {@link ConflictError} When more than one broken file holds the
+   * @throws {@link ZitadelConfigResourceClashError} When more than one broken file holds the
    *   handle and no document does.
-   * @throws {@link InvalidHandleError} When no file holds the handle and it is
+   * @throws {@link ZitadelConfigHandleInvalidError} When no file holds the handle and it is
    *   not a single safe path segment.
    */
   placeRevision(handle: string, revision: JsonObject): Change {

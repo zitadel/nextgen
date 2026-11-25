@@ -17,7 +17,12 @@ import {
   isCategorized,
   toZitadelError,
 } from "@/lib/errors";
-import { BrokenFlowsError, ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
+import {
+  ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigError,
+  ZitadelConfigResourceClashError,
+  ZitadelConfigResourceMissingError,
+} from "@/lib/zitadel";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -110,30 +115,38 @@ describe("toZitadelError", () => {
   });
 
   it.each([
-    ["a ConflictError", new ConflictError("two with one slug"), "E_CONFLICT"],
-    ["a NotFoundError", new NotFoundError("no such connection"), "E_NOT_FOUND"],
-    ["any other ConfigError", new ConfigError("not valid"), "E_VALIDATION"],
     [
-      "a ConfigError for a file the OS refused to read",
-      new ConfigError("x.json cannot be read (EACCES)", { details: { code: "EACCES" } }),
+      "a ZitadelConfigResourceClashError",
+      new ZitadelConfigResourceClashError("two with one slug"),
+      "E_CONFLICT",
+    ],
+    [
+      "a ZitadelConfigResourceMissingError",
+      new ZitadelConfigResourceMissingError("no such connection"),
+      "E_NOT_FOUND",
+    ],
+    ["any other ZitadelConfigError", new ZitadelConfigError("not valid"), "E_VALIDATION"],
+    [
+      "a ZitadelConfigError for a file the OS refused to read",
+      new ZitadelConfigError("x.json cannot be read (EACCES)", { details: { code: "EACCES" } }),
       "E_AUTH",
     ],
     [
-      "a ConfigError for a file the OS would not let it touch",
-      new ConfigError("x.json cannot be read (EPERM)", { details: { code: "EPERM" } }),
+      "a ZitadelConfigError for a file the OS would not let it touch",
+      new ZitadelConfigError("x.json cannot be read (EPERM)", { details: { code: "EPERM" } }),
       "E_AUTH",
     ],
     [
-      "a ConfigError for any other errno",
-      new ConfigError("x.json cannot be read (EIO)", { details: { code: "EIO" } }),
+      "a ZitadelConfigError for any other errno",
+      new ZitadelConfigError("x.json cannot be read (EIO)", { details: { code: "EIO" } }),
       "E_VALIDATION",
     ],
   ])("maps %s to %s", (_name, err, code) => {
     expect(toZitadelError(err).code).toBe(code);
   });
 
-  it("passes a ConfigError's message, hint and details on", () => {
-    const err = new ConfigError("boom", { hint: "do this", details: { file: "a.json" } });
+  it("passes a ZitadelConfigError's message, hint and details on", () => {
+    const err = new ZitadelConfigError("boom", { hint: "do this", details: { file: "a.json" } });
     const result = toZitadelError(err);
     expect([result.message, result.hint, result.details]).toEqual([
       "boom",
@@ -160,7 +173,7 @@ describe("toZitadelError", () => {
     ],
   ] as const)("gives %s its follow-up", (_name, report, next) => {
     const result = toZitadelError(
-      new BrokenFlowsError({
+      new ZitadelConfigEditBreaksFlowsError({
         ...report,
         file: "default-human-user.json",
         heading: "A login flow would break:",
@@ -171,8 +184,8 @@ describe("toZitadelError", () => {
     expect(result.nextCommands).toEqual(next);
   });
 
-  it("leaves out the hint and details a ConfigError has none of", () => {
-    const result = toZitadelError(new ConfigError("boom"));
+  it("leaves out the hint and details a ZitadelConfigError has none of", () => {
+    const result = toZitadelError(new ZitadelConfigError("boom"));
     expect([result.hint, result.details]).toEqual([undefined, undefined]);
   });
 

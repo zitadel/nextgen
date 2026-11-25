@@ -160,7 +160,7 @@ export interface ConfigStore {
    * @returns The files, in file-name order; one that is not valid JSON, or
    *   holds something other than a JSON object, comes back as an
    *   {@link UnparsedFile} with the reason, so it never hides the rest.
-   * @throws {@link ConfigError} When a file cannot be read at all.
+   * @throws {@link ZitadelConfigError} When a file cannot be read at all.
    */
   read(kind: ConfigKind): Promise<readonly StoredFile[]>;
 
@@ -181,7 +181,7 @@ export interface ConfigStore {
    * several files refuse all of them before the first is written.
    *
    * @param path - The project-relative path.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or a
    *   directory it needs is a file.
    */
   assertWritable(path: string): void;
@@ -194,7 +194,7 @@ export interface ConfigStore {
    * is not there, so removing it is not refused.
    *
    * @param path - The project-relative path.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or is
    *   a directory.
    */
   assertRemovable(path: string): void;
@@ -205,9 +205,9 @@ export interface ConfigStore {
    * @param file - The file to write.
    * @param mode - Whether an existing file may be replaced.
    * @returns Nothing, once the file is written.
-   * @throws {@link FileExistsError} When the file is already there, under
+   * @throws {@link ZitadelConfigFileExistsError} When the file is already there, under
    *   `create`.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or a
    *   directory it needs is a file.
    */
   write(file: ConfigFile, mode: WriteMode): Promise<void>;
@@ -217,7 +217,7 @@ export interface ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Nothing, once the file is gone.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or is
    *   a directory.
    */
   remove(path: string): Promise<void>;
@@ -229,9 +229,9 @@ export interface ConfigStore {
    * @param text - What it holds.
    * @param mode - Whether an existing file may be replaced.
    * @returns Nothing, once the file is written.
-   * @throws {@link FileExistsError} When the file is already there, under
+   * @throws {@link ZitadelConfigFileExistsError} When the file is already there, under
    *   `create`.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or a
    *   directory it needs is a file.
    */
   writeText(path: string, text: string, mode: WriteMode): Promise<void>;
@@ -244,7 +244,7 @@ export interface ConfigStore {
    * @param file - The file whose references to resolve.
    * @param missing - What to do with a reference whose file is not there.
    * @returns The body with its references inlined.
-   * @throws {@link ConfigError} When a reference leads outside the project,
+   * @throws {@link ZitadelConfigError} When a reference leads outside the project,
    *   or cannot be read under `throw`.
    */
   inlineReferences(file: ConfigFile, missing: MissingReference): JsonObject;
@@ -254,7 +254,7 @@ export interface ConfigStore {
    *
    * @param file - The file.
    * @returns The paths, spelled with `/`.
-   * @throws {@link ConfigError} When a reference leads outside the project.
+   * @throws {@link ZitadelConfigError} When a reference leads outside the project.
    */
   listReferencedPaths(file: ConfigFile): readonly string[];
 }

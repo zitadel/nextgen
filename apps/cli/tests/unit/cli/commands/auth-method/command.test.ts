@@ -14,7 +14,13 @@ import AuthMethodSsoDisable from "@/cli/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 
-import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
+import {
+  ZitadelConfigFileBrokenError,
+  type Change,
+  DiskStore,
+  Schemas,
+  UserSchema,
+} from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
 import { recordLog } from "@tests/fixtures/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
@@ -990,7 +996,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
       expect(error).toMatchObject({
         problems: [expect.objectContaining({ path: ".zitadel/schemas/customers.json" })],
       });
@@ -1005,7 +1011,7 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees" });
       });
 
-      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
       expect(error).toMatchObject({
         problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
       });
@@ -1026,7 +1032,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).not.toBeInstanceOf(BrokenFilesError);
+      expect(error).not.toBeInstanceOf(ZitadelConfigFileBrokenError);
       expect(error).toMatchObject({
         message: "This project has more than one user schema",
       });
@@ -1045,7 +1051,7 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees.json" });
       });
 
-      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
     });
 
     it("refuses a name no schema has as unknown, not as the broken file", async ({ dir }) => {
@@ -1091,7 +1097,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
       expect(error).toMatchObject({
         problems: expect.arrayContaining([
           expect.objectContaining({ path: ".zitadel/idps/broken.json" }),

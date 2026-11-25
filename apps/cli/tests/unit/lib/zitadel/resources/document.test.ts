@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { BrokenFilesError, RefusedEditError } from "@/lib/zitadel/errors";
+import { ZitadelConfigFileBrokenError, ZitadelConfigEditRefusedError } from "@/lib/zitadel/errors";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
@@ -113,7 +113,7 @@ class Sample extends ConfigDocument<SampleValue> {
    *
    * @param file - The file.
    * @returns The sample, marked as read.
-   * @throws {@link BrokenFilesError} When the contract refuses the body.
+   * @throws {@link ZitadelConfigFileBrokenError} When the contract refuses the body.
    */
   static of(file: DocumentFile): Sample {
     return new Sample(file, Sample.parseFile(Sample.CONTRACT, file), "read");
@@ -124,7 +124,7 @@ class Sample extends ConfigDocument<SampleValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The sample, marked as created.
-   * @throws {@link BrokenFilesError} When the contract refuses the body.
+   * @throws {@link ZitadelConfigFileBrokenError} When the contract refuses the body.
    */
   static create(file: DocumentFile): Sample {
     return new Sample(file, Sample.parseFile(Sample.CONTRACT, file), "created");
@@ -145,8 +145,8 @@ class Sample extends ConfigDocument<SampleValue> {
    *
    * @param name - The new name.
    * @returns The edited sample.
-   * @throws {@link RefusedEditError} When `name` is not a string.
-   * @throws {@link BrokenFilesError} When the contract refuses the new name.
+   * @throws {@link ZitadelConfigEditRefusedError} When `name` is not a string.
+   * @throws {@link ZitadelConfigFileBrokenError} When the contract refuses the new name.
    */
   withName(name: JsonObject[string]): Sample {
     this.refuseUneditable(typeof this.value.name === "string" ? undefined : "name is not a string");
@@ -302,7 +302,7 @@ describe("ConfigDocument.parseFile", () => {
       return Sample.of(file);
     });
 
-    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
     expect(error).toMatchObject({ problems: [{ path: PATH }] });
   });
 });
@@ -335,7 +335,7 @@ describe("ConfigDocument edits", () => {
       return sample.withName("b");
     });
 
-    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditRefusedError);
     expect(error).toMatchObject({
       message: `${PATH}: name is not a string`,
       details: { file: PATH, region: "name is not a string" },
@@ -349,7 +349,7 @@ describe("ConfigDocument edits", () => {
       return sample.withName(true);
     });
 
-    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
   });
 
   it("hold what the contract parsed the new body to", () => {

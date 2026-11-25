@@ -1,6 +1,11 @@
 import { describe, expect } from "vitest";
 
-import { CONFIG_DIRECTORIES, ConfigError, FileExistsError, type JsonObject } from "@/lib/zitadel";
+import {
+  CONFIG_DIRECTORIES,
+  ZitadelConfigError,
+  ZitadelConfigFileExistsError,
+  type JsonObject,
+} from "@/lib/zitadel";
 import type { Store } from "@/lib/zitadel/storage/backend/store";
 import { BACKENDS } from "@tests/helpers/storage/backend/backends";
 import { it } from "@tests/fixtures";
@@ -327,7 +332,7 @@ describe("Store.write", () => {
         return store.write({ path: IDP_A, body: { slug: "a" } }, "create");
       });
 
-      expect(error).toBeInstanceOf(FileExistsError);
+      expect(error).toBeInstanceOf(ZitadelConfigFileExistsError);
       expect(error).toMatchObject({ path: IDP_A });
     });
 
@@ -349,7 +354,7 @@ describe("Store.write", () => {
         return store.write({ path: `${CONFIG_DIRECTORIES.schemas}/x.json`, body: {} }, "create");
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
     });
   });
 });
@@ -414,7 +419,7 @@ describe("Store.remove", () => {
         return store.remove(IDP_A);
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
     });
 
     it("names the directory it refuses to remove", async ({ dir, other }) => {
@@ -436,7 +441,7 @@ describe("Store.remove", () => {
         return store.remove(`${CONFIG_DIRECTORIES.schemas}/../../${PACKAGE}`);
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
     });
 
     it("leaves the file a refused path names", async ({ dir, other }) => {
@@ -463,7 +468,7 @@ describe("Store.assertWritable", () => {
         store.assertWritable(`${TEMPLATE}/x`);
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
     });
   });
 });
@@ -489,7 +494,7 @@ describe("Store.assertRemovable", () => {
         store.assertRemovable(IDP_A);
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
     });
 
     it("names the directory it refuses as removable", async ({ dir, other }) => {
@@ -510,7 +515,7 @@ describe("Store.assertRemovable", () => {
         store.assertRemovable(OUTSIDE);
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
     });
   });
 });
@@ -547,7 +552,7 @@ describe("Store.writeText", () => {
           return store.writeText(path, MAIN, "create");
         });
 
-        expect(error).toBeInstanceOf(ConfigError);
+        expect(error).toBeInstanceOf(ZitadelConfigError);
         expect(error).toMatchObject({
           message: `${path} cannot be written (ENOTDIR)`,
           hint: `Remove ${TEMPLATE}, which is a file where a directory is needed, then run the command again.`,
@@ -564,7 +569,7 @@ describe("Store.writeText", () => {
         return store.writeText(TEMPLATE, "new", "create");
       });
 
-      expect(error).toBeInstanceOf(FileExistsError);
+      expect(error).toBeInstanceOf(ZitadelConfigFileExistsError);
       expect(error).toMatchObject({ path: TEMPLATE });
     });
 
@@ -607,7 +612,7 @@ describe("Store outside .zitadel/", () => {
         return act(store);
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({ message: `${OUTSIDE} points outside .zitadel/` });
     });
 
@@ -634,7 +639,7 @@ describe("Store outside .zitadel/", () => {
         store.assertWritable(IDP_A);
       });
 
-      expect([outside, inside]).toEqual([expect.any(ConfigError), undefined]);
+      expect([outside, inside]).toEqual([expect.any(ZitadelConfigError), undefined]);
     });
   });
 });
@@ -673,7 +678,7 @@ describe("Store.inlineReferences", () => {
         return store.inlineReferences(aBrandingReferencing("./gone.liquid"), "throw");
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({ message: '$file "./gone.liquid" cannot be read' });
     });
 
@@ -705,7 +710,7 @@ describe("Store.inlineReferences", () => {
           return store.inlineReferences(aBrandingReferencing("./login.liquid"), "omit");
         });
 
-        expect(error).toBeInstanceOf(ConfigError);
+        expect(error).toBeInstanceOf(ZitadelConfigError);
         expect(error).toMatchObject({ message: '$file "./login.liquid" cannot be read' });
       },
     );
@@ -732,7 +737,7 @@ describe("Store.inlineReferences", () => {
         return store.inlineReferences(aBrandingReferencing("../../../outside.txt"), "omit");
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: '$file "../../../outside.txt" points outside the project',
       });
@@ -750,7 +755,7 @@ describe("Store.inlineReferences", () => {
         return store.inlineReferences(aBrandingReferencing("./elsewhere/secret.txt"), "omit");
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: '$file "./elsewhere/secret.txt" points outside the project',
       });
@@ -764,7 +769,7 @@ describe("Store.inlineReferences", () => {
         return store.inlineReferences(aBrandingReferencing("./dangling/x.liquid"), "omit");
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: '$file "./dangling/x.liquid" points outside the project',
       });
@@ -800,7 +805,7 @@ describe("Store.listReferencedPaths", () => {
         return store.listReferencedPaths(aBrandingReferencing("../../../outside.txt"));
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: '$file "../../../outside.txt" points outside the project',
       });

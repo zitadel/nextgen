@@ -178,7 +178,7 @@ export class ProviderChoice {
    * @param ask - How a question is asked: the running command's `this.ask`.
    * @returns The provider, checked.
    * @throws {@link ZitadelError} When a setting is refused.
-   * @throws {@link ConfigError} When the slug names a connection that cannot
+   * @throws {@link ZitadelConfigError} When the slug names a connection that cannot
    *   be reused, or a flow would reject the provider.
    */
   async resolve(target: ProviderTarget, ask: Questions): Promise<ProviderSelection> {
@@ -222,9 +222,9 @@ export class ProviderChoice {
    * @param existing - The connection the slug names, if any.
    * @returns Each stored setting the run uses; `undefined` for one the flags
    *   gave, and for both when no connection has the slug.
-   * @throws {@link NotOidcConnectionError} When the connection has no issuer,
+   * @throws {@link ZitadelConfigConnectionNotOidcError} When the connection has no issuer,
    *   whatever issuer was given.
-   * @throws {@link UnusableSettingError} When a stored setting the run would
+   * @throws {@link ZitadelConfigConnectionUnusableError} When a stored setting the run would
    *   use cannot be used.
    */
   readStoredSettings(existing: Connection | undefined): StoredSettings {
@@ -263,7 +263,7 @@ export class ProviderChoice {
    *   against.
    * @param ask - How a question is asked.
    * @returns Every setting.
-   * @throws {@link ConfigError} When the slug names a connection to another
+   * @throws {@link ZitadelConfigError} When the slug names a connection to another
    *   issuer, or a flow would reject the provider.
    */
   private async askCustomSettings(

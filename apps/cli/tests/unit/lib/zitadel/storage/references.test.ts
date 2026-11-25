@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ConfigError } from "@/lib/zitadel";
+import { ZitadelConfigError } from "@/lib/zitadel";
 import {
   findFileReferences,
   inlineFileReferences,
@@ -77,7 +77,7 @@ describe("inlineFileReferences", () => {
       return inlineFileReferences({ t: GONE }, readA, "throw");
     });
 
-    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({ message: '$file "./gone" cannot be read' });
   });
 

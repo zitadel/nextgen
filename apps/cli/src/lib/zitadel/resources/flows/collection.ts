@@ -1,6 +1,6 @@
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import { NotFoundError } from "@/lib/zitadel/errors";
+import { ZitadelConfigResourceMissingError } from "@/lib/zitadel/errors";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Offer, PinnedOffer } from "@/lib/zitadel/resources/flows/types";
@@ -128,17 +128,17 @@ export class Flows extends PinnedCollection<Flow> {
    * @param schema - The schema.
    * @param slug - The provider, when it is known.
    * @returns The flows that run against it.
-   * @throws {@link NotFoundError} When no flow runs against the schema: a
+   * @throws {@link ZitadelConfigResourceMissingError} When no flow runs against the schema: a
    *   provider no flow offers is no sign-in button at all.
-   * @throws {@link RefusedEditError} When a region the edit writes is not the
+   * @throws {@link ZitadelConfigEditRefusedError} When a region the edit writes is not the
    *   shape it writes.
-   * @throws {@link BrokenFlowsError} When offering the slug would leave a flow
+   * @throws {@link ZitadelConfigEditBreaksFlowsError} When offering the slug would leave a flow
    *   failing the server's rules, or one already fails them.
    */
   resolveForSso(schema: UserSchema, slug?: ConnectionSlug): readonly Flow[] {
     const flows = this.findForSchema(schema);
     if (flows.length === 0) {
-      throw new NotFoundError(`No login flow runs against ${schema.name}`, {
+      throw new ZitadelConfigResourceMissingError(`No login flow runs against ${schema.name}`, {
         hint:
           "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
           "names this schema. Check that the flow's user_schema names the schema's objectType.",

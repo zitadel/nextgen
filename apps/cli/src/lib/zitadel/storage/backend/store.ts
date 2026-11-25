@@ -1,6 +1,10 @@
 import { stringify } from "safe-stable-stringify";
 
-import { ConfigError, FileExistsError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigError,
+  ZitadelConfigFileExistsError,
+  ZitadelConfigFileUnreadableError,
+} from "@/lib/zitadel/errors";
 import {
   CONFIG_DIRECTORIES,
   type ConfigFile,
@@ -82,7 +86,7 @@ export abstract class Store implements ConfigStore {
    * @returns The files, in file-name order; none when the kind's directory is
    *   not there. A file that is not valid JSON, or holds something other than
    *   a JSON object, comes back as an {@link UnparsedFile} with the reason.
-   * @throws {@link ConfigError} When the directory or a file cannot be read;
+   * @throws {@link ZitadelConfigError} When the directory or a file cannot be read;
    *   of several files that cannot, the first in path order.
    */
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
@@ -97,7 +101,7 @@ export abstract class Store implements ConfigStore {
         if (code === "ENOENT") {
           return [];
         }
-        throw Store.unreadable(directory, code);
+        throw Store.unreadable(directory, code, error);
       });
     // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
     const files = names
@@ -151,7 +155,7 @@ export abstract class Store implements ConfigStore {
    * Check that a file may be written, without touching it.
    *
    * @param path - The project-relative path.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`, or a directory it needs is a file.
    */
   assertWritable(path: string): void {
@@ -162,7 +166,7 @@ export abstract class Store implements ConfigStore {
    * Check that a file may be removed, without touching it.
    *
    * @param path - The project-relative path.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`, or it is a directory.
    */
   assertRemovable(path: string): void {
@@ -176,9 +180,9 @@ export abstract class Store implements ConfigStore {
    * @param file - The file to write.
    * @param mode - Whether an existing file may be replaced.
    * @returns Nothing, once the file is written.
-   * @throws {@link FileExistsError} When the file is already there, under
+   * @throws {@link ZitadelConfigFileExistsError} When the file is already there, under
    *   `create`.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or a
    *   directory it needs is a file.
    */
   async write(file: ConfigFile, mode: WriteMode): Promise<void> {
@@ -190,7 +194,7 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Nothing, once the file is gone.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or is
    *   a directory.
    */
   async remove(path: string): Promise<void> {
@@ -211,9 +215,9 @@ export abstract class Store implements ConfigStore {
    * @param text - What it holds.
    * @param mode - Whether an existing file may be replaced.
    * @returns Nothing, once the file is written.
-   * @throws {@link FileExistsError} When the file is already there, under
+   * @throws {@link ZitadelConfigFileExistsError} When the file is already there, under
    *   `create`.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or a
    *   directory it needs is a file.
    */
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
@@ -224,7 +228,7 @@ export abstract class Store implements ConfigStore {
       .writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] })
       .catch((error: unknown) => {
         if (Store.errnoOf(error) === "EEXIST") {
-          throw new FileExistsError(path);
+          throw new ZitadelConfigFileExistsError(path);
         }
         throw error;
       });
@@ -237,7 +241,7 @@ export abstract class Store implements ConfigStore {
    * @param file - The file whose references to resolve.
    * @param missing - What to do with a reference whose file is not there.
    * @returns The body with its references inlined.
-   * @throws {@link ConfigError} When a reference leads outside the project,
+   * @throws {@link ZitadelConfigError} When a reference leads outside the project,
    *   when its file is there but cannot be read, or when it is not there,
    *   under `throw`.
    */
@@ -255,14 +259,20 @@ export abstract class Store implements ConfigStore {
           if (code === "ENOENT" || code === "ENOTDIR") {
             return undefined;
           }
-          throw new ConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
-            hint: "Create the referenced file or fix the path.",
-            details: {
-              file: file.path,
-              ref,
-              ...(code === undefined ? {} : { code }),
+          if (code !== "EACCES" && code !== "EPERM") {
+            throw error;
+          }
+          throw new ZitadelConfigFileUnreadableError(
+            `$file ${JSON.stringify(ref)} cannot be read`,
+            {
+              hint: "Check that the referenced file is readable, then run the command again.",
+              details: {
+                file: file.path,
+                ref,
+                code,
+              },
             },
-          });
+          );
         }
       },
       missing,
@@ -274,7 +284,7 @@ export abstract class Store implements ConfigStore {
    *
    * @param file - The file.
    * @returns The paths, spelled with `/`.
-   * @throws {@link ConfigError} When a reference leads outside the project.
+   * @throws {@link ZitadelConfigError} When a reference leads outside the project.
    */
   listReferencedPaths(file: ConfigFile): readonly string[] {
     return findFileReferences(file.body).map((item) => {
@@ -303,7 +313,7 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns The path to touch.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`.
    */
   private place(path: string): Path {
@@ -327,7 +337,7 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns The path to remove.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`, or it is a directory.
    */
   private removable(path: string): string {
@@ -349,7 +359,7 @@ export abstract class Store implements ConfigStore {
    * @param file - The file holding the reference.
    * @param ref - The reference as written.
    * @returns The path it names.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves the project.
    */
   private locate(file: ConfigFile, ref: string): Path {
@@ -373,7 +383,7 @@ export abstract class Store implements ConfigStore {
    * @param path - The project-relative path.
    * @returns The file; an {@link UnparsedFile} with the reason when it is not
    *   valid JSON, not a JSON object, or a directory.
-   * @throws {@link ConfigError} When the file cannot be read, naming the error
+   * @throws {@link ZitadelConfigError} When the file cannot be read, naming the error
    *   code.
    */
   private async readFileAt(path: string): Promise<StoredFile> {
@@ -389,7 +399,7 @@ export abstract class Store implements ConfigStore {
         if (code === "EISDIR") {
           return undefined;
         }
-        throw Store.unreadable(path, code);
+        throw Store.unreadable(path, code, error);
       });
     if (text === undefined) {
       return UnparsedFile.directory(path);
@@ -413,19 +423,23 @@ export abstract class Store implements ConfigStore {
    * The failure for a file or directory that cannot be read.
    *
    * @remarks
-   * The errno is kept in `details.code`, so the CLI can tell a permission
-   * failure from the rest.
+   * Only a refused permission carries advice, so only that becomes an error of
+   * this package; any other failure is returned as it came, for the caller to
+   * throw.
    *
    * @param path - The project-relative path.
    * @param code - The errno of the failed operation, when it had one.
    * @returns The error to throw.
    */
-  private static unreadable(path: string, code: string | undefined): ConfigError {
-    return new ConfigError(`${path} cannot be read${code === undefined ? "" : ` (${code})`}`, {
+  private static unreadable(path: string, code: string | undefined, error: unknown): unknown {
+    if (code !== "EACCES" && code !== "EPERM") {
+      return error;
+    }
+    return new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`, {
       hint: "Check that the file is readable, then run the command again.",
       details: {
         file: path,
-        ...(code === undefined ? {} : { code }),
+        code,
       },
     });
   }
@@ -457,12 +471,12 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path being written.
    * @param target - Where it is written.
-   * @throws {@link ConfigError} When a directory it needs is a file.
+   * @throws {@link ZitadelConfigError} When a directory it needs is a file.
    */
   private assertClear(path: string, target: Path): void {
     const blocker = this.blockerOf(target);
     if (blocker !== undefined) {
-      throw new ConfigError(`${path} cannot be written (ENOTDIR)`, {
+      throw new ZitadelConfigError(`${path} cannot be written (ENOTDIR)`, {
         hint: `Remove ${blocker}, which is a file where a directory is needed, then run the command again.`,
         details: { file: path, code: "ENOTDIR", blocker },
       });
@@ -475,8 +489,8 @@ export abstract class Store implements ConfigStore {
    * @param path - The project-relative path.
    * @returns The error to throw.
    */
-  private static directoryInTheWay(path: string): ConfigError {
-    return new ConfigError(`${path} cannot be removed (EISDIR)`, {
+  private static directoryInTheWay(path: string): ZitadelConfigError {
+    return new ZitadelConfigError(`${path} cannot be removed (EISDIR)`, {
       hint: `Remove ${path}, which is a directory where a file is expected, then run the command again.`,
       details: { file: path, code: "EISDIR" },
     });

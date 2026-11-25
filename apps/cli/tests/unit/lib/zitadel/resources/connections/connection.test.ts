@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { idpProvider } from "@zitadel/config/idp";
 
 import {
-  ConfigError,
+  ZitadelConfigError,
   Connection,
-  NotOidcConnectionError,
+  ZitadelConfigConnectionNotOidcError,
   UserSchema,
-  UnusableSettingError,
+  ZitadelConfigConnectionUnusableError,
 } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
@@ -511,7 +511,7 @@ describe("Connection.refuseDifferentClientId", () => {
         return acme.refuseDifferentClientId("other");
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: `${ACME_FILE} already uses client id client, not other`,
       });
@@ -552,7 +552,7 @@ describe("Connection.refuseNonOidc", () => {
         return acme.refuseNonOidc();
       });
 
-      expect(error).toBeInstanceOf(NotOidcConnectionError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionNotOidcError);
     });
   });
 });
@@ -572,7 +572,7 @@ describe("Connection.readUsableDisplayName", () => {
         return acme.readUsableDisplayName();
       });
 
-      expect(error).toBeInstanceOf(UnusableSettingError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionUnusableError);
       expect(error).toMatchObject({ details: { file: ACME_SSO_FILE, slug: "acme-sso" } });
     });
   });

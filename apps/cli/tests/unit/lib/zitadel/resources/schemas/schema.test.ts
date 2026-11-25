@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 
-import { BrokenFilesError, RefusedEditError, UserSchema } from "@/lib/zitadel";
+import {
+  ZitadelConfigFileBrokenError,
+  ZitadelConfigEditRefusedError,
+  UserSchema,
+} from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
@@ -165,7 +169,7 @@ describe("UserSchema.of", () => {
       return UserSchema.of(aFile("schemas", SCHEMA_FILE, REFUSED));
     });
 
-    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
     expect(error).toMatchObject({ problems: [expect.objectContaining({ path: PATH })] });
   });
 });
@@ -498,7 +502,7 @@ describe("UserSchema.withMethod", () => {
       return schema.withMethod("password");
     });
 
-    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditRefusedError);
     expect(error).toMatchObject({ message: `${PATH} has no x-identifier for password` });
   });
 });
@@ -571,6 +575,6 @@ describe("UserSchema edits of an external schema", () => {
       return edit(external);
     });
 
-    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditRefusedError);
   });
 });

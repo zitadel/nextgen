@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import { ProviderChoice } from "@/lib/idp";
-import { ConfigError, ConflictError, Connection } from "@/lib/zitadel";
+import { ZitadelConfigError, Connection } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -116,7 +116,7 @@ describe("ProviderChoice.readStoredSettings", () => {
         return UNDESCRIBED.readStoredSettings(acme);
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           `${ACME_SSO_FILE} holds a display name that cannot be used: `,
@@ -145,7 +145,7 @@ describe("ProviderChoice.readStoredSettings", () => {
         return choice.readStoredSettings(acme);
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toMatchObject({ category: "conflict" });
       expect(error).toMatchObject({
         message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
         hint: "Fix the file, or choose another slug, then run the command again.",

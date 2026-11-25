@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFlowsError, type ConfigOptions, NotFoundError, UserSchema } from "@/lib/zitadel";
+import { ZitadelConfigEditBreaksFlowsError, type ConfigOptions, UserSchema } from "@/lib/zitadel";
 import type { JsonObject } from "@/lib/zitadel/types";
 import {
   aConfig,
@@ -298,7 +298,7 @@ describe("Flows.resolveForSso", () => {
       return config.flows.resolveForSso(customers(ssoSchema()));
     });
 
-    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toMatchObject({ category: "not_found" });
     expect(error).toMatchObject({
       message: "No login flow runs against customers",
       details: { schema: CUSTOMERS },
@@ -315,7 +315,7 @@ describe("Flows.resolveForSso", () => {
       return config.flows.resolveForSso(customers(ssoSchema()), slug("acme-sso"));
     });
 
-    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
   });
 });
 

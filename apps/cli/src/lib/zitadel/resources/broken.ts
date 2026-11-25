@@ -75,7 +75,7 @@ export class BrokenFile {
   }
 
   /**
-   * The findings as a {@link BrokenFilesError} names them.
+   * The findings as a {@link ZitadelConfigFileBrokenError} names them.
    *
    * @returns One problem per finding, each naming the file.
    */

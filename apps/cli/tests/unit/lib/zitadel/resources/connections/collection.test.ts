@@ -3,13 +3,11 @@ import { describe, expect, it } from "vitest";
 import { idpProvider } from "@zitadel/config/idp";
 
 import {
-  ConfigError,
-  ConflictError,
+  ZitadelConfigError,
   Connection,
   isJsonObject,
   type JsonObject,
-  NoSignInLeftError,
-  NotFoundError,
+  ZitadelConfigEditLockoutError,
   UserSchema,
 } from "@/lib/zitadel";
 import { listAt } from "@/lib/zitadel/utils/json";
@@ -310,7 +308,7 @@ describe("Connections.enable", () => {
         return config.connections.enable(CUSTOMERS_SCHEMA, GOOGLE);
       });
 
-      expect(error).toBeInstanceOf(NotFoundError);
+      expect(error).toMatchObject({ category: "not_found" });
       expect(error).toMatchObject({ message: "No login flow runs against customers" });
     });
   });
@@ -822,7 +820,7 @@ describe("Connections.disable", () => {
         return config.connections.disable(config.schemas.resolve(), "google");
       });
 
-      expect(error).toBeInstanceOf(NoSignInLeftError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditLockoutError);
     });
 
     it("removes it when forced", () => {
@@ -864,7 +862,7 @@ describe("Connections.disable", () => {
         return config.connections.disable(config.schemas.resolve(), "gogle");
       });
 
-      expect(error).toBeInstanceOf(NotFoundError);
+      expect(error).toMatchObject({ category: "not_found" });
       expect(error).toMatchObject(fields);
     });
   });
@@ -1022,7 +1020,7 @@ describe("Connections.resolveExisting", () => {
         return config.connections.resolveExisting(GOOGLE);
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toMatchObject({ category: "conflict" });
       expect(error).toMatchObject({ message });
     });
 
@@ -1040,7 +1038,7 @@ describe("Connections.resolveExisting", () => {
         return config.connections.resolveExisting(GOOGLE, { clientId: given });
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({ message });
     });
 
@@ -1059,7 +1057,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(GOOGLE);
         });
 
-        expect(error).toBeInstanceOf(ConflictError);
+        expect(error).toMatchObject({ category: "conflict" });
         expect(error).toMatchObject({
           hint: expect.stringContaining("in the schemas and flows that name it"),
         });
@@ -1070,7 +1068,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(GOOGLE);
         });
 
-        expect(error).toBeInstanceOf(ConflictError);
+        expect(error).toMatchObject({ category: "conflict" });
         expect(error).toMatchObject({ hint: expect.not.stringContaining("--") });
       });
     });
@@ -1197,7 +1195,7 @@ describe("Connections.resolveExisting", () => {
         return config.connections.resolveExisting(candidate);
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toMatchObject({ category: "conflict" });
       expect(error).toMatchObject({ message });
     });
 
@@ -1212,7 +1210,7 @@ describe("Connections.resolveExisting", () => {
         return config.connections.resolveExisting(ACME_SSO, { clientId: clientId("another-id") });
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: `${ACME_SSO_FILE} already uses client id literal-id, not another-id`,
       });
@@ -1230,7 +1228,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(candidate);
         });
 
-        expect(error).toBeInstanceOf(ConflictError);
+        expect(error).toMatchObject({ category: "conflict" });
         expect(error).toMatchObject({ hint: expect.stringContaining("Choose another slug") });
       });
     });
@@ -1245,7 +1243,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(ACME_SSO);
         });
 
-        expect(error).toBeInstanceOf(ConflictError);
+        expect(error).toMatchObject({ category: "conflict" });
         expect(error).toMatchObject({
           hint: "Rename or remove that file, or choose another slug, then run the command again.",
         });
@@ -1268,7 +1266,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(GOOGLE);
         });
 
-        expect(error).toBeInstanceOf(ConflictError);
+        expect(error).toMatchObject({ category: "conflict" });
         expect(error).toMatchObject({
           hint: "Rename or remove that file, then run the command again.",
         });
@@ -1330,7 +1328,7 @@ describe("Connections.resolveBySlug", () => {
       return config.connections.resolveBySlug("acme-sso", given);
     });
 
-    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ category: "conflict" });
     expect(error).toMatchObject({ message });
   });
 
@@ -1342,7 +1340,7 @@ describe("Connections.resolveBySlug", () => {
         return config.connections.resolveBySlug("acme-sso", "https://sso.other.example");
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toMatchObject({ category: "conflict" });
       expect(error).toMatchObject({
         details: {
           file: ACME_SSO_FILE,

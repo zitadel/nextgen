@@ -16,15 +16,15 @@ import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Output, warnings } from "@/lib/ui";
 import {
-  AmbiguousSchemaError,
-  BrokenFilesError,
+  ZitadelConfigSchemaAmbiguousError,
+  ZitadelConfigFileBrokenError,
   type Change,
   CONFIG_DIRECTORIES,
   type ConfigStore,
   DiskStore,
   type ForceOptions,
-  NoSignInLeftError,
-  SchemaNotFoundError,
+  ZitadelConfigEditLockoutError,
+  ZitadelConfigSchemaMissingError,
   type Schemas,
   type ToggleableMethod,
   type UserSchema,
@@ -166,7 +166,7 @@ const AMBIGUOUS_SCHEMA_REFUSAL = {
  * @returns What the run read.
  * @throws {@link ZitadelError} When no schema, or more than one, fits
  *   `--schema`, or the one that does points at an external schema.
- * @throws {@link BrokenFilesError} Naming every file the contract rules refuse.
+ * @throws {@link ZitadelConfigFileBrokenError} Naming every file the contract rules refuse.
  */
 export async function readSchemaTarget(input: {
   cwd: string;
@@ -177,7 +177,7 @@ export async function readSchemaTarget(input: {
   try {
     loaded.schemas.resolve(input.schema);
   } catch (error) {
-    if (error instanceof SchemaNotFoundError) {
+    if (error instanceof ZitadelConfigSchemaMissingError) {
       const brokenSchemas = loaded.broken.filter((file) => {
         return file.kind === "schema";
       });
@@ -191,7 +191,7 @@ export async function readSchemaTarget(input: {
               return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
             });
       if (broken.length > 0) {
-        throw new BrokenFilesError(
+        throw new ZitadelConfigFileBrokenError(
           broken.flatMap((file) => {
             return file.problems;
           }),
@@ -257,7 +257,7 @@ const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"
  * What {@link refuseNoSignInLeft} words its refusal from.
  */
 type NoSignInLeftRefusal = {
-  readonly error: NoSignInLeftError;
+  readonly error: ZitadelConfigEditLockoutError;
   readonly question: string;
   /** The exact re-run first, then enabling each method the schema could take instead, then a provider. */
   readonly suggested: FollowUps;
@@ -352,7 +352,7 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
   try {
     return schemas.resolve(requested);
   } catch (error) {
-    if (error instanceof SchemaNotFoundError) {
+    if (error instanceof ZitadelConfigSchemaMissingError) {
       const { requested } = error;
       if (error.known.length === 0 || requested === undefined) {
         throw refusalError(NO_SCHEMA_REFUSAL, {});
@@ -364,7 +364,7 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
         schemas: detailsOf(error.known),
       });
     }
-    if (error instanceof AmbiguousSchemaError) {
+    if (error instanceof ZitadelConfigSchemaAmbiguousError) {
       const { requested } = error;
       if (requested === undefined) {
         throw refusalError(UNNAMED_SCHEMA_REFUSAL, {
@@ -799,7 +799,7 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         dryRun: true,
       });
     } catch (error) {
-      if (!(error instanceof NoSignInLeftError)) {
+      if (!(error instanceof ZitadelConfigEditLockoutError)) {
         throw error;
       }
       if (this.nonInteractive && !this.force) {
@@ -819,7 +819,7 @@ export abstract class AuthMethodDisableCommand extends Destructive(
    *
    * @remarks
    * It is made without `force` first; when the configuration refuses it with
-   * {@link NoSignInLeftError}, the person is asked, and a yes makes it again
+   * {@link ZitadelConfigEditLockoutError}, the person is asked, and a yes makes it again
    * with `force`. `--force` answers for them, and with nobody to ask and no
    * `--force` the run is refused. Either way the change carries the
    * {@link Consent} that answered, which {@link write} requires.
@@ -847,7 +847,7 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         consent: undefined,
       };
     } catch (error) {
-      if (!(error instanceof NoSignInLeftError)) {
+      if (!(error instanceof ZitadelConfigEditLockoutError)) {
         throw error;
       }
       const { question, retry, refusal } = await this.refusalOf(error, target, naming);
@@ -888,7 +888,7 @@ export abstract class AuthMethodDisableCommand extends Destructive(
    * @returns The question, the re-run and the refusal.
    */
   private async refusalOf(
-    error: NoSignInLeftError,
+    error: ZitadelConfigEditLockoutError,
     target: SchemaTarget,
     naming: Readonly<{ provider?: string }>,
   ) {

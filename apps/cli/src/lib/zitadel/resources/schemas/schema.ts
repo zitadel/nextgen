@@ -14,7 +14,7 @@ import {
   type DocumentStatus,
   type Edit,
 } from "@/lib/zitadel/resources/document";
-import { RefusedEditError } from "@/lib/zitadel/errors";
+import { ZitadelConfigEditRefusedError } from "@/lib/zitadel/errors";
 import {
   type ObjectType,
   objectType,
@@ -123,7 +123,7 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    *
    * @param file - The file.
    * @returns The schema, marked as read.
-   * @throws {@link BrokenFilesError} When the schema contract refuses the body.
+   * @throws {@link ZitadelConfigFileBrokenError} When the schema contract refuses the body.
    */
   static of(file: DocumentFile): UserSchema {
     return UserSchema.build(file, "read");
@@ -135,7 +135,7 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The schema, marked as created.
-   * @throws {@link BrokenFilesError} When the schema contract refuses the body.
+   * @throws {@link ZitadelConfigFileBrokenError} When the schema contract refuses the body.
    */
   static create(file: DocumentFile): UserSchema {
     return UserSchema.build(file, "created");
@@ -148,7 +148,7 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The schema.
-   * @throws {@link BrokenFilesError} When the schema contract refuses the body.
+   * @throws {@link ZitadelConfigFileBrokenError} When the schema contract refuses the body.
    */
   private static build(file: DocumentFile, status: DocumentStatus): UserSchema {
     return new UserSchema(file, UserSchema.parseFile(UserSchema.CONTRACT, file), status);
@@ -500,9 +500,9 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    * @param method - The method.
    * @returns The edit: the edited schema, or this one when the method is
    *   already on.
-   * @throws {@link RefusedEditError} When the schema points at an external
+   * @throws {@link ZitadelConfigEditRefusedError} When the schema points at an external
    *   schema, or password is switched on in a schema with no identifier.
-   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   * @throws {@link ZitadelConfigFileBrokenError} When the schema contract refuses the
    *   schema the edit makes.
    */
   withMethod(method: ToggleableMethod): Edit<UserSchema> {
@@ -511,7 +511,7 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
       return { document: this, changed: false, skipped: [] };
     }
     if (method === "password" && !this.hasIdentifier) {
-      throw new RefusedEditError(`${this.path} has no x-identifier for password`, {
+      throw new ZitadelConfigEditRefusedError(`${this.path} has no x-identifier for password`, {
         hint:
           "A password is checked against the user found by the schema's identifier. " +
           'Set "x-identifier" to the property users sign in with, e.g. "email", then run the command again.',
@@ -539,9 +539,9 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    * @param method - The method.
    * @returns The edit: the edited schema, or this one when the method is
    *   already off.
-   * @throws {@link RefusedEditError} When the schema points at an external
+   * @throws {@link ZitadelConfigEditRefusedError} When the schema points at an external
    *   schema, which holds its sign-in methods at its url.
-   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   * @throws {@link ZitadelConfigFileBrokenError} When the schema contract refuses the
    *   schema the edit makes.
    */
   withoutMethod(method: ToggleableMethod): Edit<UserSchema> {
@@ -571,9 +571,9 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    * @param slug - The provider.
    * @returns The edit: the edited schema, or this one when SSO is on and lists
    *   it.
-   * @throws {@link RefusedEditError} When the schema points at an external
+   * @throws {@link ZitadelConfigEditRefusedError} When the schema points at an external
    *   schema, which holds its sign-in methods at its url.
-   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   * @throws {@link ZitadelConfigFileBrokenError} When the schema contract refuses the
    *   schema the edit makes.
    */
   withProvider(slug: ConnectionSlug): Edit<UserSchema> {
@@ -605,9 +605,9 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    * @param slug - The provider.
    * @returns The edit: the edited schema, or this one when it does not list
    *   the provider.
-   * @throws {@link RefusedEditError} When the schema points at an external
+   * @throws {@link ZitadelConfigEditRefusedError} When the schema points at an external
    *   schema, which holds its sign-in methods at its url.
-   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   * @throws {@link ZitadelConfigFileBrokenError} When the schema contract refuses the
    *   schema the edit makes.
    */
   withoutProvider(slug: string): Edit<UserSchema> {
@@ -634,13 +634,13 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    * external schema, which holds them at its url: writing `x-auth-methods`
    * into the pointer file would change nothing the server reads.
    *
-   * @throws {@link RefusedEditError} When the schema is external.
+   * @throws {@link ZitadelConfigEditRefusedError} When the schema is external.
    */
   private assertMethodsEditable(): void {
     if (!this.isExternal) {
       return;
     }
-    throw new RefusedEditError(`${this.path} points at an external schema`, {
+    throw new ZitadelConfigEditRefusedError(`${this.path} points at an external schema`, {
       hint:
         "Its sign-in methods live in the schema at its url, which the server fetches. " +
         "Edit x-auth-methods there instead.",

@@ -2,7 +2,11 @@ import { basename } from "node:path";
 
 import { Change, type Notice } from "@/lib/zitadel/change";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
-import { AmbiguousSchemaError, NoSignInLeftError, SchemaNotFoundError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigSchemaAmbiguousError,
+  ZitadelConfigEditLockoutError,
+  ZitadelConfigSchemaMissingError,
+} from "@/lib/zitadel/errors";
 import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/rules/flows";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import {
@@ -58,9 +62,9 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * @param schema - The schema.
    * @param method - The method.
    * @returns The change.
-   * @throws {@link RefusedEditError} When the schema's methods are not the
+   * @throws {@link ZitadelConfigEditRefusedError} When the schema's methods are not the
    *   shape the edit writes, or password is enabled without an identifier.
-   * @throws {@link BrokenFlowsError} When a flow would stop validating.
+   * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow would stop validating.
    */
   enable(schema: UserSchema, method: ToggleableMethod): Change {
     const edited = schema.withMethod(method).document;
@@ -80,10 +84,10 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * @param method - The method.
    * @param options - Whether to leave the schema with no way to sign in.
    * @returns The change.
-   * @throws {@link RefusedEditError} When the schema's methods are not the
+   * @throws {@link ZitadelConfigEditRefusedError} When the schema's methods are not the
    *   shape the edit writes.
-   * @throws {@link BrokenFlowsError} When a flow still uses the method.
-   * @throws {@link NoSignInLeftError} When it is the last way to sign in and
+   * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow still uses the method.
+   * @throws {@link ZitadelConfigEditLockoutError} When it is the last way to sign in and
    *   `force` is not set.
    */
   disable(schema: UserSchema, method: ToggleableMethod, options: ForceOptions = {}): Change {
@@ -142,19 +146,19 @@ export class Schemas extends PinnedCollection<UserSchema> {
    *
    * @param requested - The name, if any.
    * @returns The schema.
-   * @throws {@link SchemaNotFoundError} When there is no schema at all, or
+   * @throws {@link ZitadelConfigSchemaMissingError} When there is no schema at all, or
    *   none has the name.
-   * @throws {@link AmbiguousSchemaError} When more than one schema fits, or
+   * @throws {@link ZitadelConfigSchemaAmbiguousError} When more than one schema fits, or
    *   there are several and no name is given.
    */
   resolve(requested?: string): UserSchema {
     const only = this.all[0];
     if (only === undefined) {
-      throw new SchemaNotFoundError(requested, this.all);
+      throw new ZitadelConfigSchemaMissingError(requested, this.all);
     }
     if (requested === undefined) {
       if (this.all.length > 1) {
-        throw new AmbiguousSchemaError(undefined, this.all);
+        throw new ZitadelConfigSchemaAmbiguousError(undefined, this.all);
       }
       return only;
     }
@@ -165,10 +169,10 @@ export class Schemas extends PinnedCollection<UserSchema> {
     });
     const match = matches[0];
     if (match === undefined) {
-      throw new SchemaNotFoundError(wanted, this.all);
+      throw new ZitadelConfigSchemaMissingError(wanted, this.all);
     }
     if (matches.length > 1) {
-      throw new AmbiguousSchemaError(wanted, matches);
+      throw new ZitadelConfigSchemaAmbiguousError(wanted, matches);
     }
     return match;
   }
@@ -203,7 +207,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * @param edit - The edit, made on this collection's configuration.
    * @param disabling - What it turns off: a method, or a provider.
    * @param force - Whether the caller asked for it anyway.
-   * @throws {@link NoSignInLeftError} When it leaves no way in and `force` is
+   * @throws {@link ZitadelConfigEditLockoutError} When it leaves no way in and `force` is
    *   not set.
    */
   assertSignInLeft(edit: SchemaEdit, disabling: string, force: boolean): void {
@@ -217,7 +221,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
       }
       return method !== "password" || schema.hasIdentifier;
     });
-    throw new NoSignInLeftError({
+    throw new ZitadelConfigEditLockoutError({
       path: schema.path,
       schema: schema.name,
       disabling,

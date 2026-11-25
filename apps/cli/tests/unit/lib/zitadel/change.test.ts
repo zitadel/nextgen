@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 import {
   Change,
   CONFIG_DIRECTORIES,
-  ConfigError,
+  ZitadelConfigError,
   DocumentChange,
-  FileExistsError,
+  ZitadelConfigFileExistsError,
   Policy,
   UserSchema,
   ZitadelConfig,
@@ -254,7 +254,7 @@ describe("Change.save", () => {
       },
     });
 
-    await expect(saving).rejects.toBeInstanceOf(FileExistsError);
+    await expect(saving).rejects.toBeInstanceOf(ZitadelConfigFileExistsError);
   });
 
   it("replaces a file a new document is put over", async () => {
@@ -289,7 +289,7 @@ describe("Change.save", () => {
 
     const saving = config.policies.put(NEW_PASSWORD).save(store);
 
-    await expect(saving).rejects.toBeInstanceOf(FileExistsError);
+    await expect(saving).rejects.toBeInstanceOf(ZitadelConfigFileExistsError);
   });
 
   it("replaces a document outside createOnly under overwrite", async () => {
@@ -329,7 +329,7 @@ describe("Change.save", () => {
       },
     });
 
-    await expect(saving).rejects.toBeInstanceOf(FileExistsError);
+    await expect(saving).rejects.toBeInstanceOf(ZitadelConfigFileExistsError);
   });
 });
 
@@ -350,7 +350,7 @@ describe("Change.check", () => {
 
     const checking = creating.check(store);
 
-    await expect(checking).rejects.toBeInstanceOf(FileExistsError);
+    await expect(checking).rejects.toBeInstanceOf(ZitadelConfigFileExistsError);
   });
 
   it("refuses a path that leads outside .zitadel/", async () => {
@@ -362,7 +362,7 @@ describe("Change.check", () => {
 
     const checking = creating.check(store);
 
-    await expect(checking).rejects.toBeInstanceOf(ConfigError);
+    await expect(checking).rejects.toBeInstanceOf(ZitadelConfigError);
   });
 
   it("writes nothing when it accepts", async () => {
@@ -381,7 +381,7 @@ describe("Change.check", () => {
 
     const saving = creating.save(store);
 
-    await expect(saving).rejects.toBeInstanceOf(FileExistsError);
+    await expect(saving).rejects.toBeInstanceOf(ZitadelConfigFileExistsError);
   });
 });
 

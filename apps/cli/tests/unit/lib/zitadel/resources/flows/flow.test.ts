@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Flow, RefusedEditError } from "@/lib/zitadel";
+import { Flow, ZitadelConfigEditRefusedError } from "@/lib/zitadel";
 import { stepName } from "@/lib/zitadel/names";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
@@ -652,7 +652,7 @@ describe("Flow.assertProviderEditable", () => {
       flow.assertProviderEditable();
     });
 
-    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditRefusedError);
     expect(error).toMatchObject({
       message: `${FLOW_PATH}: no step marks where a completed sign-in ends`,
     });

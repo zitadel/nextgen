@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ConfigError } from "@/lib/zitadel";
+import { ZitadelConfigError } from "@/lib/zitadel";
 import {
   isJsonObject,
   isJsonValue,
@@ -65,7 +65,7 @@ describe("toJsonObject", () => {
         return toJsonObject(value, "The flow");
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({ message: "The flow is not a JSON object" });
     },
   );

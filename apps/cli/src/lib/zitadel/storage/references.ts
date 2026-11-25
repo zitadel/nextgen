@@ -1,4 +1,4 @@
-import { ConfigError } from "@/lib/zitadel/errors";
+import { ZitadelConfigError, ZitadelConfigResourceMissingError } from "@/lib/zitadel/errors";
 import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 import type { MissingReference } from "@/lib/zitadel/storage/types";
 import { isJsonArray, isJsonObject } from "@/lib/zitadel/utils/json";
@@ -105,7 +105,7 @@ export function findFileReferences(document: JsonValue): readonly FoundReference
  * @param missing - `throw` to refuse a reference that cannot be read, `omit`
  *   to leave its value out (the key from an object, the element from a list).
  * @returns The document with its references inlined.
- * @throws {@link ConfigError} When a reference cannot be read, under `throw`.
+ * @throws {@link ZitadelConfigError} When a reference cannot be read, under `throw`.
  */
 export function inlineFileReferences(
   document: JsonObject,
@@ -117,7 +117,7 @@ export function inlineFileReferences(
    *
    * @param node - The value.
    * @returns The inlined value, or {@link omitted} for a reference left out.
-   * @throws {@link ConfigError} When a reference cannot be read, under `throw`.
+   * @throws {@link ZitadelConfigError} When a reference cannot be read, under `throw`.
    */
   const inline = (node: JsonValue | undefined): JsonValue | undefined | typeof omitted => {
     const ref = referenceIn(node);
@@ -129,7 +129,7 @@ export function inlineFileReferences(
       if (missing === "omit") {
         return omitted;
       }
-      throw new ConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
+      throw new ZitadelConfigResourceMissingError(`$file ${JSON.stringify(ref)} cannot be read`, {
         hint: "Create the referenced file or fix the path.",
       });
     }
@@ -166,8 +166,8 @@ export function inlineFileReferences(
  * @param ref - The reference as written.
  * @returns The error to throw.
  */
-export function outsideProject(ref: string): ConfigError {
-  return new ConfigError(`$file ${JSON.stringify(ref)} points outside the project`, {
+export function outsideProject(ref: string): ZitadelConfigError {
+  return new ZitadelConfigError(`$file ${JSON.stringify(ref)} points outside the project`, {
     hint:
       "Keep referenced files inside the project, next to the file that references them; " +
       "a symlink on the way must resolve inside the project too.",
@@ -187,8 +187,8 @@ export const CONFIG_ROOT = ".zitadel";
  * @param path - The project-relative path as given.
  * @returns The error to throw.
  */
-export function outsideConfig(path: string): ConfigError {
-  return new ConfigError(`${path} points outside ${CONFIG_ROOT}/`, {
+export function outsideConfig(path: string): ZitadelConfigError {
+  return new ZitadelConfigError(`${path} points outside ${CONFIG_ROOT}/`, {
     hint: "Files are only written and removed inside .zitadel/.",
     details: { file: path },
   });

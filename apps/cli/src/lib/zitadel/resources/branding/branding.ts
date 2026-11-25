@@ -14,7 +14,7 @@ import {
   type ReadableFile,
   type DocumentStatus,
 } from "@/lib/zitadel/resources/document";
-import { ConfigError } from "@/lib/zitadel/errors";
+import { ZitadelConfigError } from "@/lib/zitadel/errors";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
@@ -77,7 +77,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
    *
    * @param file - The file.
    * @returns The descriptor, marked as read.
-   * @throws {@link BrokenFilesError} When the branding contract refuses the body.
+   * @throws {@link ZitadelConfigFileBrokenError} When the branding contract refuses the body.
    */
   static of(file: DocumentFile): Branding {
     return Branding.build(file, "read");
@@ -89,7 +89,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The descriptor, marked as created.
-   * @throws {@link BrokenFilesError} When the branding contract refuses the body.
+   * @throws {@link ZitadelConfigFileBrokenError} When the branding contract refuses the body.
    */
   static create(file: DocumentFile): Branding {
     return Branding.build(file, "created");
@@ -102,7 +102,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The descriptor.
-   * @throws {@link BrokenFilesError} When the branding contract refuses the body.
+   * @throws {@link ZitadelConfigFileBrokenError} When the branding contract refuses the body.
    */
   private static build(file: DocumentFile, status: DocumentStatus): Branding {
     return new Branding(file, Branding.parseFile(Branding.CONTRACT, file), status);
@@ -122,7 +122,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
    *   the template checks are skipped.
    * @returns The `branding/template-file` or `branding/template` findings;
    *   none when the descriptor is sound.
-   * @throws Whatever reading a reference throws that is not a {@link ConfigError}.
+   * @throws Whatever reading a reference throws that is not a {@link ZitadelConfigError}.
    */
   override check(context: ValidationContext): readonly Issue[] {
     if (context.store === undefined) {
@@ -141,7 +141,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
           return this.makeIssue("branding/template", `template ${issue.rule}: ${issue.message}`);
         });
     } catch (error) {
-      if (!(error instanceof ConfigError)) {
+      if (!(error instanceof ZitadelConfigError)) {
         throw error;
       }
       return [this.makeIssue("branding/template-file", error.message)];
@@ -233,7 +233,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
    *
    * @param store - Where the referenced file is read from.
    * @returns The template, or `undefined` when the descriptor has none.
-   * @throws {@link ConfigError} When a reference names a file that cannot be read.
+   * @throws {@link ZitadelConfigError} When a reference names a file that cannot be read.
    */
   private readTemplate(store: ConfigStore): string | undefined {
     const template = this.value.liquid_template;

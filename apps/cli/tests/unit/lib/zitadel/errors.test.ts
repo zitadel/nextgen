@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  BrokenFilesError,
-  BrokenFlowsError,
+  ZitadelConfigFileBrokenError,
+  ZitadelConfigDeployBlockedError,
+  ZitadelConfigEditBreaksFlowsError,
   CONFIG_DIRECTORIES,
-  ConflictError,
-  ConnectionExistsError,
-  FileExistsError,
-  NoSignInLeftError,
+  ZitadelConfigConnectionExistsError,
+  ZitadelConfigFileExistsError,
+  ZitadelConfigEditLockoutError,
+  ZitadelConfigFileUnreadableError,
+  ZitadelConfigInternalError,
 } from "@/lib/zitadel";
 import { stepName } from "@/lib/zitadel/names";
 import type { IncomingTransition } from "@/lib/zitadel/resources/flows/types";
@@ -105,7 +107,7 @@ const STAYING: readonly IncomingTransition[] = [
 function refusalOf(
   issues: readonly FlowIssue[],
   uses?: readonly FlowMethodUse[],
-): BrokenFlowsError {
+): ZitadelConfigEditBreaksFlowsError {
   const refused = {
     file: SCHEMA_PATH,
     heading: "A login flow would stop validating after this change:",
@@ -113,12 +115,12 @@ function refusalOf(
     issues,
   };
   if (uses === undefined) {
-    return new BrokenFlowsError({ ...refused, kind: "broken" });
+    return new ZitadelConfigEditBreaksFlowsError({ ...refused, kind: "broken" });
   }
-  return new BrokenFlowsError({ ...refused, kind: "method-in-use", uses });
+  return new ZitadelConfigEditBreaksFlowsError({ ...refused, kind: "method-in-use", uses });
 }
 
-describe("BrokenFlowsError", () => {
+describe("ZitadelConfigEditBreaksFlowsError", () => {
   it("lists each issue under the heading as the flow rules word it", () => {
     const error = refusalOf([issueOn("password", 'step "password": no such field')]);
 
@@ -261,15 +263,15 @@ describe("BrokenFlowsError", () => {
   });
 });
 
-describe("NoSignInLeftError", () => {
+describe("ZitadelConfigEditLockoutError", () => {
   it("names the schema that would have no way to sign in", () => {
-    const error = new NoSignInLeftError(NO_SIGN_IN_LEFT);
+    const error = new ZitadelConfigEditLockoutError(NO_SIGN_IN_LEFT);
 
     expect(error.message).toBe(`${SCHEMA_PATH} would have no way to sign in left`);
   });
 
   it("names the schema, what it enabled and its alternatives in its details", () => {
-    const error = new NoSignInLeftError(NO_SIGN_IN_LEFT);
+    const error = new ZitadelConfigEditLockoutError(NO_SIGN_IN_LEFT);
 
     expect(error.details).toEqual({
       file: SCHEMA_PATH,
@@ -279,9 +281,9 @@ describe("NoSignInLeftError", () => {
   });
 });
 
-describe("BrokenFilesError", () => {
+describe("ZitadelConfigFileBrokenError", () => {
   it("counts a file once however many problems it has", () => {
-    const error = new BrokenFilesError([
+    const error = new ZitadelConfigFileBrokenError([
       { path: ".zitadel/idps/acme.json", problem: "protocol is missing" },
       { path: ".zitadel/idps/acme.json", problem: "name is missing" },
     ]);
@@ -290,7 +292,7 @@ describe("BrokenFilesError", () => {
   });
 
   it("counts each file that has a problem", () => {
-    const error = new BrokenFilesError([
+    const error = new ZitadelConfigFileBrokenError([
       { path: ".zitadel/idps/acme.json", problem: "protocol is missing" },
       { path: ".zitadel/idps/other.json", problem: "protocol is missing" },
     ]);
@@ -299,7 +301,7 @@ describe("BrokenFilesError", () => {
   });
 
   it("lists every problem, one to a line", () => {
-    const error = new BrokenFilesError([
+    const error = new ZitadelConfigFileBrokenError([
       { path: ".zitadel/idps/acme.json", problem: "protocol is missing" },
       { path: ".zitadel/idps/acme.json", problem: "name is missing" },
     ]);
@@ -311,54 +313,84 @@ describe("BrokenFilesError", () => {
   });
 });
 
-describe("ConnectionExistsError", () => {
+describe("ZitadelConfigConnectionExistsError", () => {
   it("is a conflict", () => {
-    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
 
-    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ category: "conflict" });
   });
 
   it("says the connection file is already there", () => {
-    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.message).toBe(`${GOOGLE_PATH} already exists`);
   });
 
   it("never offers to replace the file", () => {
-    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.hint).not.toContain("--force");
   });
 
   it("names the file in its details", () => {
-    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.details).toEqual({ file: GOOGLE_PATH });
   });
 
   it("keeps the provider as it was chosen", () => {
-    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.selection).toBe(googleSelection);
   });
 });
 
-describe("FileExistsError", () => {
+describe("ZitadelConfigFileExistsError", () => {
   it("is a conflict", () => {
-    const error = new FileExistsError(GOOGLE_PATH);
+    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH);
 
-    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ category: "conflict" });
   });
 
   it("names no flag, as not every command that writes a file has one", () => {
-    const error = new FileExistsError(GOOGLE_PATH);
+    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH);
 
     expect(error.hint).not.toContain("--");
   });
 
   it("names the file in its details", () => {
-    const error = new FileExistsError(GOOGLE_PATH);
+    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH);
 
     expect(error.details).toEqual({ file: GOOGLE_PATH });
+  });
+});
+
+describe("ZitadelConfigFileUnreadableError", () => {
+  it("is an auth failure", () => {
+    expect(new ZitadelConfigFileUnreadableError("x.json cannot be read")).toMatchObject({
+      category: "auth",
+    });
+  });
+});
+
+describe("ZitadelConfigDeployBlockedError", () => {
+  it("is a precondition when there is nothing to deploy", () => {
+    expect(new ZitadelConfigDeployBlockedError("empty", "nothing here")).toMatchObject({
+      category: "precondition",
+      reason: "empty",
+    });
+  });
+
+  it("is a validation failure when there is too much to deploy", () => {
+    expect(new ZitadelConfigDeployBlockedError("too-large", "too many")).toMatchObject({
+      category: "validation",
+      reason: "too-large",
+    });
+  });
+});
+
+describe("ZitadelConfigInternalError", () => {
+  it("is an internal failure", () => {
+    expect(new ZitadelConfigInternalError("not an object")).toMatchObject({ category: "internal" });
   });
 });

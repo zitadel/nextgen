@@ -8,7 +8,7 @@
  * The configuration is kept in a {@link ConfigStore}: {@link DiskStore} for a
  * project's files. A file its contract refuses is a {@link BrokenFile}, never a
  * document. Nothing in this module prints or knows the command line. It fails
- * only with a {@link ConfigError}, and depends on nothing else under `lib/`.
+ * only with a {@link ZitadelConfigError}, and depends on nothing else under `lib/`.
  */
 export {
   BRANDING_DESIGN_INFO,
@@ -53,23 +53,26 @@ export type {
   SkippedRegion,
 } from "@/lib/zitadel/resources/document";
 export {
-  AmbiguousSchemaError,
-  BrokenFilesError,
-  BrokenFlowsError,
-  ClientIdMismatchError,
-  ConfigError,
-  ConflictError,
-  ConnectionExistsError,
-  FileExistsError,
-  InvalidHandleError,
-  NoSignInLeftError,
-  NotFoundError,
-  NotOidcConnectionError,
-  RefusedEditError,
-  SchemaNotFoundError,
-  UnusableSettingError,
+  ZitadelConfigSchemaAmbiguousError,
+  ZitadelConfigFileBrokenError,
+  ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigConnectionClientIdError,
+  ZitadelConfigDeployBlockedError,
+  ZitadelConfigError,
+  ZitadelConfigFileUnreadableError,
+  ZitadelConfigInternalError,
+  ZitadelConfigResourceClashError,
+  ZitadelConfigConnectionExistsError,
+  ZitadelConfigFileExistsError,
+  ZitadelConfigHandleInvalidError,
+  ZitadelConfigEditLockoutError,
+  ZitadelConfigResourceMissingError,
+  ZitadelConfigConnectionNotOidcError,
+  ZitadelConfigEditRefusedError,
+  ZitadelConfigSchemaMissingError,
+  ZitadelConfigConnectionUnusableError,
   type BrokenFlows,
-  type ConfigErrorOptions,
+  type ZitadelConfigErrorOptions,
   type FileProblem,
   type NoSignInLeft,
 } from "@/lib/zitadel/errors";

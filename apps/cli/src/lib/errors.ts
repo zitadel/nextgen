@@ -4,12 +4,7 @@ import { BackendError, BackendUnavailableError, type BackendUnavailableReason } 
 import { type Categorized, ERROR_CATEGORIES, type ErrorCategory } from "@/constants";
 import { isObject } from "./json";
 import type { Suggested } from "./suggestion";
-import {
-  ConflictError as ConfigConflictError,
-  ConfigError,
-  BrokenFlowsError,
-  NotFoundError as ConfigNotFoundError,
-} from "./zitadel";
+import { ZitadelConfigError, ZitadelConfigEditBreaksFlowsError } from "./zitadel";
 
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
@@ -186,19 +181,13 @@ const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
  * @param error - The error.
  * @returns The code it is reported with.
  */
-function configErrorCode(error: ConfigError): ZitadelErrorCode {
+function configErrorCode(error: ZitadelConfigError): ZitadelErrorCode {
   const errno = error.details?.code;
   if (errno === "EACCES" || errno === "EPERM") {
     return "E_AUTH";
   }
-  if (error instanceof ConfigConflictError) {
-    return "E_CONFLICT";
-  }
-  if (error instanceof ConfigNotFoundError) {
-    return "E_NOT_FOUND";
-  }
 
-  return "E_VALIDATION";
+  return CATEGORY_CODES[error.category];
 }
 
 /**
@@ -293,11 +282,12 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   // Configuration that cannot be read or edited as asked is the developer's
   // to fix, with the hint and details the configuration library gave.
-  if (error instanceof ConfigError) {
+  if (error instanceof ZitadelConfigError) {
     return new ZitadelError(configErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
-      ...(error instanceof BrokenFlowsError && error.hint?.includes("deploy --dry-run")
+      ...(error instanceof ZitadelConfigEditBreaksFlowsError &&
+      error.hint?.includes("deploy --dry-run")
         ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
         : {}),
     });

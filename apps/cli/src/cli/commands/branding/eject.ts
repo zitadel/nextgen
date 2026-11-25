@@ -28,7 +28,7 @@ import {
   BRANDING_DESIGN_INFO,
   CONFIG_DIRECTORIES,
   DiskStore,
-  FileExistsError,
+  ZitadelConfigFileExistsError,
   PAGE_LAYOUT_HINT,
   RETIRED_BRANDING_DESIGNS,
   ZitadelConfig,
@@ -309,7 +309,7 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
         );
       }
     } catch (error) {
-      if (error instanceof FileExistsError) {
+      if (error instanceof ZitadelConfigFileExistsError) {
         throw new ZitadelError("E_CONFLICT", error.message, {
           hint: "Rerun with --force to replace it, or edit the existing file directly.",
           nextCommands: [await this.again("branding:eject", { with: { design, force: true } })],

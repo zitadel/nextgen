@@ -25,7 +25,7 @@ import {
   CONFIG_DIRECTORIES,
   Connection,
   DiskStore,
-  FileExistsError,
+  ZitadelConfigFileExistsError,
   SignupPolicy,
 } from "@/lib/zitadel";
 
@@ -179,7 +179,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
             await store.writeText(path, text, "create");
             return [path];
           } catch (error) {
-            if (error instanceof FileExistsError) {
+            if (error instanceof ZitadelConfigFileExistsError) {
               return [];
             }
             throw error;

@@ -1,5 +1,5 @@
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
-import { FileExistsError } from "@/lib/zitadel/errors";
+import { ZitadelConfigFileExistsError } from "@/lib/zitadel/errors";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
 import type { ConfigFile } from "@/lib/zitadel/types";
 
@@ -133,7 +133,7 @@ export type ChangeInput = {
  * Every edit returns one, whatever it edits: a collection's `put` and
  * `remove` for a single document, and operations such as
  * `config.connections.enable` that edit several files together. An operation
- * refuses, with a {@link ConfigError}, anything it cannot do, so a change that
+ * refuses, with a {@link ZitadelConfigError}, anything it cannot do, so a change that
  * exists is one that can be written. Nothing is written until {@link save}.
  */
 export class Change {
@@ -265,9 +265,9 @@ export class Change {
    *   which documents never may.
    * @returns The paths written, not those deleted, which
    *   {@link Change.removedPaths} lists.
-   * @throws {@link FileExistsError} When a new file is already on disk and
+   * @throws {@link ZitadelConfigFileExistsError} When a new file is already on disk and
    *   may not be replaced.
-   * @throws {@link ConfigError} When any path to write or delete leads
+   * @throws {@link ZitadelConfigError} When any path to write or delete leads
    *   outside `.zitadel/`; nothing is written or deleted then.
    */
   async save(store: ConfigStore, options: SaveOptions = {}): Promise<readonly string[]> {
@@ -294,9 +294,9 @@ export class Change {
    * @param store - Where the configuration is kept.
    * @param options - Whether a new file may replace one already there, and
    *   which documents never may.
-   * @throws {@link FileExistsError} When a new file is already on disk and
+   * @throws {@link ZitadelConfigFileExistsError} When a new file is already on disk and
    *   may not be replaced.
-   * @throws {@link ConfigError} When any path to write or delete leads
+   * @throws {@link ZitadelConfigError} When any path to write or delete leads
    *   outside `.zitadel/`.
    */
   async check(store: ConfigStore, options: SaveOptions = {}): Promise<void> {
@@ -311,9 +311,9 @@ export class Change {
    * @param options - Whether a new file may replace one already there, and
    *   which documents never may.
    * @returns The writes, creating ones first.
-   * @throws {@link FileExistsError} When a new file is already on disk and
+   * @throws {@link ZitadelConfigFileExistsError} When a new file is already on disk and
    *   may not be replaced.
-   * @throws {@link ConfigError} When any path to write or delete leads
+   * @throws {@link ZitadelConfigError} When any path to write or delete leads
    *   outside `.zitadel/`.
    */
   private async verified(
@@ -370,7 +370,7 @@ export class Change {
     // refuses with nothing touched, not after the files before it.
     for (const write of writes) {
       if (write.mode === "create" && (await store.exists(write.path))) {
-        throw new FileExistsError(write.path);
+        throw new ZitadelConfigFileExistsError(write.path);
       }
     }
     return writes;

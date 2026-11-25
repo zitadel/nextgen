@@ -58,9 +58,9 @@ import { tryCatch } from "@/lib/try-catch";
 import type { Questions, Spinner, Step, Ui } from "@/lib/ui";
 import {
   CONFIG_DIRECTORIES,
-  ConnectionExistsError,
+  ZitadelConfigConnectionExistsError,
   DiskStore,
-  FileExistsError,
+  ZitadelConfigFileExistsError,
   PasswordPolicy,
   type PasswordMinLength,
   type Scaffold,
@@ -856,10 +856,10 @@ export function setupRefusal(
   error: unknown,
   connections: readonly ScaffoldedConnection[],
 ): unknown {
-  if (error instanceof ConnectionExistsError) {
+  if (error instanceof ZitadelConfigConnectionExistsError) {
     return connectionRefusal(error.path, error.selection);
   }
-  if (!(error instanceof FileExistsError)) {
+  if (!(error instanceof ZitadelConfigFileExistsError)) {
     return error;
   }
   const planned = connections.find((scaffolded) => {
