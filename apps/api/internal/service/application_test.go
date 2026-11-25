@@ -470,6 +470,121 @@ func TestApplicationService_Client(t *testing.T) {
 	}
 }
 
+// A registered client passes with any of its stored secrets, so it keeps
+// working while its secret is rotated.
+func TestApplicationService_AuthenticateRegisteredClient(t *testing.T) {
+	t.Parallel()
+	row := &domain.ApplicationClient{ApplicationID: "app_1", ID: "appcl_1", Slug: "web", ClientID: "shop-web"}
+	stored := []*domain.ApplicationClientSecret{
+		{ApplicationClientID: "appcl_1", SecretHash: domain.HashSecret("older")},
+		{ApplicationClientID: "appcl_1", SecretHash: domain.HashSecret("newer")},
+	}
+	tests := []struct {
+		name       string
+		secret     string
+		rowErr     error
+		secretsErr error
+		// document replaces the stored one when set.
+		document []byte
+		wantErr  error
+	}{
+		{name: "newest_secret", secret: "newer"},
+		{name: "older_secret", secret: "older"},
+		{name: "wrong_secret", secret: "wrong", wantErr: domain.ErrApplicationClientSecretInvalid()},
+		{name: "empty_secret", wantErr: domain.ErrApplicationClientSecretInvalid()},
+		{
+			// application.json allows no public client yet; one holds no secret
+			// to check.
+			name:     "public_client",
+			secret:   "newer",
+			document: shopDocument(`{"slug":"web","client_id":"shop-web","type":"public","grant_types":["authorization_code"],"redirect_uris":["https://shop.example.com/callback"]}`),
+			wantErr:  domain.ErrApplicationClientSecretInvalid(),
+		},
+		{name: "unknown_client", secret: "newer", rowErr: database.NewNoRowFoundError(nil), wantErr: domain.ErrApplicationClientNotFound()},
+		{name: "lookup_unavailable", secret: "newer", rowErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
+		{name: "secrets_unavailable", secret: "newer", secretsErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
+		{name: "secrets_fail", secret: "newer", secretsErr: errors.New("boom"), wantErr: domain.ErrInternal(nil)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newApplicationFixture(t)
+			f.pool.EXPECT().GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-web").Return(row, tt.rowErr)
+			if tt.rowErr == nil {
+				app := storedShop()
+				if tt.document != nil {
+					app.Document = tt.document
+				}
+				f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(app, nil)
+			}
+			if tt.secret != "" && tt.rowErr == nil && tt.document == nil {
+				f.pool.EXPECT().ListApplicationClientSecrets(gomock.Any(), appProjectID, "appcl_1").Return(stored, tt.secretsErr)
+			}
+
+			// The deployment is not read for a registered client: the strict mock
+			// fails on any call it does not expect.
+			got, err := f.svc.AuthenticateClient(t.Context(), appProjectID, "dep_1", "shop-web", tt.secret)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "web", got.Document.Slug)
+			assert.Equal(t, row, got.Stored)
+		})
+	}
+}
+
+// A declared client is served only by the deployment the caller names. Each
+// way that deployment fails to serve it is an answer that means "no", except
+// a read that failed.
+func TestApplicationService_AuthenticateDeclaredClientRefusals(t *testing.T) {
+	t.Parallel()
+	deployment := &domain.Deployment{ProjectID: appProjectID, ID: "dep_1", ReleaseID: "rel_1"}
+	pinned := &domain.Release{ID: "rel_1", Pointers: []domain.ReleasePointer{{
+		Kind: domain.ReleasePointerKindApplication, Handle: "shop", RevisionID: "apprev_1",
+	}}}
+	tests := []struct {
+		name         string
+		deploymentID string
+		// deploymentErr, release and releaseErr answer the reads of a named
+		// deployment.
+		deploymentErr error
+		release       *domain.Release
+		wantErr       error
+	}{
+		{name: "no_deployment", wantErr: domain.ErrReleaseNotDeployed(nil)},
+		// GetDeploymentByID reads within the project, so another project's
+		// deployment is not found either.
+		{name: "unknown_deployment", deploymentID: "dep_1", deploymentErr: database.NewNoRowFoundError(nil), wantErr: domain.ErrDeploymentNotFound()},
+		{name: "deployment_unavailable", deploymentID: "dep_1", deploymentErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
+		{name: "deployment_read_fails", deploymentID: "dep_1", deploymentErr: errors.New("boom"), wantErr: domain.ErrInternal(nil)},
+		{name: "release_revoked", deploymentID: "dep_1", release: &domain.Release{ID: "rel_1", RevokedAt: new(time.Now()), Pointers: pinned.Pointers}, wantErr: domain.ErrReleaseRevoked()},
+		{name: "release_does_not_pin_the_application", deploymentID: "dep_1", release: &domain.Release{ID: "rel_1"}, wantErr: domain.ErrApplicationClientNotFound()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newApplicationFixture(t)
+			f.pool.EXPECT().
+				GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-web").
+				Return(&domain.ApplicationClient{ApplicationID: "app_1", Slug: "web", ClientID: "shop-web"}, nil)
+			f.pool.EXPECT().
+				GetApplication(gomock.Any(), gomock.Any()).
+				Return(&domain.Application{ProjectID: appProjectID, ID: "app_1", Slug: "shop", IsDeclared: true}, nil)
+			if tt.deploymentID != "" {
+				f.pool.EXPECT().GetDeploymentByID(gomock.Any(), appProjectID, tt.deploymentID).Return(deployment, tt.deploymentErr)
+			}
+			if tt.release != nil {
+				f.pool.EXPECT().GetReleaseByID(gomock.Any(), appProjectID, "rel_1").Return(tt.release, nil)
+			}
+
+			_, err := f.svc.AuthenticateClient(t.Context(), appProjectID, tt.deploymentID, "shop-web", "s3cr3t")
+			assert.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestApplicationService_ClientUsesDeploymentReleaseForDeclaredApplication(t *testing.T) {
 	t.Parallel()
 	f := newApplicationFixture(t)

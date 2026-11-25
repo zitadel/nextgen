@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"crypto/subtle"
 	"errors"
@@ -48,13 +49,15 @@ type ApplicationService interface {
 	// ctx: a registered application at its newest revision, a declared one at
 	// the revision the request's release pins (ADR 082 §3).
 	ServedClient(ctx context.Context, projectID, clientID string) (*ServedApplicationClient, error)
-	// AuthenticateClient is [ApplicationService.ServedClient] for a client that
+	// AuthenticateClient is [ApplicationService.Client] for a client that
 	// presents secret: a registered client's must match one of its stored
 	// hashes, a declared one's the variable its `secret` names, as the
-	// request's deployment froze it. Errors: those of Client, and
-	// app.client_secret_invalid when the client is not confidential or the
-	// secret does not match.
-	AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*ServedApplicationClient, error)
+	// deployment froze it. A declared client is served by the deployment on
+	// ctx, or else by deploymentID, which a registered client ignores. Errors:
+	// those of Client, app.client_secret_invalid when the client is not
+	// confidential or the secret does not match, and dep.not_found when
+	// deploymentID names no deployment of the project.
+	AuthenticateClient(ctx context.Context, projectID, deploymentID, clientID, secret string) (*ServedApplicationClient, error)
 }
 
 type applicationService struct {
@@ -718,6 +721,11 @@ func (s *applicationService) servedClient(ctx context.Context, projectID, deploy
 			}
 			if resolution == nil || resolution.Deployment == nil || resolution.Release == nil {
 				deployment, err := stmts.GetDeploymentByID(ctx, projectID, deploymentID)
+				// The token endpoint takes deploymentID from the caller's code, so a
+				// deployment the project does not have is an answer, not a fault.
+				if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+					return nil, domain.ErrDeploymentNotFound()
+				}
 				if err != nil {
 					return nil, applicationReadError(err)
 				}
@@ -760,11 +768,11 @@ func (s *applicationService) servedClient(ctx context.Context, projectID, deploy
 	return &ServedApplicationClient{Application: entity, Document: doc.Clients[i], Stored: stored}, nil
 }
 
-func (s *applicationService) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (_ *ServedApplicationClient, err error) {
+func (s *applicationService) AuthenticateClient(ctx context.Context, projectID, deploymentID, clientID, secret string) (_ *ServedApplicationClient, err error) {
 	ctx, end := startSpan(ctx, "ApplicationService.AuthenticateClient")
 	defer end(&err)
 
-	served, err := s.ServedClient(ctx, projectID, clientID)
+	served, err := s.servedClient(ctx, projectID, deploymentID, clientID)
 	if err != nil {
 		return nil, err
 	}
@@ -776,7 +784,7 @@ func (s *applicationService) AuthenticateClient(ctx context.Context, projectID, 
 		if !ok {
 			return nil, domain.ErrApplicationClientSecretInvalid()
 		}
-		want, err := secretVariable(ctx, s.variables, decrypterOfWritingKey(ctx, s.keys), projectID, sealedDeploymentID(ctx), name)
+		want, err := secretVariable(ctx, s.variables, decrypterOfWritingKey(ctx, s.keys), projectID, cmp.Or(sealedDeploymentID(ctx), deploymentID), name)
 		if err != nil {
 			return nil, err
 		}

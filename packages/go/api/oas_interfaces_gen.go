@@ -49,6 +49,10 @@ type AuthRequestCreatedRes interface {
 	authRequestCreatedRes()
 }
 
+type AuthRequestExchangeFailedRes interface {
+	authRequestExchangeFailedRes()
+}
+
 type AuthSsoAuthorizationFailedRes interface {
 	authSsoAuthorizationFailedRes()
 }

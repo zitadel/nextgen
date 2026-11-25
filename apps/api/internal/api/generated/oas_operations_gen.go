@@ -124,6 +124,7 @@ const (
 	AuthFactorPasskeyEnrolledOperation       OperationName = "AuthFactorPasskeyEnrolled"
 	AuthFactorPasswordSetOperation           OperationName = "AuthFactorPasswordSet"
 	AuthRequestCreatedOperation              OperationName = "AuthRequestCreated"
+	AuthRequestExchangeFailedOperation       OperationName = "AuthRequestExchangeFailed"
 	AuthSsoAuthorizationFailedOperation      OperationName = "AuthSsoAuthorizationFailed"
 	AuthSsoExchangeFailedOperation           OperationName = "AuthSsoExchangeFailed"
 	AuthSsoExchangeSucceededOperation        OperationName = "AuthSsoExchangeSucceeded"

@@ -39,6 +39,7 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeAuthCheckFailed:                "internal/service",
 	domain.EventTypeAuthCheckSucceeded:             "internal/service",
 	domain.EventTypeAuthRequestCreated:             "internal/service",
+	domain.EventTypeAuthRequestExchangeFailed:      "internal/service",
 	domain.EventTypeAuthSSOAuthorizationFailed:     "internal/service",
 	domain.EventTypeAuthSSOExchangeSucceeded:       "internal/service",
 	domain.EventTypeAuthSSOExchangeFailed:          "internal/service",

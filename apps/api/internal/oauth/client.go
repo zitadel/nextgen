@@ -8,19 +8,35 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
-// ClientResolver finds a client among the project's registered applications
-// only, for now (ADR 082 §3). An unknown client is
-// [domain.ErrApplicationNotFound].
+// ClientResolver finds a client of the project's applications (ADR 082 §3):
+// a registered application at its newest revision, a declared one at the
+// revision the serving release pins. An unknown client is
+// [domain.ErrApplicationClientNotFound], and a client of a revoked release is
+// [domain.ErrReleaseRevoked].
 type ClientResolver interface {
+	// Client finds the client for the release of deploymentID.
 	Client(ctx context.Context, projectID, deploymentID, clientID string) (domain.ApplicationClientDocument, error)
+	// AuthenticateClient finds the client when it is confidential and secret
+	// is its secret: one of a registered client's stored secrets, or the
+	// variable a declared client names in the deployment that serves it. That
+	// deployment is the one on ctx, or else deploymentID, which a registered
+	// client ignores. A public client, or a wrong or empty secret, is
+	// [domain.ErrApplicationClientSecretInvalid]. A declared client with no
+	// deployment is [domain.ErrReleaseNotDeployed], and one whose
+	// deploymentID the project does not have is
+	// [domain.ErrDeploymentNotFound].
+	AuthenticateClient(ctx context.Context, projectID, deploymentID, clientID, secret string) (*service.ServedApplicationClient, error)
 }
 
-// client is a client as the library reads it, for one authorization request.
+// client is a client as the library reads it, for one request.
 // Phase 1 has only confidential web clients on the authorization code grant.
 type client struct {
-	id           string
+	id string
+	// projectID is the project a token request authenticated the client in.
+	projectID    string
 	redirectURIs []string
 	grantTypes   []oidc.GrantType
 	// settings are the issuer's, read when the client was resolved, so
