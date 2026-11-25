@@ -4,8 +4,8 @@ Integrates Zitadel auth into a SvelteKit app. Like Next and Nuxt, SvelteKit prox
 verifies the session server-side — here through the `createZitadelHandle` hook from
 `@zitadel/sdk-sveltekit`.
 
-The detector requires `@sveltejs/kit` 3 or newer (for `$app/env/private`) and `svelte` 5 or newer (the widgets come
-from `@zitadel/sdk-svelte`, which is written with runes); older versions are refused.
+The detector requires `@sveltejs/kit` 3 or newer (for `$app/env/private`) and `svelte` 5 or newer (the widgets are
+`@zitadel/sdk-svelte`, re-exported by `@zitadel/sdk-sveltekit/components`, and are written with runes); older versions are refused.
 
 ## What it patches
 
@@ -19,13 +19,14 @@ from `@zitadel/sdk-svelte`, which is written with runes); older versions are ref
 - `src/routes/+layout.svelte` — dark surface for every page
 - `src/routes/+page.svelte`, `src/routes/login/+page.svelte`,
   `src/routes/register/+page.svelte`, `src/routes/profile/+page.svelte` — landing and
-  auth pages, rendering `<ZitadelLogin>` and `<ZitadelSession>` from `@zitadel/sdk-svelte`
+  auth pages, rendering `<ZitadelLogin>` and `<ZitadelSession>` from `@zitadel/sdk-sveltekit/components`
   on the client only
 - `.env.example`, `.env.local` — `VITE_ZITADEL_PROJECT_ID` (client-exposed), plus
   the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_PROJECT_ID`,
   `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`,
   `ZITADEL_ENVIRONMENT`)
-- `package.json` — adds `@zitadel/sdk-sveltekit` and `@zitadel/sdk-svelte`, and pins the
+- `package.json` — adds `@zitadel/sdk-sveltekit` and `@zitadel/sdk-svelte` (the Svelte Vite plugin finds the
+  library to compile in the app's own `package.json`), and pins the
   dev script to the registered port with `--strictPort` (an edit eject cannot revert)
 
 No config file is edited: the hook is a plain file, so every managed file carries the marker.

@@ -5,8 +5,8 @@ proxies and verifies the session server-side — here through the `createZitadel
 plugin from `@zitadel/sdk-qwik-router`.
 
 The detector requires `@qwik.dev/core` and `@qwik.dev/router` at `2.0.0-beta.45` or newer.
-A Qwik 1 app (`@builder.io/qwik-city`) is not matched, because the `@zitadel/sdk-qwik`
-widgets need Qwik 2.
+A Qwik 1 app (`@builder.io/qwik-city`) is not matched, because the widgets of
+`@zitadel/sdk-qwik`, which `@zitadel/sdk-qwik-router/components` re-exports, need Qwik 2.
 
 ## What it patches
 
@@ -15,13 +15,14 @@ widgets need Qwik 2.
   `/profile` to `/login`
 - `src/routes/index.tsx`, `src/routes/login/index.tsx`, `src/routes/register/index.tsx`,
   `src/routes/profile/index.tsx` — landing and auth pages, rendering `<ZitadelLogin>` and
-  `<ZitadelSession>` from `@zitadel/sdk-qwik`
+  `<ZitadelSession>` from `@zitadel/sdk-qwik-router/components`
 - `.env.example`, `.env.local` — `PUBLIC_ZITADEL_PROJECT_ID` (client-exposed), plus
   the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_PROJECT_ID`,
   `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`,
   `ZITADEL_ENVIRONMENT`)
 - `package.json` — adds `@zitadel/sdk-qwik-router` and `@zitadel/sdk-qwik` as
-  `devDependencies` (Qwik bundles those into the server build; the writer moves an existing
+  `devDependencies` (Qwik's optimizer finds the library to compile in the app's own
+  `package.json`, and Qwik bundles those into the server build; the writer moves an existing
   `dependencies` entry rather than listing a package twice), and pins the dev script to the
   registered port with `--strictPort` (an edit eject cannot revert)
 
