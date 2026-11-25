@@ -10,11 +10,9 @@ import {
   parseProviderSelection,
   parseScopes,
   RESERVED_SLUGS,
-  selectionName,
 } from "@zitadel/config/idp";
 
 import { ZitadelError } from "@/lib/errors";
-import type { SuggestFlags } from "@/lib/suggestion";
 
 /**
  * The settings that describe a custom connection, in the order a command line
@@ -265,34 +263,6 @@ function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
 }
 
 /**
- * Check the settings that were given, and only those, naming the flag that
- * carried a bad one.
- *
- * @remarks
- * For a run that will ask for the rest: a slug the server would refuse is
- * refused before the first question, as a missing client id is.
- *
- * @param values - The settings the flags gave.
- * @param flag - How the command spells each flag.
- * @throws {@link ZitadelError} With `E_VALIDATION` naming the first flag whose
- *   value the platform refuses.
- */
-export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlagNames): void {
-  if (values.slug !== undefined) {
-    checkedUnder(flag.slug, parseConnectionSlug(values.slug, RESERVED_SLUGS));
-  }
-  if (values.displayName !== undefined) {
-    checkedUnder(flag.displayName, parseDisplayName(values.displayName));
-  }
-  if (values.issuer !== undefined) {
-    checkedUnder(flag.issuer, parseIssuer(values.issuer));
-  }
-  if (values.scopes !== undefined) {
-    checkedUnder(flag.scopes, parseScopes(values.scopes));
-  }
-}
-
-/**
  * The provider a command line names, with its settings checked as a whole.
  *
  * @remarks
@@ -304,6 +274,10 @@ export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlag
  * settings are flags on purpose — a name, issuer and scopes are what a script
  * or an agent supplies, and what a person can read back from their shell
  * history.
+ *
+ * A catalog provider knows its own name, issuer and scopes, so a setting given
+ * alongside it would be ignored, and an ignored flag reads as honoured: it is
+ * refused instead.
  *
  * @param provider - The provider the command line names.
  * @param values - The settings the flags gave.
@@ -323,8 +297,6 @@ export function selectionFromFlags(
   const given = givenCustomFlags(values, flag);
 
   if (provider !== CUSTOM_PROVIDER) {
-    // A catalog provider knows its own name, issuer and scopes, so a setting
-    // given alongside it would be ignored, and an ignored flag reads as honoured.
     if (given.length > 0) {
       throw new ZitadelError(
         "E_VALIDATION",
@@ -365,30 +337,5 @@ export function selectionFromFlags(
       issuer: checkedUnder(flag.issuer, parseIssuer(issuer)),
       scopes: checkedUnder(flag.scopes, parseScopes(values.scopes)),
     },
-  };
-}
-
-/**
- * The flags `auth-method sso enable` takes to add `selection` to a project: the
- * provider, and for a custom connection the settings that describe it. None
- * of them is a credential: the client id is asked for, as the secret is.
- *
- * @param selection - The provider.
- * @returns The flags, in the order the command line takes them.
- */
-export function ssoEnableFlags(
-  selection: ProviderSelection,
-): SuggestFlags<"auth-method:sso:enable"> {
-  if (selection.kind !== "custom") {
-    return { provider: selectionName(selection) };
-  }
-  const { slug, displayName, issuer, scopes } = selection.connection;
-
-  return {
-    provider: selectionName(selection),
-    slug,
-    displayName,
-    issuer,
-    scopes: scopes.join(" "),
   };
 }

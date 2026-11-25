@@ -120,6 +120,7 @@ const FLOW_FILE = ".zitadel/flows/default-login.json";
  */
 const DEFAULT_CONNECTION = {
   claim_mapping: { email: "email" },
+  new_attributes: [],
   verified_claims: { email: "email_verified" },
   scopes: ["openid", "profile", "email"],
   unmapped: [],
@@ -424,7 +425,7 @@ describe("auth-method sso enable", () => {
                 ],
               ],
               next_actions: [
-                `Deploy it to make ${provider.displayName} sign-in available in your app, then reload the app and test it`,
+                `Deploy to turn on ${provider.displayName} sign-in, then reload your app and try it`,
               ],
               next_commands: [
                 expectedPublicCliCommand(
@@ -721,9 +722,7 @@ describe("auth-method sso enable", () => {
                   app.path,
                 ],
               ],
-              next_actions: [
-                "Deploy it to make Google sign-in available in your app, then reload the app and test it",
-              ],
+              next_actions: ["Deploy to turn on Google sign-in, then reload your app and try it"],
               next_commands: [
                 expectedPublicCliCommand(
                   `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
@@ -785,9 +784,7 @@ describe("auth-method sso enable", () => {
                   app.path,
                 ],
               ],
-              next_actions: [
-                "Deploy it to make Google sign-in available in your app, then reload the app and test it",
-              ],
+              next_actions: ["Deploy to turn on Google sign-in, then reload your app and try it"],
               next_commands: [
                 expectedPublicCliCommand(
                   `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
@@ -921,6 +918,9 @@ describe("auth-method sso enable", () => {
                 slug: ACME.slug,
                 file: ".zitadel/idps/acme-sso.json",
                 ...DEFAULT_CONNECTION,
+                claim_mapping: {},
+                verified_claims: {},
+                unmapped: [{ property: "email", required: true }],
                 scopes: ["openid", "groups"],
               },
               callback_uri: "http://localhost:3000/__nextgen/idp/acme-sso/callback",
@@ -1167,7 +1167,7 @@ describe("auth-method sso enable", () => {
                 ],
               ],
               next_actions: [
-                `Deploy it to make ${HOSTILE_DISPLAY_NAME} sign-in available in your app, then reload the app and test it`,
+                `Deploy to turn on ${HOSTILE_DISPLAY_NAME} sign-in, then reload your app and try it`,
               ],
               next_commands: [
                 expectedPublicCliCommand(
@@ -1180,6 +1180,139 @@ describe("auth-method sso enable", () => {
             },
             warnings: [],
           });
+        });
+      });
+
+      describe("a custom connection with claim mappings", () => {
+        const STAFF_NUMBER = ["--claim", "staffNumber=employee_id:integer"];
+
+        /**
+         * A project whose user schema also holds an integer `staffNumber`.
+         */
+        async function anAppWithStaffNumbers(): Promise<ScaffoldedApp> {
+          const app = await aSetUpApp(["--use-case", "business"]);
+          await app.editUserSchema((schema) => {
+            schema.properties.staffNumber = { type: "integer" };
+            schema.properties.badge = { type: "string" };
+          });
+          return app;
+        }
+
+        it("registers the mapping, its verification and its scopes with the platform", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            ...STAFF_NUMBER,
+            "--verified-claim",
+            "staffNumber=true",
+            "--claim-scope",
+            "employee",
+          ]);
+          await app.publish();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition).toMatchObject({
+            claim_mapping: { staffNumber: "employee_id", email: "email" },
+            verified_claims: { staffNumber: true, email: "email_verified" },
+            oidc: { scopes: ["openid", "profile", "email", "employee"] },
+          });
+        });
+
+        it("registers the standard claims the schema has when none is given", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+          await app.publish();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.claim_mapping).toMatchObject({
+            email: "email",
+            givenName: "given_name",
+            familyName: "family_name",
+          });
+        });
+
+        it("registers no verification for a default it replaced", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, ["--claim", "email=mail"]);
+          await app.publish();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.verified_claims).toBeUndefined();
+        });
+
+        it("registers the verification a replaced default is then given", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            "--claim",
+            "email=mail",
+            "--verified-claim",
+            "email=mail_verified",
+          ]);
+          await app.publish();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.verified_claims).toEqual({ email: "mail_verified" });
+        });
+
+        it("deploys once the mapping is in", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, STAFF_NUMBER);
+
+          const result = await app.publish();
+
+          expect(result).toSucceed();
+        });
+
+        it.each([
+          ["a string claim for an integer property", ["--claim", "staffNumber=employee_id"]],
+          ["a claim that already fills another property", ["--claim", "badge=given_name"]],
+          ["a property the schema does not define", ["--claim", "shoeSize=shoe"]],
+          [
+            "a verification of a property it does not map",
+            ["--verified-claim", "staffNumber=true"],
+          ],
+        ])("refuses %s", async (_what, flags) => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, flags);
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("writes nothing for a mapping it refuses", async () => {
+          const app = await anAppWithStaffNumbers();
+          const before = await app.snapshot();
+
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, ["--claim", "staffNumber=employee_id"]);
+
+          expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
+      });
+
+      describe("a catalog provider with claims but without a client secret", () => {
+        it("suggests the command to run with the claims it was given", async () => {
+          const app = await aSetUpApp(["--use-case", "business"]);
+
+          const result = await app.enableSsoWith(
+            [
+              "--provider",
+              "google",
+              "--client-id",
+              "a-client-id",
+              "--claim",
+              "companyName=organization",
+              "--claim-scope",
+              "organization",
+            ],
+            "",
+          );
+
+          expect(result).toSuggest(
+            "--client-id a-client-id --claim companyName=organization --claim-scope organization",
+          );
         });
       });
 
@@ -1492,7 +1625,7 @@ describe("auth-method sso enable", () => {
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
         expect(result).toPrint(
-          "Callback URI   http://localhost:3000/__nextgen/idp/google/callback",
+          "Redirect URL   http://localhost:3000/__nextgen/idp/google/callback",
         );
       });
 
@@ -1510,7 +1643,7 @@ describe("auth-method sso enable", () => {
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
         expect(result).toSayOnce(
-          "Deploy it to make Google sign-in available in your app, then reload the app and test it",
+          "Deploy to turn on Google sign-in, then reload your app and try it",
         );
       });
 
@@ -1588,7 +1721,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoDryRun(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("email comes from the provider's email claim");
+        expect(result).toPrint("email ← email");
       });
 
       it("shows the mapping a developer edited when enabled again, not a regenerated one", async () => {
@@ -1600,7 +1733,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("email comes from the provider's mail claim");
+        expect(result).toPrint("email ← mail");
       });
     });
   });

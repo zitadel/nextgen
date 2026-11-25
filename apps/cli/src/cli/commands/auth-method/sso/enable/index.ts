@@ -16,7 +16,13 @@ import { AuthMethodCommand, providerKind } from "@/cli/commands/auth-method/comm
 import type { EnableFacts, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
-import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
+import {
+  customExample,
+  ENABLE_FLAG_NAMES,
+  parseClaimEntry,
+  parseScopeList,
+  parseVerifiedEntry,
+} from "@/lib/idp";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { environmentFlags } from "@/cli/core/environment-flags";
@@ -26,6 +32,7 @@ import { RealMachine } from "@/lib/server";
 import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 
+import { AskClaims } from "./steps/ask-claims";
 import { BuildChange } from "./steps/build-change";
 import { ChooseProvider } from "./steps/choose-provider";
 import { CollectCredentials } from "./steps/collect-credentials";
@@ -34,6 +41,7 @@ import { LoadSchema } from "./steps/load-schema";
 import { PlanChange } from "./steps/plan-change";
 import { PreviewChange } from "./steps/preview-change";
 import { PublishCredentials } from "./steps/publish-credentials";
+import { ReadClaims } from "./steps/read-claims";
 import { ReadIssuer } from "./steps/read-issuer";
 import { ReadOrigins } from "./steps/read-origins";
 import { SelectConnection } from "./steps/select-connection";
@@ -121,6 +129,26 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     })({
       description: "Client id of the application registered with the provider.",
     }),
+    claim: Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseClaimEntry, { blankAsValue: true }),
+    })({
+      description:
+        "Fill a user-schema property from a provider claim: <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim the provider returns as a number or boolean says so after a colon (string is the default). Repeatable. Given, it replaces the interactive claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "verified-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseVerifiedEntry, { blankAsValue: true }),
+    })({
+      description:
+        "Say how a mapped property is verified: <property>=<claim> names the boolean claim that must be true, <property>=true trusts the provider. Repeatable.",
+    }),
+    "claim-scope": Flags.custom<string>({
+      parse: accepts(parseScopeList, { blankAsValue: true }),
+    })({
+      description:
+        "Extra scopes the mapped claims need before the provider returns them, separated by spaces or commas.",
+    }),
   };
 
   static override meta = {
@@ -201,13 +229,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           dryRun: this.dryRun,
         }),
       )
+      .step(new ReadClaims())
       .step(
         new PlanChange({
-          ask: this.ask,
           machine: new RealMachine(),
-          developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
-          suggest: this.suggest,
-          again: this.again,
         }),
       )
       .step(new IntroduceProvider())
@@ -228,12 +253,25 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           },
         }),
       )
-      .step(new CollectCredentials())
+      .step(
+        new CollectCredentials({
+          ask: this.ask,
+          developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
+          again: this.again,
+        }),
+      )
+      .step(
+        new AskClaims({
+          ask: this.ask,
+          nonInteractive: this.nonInteractive,
+        }),
+      )
       .step(new BuildChange())
       .step(
         new PublishCredentials({
           signal: this.signal,
           source: this.meta.source,
+          suggest: this.suggest,
         }),
       )
       .step(

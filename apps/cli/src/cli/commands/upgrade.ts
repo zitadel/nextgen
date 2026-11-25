@@ -101,7 +101,7 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
         ? []
         : [`  Would run ${style.command(result.installCommand)}`]),
       ...plan.leftAlone.map(({ name, specifier }) => {
-        const said = `- ${name} left at "${specifier}", not an exact version`;
+        const said = `• ${name} left at "${specifier}", not an exact version`;
 
         return `  ${style.dim(escapeControlCharacters(said))}`;
       }),
@@ -194,7 +194,7 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
         ? refreshed[refresh]
         : []),
       ...plan.leftAlone.map(({ name, specifier }) => {
-        const said = `- ${name} left at "${specifier}", not an exact version`;
+        const said = `• ${name} left at "${specifier}", not an exact version`;
 
         return `  ${style.dim(escapeControlCharacters(said))}`;
       }),

@@ -338,7 +338,7 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
-            "Configuration validation failed (1 issue):\n  - .zitadel/policies/auth.factor.password.set.json: config.min_length Too small: expected number to be >=1",
+            "Configuration validation failed (1 issue):\n  • .zitadel/policies/auth.factor.password.set.json: config.min_length Too small: expected number to be >=1",
           hint: "Fix the files named above and rerun; no changes were made.",
           details: {
             issues: [
@@ -377,7 +377,7 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
-            "Configuration validation failed (1 issue):\n  - .zitadel/policies/password.json: holds the auth.factor.password.set policy, so it must be named auth.factor.password.set.json",
+            "Configuration validation failed (1 issue):\n  • .zitadel/policies/password.json: holds the auth.factor.password.set policy, so it must be named auth.factor.password.set.json",
           hint: "Fix the files named above and rerun; no changes were made.",
           details: {
             issues: [
@@ -1838,7 +1838,7 @@ describe("deploy", () => {
             command: "deploy",
             source: MOCK_SERVER_URL,
             code: "E_VALIDATION",
-            message: `Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: ${issue}`,
+            message: `Configuration validation failed (1 issue):\n  • .zitadel/idps/google.json: ${issue}`,
             hint: "Fix the files named above and rerun; no changes were made.",
             details: {
               issues: [{ rule, path: ".zitadel/idps/google.json", message: issue }],
@@ -1859,7 +1859,7 @@ describe("deploy", () => {
             command: "deploy",
             source: MOCK_SERVER_URL,
             code: "E_VALIDATION",
-            message: `Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: ${issue}`,
+            message: `Configuration validation failed (1 issue):\n  • .zitadel/idps/google.json: ${issue}`,
             hint: "Fix the files named above and rerun; no changes were made.",
             details: {
               issues: [{ rule, path: ".zitadel/idps/google.json", message: issue }],

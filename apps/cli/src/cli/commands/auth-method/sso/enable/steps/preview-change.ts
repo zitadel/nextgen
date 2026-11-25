@@ -26,7 +26,7 @@ const NOTHING_PUBLISHED: PublishedCredentials = {
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"flags" | "summary" | "preview" | "delivery" | "target" | "provider">;
+type Needs = Fact<"flags" | "summary" | "preview" | "names" | "claims" | "provider">;
 
 /**
  * What the step is given by the command.
@@ -84,11 +84,11 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
     const real = await this.deps.realRun();
     this.deps.report(needs.preview);
     const toStore = !needs.summary.reused
-      ? [needs.delivery.names.clientId, needs.delivery.names.clientSecret].filter((name) => {
+      ? [needs.names.clientId, needs.names.clientSecret].filter((name) => {
           return name !== undefined;
         })
-      : needs.flags.clientId !== undefined && needs.delivery.names.clientId !== undefined
-        ? [needs.delivery.names.clientId]
+      : needs.flags.clientId !== undefined && needs.names.clientId !== undefined
+        ? [needs.names.clientId]
         : [];
     const said = [
       ...needs.preview.changedPaths.map((file) => {
@@ -106,7 +106,8 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
           summary: needs.summary,
           change: needs.preview,
           published: NOTHING_PUBLISHED,
-          names: needs.delivery.names,
+          names: needs.names,
+          claims: needs.claims,
         }),
         title,
         would_store: toStore,

@@ -26,6 +26,9 @@ import {
   customExample,
   customFlagValues,
   givenCustomFlags,
+  parseClaimEntry,
+  parseScopeList,
+  parseVerifiedEntry,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
@@ -39,6 +42,7 @@ import {
   AVAILABLE_RENDERER_IDS,
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
+import { Runtime } from "@/lib/runtime";
 import { LocalRuntime, RealMachine } from "@/lib/server";
 import type { Scope } from "@/lib/suggestion";
 import { Output, warnings } from "@/lib/ui";
@@ -178,13 +182,29 @@ const RENDERER_FLAG_DESCRIPTION =
 export type SetupFlags = Admitted<typeof Setup>["flags"];
 
 /**
+ * How the claim flags without `--sso` are refused.
+ */
+const CLAIMS_NEED_SSO_REFUSAL = {
+  message: "{flags} needs --sso",
+  hint: "Name the provider with --sso, e.g. --sso google.",
+} as const satisfies Refusal;
+
+/**
  * The flags {@link refuseUnusableFlags} reads, as a command reads them.
  */
 export type SetupFlagsToCheck = Readonly<
   Partial<
     Pick<
       SetupFlags,
-      "design" | "sso" | "ssoSlug" | "ssoDisplayName" | "ssoIssuer" | "ssoScopes"
+      | "design"
+      | "sso"
+      | "ssoSlug"
+      | "ssoDisplayName"
+      | "ssoIssuer"
+      | "ssoScopes"
+      | "ssoClaim"
+      | "ssoVerifiedClaim"
+      | "ssoClaimScope"
     > & {
       ssoClientId: string;
     }
@@ -213,6 +233,14 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
   }
   const given = givenCustomFlags(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES);
   if (flags.sso === undefined) {
+    const claimFlags = [
+      ...(flags.ssoClaim === undefined ? [] : ["--sso-claim"]),
+      ...(flags.ssoVerifiedClaim === undefined ? [] : ["--sso-verified-claim"]),
+      ...(flags.ssoClaimScope === undefined ? [] : ["--sso-claim-scope"]),
+    ];
+    if (claimFlags.length > 0) {
+      throw refusalError(CLAIMS_NEED_SSO_REFUSAL, { flags: claimFlags.join(", ") });
+    }
     if (given[0] !== undefined) {
       throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
         flag: given[0],
@@ -358,6 +386,26 @@ export default class Setup extends Telemetered(
     })({
       description: "Client id of the OAuth application registered with the --sso provider.",
     }),
+    "sso-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseClaimEntry),
+    })({
+      description:
+        "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. The standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "sso-verified-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseVerifiedEntry),
+    })({
+      description:
+        "With --sso: how a mapped property is verified, <property>=<claim> for the boolean claim that must be true or <property>=true to trust the provider. Repeatable.",
+    }),
+    "sso-claim-scope": Flags.custom<string>({
+      parse: accepts(parseScopeList),
+    })({
+      description:
+        "With --sso: extra scopes the mapped claims need, separated by spaces or commas.",
+    }),
     [SETUP_FLAG_KEYS.slug]: Flags.custom<string>({
       parse: accepts((value) => {
         return parseConnectionSlug(value, RESERVED_SLUGS);
@@ -473,6 +521,7 @@ export default class Setup extends Telemetered(
     const prompting = {
       ask: this.ask,
       cwd: this.cwd,
+      developmentBuild: Runtime.current().isDevelopment(),
       dryRun: this.dryRun,
       machine,
       nonInteractive: this.nonInteractive,

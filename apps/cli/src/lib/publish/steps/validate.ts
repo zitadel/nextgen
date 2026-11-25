@@ -103,7 +103,7 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
     return finding.rule === "connection/literal-secret";
   });
   const lines = errors.map((finding) => {
-    return `  - ${finding.file}: ${finding.message}`;
+    return `  • ${finding.file}: ${finding.message}`;
   });
   // Any refused key may be one a newer server declares and this CLI's
   // meta-schema does not know yet, so the hint says what fixes that too.

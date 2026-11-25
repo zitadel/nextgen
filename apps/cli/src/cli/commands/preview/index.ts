@@ -308,7 +308,7 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
         [
           dryRun.summary.title,
           ...urls.map((url) => {
-            return `  - ${url}`;
+            return `  • ${url}`;
           }),
         ].join("\n"),
       ),
@@ -316,7 +316,7 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       summary: {
         ...dryRun.summary,
         lines: urls.map((url) => {
-          return `  - ${escapeControlCharacters(url)}`;
+          return `  • ${escapeControlCharacters(url)}`;
         }),
       },
     };
@@ -396,8 +396,8 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
           `Previewed ${release.content_hash} on ${previewUrls}`,
           ...previews.map((preview) => {
             return preview.expires_at === null
-              ? `  - ${preview.url}`
-              : `  - ${preview.url} (until ${preview.expires_at})`;
+              ? `  • ${preview.url}`
+              : `  • ${preview.url} (until ${preview.expires_at})`;
           }),
           `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
         ].join("\n"),
@@ -408,8 +408,8 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
         lines: [
           ...previews.map((preview) => {
             return preview.expires_at === null
-              ? `  - ${escapeControlCharacters(preview.url)}`
-              : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
+              ? `  • ${escapeControlCharacters(preview.url)}`
+              : `  • ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
           }),
           `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
         ],

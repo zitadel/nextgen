@@ -598,7 +598,7 @@ describe("preview", () => {
           source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
           message:
-            'Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
+            'Configuration validation failed (1 issue):\n  • .zitadel/idps/google.json: client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
           hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
           next_commands: [expectedPublicCliCommand(app.againAsRun("variable set NAME --secret"))],
           details: {
@@ -891,8 +891,8 @@ describe("preview", () => {
 
         const lines = result.stdout.trimEnd().split("\n");
         expect(lines[0]).toMatch(/^Previewed sha256:[0-9a-f]{64} on 2 URLs$/);
-        expect(lines[1]).toMatch(new RegExp(`^ {2}- ${PREVIEW_URL} \\(until \\S+\\)$`));
-        expect(lines[2]).toMatch(new RegExp(`^ {2}- ${OTHER_URL} \\(until \\S+\\)$`));
+        expect(lines[1]).toMatch(new RegExp(`^ {2}• ${PREVIEW_URL} \\(until \\S+\\)$`));
+        expect(lines[2]).toMatch(new RegExp(`^ {2}• ${OTHER_URL} \\(until \\S+\\)$`));
       });
 
       it("prints the headline once", async () => {
@@ -910,7 +910,7 @@ describe("preview", () => {
 
         const lines = result.stdout.split("\n");
         expect(lines[0]).toBe("Would deploy the preview to 1 URL (dry run)");
-        expect(lines[1]).toBe(`  - ${PREVIEW_URL}`);
+        expect(lines[1]).toBe(`  • ${PREVIEW_URL}`);
       });
 
       it("suggests the real command once after a dry run", async () => {
@@ -933,7 +933,7 @@ describe("preview", () => {
           "--dry-run",
         ]);
 
-        expect(result.stdout.split("\n")[1]).toBe("  - https://w\\x1b[2J-acme.vercel.app");
+        expect(result.stdout.split("\n")[1]).toBe("  • https://w\\x1b[2J-acme.vercel.app");
         expect(result.stdout + result.stderr).not.toContain("\u001b");
       });
 
