@@ -1,28 +1,13 @@
-import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it } from "vitest";
 
 import { BackendForbiddenError } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
 import { PublishConnectionVariableClientSecretMissingError, PublishError } from "@/lib/publish";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
 import type { ClientStubs } from "@tests/helpers/fake-client";
 import { holdingVariables, SECRET_VARIABLE } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
-import { rejectionOf as rejectionOfRun } from "@tests/helpers/thrown-value";
-
-/**
- * What `run` rejects with, as the CLI reports it: a publish refusal is turned
- * into its error at the boundary, every other rejection is left as it is.
- *
- * @param run - What to run.
- * @returns The reported error, or `undefined` when `run` resolves.
- */
-const rejectionOf = async (run: () => unknown): Promise<unknown> => {
-  const error = await rejectionOfRun(run);
-
-  return error instanceof PublishError ? toZitadelError(error) : error;
-};
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
  * A configuration holding one connection, the default `acme` one.
@@ -74,7 +59,7 @@ describe("validateConnections", () => {
       return validateConnections(context);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishError);
     expect(error).toMatchObject({
       message: expect.stringContaining(".zitadel/idps/acme-workspace.json"),
     });
@@ -97,7 +82,7 @@ describe("validateConnections", () => {
       return validateConnections(context);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishError);
     expect(error).toMatchObject({
       message: expect.stringContaining(
         ".zitadel/idps/b-okta.json: client_secret names the variable OKTA_CLIENT_SECRET",
@@ -113,14 +98,14 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
 
     it("suggests publishing a missing variable", async () => {
       const context = aStepContext({ config: ACME, client: holdingVariables({}) });
 
-      const error = await rejectionOfRun(() => {
+      const error = await rejectionOf(() => {
         return validateConnections(context);
       });
 
@@ -141,7 +126,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ message: expect.stringContaining("which is not a secret") });
     });
 
@@ -163,7 +148,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ message: expect.stringContaining("which is a secret") });
     });
 
@@ -182,7 +167,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           "client_id and client_secret both name the variable ACME_CLIENT_SECRET",
@@ -209,14 +194,14 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
 
     it("suggests setting the missing credential for the preview kind", async () => {
       const context = aStepContext({ config: ACME, mode: "preview", client: holdingVariables({}) });
 
-      const error = await rejectionOfRun(() => {
+      const error = await rejectionOf(() => {
         return validateConnections(context);
       });
 
@@ -238,7 +223,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
 

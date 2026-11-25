@@ -49,7 +49,7 @@ describe("SvelteDetector version floor", () => {
     await expect(
       new SvelteDetector().detect(await project(dir, { svelte: "^4", vite: "^5" })),
     ).rejects.toMatchObject({
-      category: "invalid",
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
     });
   });
 

@@ -167,7 +167,7 @@ describe("scaffold - write", () => {
       }),
     );
     expect(caught).toBeInstanceOf(OrcaError);
-    expect((caught as OrcaError).category).toBe("conflict");
+    expect((caught as OrcaError).code).toBe("E_CONFLICT");
     // file left untouched
     expect(await readFile(join(dir, "page.tsx"), "utf8")).toBe("user-authored");
   });
@@ -576,7 +576,7 @@ describe("scaffold - add-dep", () => {
     expect(result.depsAdded).toEqual([]);
   });
 
-  it("throws OrcaPatchFileMissingError when package.json is missing", async ({ dir }) => {
+  it("throws E_VALIDATION when package.json is missing", async ({ dir }) => {
     const caught = await rejectionOf(() =>
       scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
         cwd: dir,
@@ -585,6 +585,7 @@ describe("scaffold - add-dep", () => {
       }),
     );
     expect(caught).toBeInstanceOf(OrcaPatchFileMissingError);
+    expect((caught as OrcaError).code).toBe("E_VALIDATION");
   });
 
   it("records the dep but does not write on dry-run", async ({ dir }) => {

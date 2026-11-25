@@ -40,7 +40,7 @@ describe("WriteOp", () => {
     );
 
     expect(error).toMatchObject({
-      category: "conflict",
+      code: "E_CONFLICT",
       details: {
         path: join(dir, "a.txt"),
       },

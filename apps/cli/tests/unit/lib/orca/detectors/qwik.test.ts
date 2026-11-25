@@ -59,7 +59,7 @@ describe("QwikDetector", () => {
       await expect(
         new QwikDetector().detect(await project(dir, { "@qwik.dev/core": spec, vite: "^8" })),
       ).rejects.toMatchObject({
-        category: "invalid",
+        code: "E_UNSUPPORTED_PROJECT_SHAPE",
       });
     },
   );

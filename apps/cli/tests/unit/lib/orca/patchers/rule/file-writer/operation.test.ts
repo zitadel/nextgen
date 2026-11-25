@@ -50,7 +50,7 @@ describe("Operation", () => {
     );
 
     expect(error).toMatchObject({
-      name: "OrcaInternalError",
+      code: "E_VALIDATION",
     });
   });
 
@@ -70,7 +70,7 @@ describe("Operation", () => {
     );
 
     expect(error).toMatchObject({
-      name: "OrcaPatchFileUnsupportedError",
+      code: "E_VALIDATION",
       message: expect.stringContaining("not a regular file"),
     });
     expect(seen).toEqual([]);
@@ -84,7 +84,7 @@ describe("Operation", () => {
     );
 
     expect(error).toMatchObject({
-      name: "OrcaPatchFileUnsupportedError",
+      code: "E_VALIDATION",
     });
   });
 

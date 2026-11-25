@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { toZitadelError } from "@/lib/errors";
 import { IdpError, ProviderChoice } from "@/lib/idp";
-import { ZitadelConfigError, Connection } from "@/lib/zitadel";
+import { Connection, ZitadelConfigError, ZitadelConfigResourceClashError } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -150,9 +150,7 @@ describe("ProviderChoice.readStoredSettings", () => {
         return choice.readStoredSettings(acme);
       });
 
-      expect(error).toMatchObject({
-        category: "conflict",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({
         message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
         hint: "Fix the file, or choose another slug, then run the command again.",

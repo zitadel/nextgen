@@ -57,7 +57,7 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
 
     it("refuses a version below the floor, naming the floor and an upgrade", async ({ dir }) => {
       const error = await refusal(check(below, dir));
-      expect(error.category).toBe("invalid");
+      expect(error.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
       expect(error.message).toContain(
         `${detector.displayName} "${below}" is below the supported floor`,
       );
@@ -68,7 +68,9 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
     });
 
     it("refuses a range that stays below the floor", async ({ dir }) => {
-      expect((await refusal(check(`<${detector.versionFloor}`, dir))).category).toBe("invalid");
+      expect((await refusal(check(`<${detector.versionFloor}`, dir))).code).toBe(
+        "E_UNSUPPORTED_PROJECT_SHAPE",
+      );
     });
 
     it("refuses a below-floor version declared in devDependencies", async ({ dir }) => {
@@ -79,7 +81,7 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
           dir,
         ),
       );
-      expect(error.category).toBe("invalid");
+      expect(error.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
     });
 
     it.for<[string, string]>([
@@ -100,7 +102,7 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
     const prereleaseFloor = (semver.prerelease(detector.versionFloor)?.length ?? 0) > 0;
     if (exactRelease && !prereleaseFloor) {
       it("refuses a prerelease of the exact release floor", async ({ dir }) => {
-        expect((await refusal(check(prerelease, dir))).category).toBe("invalid");
+        expect((await refusal(check(prerelease, dir))).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
       });
     } else {
       it("accepts a prerelease of the floor", async ({ dir }) => {
@@ -137,7 +139,7 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
             await installed(dir, below),
           ),
         );
-        expect(error.category).toBe("invalid");
+        expect(error.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
         expect(error.message).toContain(`${detector.displayName} ${below} is installed`);
       });
 

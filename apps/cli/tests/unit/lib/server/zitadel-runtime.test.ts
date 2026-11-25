@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import { LOCAL_ADMIN_FILE } from "@/lib/server/local/admin-credential";
 import {
   LOCAL_DATA_DIR,
@@ -298,8 +297,8 @@ describe("LocalRuntime", () => {
           stopPid: async (pid) => ({ pid, status: "failed", target: "process", signal: "SIGKILL" }),
         }).reset(DestroyPermit.forFolder(cwd)),
       ).rejects.toMatchObject({
+        code: "E_VALIDATION",
         name: "LocalServerOrphansStopError",
-        category: "invalid",
       });
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
@@ -317,8 +316,8 @@ describe("LocalRuntime", () => {
           servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
         }).reset(DestroyPermit.forFolder(cwd)),
       ).rejects.toMatchObject({
+        code: "E_VALIDATION",
         name: "LocalServerProcessesUnlistableError",
-        category: "invalid",
       });
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
@@ -391,6 +390,8 @@ describe("LocalRuntime", () => {
   describe("logs", () => {
     it("refuses a directory that never started a server", async ({ dir }) => {
       await expect(at(dir).logs({ tail: 10 })).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "Local Zitadel runtime has not been started",
         name: "LocalServerNotStartedError",
       });
     });
@@ -523,6 +524,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt(url);
 
       await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
+        code: "E_LOCAL_SERVER_NOT_RUNNING",
         name: "LocalServerNotRespondingError",
       });
     });
@@ -536,6 +538,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt(url);
 
       await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
+        code: "E_LOCAL_SERVER_NOT_RUNNING",
         name: "LocalServerNotRespondingError",
       });
     });
@@ -549,6 +552,7 @@ describe("LocalRuntime", () => {
       await mkdir(app);
 
       await expect(LocalRuntime.resolveUrl(app, answeringAt())).rejects.toMatchObject({
+        code: "E_LOCAL_SERVER_NOT_RUNNING",
         name: "LocalServerNotRespondingElsewhereError",
         details: { server_url: url, directory: cwd },
       });
@@ -559,6 +563,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt();
 
       await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
+        code: "E_LOCAL_SERVER_NOT_RUNNING",
         name: "LocalServerNotRespondingError",
       });
     });
@@ -569,6 +574,7 @@ describe("LocalRuntime", () => {
       const fetcher = answeringAt("http://localhost:8080");
 
       await expect(LocalRuntime.resolveUrl(dir, fetcher)).rejects.toMatchObject({
+        code: "E_LOCAL_SERVER_NOT_RUNNING",
         name: "LocalServerNotRunningError",
       });
     });
@@ -834,6 +840,7 @@ describe("ZitadelRuntime.resolve", () => {
     await expect(
       ZitadelRuntime.resolve({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
     ).rejects.toMatchObject({
+      code: "E_VALIDATION",
       name: "LocalServerUrlInvalidError",
     });
   });
@@ -842,6 +849,7 @@ describe("ZitadelRuntime.resolve", () => {
     await expect(
       ZitadelRuntime.resolve({ cwd: dir, serverFlag: "not a url" }),
     ).rejects.toMatchObject({
+      code: "E_VALIDATION",
       name: "LocalServerUrlInvalidError",
     });
   });
@@ -860,17 +868,10 @@ describe("ZitadelRuntime.resolve", () => {
   }) => {
     await writeLocalRuntime(dir, "http://localhost:9");
 
-    const error = await ZitadelRuntime.resolve({
-      cwd: dir,
-      serverFlag: "local",
-    }).catch((caught: unknown) => {
-      return caught;
-    });
-
-    expect(error).toMatchObject({
+    await expect(ZitadelRuntime.resolve({ cwd: dir, serverFlag: "local" })).rejects.toMatchObject({
+      code: "E_LOCAL_SERVER_NOT_RUNNING",
       name: "LocalServerNotRespondingError",
     });
-    expect(toZitadelError(error).code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
   });
 });
 

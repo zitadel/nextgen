@@ -31,8 +31,7 @@ describe("AddDepOp", () => {
     );
 
     expect(error).toMatchObject({
-      name: "OrcaPatchFileMissingError",
-      category: "missing",
+      code: "E_VALIDATION",
     });
   });
 

@@ -7,6 +7,7 @@ import {
   Branding,
   CONFIG_DIRECTORIES,
   ZitadelConfigError,
+  ZitadelConfigResourceClashError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
   Flow,
@@ -834,9 +835,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
       });
 
-      expect(error).toMatchObject({
-        category: "conflict",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
     });
 
     it("refuses one that connects to another issuer, saying to choose another slug", () => {
@@ -850,9 +849,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: acmeSelection }] });
       });
 
-      expect(error).toMatchObject({
-        category: "conflict",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({
         hint: expect.stringContaining("Choose another slug for this connection"),
       });
@@ -879,9 +876,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: acmeSelection }] });
       });
 
-      expect(error).toMatchObject({
-        category: "conflict",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
     });
   });
 

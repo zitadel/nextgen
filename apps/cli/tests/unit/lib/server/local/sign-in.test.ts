@@ -222,6 +222,7 @@ describe("local admin sign-in", () => {
     const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
+      code: "E_VALIDATION",
       message: expect.stringContaining("does not host the platform project") as string,
       name: "LocalServerAdminPlatformMissingError",
     });
@@ -242,9 +243,9 @@ describe("local admin sign-in", () => {
     const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
+      code: "E_AUTH",
       message: "The local server could not find the local admin",
       name: "LocalServerAdminRejectedError",
-      category: "denied",
     });
   });
 

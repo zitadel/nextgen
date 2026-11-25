@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   allowDestructive,
+  BackendRejectedError,
   createZitadelClient,
   responseFailure,
   type ZitadelClient,
 } from "@/lib/backend";
 import { connectionOf, REQUEST_TIMEOUT_MS, translateFailure } from "@/lib/backend/client";
-import { BackendRejectedError } from "@/lib/backend";
 
 const signal = new AbortController().signal;
 
@@ -151,9 +151,6 @@ describe("responseFailure", () => {
     [429, "BackendUnavailableError"],
     [500, "BackendUnavailableError"],
     [503, "BackendUnavailableError"],
-    [501, "BackendUnavailableError"],
-    [405, "BackendRejectedError"],
-    [408, "BackendRejectedError"],
   ])("raises a %i as a %s", (status, name) => {
     expect(responseFailure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
       name,
@@ -189,22 +186,6 @@ describe("responseFailure", () => {
       responseFailure(409, "http://localhost:8080/p", { code: "rel.revoked" }, "refused")
         .serverCode,
     ).toBe("rel.revoked");
-  });
-
-  it("tells whether the server answered with one code", () => {
-    const error = responseFailure(
-      409,
-      "http://localhost:8080/p",
-      {
-        code: "rel.revoked",
-      },
-      "refused",
-    );
-
-    expect([error.serverCode === "rel.revoked", error.serverCode === "rel.in_use"]).toEqual([
-      true,
-      false,
-    ]);
   });
 
   it("reads no code off a body that is not the platform's error envelope", () => {

@@ -1,8 +1,6 @@
-import { toZitadelError } from "@/lib/errors";
 import { describe, expect, it, vi } from "vitest";
 
 import { SchemaService } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
 import {
   PublishConfigInvalidError,
   PublishConfigLiteralSecretError,
@@ -24,20 +22,7 @@ import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
 import { holdingVariables, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
 import { aSchemaListing } from "@tests/helpers/schemas";
 import { aStepContext } from "@tests/helpers/step-context";
-import { rejectionOf as rejectionOfRun } from "@tests/helpers/thrown-value";
-
-/**
- * What `run` rejects with, as the CLI reports it: a publish refusal is turned
- * into its error at the boundary, every other rejection is left as it is.
- *
- * @param run - What to run.
- * @returns The reported error, or `undefined` when `run` resolves.
- */
-const rejectionOf = async (run: () => unknown): Promise<unknown> => {
-  const error = await rejectionOfRun(run);
-
-  return error instanceof PublishError ? toZitadelError(error) : error;
-};
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
  * What the step reports for a configuration it accepts.
@@ -116,7 +101,7 @@ describe("validateStep", () => {
       return validateStep.run(aStepContext({ config }));
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("MISSING_VAR"),
@@ -132,7 +117,7 @@ describe("validateStep", () => {
       return validateStep.run(aStepContext({ config }));
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishError);
     expect(error).toMatchObject({
       message: expect.stringMatching(
         /\.zitadel\/schemas\/a\.json[\s\S]*\.zitadel\/schemas\/b\.json/,
@@ -174,7 +159,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 
@@ -188,7 +173,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         details: {
           issues: [
@@ -230,7 +215,7 @@ describe("validateStep", () => {
     });
 
     it("states that a key a newer server added is among the refused ones", async () => {
-      const error = await rejectionOfRun(() => {
+      const error = await rejectionOf(() => {
         return validateStep.run(aStepContext({ config }));
       });
 
@@ -246,7 +231,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(
@@ -258,7 +243,7 @@ describe("validateStep", () => {
     it("states that a literal client_secret is among the refused findings", async () => {
       const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
 
-      const error = await rejectionOfRun(() => {
+      const error = await rejectionOf(() => {
         return validateStep.run(aStepContext({ config }));
       });
 
@@ -268,7 +253,7 @@ describe("validateStep", () => {
     it("states no literal secret and no refused key for a refusal that has neither", async () => {
       const config = aConfig({ flows: { "login.json": { name: "bad" } } });
 
-      const error = await rejectionOfRun(() => {
+      const error = await rejectionOf(() => {
         return validateStep.run(aStepContext({ config }));
       });
 
@@ -300,7 +285,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config, ...overrides }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 
@@ -313,7 +298,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/idps/b-acme.json: client_secret must reference"),
@@ -340,7 +325,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(JSON.stringify(error)).not.toContain("a-literal-secret");
     });
 
@@ -354,7 +339,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           ".zitadel/idps/acme.json: oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint",
@@ -393,7 +378,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/idps/b-bad.json"),
@@ -407,7 +392,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config, client: NOTHING_HELD }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
   });
@@ -420,7 +405,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         details: {
@@ -500,7 +485,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config, schemas }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         details: {
@@ -581,7 +566,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(`.zitadel/policies/${PASSWORD_POLICY}.json: config`),
@@ -595,7 +580,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(
@@ -635,7 +620,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_VALIDATION", message: expect.stringContaining(why) });
     });
 
@@ -663,7 +648,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config, store }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("BRAND_NAME"),

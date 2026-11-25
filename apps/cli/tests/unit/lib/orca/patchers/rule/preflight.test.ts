@@ -238,7 +238,7 @@ describe("SPA patchers' root component", () => {
       const cwd = await project(dir, existingApp);
 
       await expect(patcher.patch(ctx, { cwd, dryRun: false, force: true })).rejects.toMatchObject({
-        category: "conflict",
+        code: "E_CONFLICT",
         details: { path: foreignRoot, writes: root },
       });
       expect(existsSync(join(cwd, root))).toBe(false);
@@ -273,7 +273,7 @@ describe("NextPatcher's request boundary", () => {
     await expect(
       new NextPatcher().patch(ctxFor("next", "app", 16), { cwd, dryRun: false, force: true }),
     ).rejects.toMatchObject({
-      category: "conflict",
+      code: "E_CONFLICT",
       message: "Next.js 16 will not start with both middleware.ts and the proxy.ts setup writes",
       details: { path: "middleware.ts", writes: "proxy.ts" },
     });
@@ -295,7 +295,7 @@ describe("NextPatcher's request boundary", () => {
     await expect(
       new NextPatcher().patch(ctxFor("next", "app", 15), { cwd, dryRun: true, force: false }),
     ).rejects.toMatchObject({
-      category: "conflict",
+      code: "E_CONFLICT",
       message: "Next.js runs one middleware file, and this app already has middleware.js",
     });
   });
@@ -306,7 +306,7 @@ describe("NextPatcher's request boundary", () => {
     await expect(
       new NextPatcher().patch(ctxFor("next", "src/app"), { cwd, dryRun: true, force: false }),
     ).rejects.toMatchObject({
-      category: "conflict",
+      code: "E_CONFLICT",
       hint: expect.stringContaining(
         'Pin next to the version range the app runs, such as "^16.0.0"',
       ),

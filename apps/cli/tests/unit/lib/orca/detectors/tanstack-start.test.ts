@@ -49,7 +49,7 @@ describe("TanStackStartDetector version floor", () => {
         await project(dir, { react: "^19", "@tanstack/react-start": "1.168.9", vite: "^8" }),
       ),
     ).rejects.toMatchObject({
-      category: "invalid",
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
     });
   });
 

@@ -93,7 +93,7 @@ describe("envVarsEdit", () => {
   it("refuses a file that exports no variables", () => {
     expect(() => edit("export const settings = {};\n")).toThrow(
       expect.objectContaining({
-        name: "OrcaPatchFileUnsupportedError",
+        code: "E_VALIDATION",
       }),
     );
   });
@@ -101,7 +101,7 @@ describe("envVarsEdit", () => {
   it("refuses variables it cannot edit in place", () => {
     expect(() => edit("export const variables = defineEnvVars(shared);\n")).toThrow(
       expect.objectContaining({
-        name: "OrcaPatchFileUnsupportedError",
+        code: "E_VALIDATION",
       }),
     );
   });

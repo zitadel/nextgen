@@ -145,6 +145,7 @@ describe("local server binary helpers", () => {
     }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     await expect(launching).rejects.toMatchObject({
+      code: "E_VALIDATION",
       name: "LocalServerBinaryBlockedError",
     });
   });
@@ -178,6 +179,7 @@ describe("local server binary helpers", () => {
     }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     await expect(launching).rejects.toMatchObject({
+      code: "E_VALIDATION",
       name: "LocalServerBinaryMissingError",
     });
     resolver.missing = false;

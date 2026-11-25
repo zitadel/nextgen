@@ -1,4 +1,3 @@
-import { toZitadelError } from "@/lib/errors";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 
 import { join } from "node:path";
@@ -25,28 +24,6 @@ vi.mock("@clack/prompts", () => ({
   isCancel: (value: unknown) => typeof value === "symbol",
   cancel: vi.fn(),
 }));
-
-/**
- * What a rejection is as the CLI reports it.
- *
- * @param pending - What is expected to reject.
- * @returns The same promise, rejecting with the CLI's error.
- */
-function reported(pending: Promise<unknown>): Promise<unknown> {
-  return pending.catch((error: unknown) => {
-    throw toZitadelError(error);
-  });
-}
-
-/**
- * What a call throws as the CLI reports it.
- *
- * @param run - What is expected to throw.
- * @returns The CLI's error.
- */
-function reportedBy(run: () => unknown): unknown {
-  return toZitadelError(thrownBy(run));
-}
 
 /**
  * The asker the command would hand in, answering with `answer`. It records
@@ -341,7 +318,7 @@ describe("Environment.resolve", () => {
       await write(dir, ".env.development.local", { ZITADEL_URL: "ftp://file.example" });
 
       await expect(resolve(dir)).rejects.toBeInstanceOf(EnvironmentServerInvalidError);
-      await expect(reported(resolve(dir))).rejects.toMatchObject({
+      await expect(resolve(dir)).rejects.toMatchObject({
         code: "E_VALIDATION",
       });
     });
@@ -368,12 +345,10 @@ describe("Environment.resolve", () => {
       await write(dir, "staging.env", { ZITADEL_PROJECT_ID: "proj_file" });
 
       await expect(
-        reported(
-          resolve(dir, {
-            envName: "staging",
-            envFile: "staging.env",
-          }),
-        ),
+        resolve(dir, {
+          envName: "staging",
+          envFile: "staging.env",
+        }),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("--env-file"),
@@ -387,11 +362,9 @@ describe("Environment.resolve", () => {
         }),
       ).rejects.toBeInstanceOf(EnvironmentFileMissingError);
       await expect(
-        reported(
-          resolve(dir, {
-            envFile: "missing.env",
-          }),
-        ),
+        resolve(dir, {
+          envFile: "missing.env",
+        }),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("missing.env"),
@@ -405,11 +378,9 @@ describe("Environment.resolve", () => {
         }),
       ).rejects.toBeInstanceOf(EnvironmentNameInvalidError);
       await expect(
-        reported(
-          resolve(dir, {
-            envName: "../evil",
-          }),
-        ),
+        resolve(dir, {
+          envName: "../evil",
+        }),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("valid environment name"),
@@ -481,7 +452,7 @@ describe("Environment.require", () => {
   it("names the environment, the variable and every source consulted", async ({ dir }) => {
     const environment = await resolve(dir, { envName: "production" });
 
-    const thrown = reportedBy(() => environment.require("ZITADEL_PROJECT_ID"));
+    const thrown = thrownBy(() => environment.require("ZITADEL_PROJECT_ID"));
 
     expect(thrownBy(() => environment.require("ZITADEL_PROJECT_ID"))).toBeInstanceOf(
       EnvironmentValueUnboundError,

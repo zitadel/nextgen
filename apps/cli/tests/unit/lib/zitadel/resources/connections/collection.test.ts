@@ -4,6 +4,8 @@ import { idpProvider } from "@zitadel/config/idp";
 
 import {
   ZitadelConfigError,
+  ZitadelConfigResourceClashError,
+  ZitadelConfigResourceMissingError,
   Connection,
   isJsonObject,
   type JsonObject,
@@ -308,9 +310,7 @@ describe("Connections.enable", () => {
         return config.connections.enable(CUSTOMERS_SCHEMA, GOOGLE);
       });
 
-      expect(error).toMatchObject({
-        category: "missing",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceMissingError);
       expect(error).toMatchObject({ message: "No login flow runs against customers" });
     });
   });
@@ -864,9 +864,7 @@ describe("Connections.disable", () => {
         return config.connections.disable(config.schemas.resolve(), "gogle");
       });
 
-      expect(error).toMatchObject({
-        category: "missing",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceMissingError);
       expect(error).toMatchObject(fields);
     });
   });
@@ -1024,9 +1022,7 @@ describe("Connections.resolveExisting", () => {
         return config.connections.resolveExisting(GOOGLE);
       });
 
-      expect(error).toMatchObject({
-        category: "conflict",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({ message });
     });
 
@@ -1063,9 +1059,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(GOOGLE);
         });
 
-        expect(error).toMatchObject({
-          category: "conflict",
-        });
+        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
         expect(error).toMatchObject({
           hint: expect.stringContaining("in the schemas and flows that name it"),
         });
@@ -1076,9 +1070,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(GOOGLE);
         });
 
-        expect(error).toMatchObject({
-          category: "conflict",
-        });
+        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
         expect(error).toMatchObject({ hint: expect.not.stringContaining("--") });
       });
     });
@@ -1205,9 +1197,7 @@ describe("Connections.resolveExisting", () => {
         return config.connections.resolveExisting(candidate);
       });
 
-      expect(error).toMatchObject({
-        category: "conflict",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({ message });
     });
 
@@ -1240,9 +1230,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(candidate);
         });
 
-        expect(error).toMatchObject({
-          category: "conflict",
-        });
+        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
         expect(error).toMatchObject({ hint: expect.stringContaining("Choose another slug") });
       });
     });
@@ -1257,9 +1245,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(ACME_SSO);
         });
 
-        expect(error).toMatchObject({
-          category: "conflict",
-        });
+        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
         expect(error).toMatchObject({
           hint: "Rename or remove that file, or choose another slug, then run the command again.",
         });
@@ -1282,9 +1268,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(GOOGLE);
         });
 
-        expect(error).toMatchObject({
-          category: "conflict",
-        });
+        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
         expect(error).toMatchObject({
           hint: "Rename or remove that file, then run the command again.",
         });
@@ -1346,9 +1330,7 @@ describe("Connections.resolveBySlug", () => {
       return config.connections.resolveBySlug("acme-sso", given);
     });
 
-    expect(error).toMatchObject({
-      category: "conflict",
-    });
+    expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
     expect(error).toMatchObject({ message });
   });
 
@@ -1360,9 +1342,7 @@ describe("Connections.resolveBySlug", () => {
         return config.connections.resolveBySlug("acme-sso", "https://sso.other.example");
       });
 
-      expect(error).toMatchObject({
-        category: "conflict",
-      });
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({
         details: {
           file: ACME_SSO_FILE,

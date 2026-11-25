@@ -271,5 +271,8 @@ describe("devScriptEdit", () => {
     const refusal = thrownBy(() => devScriptEdit(undefined));
 
     expect(refusal).toBeInstanceOf(OrcaPatchFileMissingError);
+    expect(refusal).toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 });

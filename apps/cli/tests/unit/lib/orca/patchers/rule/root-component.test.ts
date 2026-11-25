@@ -129,14 +129,14 @@ describe("assertMountsRootComponent", () => {
     });
 
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
-      category: "conflict",
+      code: "E_CONFLICT",
       message: "src/main.jsx mounts src/App.jsx, not the src/App.tsx setup writes",
       hint: expect.stringContaining('import App from "./App.tsx"'),
       details: { path: "src/App.jsx", entry: "src/main.jsx", writes: "src/App.tsx" },
     });
   });
 
-  it("refuses with an error that replacing files does not resolve", async ({ dir }) => {
+  it("says replacing files can't fix it", async ({ dir }) => {
     const cwd = await project(dir, {
       "src/main.jsx": reactMain("./App.jsx"),
       "src/App.jsx": "export default function App() {}\n",
@@ -144,6 +144,7 @@ describe("assertMountsRootComponent", () => {
 
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
       name: "OrcaPatchLayoutConflictError",
+      hint: expect.stringContaining("Your app would keep loading src/App.jsx"),
     });
   });
 

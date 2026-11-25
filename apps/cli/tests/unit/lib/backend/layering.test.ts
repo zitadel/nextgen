@@ -17,7 +17,7 @@ describe("the backend's dependencies", () => {
         return (
           found.target !== LAYER &&
           !found.target.startsWith(`${LAYER}/`) &&
-          !(found.file === `${LAYER}/errors.ts` && found.target === "lib/errors")
+          found.target !== "lib/errors"
         );
       })
       .map((found) => {

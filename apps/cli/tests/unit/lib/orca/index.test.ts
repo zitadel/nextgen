@@ -85,7 +85,7 @@ describe("Orca selection", () => {
     expect(orca.patcherFor("angular").canPatch("angular")).toBe(true);
   });
 
-  it("throws for an unsupported framework", () => {
+  it("throws E_VALIDATION for an unsupported framework", () => {
     expect(() => orca.scaffolderFor("ember")).toThrowError(/No scaffolder/);
     expect(() => orca.patcherFor("ember")).toThrowError(/No patcher/);
   });
@@ -124,18 +124,16 @@ describe("Orca detection", () => {
     });
   });
 
-  it("throws OrcaFrameworkMissingError when nothing matches", async ({ dir }) => {
+  it("throws E_FRAMEWORK_NOT_DETECTED when nothing matches", async ({ dir }) => {
     await expect(orca.detect(dir)).rejects.toMatchObject({
-      name: "OrcaFrameworkMissingError",
-      category: "missing",
+      code: "E_FRAMEWORK_NOT_DETECTED",
       message: "Could not detect a supported app framework",
     });
   });
 
-  it("throws OrcaFrameworkMissingError for an unsupported requested framework", async ({ dir }) => {
-    await expect(orca.detect(dir, "cobol")).rejects.toMatchObject({
-      name: "OrcaFrameworkMissingError",
-      message: 'Unsupported framework "cobol"',
+  it("throws E_FRAMEWORK_NOT_DETECTED for an unsupported requested framework", async ({ dir }) => {
+    await expect(orca.detect(dir, "svelte")).rejects.toMatchObject({
+      code: "E_FRAMEWORK_NOT_DETECTED",
     });
   });
 
@@ -143,7 +141,7 @@ describe("Orca detection", () => {
   // --force would then scaffold a new app over this one.
   it("refuses a requested framework other than the app's own", async ({ dir }) => {
     await expect(orca.detect(await nextProject(dir), "react")).rejects.toMatchObject({
-      category: "conflict",
+      code: "E_CONFLICT",
       message: "Setup detects Next.js here, not React (Vite)",
       name: "OrcaFrameworkMismatchError",
       details: { requested: "react", detected: "next" },
@@ -160,7 +158,7 @@ describe("Orca detection", () => {
     );
 
     await expect(orca.detect(pagesRouter, "react")).rejects.toMatchObject({
-      category: "invalid",
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
     });
   });
 
@@ -395,7 +393,7 @@ describe("Orca.scaffold", () => {
     const cwd = await tmpPackageSafe(dir);
     await writeFile(join(cwd, ".gitignore"), "x\n");
     await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({
-      category: "conflict",
+      code: "E_CONFLICT",
     });
   });
 
@@ -403,7 +401,7 @@ describe("Orca.scaffold", () => {
     const cwd = dir;
     await writeFile(join(cwd, "package.json"), "{}");
     await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({
-      category: "conflict",
+      code: "E_CONFLICT",
     });
   });
 
@@ -587,7 +585,7 @@ describe("Orca.scaffold", () => {
       );
 
       await expect(undetectableOrca.scaffoldUndoably(cwd, "fake")).rejects.toMatchObject({
-        name: "OrcaFrameworkMissingError",
+        code: "E_FRAMEWORK_NOT_DETECTED",
       });
       await expect(readdir(cwd)).resolves.toEqual([".gitignore"]);
     });
@@ -632,7 +630,7 @@ describe("Orca.planScaffold", () => {
     const withoutPatchers = new Orca(detectors, scaffolders, [], LocalRuntime.DIR);
 
     await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
-      category: "fault",
+      code: "E_VALIDATION",
       message: 'No patcher supports "next"',
     });
   });

@@ -57,7 +57,7 @@ describe("ReactDetector", () => {
       new ReactDetector().detect(await project(dir, { react: "^17.0.2", vite: "^5" })),
     );
     expect(caught).toBeInstanceOf(OrcaError);
-    expect((caught as OrcaError).category).toBe("invalid");
+    expect((caught as OrcaError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
     expect((caught as OrcaError).message).toContain("below the supported floor");
   });
 

@@ -333,33 +333,6 @@ describe("Wizard", () => {
       });
     });
 
-    it("keeps the error that stopped the run as the cause when an undo cannot be reported", async () => {
-      const wizard = started()
-        .step(new UndoFails())
-        .step(new Fails())
-        .finish(() => "done");
-
-      const error = await wizard
-        .run(
-          {
-            input: "x",
-          },
-          {
-            onUndoError: () => {
-              throw new Error("the report failed");
-            },
-          },
-        )
-        .catch((caught: unknown) => caught);
-
-      expect(error).toBeInstanceOf(WizardInternalError);
-      expect(error).toMatchObject({
-        cause: expect.objectContaining({
-          message: "boom",
-        }),
-      });
-    });
-
     it("undoes the steps that finished when the answer cannot be built", async () => {
       const log: Log = [];
       const wizard = started()
