@@ -66,8 +66,18 @@ security, and spell out what that costs:
 - a deploy racing a revoke is not serialised (TODO #2206 in
   `service/release.go`).
 
-Follow-ups if revocation proves too coarse: a bound on how far back a pin
-reaches, or a bulk "revoke every superseded release on this origin" command.
+Follow-ups if revocation proves too coarse:
+
+- **A pinnable flag on the release.** Only a release marked pinnable can be
+  pinned; any other release answers as if never deployed to the origin. Off by
+  default, the exposure is the releases someone chose, not every release ever
+  deployed. Unlike revoking, clearing the flag is reversible and leaves the
+  release deployable and rollback-able, so a superseded release can be taken
+  out of reach of pins without giving it up. Open: who sets it (`deploy
+  --pinnable`, or the CLI by default once a project's builds pin), and the flag
+  is mutable state on an otherwise immutable release, as `revoked_at` is.
+- A bound on how far back a pin reaches.
+- A bulk "revoke every superseded release on this origin" command.
 
 ## Events
 
