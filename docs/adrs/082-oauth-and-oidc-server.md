@@ -48,6 +48,12 @@
 > only when it sent Basic credentials. The code names the deployment that
 > served its request, so a declared client authenticates against that
 > deployment's variable (zitadel/nextgen#2796).
+>
+> **Amended 2026-11-25** (§8, §11, open question 7): a consent is a
+> delegation ([ADR 033 §3](033-internal-permission-management.md#3-delegation)):
+> one record per user, client and API, holding a set of scopes, with a
+> `delegation_id` that its tokens and their events share. Token exchange is
+> delegation, never impersonation: the token names who acts in `act`.
 
 ## TL;DR
 
@@ -411,8 +417,11 @@ refresh tokens ship.
 ### 8. Consent
 
 A consent records that a user let a client use some scopes. It is kept per
-user, client and scope, and is called a consent because ADR 032 uses *grant*
-for permissions. The flow engine inserts the consent step (ADR 081 §11) when
+user, client and API, as one record holding a set of scopes, and is called a
+consent because ADR 032 uses *grant* for permissions. A consent is a
+delegation ([ADR 033 §3](033-internal-permission-management.md#3-delegation)):
+it carries a `delegation_id`, which the tokens issued under it and their
+events share. The flow engine inserts the consent step (ADR 081 §11) when
 a third-party client asks for scopes the user has not consented to, and
 whenever a request says `prompt=consent`, and on every request for an
 application whose document says so (§3). The scope descriptions on the
@@ -471,9 +480,11 @@ enterprise-managed authorization builds on token exchange and comes with it
 
 ### 11. Later
 
-- Token exchange (RFC 8693), first, since delegation, impersonation and
-  workload identity federation ride on it, and MCP's enterprise-managed
-  authorization with them (§10).
+- Token exchange (RFC 8693), first, since delegation and workload identity
+  federation ride on it, and MCP's enterprise-managed authorization with them
+  (§10). Token exchange is delegation, never impersonation: a token it issues
+  for a user names the acting client in `act`, and Zitadel issues none that
+  hides its actor ([ADR 033 §3](033-internal-permission-management.md#3-delegation)).
 - Device authorization (RFC 8628) for CLIs and TVs.
 - Back-channel logout for third-party clients (first-party ones share the
   session, ADR 081 §12).
@@ -598,6 +609,11 @@ protocol spans the server, the SDK proxy and the widget.
    `<zitadel-session>`, and its name.
 6. How a registered application moves into the release, since the release
    build refuses a file that takes its slug (§3).
+7. Whether a first-hop token, which a client obtains itself with the
+   authorization code grant, carries `act` in addition to `client_id`, or
+   `act` appears only when a different principal presents the user, through
+   token exchange or an operator's act-as
+   ([ADR 033 §3](033-internal-permission-management.md#3-delegation)).
 
 ## Rejected alternatives
 

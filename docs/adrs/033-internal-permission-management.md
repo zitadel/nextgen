@@ -3,6 +3,13 @@
 > **Status:** Proposed
 > **Date:** 2026-07-09
 > **Context:** Authorization for Zitadel-owned internal resources (projects, teams, users, apps, flows, policies) and agent delegation. Builds on [ADR 032](032-permission-catalogs.md).
+>
+> **Amended 2026-11-25** (§3, §5): every call made for a user names who acts,
+> and no token hides its actor. A delegation is a user's consent to a client,
+> a token exchange, or an operator's act-as that the user did not grant, with
+> one `delegation_id` that the consent, the tokens and every event share.
+> Consent is its own record, not an assignment. There is no impersonation. An
+> agent is an application, and its client is the principal.
 
 ## Introduction
 
@@ -47,7 +54,7 @@ Terms specific to internal/system-catalog authorization, in addition to
 |---|---|
 | **System catalog** | The catalog of Zitadel-owned permissions and optional bundles for internal API resources; replaces legacy level-specific role semantics. See [ADR 032 §1](032-permission-catalogs.md#1-one-model-two-catalogs). |
 | **Credential class** | The kind of principal presenting a request (user token, `sk_proj_`, `sk_team_`, origin-bound browser nonce), which constrains which permissions/scopes are even reachable regardless of grants. |
-| **Agent delegation** | A scoped, explicit, auditable grant of authority from a human or service principal to an agent, distinct from the agent inheriting the grantor's full permission set. |
+| **Delegation** | Authority to act for a user: the user's consent to a client, a token exchange, or an operator's act-as that the user did not grant. Scoped, explicit and audited under one `delegation_id`, distinct from the acting principal inheriting the user's full permission set (§3). |
 
 ## Context
 
@@ -77,8 +84,9 @@ Two related issue areas constrain the decision:
 
 - Tenant isolation and data residency need project/tenant boundaries that
   can be enforced before resource data is fetched.
-- Agent identity needs first-class principals and scoped delegations, not
-  broad inherited user authority.
+- Agents need scoped delegations, not broad inherited user authority. An
+  agent is an application, and the client it acts through is the principal
+  ([identity model](../design/api/identity-model.md#applications)).
 
 Cross-project human identity (agencies, consultants, platform staff, and
 operators) is a related but distinct issue area, tracked by
@@ -140,15 +148,35 @@ access is out of scope here (see Introduction, [#333](https://github.com/zitadel
 whatever grant model that future ADR defines must fit this same
 storage/residency invariant, not bypass it.
 
-### 3. Agent delegation
+### 3. Delegation
 
-Agent delegations are stored as assignments with an explicit grantor,
-delegation id, expiry/revocation state, and scope (the general storage
-shape from [ADR 032 §3](032-permission-catalogs.md#3-canonical-relational-storage)).
-An agent never receives permissions by copying all permissions from its
-owner. The resolver must be able to explain which delegation authorized or
-denied an agent action, so that both audit review and the agent itself can
-see exactly why an action succeeded or failed.
+**Amended 2026-11-25.** Every call made for a user names who acts: a token
+issued for a user on behalf of another principal carries `act`, and Zitadel
+issues no token that hides its actor. A delegation is a user's consent to a
+client, a token exchange, or an operator's act-as that the user did not
+grant. It has one `delegation_id`, which the consent record, the tokens and
+every event share.
+
+There is no impersonation. A support or admin act-as is a delegation the user
+did not grant, named and recorded as one.
+
+Consent is a record of its own per user, client and protected API, holding a
+set of scopes ([ADR 082 §8](082-oauth-and-oidc-server.md#8-consent)). It is
+not an `authz_assignments` row: that table's foreign key to a catalog
+relation, its principal types, which have no client, and its lack of an API
+column cannot hold it. Assignment rows reference a `delegation_id` only for
+grants on Zitadel's own API; those are stored with an explicit grantor,
+expiry/revocation state, and scope (the general storage shape from
+[ADR 032 §3](032-permission-catalogs.md#3-canonical-relational-storage)).
+
+Whether a first-hop token, which a client obtains itself with the
+authorization code grant, carries `act` beside `client_id` is
+[ADR 082's open question 7](082-oauth-and-oidc-server.md#open-questions).
+
+An acting principal never receives permissions by copying all permissions
+from the user it acts for. The resolver must be able to explain which
+delegation authorized or denied an action, so that both audit review and the
+acting principal can see exactly why an action succeeded or failed.
 
 ### 4. Resolver and list filtering for internal resources
 
@@ -201,20 +229,27 @@ the same authorization semantics.
 
 ### 5. Audit trail and grant provenance
 
-Every action performed under an explicit grant or agent delegation records
-the grant context in the event actor metadata. For example, an agent acting
-under a delegation:
+Every action performed under an explicit grant or a delegation records the
+grant context in the event actor metadata. A delegated event records `actor`,
+the acting principal (a client or an operator); `user_id`, the user acted
+for; `grantor`, who authorized it; `delegation_id`; and `delegation_type`.
+For example, a client acting for a user under a delegation:
 
 ```
-actor:        agent:report-bot
-delegation_id: delegation-123
-grantor:      user:alice
-action:       project.export.create
-target:       project:42
+actor:           client:report-bot
+user_id:         user:alice
+grantor:         user:alice
+delegation_id:   delegation-123
+delegation_type: delegated
+action:          project.export.create
+target:          project:42
 ```
 
-This makes delegated agent actions visible in the resource owner's audit
-log. There is no hidden access path: the grant check and the audit record
+The event contract still lists `agent` as an actor type until the rename to
+`client` lands ([identity model](../design/api/identity-model.md#what-changes)).
+
+This makes delegated actions visible in the resource owner's audit log.
+There is no hidden access path: the grant check and the audit record
 are the same code path. (The equivalent shape for staff/support grants —
 issuer, human-readable `reason`, role tier, and a break-glass escape hatch
 for when normal grant issuance is unavailable — is defined by
@@ -266,14 +301,14 @@ scoped SQL query against data we already own.
    `app.read`, `app.write`, `app.delete` — and extend to all Zitadel resource
    types. Canonical names live in
    [`docs/design/api/system-permission-catalog.md`](../design/api/system-permission-catalog.md).
-2. Design relational migrations for `resource_scope_index` and agent
-   delegation columns on `authz_assignments` (D2 — not sibling delegation
-   tables). Wave 0 DDL spike and locked decisions:
+2. Design relational migrations for `resource_scope_index` and the
+   delegation columns on `authz_assignments` for grants on Zitadel's own API
+   (D2 — not sibling delegation tables; consent is its own record, §3). Wave 0 DDL spike and locked decisions:
    [`docs/design/api/permission-storage.md`](../design/api/permission-storage.md)
    (implementation tracked by [issue #422](https://github.com/zitadel/nextgen/issues/422)).
 3. Update OpenAPI security declarations to use the final permission names.
-4. Define agent delegation schema, audit record shape, and denial
-   explanation fields.
+4. Define the delegation schema, audit record shape, and denial explanation
+   fields.
 5. Staff/support access, cross-project human identity, and the break-glass
    escape hatch are tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333)
    and intentionally out of scope here. Cross-project principals are
