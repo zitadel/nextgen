@@ -13,15 +13,13 @@ const PATCH_OVERWRITE_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
   hint: "Rerun with --force if you want the CLI to replace this file.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a file of the app that leaves the integration broken is refused. */
 const PATCH_LAYOUT_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
-  hint: "{hint} --force can't fix this: it only replaces files at the paths setup writes.",
-  details: "{details}",
+  hint: "--force can't fix this: it only replaces files at the paths setup writes.",
 } as const satisfies Refusal;
 
 /** How a renderer that is declared and not published yet is refused. */
@@ -108,14 +106,11 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
         if (error instanceof OrcaPatchFileOverwriteError) {
           throw refusalError(PATCH_OVERWRITE_REFUSAL, {
             message: error.message,
-            details: error.details ?? null,
           });
         }
         if (error instanceof OrcaPatchLayoutConflictError) {
           throw refusalError(PATCH_LAYOUT_REFUSAL, {
             message: error.message,
-            hint: error.hint ?? "",
-            details: error.details ?? null,
           });
         }
         if (error instanceof OrcaRendererPendingError) {

@@ -70,7 +70,6 @@ const FILE_OVERWRITE_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
   hint: "Rerun with --force if you want the CLI to replace this file.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** What the app's `package.json` declares, as far as the suite cares. */
@@ -370,7 +369,6 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
       if (error instanceof OrcaPatchFileOverwriteError) {
         throw refusalError(FILE_OVERWRITE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       throw error;

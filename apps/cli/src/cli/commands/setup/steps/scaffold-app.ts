@@ -10,8 +10,7 @@ import { WizardStep } from "@/lib/wizard";
 const SCAFFOLD_OCCUPIED_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
-  hint: "{hint} Pass --force to scaffold into a non-empty directory, or run setup from an existing supported app project.",
-  details: "{details}",
+  hint: "Pass --force to scaffold into a non-empty directory, or run setup from an existing supported app project.",
 } as const satisfies Refusal;
 
 /**
@@ -104,8 +103,6 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
       if (error instanceof OrcaScaffoldOccupiedError) {
         throw refusalError(SCAFFOLD_OCCUPIED_REFUSAL, {
           message: error.message,
-          hint: error.hint ?? "",
-          details: error.details ?? null,
         });
       }
       throw error;

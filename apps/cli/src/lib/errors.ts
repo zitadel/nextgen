@@ -303,10 +303,7 @@ export function toZitadelError(error: unknown): ZitadelError {
   }
 
   if (error instanceof OrcaError) {
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      details: error.details,
-    });
+    return new ZitadelError(error.code, error.message);
   }
 
   if (error instanceof LocalServerError) {
