@@ -16,9 +16,9 @@ Client, from `@zitadel/sdk-tanstack-start/client`:
 
 Browser, from `@zitadel/sdk-tanstack-start/components`:
 
-- {@link react!ZitadelLogin} renders the sign-in and sign-up widget. Use it on your login and register pages.
-- {@link react!ZitadelSession} renders the "signed in as" card with a sign-out button. Use it on a profile page.
-- {@link react!ZitadelLogout} renders a sign-out control on its own.
+- {@link components!ZitadelLogin} renders the sign-in and sign-up widget. Use it on your login and register pages.
+- {@link components!ZitadelSession} renders the "signed in as" card with a sign-out button. Use it on a profile page.
+- {@link components!ZitadelLogout} renders a sign-out control on its own.
 
 ## How it works
 
@@ -37,4 +37,4 @@ The `/react` entry loads without a DOM: `@zitadel/components` has an edge build 
 ## Where to go next
 
 - The [README on GitHub](https://github.com/zitadel/nextgen/tree/main/packages/sdk-tanstack-start#readme) has the install steps and the full middleware option table.
-- Start from {@link server!createZitadelRequestMiddleware} for the server and {@link react!ZitadelLogin} for the browser.
+- Start from {@link server!createZitadelRequestMiddleware} for the server and {@link components!ZitadelLogin} for the browser.
