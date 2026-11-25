@@ -94,13 +94,15 @@ function settingsLookup(rootDir: string): (name: string) => string | undefined {
  * can refuse to start instead of ignoring them.
  *
  * The configuration key was renamed from `nextgen` to `zitadel`, together with the
- * `NUXT_NEXTGEN_*` environment variables and the public `nextgenProxyPath` and `nextgenApiBase`
- * runtime settings. Nuxt does not complain about a key no module reads, so an app that kept the
- * old name would lose every setting silently, including `protectedRoutes`, and its protected pages
- * would open to signed-out visitors. Naming the old settings here turns that into a build error.
+ * `NUXT_NEXTGEN_*` and `NUXT_PUBLIC_NEXTGEN_*` environment variables and the public
+ * `nextgenProxyPath` and `nextgenApiBase` runtime settings. Nuxt does not complain about a key no
+ * module reads, so an app that kept the old name would lose every setting silently, including
+ * `protectedRoutes`, and its protected pages would open to signed-out visitors. Naming the old
+ * settings here turns that into a build error.
  *
- * Only the environment of the build or dev server is visible here. A `NUXT_NEXTGEN_*` variable
- * that is set only on the running server cannot be seen at this point.
+ * Only the environment of the build or dev server is visible here. A `NUXT_NEXTGEN_*`
+ * or `NUXT_PUBLIC_NEXTGEN_*` variable that is set only on the running server cannot be seen at
+ * this point.
  *
  * @param nuxt - The Nuxt instance the module is installed into.
  * @returns One line per old setting found, or an empty list when the app uses the new names.
@@ -120,8 +122,8 @@ function legacyConfigProblems(nuxt: Nuxt): string[] {
     }
   }
   for (const name of Object.keys(process.env)) {
-    if (name.startsWith("NUXT_NEXTGEN_")) {
-      problems.push(`${name} is now ${name.replace("NUXT_NEXTGEN_", "NUXT_ZITADEL_")}`);
+    if (name.startsWith("NUXT_NEXTGEN_") || name.startsWith("NUXT_PUBLIC_NEXTGEN_")) {
+      problems.push(`${name} is now ${name.replace("NEXTGEN_", "ZITADEL_")}`);
     }
   }
   return problems;

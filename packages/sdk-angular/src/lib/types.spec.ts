@@ -34,6 +34,13 @@ type KeysOf<Props> = { readonly [K in keyof Required<Props>]: true };
 
 /**
  * Reads the input names Angular registered for a component class.
+ *
+ * Angular has no public API that lists the inputs of a component, so this reads the private
+ * `ɵcmp.inputs` field. The specs below assert the list is not empty, so a future Angular that
+ * moves the field fails loudly instead of comparing two empty sets.
+ *
+ * @param component - The component class to read.
+ * @returns The sorted input names.
  */
 function inputNames(component: Type<unknown>): string[] {
   const definition = (component as unknown as { ɵcmp: { inputs: Record<string, unknown> } }).ɵcmp;
@@ -83,7 +90,10 @@ describe("the Props types equal the component inputs", () => {
     ["ZitadelLogout", ZitadelLogout, logoutKeys],
     ["ZitadelSession", ZitadelSession, sessionKeys],
   ])("%s declares exactly the keys of its Props type", (_name, component, keys) => {
-    expect(inputNames(component)).toEqual(Object.keys(keys).sort());
+    const names = inputNames(component);
+
+    expect(names.length).toBeGreaterThan(0);
+    expect(names).toEqual(Object.keys(keys).sort());
   });
 
   it("types the inputs of each component as its shared config", () => {

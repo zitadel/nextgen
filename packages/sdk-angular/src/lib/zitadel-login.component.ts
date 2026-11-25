@@ -379,7 +379,9 @@ export class ZitadelLogin {
    * @param event - The DOM event; anything that is not a `CustomEvent` is ignored.
    */
   onFlowStep(event: Event): void {
-    if (event instanceof CustomEvent) this.flowStep.emit(event.detail);
+    if (event instanceof CustomEvent) {
+      this.flowStep.emit(event.detail);
+    }
   }
 
   /**
@@ -390,7 +392,9 @@ export class ZitadelLogin {
    * @param event - The DOM event; anything that is not a `CustomEvent` is ignored.
    */
   onFlowInput(event: Event): void {
-    if (event instanceof CustomEvent) this.flowInput.emit(event.detail);
+    if (event instanceof CustomEvent) {
+      this.flowInput.emit(event.detail);
+    }
   }
 
   /**
@@ -402,7 +406,9 @@ export class ZitadelLogin {
    * @param event - The DOM event; anything that is not a `CustomEvent` is ignored.
    */
   onFlowComplete(event: Event): void {
-    if (event instanceof CustomEvent) this.flowComplete.emit(event.detail);
+    if (event instanceof CustomEvent) {
+      this.flowComplete.emit(event.detail);
+    }
   }
 
   /**
@@ -414,7 +420,9 @@ export class ZitadelLogin {
    * @param event - The DOM event; anything that is not a `CustomEvent` is ignored.
    */
   onFlowRedirect(event: Event): void {
-    if (event instanceof CustomEvent) this.flowRedirect.emit(event.detail);
+    if (event instanceof CustomEvent) {
+      this.flowRedirect.emit(event.detail);
+    }
   }
 
   /**
@@ -425,6 +433,8 @@ export class ZitadelLogin {
    * @param event - The DOM event; anything that is not a `CustomEvent` is ignored.
    */
   onFlowError(event: Event): void {
-    if (event instanceof CustomEvent) this.flowError.emit(event.detail);
+    if (event instanceof CustomEvent) {
+      this.flowError.emit(event.detail);
+    }
   }
 }

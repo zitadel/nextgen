@@ -80,6 +80,14 @@ describe("@zitadel/sdk-nuxt module", () => {
       );
     });
 
+    it("refuses a NUXT_PUBLIC_NEXTGEN_* variable and names its replacement", async () => {
+      vi.stubEnv("NUXT_PUBLIC_NEXTGEN_PROXY_PATH", "/auth");
+
+      await expect(install()).rejects.toThrow(
+        "NUXT_PUBLIC_NEXTGEN_PROXY_PATH is now NUXT_PUBLIC_ZITADEL_PROXY_PATH",
+      );
+    });
+
     it("refuses the old public runtime settings", async () => {
       await expect(install({ publicRuntimeConfig: { nextgenProxyPath: "/auth" } })).rejects.toThrow(
         "runtimeConfig.public.nextgenProxyPath is now runtimeConfig.public.zitadelProxyPath",

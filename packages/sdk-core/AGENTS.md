@@ -10,9 +10,8 @@ project configuration from `@zitadel/sdk-core/config`.
 
 - **Import `@zitadel/api` only in `sdk-core`.** The generated client changes
   with the OpenAPI document; an SDK must not change with it.
-- **Declare a name that an app can see by hand,** never re-export a generated
-  type. `ZitadelFlowPurpose`, `ZitadelFlowBehavior` and `ZitadelFlowStep` are
-  the examples; `ZitadelProject` and `ZitadelConfig` are declared in `config.ts`.
+- **Declare a name an app can see by hand,** never re-export a generated type
+  (`ZitadelFlowStep`, or `ZitadelProject` in `config.ts`).
 - **Add a check next to every hand-written type** that the generated type still
   fits it (`types.spec.ts`, `config.spec.ts`), and keep the field set small.
 - **Keep a field out of `ZitadelFlowStep` unless an app needs it.** A

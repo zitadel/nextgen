@@ -25,34 +25,25 @@ change needs a changeset, and the whole train versions together.
 - **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
   points use `export type *`. This is the one statement of it; READMEs link
   here.
-- **Name a server entry after its framework, and say why.** A meta-framework
-  SDK exposes the entry its framework asks for under the framework's own term
-  (`createZitadelHandle` for SvelteKit's `handle`, `zitadelMiddleware` for the
-  function Next.js calls), and a name that starts with `create` is a factory
-  that returns the handler. Write the reason in the `public-api.json` entry,
-  in the TSDoc of the function and in [ADR 090](../docs/adrs/090-sdk-public-api-standard.md).
-- **Every meta-framework SDK re-exports the widgets of its UI SDK. Never
-  remove, narrow or "deduplicate" that re-export.** `sdk-next` and
-  `sdk-tanstack-start` re-export `sdk-react`, `sdk-sveltekit` re-exports
-  `sdk-svelte`, `sdk-qwik-router` re-exports `sdk-qwik`, `sdk-solid-start`
-  re-exports `sdk-solid` and `sdk-nuxt` re-exports `sdk-vue`, from a
-  `./components` entry (kind `widgets`), by name and never `export *` (TanStack Start wraps the
-  three components so they mount in the browser only, and re-exports the rest). It looks
-  redundant, because the widgets also exist in the UI SDK, and it is deliberate:
-  an app imports everything for its framework from one package, a widget can
-  move between packages without breaking an app, and the references of the
-  sibling SDKs show the same names. The UI SDK is a runtime `dependency` (not a
-  peer) and its build runs first. Widgets stay out of `./server` and `./client`,
-  which load on edge runtimes. A widget name added to or removed from a UI SDK
-  changes the framework SDK's `./components` in the same change. The reasons are
-  in [ADR 090](../docs/adrs/090-sdk-public-api-standard.md#widgets-come-through-the-framework-sdk);
-  `sdk-core`'s contract spec fails when a name is missing.
+- **Name a server entry after its framework.** A meta-framework SDK exposes the
+  entry its framework asks for under the framework's own term, and a `create…`
+  name is a factory that returns the handler ([ADR 090](../docs/adrs/090-sdk-public-api-standard.md)).
+- **Write the reason for a handler name** in its `public-api.json` entry and in
+  the TSDoc of the function.
+- **Every meta-framework SDK re-exports the widgets of its UI SDK** from a
+  `./components` entry (kind `widgets`); never remove, narrow or "deduplicate" it
+  ([why](../docs/adrs/090-sdk-public-api-standard.md#widgets-come-through-the-framework-sdk)).
+- **Re-export widgets by name, never `export *`;** TanStack Start wraps the
+  three components so they mount in the browser only.
+- **Keep the UI SDK a runtime `dependency` of its framework SDK,** built first,
+  and out of `./server` and `./client`, which load on edge runtimes.
+- **Change `./components` in the same change** that adds or removes a widget name
+  in a UI SDK; `sdk-core`'s contract spec fails when a name is missing.
 - **Reach the API package only through `sdk-core`.** An SDK imports
   `@zitadel/sdk-core/config`, never `@zitadel/api`, and a name an app can see is
   declared by hand in `sdk-core`, never re-exported from the generated client.
 - **Never put the codename "nextgen" in a public name, header, configuration
-  key or text.** Use Zitadel. The one exception is the `/__nextgen` proxy path,
-  which the server also knows.
+  key or text;** use Zitadel. The one exception is the `/__nextgen` proxy path.
 - **Keep each package's build tool** (its `build` script). `sdk-next` builds
   per file with `tsc` because bundlers merge `"use client"` modules into shared
   chunks and strip the directive. Never unify the builds without re-testing
@@ -97,9 +88,10 @@ may have nothing else to read. Rules for those comments:
 
 - **Write every doc comment as a multi-line block**, never `/** text */`
   on one line, for each export, property, parameter, prop and event.
-- **Say what it is, why it exists, when to use it and when not to,** what it
-  does when unset or invalid, which option wins, and what happens on the server,
-  on the edge and while hydrating.
+- **Say what it is, why it exists and when (not) to use it,** and what happens
+  when unset or invalid.
+- **Say which option wins** and what happens on the server, on the edge and
+  while hydrating.
 - **Put the caveats from the history in the comment, in words.** Read the
   commits of the symbol (`git log -S'<name>'`); never cite an issue, pull
   request or commit number.
@@ -111,13 +103,12 @@ may have nothing else to read. Rules for those comments:
   documents only what is local to it, and links the rest with `{@link}`.
 - **Link a name only where every SDK that shows the comment exports it.**
   Otherwise write it as a plain literal; TypeDoc fails on a dead link.
-- **Build the references with `pnpm run docs:api`** at the root. It must print
-  no warning, and CI runs it (the root `ci` script), so a warning fails the PR. Each SDK's `typedoc.json` differs from the others only in its
-  `name` and `entryPoints` (Svelte also in `tsconfig`, because TypeDoc cannot
-  read `.svelte`); shared options live in the root `typedoc.base.json`.
-- **Describe a change to an SDK's exports in its `public-api.json`** and in
-  [ADR 090](../docs/adrs/090-sdk-public-api-standard.md), and name the new
-  entry after its framework with the reason, as described above.
+- **Build the references with `pnpm run docs:api`** at the root; a warning
+  fails CI.
+- **Keep each SDK's `typedoc.json` to its `name` and `entryPoints`** (Svelte also
+  `tsconfig`); shared options live in the root `typedoc.base.json`.
+- **Describe a change to an SDK's exports** in its `public-api.json` and in
+  [ADR 090](../docs/adrs/090-sdk-public-api-standard.md).
 
 `sdk-core` has rules of its own: [`sdk-core/AGENTS.md`](sdk-core/AGENTS.md).
 

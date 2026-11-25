@@ -208,6 +208,8 @@ export class ZitadelSession {
    * @param event - The DOM event; anything that is not a `CustomEvent` is ignored.
    */
   onSignout(event: Event): void {
-    if (event instanceof CustomEvent) this.signout.emit(event.detail);
+    if (event instanceof CustomEvent) {
+      this.signout.emit(event.detail);
+    }
   }
 }
