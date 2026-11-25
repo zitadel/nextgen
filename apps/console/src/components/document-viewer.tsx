@@ -3,7 +3,7 @@ import { stringify as stringifyYaml } from "yaml";
 
 import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
 import { CopyButton } from "@/components/ui/copy-button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
 
@@ -77,9 +77,11 @@ export function DocumentViewer({
     // `flex-1 min-w-0` so the viewer takes the width the field table leaves and
     // its own long lines scroll inside it — without it the `pre` sizes to its
     // content and pushes the panel out of the card.
-    <div
+    <Tabs
+      value={view}
+      onValueChange={(next) => setView(next as View)}
       className={cn(
-        "flex min-w-0 flex-1 flex-col overflow-hidden border-border",
+        "min-w-0 flex-1 gap-0 overflow-hidden border-border",
         compact ? "border-t" : "rounded-md border",
       )}
     >
@@ -92,21 +94,19 @@ export function DocumentViewer({
           compact ? "pr-2 pl-[5px]" : "pr-2.5 pl-3",
         )}
       >
-        <Tabs value={view} onValueChange={(next) => setView(next as View)}>
-          <TabsList>
-            {fields && (
-              <TabsTrigger value="fields" variant="muted" className={tab}>
-                Fields
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="json" variant="muted" className={tab}>
-              JSON
+        <TabsList>
+          {fields && (
+            <TabsTrigger value="fields" variant="muted" className={tab}>
+              Fields
             </TabsTrigger>
-            <TabsTrigger value="yaml" variant="muted" className={tab}>
-              YAML
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+          )}
+          <TabsTrigger value="json" variant="muted" className={tab}>
+            JSON
+          </TabsTrigger>
+          <TabsTrigger value="yaml" variant="muted" className={tab}>
+            YAML
+          </TabsTrigger>
+        </TabsList>
         {view !== "fields" && (
           <CopyButton
             value={source}
@@ -116,48 +116,59 @@ export function DocumentViewer({
         )}
       </div>
 
-      {view === "fields" && (
-        <div className={cn("overflow-auto", compact ? "max-h-80" : "max-h-[32rem]")}>{fields}</div>
-      )}
+      {/* One panel for whichever view is active, so the selected tab's
+          `aria-controls` names an element that exists. */}
+      <TabsContent
+        value={view}
+        // The scrolling source inside is the tab stop; the panel is not a second one.
+        tabIndex={-1}
+        className="flex-none"
+      >
+        {view === "fields" && (
+          <div className={cn("overflow-auto", compact ? "max-h-80" : "max-h-[32rem]")}>
+            {fields}
+          </div>
+        )}
 
-      {/* The design's code block hugs its content, but it is drawn around a
+        {/* The design's code block hugs its content, but it is drawn around a
           ten-line sample; a real schema runs to a few hundred lines, which
           would push the CLI hint — the point of the panel — thousands of
           pixels below the fold and leave the field table stranded beside a
           column of JSON. Capping the viewport keeps the hint at the foot and
           the two panels the same order of height the design pairs them at. */}
-      <pre
-        hidden={view === "fields"}
-        className={cn(
-          "overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)",
-          // Compact, the source sits in a bordered code block of its own, a
-          // shade below the popover, as the schema screen frames it: it reads
-          // as text to copy, apart from the Fields list on the popover's
-          // surface. Dark, the full canvas is too deep against `popover`.
-          compact
-            ? "m-3 max-h-72 rounded-md border border-border bg-background dark:bg-background/40"
-            : "max-h-[32rem]",
-        )}
-      >
-        {/* Plain until the grammars compile — same face, size and leading, so
+        <pre
+          hidden={view === "fields"}
+          className={cn(
+            "overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)",
+            // Compact, the source sits in a bordered code block of its own, a
+            // shade below the popover, as the schema screen frames it: it reads
+            // as text to copy, apart from the Fields list on the popover's
+            // surface. Dark, the full canvas is too deep against `popover`.
+            compact
+              ? "m-3 max-h-72 rounded-md border border-border bg-background dark:bg-background/40"
+              : "max-h-[32rem]",
+          )}
+        >
+          {/* Plain until the grammars compile — same face, size and leading, so
             the block does not reflow when the colour arrives. */}
-        <code>
-          {lines
-            ? lines.map((line, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static syntax-highlighted lines, never reordered
-                <Fragment key={index}>
-                  {index > 0 && "\n"}
-                  {line.map((token, position) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: static highlight tokens within a line, never reordered
-                    <span key={position} style={{ color: token.color }}>
-                      {token.content}
-                    </span>
-                  ))}
-                </Fragment>
-              ))
-            : source}
-        </code>
-      </pre>
+          <code>
+            {lines
+              ? lines.map((line, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: static syntax-highlighted lines, never reordered
+                  <Fragment key={index}>
+                    {index > 0 && "\n"}
+                    {line.map((token, position) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: static highlight tokens within a line, never reordered
+                      <span key={position} style={{ color: token.color }}>
+                        {token.content}
+                      </span>
+                    ))}
+                  </Fragment>
+                ))
+              : source}
+          </code>
+        </pre>
+      </TabsContent>
 
       {cliHint && (
         <CliHint>
@@ -165,7 +176,7 @@ export function DocumentViewer({
           <CliCommand>{CLI_DEPLOY}</CliCommand>. Deploying creates a new revision.
         </CliHint>
       )}
-    </div>
+    </Tabs>
   );
 }
 

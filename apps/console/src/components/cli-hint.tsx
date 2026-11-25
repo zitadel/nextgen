@@ -30,8 +30,8 @@ export function cliSetup(server: string): string {
 }
 
 /**
- * The footer line under a document or a resource table that says how to change
- * what it shows from the CLI. It sits inside the bordered panel, ruled off
+ * The footer line under a document that says how to change what it shows from
+ * the CLI. It sits inside the bordered panel, ruled off
  * above.
  *
  * Inline flow, not a flex row: the design is three auto-layout children with a
@@ -46,7 +46,7 @@ export function CliHint({ children }: { children: ReactNode }) {
   );
 }
 
-/** A CLI command inside a `CliHint`. */
+/** A CLI command set inline in a sentence, as in a `CliHint`. */
 export function CliCommand({ children }: { children: string }) {
   return <InlineCode className="text-[10px]">{children}</InlineCode>;
 }

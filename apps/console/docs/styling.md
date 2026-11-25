@@ -120,7 +120,8 @@ Canonical examples:
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
-| Centred state in place of a screen's content (the project picker), or of a table with nothing to list yet (in a `Card`) | `Empty` (`src/components/ui/empty.tsx`) |
+| Centred state in place of a screen's content (the project picker) | `Empty` (`src/components/ui/empty.tsx`) |
+| A directory or tab with nothing in it yet, where the design draws a card in place of its table; the docs link only where the design draws one | `ResourceEmpty` (`src/components/resource-empty.tsx`) |
 
 ### Status tones
 
@@ -191,7 +192,8 @@ beside the action on one 36px row and on its own row under the title on a
 phone, where `filterBelow` keeps it at every width, as Events' search is, and
 the list's `ResourceFilter` as its `below` row, by "List filters" below),
 then `ResourceHeaderRow` +
-`ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
+`ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` (a filter that matches
+nothing; a directory or tab whose design draws a card when it has nothing yet takes `ResourceEmpty`) and `LoadMore`. A
 fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside
 its card below 576px rather than squeezing the cells.
 

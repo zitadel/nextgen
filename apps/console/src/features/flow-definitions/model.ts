@@ -57,14 +57,6 @@ export function humanise(value: string): string {
   return titleCase(value.replace(/[-_]/g, " "));
 }
 
-/**
- * Step names in the definition's own order — the author's reading order, not the
- * runtime sequence, which comes from each step's transitions.
- */
-export function flowStepNames(definition: FlowDefinition): string[] {
-  return (definition.steps ?? []).map((step) => step.name);
-}
-
 /** `submit, passkey, navigate` — the actions column of the steps table. */
 export function stepActionNames(step: FlowStep): string {
   return (step.actions ?? []).map((action) => action.name).join(", ");
