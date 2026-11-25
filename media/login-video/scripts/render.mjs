@@ -41,9 +41,7 @@ if (stills) {
     await page.screenshot({ path: join(dir, `${t.toFixed(2)}.png`) });
   }
   const { music, ...schedule } = info.schedule;
-  console.log(
-    JSON.stringify({ duration: info.duration, build: info.build, ladder: info.ladder, schedule }),
-  );
+  console.log(JSON.stringify({ duration: info.duration, runs: info.runs, schedule }));
   await browser.close();
   process.exit(0);
 }
