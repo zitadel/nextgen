@@ -88,7 +88,9 @@ describe("AuthAttemptService.prove", () => {
   it("raises any failure that is not a rejected proof", async () => {
     await expect(
       proving(async () => {
-        throw new BackendUnavailableError("broken", { status: 500 });
+        throw new BackendUnavailableError("broken", {
+          status: 500,
+        });
       }).prove("att_1", "password", { password: "hunter2" }),
     ).rejects.toMatchObject({ status: 500 });
   });

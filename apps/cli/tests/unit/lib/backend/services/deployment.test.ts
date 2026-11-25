@@ -4,7 +4,11 @@ import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { BackendConflictError, BackendForbiddenError } from "@/lib/backend";
+import {
+  BackendConflictError,
+  BackendForbiddenError,
+  BackendReleaseRevokedError,
+} from "@/lib/backend";
 import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
@@ -701,7 +705,7 @@ describe("DeploymentService.deployToPrimary", () => {
 
   it("reports a revoked release, which trying again would fail the same way", async () => {
     const deploymentService = deployWith([], async () => {
-      throw new BackendConflictError("revoked", {
+      throw new BackendReleaseRevokedError("revoked", {
         status: 409,
         body: {
           code: "rel.revoked",

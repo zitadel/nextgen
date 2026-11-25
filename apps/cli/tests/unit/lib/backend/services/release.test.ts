@@ -1,7 +1,7 @@
 import { RevokeRelease409DetailsOriginsItemKind } from "@zitadel/api/generated/model";
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendConflictError } from "@/lib/backend";
+import { BackendConflictError, BackendReleaseInUseError } from "@/lib/backend";
 import { ReleaseService } from "@/lib/backend/services/release";
 import { fakeClient } from "@tests/helpers/fake-client";
 import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
@@ -110,7 +110,7 @@ describe("ReleaseService.revoke", () => {
      */
     function refusedWith(body: unknown): ReleaseService {
       const revokeRelease = async () => {
-        throw new BackendConflictError("release: still served by an origin", {
+        throw new BackendReleaseInUseError("release: still served by an origin", {
           status: 409,
           body,
         });
@@ -140,7 +140,6 @@ describe("ReleaseService.revoke", () => {
     );
 
     it.each([
-      ["another code", { ...anInUseAnswer([PRIMARY]), code: "rel.revoked" }],
       ["no origins", anInUseAnswer([])],
       ["an origin of no known kind", anInUseAnswer([{ ...PRIMARY, kind: "other" }])],
       ["an origin that is empty", anInUseAnswer([{ ...PRIMARY, origin: "" }])],

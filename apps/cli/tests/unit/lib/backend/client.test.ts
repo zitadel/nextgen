@@ -142,17 +142,40 @@ describe("a client's destructive operations", () => {
 describe("responseFailure", () => {
   it.each([
     [404, "BackendNotFoundError"],
-    [410, "BackendNotFoundError"],
+    [410, "BackendGoneError"],
     [409, "BackendConflictError"],
     [401, "BackendUnauthorizedError"],
     [403, "BackendForbiddenError"],
     [400, "BackendRejectedError"],
     [422, "BackendRejectedError"],
-    [429, "BackendUnavailableError"],
+    [429, "BackendTooManyRequestsError"],
     [500, "BackendUnavailableError"],
     [503, "BackendUnavailableError"],
   ])("raises a %i as a %s", (status, name) => {
     expect(responseFailure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
+      name,
+      status,
+    });
+  });
+
+  it.each([
+    [410, "proj.claim_window_expired", "BackendClaimWindowExpiredError"],
+    [404, "claim_challenge.not_found", "BackendClaimChallengeNotFoundError"],
+    [409, "rel.revoked", "BackendReleaseRevokedError"],
+    [409, "rel.in_use", "BackendReleaseInUseError"],
+    [409, "att.proof_rejected", "BackendProofRejectedError"],
+    [400, "req.invalid", "BackendRequestInvalidError"],
+  ])("raises a %i answering %s as a %s", (status, code, name) => {
+    expect(
+      responseFailure(
+        status,
+        "http://localhost:8080/p",
+        {
+          code,
+        },
+        "refused",
+      ),
+    ).toMatchObject({
       name,
       status,
     });

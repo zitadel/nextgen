@@ -86,7 +86,7 @@ describe("SchemaService.get", () => {
     });
   });
 
-  it("refuses a reference that is neither, saying how to see what the project has", async () => {
+  it("refuses a reference that is neither", async () => {
     await expect(
       service({
         getSchema: async () => {
