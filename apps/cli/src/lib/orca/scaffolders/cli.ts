@@ -120,7 +120,6 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     }
     if (support === "refused") {
       throw new OrcaScaffoldBlockedError(
-        "node",
         `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}`,
         {
           hint: `Switch to Node ${describeAcceptedNode(range)} and rerun, or create the ${this.displayName} app with that Node and run setup inside it.`,
@@ -141,7 +140,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     const result = execaSync(command, [...args], { cwd, reject: false });
     if (result.code !== undefined) {
       if (result.code === "ENOENT") {
-        throw new OrcaScaffoldBlockedError("command", `Command not found: ${command}`, {
+        throw new OrcaScaffoldBlockedError(`Command not found: ${command}`, {
           hint: `Ensure '${command}' is installed and on PATH.`,
           details: { command, args: [...args], code: result.code },
         });

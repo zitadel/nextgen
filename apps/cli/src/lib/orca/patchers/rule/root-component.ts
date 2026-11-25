@@ -3,7 +3,7 @@ import { join, posix } from "node:path";
 
 import { parseModule } from "magicast";
 
-import { OrcaPatchFileConflictError } from "@/lib/orca/errors";
+import { OrcaPatchLayoutConflictError } from "@/lib/orca/errors";
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
 import { tryCatch } from "@/lib/try-catch";
 import { isFile } from "@/lib/fs";
@@ -60,7 +60,7 @@ const TYPESCRIPT_FOR_JAVASCRIPT: Readonly<Record<string, ReadonlyArray<string>>>
 };
 
 /**
- * Throws OrcaPatchFileConflictError when the app's entry mounts a root component from a
+ * Throws OrcaPatchLayoutConflictError when the app's entry mounts a root component from a
  * file other than `root.path`, so setup stops before it creates a project
  * instead of writing a root component the app never loads.
  *
@@ -102,10 +102,9 @@ export async function assertMountsRootComponent(
     return;
   }
   const statement = importStatement(entry, root);
-  throw new OrcaPatchFileConflictError(
+  throw new OrcaPatchLayoutConflictError(
     `${entry} mounts ${mountedRoot}, not the ${root.path} setup writes`,
     {
-      force: "useless",
       hint:
         `Your app would keep loading ${mountedRoot}, and the root component setup writes would ` +
         `never run. In ${entry}, import the root as \`${statement}\` and mount that instead, ` +

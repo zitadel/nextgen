@@ -124,18 +124,19 @@ describe("Orca detection", () => {
     });
   });
 
-  it("throws OrcaFrameworkError when nothing matches", async ({ dir }) => {
+  it("throws OrcaFrameworkNotDetectedError when nothing matches", async ({ dir }) => {
     await expect(orca.detect(dir)).rejects.toMatchObject({
-      name: "OrcaFrameworkError",
+      name: "OrcaFrameworkNotDetectedError",
       category: "missing",
       message: "Could not detect a supported app framework",
     });
   });
 
-  it("throws OrcaFrameworkError for an unsupported requested framework", async ({ dir }) => {
+  it("throws OrcaFrameworkNotDetectedError for an unsupported requested framework", async ({
+    dir,
+  }) => {
     await expect(orca.detect(dir, "cobol")).rejects.toMatchObject({
-      name: "OrcaFrameworkError",
-      reason: "unknown",
+      name: "OrcaFrameworkNotDetectedError",
       details: { requested: "cobol" },
     });
   });
@@ -146,7 +147,7 @@ describe("Orca detection", () => {
     await expect(orca.detect(await nextProject(dir), "react")).rejects.toMatchObject({
       category: "conflict",
       message: "Setup detects Next.js here, not React (Vite)",
-      reason: "mismatch",
+      name: "OrcaFrameworkMismatchError",
       details: { requested: "react", detected: "next" },
     });
   });
@@ -584,7 +585,7 @@ describe("Orca.scaffold", () => {
       );
 
       await expect(undetectableOrca.scaffoldUndoably(cwd, "fake")).rejects.toMatchObject({
-        name: "OrcaFrameworkError",
+        name: "OrcaFrameworkNotDetectedError",
       });
       await expect(readdir(cwd)).resolves.toEqual([".gitignore"]);
     });

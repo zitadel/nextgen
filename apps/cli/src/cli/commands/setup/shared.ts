@@ -44,14 +44,7 @@ import {
   ssoEnableFlags,
 } from "@/lib/idp";
 import type { GlobalOptions } from "@/cli/core/types";
-import {
-  type FrameworkChoice,
-  type FrameworkFacts,
-  type Orca,
-  OrcaPatchFileConflictError,
-  type OrcaPatchForce,
-  type UndoableScaffold,
-} from "@/lib/orca";
+import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -842,36 +835,6 @@ export async function scaffoldOf(
   } catch (error) {
     throw setupRefusal(error, []);
   }
-}
-
-/** What setup adds to the hint of a patch that meets a file, by what would resolve it. */
-const PATCH_FORCE_ADVICE: Record<OrcaPatchForce, string | undefined> = {
-  replaces: "Rerun with --force if you want the CLI to replace this file.",
-  useless: "--force can't fix this: it only replaces files at the paths setup writes.",
-  none: undefined,
-};
-
-/**
- * A patch's conflict with a file, with what setup says of `--force` added to
- * its hint.
- *
- * @param error - What patching the app threw.
- * @returns The refusal setup reports, or `error` as it was when it has nothing to add.
- */
-export function patchRefusal(error: unknown): unknown {
-  if (!(error instanceof OrcaPatchFileConflictError)) {
-    return error;
-  }
-  const after = PATCH_FORCE_ADVICE[error.force];
-  if (after === undefined) {
-    return error;
-  }
-
-  return new ZitadelError(error.code, error.message, {
-    hint: [error.hint, after].filter(Boolean).join(" "),
-    details: error.details,
-    cause: error,
-  });
 }
 
 /**

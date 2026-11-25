@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { OrcaRendererError } from "@/lib/orca";
+import { OrcaRendererPendingError, OrcaRendererUnknownError } from "@/lib/orca";
 import {
   AVAILABLE_RENDERER_IDS,
   getRenderer,
@@ -62,8 +62,7 @@ describe("getRenderer", () => {
       getRenderer("web-component");
       expect.unreachable("getRenderer should throw for a not-implemented renderer");
     } catch (error) {
-      expect(error).toBeInstanceOf(OrcaRendererError);
-      expect((error as OrcaRendererError).reason).toBe("pending");
+      expect(error).toBeInstanceOf(OrcaRendererPendingError);
     }
   });
 
@@ -72,8 +71,7 @@ describe("getRenderer", () => {
       getRenderer("vue");
       expect.unreachable("getRenderer should throw for an unknown renderer");
     } catch (error) {
-      expect(error).toBeInstanceOf(OrcaRendererError);
-      expect((error as OrcaRendererError).reason).toBe("unknown");
+      expect(error).toBeInstanceOf(OrcaRendererUnknownError);
     }
   });
 
@@ -82,7 +80,7 @@ describe("getRenderer", () => {
       getRenderer("vue");
       expect.unreachable("getRenderer should throw for an unknown renderer");
     } catch (error) {
-      const hint = (error as OrcaRendererError).hint;
+      const hint = (error as OrcaRendererUnknownError).hint;
       expect(hint).toContain("react");
       expect(hint).not.toContain("web-component");
     }

@@ -1,6 +1,7 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca, OrcaFrameworkError, type OrcaFrameworkReason } from "@/lib/orca";
+import { createOrca, OrcaFrameworkMismatchError, OrcaFrameworkNotDetectedError } from "@/lib/orca";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
@@ -11,58 +12,13 @@ import {
   setupRetryFlags,
 } from "@/cli/commands/setup/shared";
 
-/**
- * What setup adds to the hint of a framework it cannot use, where it names the
- * flags it takes, by why.
- */
-const FRAMEWORK_ADVICE: Record<
-  OrcaFrameworkReason,
-  (error: OrcaFrameworkError) => string | undefined
-> = {
-  none: () => {
-    return "Pass --cwd <path-to-app> to point setup at your app.";
-  },
-  unknown: () => {
-    return undefined;
-  },
-  layout: () => {
-    return undefined;
-  },
-  outdated: () => {
-    return undefined;
-  },
-  mismatch: (error) => {
-    const { requested, detected, requestedName } = error.details ?? {};
-
-    return (
-      `Rerun setup without --framework, or with --framework ${String(detected)}, to set up this ` +
-      `app, or point --cwd at the ${String(requestedName ?? requested)} app you meant. Setup never ` +
-      "scaffolds a new app over one it detects, --force or not."
-    );
-  },
-};
-
-/**
- * A framework failure with what setup says of the flags added to its hint.
- *
- * @param error - What detecting the framework threw.
- * @returns The refusal setup reports, or `error` as it was when it has nothing to add.
- */
-function frameworkRefusal(error: unknown): unknown {
-  if (!(error instanceof OrcaFrameworkError)) {
-    return error;
-  }
-  const after = FRAMEWORK_ADVICE[error.reason](error);
-  if (after === undefined) {
-    return error;
-  }
-
-  return new ZitadelError(error.code, error.message, {
-    hint: [error.hint, after].filter(Boolean).join(" "),
-    details: error.details,
-    cause: error,
-  });
-}
+/** How an app of another framework than the one asked for is refused. */
+const FRAMEWORK_MISMATCH_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun setup without --framework, or with --framework {detected}, to set up this app, or point --cwd at the {requestedName} app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
+  details: { requested: "{requested}", detected: "{detected}" },
+} as const satisfies Refusal;
 
 /**
  * The framework a rerun is told to scaffold when the available ones include it.
@@ -166,10 +122,30 @@ export class DetectFramework extends WizardStep<
           scaffoldedBesideFiles: false,
         };
       })
-      .catch(async (error) => {
-        if (!(error instanceof OrcaFrameworkError && error.scaffoldable)) {
+      .catch((error: unknown) => {
+        if (!(error instanceof OrcaFrameworkNotDetectedError)) {
           detecting.fail();
-          throw frameworkRefusal(error);
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof OrcaFrameworkMismatchError) {
+          const { requested, detected, requestedName } = error.details ?? {};
+          throw Object.assign(
+            refusalError(FRAMEWORK_MISMATCH_REFUSAL, {
+              message: error.message,
+              requested: String(requested),
+              detected: String(detected),
+              requestedName: String(requestedName ?? requested),
+            }),
+            { cause: error },
+          );
+        }
+        throw error;
+      })
+      .catch(async (error: unknown) => {
+        if (!(error instanceof OrcaFrameworkNotDetectedError)) {
+          throw error;
         }
         const target = await orca.inspectScaffoldTarget(this.deps.cwd);
         if (!target.scaffoldable && !this.deps.force) {

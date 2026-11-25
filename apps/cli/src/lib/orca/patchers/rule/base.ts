@@ -70,7 +70,7 @@ export abstract class AbstractRulePatcher implements Patcher {
    * @param ctx - What the integration is applied with.
    * @param opts - Where, and whether to write or only report.
    * @returns Every file the run touched or skipped, and every dependency it added.
-   * @throws OrcaPatchFileConflictError when {@link preflight} refuses the project, or a
+   * @throws OrcaPatchLayoutConflictError when {@link preflight} refuses the project, or OrcaPatchFileOverwriteError when a
    *   planned file holds something else and `force` is not set.
    */
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
@@ -105,7 +105,7 @@ export abstract class AbstractRulePatcher implements Patcher {
   }
 
   /**
-   * Refuses, with OrcaPatchFileConflictError, a project the plan would leave broken without
+   * Refuses, with OrcaPatchLayoutConflictError, a project the plan would leave broken without
    * conflicting on any path it writes: the file-writer only stops on a file
    * at exactly a path in the plan, and some of the app's own files break the
    * integration from another path. Setup's dry-run patch runs this before it

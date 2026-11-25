@@ -136,14 +136,14 @@ describe("assertMountsRootComponent", () => {
     });
   });
 
-  it("says replacing files would change nothing", async ({ dir }) => {
+  it("refuses with an error that replacing files does not resolve", async ({ dir }) => {
     const cwd = await project(dir, {
       "src/main.jsx": reactMain("./App.jsx"),
       "src/App.jsx": "export default function App() {}\n",
     });
 
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
-      force: "useless",
+      name: "OrcaPatchLayoutConflictError",
     });
   });
 

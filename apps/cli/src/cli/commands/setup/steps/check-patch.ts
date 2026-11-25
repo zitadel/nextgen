@@ -1,6 +1,24 @@
 import { WizardStep } from "@/lib/wizard";
+import { OrcaPatchFileOverwriteError, OrcaPatchLayoutConflictError } from "@/lib/orca";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 
-import { type Fact, patchRefusal, type SetupServices } from "@/cli/commands/setup/shared";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
+
+/** How a file the patch would write over, holding something else, is refused. */
+const PATCH_OVERWRITE_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun with --force if you want the CLI to replace this file.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a file of the app that leaves the integration broken is refused. */
+const PATCH_LAYOUT_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "{hint} --force can't fix this: it only replaces files at the paths setup writes.",
+  details: "{details}",
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -76,7 +94,29 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
           },
         )
         .catch((error: unknown) => {
-          throw patchRefusal(error);
+          if (error instanceof OrcaPatchFileOverwriteError) {
+            throw Object.assign(
+              refusalError(PATCH_OVERWRITE_REFUSAL, {
+                message: error.message,
+                details: error.details ?? null,
+              }),
+              { cause: error },
+            );
+          }
+          throw error;
+        })
+        .catch((error: unknown) => {
+          if (error instanceof OrcaPatchLayoutConflictError) {
+            throw Object.assign(
+              refusalError(PATCH_LAYOUT_REFUSAL, {
+                message: error.message,
+                hint: error.hint ?? "",
+                details: error.details ?? null,
+              }),
+              { cause: error },
+            );
+          }
+          throw error;
         });
     }
     return {};

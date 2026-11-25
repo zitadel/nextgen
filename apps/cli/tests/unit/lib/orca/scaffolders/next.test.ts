@@ -63,7 +63,6 @@ describe("NextScaffolder", () => {
       new NextScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "next"),
     ).rejects.toMatchObject({
       name: "OrcaScaffoldBlockedError",
-      reason: "command",
       message: expect.stringContaining("Command not found"),
       hint: expect.stringContaining("PATH"),
     });

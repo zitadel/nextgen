@@ -1,42 +1,18 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { toZitadelError, ZitadelError } from "@/lib/errors";
-import { OrcaScaffoldBlockedError, type OrcaScaffoldBlockedReason } from "@/lib/orca";
+import { toZitadelError } from "@/lib/errors";
+import { OrcaScaffoldOccupiedError } from "@/lib/orca";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
-/**
- * What setup adds to the hint of a scaffold it cannot start, where it names the
- * flags it takes, by what stands in the way.
- */
-const SCAFFOLD_ADVICE: Record<OrcaScaffoldBlockedReason, string | undefined> = {
-  occupied:
-    "Pass --force to scaffold into a non-empty directory, or run setup from an existing supported app project.",
-  node: undefined,
-  command: undefined,
-};
-
-/**
- * A blocked scaffold with what setup says of the flags added to its hint.
- *
- * @param error - What scaffolding threw.
- * @returns The refusal setup reports, or `error` as it was when it has nothing to add.
- */
-function scaffoldRefusal(error: unknown): unknown {
-  if (!(error instanceof OrcaScaffoldBlockedError)) {
-    return error;
-  }
-  const after = SCAFFOLD_ADVICE[error.reason];
-  if (after === undefined) {
-    return error;
-  }
-
-  return new ZitadelError(error.code, error.message, {
-    hint: [error.hint, after].filter(Boolean).join(" "),
-    details: error.details,
-    cause: error,
-  });
-}
+/** How a directory that already holds something is refused as a place to scaffold. */
+const SCAFFOLD_OCCUPIED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "{hint} Pass --force to scaffold into a non-empty directory, or run setup from an existing supported app project.",
+  details: "{details}",
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -105,7 +81,20 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
           .scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force)
           .catch((error) => {
             current?.fail();
-            throw scaffoldRefusal(error);
+            throw error;
+          })
+          .catch((error: unknown) => {
+            if (error instanceof OrcaScaffoldOccupiedError) {
+              throw Object.assign(
+                refusalError(SCAFFOLD_OCCUPIED_REFUSAL, {
+                  message: error.message,
+                  hint: error.hint ?? "",
+                  details: error.details ?? null,
+                }),
+                { cause: error },
+              );
+            }
+            throw error;
           })
       : undefined;
     if (newApp !== undefined) {
