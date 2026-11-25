@@ -823,6 +823,8 @@ describe("SDK public API ↔ the standard", () => {
     "ZitadelFlowErrorDetail",
     "ZitadelSignoutDetail",
     "ZitadelFlowPurpose",
+    "ZitadelFlowStep",
+    "ZitadelFlowBehavior",
   ];
   const SETUP = [
     "configureZitadel",
@@ -939,5 +941,36 @@ describe("SDK doc comments ↔ the documentation standard", () => {
         .flatMap((line, at) => (SINGLE_LINE_DOC.test(line) ? [`${path}:${at + 1}`] : [])),
     );
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * Where the SDKs meet the API package (ADR 090).
+ *
+ * The API package is generated from the OpenAPI document and changes with it. So `sdk-core` is the
+ * only SDK that imports it, through `config.ts`, and its public type files declare the types an app
+ * can see themselves. An SDK that imported the API package directly, or a public type that named a
+ * generated one, would tie that SDK's public API to every API change.
+ */
+describe("SDK sources ↔ the API package", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const sdkDirs = readdirSync(packagesDir).filter(
+    (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
+  );
+  const API_IMPORT = /(?:from|import\()\s*["']@zitadel\/api(?:\/[^"']*)?["']/;
+  const TEST_FILE = /\.(spec|test)\.[cm]?[jt]sx?$|__tests__|test-setup/;
+  const SOURCE_FILE = /\.(ts|tsx|vue|svelte)$/;
+
+  it.each(sdkDirs)("%s reaches the API package only through sdk-core", (dir) => {
+    const offenders = readdirSync(`${packagesDir}${dir}/src`, { recursive: true, encoding: "utf8" })
+      .filter((file) => SOURCE_FILE.test(file) && !TEST_FILE.test(file))
+      .filter((file) => API_IMPORT.test(readFileSync(`${packagesDir}${dir}/src/${file}`, "utf8")));
+    expect(offenders).toEqual([]);
+  });
+
+  it.each(["types.ts", "config.ts"])("sdk-core's public %s names no generated type", (file) => {
+    expect(readFileSync(`${packagesDir}sdk-core/src/${file}`, "utf8")).not.toMatch(
+      /@zitadel\/api\/generated/,
+    );
   });
 });

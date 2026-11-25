@@ -7,8 +7,8 @@ import "@zitadel/components";
 export { default as ZitadelLogin } from "./ZitadelLogin.svelte";
 export { default as ZitadelLogout } from "./ZitadelLogout.svelte";
 export { default as ZitadelSession } from "./ZitadelSession.svelte";
-export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
-export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
+export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
+export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";
 export * from "./types";
 
 /*

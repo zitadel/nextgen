@@ -8,7 +8,7 @@
  *
  * @module
  */
-import { getZitadelConfig } from "@zitadel/api/config";
+import { getZitadelConfig } from "@zitadel/sdk-core/config";
 import { getSession as readSession } from "@zitadel/sdk-core/session";
 
 import type { ClientAuthResult } from "./types.js";

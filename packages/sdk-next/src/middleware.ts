@@ -15,7 +15,7 @@
  *
  * @module
  */
-import type { ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelProject } from "@zitadel/sdk-core/config";
 import type { NextgenMiddlewareOptions, ResolveSessionOptions } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 import type { NextRequest } from "next/server";

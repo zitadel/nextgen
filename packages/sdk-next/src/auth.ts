@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getZitadelConfig } from "@zitadel/api/config";
+import { getZitadelConfig } from "@zitadel/sdk-core/config";
 import { checkOpaqueSessionToken, jwtNamesProject } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 import { headers } from "next/headers";

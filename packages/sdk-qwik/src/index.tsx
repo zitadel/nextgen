@@ -28,14 +28,14 @@ import {
   getZitadelConfig,
   type ZitadelConfig,
   type ZitadelProject,
-} from "@zitadel/api/config";
+} from "@zitadel/sdk-core/config";
 
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import type { ZitadelWidgetAttributes } from "./types.js";
 
 /**
  * Re-exports {@link configureZitadel}, {@link getApi} and {@link getZitadelConfig} from
- * `@zitadel/api/config`, so an app wires the API client from this one package.
+ * `@zitadel/sdk-core/config`, so an app wires the API client from this one package.
  *
  * {@link configureZitadel} sets the project the SDK talks to and returns the project handle,
  * {@link getApi} returns the configured API client, and {@link getZitadelConfig} reads the
@@ -53,6 +53,8 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export type {
   ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,

@@ -44,6 +44,8 @@ export {
 } from "@zitadel/sdk-react";
 export type {
   ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,

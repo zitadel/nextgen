@@ -9,5 +9,5 @@ import "@zitadel/components";
  * direct @zitadel/components dependency (strict package managers reject those).
  */
 export { businessLocales } from "@zitadel/components";
-export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
-export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
+export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
+export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";

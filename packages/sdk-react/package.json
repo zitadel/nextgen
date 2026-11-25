@@ -35,7 +35,6 @@
   },
   "dependencies": {
     "@lit/react": "^1.0.8",
-    "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*"
   },
@@ -50,6 +49,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/client-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",

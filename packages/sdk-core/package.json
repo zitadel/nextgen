@@ -49,6 +49,11 @@
       "@zitadel/source": "./src/session.ts",
       "types": "./dist/session.d.mts",
       "import": "./dist/session.mjs"
+    },
+    "./config": {
+      "@zitadel/source": "./src/config.ts",
+      "types": "./dist/config.d.mts",
+      "import": "./dist/config.mjs"
     }
   },
   "publishConfig": {

@@ -67,7 +67,6 @@
     "prepack": "publint --strict"
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",
     "@zitadel/sdk-react": "workspace:*",
@@ -87,6 +86,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/client-sdk-contract": "workspace:*",
     "@zitadel/server-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",

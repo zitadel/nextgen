@@ -1,5 +1,4 @@
-import type { ZitadelProject } from "@zitadel/api/config";
-import type { CreateFlow201Step, CreateFlow201StepComplete } from "@zitadel/api/generated/model";
+import type { ZitadelProject } from "./config.js";
 
 /**
  * What a visitor is doing when a flow starts, which selects the entry step of the flow definition
@@ -23,7 +22,7 @@ import type { CreateFlow201Step, CreateFlow201StepComplete } from "@zitadel/api/
  * <ZitadelLogin project={project} purpose="register" />
  * ```
  *
- * @see {@link ZitadelLoginProps.purpose}
+ * @see {@link ZitadelLoginProps}
  */
 export type ZitadelFlowPurpose =
   | "login"
@@ -32,6 +31,82 @@ export type ZitadelFlowPurpose =
   | "profiling"
   | "reauth"
   | "link_account";
+
+/**
+ * What the widget does when a flow reaches its last step.
+ *
+ * - `redirect` sends the browser on to the address the flow ends with, which is what finishes an
+ *   OpenID Connect or SAML sign-in.
+ * - `show` renders the last step as a result screen, for example "registration confirmed", and
+ *   leaves the page where it is.
+ *
+ * The SDKs declare this union themselves, for the reason given at {@link ZitadelFlowPurpose}, and
+ * `types.spec.ts` fails when it stops matching the API.
+ *
+ * @see {@link ZitadelFlowCompleteDetail.behavior}
+ */
+export type ZitadelFlowBehavior = "redirect" | "show";
+
+/**
+ * The part of a flow step that the SDKs promise to keep stable.
+ *
+ * The server returns much more for each step: the fields to render, the actions, the challenges and
+ * the identity providers. That is the widget's own rendering data, it changes whenever the flow
+ * model does, and an app has no reason to read it. So this contract lists only what the host page
+ * needs, for example to title the page from the purpose of the step, and the check in
+ * `types.spec.ts` fails if the API stops providing any of it.
+ *
+ * The object a listener receives is the one the server sent, so it can carry more than these
+ * fields. Reading anything else is outside the contract and can break on any release.
+ *
+ * @example
+ * ```tsx
+ * <ZitadelLogin
+ *   project={project}
+ *   onFlowStep={({ step }) => setTitle(step.purpose ?? "login")}
+ * />
+ * ```
+ *
+ * @see {@link ZitadelFlowStepDetail.step}
+ */
+export interface ZitadelFlowStep {
+  /**
+   * The name of the step in the flow definition.
+   *
+   * A project chooses its own step names, so a listener must not assume a fixed set. To decide what
+   * the page is for, read {@link ZitadelFlowStep.purpose} instead.
+   */
+  readonly name: string;
+  /**
+   * What the visitor is doing on this step.
+   *
+   * A login moves between `login` and `register` by itself: an identifier with no account
+   * continues as a sign-up, and one with an account continues a sign-up as a sign-in. A page that
+   * titles itself should follow this value, not {@link ZitadelFlowStep.name}, which the flow
+   * definition chooses.
+   *
+   * @defaultValue unset, when the flow definition gives the step no purpose
+   */
+  readonly purpose?: ZitadelFlowPurpose;
+  /**
+   * A localization key that says why the flow moved to this step's purpose without being asked.
+   *
+   * It is set only on the step right after such a move, for example when an identifier with no
+   * account continues as a sign-up. It is `null` or unset on every other step.
+   *
+   * @defaultValue unset
+   */
+  readonly notice?: string | null;
+  /**
+   * The localization keys of the error from the previous failed submission.
+   *
+   * A field-validation failure carries one key per violation, joined with `"; "`. It is `null` or
+   * unset when the previous submission succeeded.
+   *
+   * @defaultValue unset
+   */
+  readonly error?: string | null;
+}
 
 /**
  * The widget contract shared by every single-page-application SDK: the event detail types, plus
@@ -54,7 +129,7 @@ export type ZitadelFlowPurpose =
  * @example
  * ```ts
  * const onFlowStep = (detail: ZitadelFlowStepDetail) => {
- *   analytics.track("sign-in-step", { step: detail.step.type });
+ *   analytics.track("sign-in-step", { step: detail.step.name, purpose: detail.step.purpose });
  * };
  * ```
  */
@@ -62,11 +137,11 @@ export interface ZitadelFlowStepDetail {
   /**
    * The step the flow has just entered.
    *
-   * The value is exactly what the server returned, so its shape follows the flow definition of the
-   * project and a custom step reaches the listener unchanged. Treat the step types of a custom flow
-   * as open: a listener should ignore a type it does not know.
+   * Only the fields of {@link ZitadelFlowStep} are part of the contract. The step names belong to
+   * the flow definition of the project, so a custom step reaches the listener unchanged and a
+   * listener should ignore a step name it does not know.
    */
-  readonly step: CreateFlow201Step;
+  readonly step: ZitadelFlowStep;
 }
 
 /**
@@ -156,7 +231,7 @@ export interface ZitadelFlowCompleteDetail extends ZitadelNavigationDetail {
    *
    * The value is exactly as the flow returned it.
    */
-  readonly behavior: CreateFlow201StepComplete;
+  readonly behavior: ZitadelFlowBehavior;
   /**
    * The address the server sends the browser to next.
    *
@@ -205,7 +280,7 @@ export interface ZitadelFlowRedirectDetail extends ZitadelNavigationDetail {
    *
    * A listener uses it to tell which identity provider the user chose.
    */
-  readonly step: CreateFlow201Step;
+  readonly step: ZitadelFlowStep;
 }
 
 /**

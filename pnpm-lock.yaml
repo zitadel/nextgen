@@ -2258,9 +2258,6 @@ importers:
 
   packages/sdk-angular:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2313,6 +2310,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2383,9 +2383,6 @@ importers:
 
   packages/sdk-next:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2423,6 +2420,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/client-sdk-contract':
         specifier: workspace:*
         version: link:../client-sdk-contract
@@ -2453,9 +2453,6 @@ importers:
 
   packages/sdk-nuxt:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2481,6 +2478,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2505,9 +2505,6 @@ importers:
 
   packages/sdk-qwik:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2533,6 +2530,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2563,9 +2563,6 @@ importers:
 
   packages/sdk-qwik-router:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -2585,6 +2582,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2609,9 +2609,6 @@ importers:
       '@lit/react':
         specifier: ^1.0.8
         version: 1.0.8(@types/react@19.3.0)
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2637,6 +2634,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2673,9 +2673,6 @@ importers:
 
   packages/sdk-solid:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2698,6 +2695,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2734,9 +2734,6 @@ importers:
 
   packages/sdk-solid-start:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -2756,6 +2753,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2780,9 +2780,6 @@ importers:
 
   packages/sdk-svelte:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2805,6 +2802,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2841,9 +2841,6 @@ importers:
 
   packages/sdk-sveltekit:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -2860,6 +2857,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2887,9 +2887,6 @@ importers:
       '@tanstack/react-start':
         specifier: '>=1.168.10'
         version: 1.169.5(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.19)(rollup@4.67.4)(supports-color@10.2.2)(vite-plugin-solid@2.11.16(@testing-library/jest-dom@6.9.1)(solid-js@1.9.19)(supports-color@10.2.2)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.3(@swc/helpers@0.5.23))(cssnano@9.9.0(postcss@8.5.32))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(uglify-js@3.19.3))
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2915,6 +2912,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2942,9 +2942,6 @@ importers:
 
   packages/sdk-vue:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2961,6 +2958,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock

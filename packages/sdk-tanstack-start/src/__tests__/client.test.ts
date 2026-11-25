@@ -1,4 +1,4 @@
-import { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
+import { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
 import { describe, expect, it } from "vitest";
 
 import * as client from "../client";
@@ -15,7 +15,7 @@ describe("@zitadel/sdk-tanstack-start/client", () => {
     ["configureZitadel", client.configureZitadel, configureZitadel],
     ["getApi", client.getApi, getApi],
     ["getZitadelConfig", client.getZitadelConfig, getZitadelConfig],
-  ])("re-exports @zitadel/api/config's %s", (_name, exported, original) => {
+  ])("re-exports @zitadel/sdk-core/config's %s", (_name, exported, original) => {
     expect(exported).toBe(original);
   });
 });

@@ -18,7 +18,7 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelProject } from "@zitadel/sdk-core/config";
 
 // Registers <zitadel-login> / <zitadel-logout> with the browser.
 import "@zitadel/components";

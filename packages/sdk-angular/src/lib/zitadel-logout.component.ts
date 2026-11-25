@@ -11,7 +11,7 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelProject } from "@zitadel/sdk-core/config";
 
 import "@zitadel/components";
 

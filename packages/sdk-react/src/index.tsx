@@ -5,7 +5,7 @@ import {
   getZitadelConfig,
   type ZitadelConfig,
   type ZitadelProject,
-} from "@zitadel/api/config";
+} from "@zitadel/sdk-core/config";
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
@@ -39,6 +39,8 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export type {
   ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,

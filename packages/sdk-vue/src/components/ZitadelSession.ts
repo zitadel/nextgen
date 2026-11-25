@@ -1,4 +1,4 @@
-import type { ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelProject } from "@zitadel/sdk-core/config";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 

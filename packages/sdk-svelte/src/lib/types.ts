@@ -16,6 +16,8 @@ import type { HTMLAttributes } from "svelte/elements";
  */
 export type {
   ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,

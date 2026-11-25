@@ -10,5 +10,5 @@
  *
  * @module
  */
-export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
-export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
+export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
+export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";

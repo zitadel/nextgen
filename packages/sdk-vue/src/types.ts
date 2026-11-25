@@ -12,6 +12,8 @@ import type { HTMLAttributes } from "vue";
 // of the browser SDK surface.
 export type {
   ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,

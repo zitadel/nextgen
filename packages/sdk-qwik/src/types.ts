@@ -11,6 +11,8 @@ import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
  */
 export type {
   ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,

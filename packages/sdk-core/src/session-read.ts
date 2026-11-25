@@ -1,6 +1,6 @@
 import type { GetMySession200 } from "@zitadel/api/generated/model";
 
-import { getZitadelConfig } from "@zitadel/api/config";
+import { getZitadelConfig } from "./config.js";
 import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 
 import type { ClientAuthResult } from "./middleware.js";

@@ -188,7 +188,9 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expect(names.filter((name) => !sdkReactNames.includes(name))).toEqual([]);
     expect(names).toEqual(
       [
+        "ZitadelFlowBehavior",
         "ZitadelFlowPurpose",
+        "ZitadelFlowStep",
         "ZitadelFlowCompleteDetail",
         "ZitadelFlowErrorDetail",
         "ZitadelFlowInputDetail",

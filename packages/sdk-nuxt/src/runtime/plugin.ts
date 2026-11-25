@@ -1,5 +1,5 @@
 import { defineNuxtPlugin, useRequestEvent, useRuntimeConfig, useState } from "#imports";
-import { configureZitadel } from "@zitadel/api/config";
+import { configureZitadel } from "@zitadel/sdk-core/config";
 
 import { DEFAULT_URL, resolveUrl } from "./lib/settings";
 import type { ClientAuthResult } from "./types";

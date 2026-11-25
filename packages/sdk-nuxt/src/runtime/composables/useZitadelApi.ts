@@ -1,4 +1,4 @@
-import { getApi, getZitadelConfig } from "@zitadel/api/config";
+import { getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
 
 /**
  * Returns the typed Zitadel API client for the current project, so an app can call the API

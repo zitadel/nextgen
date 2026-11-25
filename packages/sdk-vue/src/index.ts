@@ -7,10 +7,12 @@ import "@zitadel/components";
 export { default as ZitadelLogin } from "./components/ZitadelLogin.js";
 export { default as ZitadelLogout } from "./components/ZitadelLogout.js";
 export { default as ZitadelSession } from "./components/ZitadelSession.js";
-export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
-export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
+export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
+export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";
 export type {
   ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,

@@ -1,4 +1,4 @@
-import { getZitadelConfig, type ZitadelProject } from "@zitadel/api/config";
+import { getZitadelConfig, type ZitadelProject } from "./config.js";
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 
 import type { ClientSession } from "./middleware.js";

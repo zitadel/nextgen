@@ -19,7 +19,7 @@ import {
   getZitadelConfig,
   type ZitadelConfig,
   type ZitadelProject,
-} from "@zitadel/api/config";
+} from "@zitadel/sdk-core/config";
 
 import type {
   ZitadelFlowCompleteDetail,
@@ -388,7 +388,7 @@ export type ZitadelSessionProps = CoreSessionProps &
   };
 
 /**
- * Re-exports the configuration helpers of `@zitadel/api`, so an app needs no direct dependency on
+ * Re-exports the configuration helpers of `@zitadel/sdk-core`, so an app needs no direct dependency on
  * it.
  *
  * {@link configureZitadel} creates the project handle that the components take as `project`,
@@ -399,6 +399,8 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export type {
   ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,

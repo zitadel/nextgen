@@ -6,5 +6,5 @@
  * can configure the SDK without depending on `@zitadel/api/config` directly, which strict package
  * managers do not resolve. Call it before the widget mounts, for example in `+page.svelte`.
  */
-export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
-export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
+export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
+export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";

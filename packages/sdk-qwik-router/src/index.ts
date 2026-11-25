@@ -19,8 +19,8 @@
 
 export { createNextgenMiddleware, getAuth } from "./server.js";
 export type { QwikRequestEvent, QwikCookieValue, QwikCookieOptions } from "./server.js";
-export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
-export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
+export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
+export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";
 export type {
   NextgenMiddlewareOptions,
   AuthResult,

@@ -36,7 +36,6 @@
     "docs:api": "typedoc"
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",
     "tslib": "^2.6.0"
@@ -60,6 +59,7 @@
     "@testing-library/angular": "^19.6.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/client-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
