@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+
+	"go.zitadel.com/zitadel/v5/api"
 )
 
 // locales/*.json is generated from the components package's TS catalogs by
@@ -51,6 +53,17 @@ type Texts struct {
 
 // lookup is key's copy in the locale, else in English. ok tells a key the
 // catalogs lack from one whose copy is deliberately empty.
+// catalog is the catalog the locale renders from: its own when it is built
+// in, else English. A variant key is offered only when this one has it, so a
+// localised plain sentence always beats an English variant.
+func (t Texts) catalog() map[string]string {
+	all := catalogs()
+	if c, ok := all[t.Locale]; ok {
+		return c
+	}
+	return all["en"]
+}
+
 func (t Texts) lookup(key string) (string, bool) {
 	all := catalogs()
 	if v, ok := all[t.Locale][key]; ok {
@@ -88,6 +101,53 @@ func (t Texts) Text(key string) string {
 		}
 	}
 	return key
+}
+
+// collectsCustomIdentifier reports whether the step collects the user's
+// identifier and it is not an email address. The server marks the identifier
+// field autocomplete="username" whatever its type, so that token finds it.
+func collectsCustomIdentifier(fields []api.Field) bool {
+	i := slices.IndexFunc(fields, func(f api.Field) bool {
+		return slices.Contains(strings.Fields(strings.ToLower(f.Autocomplete.Or(""))), "username")
+	})
+	return i >= 0 && fields[i].Type != api.FieldTypeEmail
+}
+
+// DescriptionKey is the key a step's description renders with. A step that
+// collects an identifier other than an email describes itself with the
+// `.custom_identifier` variant where the catalog has one, since the plain
+// sentence may name the email above a differently labelled field ("Enter your
+// email to continue" over an "Employee number"). The variant replaces the
+// `.sso` one too: a provider sentence may name the email as well, and leaving
+// the providers out of the subtitle is the smaller loss, since they show on
+// the step anyway. Mirrors stepTexts in the widget's liquid.ts.
+func (t Texts) DescriptionKey(key string, fields []api.Field) string {
+	if key == "" || !collectsCustomIdentifier(fields) {
+		return key
+	}
+	plain := strings.TrimSuffix(key, ".sso")
+	if !strings.HasSuffix(plain, ".description") {
+		return key
+	}
+	if variant := plain + ".custom_identifier"; t.catalog()[variant] != "" {
+		return variant
+	}
+	return key
+}
+
+// NoticeKey is the key a step's notice renders with, by DescriptionKey's
+// rule: the register step a sign-in moved to sign-up says the email had no
+// account, and points at an email field it does not show. A step that does
+// not collect the identifier cannot tell, and its notices are worded for any
+// identifier instead. Mirrors stepNotice in the widget's liquid.ts.
+func (t Texts) NoticeKey(notice string, fields []api.Field) string {
+	if !collectsCustomIdentifier(fields) {
+		return notice
+	}
+	if variant := notice + ".custom_identifier"; t.catalog()[variant] != "" {
+		return variant
+	}
+	return notice
 }
 
 // errorRules are the validation-rule suffixes of a `error.<field>_<rule>`

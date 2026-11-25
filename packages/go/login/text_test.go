@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"go.zitadel.com/zitadel/v5/api"
 )
 
 func TestTexts(t *testing.T) {
@@ -36,7 +38,11 @@ func TestTexts(t *testing.T) {
 
 func TestTextsErrors(t *testing.T) {
 	en := Texts{}
-	assert.Equal(t, []string{"Wrong email or password."}, en.Errors("error.invalid_credentials"))
+	// The copy itself is generated from the components catalogs and is reworded
+	// upstream; assert the path, not the sentence.
+	invalid, ok := en.lookup("error.invalid_credentials")
+	assert.True(t, ok, "the catalog has the key")
+	assert.Equal(t, []string{invalid}, en.Errors("error.invalid_credentials"), "a plain catalog key resolves to its copy")
 	assert.Equal(t, []string{"Please enter an email address", "Please enter a password"},
 		en.Errors("error.email_required; error.password_required"), "one sentence per key")
 	assert.Equal(t, []string{"We couldn't complete your sign in. Please try again in a few minutes"},
@@ -55,4 +61,38 @@ func TestTextsErrors(t *testing.T) {
 	assert.False(t, en.knownErrors("error.phone_required", fields), "a rule on a field the step lacks")
 	assert.False(t, en.knownErrors("error.email_required; Call 555", fields))
 	assert.False(t, en.knownErrors("identifier.title", nil), "a known key that is not an error")
+}
+
+func TestTextsCustomIdentifier(t *testing.T) {
+	texts := Texts{Locale: "en"}
+	email := []api.Field{{Name: "email", Type: api.FieldTypeEmail, Autocomplete: api.NewOptString("username")}}
+	custom := []api.Field{{Name: "employee_number", Type: api.FieldTypeText, Autocomplete: api.NewOptString("username")}}
+	// The password step collects no identifier, so it cannot tell.
+	password := []api.Field{{Name: "password", Type: api.FieldTypePassword, Autocomplete: api.NewOptString("current-password")}}
+
+	t.Run("description", func(t *testing.T) {
+		assert.Equal(t, "identifier.description", texts.DescriptionKey("identifier.description", email),
+			"an email identifier keeps the plain sentence")
+		assert.Equal(t, "identifier.description.custom_identifier", texts.DescriptionKey("identifier.description", custom),
+			"a custom identifier takes the variant")
+		assert.Equal(t, "identifier.description.custom_identifier", texts.DescriptionKey("identifier.description.sso", custom),
+			"the variant replaces the .sso one")
+		assert.Equal(t, "identifier.description", texts.DescriptionKey("identifier.description", password),
+			"a step that collects no identifier cannot tell")
+		assert.Equal(t, "password.title", texts.DescriptionKey("password.title", custom),
+			"only a .description key has a variant")
+		assert.Empty(t, texts.DescriptionKey("", custom))
+	})
+
+	t.Run("notice", func(t *testing.T) {
+		assert.Equal(t, "notice.user_not_found.custom_identifier", texts.NoticeKey("notice.user_not_found", custom))
+		assert.Equal(t, "notice.user_not_found", texts.NoticeKey("notice.user_not_found", email))
+		assert.Equal(t, "notice.user_already_exists", texts.NoticeKey("notice.user_already_exists", custom),
+			"a notice with no variant in the catalog stays as it came")
+	})
+
+	t.Run("resolves to real copy", func(t *testing.T) {
+		assert.Equal(t, "Enter your details to continue",
+			texts.Text(texts.DescriptionKey("identifier.description", custom)))
+	})
 }
