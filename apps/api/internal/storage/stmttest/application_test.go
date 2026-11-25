@@ -156,6 +156,127 @@ func TestApplicationStatements_ReviseAddsClients(t *testing.T) {
 	})
 }
 
+func TestApplicationStatements_DeclaredAndPinnedRevisions(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		registered := createApplication(t, d.stmts, projectID, "crm-"+uniqueSuffix(t), &domain.ApplicationClient{Slug: "web"})
+		slug := "shop-" + uniqueSuffix(t)
+		web := &domain.ApplicationClient{Slug: "web", ClientID: "shop-web-" + uniqueSuffix(t)}
+		declared := &domain.Application{ProjectID: projectID, Slug: slug, IsDeclared: true, Document: applicationDocument(slug, web)}
+		require.NoError(t, d.stmts.CreateApplication(t.Context(), declared, []*domain.ApplicationClient{web}))
+		first := *declared
+
+		got, err := d.stmts.GetApplication(t.Context(), applicationByID(projectID, registered.ID))
+		require.NoError(t, err)
+		assert.False(t, got.IsDeclared)
+		got, err = d.stmts.GetApplication(t.Context(), applicationByID(projectID, declared.ID))
+		require.NoError(t, err)
+		assert.True(t, got.IsDeclared)
+
+		api := &domain.ApplicationClient{Slug: "api", ClientID: "shop-api-" + uniqueSuffix(t)}
+		declared.Document = applicationDocument(slug, web, api)
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), declared, []*domain.ApplicationClient{api}))
+
+		// A release keeps serving the revision it pins after a newer one.
+		pinned, err := d.stmts.GetApplicationRevision(t.Context(), projectID, first.RevisionID)
+		require.NoError(t, err)
+		assert.Equal(t, declared.ID, pinned.ID)
+		assert.Equal(t, slug, pinned.Slug)
+		assert.True(t, pinned.IsDeclared)
+		assert.Equal(t, first.RevisionID, pinned.RevisionID)
+		assert.True(t, pinned.UpdatedAt.Equal(first.UpdatedAt))
+		assert.JSONEq(t, string(applicationDocument(slug, web)), string(pinned.Document))
+
+		newest, err := d.stmts.GetApplicationRevision(t.Context(), projectID, declared.RevisionID)
+		require.NoError(t, err)
+		assert.JSONEq(t, string(applicationDocument(slug, web, api)), string(newest.Document))
+
+		_, err = d.stmts.GetApplicationRevision(t.Context(), projectID, "apprev_unknown")
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		_, err = d.stmts.GetApplicationRevision(t.Context(), ensureProject(t, d.stmts), first.RevisionID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a revision is read only in its own project")
+	})
+}
+
+func TestApplicationStatements_ListRevisionsNewestFirst(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		slug := "shop-" + uniqueSuffix(t)
+		web := &domain.ApplicationClient{Slug: "web"}
+		application := createApplication(t, d.stmts, projectID, slug, web)
+		first := application.RevisionID
+		api := &domain.ApplicationClient{Slug: "api"}
+		application.Document = applicationDocument(slug, web, api)
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), application, []*domain.ApplicationClient{api}))
+		second := application.RevisionID
+		application.Document = applicationDocument(slug, web)
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), application, nil))
+		third := application.RevisionID
+
+		revisions, err := d.stmts.ListApplicationRevisions(t.Context(), projectID, application.ID, 10)
+		require.NoError(t, err)
+		ids := make([]string, len(revisions))
+		for i, revision := range revisions {
+			ids[i] = revision.RevisionID
+			assert.Equal(t, application.ID, revision.ID)
+			assert.Equal(t, slug, revision.Slug)
+		}
+		assert.Equal(t, []string{third, second, first}, ids)
+		assert.JSONEq(t, string(applicationDocument(slug, web, api)), string(revisions[1].Document))
+
+		limited, err := d.stmts.ListApplicationRevisions(t.Context(), projectID, application.ID, 2)
+		require.NoError(t, err)
+		require.Len(t, limited, 2)
+		assert.Equal(t, third, limited[0].RevisionID)
+		assert.Equal(t, second, limited[1].RevisionID)
+
+		missing, err := d.stmts.ListApplicationRevisions(t.Context(), projectID, "app_unknown", 10)
+		require.NoError(t, err)
+		assert.Empty(t, missing)
+		crossProject, err := d.stmts.ListApplicationRevisions(t.Context(), ensureProject(t, d.stmts), application.ID, 10)
+		require.NoError(t, err)
+		assert.Empty(t, crossProject, "revisions are listed only in their own project")
+	})
+}
+
+// A secret variable name is claimed once per project, by one client.
+func TestApplicationStatements_SecretVariableClaims(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		web := &domain.ApplicationClient{Slug: "web", ClientID: "shop-web-" + uniqueSuffix(t)}
+		api := &domain.ApplicationClient{Slug: "api", ClientID: "shop-api-" + uniqueSuffix(t)}
+		createApplication(t, d.stmts, projectID, "shop-"+uniqueSuffix(t), web, api)
+		name := "SHOP_WEB_SECRET_" + uniqueSuffix(t)
+
+		_, err := d.stmts.GetApplicationSecretVariable(t.Context(), projectID, name)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		claim := &domain.ApplicationSecretVariable{ProjectID: projectID, Name: name, ApplicationClientID: web.ID}
+		require.NoError(t, d.stmts.CreateApplicationSecretVariable(t.Context(), claim))
+		assert.WithinDuration(t, time.Now(), claim.CreatedAt, 5*time.Second)
+
+		got, err := d.stmts.GetApplicationSecretVariable(t.Context(), projectID, name)
+		require.NoError(t, err)
+		assert.Equal(t, web.ID, got.ApplicationClientID)
+		assert.Equal(t, name, got.Name)
+		assert.True(t, got.CreatedAt.Equal(claim.CreatedAt))
+
+		err = d.stmts.CreateApplicationSecretVariable(t.Context(), &domain.ApplicationSecretVariable{ProjectID: projectID, Name: name, ApplicationClientID: api.ID})
+		assert.ErrorIs(t, err, new(database.UniqueError), "a name is one client's")
+
+		err = d.stmts.CreateApplicationSecretVariable(t.Context(), &domain.ApplicationSecretVariable{ProjectID: projectID, Name: "OTHER_" + uniqueSuffix(t), ApplicationClientID: "appcl_unknown"})
+		assert.ErrorIs(t, err, new(database.ForeignKeyError))
+
+		_, err = d.stmts.GetApplicationSecretVariable(t.Context(), ensureProject(t, d.stmts), name)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a claim is read only in its own project")
+
+		_, err = d.stmts.DeleteProjectByID(t.Context(), projectID)
+		require.NoError(t, err)
+		_, err = d.stmts.GetApplicationSecretVariable(t.Context(), projectID, name)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a project delete cascades")
+	})
+}
+
 func TestApplicationStatements_UnknownApplication(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)

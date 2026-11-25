@@ -4,14 +4,14 @@ import { z } from "zod";
 import { DeploymentService } from "@/lib/backend";
 import { GetDeploymentParams, GetDeploymentResponse } from "@/lib/backend/schemas";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { type Refused, taken } from "@/lib/oclif/flags";
-import { fieldPaths } from "@/lib/oclif/crud";
-import { fieldsFlag, Tabulatable } from "@/lib/oclif/tabulatable";
-
+import type { Admitted, CommandResult } from "@/cli/core";
+import { type Refused, taken } from "@/cli/core/flags";
+import { fieldPaths } from "@/cli/core/crud";
+import { fieldsFlag } from "@/cli/core/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
@@ -35,7 +35,7 @@ const DEPLOYMENT_ID: Refused<string> = {
  * froze. `--fields` cuts the data and the rows to the dot-paths it names,
  * judged by the deployment's shape, and leaves the frozen variables out.
  */
-export default class DeploymentGet extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class DeploymentGet extends Telemetered(ReadCommand) {
   static override description = "Read one deployment by id.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;
@@ -56,9 +56,14 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
     }),
   };
 
-  protected async execute({ args, flags }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const deploymentService = new DeploymentService(client, projectId);
+  /**
+   * Reads one deployment by id.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The deployment.
+   */
+  protected async execute({ args, flags }: Admitted<typeof DeploymentGet>): Promise<CommandResult> {
+    const deploymentService = await this.service(DeploymentService);
     const [deployment, variables] = await Promise.all([
       deploymentService.get(args.deploymentId),
       flags.fields === undefined
@@ -96,7 +101,7 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
       "origins",
       "deployed_at",
     ]);
-    return this.emit({
+    return {
       status: "ok",
       data: view.data,
       summary: {
@@ -119,6 +124,6 @@ export default class DeploymentGet extends Tabulatable(ServerCommand(Environment
           ...(frozen === undefined ? [] : ["", ...frozen]),
         ],
       },
-    });
+    };
   }
 }

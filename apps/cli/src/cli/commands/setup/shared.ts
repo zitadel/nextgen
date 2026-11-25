@@ -43,12 +43,13 @@ import {
   selectionFromFlags,
   ssoEnableFlags,
 } from "@/lib/idp";
-import type { GlobalOptions } from "@/lib/oclif/types";
+import type { GlobalOptions } from "@/cli/core/types";
 import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { LocalRuntime, type LocalMachine, type ResolvedServer } from "@/lib/server";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import type { Facts } from "@/cli/core/base";
+import { LocalRuntime, type LocalMachine, type ResolvedServer, ZitadelRuntime } from "@/lib/server";
 
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
@@ -75,7 +76,7 @@ import type { SetupFlags } from "./index";
 import type { InitialCommitOutcome } from "./steps/make-initial-commit";
 import type { SetupInstallOutcome } from "./steps/install-dependencies";
 import { z } from "zod";
-import { type Refused, whole } from "@/lib/oclif/flags";
+import { type Refused, whole } from "@/cli/core/flags";
 import { Runtime } from "@/lib/runtime";
 import { Project } from "@/lib/project";
 
@@ -1635,4 +1636,82 @@ export async function refuseOutdatedLocalServer(
       },
     },
   );
+}
+
+/**
+ * How `setup`'s wizard names its steps for reports of the onboarding flow: the
+ * checks before the questions, and each question with the choice it settled.
+ * Nothing a developer typed, such as the port, is ever a fact.
+ *
+ * @param key - The step's name in the wizard.
+ * @param known - What is known once the step finished; absent while it is starting.
+ * @returns The step's name in the event catalog and its choice, or nothing for a step
+ *   the flow does not report.
+ */
+export function onboardingStep(
+  key: string,
+  known?: Partial<SetupFacts>,
+): Readonly<{ step?: string; choice?: Facts }> | undefined {
+  switch (key) {
+    case "preconditions":
+    case "moveDevPort":
+    case "alreadySetUp":
+    case "ssoFlags": {
+      return { step: "initial_checks" };
+    }
+    case "frameworkConfirm": {
+      return { step: "framework_selection" };
+    }
+    case "detect": {
+      return {
+        step: "framework_selection",
+        choice: known?.found === undefined ? undefined : { framework: known.found.app.framework },
+      };
+    }
+    case "server": {
+      return {
+        step: "server_selection",
+        choice:
+          known?.answers === undefined
+            ? undefined
+            : {
+                server_type:
+                  ZitadelRuntime.fromUrl(known.answers.server).kind === "local"
+                    ? "local"
+                    : "remote",
+              },
+      };
+    }
+    case "devPort": {
+      return { step: "dev_port_selection", choice: known === undefined ? undefined : {} };
+    }
+    case "useCase": {
+      return {
+        step: "use_case_selection",
+        choice: known?.answers === undefined ? undefined : { use_case: known.answers.useCase },
+      };
+    }
+    case "signInPreset": {
+      return {
+        step: "preset_selection",
+        choice: known?.answers === undefined ? undefined : { preset: known.answers.preset },
+      };
+    }
+    case "socialSignIn": {
+      return {
+        step: "provider_selection",
+        choice:
+          known?.answers === undefined
+            ? undefined
+            : {
+                provider_types: known.answers.sso.map((draft) => {
+                  return selectionName(draft.selection);
+                }),
+              },
+      };
+    }
+    default: {
+      return undefined;
+    }
+  }
 }

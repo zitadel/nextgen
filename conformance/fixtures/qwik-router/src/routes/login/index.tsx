@@ -9,7 +9,7 @@ const project = configureZitadel({
 
 export default component$(() => {
   return (
-    <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+    <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
       <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />
     </div>
   );

@@ -25,7 +25,7 @@ or {
     `{ $_ } = Consent`
   } as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
-    $filename <: not r".*/apps/cli/src/lib/oclif/destructive\.ts$",
+    $filename <: not r".*/apps/cli/src/cli/core/destructive\.ts$",
     register_diagnostic(span=$bypass, message="Ask for consent with Destructive's confirmed() or consent(), which take --force and the terminal from the run.", severity="error")
   },
   or {

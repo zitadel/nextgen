@@ -26,7 +26,12 @@ export class GitignoreCheck implements SanityCheck {
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
     return this.evaluate(ctx).catch((error: unknown) => {
-      return { name: this.name, path: this.path, status: "fail", message: errorMessage(error) };
+      return {
+        name: this.name,
+        path: this.path,
+        status: "fail",
+        message: errorMessage(error),
+      };
     });
   }
 
@@ -55,7 +60,11 @@ export class GitignoreCheck implements SanityCheck {
     const base = { name: this.name, path: this.path };
     const text = await readText(join(ctx.cwd, this.path));
     if (text === undefined) {
-      return { ...base, status: "fail", message: `${this.path} was not found` };
+      return {
+        ...base,
+        status: "fail",
+        message: `${this.path} was not found`,
+      };
     }
     const broken = Project.gitignore().broken(text);
     const exposed = broken.filter(isIgnoredByRule);
@@ -67,7 +76,11 @@ export class GitignoreCheck implements SanityCheck {
       };
     }
     if (broken.length === 0) {
-      return { ...base, status: "pass", message: ".gitignore protects local secret/env files" };
+      return {
+        ...base,
+        status: "pass",
+        message: ".gitignore protects local secret/env files",
+      };
     }
     if (!(await holdsNamesOnly(ctx.cwd, broken))) {
       return {
@@ -80,7 +93,10 @@ export class GitignoreCheck implements SanityCheck {
       ...base,
       status: "warn",
       message: `${this.path} ignores ${pathsOf(broken)}, so the variable names it documents are never committed`,
-      remedy: ctx.suggest({ id: "doctor", flags: { fix: true } }),
+      remedy: ctx.suggest({
+        id: "doctor",
+        flags: { fix: true },
+      }),
     };
   }
 }

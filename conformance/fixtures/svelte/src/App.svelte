@@ -18,15 +18,15 @@ onMount(() => {
 </script>
 
 {#if path.startsWith("/profile")}
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <ZitadelSession {project} postSignOutUrl="/login" />
   </div>
 {:else if path.startsWith("/register")}
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <ZitadelLogin {project} purpose="register" postSignInUrl="/profile" />
   </div>
 {:else if path !== "/"}
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <ZitadelLogin {project} purpose="login" postSignInUrl="/profile" />
   </div>
 {/if}

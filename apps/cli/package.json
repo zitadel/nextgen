@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -155,6 +155,7 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
+    "agent-cli-detector": "^0.1.7",
     "ajv": "catalog:",
     "dot-prop": "catalog:",
     "escape-string-regexp": "catalog:",

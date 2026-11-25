@@ -10,7 +10,7 @@ These guidelines apply across all Zitadel interfaces, including the marketing we
 
 Vercel Web Analytics and Speed Insights continue to provide traffic and performance reporting for the hosted frontends. Mixpanel provides product journey, funnel and outcome reporting. Counts may differ because collection methods and consent conditions differ.
 
-Mixpanel is paused for now: the CLI and the service ping send it nothing, and the CLI's events go only to Vercel Web Analytics ([the catalog](product-analytics-events.yaml) says how).
+The CLI sends its events to Mixpanel, production runs to the production project, development runs to a development project and CI runs nowhere, and the lifecycle events of production runs also to Vercel Web Analytics ([the catalog](product-analytics-events.yaml) says which event goes where).
 
 This document defines shared patterns. [`product-analytics-events.yaml`](product-analytics-events.yaml) defines the header every event carries, and lists every event and property per interface: what each one sends today and what its tracking ticket plans.
 
@@ -132,3 +132,5 @@ Each tracking ticket specifies:
 Add a ticket's events to the catalog as `planned`, and mark them `emitted` in the change that sends them.
 
 Verify that tracked actions appear in Mixpanel once, with the expected names and properties.
+
+The metrics a product manager reads, and how to build each one in Mixpanel, are in [product-analytics-metrics.md](product-analytics-metrics.md).

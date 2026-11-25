@@ -77,6 +77,9 @@ import {
   ListDeploymentVariablesQueryParams,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
+  GetApplicationRevisionParams,
+  GetApplicationRevisionQueryParams,
+  GetApplicationRevisionResponse,
   GetIdpParams,
   GetIdpQueryParams,
   GetIdpResponse,
@@ -389,6 +392,22 @@ type IdpConnectionRecord = {
 };
 
 /**
+ * One revision of an application a release declares. Revisions of one
+ * application share `applicationId`; a build whose document for the slug
+ * equals the newest revision reuses it, any other adds one.
+ */
+type ApplicationRevisionRecord = {
+  applicationId: string;
+  revisionId: string;
+  projectId: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
+  seq: number;
+  body: Record<string, unknown>;
+};
+
+/**
  * One operation policy (ADR 066), as the CLI's policy syncer publishes it.
  *
  * Keyed by `id`; `operation` is what dedupes a write. A project has one policy
@@ -506,6 +525,8 @@ type Store = {
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
   idps: Map<string, IdpConnectionRecord>;
+  /** Declared application revisions, keyed by revision id. */
+  applicationRevisions: Map<string, ApplicationRevisionRecord>;
   releases: Map<string, ReleaseRecord>;
   deployments: Map<string, DeploymentRecord>;
   previews: Map<string, PreviewRecord>;
@@ -533,6 +554,7 @@ function makeStore(): Store {
     schemas: new Map(),
     flowDefinitions: new Map(),
     idps: new Map(),
+    applicationRevisions: new Map(),
     releases: new Map(),
     deployments: new Map(),
     previews: new Map(),
@@ -1267,6 +1289,9 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
   if (kind === "idp") {
     return typeof resource.slug === "string" ? resource.slug : "idp";
   }
+  if (kind === "application") {
+    return typeof resource.slug === "string" ? resource.slug : "application";
+  }
   if (kind === "policy") {
     return typeof resource.operation === "string" ? resource.operation : "policy";
   }
@@ -1368,6 +1393,34 @@ function materializeBundle(
       store.idps.set(record.id, record);
     }
     pointers.push({ kind: "idp", handle, revision_id: record.revisionId });
+  }
+  for (const item of asArray(bundle.applications)) {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("application", resource);
+    const revisions = [...store.applicationRevisions.values()]
+      .filter((record) => record.projectId === projectId && record.slug === handle)
+      .sort((a, b) => b.seq - a.seq);
+    const newest = revisions[0];
+    // Any revision with the same document is reused, the newest match first, as
+    // the service does: rebuilding an older bundle keeps its release id.
+    const match = revisions.find(
+      (record) => JSON.stringify(record.body) === JSON.stringify(resource),
+    );
+    const now = nowIso();
+    const record: ApplicationRevisionRecord = match ?? {
+      applicationId: newest?.applicationId ?? `app_${shortId()}`,
+      revisionId: `apprev_${shortId()}`,
+      projectId,
+      slug: handle,
+      createdAt: newest?.createdAt ?? now,
+      updatedAt: now,
+      seq: ++store.lastSeq,
+      body: resource,
+    };
+    if (!match) {
+      store.applicationRevisions.set(record.revisionId, record);
+    }
+    pointers.push({ kind: "application", handle, revision_id: record.revisionId });
   }
   for (const item of isObject(bundle.branding) ? [bundle.branding] : []) {
     const resource = item;
@@ -1484,6 +1537,7 @@ function bundleDigestEntries(
     ["schemas", "schema"],
     ["flow_definitions", "flow_definition"],
     ["idps", "idp"],
+    ["applications", "application"],
   ];
   for (const [field, kind] of groups) {
     const items = bundle[field];
@@ -1522,6 +1576,12 @@ function pointerHandle(kind: string, revisionId: string): string {
     const name = record?.body.name;
     if (typeof name === "string") {
       return name;
+    }
+  }
+  if (kind === "application") {
+    const record = store.applicationRevisions.get(revisionId);
+    if (record) {
+      return record.slug;
     }
   }
   if (kind === "branding") {
@@ -3467,6 +3527,40 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    http.get("*/applications/revisions/:revision_id", ({ params, request }) => {
+      const path = parse(GetApplicationRevisionParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetApplicationRevisionQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.applicationRevisions.get(path.data.revision_id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("app.not_found", "application: not found"), {
+          status: 404,
+        });
+      }
+      const out = parseOut(GetApplicationRevisionResponse, {
+        id: record.applicationId,
+        revision_id: record.revisionId,
+        slug: record.slug,
+        declared: true,
+        // A response carries each client's first_party in effect; a declared
+        // client is first-party unless its document says otherwise.
+        definition: {
+          ...record.body,
+          clients: asArray(record.body.clients).map((client) =>
+            isObject(client) ? { first_party: true, ...client } : client,
+          ),
+        },
+        created_at: record.createdAt,
+        updated_at: record.updatedAt,
+      });
+      return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
     // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"

@@ -31,6 +31,25 @@ const ProjectRequest = z.object({
   name: z.string().optional(),
 });
 
+/** A request the mock platform answered. */
+export interface ObservedRequest {
+  readonly method: string;
+  readonly path: string;
+}
+
+/** Every request the mock platform has been asked since the last spec ended. */
+const observed: ObservedRequest[] = [];
+
+/**
+ * The requests the mock platform has answered so far, in order, so a run can be
+ * held to what it asked of the platform by comparing the list before and after.
+ *
+ * @returns A copy of the list.
+ */
+export function requestsObserved(): readonly ObservedRequest[] {
+  return [...observed];
+}
+
 /** What the platform was asked to publish, for a surface the mock does not keep. */
 export interface Captured<T> {
   readonly all: T[];
@@ -311,9 +330,17 @@ export function usePlatformMock(): PlatformMock {
   const server = setupServer(...setupPlatformHandlers());
   const watchers: NodeJS.Timeout[] = [];
 
+  server.events.on("request:start", ({ request }) => {
+    observed.push({
+      method: request.method,
+      path: new URL(request.url).pathname,
+    });
+  });
+
   beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
   afterAll(() => server.close());
   afterEach(() => {
+    observed.splice(0);
     for (const watcher of watchers.splice(0)) {
       clearInterval(watcher);
     }

@@ -210,6 +210,17 @@ type GetApplicationParams struct {
 	ApplicationID string
 }
 
+// GetApplicationRevisionParams is parameters of getApplicationRevision operation.
+type GetApplicationRevisionParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// The revision ID: the `revision_id` that `publishApplication` (`POST /applications`) or
+	// `getApplication` returns, or that a release pins.
+	RevisionID ApplicationRevisionID
+}
+
 // GetAuthAttemptParams is parameters of getAuthAttempt operation.
 type GetAuthAttemptParams struct {
 	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
@@ -817,17 +828,6 @@ type ListPolicyRevisionsParams struct {
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-}
-
-// ListProjectAdminsParams is parameters of listProjectAdmins operation.
-type ListProjectAdminsParams struct {
-	// Maximum number of items to return.
-	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
-	// previous response. Omit to start from the beginning. Its format is opaque and may change between
-	// releases.
-	PageToken OptPageToken `json:",omitempty,omitzero"`
-	ProjectID ProjectID
 }
 
 // ListProjectMembersParams is parameters of listProjectMembers operation.

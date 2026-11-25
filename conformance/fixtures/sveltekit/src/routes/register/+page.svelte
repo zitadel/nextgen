@@ -15,7 +15,7 @@
   });
 </script>
 
-<main style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+<main style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
   {#if mounted}
     <ZitadelLogin {project} purpose="register" postSignInUrl="/profile" />
   {/if}

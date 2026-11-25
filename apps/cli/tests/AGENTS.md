@@ -50,7 +50,7 @@ reclassified until it is one.
   was involved.
 - The binary's own behaviour (unknown command, server resolution) is
   `cli.spec.ts`. The generated resource commands share one factory
-  (`src/lib/oclif/crud/`): unit-test the factory, and `resources.spec.ts`
+  (`src/cli/core/crud/`): unit-test the factory, and `resources.spec.ts`
   proves it is wired.
 
 ## The shape of a spec

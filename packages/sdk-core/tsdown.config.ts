@@ -6,6 +6,7 @@ export default defineConfig({
     types: "src/types.ts",
     jwt: "src/jwt.ts",
     middleware: "src/middleware.ts",
+    session: "src/session.ts",
   },
   outDir: "dist",
   format: ["esm"],

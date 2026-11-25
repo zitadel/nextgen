@@ -106,6 +106,9 @@ type TeamMembershipUpdatedPayload struct {
 
 type AuthTokenIssuedPayload struct {
 	Scopes []string `json:"scopes,omitempty"`
+	// ClientID is the client that redeemed an authorization code; empty for
+	// every other token.
+	ClientID string `json:"client_id,omitempty"`
 }
 
 type AuthTokenRevokedPayload struct{}
@@ -130,6 +133,27 @@ type AuthAttemptHandedOffPayload struct{}
 // challenge and the redirect URI come from the request and stay out.
 type AuthRequestCreatedPayload struct {
 	ClientID string `json:"client_id"`
+}
+
+// Reasons on auth.request.exchange.failed: the check that refused the code.
+const (
+	AuthRequestExchangeReasonClientMismatch         = "client_mismatch"
+	AuthRequestExchangeReasonCodeExpired            = "code_expired"
+	AuthRequestExchangeReasonRedirectURIMismatch    = "redirect_uri_mismatch"
+	AuthRequestExchangeReasonCodeVerifierMissing    = "code_verifier_missing"
+	AuthRequestExchangeReasonCodeVerifierInvalid    = "code_verifier_invalid"
+	AuthRequestExchangeReasonCodeVerifierUnexpected = "code_verifier_unexpected"
+	AuthRequestExchangeReasonReleaseRevoked         = "release_revoked"
+	AuthRequestExchangeReasonSessionNotActive       = "session_not_active"
+	AuthRequestExchangeReasonUserNotActive          = "user_not_active"
+)
+
+// AuthRequestExchangeFailedPayload names the client that presented the code
+// and why it was refused. The code, its hash, the verifier and the redirect
+// URI stay out.
+type AuthRequestExchangeFailedPayload struct {
+	ClientID string `json:"client_id"`
+	Reason   string `json:"reason"`
 }
 
 type AuthCheckPayload struct {
@@ -482,8 +506,9 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 type SignupChallengePayload struct{}
 
 // ApplicationPayload is shared by application.created (snapshot) and
-// application.updated (delta). ClientIDs are the clients the write created,
-// each of which got a secret. The document body and the secrets stay out.
+// application.updated (delta). ClientIDs are the clients the write created:
+// a registered application's each got a secret, a declared one's name a
+// variable. The document body and the secrets stay out.
 type ApplicationPayload struct {
 	Slug       string   `json:"slug,omitempty"`
 	Name       string   `json:"name,omitempty"`

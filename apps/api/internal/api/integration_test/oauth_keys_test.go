@@ -40,7 +40,7 @@ func TestOAuthJWKS(t *testing.T) {
 	other := newProject(true)
 	off := newProject(false)
 
-	signer, err := harness.EnsureKeyService(t).GetProjectSigner(t.Context(), project, domain.SigningKeyPurposeToken)
+	signer, err := harness.EnsureKeyService(t).GetProjectSigner(t.Context(), project, domain.SigningKeyPurposeToken, nil)
 	require.NoError(t, err)
 	jws, err := signer.Sign([]byte(`{"sub":"user_1"}`))
 	require.NoError(t, err)

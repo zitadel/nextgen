@@ -892,7 +892,7 @@ func TestKeyService_GetProjectPublicSigningKeys(t *testing.T) {
 		for i, key := range keys {
 			assert.Equal(t, key.ID, public[i].KeyID)
 			assert.True(t, public[i].IsPublic())
-			signer, err := key.Signer(kekCrypter)
+			signer, err := key.Signer(kekCrypter, nil)
 			require.NoError(t, err)
 			jws, err := signer.Sign([]byte("payload"))
 			require.NoError(t, err)

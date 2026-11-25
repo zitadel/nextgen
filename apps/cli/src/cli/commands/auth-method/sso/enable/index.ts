@@ -1,4 +1,3 @@
-import { RealMachine } from "@/lib/server";
 import { Flags } from "@oclif/core";
 import {
   type ClientId,
@@ -10,18 +9,20 @@ import {
   parseIssuer,
   parseScopes,
   RESERVED_SLUGS,
+  selectionName,
 } from "@zitadel/config/idp";
 
-import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
-import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { AuthMethodCommand, providerKind } from "@/cli/commands/auth-method/command";
+import type { EnableFacts, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
 import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
 import { CommandGroups } from "@/cli/commands/groups";
-import type { Admitted, CommandResult, JsonEnvelope } from "@/lib/oclif";
-import { environmentFlags } from "@/lib/oclif/environment-flags";
-import { accepts, parses } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { environmentFlags } from "@/cli/core/environment-flags";
+import { accepts, parses } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { RealMachine } from "@/lib/server";
 import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 
@@ -127,6 +128,27 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   };
 
   /**
+   * What `--dry-run` does: the same steps as a real run, which show the change
+   * and write nothing.
+   *
+   * @param admitted - What the command admitted.
+   * @returns The result.
+   */
+  protected async preview(admitted: Admitted<typeof AuthMethodSsoEnable>): Promise<CommandResult> {
+    return this.wizard(admitted);
+  }
+
+  /**
+   * What the command does: the steps, in order.
+   *
+   * @param admitted - What the command admitted.
+   * @returns The result.
+   */
+  protected async apply(admitted: Admitted<typeof AuthMethodSsoEnable>): Promise<CommandResult> {
+    return this.wizard(admitted);
+  }
+
+  /**
    * Add the provider to the schema and its login flows, and publish its
    * credentials to the project.
    *
@@ -140,106 +162,121 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * @throws {@link ZitadelError} When no provider is named, a setting is
    *   refused, the schema cannot be chosen, or no flow can offer the provider.
    */
-  protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+  private async wizard({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<CommandResult> {
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
+    this.annotate({ provider_type: providerKind(flags.provider) });
 
-    return this.emit(
-      await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
-        .step(
-          new ChooseProvider({
-            dryRun: this.dryRun,
-            nonInteractive: this.nonInteractive,
-          }),
-        )
-        .step(
-          new ReadIssuer({
-            cwd: this.cwd,
-            env: this.env,
-          }),
-        )
-        .step(
-          new LoadSchema({
-            loadSchemaTarget: (input) => {
-              return this.loadSchemaTarget(input);
-            },
-          }),
-        )
-        .step(
-          new ReadOrigins({
-            connect: () => {
-              return this.connect();
-            },
-          }),
-        )
-        .step(
-          new SelectConnection({
-            ask: this.ask,
-            dryRun: this.dryRun,
-          }),
-        )
-        .step(
-          new PlanChange({
-            ask: this.ask,
-            machine: new RealMachine(),
-            developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
-            suggest: this.suggest,
-            again: this.again,
-          }),
-        )
-        .step(new IntroduceProvider())
-        .endWhen(
-          new PreviewChange({
-            argsOf: (command) => {
-              return this.argsOf(command);
-            },
-            dryRun: this.dryRun,
-            realRun: () => {
-              return this.realRun();
-            },
-            report: (change) => {
-              this.report(change);
-            },
-          }),
-        )
-        .step(new CollectCredentials())
-        .step(new BuildChange())
-        .step(
-          new PublishCredentials({
-            signal: this.signal,
-            source: this.meta.source,
-          }),
-        )
-        .step(
-          new WriteFiles({
-            report: (change) => {
-              this.report(change);
-            },
-            write: (target, change) => {
-              return this.write(target, change, undefined);
-            },
-          }),
-        )
-        .step(
-          new ShowResult({
-            followUps: (changed, leading) => {
-              return this.followUps(changed, leading);
-            },
-            suggest: this.suggest,
-          }),
-        )
-        .finish((state) => {
-          return state.answer;
-        })
-        .run(
-          { flags },
-          {
-            onUndoError: (key, error) => {
-              warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
-            },
+    return await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
+      .step(
+        new ChooseProvider({
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+        }),
+      )
+      .step(
+        new ReadIssuer({
+          cwd: this.cwd,
+          env: this.env,
+        }),
+      )
+      .step(
+        new LoadSchema({
+          loadSchemaTarget: (input) => {
+            return this.loadSchemaTarget(input);
           },
-        ),
-    );
+        }),
+      )
+      .step(
+        new ReadOrigins({
+          connect: () => {
+            return this.connect();
+          },
+        }),
+      )
+      .step(
+        new SelectConnection({
+          ask: this.ask,
+          dryRun: this.dryRun,
+        }),
+      )
+      .step(
+        new PlanChange({
+          ask: this.ask,
+          machine: new RealMachine(),
+          developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
+          suggest: this.suggest,
+          again: this.again,
+        }),
+      )
+      .step(new IntroduceProvider())
+      .endWhen(
+        new PreviewChange({
+          argsOf: (command) => {
+            return this.argsOf(command);
+          },
+          dryRun: this.dryRun,
+          realRun: () => {
+            return this.realRun();
+          },
+          report: (change) => {
+            this.report(change);
+          },
+          said: (change) => {
+            return this.said(change);
+          },
+        }),
+      )
+      .step(new CollectCredentials())
+      .step(new BuildChange())
+      .step(
+        new PublishCredentials({
+          signal: this.signal,
+          source: this.meta.source,
+        }),
+      )
+      .step(
+        new WriteFiles({
+          report: (change) => {
+            this.report(change);
+          },
+          write: (target, change) => {
+            return this.write(target, change, undefined);
+          },
+        }),
+      )
+      .step(
+        new ShowResult({
+          said: (change, written) => {
+            return this.said(change, written);
+          },
+          followUps: (changed, leading) => {
+            return this.followUps(changed, leading);
+          },
+          suggest: this.suggest,
+        }),
+      )
+      .finish((state) => {
+        return state.answer;
+      })
+      .run(
+        { flags },
+        {
+          watch: this.watchWizard({
+            flow: "oidc_provider_setup",
+            with: { entry_point: "standalone" },
+            step: (key, known) => {
+              const settled = known as Partial<EnableFacts> | undefined;
+              return key === "selection" && settled?.selection !== undefined
+                ? { choice: { provider_type: selectionName(settled.selection) } }
+                : undefined;
+            },
+          }),
+          onUndoError: (key, error) => {
+            warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
+          },
+        },
+      );
   }
 }

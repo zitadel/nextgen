@@ -26,7 +26,7 @@ type SigningKeys interface {
 // every origin, so a shared cache may keep it for the configured max age.
 func (s opServer) Keys(ctx context.Context, _ *op.Request[struct{}]) (_ *op.Response, err error) {
 	defer func() { keepError(ctx, err) }()
-	projectID, err := tenantProject(op.TenantFromContext(ctx), s.platformEnabled)
+	projectID, _, err := tenantProject(op.TenantFromContext(ctx), s.platformEnabled)
 	if err != nil {
 		return nil, metadataError(err)
 	}

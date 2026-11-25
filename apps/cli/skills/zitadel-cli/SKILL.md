@@ -237,7 +237,11 @@ nothing; `data.skills` and `data.directories` say what it added where.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
   it (`ZITADEL_TELEMETRY=0`, or the standard `DO_NOT_TRACK`, in their
   environment), but that is the user's environment choice, not a flag to attach
-  to every call.
+  to every call. The CLI prints a one-time notice about it only in an interactive
+  terminal, so a run you drive never shows it: when you first run the CLI for a
+  user, tell them it sends anonymous usage data (never project IDs,
+  never server URLs or file contents), that it records the coding agent it runs inside, and
+  how to turn it off. Never turn it off for them without being asked.
 - **Flag conventions.** Flags follow what a model already expects from curl, ssh
   and wget: `--help`/`-h` (also `zitadel api help`), `--version`, `-v`/`--verbose`,
   kebab-case long flags, both `--flag value` and `--flag=value`, and
@@ -300,7 +304,11 @@ nothing; `data.skills` and `data.directories` say what it added where.
 - **Streams.** Capture stdout and stderr separately when scripting, into files
   outside the app directory: `setup` scaffolds a new app only into an empty
   directory. The machine contract is one parseable JSON object on stdout;
-  installer, audit, and package-manager progress belongs on stderr.
+  installer, audit, and package-manager progress belongs on stderr. Without
+  `--json`, stdout that is not a terminal holds the command's result alone: log
+  and progress lines, such as `setup`'s per-file `Wrote …` lines, are written
+  only to a terminal, `--debug` detail goes to stderr, and the result opens with
+  its headline and lists the facts under it.
 
 ## Discovering commands
 
@@ -382,6 +390,10 @@ Each invocation prints one JSON object:
 - On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
   `nothing-to-eject`) and the headline it draws as `data.title`. `skipped` means
   nothing was done because a person declined or there was nothing to do.
+- `--dry-run` is taken only by a command that changes something, and `--force` only by one
+  that asks consent; any other command refuses either as an unknown flag.
+- `--server` is taken only by a command that reads a server: `start`, `stop`, `reset`, `logs`,
+  `tests add`, `skills add`, `upgrade`, `eject` and `branding eject` refuse it as an unknown flag.
 - A dry run (`--dry-run`) answers `ok` with `data.dry_run: true` and a headline
   ending in `(dry run)` as `data.title`, never `skipped`, and `next_commands` holds
   the real command to run.
@@ -679,6 +691,7 @@ Ask about:
   those too. In an interactive `setup`, Space ticks a provider and Enter
   continues; pressing Enter with none ticked asks whether to continue without
   setting up SSO, where No goes back to the list, so nothing is skipped by accident.
+  Yes is preselected, so pressing Enter at every question finishes setup.
   A non-interactive run names the providers with `--sso` instead.
 - **Profile fields** — which attributes sign-up collects. The starting field
   set depends on the use-case you pick (see *Presets and use-cases* below) —

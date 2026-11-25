@@ -7,7 +7,7 @@
   change to the command surface.
 - `command-reference.json` is the docs site's CLI reference, generated from
   `COMMANDS`, `FLAG_VARIABLES` and `EXIT_CODES`: after a change to any of them,
-  rerun `tests/unit/lib/oclif/reference.test.ts` with `--update`.
+  rerun `tests/unit/cli/core/reference.test.ts` with `--update`.
 - `README.md`'s command reference is `oclif readme` output: after adding, renaming or removing a
   command, run `turbo run readme --filter=@zitadel/cli`; `tests/unit/docs/readme.test.ts` gates it.
 - Running git, and why every call goes through one module:
@@ -37,7 +37,7 @@
   what is suggestible derives from `src/index.ts`, so add no mapping.
 - Declare `required`, `exclusive` and `dependsOn` through `relatedFlags`
   (`src/lib/suggestion/relations.ts`); `flags-declared.test.ts` fails on an inline one.
-- Keep everything about suggestions in `src/lib/suggestion/`, outside `lib/oclif`,
+- Keep everything about suggestions in `src/lib/suggestion/`, outside `lib/oclif` and `cli/core`,
   which domain libs may not import (`layering.test.ts`).
 - Never pass the run's `--cwd`/`--env`/`--env-file`/`--server`: the renderer adds
   them; set one only to aim elsewhere (a new app, a new environment).
@@ -56,9 +56,9 @@
   quoting a value a person typed with `Cmd.quote`.
 - Suggest a package manager's command with `suggestedCommandOf`, chain commands
   with `shellSteps`, and wrap one with `pipedFrom`, `readingFrom` or `andTheRest`.
-- Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
-  in its data: `emit` hands them to the `Presenter`
-  (`src/lib/oclif/presenter.ts`), which writes them to the envelope and prints every one.
+- Pass a result's next steps as `next` (`src/cli/core/next-steps.ts`), never
+  in its data: the base command hands them to the `Presenter`
+  (`src/cli/core/presenter.ts`), which writes them to the envelope and prints every one.
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
   hand-written `next_commands:` or `next_actions:` key under `apps/cli/src`.
 - Set `nextShown` only when the result's own output showed the steps
@@ -97,7 +97,7 @@
   remembers for a run, then `sourceOf`, then `execute`, then the private
   methods `execute` calls. Nothing it calls is declared above it.
 - A command does its work in `execute`, never `run`: `BaseCommand.run`
-  (`src/lib/oclif/base.ts`) parses the flags, resolves `static meta`, and only
+  (`src/cli/core/base.ts`) parses the flags, resolves `static meta`, and only
   then calls it.
 - Refuse a bad value in the flag or argument itself, so `execute` never checks
   one: a typed `Flags.custom`/`Args.custom` whose `parse` calls a validator
@@ -124,7 +124,7 @@
 - Declare a refusal `as const satisfies`, never `: Refusal` or `: Refused<T>`,
   so the compiler refuses a throw or a `reads` that leaves a name unfilled.
   - Annotate one only where its `next` would make the type circular;
-    `tests/unit/lib/oclif/refusal-wording.test.ts` weighs every refusal.
+    `tests/unit/cli/core/refusal-wording.test.ts` weighs every refusal.
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
   command, with one exception: a command that runs as a wizard.
   - A wizard command (`setup`, `auth-method sso enable`) keeps one class per step under its own
@@ -134,10 +134,10 @@
     uses lives in that step's file.
   - A step never imports another step or a value from the command's `index.ts`. It takes what it
     needs through its constructor, which the command's `execute` fills when it builds the wizard,
-    and the command keeps its flags, refusals and telemetry (recorded through the observer given
-    to `.step(...)`) and emits the one result the wizard returns.
+    and the command keeps its flags, refusals and telemetry (reported through the `watch` its
+    `this.watchWizard(...)` gives the wizard) and emits the one result the wizard returns.
 - `--input` (also `--flags-file`, `--cli-input-json`) passes a whole invocation as one JSON document,
-  read by the `Documented` mixin (`src/lib/oclif/documented.ts`), which `BaseCommand` extends.
+  read by the `Documented` mixin (`src/cli/core/documented.ts`), which `BaseCommand` extends.
 - Beside `--input` only the global flags may stand, so a command never knows about it.
 - An id argument without its own `idSchema` refuses empty, `.`, `..` and control characters in
   `idArg` (`crud/shared.ts`); `api` does the same for its path values in `ApiCall.pathValues`.
@@ -147,7 +147,7 @@
 - Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
   `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
-  (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand; its `next`
+  (`src/cli/core/refusal.ts`), never a `ZitadelError` built by hand; its `next`
   entries are `{ id, … }` objects, and a `{name}` one is filled from `refusalError`'s
   third argument, never from its values.
   - A flag's refusal has no third argument: its `next` holds objects only.
@@ -166,7 +166,7 @@
   `jsonEnabled()`, which `--json` sets. A command that reads `process.stdout` or
   recomputes colour has its own answer to a question the run already settled.
 - To find where a flag's meaning is decided: `--json` and colour in `Output`,
-  `--fields` in `fieldsFlag` and `src/lib/oclif/columns.ts`, `--input` in
+  `--fields` in `fieldsFlag` and `src/cli/core/columns.ts`, `--input` in
   `inputFlag` and the `Documented` mixin.
 - JSON is for `--json` alone: off a terminal a command prints its plain summary,
   never JSON, so a command does not choose its output by the mode.
@@ -178,15 +178,18 @@
   still export several values each.
 - Keep a loose file at the root of `src/lib` to a utility that knows nothing of Zitadel or the
   CLI; `errors.ts` is the one known exception.
-- A domain lib under `src/lib` never imports `lib/oclif`; `upgrade` builds only on the small
+- No file under `src/lib` imports anything under `src/cli`, with no exception
+  (`tests/unit/lib/oclif/layering.test.ts`); `upgrade` builds only on the small
   utilities `tests/unit/lib/upgrade/layering.test.ts` lists.
 - `src/lib/upgrade` takes each of Zitadel's defaults (`defaults.ts`, `config.ts`) as an option, so a
   test or another product can swap it; the `upgrade` command does the CLI's part, `doctor --fix` too.
-- Say what a command is doing with `log` (`src/lib/ui/log.ts`) from a command or a
-  library alike, never a logger or stream of your own: the running command's
-  sink decides the look, and `--json` installs one that draws nothing; with no
-  sink installed, a line is written plainly. A unit test fails on a
-  `consola` import.
+- Say what a command is doing with `this.info`, `this.warn`, `this.fail` and `this.debug`
+  (`src/cli/core/loggable.ts`).
+- Say it from a wizard step or a library with `log` (`src/lib/ui/log.ts`), never a logger or
+  stream of your own. A unit test fails on a `consola` import.
+- A `log` line is for a person at a terminal: a terminal draws it, `--json` and a pipe drop it.
+  `warn` and `fail` stay, and `debug` with `--debug` goes to stderr.
+- Put anything a script reads in the command's result, never a `log` line.
 - Report a warning through `warnings.report` (`src/lib/ui/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
   fails on any other `log.warn`.
@@ -198,7 +201,7 @@
   `src/cli/commands`.
 - Put a command that takes `--env-file` in `nextCommands`; a `hint:` may name it for a person to
   read, but a message or a box line never may: prose drops the selector
-  (`tests/unit/lib/oclif/environment-flags.test.ts`).
+  (`tests/unit/cli/core/environment-flags.test.ts`).
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
@@ -225,8 +228,11 @@
   `tests/unit/lib/ui/index.test.ts` lists every file that still does; add none.
 - Fail early: run every check that does not depend on an answer before the
   first question, and each one that does as soon as its answer is given.
-- Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
+- Pass `this.signal` (the run's Ctrl-C, `src/cli/core/interruptible.ts`) to every
   client and wait a command starts; `createZitadelClient` requires it.
+- Extend `ReadCommand`, `ChangeCommand` or `RemoveCommand(forces)` from
+  `src/cli/commands/bases.ts` (`ProjectCommand` for a command that reads nothing to show),
+  then add `Promptable` or `LocalServerCommand` around it only where the command needs it.
 - Pick the command's base by what it does with a server (all from
   `src/cli/commands/server-command.ts`, wrapping what a command extends); a
   command never resolves, parses or normalises a server address itself. No base
@@ -238,22 +244,20 @@
   | talks to one through `--server` or its environment | `ServerCommand(Base)` |
   | may have to ask which server | `Promptable(ChoosingServerCommand(Base))` |
   | is about the local server | `LocalServerCommand(Base, folderRule)` |
-  | is destructive | `Destructive(...)`, outermost |
+  | is destructive | `Destructive(Previewable(...))`, or `RemoveCommand` for a project |
+  | reports its run | `Telemetered(...)`, outermost |
 
   A command that reads an environment is `ServerCommand(EnvironmentCommand)`:
   the mixin goes directly on the base, then `Promptable`, `Tabulatable` or
-  `Destructive` around it. `LocalServerCommand` does not take `--server`; a
-  command that also reads one is `LocalServerCommand(ServerCommand(Base))`.
-  Each local-server command declares its own `group`.
-  `start`, `stop`, `logs`, `reset`, `setup`, `upgrade`, `eject` and a few more
-  still wrap `ServerCommand(...)` only to keep accepting `--server`, which they
-  ignore, each overriding `resolveServer` to name no server: leave them as they
-  are until the flag is removed from them.
+  `Destructive` around it. `LocalServerCommand` names no server itself and ignores
+  `--server`, even around `ServerCommand(Base)`, so a command that reads one (`console`,
+  `doctor`) names it in its own `sourceOf`. Each local-server command declares its own `group`.
+  A command that does not use `--server` does not take it: it never wraps `ServerCommand`.
 - "Server" on its own is the Zitadel instance a command talks to by URL. The
   "local server" is the one `zitadel start` runs in a folder. The "server
   binary" is `@zitadel/server`.
 - A command that asks anything extends `Promptable(...)`
-  (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
+  (`src/cli/core/promptable.ts`), as in `Promptable(BaseCommand)` or
   `Promptable(EnvironmentCommand)`. Only such a command has `this.ask`, so
   what can prompt is visible from its class, and the compiler rejects a
   command that asks without it.
@@ -277,7 +281,7 @@
 - Write "project" in lowercase in every message ("stored in your project"), as the prompts
   do; only product names are capitalised.
 - A command that prints a table, a list or a record extends `Tabulatable(...)`
-  (`src/lib/oclif/tabulatable.ts`). A record or a table inside another output
+  (`src/cli/core/tabulatable.ts`). A record or a table inside another output
   uses `this.tabulate` or `this.tabulateDetail`; a table draws nothing under
   `--json`, and a unit test fails on any other import of `@oclif/table`.
 - A list command declares `plain: plainFlag` last in its `flags` and names its
@@ -287,13 +291,22 @@
 - `listData` reports `truncated` beside `next_page_token`.
 - A list command ends with the locals `items`, `rows`, `columns`, `empty`,
   `footer`, `page` and `extra`, empty values spelled out, passed to
-  `this.emitList(flags, {...})`.
+  `this.listed(flags, {...})`.
 - Leave plain, the list JSON, the footer and the next-page command to
-  `emitList`; a command never builds them.
+  `listed`; a command never builds them.
 - A paged list's next page is the run again with the new `--page-token`
-  (`emitList` builds it), so the token goes with the flags that issued it.
-- A command that deletes, revokes or rolls back extends `Destructive(...)`
-  (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
+  (`listed` builds it), so the token goes with the flags that issued it.
+- A command returns its result and never calls `this.emit`; the base command emits it once
+  (`biome-plugins/no-command-emit.grit`).
+- Compose a command's mixins in one order, outermost first: `Tabulatable`, `Destructive`,
+  `Promptable`, `LocalServerCommand`, `Previewable`, `ServerCommand`, then its base.
+- A command that changes anything extends `Previewable(...)` (`src/cli/core/previewable.ts`):
+  it takes `--dry-run`, and the compiler requires its `preview` and `apply`. Never write
+  `execute` on one, and never read `--dry-run` on a command that is not one.
+- A command that deletes, revokes or rolls back extends `Destructive(Previewable(...))`
+  (`src/cli/core/destructive.ts`), which takes `--force`, and does it in `this.confirmed({ ... })`
+  inside `apply`. Declare no `--force` of your own unless it means something else
+  (`setup` overwriting files).
 - Every destructive operation takes a `Consent` (`src/lib/consent/consent.ts`); the
   client withholds the spec's destructive operations until `consent.unlock`.
 - An update that sets a field to `null` removes it, so it asks as a deletion does and
@@ -308,17 +321,18 @@
   global flag, or a deviation, in `SKILL.md`'s invocation rules.
 - Declare an environment variable that sets what a global flag sets as a
   `FlagVariable` beside the code that reads it, read it by its `name`, and add
-  it to `FLAG_VARIABLES` (`src/lib/oclif/base.ts`).
+  it to `FLAG_VARIABLES` (`src/cli/core/base.ts`); a flag a mixin adds (`--telemetry`)
+  keeps its variables in the mixin's static `flagVariables`, which the reference reads
+  from each command.
 
 ## Telemetry
 
 Anonymous product analytics: a copy of each event to Vercel Web Analytics
-(`src/lib/telemetry/vercel.ts`), and Mixpanel's Node SDK (`mixpanel`), which is
-paused.
+(`src/lib/telemetry/vercel.ts`), and Mixpanel's Node SDK (`mixpanel`).
 
 - Add no other analytics tool or SDK, browser SDK included.
-- The Vercel copy sends only `VERCEL_EVENT_KEYS` (`src/lib/oclif/command-telemetry.ts`),
-  the catalog's `vercel` list (`catalog.test.ts`); Vercel locates it by IP.
+- The Vercel copy sends only the keys `vercelEventKeys` (`src/cli/telemetry/properties.ts`)
+  returns, the catalog's `vercel` list (`catalog.test.ts`); Vercel locates it by IP.
 - Development runs (`resolveChannel`, CI included) send no Vercel copy unless
   `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake.
 - Send nothing that identifies a person, machine or credential: no user,
@@ -335,10 +349,22 @@ paused.
 - Consent is opt-out (`--no-telemetry`, `DO_NOT_TRACK`, `ZITADEL_TELEMETRY=0`)
   and resolved once in `resolveConsent` (`src/lib/telemetry/consent.ts`).
   Never send around it.
-- `BaseCommand` (`src/lib/oclif/base.ts`) is the only place a client is
-  built; CLI-specific properties live in `src/lib/oclif/command-telemetry.ts`.
-- Telemetry never writes to stdout and never fails a command. The first-run
-  notice goes to stderr, in interactive mode only.
+- `Telemetered` (`src/cli/telemetry/telemetered.ts`) is the only place a client is built
+  and an event is sent. A command that extends it reports on its own run; one that does
+  not sends nothing. Put it outermost: `extends Telemetered(Destructive(ServerCommand(…)))`.
+- `BaseCommand` and `src/lib` hold no telemetry. The base command offers one neutral hook,
+  `describe()`, for what a command knows about its run; a layer or a command overrides it
+  and keeps `super.describe()`.
+- Keep no table that maps command ids, step keys or properties to events: a command
+  says what it knows in its own `describe()` and `annotate()` calls. The one place a step
+  key meets an event name is the `step` function a wizard command hands to
+  `this.watchWizard`, kept in that command's `shared.ts`.
+- A wizard command passes `this.watchWizard({ flow, step })` as the wizard's `watch`;
+  `step` is one function in the command that names a step for the event catalog and
+  returns the choice the step settled.
+- A command's Vercel copy keeps one fact of its own: `static override readonly headline`.
+- A generated resource says what it knows from the body it sends with `facts` on its
+  `create` or `update`, in `resources.ts`.
 - Mixpanel is paused: `src/lib/telemetry/config.ts` bakes in no token, so only
   `ZITADEL_TELEMETRY_TOKEN` sends to it. Bake one back in only for a project in
   the region its endpoint names; tokens are write-only, published on purpose.
@@ -353,11 +379,12 @@ paused.
 
 ### Adding a dimension
 
-`cli_command_started`, `cli_command_completed` and `cli_command_failed` fire
-from `BaseCommand` for every command. Add a dimension rather than an event:
+`cli_command_started`, `cli_command_completed` and `cli_command_failed` are sent by
+`Telemetered` for every command that extends it. Add a dimension rather than an event:
 
-1. Record it with `this.recordTelemetry({ … })`. It reaches the events fired
-   after it, so not `started`. Never fetch data just to record it.
+1. Note it with `this.annotate({ … })` as the run learns it, or return it from `describe()`
+   once the run is over. It reaches the events fired after it, so not `started`. Never
+   fetch data just to note it.
 2. Name it `snake_case`; a boolean starts with `is_`, `has_`, `dry_` or
    `non_`. Leave out empty values; `compact()` drops them.
 3. List it under its command in the
@@ -365,6 +392,6 @@ from `BaseCommand` for every command. Add a dimension rather than an event:
    telemetry page; `tests/unit/lib/telemetry/catalog.test.ts` fails when the
    code and the catalog disagree.
 4. Check that it arrives in Mixpanel's Live View, with `ZITADEL_TELEMETRY_TOKEN`
-   naming the dev project while Mixpanel is paused. The region defaults to
+   naming a project of your own, or rely on the development project a development run sends to. Each baked-in project carries its own region; a token of your own defaults to
    `eu`; set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are
    silently dropped.

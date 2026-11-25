@@ -62,7 +62,9 @@ export class PlanChange extends WizardStep<
    * URIs is built from a Set first, because two spellings of one origin, such as
    * with and without a trailing slash, name the same redirect URI, which is
    * listed once. A deployed URI that equals the development one, and a preview
-   * URI that equals either, is left out of its list.
+   * URI that equals either, is left out of its list. A custom connection's
+   * settings are not a retry an agent can be handed whole, so the credential
+   * prompt is offered a retry only for a catalog provider.
    *
    * @param needs - What was read and decided.
    * @returns The plan.
@@ -118,13 +120,14 @@ export class PlanChange extends WizardStep<
         ask: this.deps.ask,
         developmentBuild: this.deps.developmentBuild,
         retry: async (clientId, piped) => {
-          // A custom connection's settings are not a retry an agent can be
-          // handed whole, so it is not offered one.
           if (needs.selection.kind !== "catalog") {
             return undefined;
           }
           const command = await this.deps.again("auth-method:sso:enable", {
-            with: { provider: selectionName(needs.selection), clientId },
+            with: {
+              provider: selectionName(needs.selection),
+              clientId,
+            },
           });
 
           return piped ? pipedFrom("CLIENT_SECRET", command) : command;

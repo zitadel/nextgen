@@ -108,15 +108,15 @@ func (s *server) withIssuer(next http.Handler) http.Handler {
 }
 
 // deriveIssuer builds the issuer of a request to tenant, for the project
-// tenantProject names. A project's URL is the one the client fetched: the
+// tenantProject finds. A project's URL is the one the client fetched: the
 // forwarded origin, normalized, the forwarded prefix and Prefix, then the
 // project ID.
 func (s *server) deriveIssuer(r *http.Request, tenant string) (Issuer, error) {
-	projectID, err := tenantProject(tenant, s.platformEnabled)
+	projectID, platform, err := tenantProject(tenant, s.platformEnabled)
 	if err != nil {
 		return Issuer{}, err
 	}
-	issuer := Issuer{ProjectID: projectID, Platform: tenant == ""}
+	issuer := Issuer{ProjectID: projectID, Platform: platform}
 	origin, err := domain.NormalizeOrigin(httputil.ForwardedOrigin(r))
 	if err != nil {
 		return Issuer{}, err
@@ -141,6 +141,23 @@ func (s *server) deriveIssuer(r *http.Request, tenant string) (Issuer, error) {
 	return issuer, nil
 }
 
+// tenantProject is the project a request to tenant is for. The empty tenant
+// is the platform project, only when a platform project is configured; any
+// other tenant must be a project ID. The platform project's own ID is no
+// tenant, because its issuer is Prefix itself.
+func tenantProject(tenant string, platformEnabled bool) (projectID string, platform bool, err error) {
+	switch {
+	case tenant == "":
+		if !platformEnabled {
+			return "", false, domain.ErrProjectNotFound()
+		}
+		return domain.PlatformProjectID, true, nil
+	case tenant == domain.PlatformProjectID, !domain.PrefixProject.Matches(tenant):
+		return "", false, domain.ErrProjectNotFound()
+	}
+	return tenant, false, nil
+}
+
 // platformIssuer is the platform project's issuer: Prefix under the
 // server's public base, path included, whatever path the request took
 // after a proxy stripped that path. It is reached only directly at the
@@ -158,19 +175,6 @@ func (s *server) platformIssuer(r *http.Request, issuer Issuer, origin string) (
 	}
 	issuer.URL = &url.URL{Scheme: s.publicBase.Scheme, Host: s.publicBase.Host, Path: base + Prefix}
 	return issuer, nil
-}
-
-func tenantProject(tenant string, platformEnabled bool) (string, error) {
-	switch {
-	case tenant == "":
-		if !platformEnabled {
-			return "", domain.ErrProjectNotFound()
-		}
-		return domain.PlatformProjectID, nil
-	case tenant == domain.PlatformProjectID, !domain.PrefixProject.Matches(tenant):
-		return "", domain.ErrProjectNotFound()
-	}
-	return tenant, nil
 }
 
 // forwardedPrefix is the path prefix the client's request carried before a

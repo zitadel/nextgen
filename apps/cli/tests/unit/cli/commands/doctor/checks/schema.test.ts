@@ -239,6 +239,9 @@ describe("SchemaCheck", () => {
     async function withEmailSubject(dir: string): Promise<void> {
       await aProject(dir);
       await write(dir, {
+        [SCHEMA_FILE]: JSON.stringify(
+          aUserSchema({ "x-auth-methods": { sso: { enabled: true, providers: ["acme"] } } }),
+        ),
         [EMAIL_CONNECTION]: JSON.stringify(anOidcConnection({ subject_claim: "email" })),
       });
     }
@@ -292,6 +295,9 @@ describe("SchemaCheck", () => {
     it("asks nothing when no connection could draw the warning", async ({ dir }) => {
       await aProject(dir);
       await write(dir, {
+        [SCHEMA_FILE]: JSON.stringify(
+          aUserSchema({ "x-auth-methods": { sso: { enabled: true, providers: ["acme"] } } }),
+        ),
         [EMAIL_CONNECTION]: JSON.stringify(anOidcConnection({ subject_claim: "sub" })),
       });
       const listings = countingListings();
