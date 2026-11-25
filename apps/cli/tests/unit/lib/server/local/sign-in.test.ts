@@ -223,8 +223,7 @@ describe("local admin sign-in", () => {
 
     expect(error).toMatchObject({
       message: expect.stringContaining("does not host the platform project") as string,
-      name: "LocalServerAdminError",
-      reason: "platform-missing",
+      name: "LocalServerAdminPlatformMissingError",
     });
     // Nothing is attempted against a server that cannot sign the admin in.
     expect(calls).toEqual([]);
@@ -244,8 +243,7 @@ describe("local admin sign-in", () => {
 
     expect(error).toMatchObject({
       message: "The local server could not find the local admin",
-      name: "LocalServerAdminError",
-      reason: "rejected",
+      name: "LocalServerAdminRejectedError",
       category: "denied",
     });
   });

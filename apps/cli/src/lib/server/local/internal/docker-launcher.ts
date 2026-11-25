@@ -249,7 +249,7 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     if (result.status === 0) {
       return "remote";
     }
-    throw dockerFailed(`Inspect Docker image ${image}`, args, result);
+    throw dockerError(`Inspect Docker image ${image}`, args, result);
   }
 
   /**
@@ -433,7 +433,7 @@ async function requireDocker(
     throw new LocalServerDockerMissingError(error);
   });
   if (result.status !== 0) {
-    throw dockerFailed(action, args, result);
+    throw dockerError(action, args, result);
   }
   return result;
 }
@@ -461,16 +461,22 @@ async function ensureImage(image: string): Promise<"local" | "pulled"> {
 }
 
 /**
- * The error for a `docker` call that ran and exited non-zero: the command and
- * what Docker printed, with no category, because the cause is not one we know.
- *
- * @param action - What was being done.
- * @param args - The arguments `docker` was run with.
- * @param result - What the call returned.
- * @returns The error.
+ * Wraps a failed `docker` call, keeping its command and stderr for whoever is debugging.
  */
-function dockerFailed(action: string, args: string[], result: DockerResult): Error {
-  return new Error(`${action} failed: docker ${args.join(" ")}: ${result.stderr.trim()}`, {
-    cause: result,
-  });
+function dockerError(action: string, args: string[], cause: unknown): Error {
+  if (cause && typeof cause === "object" && "stderr" in cause) {
+    return new Error(`${action} failed`, {
+      cause: {
+        command: ["docker", ...args],
+        stderr: String((cause as { stderr?: unknown }).stderr),
+      },
+    });
+  } else {
+    return new Error(`${action} failed`, {
+      cause: {
+        command: ["docker", ...args],
+        cause,
+      },
+    });
+  }
 }

@@ -7,7 +7,10 @@ import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
 import { errorMessage } from "@/lib/errors";
-import { LocalServerFileError, LocalServerMalformedError } from "@/lib/server/errors";
+import {
+  LocalServerAdminFileMalformedError,
+  LocalServerFileUnreadableError,
+} from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
 import {
@@ -79,8 +82,11 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw new LocalServerFileError("unreadable", `${LOCAL_ADMIN_FILE} cannot be read`, {
-      details: { path: join(cwd, LOCAL_ADMIN_FILE), cause: errorMessage(error) },
+    throw new LocalServerFileUnreadableError(`${LOCAL_ADMIN_FILE} cannot be read`, {
+      details: {
+        path: join(cwd, LOCAL_ADMIN_FILE),
+        cause: errorMessage(error),
+      },
       cause: error,
     });
   });
@@ -112,11 +118,19 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
  * could never sign in. Removing the file and resetting the data lets the next
  * start mint a fresh credential and import it.
  */
-function malformedAdminFile(cwd: string, cause?: unknown): LocalServerMalformedError {
-  const details = { path: join(cwd, LOCAL_ADMIN_FILE), directory: cwd };
+function malformedAdminFile(cwd: string, cause?: unknown): LocalServerAdminFileMalformedError {
+  const details = {
+    path: join(cwd, LOCAL_ADMIN_FILE),
+    directory: cwd,
+  };
 
-  return new LocalServerMalformedError("admin", `${LOCAL_ADMIN_FILE} is malformed`, {
-    details: cause ? { ...details, cause: errorMessage(cause) } : details,
+  return new LocalServerAdminFileMalformedError(`${LOCAL_ADMIN_FILE} is malformed`, {
+    details: cause
+      ? {
+          ...details,
+          cause: errorMessage(cause),
+        }
+      : details,
     cause,
   });
 }

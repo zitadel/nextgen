@@ -5,7 +5,8 @@ import { ManualClock } from "@tests/fixtures/clock";
 import {
   LocalServerPortBusyError,
   LocalServerPortFullError,
-  LocalServerStartError,
+  LocalServerStartExitedError,
+  LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server";
 import {
@@ -322,8 +323,7 @@ describe("Lifecycle", () => {
         .start()
         .catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(LocalServerStartError);
-      expect(error).toMatchObject({ reason: "exited" });
+      expect(error).toBeInstanceOf(LocalServerStartExitedError);
       await expect(world.server().state()).resolves.toMatchObject({ kind: "dead" });
     });
 
@@ -348,7 +348,7 @@ describe("Lifecycle", () => {
       const world = new World();
       world.onLaunch = () => undefined;
 
-      await expect(world.server().start()).rejects.toMatchObject({ reason: "exited" });
+      await expect(world.server().start()).rejects.toBeInstanceOf(LocalServerStartExitedError);
 
       expect(world.launched).toEqual([8080]);
     });
@@ -359,9 +359,9 @@ describe("Lifecycle", () => {
         w.takenPorts.add(record.port);
       };
 
-      await expect(world.server({ port: 9000 }).start()).rejects.toMatchObject({
-        reason: "exited",
-      });
+      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(
+        LocalServerStartExitedError,
+      );
 
       expect(world.launched).toEqual([9000]);
     });
@@ -372,7 +372,7 @@ describe("Lifecycle", () => {
       world.onLaunch = () => undefined;
 
       await expect(world.server().start()).rejects.toMatchObject({
-        reason: "exited",
+        name: "LocalServerStartExitedError",
         logTail: "listen tcp :8080: bind: address already in use",
       });
     });
@@ -383,7 +383,7 @@ describe("Lifecycle", () => {
       world.onLaunch = () => undefined;
 
       await expect(world.server().start()).rejects.toMatchObject({
-        reason: "exited",
+        name: "LocalServerStartExitedError",
         logTail: undefined,
       });
     });
@@ -515,7 +515,7 @@ describe("Lifecycle", () => {
         .start()
         .catch((e: unknown) => e);
 
-      expect(error).toMatchObject({ reason: "timeout" });
+      expect(error).toBeInstanceOf(LocalServerStartTimeoutError);
       await expect(world.server().state()).resolves.toMatchObject({ kind: "dead" });
     });
 
@@ -557,7 +557,7 @@ describe("Lifecycle", () => {
       };
 
       await expect(world.server().start()).rejects.toMatchObject({
-        reason: "timeout",
+        name: "LocalServerStartTimeoutError",
         cleanup: { status: "failed" },
       });
     });

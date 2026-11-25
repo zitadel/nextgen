@@ -11,7 +11,7 @@ import { execa } from "execa";
 import pWaitFor from "p-wait-for";
 
 import { errorMessage } from "@/lib/errors";
-import { LocalServerBinaryError } from "@/lib/server/errors";
+import { LocalServerBinaryBlockedError, LocalServerBinaryMissingError } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/server/local/runtime";
@@ -240,7 +240,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     }
   }
 
-  /** The bundled server version, or a `LocalServerBinaryError` of reason `missing`. */
+  /** The bundled server version, or a `LocalServerBinaryMissingError`. */
   static assertAvailable(): string {
     return BinaryLauncher.available(() => {
       if (!process.env[COMMAND_ENV]) {
@@ -255,8 +255,11 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return find();
     } catch (error) {
-      throw new LocalServerBinaryError("missing", "Zitadel server npm package is not available", {
-        details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
+      throw new LocalServerBinaryMissingError("Zitadel server npm package is not available", {
+        details: {
+          package: SERVER_NPM_PACKAGE,
+          message: errorMessage(error),
+        },
         cause: error,
       });
     }
@@ -525,8 +528,11 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
     child.unref();
     return pid;
   } catch (error) {
-    throw new LocalServerBinaryError("blocked", "The Zitadel server could not be started", {
-      details: { command, message: errorMessage(error) },
+    throw new LocalServerBinaryBlockedError("The Zitadel server could not be started", {
+      details: {
+        command,
+        message: errorMessage(error),
+      },
       cause: error,
     });
   }
@@ -536,11 +542,12 @@ function resolveServerPackageManifest(): string {
   try {
     return require.resolve(`${SERVER_NPM_PACKAGE}/package.json`);
   } catch (error) {
-    throw new LocalServerBinaryError(
-      "missing",
+    throw new LocalServerBinaryMissingError(
       `Missing ${SERVER_NPM_PACKAGE}. Reinstall @zitadel/cli.`,
       {
-        details: { package: SERVER_NPM_PACKAGE },
+        details: {
+          package: SERVER_NPM_PACKAGE,
+        },
         cause: error,
       },
     );

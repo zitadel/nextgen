@@ -145,8 +145,7 @@ describe("local server binary helpers", () => {
     }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     await expect(launching).rejects.toMatchObject({
-      name: "LocalServerBinaryError",
-      reason: "blocked",
+      name: "LocalServerBinaryBlockedError",
     });
   });
 
@@ -179,8 +178,7 @@ describe("local server binary helpers", () => {
     }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     await expect(launching).rejects.toMatchObject({
-      name: "LocalServerBinaryError",
-      reason: "missing",
+      name: "LocalServerBinaryMissingError",
     });
     resolver.missing = false;
   });

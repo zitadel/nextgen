@@ -8,9 +8,11 @@ import { errorMessage } from "@/lib/errors";
 import {
   LocalServerDockerMissingError,
   LocalServerInternalError,
-  LocalServerMalformedError,
   LocalServerPortBusyError,
+  LocalServerProcessesStopError,
+  LocalServerProcessesUnlistableError,
   LocalServerStopError,
+  LocalServerUrlInvalidError,
 } from "@/lib/server/errors";
 import { currentUser } from "@/lib/uidgid";
 
@@ -150,7 +152,7 @@ export abstract class ZitadelRuntime {
    *
    * @param input - The project directory and the `--server` flag, when given.
    * @returns The server and where it came from.
-   * @throws {LocalServerMalformedError} when the flag is not an http(s) URL,
+   * @throws {LocalServerUrlInvalidError} when the flag is not an http(s) URL,
    *   or the local server's own error when `local` is not running.
    */
   static async resolve(input: ResolveServerInput): Promise<ResolvedServer> {
@@ -197,17 +199,17 @@ export abstract class ZitadelRuntime {
    *
    * @param value - The server's address.
    * @returns The origin.
-   * @throws {LocalServerMalformedError} when it is not an http(s) URL.
+   * @throws {LocalServerUrlInvalidError} when it is not an http(s) URL.
    */
   static origin(value: string): string {
     if (!URL.canParse(value)) {
-      throw new LocalServerMalformedError("url", `Invalid server "${value}"`, {
+      throw new LocalServerUrlInvalidError(`Invalid server "${value}"`, {
         hint: `Use a URL like ${ZitadelRuntime.DEFAULT}.`,
       });
     }
     const url = new URL(value);
     if (url.protocol !== "https:" && url.protocol !== "http:") {
-      throw new LocalServerMalformedError("url", `Server URL must use http(s): ${value}`, {
+      throw new LocalServerUrlInvalidError(`Server URL must use http(s): ${value}`, {
         hint: `Use a URL like ${ZitadelRuntime.DEFAULT}.`,
       });
     }
@@ -249,7 +251,7 @@ export abstract class ZitadelRuntime {
    * serves it apart from the API, and `/ui/console/` on any other server.
    *
    * @returns The console's address, with its trailing slash.
-   * @throws {LocalServerMalformedError} when the address is not an http(s) URL.
+   * @throws {LocalServerUrlInvalidError} when the address is not an http(s) URL.
    */
   consoleUrl(): string {
     if (this.isCloud()) {
@@ -538,7 +540,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param cwd - The directory.
    * @returns The record, or `undefined` when none was written there.
-   * @throws {LocalServerFileError} or {LocalServerMalformedError} when it cannot be used.
+   * @throws {LocalServerFileUnreadableError} or {LocalServerRecordMalformedError} when it cannot be used.
    */
   static read(cwd: string): Promise<RuntimeMetadata | undefined> {
     return readRuntimeMetadata(cwd);
@@ -549,7 +551,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param cwd - Where to start looking.
    * @returns The record and the directory it was found in, or `undefined` when no directory above has one.
-   * @throws {LocalServerFileError} or {LocalServerMalformedError} when it cannot be used.
+   * @throws {LocalServerFileUnreadableError} or {LocalServerRecordMalformedError} when it cannot be used.
    */
   static readNearest(cwd: string): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
     return readNearestRuntimeMetadata(cwd);
@@ -823,7 +825,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param servers - The processes of this machine.
    * @returns What was stopped, or that the processes cannot be listed here.
-   * @throws {LocalServerStopError} when a process did not stop.
+   * @throws {LocalServerProcessesStopError} when a process did not stop.
    */
   static async stopAll(servers: LocalServers): Promise<SweepResult> {
     const discovery = await servers.current();
@@ -843,11 +845,12 @@ export class LocalRuntime extends ZitadelRuntime {
         return result.stop_result.status === "failed";
       })
     ) {
-      throw new LocalServerStopError(
-        "processes",
-        "Some managed local runtime processes did not stop",
-        { details: { supported: true, results } },
-      );
+      throw new LocalServerProcessesStopError("Some managed local runtime processes did not stop", {
+        details: {
+          supported: true,
+          results,
+        },
+      });
     }
     return { supported: true, results };
   }
@@ -1254,8 +1257,8 @@ export class LocalRuntime extends ZitadelRuntime {
    * @param permit - The caller's proof that deleting is meant.
    * @returns What stopping the server did.
    * @throws {LocalServerInternalError} when the permit is for another folder.
-   * @throws {LocalServerStopError} when a process on this folder's data would not stop.
-   * @throws {LocalServerStopError} when the record cannot be read and the machine's processes cannot be listed.
+   * @throws {LocalServerProcessesStopError} when a process on this folder's data would not stop.
+   * @throws {LocalServerProcessesUnlistableError} when the record cannot be read and the machine's processes cannot be listed.
    */
   async reset(permit: DestroyPermit): Promise<StopReport> {
     if (resolve(permit.folder) !== resolve(this.cwd)) {
@@ -1283,10 +1286,13 @@ export class LocalRuntime extends ZitadelRuntime {
           },
         );
         if (recordExists) {
-          throw new LocalServerStopError(
-            "unlistable",
+          throw new LocalServerProcessesUnlistableError(
             "The local runtime record cannot be read and the machine's processes cannot be listed",
-            { details: { error: discovery.error } },
+            {
+              details: {
+                error: discovery.error,
+              },
+            },
           );
         }
       }
@@ -1323,8 +1329,10 @@ export class LocalRuntime extends ZitadelRuntime {
           return orphan.stop_result.status === "failed";
         })
       ) {
-        throw new LocalServerStopError("server", "Local Zitadel server did not stop", {
-          details: { stop_results: orphans },
+        throw new LocalServerProcessesStopError("Local Zitadel server did not stop", {
+          details: {
+            stop_results: orphans,
+          },
         });
       }
     }
@@ -1422,9 +1430,7 @@ export class LocalRuntime extends ZitadelRuntime {
     if (runtime?.backend === "binary") {
       const outcome = await this.directory.processes.stopRecord(runtime);
       if (outcome.status === "failed") {
-        throw new LocalServerStopError("server", "Local Zitadel server did not stop", {
-          details: { runtime, stop_result: outcome },
-        });
+        throw new LocalServerStopError("Local Zitadel server did not stop", runtime, outcome);
       }
       return { runtime, stopped: outcome.status !== "stale", outcome };
     }

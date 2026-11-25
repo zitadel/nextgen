@@ -244,9 +244,6 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
     scope: () => {
       return this.scope();
     },
-    cwd: () => {
-      return this.meta.cwd;
-    },
   });
 
   /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */

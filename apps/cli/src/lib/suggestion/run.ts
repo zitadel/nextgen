@@ -1,5 +1,3 @@
-import { resolve } from "node:path";
-
 import { errorMessage, ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/ui/log";
 import { named } from "@/lib/names";
@@ -50,8 +48,6 @@ export type SuggestingRun = Readonly<{
   cliVersion: () => string;
   /** What the run puts back on each command it suggests. */
   scope: () => Scope;
-  /** The directory the run acts on, which a follow-up need not name again. */
-  cwd: () => string;
 }>;
 
 /** One token of a command line as oclif parsed it. */
@@ -272,13 +268,13 @@ export class RunSuggestions {
     if (error.nextCommands === undefined || !error.nextCommands.some(isSuggestion)) {
       return error;
     }
-    const scope = this.run.scope();
+    const suggest = this.aimedAt(this.run.scope());
 
     return new ZitadelError(error.code, error.message, {
       hint: error.hint,
       nextCommands: error.nextCommands.flatMap((next) => {
         try {
-          return [this.render(this.withoutOwnCwd(next), scope)];
+          return [suggest(next)];
         } catch (cause) {
           log.debug(`Left out a follow-up that could not be rendered: ${errorMessage(cause)}`);
           return [];
@@ -286,26 +282,6 @@ export class RunSuggestions {
       }),
       details: error.details,
     });
-  }
-
-  /**
-   * A follow-up that names the directory the run already acts on, without
-   * saying so: a library error aims its commands at the folder it knows
-   * (`cwd`) and cannot tell whether that is where the run is.
-   *
-   * @param next - The follow-up.
-   * @returns It, without a `cwd` that is the run's own.
-   */
-  private withoutOwnCwd(next: Suggested): Suggested | LooseNext {
-    if (!isSuggestion(next) || !("flags" in next)) {
-      return next;
-    }
-    const { cwd, ...flags } = next.flags ?? {};
-    if (typeof cwd !== "string" || resolve(cwd) !== resolve(this.run.cwd())) {
-      return next;
-    }
-
-    return { ...next, flags };
   }
 
   /**

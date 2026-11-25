@@ -20,7 +20,7 @@ import { join } from "node:path";
 import { parseEnv } from "node:util";
 
 import { errorMessage } from "@/lib/errors";
-import { LocalServerFileError } from "@/lib/server/errors";
+import { LocalServerFileUnreadableError } from "@/lib/server/errors";
 import { isObject } from "@/lib/json";
 
 /** Highest priority first. */
@@ -98,8 +98,11 @@ const readEnvFile = async (path: string): Promise<Readonly<Record<string, string
     if (isObject(error) && error.code === "ENOENT") {
       return undefined;
     }
-    throw new LocalServerFileError("unreadable", `Cannot read ${path}`, {
-      details: { path, message: errorMessage(error) },
+    throw new LocalServerFileUnreadableError(`Cannot read ${path}`, {
+      details: {
+        path,
+        message: errorMessage(error),
+      },
       cause: error,
     });
   });

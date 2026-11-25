@@ -176,8 +176,7 @@ describe("readNearestRuntimeMetadata", () => {
     await mkdir(app);
 
     await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
-      name: "LocalServerMalformedError",
-      reason: "record",
+      name: "LocalServerRecordMalformedError",
     });
   });
 
@@ -185,8 +184,7 @@ describe("readNearestRuntimeMetadata", () => {
     await malformedRecordAt(cwd);
 
     await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
-      name: "LocalServerMalformedError",
-      reason: "record",
+      name: "LocalServerRecordMalformedError",
     });
   });
 });

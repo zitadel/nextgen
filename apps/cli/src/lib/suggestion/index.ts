@@ -910,7 +910,6 @@ export function renderSuggestion(
 
 export {
   SuggestionError,
-  type SuggestionErrorOptions,
   SuggestionInternalError,
 } from "./errors";
 export { Guidance } from "./guidance";

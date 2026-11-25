@@ -8,9 +8,10 @@ import { errorMessage } from "@/lib/errors";
 import {
   LocalServerNotRespondingError,
   LocalServerNotStartedError,
-  LocalServerFileError,
+  LocalServerFileBlockedError,
+  LocalServerFileUnreadableError,
   LocalServerInternalError,
-  LocalServerMalformedError,
+  LocalServerRecordMalformedError,
 } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 
@@ -282,8 +283,11 @@ async function isOwnFile(path: string): Promise<boolean> {
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
       return false;
     }
-    throw new LocalServerFileError("unreadable", `${path} cannot be read`, {
-      details: { path, cause: errorMessage(error) },
+    throw new LocalServerFileUnreadableError(`${path} cannot be read`, {
+      details: {
+        path,
+        cause: errorMessage(error),
+      },
       cause: error,
     });
   }
@@ -430,9 +434,14 @@ export function localServerNotRunning(
   directory?: string,
 ): LocalServerNotRespondingError | LocalServerNotStartedError {
   if (serverUrl) {
-    return new LocalServerNotRespondingError({ server_url: serverUrl, directory });
+    return new LocalServerNotRespondingError({
+      server_url: serverUrl,
+      directory,
+    });
   } else {
-    return new LocalServerNotStartedError({ server_url: serverUrl });
+    return new LocalServerNotStartedError({
+      server_url: serverUrl,
+    });
   }
 }
 
@@ -537,8 +546,10 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       continue;
     }
     if (!info.isDirectory()) {
-      throw new LocalServerFileError("blocked", `${current} exists but is not a directory`, {
-        details: { path: current },
+      throw new LocalServerFileBlockedError(`${current} exists but is not a directory`, {
+        details: {
+          path: current,
+        },
       });
     }
     return current;
@@ -610,8 +621,11 @@ function explicitUrlPort(value: string): number | undefined {
 function malformedRuntime(
   input: Record<string, unknown>,
   directory: string,
-): LocalServerMalformedError {
-  return new LocalServerMalformedError("record", `${LOCAL_RUNTIME_FILE} is malformed`, {
-    details: { ...input, directory },
+): LocalServerRecordMalformedError {
+  return new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`, {
+    details: {
+      ...input,
+      directory,
+    },
   });
 }

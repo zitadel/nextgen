@@ -1,25 +1,4 @@
-import { codeOf } from "@/lib/errors";
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
-
-/**
- * What a suggestion failure carries beyond its message.
- */
-export type SuggestionErrorOptions = {
-  /**
-   * What to do about it, in words that name no command or flag.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * The error that caused this one.
-   */
-  readonly cause?: unknown;
-};
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * Anything the suggestion renderer fails with on purpose.
@@ -28,41 +7,44 @@ export type SuggestionErrorOptions = {
  * Every one is a guard on a suggestion that CLI code built wrongly: a person
  * never types a suggestion, so none is the person's to fix.
  */
-export class SuggestionError extends Error implements Categorized {
-  /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "fault";
+export abstract class SuggestionError extends Error {
+  /** The kind of failure. */
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
-  /**
-   * The stable product code the failure is reported with, which is the one
-   * its category has unless a class's condition has a code of its own.
-   */
-  get code(): ZitadelErrorCode {
-    return codeOf(this.category);
-  }
+  /** The stable product code the failure is reported with. */
+  abstract readonly code: ZitadelErrorCode;
 
-  /**
-   * What to do about it.
-   */
-  readonly hint: string | undefined;
+  /** What to do about it. */
+  abstract readonly hint: string | undefined;
 
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
+  /** Structured facts about the failure, for a `--json` reader. */
   readonly details: Readonly<Record<string, unknown>> | undefined;
 
   /**
    * Make a suggestion failure.
    *
    * @param message - What went wrong.
-   * @param options - What to do about it, the facts behind it, and its cause.
+   * @param options - The facts behind it and its cause.
    */
-  constructor(message: string, options: SuggestionErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+  constructor(
+    message: string,
+    options: {
+      details?: Readonly<Record<string, unknown>> | undefined;
+      cause?: unknown;
+    } = {},
+  ) {
+    super(
+      message,
+      options.cause === undefined
+        ? undefined
+        : {
+            cause: options.cause,
+          },
+    );
     this.name = new.target.name;
-    this.hint = options.hint;
     this.details = options.details;
   }
 }
@@ -75,4 +57,6 @@ export class SuggestionError extends Error implements Categorized {
 export class SuggestionInternalError extends SuggestionError {
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = undefined;
 }

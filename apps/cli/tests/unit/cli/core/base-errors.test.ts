@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
-import { LocalServerBusyError, LocalServerMalformedError } from "@/lib/server";
 import { resourceSuggestion } from "@/lib/suggestion";
 
 import { aConfigAt } from "@tests/helpers/suggestions";
@@ -433,47 +432,6 @@ describe("BaseCommand on an interrupted run", () => {
 
 // A wizard's failure is read on stderr like any other, while the chain it
 // drew into is still closed on a line of its own.
-describe("BaseCommand on a failure that carries its own next commands", () => {
-  it("aims them at the folder the failure names", async () => {
-    const cmd = new FailingCommand(true);
-
-    await cmd.failWith(
-      new LocalServerMalformedError("record", "bad", { details: { directory: "/parent" } }),
-    );
-
-    expect(cmd.json).toEqual([
-      expect.objectContaining({
-        next_commands: [
-          expect.stringContaining("--cwd /parent"),
-          expect.stringContaining("--cwd /parent"),
-        ],
-      }),
-    ]);
-  });
-
-  it("leaves out a folder that is the one the run acts on", async () => {
-    const cmd = new FailingCommand(true);
-
-    await cmd.failWith(
-      new LocalServerMalformedError("record", "bad", { details: { directory: process.cwd() } }),
-    );
-
-    expect(JSON.stringify(cmd.json)).not.toContain("--cwd");
-  });
-
-  it("keeps the hint the failure carries", async () => {
-    const cmd = new FailingCommand(true);
-
-    await cmd.failWith(new LocalServerBusyError({ lock_file: "/p/start.lock" }));
-
-    expect(cmd.json).toEqual([
-      expect.objectContaining({
-        hint: "Wait for it to finish, or delete /p/start.lock if no start is running.",
-      }),
-    ]);
-  });
-});
-
 describe("BaseCommand on a wizard that fails", () => {
   it("writes the error to stderr while its chain is open", async () => {
     const cmd = new FailingWizard(false);

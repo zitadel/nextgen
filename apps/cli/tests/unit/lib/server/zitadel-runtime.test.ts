@@ -298,9 +298,8 @@ describe("LocalRuntime", () => {
           stopPid: async (pid) => ({ pid, status: "failed", target: "process", signal: "SIGKILL" }),
         }).reset(DestroyPermit.forFolder(cwd)),
       ).rejects.toMatchObject({
-        name: "LocalServerStopError",
-        reason: "server",
-        category: "conflict",
+        name: "LocalServerProcessesStopError",
+        category: "invalid",
       });
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
@@ -318,8 +317,7 @@ describe("LocalRuntime", () => {
           servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
         }).reset(DestroyPermit.forFolder(cwd)),
       ).rejects.toMatchObject({
-        name: "LocalServerStopError",
-        reason: "unlistable",
+        name: "LocalServerProcessesUnlistableError",
         category: "invalid",
       });
 
@@ -835,15 +833,14 @@ describe("ZitadelRuntime.resolve", () => {
   it("rejects a non-http(s) URL with E_VALIDATION", async ({ dir }) => {
     await expect(
       ZitadelRuntime.resolve({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
-    ).rejects.toMatchObject({ name: "LocalServerMalformedError", reason: "url" });
+    ).rejects.toMatchObject({ name: "LocalServerUrlInvalidError" });
   });
 
   it("rejects an unparseable URL with E_VALIDATION", async ({ dir }) => {
     await expect(
       ZitadelRuntime.resolve({ cwd: dir, serverFlag: "not a url" }),
     ).rejects.toMatchObject({
-      name: "LocalServerMalformedError",
-      reason: "url",
+      name: "LocalServerUrlInvalidError",
     });
   });
 

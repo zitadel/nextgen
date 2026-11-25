@@ -6,7 +6,8 @@ import {
   LocalServerDockerMissingError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
-  LocalServerStartError,
+  LocalServerStartExitedError,
+  LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
@@ -136,18 +137,6 @@ const SERVER_WOULD_NOT_STOP_REFUSAL = {
   hint: "Stop the existing local runtime manually, then rerun start.",
   details: { runtime: "{runtime}", stop_result: "{stop}" },
 } as const satisfies Refusal;
-
-/** What a server that launched but did not become ready is reported as, by why. */
-const NOT_READY_REASONS = {
-  exited: {
-    message: "Local Zitadel server process exited before becoming healthy",
-    hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-  },
-  timeout: {
-    message: "Local Zitadel server did not become healthy",
-    hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
-  },
-} as const;
 
 /**
  * `zitadel start`: starts this folder's server, or finds it already running.
@@ -339,24 +328,47 @@ export default class Start extends Telemetered(
         throw error;
       })
       .catch((error: unknown) => {
-        if (error instanceof LocalServerStartError) {
+        if (error instanceof LocalServerStartExitedError) {
           const details = {
             ...error.details,
             server_url: error.record.server_url,
             log_tail: error.logTail || undefined,
           };
-          const reason = NOT_READY_REASONS[error.reason];
 
           if (error.cleanup.status === "failed") {
             throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
-              message: reason.message,
+              message: "Local Zitadel server process exited before becoming healthy",
               details,
               stop: error.cleanup,
             });
           } else {
             throw refusalError(SERVER_NOT_READY_REFUSAL, {
-              message: reason.message,
-              hint: reason.hint,
+              message: "Local Zitadel server process exited before becoming healthy",
+              hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
+              details,
+            });
+          }
+        }
+        throw error;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LocalServerStartTimeoutError) {
+          const details = {
+            ...error.details,
+            server_url: error.record.server_url,
+            log_tail: error.logTail || undefined,
+          };
+
+          if (error.cleanup.status === "failed") {
+            throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+              message: "Local Zitadel server did not become healthy",
+              details,
+              stop: error.cleanup,
+            });
+          } else {
+            throw refusalError(SERVER_NOT_READY_REFUSAL, {
+              message: "Local Zitadel server did not become healthy",
+              hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
               details,
             });
           }
