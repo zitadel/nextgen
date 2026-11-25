@@ -101,33 +101,19 @@ const OPERATION_AMBIGUOUS_REFUSAL = {
  */
 function resolveTarget(ref: string, method?: string): Target {
   try {
-    try {
-      return Operation.named(ref, method);
-    } catch (error) {
-      if (error instanceof BackendOperationUnknownError) {
-        throw Object.assign(
-          refusalError(OPERATION_UNKNOWN_REFUSAL, {
-            message: error.message,
-            hint: error.hint ?? "",
-          }),
-          {
-            cause: error,
-          },
-        );
-      }
-      throw error;
-    }
+    return Operation.named(ref, method);
   } catch (error) {
+    if (error instanceof BackendOperationUnknownError) {
+      throw refusalError(OPERATION_UNKNOWN_REFUSAL, {
+        message: error.message,
+        hint: error.hint ?? "",
+      });
+    }
     if (error instanceof BackendOperationAmbiguousError) {
-      throw Object.assign(
-        refusalError(OPERATION_AMBIGUOUS_REFUSAL, {
-          message: error.message,
-          hint: error.hint ?? "",
-        }),
-        {
-          cause: error,
-        },
-      );
+      throw refusalError(OPERATION_AMBIGUOUS_REFUSAL, {
+        message: error.message,
+        hint: error.hint ?? "",
+      });
     }
     throw error;
   }

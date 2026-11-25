@@ -13,6 +13,7 @@ import {
   EnvironmentNameInvalidError,
   EnvironmentServerInvalidError,
   EnvironmentValueMissingError,
+  EnvironmentValueUnboundError,
 } from "@/lib/environment";
 import { ZitadelRuntime } from "@/lib/server";
 import type { Questions } from "@/lib/ui";
@@ -483,7 +484,7 @@ describe("Environment.require", () => {
     const thrown = reportedBy(() => environment.require("ZITADEL_PROJECT_ID"));
 
     expect(thrownBy(() => environment.require("ZITADEL_PROJECT_ID"))).toBeInstanceOf(
-      EnvironmentValueMissingError,
+      EnvironmentValueUnboundError,
     );
 
     expect(thrown).toMatchObject({ code: "E_VALIDATION" });
@@ -509,14 +510,18 @@ describe("Environment.require", () => {
 
     expect(thrownBy(() => development.require("ZITADEL_URL"))).toMatchObject({
       environment: "development",
-      unbound: true,
       cwd: dir,
     });
+    expect(thrownBy(() => development.require("ZITADEL_URL"))).toBeInstanceOf(
+      EnvironmentValueUnboundError,
+    );
     expect(thrownBy(() => production.require("ZITADEL_URL"))).toMatchObject({
       environment: "production",
-      unbound: true,
       cwd: dir,
     });
+    expect(thrownBy(() => production.require("ZITADEL_URL"))).toBeInstanceOf(
+      EnvironmentValueUnboundError,
+    );
   });
 
   it("states the file an --env-file run reads", async ({ dir }) => {
@@ -533,9 +538,9 @@ describe("Environment.require", () => {
     await write(dir, "ci.env", { ZITADEL_URL: "https://ci.example" });
     const environment = await resolveFromDir(dir, { envFile: "ci.env" });
 
-    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_ID"))).toMatchObject({
-      unbound: false,
-    });
+    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_ID"))).toBeInstanceOf(
+      EnvironmentValueMissingError,
+    );
   });
 
   it("states the file an environment env add already bound", async ({ dir }) => {
@@ -544,8 +549,10 @@ describe("Environment.require", () => {
 
     expect(thrownBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toMatchObject({
       file: expect.stringContaining(".env.production.local"),
-      unbound: false,
     });
+    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toBeInstanceOf(
+      EnvironmentValueMissingError,
+    );
   });
 
   it("is not unbound when the process environment already names the project", async ({ dir }) => {
@@ -554,9 +561,9 @@ describe("Environment.require", () => {
       env: { ZITADEL_PROJECT_ID: "proj_ci" },
     });
 
-    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toMatchObject({
-      unbound: false,
-    });
+    expect(thrownBy(() => environment.require("ZITADEL_PROJECT_SECRET"))).toBeInstanceOf(
+      EnvironmentValueMissingError,
+    );
   });
 
   it("returns the value when it resolved", async ({ dir }) => {
@@ -577,7 +584,7 @@ describe("Environment.requireInteractive", () => {
         interactive: false,
         ask,
       }),
-    ).rejects.toBeInstanceOf(EnvironmentValueMissingError);
+    ).rejects.toBeInstanceOf(EnvironmentValueUnboundError);
     expect(ask.text).not.toHaveBeenCalled();
   });
 

@@ -9,13 +9,17 @@ import {
 } from "@/lib/idp";
 import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
+import { tryCatch } from "@/lib/try-catch";
 import { WizardStep } from "@/lib/wizard";
+import {
+  Connection,
+  ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigFlowsUncheckedError,
+} from "@/lib/zitadel";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import { Connection, ZitadelConfigEditBreaksFlowsError } from "@/lib/zitadel";
 
 /**
- * What a change that would break a login flow is refused for, without a
- * dry run to point at.
+ * What a change that would break a login flow is refused for.
  */
 const EDIT_BREAKS_FLOWS_REFUSAL = {
   message: "{message}",
@@ -24,12 +28,12 @@ const EDIT_BREAKS_FLOWS_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * What a change that would break a login flow is refused for, when a dry-run
- * deploy reports the same issues.
+ * What a change is refused for when a login flow already has errors, so it
+ * cannot be checked against the change: a dry-run deploy reports the same issues.
  */
-const EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL = {
+const FLOWS_UNCHECKED_REFUSAL = {
   message: "{message}",
-  hint: "{hint}",
+  hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
   details: "{details}",
   next: [
     {
@@ -102,105 +106,99 @@ export class PlanChange extends WizardStep<
   async run(
     needs: Needs,
   ): Promise<Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">> {
-    try {
-      const candidate = Connection.forProvider(needs.provider, needs.target.schema);
-      const preview = needs.target.config.connections.enable(
-        needs.target.schema,
-        candidate,
-        needs.options,
-      );
-      const loopback = loopbackIssuerWarning(
-        needs.selection,
-        await this.deps.machine.loopbackReach(needs.target.cwd, needs.remote.server),
-      );
-      if (loopback !== undefined) {
-        warnings.report(loopback);
-      }
-      const connection = preview.document;
-      const reused = !preview.created;
-      const delivery = new CredentialDelivery({
-        connection,
+    const candidate = Connection.forProvider(needs.provider, needs.target.schema);
+    const [error, preview] = tryCatch(() => {
+      return needs.target.config.connections.enable(needs.target.schema, candidate, needs.options);
+    });
+    if (error instanceof ZitadelConfigFlowsUncheckedError) {
+      throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
+        message: error.message,
+        details: error.details ?? null,
+      });
+    }
+    if (error instanceof ZitadelConfigEditBreaksFlowsError) {
+      throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
+        message: error.message,
+        hint: error.hint ?? "",
+        details: error.details ?? null,
+      });
+    }
+    if (error) {
+      throw error;
+    }
+    const loopback = loopbackIssuerWarning(
+      needs.selection,
+      await this.deps.machine.loopbackReach(needs.target.cwd, needs.remote.server),
+    );
+    if (loopback !== undefined) {
+      warnings.report(loopback);
+    }
+    const connection = preview.document;
+    const reused = !preview.created;
+    const delivery = new CredentialDelivery({
+      connection,
+      reused,
+      republish: (missing) => {
+        return this.deps.suggest({
+          id: "variable:set",
+          args: { name: missing.name },
+          flags: { secret: missing.secret },
+        });
+      },
+    });
+    const callbackUri = callbackUriFor(needs.issuer, connection.slug);
+    const deployedCallbackUris = [
+      ...new Set(
+        needs.origins.primary.map((origin) => {
+          return callbackUriFor(origin, connection.slug);
+        }),
+      ),
+    ].filter((uri) => {
+      return uri !== callbackUri;
+    });
+    return {
+      candidate,
+      preview,
+      delivery,
+      prompt: new CredentialPrompt({
+        selection: needs.selection,
         reused,
-        republish: (missing) => {
-          return this.deps.suggest({
-            id: "variable:set",
-            args: {
-              name: missing.name,
-            },
-            flags: {
-              secret: missing.secret,
+        secretVariable: delivery.names.clientSecret,
+        ask: this.deps.ask,
+        developmentBuild: this.deps.developmentBuild,
+        retry: async (clientId, piped) => {
+          if (needs.selection.kind !== "catalog") {
+            return undefined;
+          }
+          const command = await this.deps.again("auth-method:sso:enable", {
+            with: {
+              provider: selectionName(needs.selection),
+              clientId,
             },
           });
-        },
-      });
-      const callbackUri = callbackUriFor(needs.issuer, connection.slug);
-      const deployedCallbackUris = [
-        ...new Set(
-          needs.origins.primary.map((origin) => {
-            return callbackUriFor(origin, connection.slug);
-          }),
-        ),
-      ].filter((uri) => {
-        return uri !== callbackUri;
-      });
-      return {
-        candidate,
-        preview,
-        delivery,
-        prompt: new CredentialPrompt({
-          selection: needs.selection,
-          reused,
-          secretVariable: delivery.names.clientSecret,
-          ask: this.deps.ask,
-          developmentBuild: this.deps.developmentBuild,
-          retry: async (clientId, piped) => {
-            if (needs.selection.kind !== "catalog") {
-              return undefined;
-            }
-            const command = await this.deps.again("auth-method:sso:enable", {
-              with: {
-                provider: selectionName(needs.selection),
-                clientId,
-              },
-            });
 
-            return piped ? pipedFrom("CLIENT_SECRET", command) : command;
-          },
+          return piped ? pipedFrom("CLIENT_SECRET", command) : command;
+        },
+      }),
+      summary: {
+        projectId: needs.remote.projectId,
+        provider: selectionName(needs.selection),
+        displayName: providerOf(needs.selection).displayName,
+        schema: needs.target.schema.name,
+        connection,
+        reused,
+        callbackUri,
+        deployedCallbackUris,
+        previewCallbackUris: [
+          ...new Set(
+            needs.origins.preview.map((pattern) => {
+              return callbackUriFor(pattern, connection.slug);
+            }),
+          ),
+        ].filter((uri) => {
+          return uri !== callbackUri && !deployedCallbackUris.includes(uri);
         }),
-        summary: {
-          projectId: needs.remote.projectId,
-          provider: selectionName(needs.selection),
-          displayName: providerOf(needs.selection).displayName,
-          schema: needs.target.schema.name,
-          connection,
-          reused,
-          callbackUri,
-          deployedCallbackUris,
-          previewCallbackUris: [
-            ...new Set(
-              needs.origins.preview.map((pattern) => {
-                return callbackUriFor(pattern, connection.slug);
-              }),
-            ),
-          ].filter((uri) => {
-            return uri !== callbackUri && !deployedCallbackUris.includes(uri);
-          }),
-        },
-      };
-    } catch (error) {
-      if (!(error instanceof ZitadelConfigEditBreaksFlowsError)) {
-        throw error;
-      }
-      throw refusalError(
-        error.hint?.includes("deploy --dry-run")
-          ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
-          : EDIT_BREAKS_FLOWS_REFUSAL,
-        {
-          message: error.message,
-          hint: error.hint ?? "",
-          details: error.details ?? null,
-        },
-      );
-    }
+      },
+    };
   }
 }

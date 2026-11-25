@@ -96,15 +96,50 @@ export class LocalServerNotRespondingError extends LocalServerError {
   override readonly hint: string | undefined =
     "No healthy local server responded at the recorded address.";
 
+  /** The address the record names. */
+  readonly serverUrl: string;
+
   /**
    * Creates the error.
    *
    * @param details - The address the record names and the folder that holds it.
    */
-  constructor(details: Readonly<Record<string, unknown>>) {
+  constructor(details: { readonly server_url: string; readonly directory: string | undefined }) {
     super("Local Zitadel server is not running", {
       details,
     });
+    this.serverUrl = details.server_url;
+  }
+}
+
+/**
+ * The local server a parent folder started is not running: it does not answer
+ * at the address it recorded there.
+ */
+export class LocalServerNotRespondingElsewhereError extends LocalServerError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_LOCAL_SERVER_NOT_RUNNING";
+  override readonly hint: string | undefined =
+    "No healthy local server responded at the recorded address, which another folder holds.";
+
+  /** The address the record names. */
+  readonly serverUrl: string;
+
+  /** The folder that holds the record. */
+  readonly directory: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param details - The address the record names and the folder that holds it.
+   */
+  constructor(details: { readonly server_url: string; readonly directory: string }) {
+    super("Local Zitadel server is not running", {
+      details,
+    });
+    this.serverUrl = details.server_url;
+    this.directory = details.directory;
   }
 }
 
@@ -133,6 +168,37 @@ export class LocalServerRecordMalformedError extends LocalServerError {
   }
 }
 
+/** The runtime record another folder holds is not in the shape it is written in. */
+export class LocalServerRecordMalformedElsewhereError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined =
+    "The runtime record another folder holds is not in the shape it is written in.";
+
+  /** The folder that holds the record. */
+  readonly directory: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What is wrong with it.
+   * @param directory - The folder that holds the record.
+   * @param options - The facts behind it and the error that caused it.
+   */
+  constructor(
+    message: string,
+    directory: string,
+    options: {
+      details?: Readonly<Record<string, unknown>> | undefined;
+      cause?: unknown;
+    } = {},
+  ) {
+    super(message, options);
+    this.directory = directory;
+  }
+}
+
 /** The local admin file is not in the shape it is written in. */
 export class LocalServerAdminFileMalformedError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
@@ -141,20 +207,26 @@ export class LocalServerAdminFileMalformedError extends LocalServerError {
   override readonly hint: string | undefined =
     "The local admin file is not in the shape it is written in.";
 
+  /** The file. */
+  readonly path: string;
+
   /**
    * Creates the error.
    *
    * @param message - What is wrong with it.
+   * @param path - The file.
    * @param options - The facts behind it and the error that caused it.
    */
   constructor(
     message: string,
+    path: string,
     options: {
       details?: Readonly<Record<string, unknown>> | undefined;
       cause?: unknown;
     } = {},
   ) {
     super(message, options);
+    this.path = path;
   }
 }
 
@@ -191,15 +263,19 @@ export class LocalServerBusyError extends LocalServerError {
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
   override readonly hint: string | undefined = "A start in this directory holds the lock file.";
 
+  /** The lock file. */
+  readonly lockFile: string;
+
   /**
    * Creates the error.
    *
    * @param details - The lock file and the pid that owns it.
    */
-  constructor(details: Readonly<Record<string, unknown>>) {
+  constructor(details: { readonly lock_file: string; readonly owner_pid: number | undefined }) {
     super("Another `zitadel start` is still running in this directory", {
       details,
     });
+    this.lockFile = details.lock_file;
   }
 }
 
@@ -424,27 +500,94 @@ export class LocalServerBinaryBlockedError extends LocalServerError {
   }
 }
 
-/** A file the local server needs exists but cannot be read. */
-export class LocalServerFileUnreadableError extends LocalServerError {
+/** The runtime record exists but cannot be read. */
+export class LocalServerRecordUnreadableError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
-  override readonly hint: string | undefined = "The file or its directory cannot be read.";
+  override readonly hint: string | undefined =
+    "The runtime record or its directory cannot be read.";
+
+  /** The file. */
+  readonly path: string;
 
   /**
    * Creates the error.
    *
    * @param message - What went wrong.
+   * @param path - The file.
    * @param options - The facts behind it (its `path`) and the error that caused it.
    */
   constructor(
     message: string,
+    path: string,
     options: {
       details?: Readonly<Record<string, unknown>> | undefined;
       cause?: unknown;
     } = {},
   ) {
     super(message, options);
+    this.path = path;
+  }
+}
+
+/** The local admin file exists but cannot be read. */
+export class LocalServerAdminUnreadableError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = "The local admin file cannot be read.";
+
+  /** The file. */
+  readonly path: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong.
+   * @param path - The file.
+   * @param options - The facts behind it (its `path`) and the error that caused it.
+   */
+  constructor(
+    message: string,
+    path: string,
+    options: {
+      details?: Readonly<Record<string, unknown>> | undefined;
+      cause?: unknown;
+    } = {},
+  ) {
+    super(message, options);
+    this.path = path;
+  }
+}
+
+/** An environment file the local server reads exists but cannot be read. */
+export class LocalServerEnvUnreadableError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = "The environment file cannot be read.";
+
+  /** The file. */
+  readonly path: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong.
+   * @param path - The file.
+   * @param options - The facts behind it (its `path`) and the error that caused it.
+   */
+  constructor(
+    message: string,
+    path: string,
+    options: {
+      details?: Readonly<Record<string, unknown>> | undefined;
+      cause?: unknown;
+    } = {},
+  ) {
+    super(message, options);
+    this.path = path;
   }
 }
 

@@ -1,13 +1,12 @@
-import { Cmd } from "@/lib/cmd";
-import { isObject } from "@/lib/json";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import {
+  LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
   ZitadelRuntime,
 } from "@/lib/server";
-import { resolve } from "node:path";
+import { Cmd } from "@/lib/cmd";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -146,173 +145,148 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    const server = await ZitadelRuntime.resolve({
-      cwd: meta.cwd,
-      serverFlag: meta.serverFlag,
-    })
-      .catch((error: unknown) => {
-        if (error instanceof LocalServerNotRunningError) {
-          const retry = retryOptionsFromFlags(flags);
-          const recovery = ssoRecovery(retry, suggest);
-          const scripting =
-            retry.sso && retry.sso.length > 0
-              ? "The rerun asks for the client id and secret, because a command carries neither. " +
-                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-              : "";
-          const recovered =
-            recovery.commands.length > 0
-              ? `${recovery.hint}${recovery.commands.join(" ")} `
-              : recovery.hint;
-          throw Object.assign(
-            refusalError(
-              NO_LOCAL_SERVER_REFUSAL,
-              {
-                reason: error.hint ?? "",
-                scripting,
-                recovery: recovered,
-              },
-              {
-                start: {
-                  id: "start",
-                  flags: {},
+    try {
+      const server = await ZitadelRuntime.resolve({
+        cwd: meta.cwd,
+        serverFlag: meta.serverFlag,
+      });
+      if (!(await isDirectoryOrMissing(meta.cwd))) {
+        throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
+          cwd: meta.cwd,
+        });
+      }
+      const configured = await Project.at(meta.cwd).hasConfig();
+      if (!configured && (await Project.at(meta.cwd).hasSecret())) {
+        throw refusalError(SECRET_WITHOUT_CONFIG_REFUSAL, {});
+      }
+      if (!configured && flags.git !== false) {
+        const state = await inspectWorktree(meta.cwd);
+        if (state.kind === "unknown") {
+          throw refusalError(WORKTREE_UNKNOWN_REFUSAL, {
+            reason: state.reason,
+          });
+        }
+        if (state.kind === "blocked") {
+          throw refusalError(WORKTREE_BLOCKED_REFUSAL, {
+            blocked: state.blocked,
+          });
+        }
+        if (state.kind === "dirty") {
+          throw refusalError(WORKTREE_DIRTY_REFUSAL, {
+            parts: new Intl.ListFormat("en", { type: "conjunction" }).format(
+              [
+                {
+                  noun: "uncommitted change",
+                  files: state.modified,
                 },
-                setup: {
-                  id: "setup",
-                  flags: setupRetryFlags(retry),
+                {
+                  noun: "untracked file",
+                  files: state.untracked,
                 },
-              },
+              ]
+                .filter(({ files }) => {
+                  return files.length > 0;
+                })
+                .map(({ files, noun }) => {
+                  return `${files.length} ${noun}${new Intl.PluralRules("en").select(files.length) === "one" ? "" : "s"}`;
+                }),
             ),
-            {
-              cause: error,
-            },
-          );
+            modified: state.modified,
+            untracked: state.untracked,
+          });
         }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof LocalServerNotRespondingError) {
-          const retry = retryOptionsFromFlags(flags);
-          const recovery = ssoRecovery(retry, suggest);
-          const scripting =
-            retry.sso && retry.sso.length > 0
-              ? "The rerun asks for the client id and secret, because a command carries neither. " +
-                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-              : "";
-          const recovered =
-            recovery.commands.length > 0
-              ? `${recovery.hint}${recovery.commands.join(" ")} `
-              : recovery.hint;
-          const { directory } = isObject(error.details) ? error.details : {};
-          const elsewhere =
-            typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
-          throw Object.assign(
-            elsewhere
-              ? refusalError(
-                  LOCAL_SERVER_ELSEWHERE_REFUSAL,
-                  {
-                    reason: `No healthy local server responded at ${String(error.details?.server_url)}.`,
-                    directory: Cmd.quote(directory),
-                    scripting,
-                    recovery: recovered,
-                  },
-                  {
-                    start: {
-                      id: "start",
-                      flags: {
-                        cwd: directory,
-                      },
-                    },
-                    setup: {
-                      id: "setup",
-                      flags: setupRetryFlags(retry),
-                    },
-                  },
-                )
-              : refusalError(
-                  LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
-                  {
-                    reason: `No healthy local server responded at ${String(error.details?.server_url)}.`,
-                    scripting,
-                    recovery: recovered,
-                  },
-                  {
-                    start: {
-                      id: "start",
-                      flags: {},
-                    },
-                    setup: {
-                      id: "setup",
-                      flags: setupRetryFlags(retry),
-                    },
-                  },
-                ),
-            {
-              cause: error,
+      }
+      if (!configured) {
+        await refuseOutdatedLocalServer({
+          cwd: meta.cwd,
+          machine: this.deps.machine,
+          serverUrl: server.value,
+          flags,
+        });
+      }
+      this.deps.useServer(server.value);
+      return {
+        preflight: {
+          server,
+          configured,
+        },
+      };
+    } catch (error) {
+      const retry = retryOptionsFromFlags(flags);
+      const recovery = ssoRecovery(retry, suggest);
+      const scripting =
+        retry.sso && retry.sso.length > 0
+          ? "The rerun asks for the client id and secret, because a command carries neither. " +
+            "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+          : "";
+      const recovered =
+        recovery.commands.length > 0
+          ? `${recovery.hint}${recovery.commands.join(" ")} `
+          : recovery.hint;
+      if (error instanceof LocalServerNotRunningError) {
+        throw refusalError(
+          NO_LOCAL_SERVER_REFUSAL,
+          {
+            reason: error.hint ?? "",
+            scripting,
+            recovery: recovered,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {},
             },
-          );
-        }
-        throw error;
-      });
-    if (!(await isDirectoryOrMissing(meta.cwd))) {
-      throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
-        cwd: meta.cwd,
-      });
-    }
-    const configured = await Project.at(meta.cwd).hasConfig();
-    if (!configured && (await Project.at(meta.cwd).hasSecret())) {
-      throw refusalError(SECRET_WITHOUT_CONFIG_REFUSAL, {});
-    }
-    if (!configured && flags.git !== false) {
-      const state = await inspectWorktree(meta.cwd);
-      if (state.kind === "unknown") {
-        throw refusalError(WORKTREE_UNKNOWN_REFUSAL, {
-          reason: state.reason,
-        });
+            setup: {
+              id: "setup",
+              flags: setupRetryFlags(retry),
+            },
+          },
+        );
       }
-      if (state.kind === "blocked") {
-        throw refusalError(WORKTREE_BLOCKED_REFUSAL, {
-          blocked: state.blocked,
-        });
+      if (error instanceof LocalServerNotRespondingError) {
+        throw refusalError(
+          LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
+          {
+            reason: `No healthy local server responded at ${error.serverUrl}.`,
+            scripting,
+            recovery: recovered,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {},
+            },
+            setup: {
+              id: "setup",
+              flags: setupRetryFlags(retry),
+            },
+          },
+        );
       }
-      if (state.kind === "dirty") {
-        throw refusalError(WORKTREE_DIRTY_REFUSAL, {
-          parts: new Intl.ListFormat("en", { type: "conjunction" }).format(
-            [
-              {
-                noun: "uncommitted change",
-                files: state.modified,
+      if (error instanceof LocalServerNotRespondingElsewhereError) {
+        throw refusalError(
+          LOCAL_SERVER_ELSEWHERE_REFUSAL,
+          {
+            reason: `No healthy local server responded at ${error.serverUrl}.`,
+            directory: Cmd.quote(error.directory),
+            scripting,
+            recovery: recovered,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {
+                cwd: error.directory,
               },
-              {
-                noun: "untracked file",
-                files: state.untracked,
-              },
-            ]
-              .filter(({ files }) => {
-                return files.length > 0;
-              })
-              .map(({ files, noun }) => {
-                return `${files.length} ${noun}${new Intl.PluralRules("en").select(files.length) === "one" ? "" : "s"}`;
-              }),
-          ),
-          modified: state.modified,
-          untracked: state.untracked,
-        });
+            },
+            setup: {
+              id: "setup",
+              flags: setupRetryFlags(retry),
+            },
+          },
+        );
       }
+      throw error;
     }
-    if (!configured) {
-      await refuseOutdatedLocalServer({
-        cwd: meta.cwd,
-        machine: this.deps.machine,
-        serverUrl: server.value,
-        flags,
-      });
-    }
-    this.deps.useServer(server.value);
-    return {
-      preflight: {
-        server,
-        configured,
-      },
-    };
   }
 }

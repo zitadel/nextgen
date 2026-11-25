@@ -17,8 +17,13 @@ import {
   type Lockout,
   messageTooLong,
   PublishConfigInvalidError,
-  PublishConnectionVariableKindError,
-  PublishConnectionVariableMissingError,
+  PublishConfigLiteralSecretError,
+  PublishConfigLiteralSecretRefusedKeyError,
+  PublishConfigRefusedKeyError,
+  PublishConnectionVariableClientIdMissingError,
+  PublishConnectionVariableClientSecretMissingError,
+  PublishConnectionVariableNotPlainError,
+  PublishConnectionVariableNotSecretError,
   PublishConnectionVariableSharedError,
   Publisher,
 } from "@/lib/publish";
@@ -138,14 +143,29 @@ const DEPLOY_EMPTY_REFUSAL = {
 /** How a configuration with errors in it is refused. */
 const CONFIG_INVALID_REFUSAL = {
   message: "{message}",
-  hint: "Fix the files named above and rerun; no changes were made.{newer}",
+  hint: "Fix the files named above and rerun; no changes were made.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a configuration with errors in it, one of them a key a newer server added, is refused. */
+const CONFIG_INVALID_NEWER_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the files named above and rerun; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
   details: "{details}",
 } as const satisfies Refusal;
 
 /** How a configuration with a secret written into a file is refused. */
 const CONFIG_INVALID_SECRET_REFUSAL = {
   message: "{message}",
-  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".{newer}',
+  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a configuration with a secret written into a file and a key a newer server added is refused. */
+const CONFIG_INVALID_SECRET_NEWER_REFUSAL = {
+  message: "{message}",
+  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}". A key a newer Zitadel server added needs a CLI as new as the server.',
   details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
@@ -279,171 +299,205 @@ export default class Deploy extends Telemetered(
   protected async preview({ flags }: Admitted<typeof Deploy>): Promise<CommandResult> {
     const publisher = await this.service(Publisher);
     this.annotate({ stage: "validation" });
-    const prepared = await publisher
-      .prepare({
+    try {
+      const prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "deploy",
         dryRun: true,
         compare: true,
-      })
-      .catch((error: unknown) => {
-        if (error instanceof PublishConfigInvalidError && error.literalSecret) {
-          throw Object.assign(
-            refusalError(
-              CONFIG_INVALID_SECRET_REFUSAL,
-              {
-                message: error.message,
-                newer: error.refusedKey
-                  ? " A key a newer Zitadel server added needs a CLI as new as the server."
-                  : "",
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: "NAME",
-                  },
-                  flags: {
-                    secret: true,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConfigInvalidError) {
-          throw Object.assign(
-            refusalError(CONFIG_INVALID_REFUSAL, {
-              message: error.message,
-              newer: error.refusedKey
-                ? " A key a newer Zitadel server added needs a CLI as new as the server."
-                : "",
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableSharedError) {
-          throw Object.assign(
-            refusalError(VARIABLE_SHARED_REFUSAL, {
-              message: error.message,
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableKindError) {
-          const wantsSecret = error.field === "client_secret";
-          throw Object.assign(
-            refusalError(
-              wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
-              {
-                message: error.message,
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: error.variable,
-                  },
-                  flags: {
-                    secret: wantsSecret,
-                    preview: false,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableMissingError) {
-          throw Object.assign(
-            refusalError(
-              VARIABLE_MISSING_REFUSAL,
-              {
-                message: error.message,
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: error.variable,
-                  },
-                  flags: {
-                    secret: error.field === "client_secret",
-                    preview: false,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof ZitadelConfigDeployEmptyError) {
-          throw refusalError(DEPLOY_EMPTY_REFUSAL, {
+      });
+      this.annotate({ stage: undefined });
+      const diff = this.said(prepared);
+      const question = await this.lockoutQuestion(prepared.lockouts);
+      if (question !== undefined && this.nonInteractive && !this.force) {
+        throw new ZitadelError(
+          "E_CONFIRMATION_REQUIRED",
+          `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
+          {
+            hint: confirmationHint(question),
+            details: { question },
+            nextCommands: [await this.again("deploy", { with: { dryRun: true, force: true } })],
+          },
+        );
+      }
+      const { resourceCount } = prepared;
+      this.annotate({ resources: resourceCount });
+      const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
+      const result = dryRunResult({
+        verb: "deploy",
+        topic: "release",
+        noun: resources,
+        next: await this.again("deploy", {
+          without: ["dryRun"],
+          with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
+        }),
+      });
+
+      return {
+        ...result,
+        data: {
+          ...(result.data as object),
+          resources: resourceCount,
+          targets: "primary",
+          ...prepared.report,
+        },
+        summary: {
+          ...result.summary,
+          lines: diff,
+        },
+      };
+    } catch (error) {
+      if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
+        throw refusalError(
+          CONFIG_INVALID_SECRET_NEWER_REFUSAL,
+          {
             message: error.message,
             details: error.details ?? null,
-          });
-        }
-        throw error;
-      });
-    this.annotate({
-      stage: undefined,
-    });
-    const diff = this.said(prepared);
-    const question = await this.lockoutQuestion(prepared.lockouts);
-    if (question !== undefined && this.nonInteractive && !this.force) {
-      throw new ZitadelError(
-        "E_CONFIRMATION_REQUIRED",
-        `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
-        {
-          hint: confirmationHint(question),
-          details: { question },
-          nextCommands: [await this.again("deploy", { with: { dryRun: true, force: true } })],
-        },
-      );
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: "NAME",
+              },
+              flags: {
+                secret: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConfigLiteralSecretError) {
+        throw refusalError(
+          CONFIG_INVALID_SECRET_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: "NAME",
+              },
+              flags: {
+                secret: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConfigRefusedKeyError) {
+        throw refusalError(CONFIG_INVALID_NEWER_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConfigInvalidError) {
+        throw refusalError(CONFIG_INVALID_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConnectionVariableSharedError) {
+        throw refusalError(VARIABLE_SHARED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConnectionVariableNotSecretError) {
+        throw refusalError(
+          SECRET_KIND_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: true,
+                preview: false,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableNotPlainError) {
+        throw refusalError(
+          PLAIN_KIND_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: false,
+                preview: false,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableClientIdMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: false,
+                preview: false,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableClientSecretMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: true,
+                preview: false,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof ZitadelConfigDeployEmptyError) {
+        throw refusalError(DEPLOY_EMPTY_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      throw error;
     }
-    const { resourceCount } = prepared;
-    this.annotate({ resources: resourceCount });
-    const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
-    const result = dryRunResult({
-      verb: "deploy",
-      topic: "release",
-      noun: resources,
-      next: await this.again("deploy", {
-        without: ["dryRun"],
-        with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
-      }),
-    });
-
-    return {
-      ...result,
-      data: {
-        ...(result.data as object),
-        resources: resourceCount,
-        targets: "primary",
-        ...prepared.report,
-      },
-      summary: {
-        ...result.summary,
-        lines: diff,
-      },
-    };
   }
 
   /**
@@ -482,248 +536,282 @@ export default class Deploy extends Telemetered(
     const publisher = new Publisher(client, projectId);
     await this.requirePrimaryOrigin(publisher, projectId, environment);
     this.annotate({ stage: "validation" });
-    const prepared = await publisher
-      .prepare({
+    try {
+      const prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "deploy",
         dryRun: false,
         compare: true,
-      })
-      .catch((error: unknown) => {
-        if (error instanceof PublishConfigInvalidError && error.literalSecret) {
-          throw Object.assign(
-            refusalError(
-              CONFIG_INVALID_SECRET_REFUSAL,
-              {
-                message: error.message,
-                newer: error.refusedKey
-                  ? " A key a newer Zitadel server added needs a CLI as new as the server."
-                  : "",
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: "NAME",
-                  },
-                  flags: {
-                    secret: true,
-                  },
-                },
-              },
-            ),
+      });
+      this.annotate({ stage: undefined });
+      const diff = this.said(prepared);
+      const question = await this.lockoutQuestion(prepared.lockouts);
+      if (question !== undefined) {
+        const consent = await this.consent({
+          verb: "deploy",
+          name: LOCKOUT_ACTION,
+          message: question,
+        });
+        if (consent === undefined) {
+          return this.cancelled("deploy");
+        }
+      }
+      const { resourceCount } = prepared;
+      this.annotate({ resources: resourceCount });
+      const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
+
+      if (prepared.gitDirty) {
+        warnings.report(
+          "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
+        );
+      }
+
+      const { release, publication } = await publisher.deploy(
+        {
+          prepared,
+          message,
+        },
+        (stage) => {
+          this.annotate({ stage });
+        },
+      );
+      switch (publication.outcome) {
+        case "revoked": {
+          throw new ZitadelError(
+            "E_CONFLICT",
+            `This content was already released as ${release.id}, which is revoked`,
             {
-              cause: error,
+              hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
+              details: {
+                release_id: release.id,
+                content_hash: release.content_hash,
+              },
             },
           );
         }
-        if (error instanceof PublishConfigInvalidError) {
-          throw Object.assign(
-            refusalError(CONFIG_INVALID_REFUSAL, {
-              message: error.message,
-              newer: error.refusedKey
-                ? " A key a newer Zitadel server added needs a CLI as new as the server."
-                : "",
-              details: error.details ?? null,
-            }),
+        case "raced": {
+          const again = await this.again("deploy", {
+            without: ["dryRun"],
+            with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
+          });
+
+          throw new ZitadelError(
+            "E_CONFLICT",
+            "Another deploy changed the targets since this one was prepared",
             {
-              cause: error,
+              hint: `Rerun ${again}; it will build and deploy against the current state.`,
+              details:
+                publication.current === undefined
+                  ? undefined
+                  : { current_deployment: publication.current },
+              nextCommands: [
+                this.suggest({
+                  id: "deployment:list",
+                  flags: { live: true },
+                }),
+              ],
             },
           );
         }
-        if (error instanceof PublishConnectionVariableSharedError) {
-          throw Object.assign(
-            refusalError(VARIABLE_SHARED_REFUSAL, {
-              message: error.message,
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
+        case "deployed": {
+          break;
         }
-        if (error instanceof PublishConnectionVariableKindError) {
-          const wantsSecret = error.field === "client_secret";
-          throw Object.assign(
-            refusalError(
-              wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
-              {
-                message: error.message,
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: error.variable,
-                  },
-                  flags: {
-                    secret: wantsSecret,
-                    preview: false,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableMissingError) {
-          throw Object.assign(
-            refusalError(
-              VARIABLE_MISSING_REFUSAL,
-              {
-                message: error.message,
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: error.variable,
-                  },
-                  flags: {
-                    secret: error.field === "client_secret",
-                    preview: false,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof ZitadelConfigDeployEmptyError) {
-          throw refusalError(DEPLOY_EMPTY_REFUSAL, {
+      }
+      const { deployment } = publication;
+      this.annotate({
+        stage: undefined,
+        changed_configuration_types: prepared.changedConfiguration,
+      });
+
+      const servedOrigins = deployment.origins;
+      this.annotate({ origin_count: servedOrigins.length });
+
+      const title = `Deployed ${resources}`;
+      const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
+      const live =
+        servedOrigins.length > 0
+          ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
+              servedOrigins.map((origin) => {
+                return escapeControlCharacters(origin);
+              }),
+            )}.`
+          : `${released}.`;
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          release_id: release.id,
+          content_hash: release.content_hash,
+          deployment_id: deployment.id,
+          resources: resourceCount,
+          origins: servedOrigins,
+          ...prepared.report,
+        },
+        summary: {
+          title,
+          sections: [],
+          lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
+        },
+        next: {
+          commands: [
+            this.suggest({ id: "deployment:list" }),
+            ...(prepared.gitDirty ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
+          ],
+        },
+      };
+    } catch (error) {
+      if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
+        throw refusalError(
+          CONFIG_INVALID_SECRET_NEWER_REFUSAL,
+          {
             message: error.message,
             details: error.details ?? null,
-          });
-        }
-        throw error;
-      });
-    this.annotate({
-      stage: undefined,
-    });
-    const diff = this.said(prepared);
-    const question = await this.lockoutQuestion(prepared.lockouts);
-    if (question !== undefined) {
-      const consent = await this.consent({
-        verb: "deploy",
-        name: LOCKOUT_ACTION,
-        message: question,
-      });
-      if (consent === undefined) {
-        return this.cancelled("deploy");
-      }
-    }
-    const { resourceCount } = prepared;
-    this.annotate({ resources: resourceCount });
-    const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
-
-    if (prepared.gitDirty) {
-      warnings.report(
-        "A file this release is built from has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
-      );
-    }
-
-    const { release, publication } = await publisher.deploy(
-      {
-        prepared,
-        message,
-      },
-      (stage) => {
-        this.annotate({ stage });
-      },
-    );
-    switch (publication.outcome) {
-      case "revoked": {
-        throw new ZitadelError(
-          "E_CONFLICT",
-          `This content was already released as ${release.id}, which is revoked`,
+          },
           {
-            hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-            details: {
-              release_id: release.id,
-              content_hash: release.content_hash,
+            next: {
+              id: "variable:set",
+              args: {
+                name: "NAME",
+              },
+              flags: {
+                secret: true,
+              },
             },
           },
         );
       }
-      case "raced": {
-        const again = await this.again("deploy", {
-          without: ["dryRun"],
-          with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
-        });
-
-        throw new ZitadelError(
-          "E_CONFLICT",
-          "Another deploy changed the targets since this one was prepared",
+      if (error instanceof PublishConfigLiteralSecretError) {
+        throw refusalError(
+          CONFIG_INVALID_SECRET_REFUSAL,
           {
-            hint: `Rerun ${again}; it will build and deploy against the current state.`,
-            details:
-              publication.current === undefined
-                ? undefined
-                : { current_deployment: publication.current },
-            nextCommands: [
-              this.suggest({
-                id: "deployment:list",
-                flags: { live: true },
-              }),
-            ],
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: "NAME",
+              },
+              flags: {
+                secret: true,
+              },
+            },
           },
         );
       }
-      case "deployed": {
-        break;
+      if (error instanceof PublishConfigRefusedKeyError) {
+        throw refusalError(CONFIG_INVALID_NEWER_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
       }
+      if (error instanceof PublishConfigInvalidError) {
+        throw refusalError(CONFIG_INVALID_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConnectionVariableSharedError) {
+        throw refusalError(VARIABLE_SHARED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConnectionVariableNotSecretError) {
+        throw refusalError(
+          SECRET_KIND_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: true,
+                preview: false,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableNotPlainError) {
+        throw refusalError(
+          PLAIN_KIND_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: false,
+                preview: false,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableClientIdMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: false,
+                preview: false,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableClientSecretMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: true,
+                preview: false,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof ZitadelConfigDeployEmptyError) {
+        throw refusalError(DEPLOY_EMPTY_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      throw error;
     }
-    const { deployment } = publication;
-    this.annotate({
-      stage: undefined,
-      changed_configuration_types: prepared.changedConfiguration,
-    });
-
-    const servedOrigins = deployment.origins;
-    this.annotate({ origin_count: servedOrigins.length });
-
-    const title = `Deployed ${resources}`;
-    const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
-    const live =
-      servedOrigins.length > 0
-        ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
-            servedOrigins.map((origin) => {
-              return escapeControlCharacters(origin);
-            }),
-          )}.`
-        : `${released}.`;
-
-    return {
-      status: "ok",
-      data: {
-        title,
-        release_id: release.id,
-        content_hash: release.content_hash,
-        deployment_id: deployment.id,
-        resources: resourceCount,
-        origins: servedOrigins,
-        ...prepared.report,
-      },
-      summary: {
-        title,
-        sections: [],
-        lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
-      },
-      next: {
-        commands: [
-          this.suggest({ id: "deployment:list" }),
-          ...(prepared.gitDirty ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
-        ],
-      },
-    };
   }
 
   /**

@@ -76,44 +76,40 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
     const current = scaffolding
       ? this.deps.ui.begin(`Scaffolding a new ${app.framework} project`)
       : undefined;
-    const newApp = scaffolding
-      ? await orca
-          .scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force)
-          .catch((error) => {
-            current?.fail();
-            throw error;
-          })
-          .catch((error: unknown) => {
-            if (error instanceof OrcaScaffoldOccupiedError) {
-              throw Object.assign(
-                refusalError(SCAFFOLD_OCCUPIED_REFUSAL, {
-                  message: error.message,
-                  hint: error.hint ?? "",
-                  details: error.details ?? null,
-                }),
-                {
-                  cause: error,
-                },
-              );
-            }
-            throw error;
-          })
-      : undefined;
-    if (newApp !== undefined) {
-      current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
+    try {
+      const newApp = scaffolding
+        ? await orca
+            .scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force)
+            .catch((error) => {
+              current?.fail();
+              throw error;
+            })
+        : undefined;
+      if (newApp !== undefined) {
+        current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
+      }
+      const created = detected ?? newApp?.facts;
+      return {
+        newApp,
+        framework:
+          created === undefined
+            ? undefined
+            : {
+                ...created,
+                devPort: answers.devPort,
+                url: issuer,
+              },
+      };
+    } catch (error) {
+      if (error instanceof OrcaScaffoldOccupiedError) {
+        throw refusalError(SCAFFOLD_OCCUPIED_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+          details: error.details ?? null,
+        });
+      }
+      throw error;
     }
-    const created = detected ?? newApp?.facts;
-    return {
-      newApp,
-      framework:
-        created === undefined
-          ? undefined
-          : {
-              ...created,
-              devPort: answers.devPort,
-              url: issuer,
-            },
-    };
   }
 
   /**

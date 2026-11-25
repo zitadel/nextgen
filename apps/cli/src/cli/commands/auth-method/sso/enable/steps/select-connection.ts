@@ -2,12 +2,7 @@ import { providerOf } from "@zitadel/config/idp";
 
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import {
-  customExample,
-  ENABLE_FLAG_NAMES,
-  IdpSettingRefusedError,
-  IdpSettingsMissingError,
-} from "@/lib/idp";
+import { IdpSettingRefusedError, IdpSettingsMissingError } from "@/lib/idp";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -72,42 +67,33 @@ export class SelectConnection extends WizardStep<
    * @returns The provider and the options the edit is made with.
    */
   async run(needs: Needs): Promise<Fact<"selection" | "provider" | "options">> {
-    const selection = await needs.choice
-      .resolve(needs.target, this.deps.ask)
-      .catch((error: unknown) => {
-        if (error instanceof IdpSettingRefusedError) {
-          throw Object.assign(
-            refusalError(SETTING_REFUSED_REFUSAL, {
-              message: error.message,
-              flag: error.flag,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof IdpSettingsMissingError) {
-          throw Object.assign(
-            refusalError(SETTINGS_MISSING_REFUSAL, {
-              message: error.message,
-              example: customExample(ENABLE_FLAG_NAMES),
-              missing: error.missing,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
-      });
-    return {
-      selection,
-      provider: providerOf(selection),
-      options: {
-        clientId: needs.flags.clientId,
-        given: needs.choice.givenSettings(selection),
-        dryRun: this.deps.dryRun,
-      },
-    };
+    try {
+      const selection = await needs.choice.resolve(needs.target, this.deps.ask);
+
+      return {
+        selection,
+        provider: providerOf(selection),
+        options: {
+          clientId: needs.flags.clientId,
+          given: needs.choice.givenSettings(selection),
+          dryRun: this.deps.dryRun,
+        },
+      };
+    } catch (error) {
+      if (error instanceof IdpSettingRefusedError) {
+        throw refusalError(SETTING_REFUSED_REFUSAL, {
+          message: error.message,
+          flag: error.flag,
+        });
+      }
+      if (error instanceof IdpSettingsMissingError) {
+        throw refusalError(SETTINGS_MISSING_REFUSAL, {
+          message: error.message,
+          example: error.example,
+          missing: error.missing,
+        });
+      }
+      throw error;
+    }
   }
 }

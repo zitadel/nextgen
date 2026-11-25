@@ -25,7 +25,7 @@ type ResetTarget =
   | Readonly<{ backend: "binary"; pid: number; log_path: string }>
   | Readonly<{ backend: "docker" | "missing"; container_name: string }>;
 
-/** How a start of the local server is refused: LocalServerProcessesStopError. */
+/** How a reset is refused when processes it asked to stop are still running. */
 const PROCESSES_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
@@ -33,7 +33,7 @@ const PROCESSES_DID_NOT_STOP_REFUSAL = {
   details: "{details}",
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerProcessesUnlistableError. */
+/** How a reset is refused when the machine cannot list its processes. */
 const PROCESSES_UNLISTABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
@@ -41,7 +41,7 @@ const PROCESSES_UNLISTABLE_REFUSAL = {
   details: "{details}",
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerStopError. */
+/** How a reset is refused when the server is still running afterwards. */
 const SERVER_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
@@ -49,14 +49,14 @@ const SERVER_DID_NOT_STOP_REFUSAL = {
   details: "{details}",
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerPermitMismatchError. */
+/** How a reset is refused when its permit is for another folder. */
 const PERMIT_MISMATCH_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "A reset acts on one folder only. Run it from the folder whose server you mean to reset.",
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerOrphansStopError. */
+/** How a reset is refused when a process on the folder's data is still running. */
 const ORPHANS_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
@@ -130,52 +130,40 @@ export default class Reset extends Telemetered(
         `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
       ].join("\n"),
       apply: async () => {
-        await this.serverInThisFolder()
-          .reset(DestroyPermit.forFolder(this.cwd))
-          .catch((error: unknown) => {
-            if (error instanceof LocalServerProcessesStopError) {
-              throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-                message: error.message,
-                details: error.details ?? null,
-              });
-            }
-            throw error;
-          })
-          .catch((error: unknown) => {
-            if (error instanceof LocalServerProcessesUnlistableError) {
-              throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
-                message: error.message,
-                details: error.details ?? null,
-              });
-            }
-            throw error;
-          })
-          .catch((error: unknown) => {
-            if (error instanceof LocalServerStopError) {
-              throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-                message: error.message,
-                details: error.details ?? null,
-              });
-            }
-            throw error;
-          })
-          .catch((error: unknown) => {
-            if (error instanceof LocalServerPermitMismatchError) {
-              throw refusalError(PERMIT_MISMATCH_REFUSAL, {
-                message: error.message,
-              });
-            }
-            throw error;
-          })
-          .catch((error: unknown) => {
-            if (error instanceof LocalServerOrphansStopError) {
-              throw refusalError(ORPHANS_DID_NOT_STOP_REFUSAL, {
-                message: error.message,
-                details: error.details ?? null,
-              });
-            }
-            throw error;
-          });
+        try {
+          await this.serverInThisFolder().reset(DestroyPermit.forFolder(this.cwd));
+        } catch (error) {
+          if (error instanceof LocalServerProcessesStopError) {
+            throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          if (error instanceof LocalServerProcessesUnlistableError) {
+            throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          if (error instanceof LocalServerStopError) {
+            throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          if (error instanceof LocalServerPermitMismatchError) {
+            throw refusalError(PERMIT_MISMATCH_REFUSAL, {
+              message: error.message,
+            });
+          }
+          if (error instanceof LocalServerOrphansStopError) {
+            throw refusalError(ORPHANS_DID_NOT_STOP_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          throw error;
+        }
         const title = "Local Zitadel server runtime reset";
 
         return {

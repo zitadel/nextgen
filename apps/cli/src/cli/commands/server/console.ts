@@ -1,14 +1,26 @@
 import { Flags } from "@oclif/core";
 
 import { openInBrowser } from "@/lib/browser";
-import { Environment } from "@/lib/environment";
+import { Cmd } from "@/lib/cmd";
+import {
+  Environment,
+  EnvironmentNameInvalidError,
+  EnvironmentServerInvalidError,
+} from "@/lib/environment";
 import {
   AdminSession,
   LocalRuntime,
   LocalServerAdminFileMalformedError,
-  LocalServerFileUnreadableError,
+  LocalServerAdminPlatformMissingError,
+  LocalServerAdminRejectedError,
+  LocalServerAdminSessionError,
+  LocalServerAdminUnreadableError,
+  LocalServerNotRespondingElsewhereError,
+  LocalServerNotRespondingError,
+  LocalServerNotRunningError,
   ZitadelRuntime,
 } from "@/lib/server";
+import { shellCommand } from "@/lib/suggestion";
 import { section } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -28,13 +40,65 @@ const NO_LOCAL_ADMIN_REFUSAL = {
   next: [{ id: "start" }],
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerAdminFileMalformedError. */
+/** How an environment name that cannot be used in a path is refused. */
+const NAME_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "{hint} Pass a safe --env or set ZITADEL_ENV.",
+} as const satisfies Refusal;
+
+/** How a server address that is not a URL is refused. */
+const SERVER_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Fix or remove ZITADEL_URL in {source}; it must be a URL such as {example}.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a run is refused when no local server was started in the folder or a parent. */
+const LOCAL_SERVER_NOT_RUNNING_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
+  details: "{details}",
+  next: [
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local server this folder started does not answer. */
+const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No healthy local server responded at {server_url}. Run `zitadel start` to bring it back.",
+  details: "{details}",
+  next: [
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local server a parent folder started does not answer. */
+const LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No healthy local server responded at {server_url}. It was started in {directory}, so run `zitadel start --cwd {directory}` to bring it back.",
+  details: {
+    server_url: "{server_url}",
+    suggested_args: [["start", "--cwd", "{path}"]],
+  },
+  next: ["{start}"],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local admin file is not in the shape it is written in. */
 const ADMIN_FILE_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
   details: "{details}",
   next: [
+    "{remove}",
     {
       id: "reset",
       flags: {
@@ -47,12 +111,48 @@ const ADMIN_FILE_MALFORMED_REFUSAL = {
   ],
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerFileUnreadableError. */
-const FILE_UNREADABLE_REFUSAL = {
+/** How a run is refused when the local admin file cannot be read. */
+const ADMIN_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
+  hint: "Check that {path} is readable by you; `zitadel start` writes it owner-only.",
   details: "{details}",
+} as const satisfies Refusal;
+
+/** How a run is refused when the server does not know the local admin. */
+const ADMIN_REJECTED_REFUSAL = {
+  code: "E_AUTH",
+  message: "{message}",
+  hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
+  next: [
+    {
+      id: "logs",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the server refuses the local admin's session. */
+const ADMIN_SESSION_REFUSAL = {
+  code: "E_AUTH",
+  message: "{message}",
+  hint: "Check `zitadel logs` for why the local server refused the admin's session.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a run is refused when the server does not host the platform project. */
+const PLATFORM_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
+  details: "{details}",
+  next: [
+    {
+      id: "stop",
+    },
+    {
+      id: "start",
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -93,13 +193,63 @@ export default class Console extends Telemetered(
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
     const found = await LocalRuntime.findAdminDir(cwd);
     if (found === undefined) {
-      const environment = await Environment.resolve({
-        servers: ZitadelRuntime,
-        cwd,
-        env: process.env,
-        serverFlag: typeof flags.server === "string" ? flags.server : undefined,
-      });
-      this.named = environment.values.ZITADEL_URL?.value;
+      try {
+        const environment = await Environment.resolve({
+          servers: ZitadelRuntime,
+          cwd,
+          env: process.env,
+          serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+        });
+        this.named = environment.values.ZITADEL_URL?.value;
+      } catch (error) {
+        if (error instanceof EnvironmentNameInvalidError) {
+          throw refusalError(NAME_INVALID_REFUSAL, {
+            message: error.message,
+            hint: error.hint ?? "",
+          });
+        }
+        if (error instanceof EnvironmentServerInvalidError) {
+          throw refusalError(SERVER_INVALID_REFUSAL, {
+            message: error.message,
+            source: error.source,
+            example: error.example,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerNotRunningError) {
+          throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof LocalServerNotRespondingError) {
+          throw refusalError(LOCAL_SERVER_NOT_RESPONDING_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+            server_url: error.serverUrl,
+          });
+        }
+        if (error instanceof LocalServerNotRespondingElsewhereError) {
+          throw refusalError(
+            LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL,
+            {
+              message: error.message,
+              server_url: error.serverUrl,
+              directory: Cmd.quote(error.directory),
+              path: error.directory,
+            },
+            {
+              start: {
+                id: "start",
+                flags: {
+                  cwd: error.directory,
+                },
+              },
+            },
+          );
+        }
+        throw error;
+      }
     }
 
     return (
@@ -191,38 +341,91 @@ export default class Console extends Telemetered(
       };
     }
 
-    const { localDir, admin } = target;
-    const serverUrl = await this.serverInThisFolder(localDir).runningUrl();
-    const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
+    const { admin } = target;
+    try {
+      const serverUrl = await this.serverInThisFolder().runningUrl();
+      const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
 
-    this.debug(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
-    this.debug(escapeControlCharacters(signInUrl));
-    const skipLaunch = flags.noOpen || this.nonInteractive;
-    const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
+      this.debug(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
+      this.debug(escapeControlCharacters(signInUrl));
+      const skipLaunch = flags.noOpen || this.nonInteractive;
+      const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
 
-    const title = "Local console sign-in link";
+      const title = "Local console sign-in link";
 
-    return {
-      status: "ok",
-      data: {
-        title,
-        signed_in_as: admin.email,
-        sign_in_url: signInUrl,
-        browser_opened: opened,
-      },
-      summary: {
-        title,
-        sections: [
-          section(undefined, ["Signed in as", escapeControlCharacters(admin.email)]),
-          section(undefined, ["Link", escapeControlCharacters(signInUrl)]),
-        ],
-      },
-      next: {
-        actions: [
-          `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
-        ],
-      },
-    };
+      return {
+        status: "ok",
+        data: {
+          title,
+          signed_in_as: admin.email,
+          sign_in_url: signInUrl,
+          browser_opened: opened,
+        },
+        summary: {
+          title,
+          sections: [
+            section(undefined, ["Signed in as", escapeControlCharacters(admin.email)]),
+            section(undefined, ["Link", escapeControlCharacters(signInUrl)]),
+          ],
+        },
+        next: {
+          actions: [
+            `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
+          ],
+        },
+      };
+    } catch (error) {
+      if (error instanceof LocalServerNotRunningError) {
+        throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerNotRespondingError) {
+        throw refusalError(LOCAL_SERVER_NOT_RESPONDING_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+          server_url: error.serverUrl,
+        });
+      }
+      if (error instanceof LocalServerNotRespondingElsewhereError) {
+        throw refusalError(
+          LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL,
+          {
+            message: error.message,
+            server_url: error.serverUrl,
+            directory: Cmd.quote(error.directory),
+            path: error.directory,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {
+                cwd: error.directory,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof LocalServerAdminRejectedError) {
+        throw refusalError(ADMIN_REJECTED_REFUSAL, {
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerAdminSessionError) {
+        throw refusalError(ADMIN_SESSION_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerAdminPlatformMissingError) {
+        throw refusalError(PLATFORM_MISSING_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -243,36 +446,39 @@ export default class Console extends Telemetered(
 
     const found = await LocalRuntime.findAdminDir(this.cwd);
     const localDir = found ?? this.cwd;
-    const admin = await this.serverInThisFolder(localDir)
-      .admin()
-      .catch((error: unknown) => {
-        if (error instanceof LocalServerAdminFileMalformedError) {
-          throw refusalError(ADMIN_FILE_MALFORMED_REFUSAL, {
-            message: error.message,
-            details: error.details ?? null,
-            path: String(error.details?.path ?? ""),
-          });
-        }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof LocalServerFileUnreadableError) {
-          throw refusalError(FILE_UNREADABLE_REFUSAL, {
-            message: error.message,
-            details: error.details ?? null,
-            path: String(error.details?.path ?? ""),
-          });
-        }
-        throw error;
-      });
-    if (admin === undefined) {
-      throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
-    }
+    try {
+      const admin = await this.serverInThisFolder(localDir).admin();
+      if (admin === undefined) {
+        throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
+      }
 
-    return {
-      kind: "local" as const,
-      localDir,
-      admin,
-    };
+      return {
+        kind: "local" as const,
+        localDir,
+        admin,
+      };
+    } catch (error) {
+      if (error instanceof LocalServerAdminFileMalformedError) {
+        throw refusalError(
+          ADMIN_FILE_MALFORMED_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+            path: Cmd.quote(error.path),
+          },
+          {
+            remove: shellCommand("rm", Cmd.quote(error.path)),
+          },
+        );
+      }
+      if (error instanceof LocalServerAdminUnreadableError) {
+        throw refusalError(ADMIN_UNREADABLE_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+          path: Cmd.quote(error.path),
+        });
+      }
+      throw error;
+    }
   }
 }

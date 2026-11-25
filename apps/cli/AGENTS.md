@@ -203,7 +203,7 @@
   read, but a message or a box line never may: prose drops the selector
   (`tests/unit/cli/core/environment-flags.test.ts`).
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
-  (`src/lib/ui/questions.ts`, engine in `src/cli/core/asker.ts`) — never clack's
+  (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
   kind of question and no `kind` string: a unit test fails on a clack import
   elsewhere and on a `kind:` question outside the engine.
@@ -329,17 +329,13 @@
 
 - Keep errors on three levels: `Error`, a `<Package>Error` base, and `<Package><Condition>Error` classes extending the base.
 - Put every error of a package in `errors.ts` at the package root, exported from the barrel; import them from the barrel outside the package.
-- Derive a class's `name` from the class; never write a literal `name`.
-- Give every error `category`, `retryable`, `code`, `hint` and `details`; override `code` only for a condition with its own public code.
-- Pick `category` from the seven kinds by the ordered decision list in the TSDoc of `ERROR_CATEGORIES` in `src/lib/errors.ts`.
-- Give a class only to a condition a caller catches or that needs its own guidance; vary one condition with a `reason`.
-- Never throw `ZitadelError` or a `Refusal` from `src/lib`; keep `src/lib` free of `src/cli` imports.
-- Write a lib `hint` without a flag or command; the catching command adds flag wording and `nextCommands`.
-- Catch one typed error in a command and rethrow with flags; pass `cause`.
-- Branch on an error once: handled or not, `retryable`, or one `category`; never an `instanceof` chain or a message match.
-- Type an error only when it is handled; let an unanticipated failure bubble as unknown.
-- Report cancellation as an `AbortError` from the run's signal; never add a cancelled class.
-- Throw plain errors from utilities.
+- Derive a class's `name` from the class in the base; never write a literal `name`.
+- Give one class to each condition a caller handles, and no `reason` field that a caller branches on.
+- State `category`, `retryable`, `code`, `hint`, `details` and `cause` literally in each class; pick `category` from the seven kinds by the ordered decision list in the TSDoc of `ERROR_CATEGORIES` in `src/lib/errors.ts`.
+- Never throw `ZitadelError` or a `Refusal` from `src/lib`; write a lib `hint` as prose about files and variables, without a flag or command.
+- Where a lib failure needs flag-aware wording or next commands, the command that calls the lib catches the typed error with a plain try/catch and throws a `*_REFUSAL` with that wording.
+- In the catch, write one flat `if (error instanceof X) { throw ...; }` per class, then `throw error;`; never `else if`, `||`, `.catch` chains or a match on an error property.
+- Leave cancellation and prompts as they are.
 
 ## Telemetry
 

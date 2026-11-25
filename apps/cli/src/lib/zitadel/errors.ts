@@ -698,6 +698,50 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
 }
 
 /**
+ * A login flow that already has errors, so it cannot be checked against a
+ * changed schema.
+ *
+ * @remarks
+ * Its details name the schema and each issue the flows already have.
+ */
+export class ZitadelConfigFlowsUncheckedError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * Make the failure for these issues.
+   *
+   * @param input - The schema, the heading and hint, and the issues.
+   * @param input.file - The user schema the change edits.
+   * @param input.heading - The line the listed issues follow.
+   * @param input.hint - What to do about the issues.
+   * @param input.issues - Every issue, as the server's flow rules word it.
+   */
+  constructor(input: {
+    readonly file: string;
+    readonly heading: string;
+    readonly hint: string;
+    readonly issues: readonly FlowIssue[];
+  }) {
+    const listed = input.issues.map((item) => {
+      return `  - ${item.path}: ${item.issue.message}`;
+    });
+    const issues = input.issues.map((item): JsonObject => {
+      const issue = item.issue;
+      if (issue.step === undefined) {
+        return { path: item.path, rule: issue.rule, message: issue.message };
+      }
+      return { path: item.path, rule: issue.rule, message: issue.message, step: issue.step };
+    });
+    super([input.heading, ...listed].join("\n"), {
+      hint: input.hint,
+      details: { file: input.file, issues },
+    });
+  }
+}
+
+/**
  * A file or directory that cannot be read because the operating system refused
  * to let this process read it.
  */

@@ -8,6 +8,7 @@ import {
   EnvironmentServerInvalidError,
   EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
+  EnvironmentValueUnboundError,
 } from "@/lib/environment";
 
 describe("the environment errors", () => {
@@ -46,13 +47,11 @@ describe("the environment errors", () => {
   });
 
   it("states what an environment with no project lacks, with no advice", () => {
-    const error = new EnvironmentValueMissingError("ZITADEL_PROJECT_ID is not set", {
+    const error = new EnvironmentValueUnboundError("ZITADEL_PROJECT_ID is not set", {
       key: "ZITADEL_PROJECT_ID",
       environment: "staging",
       consulted: ["process environment", ".env"],
-      file: undefined,
       boundFile: ".env.staging.local",
-      unbound: true,
       cwd: process.cwd(),
     });
 
@@ -66,10 +65,28 @@ describe("the environment errors", () => {
       },
     });
     expect(error).toMatchObject({
-      unbound: true,
       boundFile: ".env.staging.local",
     });
     expect(toZitadelError(error).nextCommands).toBeUndefined();
+  });
+
+  it("states the file a value belongs in when the environment has a project", () => {
+    const error = new EnvironmentValueMissingError("ZITADEL_PROJECT_SECRET is not set", {
+      key: "ZITADEL_PROJECT_SECRET",
+      environment: "staging",
+      consulted: ["process environment", ".env"],
+      file: ".env.staging.local",
+      boundFile: ".env.staging.local",
+      cwd: process.cwd(),
+    });
+
+    expect(toZitadelError(error)).toMatchObject({
+      code: "E_VALIDATION",
+      hint: "Consulted, in order: process environment, .env.",
+    });
+    expect(error).toMatchObject({
+      file: ".env.staging.local",
+    });
   });
 });
 

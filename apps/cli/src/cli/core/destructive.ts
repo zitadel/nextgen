@@ -1,24 +1,12 @@
 import { type Interfaces, Flags } from "@oclif/core";
 
-import { Consent, ConsentRequiredError, type Gate } from "@/lib/consent";
+import { Consent, type Gate } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
 
 import type { BaseCommand } from "./base";
 import type { EFFECT } from "./effect";
 import type { CommandResult } from "./types";
 import type { CommandClass } from "@/lib/oclif/command-class";
-import { type Refusal, refusalError } from "./refusal";
-
-/** How a destructive action nobody can agree to is refused. */
-const CONFIRMATION_REQUIRED_REFUSAL = {
-  code: "E_CONFIRMATION_REQUIRED",
-  message: "{message}",
-  hint: "Ask a person first: {question} Pass --force only once they agree.",
-  next: ["{retry}"],
-  details: {
-    question: "{question}",
-  },
-} as const satisfies Refusal;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
 export class Settled {
@@ -169,25 +157,6 @@ export function Destructive<
       return Consent.request(retried, {
         ...session,
         confirmer: this.ui.confirmer(session),
-      }).catch((error: unknown) => {
-        if (!(error instanceof ConsentRequiredError)) {
-          throw error;
-        }
-        throw Object.assign(
-          refusalError(
-            CONFIRMATION_REQUIRED_REFUSAL,
-            {
-              message: error.message,
-              question: retried.message,
-            },
-            {
-              retry: retried.retry === undefined ? [] : [retried.retry],
-            },
-          ),
-          {
-            cause: error,
-          },
-        );
       });
     }
   }

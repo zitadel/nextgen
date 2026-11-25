@@ -4,8 +4,11 @@ import {
   LocalRuntime,
   LocalServerProcessesStopError,
   LocalServerProcessesUnlistableError,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
   LocalServerStopError,
 } from "@/lib/server";
+import { Cmd } from "@/lib/cmd";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Fact, section } from "@/lib/ui";
@@ -16,7 +19,7 @@ import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
-/** How a start of the local server is refused: LocalServerProcessesStopError. */
+/** How a stop is refused when processes it asked to stop are still running. */
 const PROCESSES_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
@@ -24,7 +27,7 @@ const PROCESSES_DID_NOT_STOP_REFUSAL = {
   details: "{details}",
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerProcessesUnlistableError. */
+/** How a stop is refused when the machine cannot list its processes. */
 const PROCESSES_UNLISTABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
@@ -32,11 +35,38 @@ const PROCESSES_UNLISTABLE_REFUSAL = {
   details: "{details}",
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerStopError. */
+/** How a stop is refused when the server is still running afterwards. */
 const SERVER_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a stop is refused when the runtime record of this folder is not in the shape it is written in. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a stop is refused when the runtime record of this folder cannot be read. */
+const RECORD_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
   details: "{details}",
 } as const satisfies Refusal;
 
@@ -213,177 +243,185 @@ export default class Stop extends Telemetered(
    * @returns The result of the run.
    */
   protected async apply({ flags }: Admitted<typeof Stop>): Promise<CommandResult> {
-    if (flags.all) {
-      const sweep = await LocalRuntime.stopAll(this.localServers())
-        .catch((error: unknown) => {
-          if (error instanceof LocalServerProcessesStopError) {
-            throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-              message: error.message,
-              details: error.details ?? null,
-            });
-          }
-          throw error;
-        })
-        .catch((error: unknown) => {
-          if (error instanceof LocalServerProcessesUnlistableError) {
-            throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
-              message: error.message,
-              details: error.details ?? null,
-            });
-          }
-          throw error;
-        })
-        .catch((error: unknown) => {
-          if (error instanceof LocalServerStopError) {
-            throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-              message: error.message,
-              details: error.details ?? null,
-            });
-          }
-          throw error;
-        });
-      if (!sweep.supported) {
-        const title = "Managed local runtime process discovery is unavailable";
+    try {
+      if (flags.all) {
+        const sweep = await LocalRuntime.stopAll(this.localServers());
+        if (!sweep.supported) {
+          const title = "Managed local runtime process discovery is unavailable";
 
-        return {
-          status: "ok",
-          data: {
-            title,
-            sweep: {
-              supported: false,
-              error: sweep.error,
-              stopped: [],
+          return {
+            status: "ok",
+            data: {
+              title,
+              sweep: {
+                supported: false,
+                error: sweep.error,
+                stopped: [],
+              },
             },
-          },
-          summary: {
-            title,
-            sections: [section(undefined, ["Error", sweep.error ?? "unknown"])],
-          },
-          warnings: ["managed-runtime-processes: discovery unavailable"],
-        };
+            summary: {
+              title,
+              sections: [section(undefined, ["Error", sweep.error ?? "unknown"])],
+            },
+            warnings: ["managed-runtime-processes: discovery unavailable"],
+          };
+        }
+
+        if (sweep.results.length === 0) {
+          return {
+            status: "ok",
+            data: {
+              title: "No host-wide managed local runtime processes found",
+              sweep: {
+                supported: true,
+                scope: "host",
+                count: 0,
+                results: sweep.results,
+              },
+            },
+            summary: {
+              title: "No host-wide managed local runtime processes found",
+              sections: [section(undefined)],
+            },
+          };
+        } else {
+          const stopped: Fact[] = sweep.results.map((result): Fact => {
+            return ["Process", String(result.process.pid)];
+          });
+
+          return {
+            status: "ok",
+            data: {
+              title: "Host-wide managed local runtime processes stopped",
+              sweep: {
+                supported: true,
+                scope: "host",
+                count: sweep.results.length,
+                results: sweep.results,
+              },
+            },
+            summary: {
+              title: "Host-wide managed local runtime processes stopped",
+              sections: [section(undefined, ...stopped)],
+            },
+          };
+        }
       }
 
-      if (sweep.results.length === 0) {
+      const server = this.serverInThisFolder();
+      const record = await server.record();
+
+      if (record !== undefined && record.backend === "binary") {
+        const facts: Fact[] = [
+          ["Runtime", "binary"],
+          ["Process", String(record.pid)],
+          ["Data", record.data_dir],
+        ];
+        const { stopped, outcome } = await server.stop();
+        const title = this.stoppedTitle(stopped);
+
         return {
           status: "ok",
           data: {
-            title: "No host-wide managed local runtime processes found",
-            sweep: {
-              supported: true,
-              scope: "host",
-              count: 0,
-              results: sweep.results,
+            title,
+            runtime: {
+              backend: "binary",
+              pid: record.pid,
+              log_path: record.log_path,
+              stop_result: outcome,
+              data_preserved: true,
+              data_dir: record.data_dir,
             },
           },
           summary: {
-            title: "No host-wide managed local runtime processes found",
-            sections: [section(undefined)],
+            title,
+            sections: [section(undefined, ...facts)],
+          },
+        };
+      } else if (record !== undefined) {
+        const facts: Fact[] = [
+          ["Runtime", "docker"],
+          ["Container", record.container_name],
+          ["Data", record.data_dir],
+        ];
+        const { stopped } = await server.stop();
+        const title = this.stoppedTitle(stopped);
+
+        return {
+          status: "ok",
+          data: {
+            title,
+            runtime: {
+              backend: "docker",
+              container_name: record.container_name,
+              data_preserved: true,
+              data_dir: record.data_dir,
+            },
+          },
+          summary: {
+            title,
+            sections: [section(undefined, ...facts)],
           },
         };
       } else {
-        const stopped: Fact[] = sweep.results.map((result): Fact => {
-          return ["Process", String(result.process.pid)];
-        });
+        const containerName = server.containerName();
+        const facts: Fact[] = [
+          ["Runtime", "missing"],
+          ["Container", containerName],
+        ];
+        const { stopped } = await server.stop();
+        const title = this.stoppedTitle(stopped);
 
         return {
           status: "ok",
           data: {
-            title: "Host-wide managed local runtime processes stopped",
-            sweep: {
-              supported: true,
-              scope: "host",
-              count: sweep.results.length,
-              results: sweep.results,
+            title,
+            runtime: {
+              backend: "missing",
+              container_name: containerName,
+              data_preserved: true,
+              data_dir: undefined,
             },
           },
           summary: {
-            title: "Host-wide managed local runtime processes stopped",
-            sections: [section(undefined, ...stopped)],
+            title,
+            sections: [section(undefined, ...facts)],
           },
         };
       }
-    }
-
-    const server = this.serverInThisFolder();
-    const record = await server.record();
-
-    if (record !== undefined && record.backend === "binary") {
-      const facts: Fact[] = [
-        ["Runtime", "binary"],
-        ["Process", String(record.pid)],
-        ["Data", record.data_dir],
-      ];
-      const { stopped, outcome } = await server.stop();
-      const title = this.stoppedTitle(stopped);
-
-      return {
-        status: "ok",
-        data: {
-          title,
-          runtime: {
-            backend: "binary",
-            pid: record.pid,
-            log_path: record.log_path,
-            stop_result: outcome,
-            data_preserved: true,
-            data_dir: record.data_dir,
-          },
-        },
-        summary: {
-          title,
-          sections: [section(undefined, ...facts)],
-        },
-      };
-    } else if (record !== undefined) {
-      const facts: Fact[] = [
-        ["Runtime", "docker"],
-        ["Container", record.container_name],
-        ["Data", record.data_dir],
-      ];
-      const { stopped } = await server.stop();
-      const title = this.stoppedTitle(stopped);
-
-      return {
-        status: "ok",
-        data: {
-          title,
-          runtime: {
-            backend: "docker",
-            container_name: record.container_name,
-            data_preserved: true,
-            data_dir: record.data_dir,
-          },
-        },
-        summary: {
-          title,
-          sections: [section(undefined, ...facts)],
-        },
-      };
-    } else {
-      const containerName = server.containerName();
-      const facts: Fact[] = [
-        ["Runtime", "missing"],
-        ["Container", containerName],
-      ];
-      const { stopped } = await server.stop();
-      const title = this.stoppedTitle(stopped);
-
-      return {
-        status: "ok",
-        data: {
-          title,
-          runtime: {
-            backend: "missing",
-            container_name: containerName,
-            data_preserved: true,
-            data_dir: undefined,
-          },
-        },
-        summary: {
-          title,
-          sections: [section(undefined, ...facts)],
-        },
-      };
+    } catch (error) {
+      if (error instanceof LocalServerProcessesStopError) {
+        throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerProcessesUnlistableError) {
+        throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerStopError) {
+        throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerRecordMalformedError) {
+        throw refusalError(RECORD_MALFORMED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+          path: Cmd.quote(error.path),
+        });
+      }
+      throw error;
     }
   }
 

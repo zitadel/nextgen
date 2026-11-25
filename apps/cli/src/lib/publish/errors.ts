@@ -75,20 +75,10 @@ export class PublishConfigInvalidError extends PublishError {
   }[];
 
   /**
-   * Whether one of them is a secret written into a file.
-   */
-  readonly literalSecret: boolean;
-
-  /**
-   * Whether one of them is a key this CLI does not know.
-   */
-  readonly refusedKey: boolean;
-
-  /**
    * Make the failure.
    *
    * @param message - What went wrong, one line per finding.
-   * @param options - The findings and what they say about the fix.
+   * @param options - The findings.
    */
   constructor(
     message: string,
@@ -99,21 +89,150 @@ export class PublishConfigInvalidError extends PublishError {
         readonly steps?: readonly unknown[] | undefined;
         readonly message: string;
       }[];
-      readonly literalSecret: boolean;
-      readonly refusedKey: boolean;
-      readonly details?: Readonly<Record<string, unknown>> | undefined;
     },
   ) {
     super(message, {
-      ...options,
       hint: "No changes were made.",
-      details: options.details ?? {
+      details: {
         issues: options.findings,
       },
     });
     this.findings = options.findings;
-    this.literalSecret = options.literalSecret;
-    this.refusedKey = options.refusedKey;
+  }
+}
+
+/**
+ * The configuration has errors, one of them a key this CLI does not know, so nothing was sent.
+ */
+export class PublishConfigRefusedKeyError extends PublishError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * Every finding that stopped the publish.
+   */
+  readonly findings: readonly {
+    readonly rule: string;
+    readonly path: string;
+    readonly steps?: readonly unknown[] | undefined;
+    readonly message: string;
+  }[];
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, one line per finding.
+   * @param options - The findings.
+   */
+  constructor(
+    message: string,
+    options: {
+      readonly findings: readonly {
+        readonly rule: string;
+        readonly path: string;
+        readonly steps?: readonly unknown[] | undefined;
+        readonly message: string;
+      }[];
+    },
+  ) {
+    super(message, {
+      hint: "No changes were made.",
+      details: {
+        issues: options.findings,
+      },
+    });
+    this.findings = options.findings;
+  }
+}
+
+/**
+ * The configuration has errors, one of them a secret written into a file, so nothing was sent.
+ */
+export class PublishConfigLiteralSecretError extends PublishError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * Every finding that stopped the publish.
+   */
+  readonly findings: readonly {
+    readonly rule: string;
+    readonly path: string;
+    readonly steps?: readonly unknown[] | undefined;
+    readonly message: string;
+  }[];
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, one line per finding.
+   * @param options - The findings.
+   */
+  constructor(
+    message: string,
+    options: {
+      readonly findings: readonly {
+        readonly rule: string;
+        readonly path: string;
+        readonly steps?: readonly unknown[] | undefined;
+        readonly message: string;
+      }[];
+    },
+  ) {
+    super(message, {
+      hint: "No changes were made.",
+      details: {
+        issues: options.findings,
+      },
+    });
+    this.findings = options.findings;
+  }
+}
+
+/**
+ * The configuration has errors, one a secret written into a file and one a key this CLI does not know, so nothing was sent.
+ */
+export class PublishConfigLiteralSecretRefusedKeyError extends PublishError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * Every finding that stopped the publish.
+   */
+  readonly findings: readonly {
+    readonly rule: string;
+    readonly path: string;
+    readonly steps?: readonly unknown[] | undefined;
+    readonly message: string;
+  }[];
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, one line per finding.
+   * @param options - The findings.
+   */
+  constructor(
+    message: string,
+    options: {
+      readonly findings: readonly {
+        readonly rule: string;
+        readonly path: string;
+        readonly steps?: readonly unknown[] | undefined;
+        readonly message: string;
+      }[];
+    },
+  ) {
+    super(message, {
+      hint: "No changes were made.",
+      details: {
+        issues: options.findings,
+      },
+    });
+    this.findings = options.findings;
   }
 }
 
@@ -166,9 +285,9 @@ export class PublishConnectionVariableSharedError extends PublishError {
 }
 
 /**
- * A connection names a variable of the wrong kind: a secret where a plain one is needed, or the reverse.
+ * A connection names a plain variable where its client secret needs a secret one.
  */
-export class PublishConnectionVariableKindError extends PublishError {
+export class PublishConnectionVariableNotSecretError extends PublishError {
   override readonly category = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
@@ -184,14 +303,52 @@ export class PublishConnectionVariableKindError extends PublishError {
   readonly variable: string;
 
   /**
-   * The credential field that names it; absent when two fields share it.
+   * Which kind of publish was refused.
    */
-  readonly field: "client_id" | "client_secret" | undefined;
+  readonly mode: "deploy" | "preview" | undefined;
 
   /**
-   * Whether the variable the project holds is a secret, when it holds one.
+   * Make the failure.
+   *
+   * @param message - What went wrong.
+   * @param options - The connection, the variable and the facts behind them.
    */
-  readonly isSecret: boolean | undefined;
+  constructor(
+    message: string,
+    options: {
+      readonly file: string;
+      readonly variable: string;
+      readonly mode?: "deploy" | "preview" | undefined;
+      readonly details?: Readonly<Record<string, unknown>> | undefined;
+    },
+  ) {
+    super(message, {
+      ...options,
+      hint: "The client secret needs a secret variable, and the project holds a plain one.",
+    });
+    this.file = options.file;
+    this.variable = options.variable;
+    this.mode = options.mode;
+  }
+}
+
+/**
+ * A connection names a secret variable where its client id needs a plain one.
+ */
+export class PublishConnectionVariableNotPlainError extends PublishError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The connection file.
+   */
+  readonly file: string;
+
+  /**
+   * The variable it names.
+   */
+  readonly variable: string;
 
   /**
    * Which kind of publish was refused.
@@ -209,28 +366,24 @@ export class PublishConnectionVariableKindError extends PublishError {
     options: {
       readonly file: string;
       readonly variable: string;
-      readonly field?: "client_id" | "client_secret" | undefined;
-      readonly isSecret?: boolean | undefined;
       readonly mode?: "deploy" | "preview" | undefined;
       readonly details?: Readonly<Record<string, unknown>> | undefined;
     },
   ) {
     super(message, {
       ...options,
-      hint: "The variable the project holds is not the kind the field needs.",
+      hint: "The client id needs a plain variable, and the project holds a secret one.",
     });
     this.file = options.file;
     this.variable = options.variable;
-    this.field = options.field;
-    this.isSecret = options.isSecret;
     this.mode = options.mode;
   }
 }
 
 /**
- * A connection names a variable the project does not have.
+ * A connection names a variable for its client id that the project does not have.
  */
-export class PublishConnectionVariableMissingError extends PublishError {
+export class PublishConnectionVariableClientIdMissingError extends PublishError {
   override readonly category = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CREDENTIAL_MISSING";
@@ -246,9 +399,52 @@ export class PublishConnectionVariableMissingError extends PublishError {
   readonly variable: string;
 
   /**
-   * The credential field that names it; absent when two fields share it.
+   * Which kind of publish was refused.
    */
-  readonly field: "client_id" | "client_secret" | undefined;
+  readonly mode: "deploy" | "preview" | undefined;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong.
+   * @param options - The connection, the variable and the facts behind them.
+   */
+  constructor(
+    message: string,
+    options: {
+      readonly file: string;
+      readonly variable: string;
+      readonly mode?: "deploy" | "preview" | undefined;
+      readonly details?: Readonly<Record<string, unknown>> | undefined;
+    },
+  ) {
+    super(message, {
+      ...options,
+      hint: "The project does not hold the variable the client id names.",
+    });
+    this.file = options.file;
+    this.variable = options.variable;
+    this.mode = options.mode;
+  }
+}
+
+/**
+ * A connection names a variable for its client secret that the project does not have.
+ */
+export class PublishConnectionVariableClientSecretMissingError extends PublishError {
+  override readonly category = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CREDENTIAL_MISSING";
+
+  /**
+   * The connection file.
+   */
+  readonly file: string;
+
+  /**
+   * The variable it names.
+   */
+  readonly variable: string;
 
   /**
    * Which kind of publish was refused.
@@ -266,18 +462,16 @@ export class PublishConnectionVariableMissingError extends PublishError {
     options: {
       readonly file: string;
       readonly variable: string;
-      readonly field?: "client_id" | "client_secret" | undefined;
       readonly mode?: "deploy" | "preview" | undefined;
       readonly details?: Readonly<Record<string, unknown>> | undefined;
     },
   ) {
     super(message, {
       ...options,
-      hint: "The project does not hold the variable the connection names.",
+      hint: "The project does not hold the variable the client secret names.",
     });
     this.file = options.file;
     this.variable = options.variable;
-    this.field = options.field;
     this.mode = options.mode;
   }
 }

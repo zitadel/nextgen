@@ -549,7 +549,7 @@ describe("LocalRuntime", () => {
       await mkdir(app);
 
       await expect(LocalRuntime.resolveUrl(app, answeringAt())).rejects.toMatchObject({
-        name: "LocalServerNotRespondingError",
+        name: "LocalServerNotRespondingElsewhereError",
         details: { server_url: url, directory: cwd },
       });
     });

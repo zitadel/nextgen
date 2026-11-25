@@ -9,9 +9,10 @@ import {
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
   LocalServerFileBlockedError,
-  LocalServerFileUnreadableError,
   LocalServerInternalError,
+  LocalServerRecordMalformedElsewhereError,
   LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
 } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 
@@ -283,7 +284,7 @@ async function isOwnFile(path: string): Promise<boolean> {
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
       return false;
     }
-    throw new LocalServerFileUnreadableError(`${path} cannot be read`, {
+    throw new LocalServerRecordUnreadableError(`${path} cannot be read`, path, {
       details: {
         path,
         cause: errorMessage(error),
@@ -347,11 +348,21 @@ export async function readNearestRuntimeMetadata(
   if (!dir) {
     return undefined;
   }
-  const runtime = await readRuntimeMetadata(dir);
-  if (runtime) {
-    return { dir, runtime };
-  } else {
-    return undefined;
+  try {
+    const runtime = await readRuntimeMetadata(dir);
+    if (runtime) {
+      return { dir, runtime };
+    } else {
+      return undefined;
+    }
+  } catch (error) {
+    if (error instanceof LocalServerRecordMalformedError && resolve(dir) !== resolve(cwd)) {
+      throw new LocalServerRecordMalformedElsewhereError(error.message, dir, {
+        details: error.details,
+        cause: error,
+      });
+    }
+    throw error;
   }
 }
 

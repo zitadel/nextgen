@@ -9,7 +9,7 @@ import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 import { errorMessage } from "@/lib/errors";
 import {
   LocalServerAdminFileMalformedError,
-  LocalServerFileUnreadableError,
+  LocalServerAdminUnreadableError,
 } from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
@@ -82,13 +82,17 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw new LocalServerFileUnreadableError(`${LOCAL_ADMIN_FILE} cannot be read`, {
-      details: {
-        path: join(cwd, LOCAL_ADMIN_FILE),
-        cause: errorMessage(error),
+    throw new LocalServerAdminUnreadableError(
+      `${LOCAL_ADMIN_FILE} cannot be read`,
+      join(cwd, LOCAL_ADMIN_FILE),
+      {
+        details: {
+          path: join(cwd, LOCAL_ADMIN_FILE),
+          cause: errorMessage(error),
+        },
+        cause: error,
       },
-      cause: error,
-    });
+    );
   });
   if (raw === undefined) return undefined;
 
@@ -121,17 +125,25 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
 function malformedAdminFile(cwd: string, cause?: unknown): LocalServerAdminFileMalformedError {
   const details = { path: join(cwd, LOCAL_ADMIN_FILE), directory: cwd };
   if (cause) {
-    return new LocalServerAdminFileMalformedError(`${LOCAL_ADMIN_FILE} is malformed`, {
-      details: {
-        ...details,
-        cause: errorMessage(cause),
+    return new LocalServerAdminFileMalformedError(
+      `${LOCAL_ADMIN_FILE} is malformed`,
+      details.path,
+      {
+        details: {
+          ...details,
+          cause: errorMessage(cause),
+        },
+        cause,
       },
-      cause,
-    });
+    );
   } else {
-    return new LocalServerAdminFileMalformedError(`${LOCAL_ADMIN_FILE} is malformed`, {
-      details,
-    });
+    return new LocalServerAdminFileMalformedError(
+      `${LOCAL_ADMIN_FILE} is malformed`,
+      details.path,
+      {
+        details,
+      },
+    );
   }
 }
 

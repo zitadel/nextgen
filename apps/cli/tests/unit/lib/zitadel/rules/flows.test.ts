@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelConfigEditBreaksFlowsError, type JsonObject } from "@/lib/zitadel";
+import {
+  ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigFlowsUncheckedError,
+  type JsonObject,
+} from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
 import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
 import {
@@ -302,12 +306,12 @@ describe("assertFlowsIntact", () => {
       assertFlowsIntact(edit);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigFlowsUncheckedError);
     expect(error).toMatchObject({
       message: expect.stringContaining(
         "A login flow has errors, so it cannot be checked against the changed schema:",
       ),
-      hint: expect.stringContaining("zitadel deploy --dry-run"),
+      hint: "Fix those errors first, then run the command again.",
     });
   });
 
@@ -582,7 +586,7 @@ describe("assertMethodUnused", () => {
       assertMethodUnused(edit, "password");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigFlowsUncheckedError);
     expect(error).toMatchObject({
       message: expect.stringContaining(
         "A login flow has errors, so it cannot be checked against the changed schema:",

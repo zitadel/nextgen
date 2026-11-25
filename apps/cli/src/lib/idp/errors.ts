@@ -128,12 +128,18 @@ export class IdpSettingsMissingError extends IdpError {
   readonly missing: readonly string[];
 
   /**
+   * A complete command line, to show.
+   */
+  readonly example: string;
+
+  /**
    * Make the failure.
    *
    * @param message - What went wrong.
    * @param missing - The settings a custom connection needs and lacks.
+   * @param example - A complete command line, to show.
    */
-  constructor(message: string, missing: readonly string[]) {
+  constructor(message: string, missing: readonly string[], example: string) {
     super(message, {
       hint: "A custom connection is described by its slug, display name and issuer.",
       details: {
@@ -141,6 +147,7 @@ export class IdpSettingsMissingError extends IdpError {
       },
     });
     this.missing = missing;
+    this.example = example;
   }
 }
 

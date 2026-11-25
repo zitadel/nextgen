@@ -186,12 +186,6 @@ export class EnvironmentValueMissingError extends EnvironmentError {
   readonly boundFile: string;
 
   /**
-   * Whether the environment has no project at all, so there is nothing to
-   * add the value to yet.
-   */
-  readonly unbound: boolean;
-
-  /**
    * The directory the run addressed.
    */
   readonly cwd: string;
@@ -206,7 +200,6 @@ export class EnvironmentValueMissingError extends EnvironmentError {
    * @param facts.consulted - Every source the chain looked in, in order.
    * @param facts.file - The file the value belongs in, when the run reads one.
    * @param facts.boundFile - The file an environment of this name binds its project in.
-   * @param facts.unbound - Whether the environment has no project at all.
    * @param facts.cwd - The directory the run addressed.
    */
   constructor(
@@ -217,7 +210,6 @@ export class EnvironmentValueMissingError extends EnvironmentError {
       readonly consulted: readonly string[];
       readonly file: string | undefined;
       readonly boundFile: string;
-      readonly unbound: boolean;
       readonly cwd: string;
     },
   ) {
@@ -234,7 +226,77 @@ export class EnvironmentValueMissingError extends EnvironmentError {
     this.consulted = facts.consulted;
     this.file = facts.file;
     this.boundFile = facts.boundFile;
-    this.unbound = facts.unbound;
+    this.cwd = facts.cwd;
+  }
+}
+
+/**
+ * A value the command cannot run without is set in no source, and the
+ * environment has no project at all, so there is nothing to add it to yet.
+ */
+export class EnvironmentValueUnboundError extends EnvironmentError {
+  override readonly category = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The variable that is not set.
+   */
+  readonly key: string;
+
+  /**
+   * The environment it is not set for.
+   */
+  readonly environment: string;
+
+  /**
+   * Every source the chain looked in, in order.
+   */
+  readonly consulted: readonly string[];
+
+  /**
+   * The file an environment of this name binds its project in.
+   */
+  readonly boundFile: string;
+
+  /**
+   * The directory the run addressed.
+   */
+  readonly cwd: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong.
+   * @param facts - The variable, the environment and where it was looked for.
+   * @param facts.key - The variable that is not set.
+   * @param facts.environment - The environment it is not set for.
+   * @param facts.consulted - Every source the chain looked in, in order.
+   * @param facts.boundFile - The file an environment of this name binds its project in.
+   * @param facts.cwd - The directory the run addressed.
+   */
+  constructor(
+    message: string,
+    facts: {
+      readonly key: string;
+      readonly environment: string;
+      readonly consulted: readonly string[];
+      readonly boundFile: string;
+      readonly cwd: string;
+    },
+  ) {
+    super(message, {
+      hint: `Consulted, in order: ${facts.consulted.join(", ")}.`,
+      details: {
+        environment: facts.environment,
+        variable: facts.key,
+        consulted: facts.consulted,
+      },
+    });
+    this.key = facts.key;
+    this.environment = facts.environment;
+    this.consulted = facts.consulted;
+    this.boundFile = facts.boundFile;
     this.cwd = facts.cwd;
   }
 }

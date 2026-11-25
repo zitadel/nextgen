@@ -72,8 +72,8 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
   async run(needs: Needs): Promise<object> {
     const { framework, issuer, patchContext, patcher } = needs;
     if (framework !== undefined && !this.deps.dryRun) {
-      await patcher
-        .patch(
+      try {
+        await patcher.patch(
           patchContext(framework, {
             id: "dry-run-0000",
             name: "dry-run",
@@ -92,36 +92,23 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
             dryRun: true,
             force: this.deps.force,
           },
-        )
-        .catch((error: unknown) => {
-          if (error instanceof OrcaPatchFileOverwriteError) {
-            throw Object.assign(
-              refusalError(PATCH_OVERWRITE_REFUSAL, {
-                message: error.message,
-                details: error.details ?? null,
-              }),
-              {
-                cause: error,
-              },
-            );
-          }
-          throw error;
-        })
-        .catch((error: unknown) => {
-          if (error instanceof OrcaPatchLayoutConflictError) {
-            throw Object.assign(
-              refusalError(PATCH_LAYOUT_REFUSAL, {
-                message: error.message,
-                hint: error.hint ?? "",
-                details: error.details ?? null,
-              }),
-              {
-                cause: error,
-              },
-            );
-          }
-          throw error;
-        });
+        );
+      } catch (error) {
+        if (error instanceof OrcaPatchFileOverwriteError) {
+          throw refusalError(PATCH_OVERWRITE_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        if (error instanceof OrcaPatchLayoutConflictError) {
+          throw refusalError(PATCH_LAYOUT_REFUSAL, {
+            message: error.message,
+            hint: error.hint ?? "",
+            details: error.details ?? null,
+          });
+        }
+        throw error;
+      }
     }
     return {};
   }

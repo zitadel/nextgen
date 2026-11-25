@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { BackendForbiddenError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { PublishError } from "@/lib/publish";
+import { PublishConnectionVariableClientSecretMissingError, PublishError } from "@/lib/publish";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
 import type { ClientStubs } from "@tests/helpers/fake-client";
@@ -124,10 +124,9 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(PublishError);
+      expect(error).toBeInstanceOf(PublishConnectionVariableClientSecretMissingError);
       expect(error).toMatchObject({
         variable: "ACME_CLIENT_SECRET",
-        field: "client_secret",
         mode: "deploy",
       });
     });
@@ -221,10 +220,9 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(PublishError);
+      expect(error).toBeInstanceOf(PublishConnectionVariableClientSecretMissingError);
       expect(error).toMatchObject({
         variable: "ACME_CLIENT_SECRET",
-        field: "client_secret",
         mode: "preview",
       });
     });

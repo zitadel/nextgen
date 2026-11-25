@@ -1,16 +1,57 @@
 import type { ServerAddresses } from "@/lib/environment";
 import { serverFlag } from "@/cli/core/flags";
 import type { BaseCommand } from "@/cli/core";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { Cmd } from "@/lib/cmd";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import {
   LocalRuntime,
   type LocalMachine,
+  LocalServerRecordMalformedElsewhereError,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
   type LocalServers,
   PsLocalServers,
   RealMachine,
   ZitadelRuntime,
 } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
+
+/** How a run is refused when the runtime record of this folder is not in the shape it is written in. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  details: "{details}",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the runtime record of a parent folder is not in the shape it is written in. */
+const RECORD_MALFORMED_ELSEWHERE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
+  details: "{details}",
+  next: ["{reset}", "{start}"],
+} as const satisfies Refusal;
+
+/** How a run is refused when the runtime record of this folder cannot be read. */
+const RECORD_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that {path} and its directory are readable by you.",
+  details: "{details}",
+} as const satisfies Refusal;
 
 /**
  * `--server`: the one flag every {@link ServerCommand} takes, declared once so
@@ -264,11 +305,58 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
       if (folderRule === undefined) {
         return super.sourceOf(flags, cwd);
       } else if (folderRule === "nearest") {
-        const server = await this.serverInNearestFolder(cwd);
-        if (server === undefined) {
-          return LocalRuntime.DEFAULT_URL;
-        } else {
-          return server.url();
+        try {
+          const server = await this.serverInNearestFolder(cwd);
+          if (server === undefined) {
+            return LocalRuntime.DEFAULT_URL;
+          } else {
+            return server.url();
+          }
+        } catch (error) {
+          if (error instanceof LocalServerRecordMalformedError) {
+            throw refusalError(RECORD_MALFORMED_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+            });
+          }
+          if (error instanceof LocalServerRecordMalformedElsewhereError) {
+            throw refusalError(
+              RECORD_MALFORMED_ELSEWHERE_REFUSAL,
+              {
+                message: error.message,
+                details: {
+                  ...error.details,
+                  suggested_args: [
+                    ["reset", "--force", "--cwd", error.directory],
+                    ["start", "--cwd", error.directory],
+                  ],
+                },
+              },
+              {
+                reset: {
+                  id: "reset",
+                  flags: {
+                    force: true,
+                    cwd: error.directory,
+                  },
+                },
+                start: {
+                  id: "start",
+                  flags: {
+                    cwd: error.directory,
+                  },
+                },
+              },
+            );
+          }
+          if (error instanceof LocalServerRecordUnreadableError) {
+            throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+              message: error.message,
+              details: error.details ?? null,
+              path: Cmd.quote(error.path),
+            });
+          }
+          throw error;
         }
       } else {
         return this.serverInThisFolder(cwd).url();

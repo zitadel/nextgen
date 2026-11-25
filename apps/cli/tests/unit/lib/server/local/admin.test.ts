@@ -144,7 +144,7 @@ describe("local admin", () => {
 
       try {
         await expect(ensureLocalAdmin(cwd)).rejects.toMatchObject({
-          name: "LocalServerFileUnreadableError",
+          name: "LocalServerAdminUnreadableError",
           category: "invalid",
           message: expect.stringMatching(/cannot be read/),
         });

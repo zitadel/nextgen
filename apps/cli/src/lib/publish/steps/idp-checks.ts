@@ -1,7 +1,9 @@
 import { BackendForbiddenError, type VariableService } from "@/lib/backend";
 import {
-  PublishConnectionVariableKindError,
-  PublishConnectionVariableMissingError,
+  PublishConnectionVariableClientIdMissingError,
+  PublishConnectionVariableClientSecretMissingError,
+  PublishConnectionVariableNotPlainError,
+  PublishConnectionVariableNotSecretError,
   PublishConnectionVariableSharedError,
 } from "@/lib/publish/errors";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
@@ -36,10 +38,13 @@ const VARIABLE_KIND = {
  * @returns Nothing when every connection's variables are held as it needs.
  * @throws {@link PublishConnectionVariableSharedError} When a connection's client id
  *   and secret name one variable.
- * @throws {@link PublishConnectionVariableKindError} When a variable is not the kind
- *   its field needs.
- * @throws {@link PublishConnectionVariableMissingError} When the project does not
- *   hold the variable a connection names.
+ * @throws {@link PublishConnectionVariableNotSecretError} When the client secret names a
+ *   plain variable.
+ * @throws {@link PublishConnectionVariableNotPlainError} When the client id names a secret one.
+ * @throws {@link PublishConnectionVariableClientIdMissingError} When the project does not
+ *   hold the variable the client id names.
+ * @throws {@link PublishConnectionVariableClientSecretMissingError} When the project does not
+ *   hold the variable the client secret names.
  * @throws {@link BackendForbiddenError} When a deploy's token may not read the
  *   variables.
  */
@@ -91,10 +96,13 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  * @param held - The project's variables, and whether each is a secret.
  * @throws {@link PublishConnectionVariableSharedError} When the client id and secret
  *   name one variable.
- * @throws {@link PublishConnectionVariableKindError} When a variable is not the kind
- *   its field needs.
- * @throws {@link PublishConnectionVariableMissingError} When a named variable is not
- *   held.
+ * @throws {@link PublishConnectionVariableNotSecretError} When the client secret names a
+ *   plain variable.
+ * @throws {@link PublishConnectionVariableNotPlainError} When the client id names a secret one.
+ * @throws {@link PublishConnectionVariableClientIdMissingError} When the variable the client id
+ *   names is not held.
+ * @throws {@link PublishConnectionVariableClientSecretMissingError} When the variable the client
+ *   secret names is not held.
  */
 function checkCredentialVariables(
   ctx: StepContext,
@@ -140,12 +148,11 @@ function checkCredentialVariables(
     const variable = use.variable;
     const wantsSecret = field === "client_secret";
     const isSecret = held.get(variable);
-    if (isSecret === undefined) {
-      throw new PublishConnectionVariableMissingError(
+    if (isSecret === undefined && wantsSecret) {
+      throw new PublishConnectionVariableClientSecretMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
         {
           file,
-          field,
           variable,
           mode: ctx.mode,
           details: {
@@ -156,17 +163,50 @@ function checkCredentialVariables(
         },
       );
     }
-    if (isSecret !== wantsSecret) {
-      const kind = isSecret ? "a secret" : "not a secret";
-      throw new PublishConnectionVariableKindError(
-        `${file}: ${field} names the variable ${variable}, which is ${kind}`,
+    if (isSecret === undefined) {
+      throw new PublishConnectionVariableClientIdMissingError(
+        `${file}: ${field} names the variable ${variable}, which the project does not have`,
         {
           file,
-          field,
           variable,
-          isSecret,
           mode: ctx.mode,
-          details: { variable, field, file, secret: isSecret },
+          details: {
+            variable,
+            field,
+            file,
+          },
+        },
+      );
+    }
+    if (wantsSecret && !isSecret) {
+      throw new PublishConnectionVariableNotSecretError(
+        `${file}: ${field} names the variable ${variable}, which is not a secret`,
+        {
+          file,
+          variable,
+          mode: ctx.mode,
+          details: {
+            variable,
+            field,
+            file,
+            secret: isSecret,
+          },
+        },
+      );
+    }
+    if (!wantsSecret && isSecret) {
+      throw new PublishConnectionVariableNotPlainError(
+        `${file}: ${field} names the variable ${variable}, which is a secret`,
+        {
+          file,
+          variable,
+          mode: ctx.mode,
+          details: {
+            variable,
+            field,
+            file,
+            secret: isSecret,
+          },
         },
       );
     }

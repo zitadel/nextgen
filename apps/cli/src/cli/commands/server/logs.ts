@@ -4,9 +4,7 @@ import { z } from "zod";
 import {
   LocalRuntime,
   LocalServerDockerFailedError,
-  LocalServerFileUnreadableError,
   LocalServerNotStartedError,
-  LocalServerRecordMalformedError,
 } from "@/lib/server";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, CommandResult } from "@/cli/core";
@@ -54,34 +52,19 @@ const NOT_STARTED_REFUSAL = {
   next: [{ id: "start" }],
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerRecordMalformedError. */
-const RECORD_MALFORMED_REFUSAL = {
+/** How a runtime that was never started is refused. */
+const RUNTIME_NOT_STARTED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  details: "{details}",
+  hint: "Run `zitadel start` first.",
   next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
     {
       id: "start",
     },
   ],
 } as const satisfies Refusal;
 
-/** How a start of the local server is refused: LocalServerFileUnreadableError. */
-const FILE_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-  details: "{details}",
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerDockerFailedError. */
+/** How a failed Docker call is refused. */
 const DOCKER_FAILED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
@@ -90,18 +73,6 @@ const DOCKER_FAILED_REFUSAL = {
   next: [
     {
       id: "doctor",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a start of the local server is refused: LocalServerNotStartedError. */
-const RUNTIME_NOT_STARTED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Run `zitadel start` first.",
-  next: [
-    {
-      id: "start",
     },
   ],
 } as const satisfies Refusal;
@@ -151,32 +122,13 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
       throw refusalError(FOLLOW_IS_NOT_JSON_REFUSAL, {});
     }
 
-    const server = await this.serverInNearestFolder()
-      .catch((error: unknown) => {
-        if (error instanceof LocalServerRecordMalformedError) {
-          throw refusalError(RECORD_MALFORMED_REFUSAL, {
-            message: error.message,
-            details: error.details ?? null,
-          });
-        }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof LocalServerFileUnreadableError) {
-          throw refusalError(FILE_UNREADABLE_REFUSAL, {
-            message: error.message,
-            details: error.details ?? null,
-            path: String(error.details?.path ?? ""),
-          });
-        }
-        throw error;
-      });
+    const server = await this.serverInNearestFolder();
     if (server === undefined) {
       throw refusalError(NOT_STARTED_REFUSAL, {});
     }
 
-    try {
-      if (flags.follow) {
+    if (flags.follow) {
+      try {
         await server.follow({
           tail: flags.tail,
           level: flags.level,
@@ -187,29 +139,44 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
           },
           signal: this.signal,
         });
-
-        const title = "Stopped following local Zitadel logs";
-        if (Output.screen) {
-          return {
-            status: "ok",
-            data: { title },
-            summary: {
-              title,
-              sections: [],
-            },
-          };
-        } else {
-          return {
-            status: "ok",
-            data: { title },
-            pretty: prose(""),
-            summary: {
-              title,
-              sections: [],
-            },
-          };
+      } catch (error) {
+        if (error instanceof LocalServerNotStartedError) {
+          throw refusalError(RUNTIME_NOT_STARTED_REFUSAL, {
+            message: error.message,
+          });
         }
+        if (error instanceof LocalServerDockerFailedError) {
+          throw refusalError(DOCKER_FAILED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        throw error;
+      }
+
+      const title = "Stopped following local Zitadel logs";
+      if (Output.screen) {
+        return {
+          status: "ok",
+          data: { title },
+          summary: {
+            title,
+            sections: [],
+          },
+        };
       } else {
+        return {
+          status: "ok",
+          data: { title },
+          pretty: prose(""),
+          summary: {
+            title,
+            sections: [],
+          },
+        };
+      }
+    } else {
+      try {
         const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
         const shown = lines.drawn(Output.color);
         const title = "Local Zitadel server logs";
@@ -249,20 +216,20 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
             },
           };
         }
+      } catch (error) {
+        if (error instanceof LocalServerNotStartedError) {
+          throw refusalError(RUNTIME_NOT_STARTED_REFUSAL, {
+            message: error.message,
+          });
+        }
+        if (error instanceof LocalServerDockerFailedError) {
+          throw refusalError(DOCKER_FAILED_REFUSAL, {
+            message: error.message,
+            details: error.details ?? null,
+          });
+        }
+        throw error;
       }
-    } catch (error) {
-      if (error instanceof LocalServerNotStartedError) {
-        throw refusalError(RUNTIME_NOT_STARTED_REFUSAL, {
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerDockerFailedError) {
-        throw refusalError(DOCKER_FAILED_REFUSAL, {
-          message: error.message,
-          details: error.details ?? null,
-        });
-      }
-      throw error;
     }
   }
 }

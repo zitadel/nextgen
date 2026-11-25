@@ -311,6 +311,7 @@ export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlag
  * @param provider - The provider the command line names.
  * @param values - The settings the flags gave.
  * @param flag - How the command spells each flag.
+ * @param example - A complete command line, for the refusal of an incomplete one.
  * @returns The provider, checked.
  * @throws {@link IdpSettingsConflictError} When a setting accompanies a catalog
  *   provider.
@@ -322,6 +323,7 @@ export function selectionFromFlags(
   provider: string,
   values: CustomFlagValues,
   flag: CustomFlagNames,
+  example: string,
 ): ProviderSelection {
   const given = givenCustomFlags(values, flag);
 
@@ -348,7 +350,11 @@ export function selectionFromFlags(
     const missing = [flag.slug, flag.displayName, flag.issuer].filter((name) => {
       return !given.includes(name);
     });
-    throw new IdpSettingsMissingError(`A custom connection needs ${missing.join(", ")}`, missing);
+    throw new IdpSettingsMissingError(
+      `A custom connection needs ${missing.join(", ")}`,
+      missing,
+      example,
+    );
   }
 
   return {

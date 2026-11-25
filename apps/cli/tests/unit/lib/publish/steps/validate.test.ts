@@ -3,7 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SchemaService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { PublishError } from "@/lib/publish";
+import {
+  PublishConfigInvalidError,
+  PublishConfigLiteralSecretError,
+  PublishConfigRefusedKeyError,
+  PublishError,
+} from "@/lib/publish";
 import { validateStep } from "@/lib/publish/steps/validate";
 import {
   aBranding,
@@ -229,10 +234,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toMatchObject({
-        refusedKey: true,
-        literalSecret: false,
-      });
+      expect(error).toBeInstanceOf(PublishConfigRefusedKeyError);
     });
   });
 
@@ -260,10 +262,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(PublishError);
-      expect(error).toMatchObject({
-        literalSecret: true,
-      });
+      expect(error).toBeInstanceOf(PublishConfigLiteralSecretError);
     });
 
     it("states no literal secret and no refused key for a refusal that has neither", async () => {
@@ -273,10 +272,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toMatchObject({
-        literalSecret: false,
-        refusedKey: false,
-      });
+      expect(error).toBeInstanceOf(PublishConfigInvalidError);
     });
 
     it("leaves out the subject-claim advice when the connections could not be listed", async () => {

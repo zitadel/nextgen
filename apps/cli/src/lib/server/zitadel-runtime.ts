@@ -7,6 +7,7 @@ import type { Parsed } from "@zitadel/config/idp";
 import { errorMessage } from "@/lib/errors";
 import {
   LocalServerDockerMissingError,
+  LocalServerNotRespondingElsewhereError,
   LocalServerNotStartedError,
   LocalServerOrphansStopError,
   LocalServerPermitMismatchError,
@@ -542,7 +543,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param cwd - The directory.
    * @returns The record, or `undefined` when none was written there.
-   * @throws {LocalServerFileUnreadableError} or {LocalServerRecordMalformedError} when it cannot be used.
+   * @throws {LocalServerRecordUnreadableError} or {LocalServerRecordMalformedError} when it cannot be used.
    */
   static read(cwd: string): Promise<RuntimeMetadata | undefined> {
     return readRuntimeMetadata(cwd);
@@ -553,7 +554,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param cwd - Where to start looking.
    * @returns The record and the directory it was found in, or `undefined` when no directory above has one.
-   * @throws {LocalServerFileUnreadableError} or {LocalServerRecordMalformedError} when it cannot be used.
+   * @throws {LocalServerRecordUnreadableError} or {LocalServerRecordMalformedError} when it cannot be used.
    */
   static readNearest(cwd: string): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
     return readNearestRuntimeMetadata(cwd);
@@ -771,7 +772,7 @@ export class LocalRuntime extends ZitadelRuntime {
    * @param cwd - The directory the run addresses.
    * @param fetcher - What asks whether the server answers (`fetch` by default).
    * @returns The address of the server running there.
-   * @throws {LocalServerNotRunningError} when no server was started there, and {LocalServerNotRespondingError} when the recorded one is not running.
+   * @throws {LocalServerNotRunningError} when no server was started there, {LocalServerNotRespondingError} when the recorded one is not running, and {LocalServerNotRespondingElsewhereError} when a parent folder started it.
    */
   static async resolveUrl(cwd: string, fetcher: typeof fetch = fetch): Promise<string> {
     const nearest = await readNearestRuntimeMetadata(cwd);
@@ -798,6 +799,12 @@ export class LocalRuntime extends ZitadelRuntime {
       ) {
         return runtime.server_url;
       }
+    }
+    if (resolve(nearest.dir) !== resolve(cwd)) {
+      throw new LocalServerNotRespondingElsewhereError({
+        server_url: runtime.server_url,
+        directory: nearest.dir,
+      });
     }
     throw localServerNotRunning(runtime.server_url, nearest.dir);
   }

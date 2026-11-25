@@ -1,5 +1,10 @@
 import { mapBounded } from "@/lib/map-bounded";
-import { PublishConfigInvalidError } from "@/lib/publish/errors";
+import {
+  PublishConfigInvalidError,
+  PublishConfigLiteralSecretError,
+  PublishConfigLiteralSecretRefusedKeyError,
+  PublishConfigRefusedKeyError,
+} from "@/lib/publish/errors";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
 
@@ -90,7 +95,8 @@ function reported(finding: Issue | ServerFinding): ReportedFinding {
  * sent.
  *
  * @param findings - Every finding.
- * @throws {@link PublishConfigInvalidError} when any finding is an error.
+ * @throws {@link PublishConfigInvalidError} when any finding is an error, and one of its
+ *   variants when a finding is a secret written into a file or a key this CLI does not know.
  */
 function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const errors = findings.filter((finding) => {
@@ -110,14 +116,26 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const refusedKey = errors.some((finding) => {
     return UserSchema.refusesKey(finding);
   });
-  throw new PublishConfigInvalidError(
-    `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
-    {
-      findings: errors.map(reported),
-      literalSecret,
-      refusedKey,
-    },
-  );
+  const message = `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`;
+  const issues = errors.map(reported);
+  if (literalSecret && refusedKey) {
+    throw new PublishConfigLiteralSecretRefusedKeyError(message, {
+      findings: issues,
+    });
+  }
+  if (literalSecret) {
+    throw new PublishConfigLiteralSecretError(message, {
+      findings: issues,
+    });
+  }
+  if (refusedKey) {
+    throw new PublishConfigRefusedKeyError(message, {
+      findings: issues,
+    });
+  }
+  throw new PublishConfigInvalidError(message, {
+    findings: issues,
+  });
 }
 
 /**

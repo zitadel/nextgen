@@ -48,7 +48,11 @@ describe("the orca errors", () => {
   it.each([
     [new OrcaFrameworkMissingError("why"), "OrcaFrameworkMissingError", "missing"],
     [new OrcaFrameworkUnsupportedError("why"), "OrcaFrameworkUnsupportedError", "invalid"],
-    [new OrcaFrameworkMismatchError("why"), "OrcaFrameworkMismatchError", "conflict"],
+    [
+      new OrcaFrameworkMismatchError("why", "react", "next"),
+      "OrcaFrameworkMismatchError",
+      "conflict",
+    ],
     [new OrcaScaffoldOccupiedError("why"), "OrcaScaffoldOccupiedError", "conflict"],
     [new OrcaScaffoldBlockedError("why"), "OrcaScaffoldBlockedError", "invalid"],
     [new OrcaScaffoldCommandFailedError("why"), "OrcaScaffoldCommandFailedError", "fault"],
@@ -72,7 +76,7 @@ describe("the orca errors' codes", () => {
   it.each([
     ["no app", new OrcaFrameworkMissingError("why"), "E_FRAMEWORK_NOT_DETECTED"],
     ["an unsupported app", new OrcaFrameworkUnsupportedError("why"), "E_UNSUPPORTED_PROJECT_SHAPE"],
-    ["another framework", new OrcaFrameworkMismatchError("why"), "E_CONFLICT"],
+    ["another framework", new OrcaFrameworkMismatchError("why", "react", "next"), "E_CONFLICT"],
     ["an occupied directory", new OrcaScaffoldOccupiedError("why"), "E_CONFLICT"],
     ["a Node too old", new OrcaScaffoldBlockedError("why"), "E_VALIDATION"],
     ["a failed command", new OrcaScaffoldCommandFailedError("why"), "E_VALIDATION"],
@@ -84,5 +88,20 @@ describe("the orca errors' codes", () => {
     ["a bug", new OrcaInternalError("why"), "E_VALIDATION"],
   ] as const)("reports %s as %s", (_name, error, code) => {
     expect(error.code).toBe(code);
+  });
+});
+
+describe("the orca framework mismatch", () => {
+  it("keeps the framework asked for and the one detected, in its details too", () => {
+    const error = new OrcaFrameworkMismatchError("why", "react", "next");
+
+    expect(error).toMatchObject({
+      requested: "react",
+      detected: "next",
+      details: {
+        requested: "react",
+        detected: "next",
+      },
+    });
   });
 });

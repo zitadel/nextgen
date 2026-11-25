@@ -140,62 +140,53 @@ export class PatchApp extends WizardStep<
     const patching = this.deps.ui.begin(
       `Patching project files${this.deps.dryRun ? " (dry run)" : ""}`,
     );
-    const patched = await patcher
-      .patch(patchContext(framework, project), {
-        cwd: this.deps.cwd,
-        dryRun: this.deps.dryRun,
-        force: this.deps.force,
-      })
-      .catch(async (error: unknown) => {
-        await this.rollBack(envFilesBefore);
-        patching.fail();
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof OrcaPatchFileOverwriteError) {
-          throw Object.assign(
-            refusalError(PATCH_OVERWRITE_REFUSAL, {
-              message: error.message,
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
+    try {
+      const patched = await patcher
+        .patch(patchContext(framework, project), {
+          cwd: this.deps.cwd,
+          dryRun: this.deps.dryRun,
+          force: this.deps.force,
+        })
+        .catch(async (error: unknown) => {
+          await this.rollBack(envFilesBefore);
+          patching.fail();
+          throw error;
+        });
+      for (const file of patched.filesWritten) {
+        const sentence = describeWrittenFile(
+          relativeDisplay(this.deps.cwd, file),
+          this.deps.dryRun,
+        );
+        if (sentence) {
+          patching.detail(sentence);
         }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof OrcaPatchLayoutConflictError) {
-          throw Object.assign(
-            refusalError(PATCH_LAYOUT_REFUSAL, {
-              message: error.message,
-              hint: error.hint ?? "",
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
-      });
-    for (const file of patched.filesWritten) {
-      const sentence = describeWrittenFile(relativeDisplay(this.deps.cwd, file), this.deps.dryRun);
-      if (sentence) {
-        patching.detail(sentence);
       }
+      for (const file of patched.filesSkipped) {
+        patching.detail(
+          `Left ${escapeControlCharacters(relativeDisplay(this.deps.cwd, file))} unchanged (already matches target)`,
+        );
+      }
+      return {
+        patched,
+        envFilesBefore,
+        patching,
+      };
+    } catch (error) {
+      if (error instanceof OrcaPatchFileOverwriteError) {
+        throw refusalError(PATCH_OVERWRITE_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof OrcaPatchLayoutConflictError) {
+        throw refusalError(PATCH_LAYOUT_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+          details: error.details ?? null,
+        });
+      }
+      throw error;
     }
-    for (const file of patched.filesSkipped) {
-      patching.detail(
-        `Left ${escapeControlCharacters(relativeDisplay(this.deps.cwd, file))} unchanged (already matches target)`,
-      );
-    }
-    return {
-      patched,
-      envFilesBefore,
-      patching,
-    };
   }
 
   /**

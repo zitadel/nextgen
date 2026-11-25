@@ -7,9 +7,9 @@ import { LocalRuntime, StartedServer, ZitadelRuntime } from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
 import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
-import { Consent, ConsentRequiredError } from "@/lib/consent";
+import { Consent } from "@/lib/consent";
 import { Environment } from "@/lib/environment";
-import { confirmationHint, errorMessage, isCancellation, ZitadelError } from "@/lib/errors";
+import { errorMessage, ZitadelError } from "@/lib/errors";
 import { Output, warnings as invocationWarnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
@@ -769,12 +769,8 @@ export default class Doctor extends Telemetered(
         try {
           await check.fix(ctx);
         } catch (error) {
-          if (isCancellation(error)) {
+          if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
             throw error;
-          }
-          if (error instanceof ConsentRequiredError) {
-            invocationWarnings.report(`${error.message}. ${confirmationHint(error.hint ?? "")}`);
-            continue;
           }
           if (Consent.isRefusal(error) && error instanceof ZitadelError) {
             invocationWarnings.report(`${error.message}. ${error.hint ?? ""}`.trim());

@@ -110,116 +110,111 @@ export class DetectFramework extends WizardStep<
           : this.deps.cwd,
       )}`,
     );
-    const found = await orca
-      .detect(this.deps.cwd, flags.framework)
-      .then((facts) => {
-        detecting.done(
-          `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
-        );
-        return {
-          app: {
-            framework: facts.id,
-            devPort: facts.devPort,
-          },
-          detected: facts,
-          scaffoldedBesideFiles: false,
-        };
-      })
-      .catch((error: unknown) => {
-        if (!(error instanceof OrcaFrameworkMissingError)) {
-          detecting.fail();
-        }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof OrcaFrameworkMismatchError) {
-          const { requested, detected } = error.details ?? {};
-          throw Object.assign(
-            refusalError(FRAMEWORK_MISMATCH_REFUSAL, {
-              message: error.message,
-              requested: String(requested),
-              detected: String(detected),
-              requestedName: orca.displayName(String(requested)),
-            }),
-            {
-              cause: error,
-            },
+    try {
+      const found = await orca
+        .detect(this.deps.cwd, flags.framework)
+        .then((facts) => {
+          detecting.done(
+            `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
           );
-        }
-        throw error;
-      })
-      .catch(async (error: unknown) => {
-        if (!(error instanceof OrcaFrameworkMissingError)) {
-          throw error;
-        }
-        const target = await orca.inspectScaffoldTarget(this.deps.cwd);
-        if (!target.scaffoldable && !this.deps.force) {
-          detecting.fail();
-          throw new ZitadelError(
-            "E_FRAMEWORK_NOT_DETECTED",
-            "Could not detect a supported app framework, and this directory is not empty",
-            {
-              hint: `${target.reason ?? "Directory is not empty."} Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.`,
-              details: {
-                cwd: this.deps.cwd,
-                entries: target.entries,
-                reason: target.reason,
+          return {
+            app: {
+              framework: facts.id,
+              devPort: facts.devPort,
+            },
+            detected: facts,
+            scaffoldedBesideFiles: false,
+          };
+        })
+        .catch(async (error) => {
+          if (!(error instanceof OrcaFrameworkMissingError)) {
+            detecting.fail();
+            throw error;
+          }
+          const target = await orca.inspectScaffoldTarget(this.deps.cwd);
+          if (!target.scaffoldable && !this.deps.force) {
+            detecting.fail();
+            throw new ZitadelError(
+              error.code,
+              "Could not detect a supported app framework, and this directory is not empty",
+              {
+                hint: `${target.reason ?? "Directory is not empty."} Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.`,
+                details: {
+                  cwd: this.deps.cwd,
+                  entries: target.entries,
+                  reason: target.reason,
+                },
               },
-            },
+            );
+          }
+          detecting.done(
+            target.scaffoldable
+              ? "Fresh app directory — setup scaffolds a new project"
+              : "Non-empty directory with --force — setup scaffolds a new project",
           );
-        }
-        detecting.done(
-          target.scaffoldable
-            ? "Fresh app directory — setup scaffolds a new project"
-            : "Non-empty directory with --force — setup scaffolds a new project",
-        );
-        if (!flags.framework && this.deps.nonInteractive) {
-          const choices: readonly string[] = orca.availableFrameworks().map((choice) => {
-            return choice.id;
-          });
-          const suggested = choices.includes(PREFERRED_FRAMEWORK)
-            ? PREFERRED_FRAMEWORK
-            : choices[0];
-          throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-            hint: `Setup asks which framework to scaffold only in a terminal. Without one, or with --json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`,
-            nextCommands:
-              this.deps.serverFlag === "local" && suggested
-                ? [
-                    {
-                      id: "setup",
-                      flags: setupRetryFlags({
-                        ...retryOptionsFromFlags(flags),
-                        framework: suggested,
-                      }),
-                    },
-                  ]
-                : [],
-            details: { frameworks: choices },
-          });
-        }
-        return {
-          app: await orca.planScaffold(
-            this.deps.cwd,
-            flags.framework ||
-              (await this.deps.ask.select({
-                name: "framework",
-                message: "Which framework would you like to scaffold?",
-                options: orca.availableFrameworks().map((choice) => {
-                  return {
-                    value: choice.id,
-                    label: choice.displayName,
-                  };
-                }),
-              })),
-          ),
-          detected: undefined,
-          scaffoldedBesideFiles: !target.scaffoldable,
-        };
-      });
-    return {
-      orca,
-      found,
-      scaffoldedFramework: found.detected === undefined,
-    };
+          if (!flags.framework && this.deps.nonInteractive) {
+            const choices: readonly string[] = orca.availableFrameworks().map((choice) => {
+              return choice.id;
+            });
+            const suggested = choices.includes(PREFERRED_FRAMEWORK)
+              ? PREFERRED_FRAMEWORK
+              : choices[0];
+            throw new ZitadelError(
+              "E_FRAMEWORK_NOT_DETECTED",
+              "Empty directory — pass --framework",
+              {
+                hint: `Setup asks which framework to scaffold only in a terminal. Without one, or with --json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`,
+                nextCommands:
+                  this.deps.serverFlag === "local" && suggested
+                    ? [
+                        {
+                          id: "setup",
+                          flags: setupRetryFlags({
+                            ...retryOptionsFromFlags(flags),
+                            framework: suggested,
+                          }),
+                        },
+                      ]
+                    : [],
+                details: { frameworks: choices },
+              },
+            );
+          }
+          return {
+            app: await orca.planScaffold(
+              this.deps.cwd,
+              flags.framework ||
+                (await this.deps.ask.select({
+                  name: "framework",
+                  message: "Which framework would you like to scaffold?",
+                  options: orca.availableFrameworks().map((choice) => {
+                    return {
+                      value: choice.id,
+                      label: choice.displayName,
+                    };
+                  }),
+                })),
+            ),
+            detected: undefined,
+            scaffoldedBesideFiles: !target.scaffoldable,
+          };
+        });
+
+      return {
+        orca,
+        found,
+        scaffoldedFramework: found.detected === undefined,
+      };
+    } catch (error) {
+      if (error instanceof OrcaFrameworkMismatchError) {
+        throw refusalError(FRAMEWORK_MISMATCH_REFUSAL, {
+          message: error.message,
+          requested: error.requested,
+          detected: error.detected,
+          requestedName: orca.displayName(error.requested),
+        });
+      }
+      throw error;
+    }
   }
 }

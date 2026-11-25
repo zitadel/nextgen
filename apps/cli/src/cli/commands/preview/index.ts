@@ -14,11 +14,17 @@ import {
   MESSAGE_MAX_LENGTH,
   messageTooLong,
   PublishConfigInvalidError,
-  PublishConnectionVariableKindError,
-  PublishConnectionVariableMissingError,
+  PublishConfigLiteralSecretError,
+  PublishConfigLiteralSecretRefusedKeyError,
+  PublishConfigRefusedKeyError,
+  PublishConnectionVariableClientIdMissingError,
+  PublishConnectionVariableClientSecretMissingError,
+  PublishConnectionVariableNotPlainError,
+  PublishConnectionVariableNotSecretError,
   PublishConnectionVariableSharedError,
   Publisher,
 } from "@/lib/publish";
+import { ZitadelConfigDeployEmptyError } from "@/lib/zitadel";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Ttl, TtlError } from "@/lib/ttl";
@@ -68,17 +74,39 @@ const ORIGIN = {
   },
 } as const satisfies Refused<string>;
 
+/** How a `.zitadel/` that holds nothing to deploy is refused. */
+const DEPLOY_EMPTY_REFUSAL = {
+  message: "{message}",
+  hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+  details: "{details}",
+} as const satisfies Refusal;
+
 /** How a configuration with errors in it is refused. */
 const CONFIG_INVALID_REFUSAL = {
   message: "{message}",
-  hint: "Fix the files named above and rerun; no changes were made.{newer}",
+  hint: "Fix the files named above and rerun; no changes were made.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a configuration with errors in it, one of them a key a newer server added, is refused. */
+const CONFIG_INVALID_NEWER_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the files named above and rerun; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
   details: "{details}",
 } as const satisfies Refusal;
 
 /** How a configuration with a secret written into a file is refused. */
 const CONFIG_INVALID_SECRET_REFUSAL = {
   message: "{message}",
-  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".{newer}',
+  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a configuration with a secret written into a file and a key a newer server added is refused. */
+const CONFIG_INVALID_SECRET_NEWER_REFUSAL = {
+  message: "{message}",
+  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}". A key a newer Zitadel server added needs a CLI as new as the server.',
   details: "{details}",
   next: ["{next}"],
 } as const satisfies Refusal;
@@ -331,161 +359,203 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, publisher } = await this.connected(flags);
-    const prepared = await publisher
-      .prepare({
+    try {
+      const prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "preview",
         dryRun: true,
         compare: false,
-      })
-      .catch((error: unknown) => {
-        if (error instanceof PublishConfigInvalidError && error.literalSecret) {
-          throw Object.assign(
-            refusalError(
-              CONFIG_INVALID_SECRET_REFUSAL,
-              {
-                message: error.message,
-                newer: error.refusedKey
-                  ? " A key a newer Zitadel server added needs a CLI as new as the server."
-                  : "",
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: "NAME",
-                  },
-                  flags: {
-                    secret: true,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConfigInvalidError) {
-          throw Object.assign(
-            refusalError(CONFIG_INVALID_REFUSAL, {
-              message: error.message,
-              newer: error.refusedKey
-                ? " A key a newer Zitadel server added needs a CLI as new as the server."
-                : "",
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableSharedError) {
-          throw Object.assign(
-            refusalError(VARIABLE_SHARED_REFUSAL, {
-              message: error.message,
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableKindError) {
-          const wantsSecret = error.field === "client_secret";
-          throw Object.assign(
-            refusalError(
-              wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
-              {
-                message: error.message,
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: error.variable,
-                  },
-                  flags: {
-                    secret: wantsSecret,
-                    preview: true,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableMissingError) {
-          throw Object.assign(
-            refusalError(
-              VARIABLE_MISSING_REFUSAL,
-              {
-                message: error.message,
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: error.variable,
-                  },
-                  flags: {
-                    secret: error.field === "client_secret",
-                    preview: true,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
       });
-    for (const warning of prepared.warnings) {
-      warnings.report(warning);
-    }
-    this.narrate(prepared.notices);
+      for (const warning of prepared.warnings) {
+        warnings.report(warning);
+      }
+      this.narrate(prepared.notices);
 
-    const dryRun = dryRunResult({
-      verb: "deploy",
-      topic: "preview",
-      noun: `the preview to ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"}`,
-      next: this.suggest({
-        id: "preview",
-        flags: {
-          origin: [...urls],
-          ttl: flags.ttl?.canonical,
-          message: flags.message,
-          strict: flags.strict,
-        },
-      }),
-    });
-
-    return {
-      ...dryRun,
-      pretty: prose(
-        [
-          dryRun.summary.title,
-          ...urls.map((url) => {
-            return `  - ${url}`;
-          }),
-        ].join("\n"),
-      ),
-      data: { ...(dryRun.data as object), targets: urls },
-      summary: {
-        ...dryRun.summary,
-        lines: urls.map((url) => {
-          return `  - ${escapeControlCharacters(url)}`;
+      const dryRun = dryRunResult({
+        verb: "deploy",
+        topic: "preview",
+        noun: `the preview to ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"}`,
+        next: this.suggest({
+          id: "preview",
+          flags: {
+            origin: [...urls],
+            ttl: flags.ttl?.canonical,
+            message: flags.message,
+            strict: flags.strict,
+          },
         }),
-      },
-    };
+      });
+
+      return {
+        ...dryRun,
+        pretty: prose(
+          [
+            dryRun.summary.title,
+            ...urls.map((url) => {
+              return `  - ${url}`;
+            }),
+          ].join("\n"),
+        ),
+        data: { ...(dryRun.data as object), targets: urls },
+        summary: {
+          ...dryRun.summary,
+          lines: urls.map((url) => {
+            return `  - ${escapeControlCharacters(url)}`;
+          }),
+        },
+      };
+    } catch (error) {
+      if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
+        throw refusalError(
+          CONFIG_INVALID_SECRET_NEWER_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: "NAME",
+              },
+              flags: {
+                secret: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConfigLiteralSecretError) {
+        throw refusalError(
+          CONFIG_INVALID_SECRET_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: "NAME",
+              },
+              flags: {
+                secret: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConfigRefusedKeyError) {
+        throw refusalError(CONFIG_INVALID_NEWER_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConfigInvalidError) {
+        throw refusalError(CONFIG_INVALID_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConnectionVariableSharedError) {
+        throw refusalError(VARIABLE_SHARED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConnectionVariableNotSecretError) {
+        throw refusalError(
+          SECRET_KIND_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: true,
+                preview: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableNotPlainError) {
+        throw refusalError(
+          PLAIN_KIND_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: false,
+                preview: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableClientIdMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: false,
+                preview: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableClientSecretMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: true,
+                preview: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof ZitadelConfigDeployEmptyError) {
+        throw refusalError(DEPLOY_EMPTY_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -507,190 +577,232 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, client, projectId, publisher } = await this.connected(flags);
-    const prepared = await publisher
-      .prepare({
+    try {
+      const prepared = await publisher.prepare({
         cwd: this.cwd,
         env: this.env,
         mode: "preview",
         dryRun: false,
         compare: false,
-      })
-      .catch((error: unknown) => {
-        if (error instanceof PublishConfigInvalidError && error.literalSecret) {
-          throw Object.assign(
-            refusalError(
-              CONFIG_INVALID_SECRET_REFUSAL,
-              {
-                message: error.message,
-                newer: error.refusedKey
-                  ? " A key a newer Zitadel server added needs a CLI as new as the server."
-                  : "",
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: "NAME",
-                  },
-                  flags: {
-                    secret: true,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConfigInvalidError) {
-          throw Object.assign(
-            refusalError(CONFIG_INVALID_REFUSAL, {
-              message: error.message,
-              newer: error.refusedKey
-                ? " A key a newer Zitadel server added needs a CLI as new as the server."
-                : "",
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableSharedError) {
-          throw Object.assign(
-            refusalError(VARIABLE_SHARED_REFUSAL, {
-              message: error.message,
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableKindError) {
-          const wantsSecret = error.field === "client_secret";
-          throw Object.assign(
-            refusalError(
-              wantsSecret ? SECRET_KIND_REFUSAL : PLAIN_KIND_REFUSAL,
-              {
-                message: error.message,
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: error.variable,
-                  },
-                  flags: {
-                    secret: wantsSecret,
-                    preview: true,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof PublishConnectionVariableMissingError) {
-          throw Object.assign(
-            refusalError(
-              VARIABLE_MISSING_REFUSAL,
-              {
-                message: error.message,
-                details: error.details ?? null,
-              },
-              {
-                next: {
-                  id: "variable:set",
-                  args: {
-                    name: error.variable,
-                  },
-                  flags: {
-                    secret: error.field === "client_secret",
-                    preview: true,
-                  },
-                },
-              },
-            ),
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
       });
-    for (const warning of prepared.warnings) {
-      warnings.report(warning);
-    }
-    this.narrate(prepared.notices);
+      for (const warning of prepared.warnings) {
+        warnings.report(warning);
+      }
+      this.narrate(prepared.notices);
 
-    const message = await deployMessage(flags.message, this.cwd, this.env);
-    const { release, deployment } = await publisher.preview({
-      prepared,
-      message,
-      urls,
-      ...(flags.ttl === undefined
-        ? {}
-        : {
-            ttl: flags.ttl.iso,
-          }),
-    });
+      const message = await deployMessage(flags.message, this.cwd, this.env);
+      const { release, deployment } = await publisher.preview({
+        prepared,
+        message,
+        urls,
+        ...(flags.ttl === undefined
+          ? {}
+          : {
+              ttl: flags.ttl.iso,
+            }),
+      });
 
-    const expiries = await PreviewExpiries.of(client, projectId).live(
-      deployment.targets.map((target) => {
-        return target.origin;
-      }),
-    );
-    const previews = deployment.targets.map((target) => {
+      const expiries = await PreviewExpiries.of(client, projectId).live(
+        deployment.targets.map((target) => {
+          return target.origin;
+        }),
+      );
+      const previews = deployment.targets.map((target) => {
+        return {
+          url: target.origin,
+          expires_at: expiries.get(target.origin) ?? null,
+        };
+      });
+
+      const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
+
+      const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
+
       return {
-        url: target.origin,
-        expires_at: expiries.get(target.origin) ?? null,
+        status: "ok",
+        data: {
+          title,
+          release_id: release.id,
+          content_hash: release.content_hash,
+          deployment_id: deployment.id,
+          previews,
+          release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+        },
+        pretty: prose(
+          [
+            `Previewed ${release.content_hash} on ${previewUrls}`,
+            ...previews.map((preview) => {
+              return preview.expires_at === null
+                ? `  - ${preview.url}`
+                : `  - ${preview.url} (until ${preview.expires_at})`;
+            }),
+            `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+          ].join("\n"),
+        ),
+        summary: {
+          title,
+          sections: [],
+          lines: [
+            ...previews.map((preview) => {
+              return preview.expires_at === null
+                ? `  - ${escapeControlCharacters(preview.url)}`
+                : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
+            }),
+            `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
+          ],
+        },
       };
-    });
-
-    const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
-
-    const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
-
-    return {
-      status: "ok",
-      data: {
-        title,
-        release_id: release.id,
-        content_hash: release.content_hash,
-        deployment_id: deployment.id,
-        previews,
-        release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
-      },
-      pretty: prose(
-        [
-          `Previewed ${release.content_hash} on ${previewUrls}`,
-          ...previews.map((preview) => {
-            return preview.expires_at === null
-              ? `  - ${preview.url}`
-              : `  - ${preview.url} (until ${preview.expires_at})`;
-          }),
-          `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
-        ].join("\n"),
-      ),
-      summary: {
-        title,
-        sections: [],
-        lines: [
-          ...previews.map((preview) => {
-            return preview.expires_at === null
-              ? `  - ${escapeControlCharacters(preview.url)}`
-              : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
-          }),
-          `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
-        ],
-      },
-    };
+    } catch (error) {
+      if (error instanceof PublishConfigLiteralSecretRefusedKeyError) {
+        throw refusalError(
+          CONFIG_INVALID_SECRET_NEWER_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: "NAME",
+              },
+              flags: {
+                secret: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConfigLiteralSecretError) {
+        throw refusalError(
+          CONFIG_INVALID_SECRET_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: "NAME",
+              },
+              flags: {
+                secret: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConfigRefusedKeyError) {
+        throw refusalError(CONFIG_INVALID_NEWER_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConfigInvalidError) {
+        throw refusalError(CONFIG_INVALID_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConnectionVariableSharedError) {
+        throw refusalError(VARIABLE_SHARED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof PublishConnectionVariableNotSecretError) {
+        throw refusalError(
+          SECRET_KIND_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: true,
+                preview: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableNotPlainError) {
+        throw refusalError(
+          PLAIN_KIND_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: false,
+                preview: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableClientIdMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: false,
+                preview: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableClientSecretMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            message: error.message,
+            details: error.details ?? null,
+          },
+          {
+            next: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: true,
+                preview: true,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof ZitadelConfigDeployEmptyError) {
+        throw refusalError(DEPLOY_EMPTY_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      throw error;
+    }
   }
 
   /**

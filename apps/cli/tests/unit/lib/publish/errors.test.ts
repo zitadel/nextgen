@@ -3,8 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   PublishConfigInvalidError,
-  PublishConnectionVariableKindError,
-  PublishConnectionVariableMissingError,
+  PublishConfigLiteralSecretError,
+  PublishConfigLiteralSecretRefusedKeyError,
+  PublishConfigRefusedKeyError,
+  PublishConnectionVariableClientIdMissingError,
+  PublishConnectionVariableClientSecretMissingError,
+  PublishConnectionVariableNotPlainError,
+  PublishConnectionVariableNotSecretError,
   PublishConnectionVariableSharedError,
   PublishError,
   PublishReleaseRejectedError,
@@ -16,8 +21,30 @@ describe("the publish errors", () => {
       "config",
       new PublishConfigInvalidError("bad", {
         findings: [],
-        literalSecret: false,
-        refusedKey: false,
+      }),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "config with a refused key",
+      new PublishConfigRefusedKeyError("bad", {
+        findings: [],
+      }),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "config with a literal secret",
+      new PublishConfigLiteralSecretError("bad", {
+        findings: [],
+      }),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "config with a literal secret and a refused key",
+      new PublishConfigLiteralSecretRefusedKeyError("bad", {
+        findings: [],
       }),
       "invalid",
       "E_VALIDATION",
@@ -32,8 +59,8 @@ describe("the publish errors", () => {
       "E_VALIDATION",
     ],
     [
-      "wrong kind",
-      new PublishConnectionVariableKindError("kind", {
+      "client secret held plain",
+      new PublishConnectionVariableNotSecretError("kind", {
         file: "a.json",
         variable: "X",
       }),
@@ -41,8 +68,26 @@ describe("the publish errors", () => {
       "E_VALIDATION",
     ],
     [
-      "missing variable",
-      new PublishConnectionVariableMissingError("missing", {
+      "client id held secret",
+      new PublishConnectionVariableNotPlainError("kind", {
+        file: "a.json",
+        variable: "X",
+      }),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "missing client id variable",
+      new PublishConnectionVariableClientIdMissingError("missing", {
+        file: "a.json",
+        variable: "X",
+      }),
+      "conflict",
+      "E_CREDENTIAL_MISSING",
+    ],
+    [
+      "missing client secret variable",
+      new PublishConnectionVariableClientSecretMissingError("missing", {
         file: "a.json",
         variable: "X",
       }),
@@ -56,7 +101,12 @@ describe("the publish errors", () => {
     expect(toZitadelError(error).code).toBe(code);
   });
 
-  it("keeps its findings as the issues a --json reader sees", () => {
+  it.each([
+    ["a config", PublishConfigInvalidError],
+    ["a config with a refused key", PublishConfigRefusedKeyError],
+    ["a config with a literal secret", PublishConfigLiteralSecretError],
+    ["a config with a literal secret and a refused key", PublishConfigLiteralSecretRefusedKeyError],
+  ] as const)("keeps the findings of %s as the issues a --json reader sees", (_name, Failure) => {
     const findings = [
       {
         rule: "r",
@@ -64,42 +114,25 @@ describe("the publish errors", () => {
         message: "bad",
       },
     ];
-    const error = new PublishConfigInvalidError("bad", {
+    const error = new Failure("bad", {
       findings,
-      literalSecret: false,
-      refusedKey: false,
     });
 
     expect(toZitadelError(error).details).toEqual({
       issues: findings,
     });
-  });
-
-  it("states a literal secret and a refused key as facts, with no command to run", () => {
-    const error = new PublishConfigInvalidError("bad", {
-      findings: [],
-      literalSecret: true,
-      refusedKey: true,
-    });
-
-    expect(error).toMatchObject({
-      literalSecret: true,
-      refusedKey: true,
-    });
     expect(toZitadelError(error).nextCommands).toBeUndefined();
   });
 
-  it("carries the variable, the field and the mode a missing variable was named with", () => {
-    const error = new PublishConnectionVariableMissingError("missing", {
+  it("carries the file, the variable and the mode a missing variable was named with", () => {
+    const error = new PublishConnectionVariableClientIdMissingError("missing", {
       file: "a.json",
-      field: "client_id",
       variable: "ID",
       mode: "preview",
     });
 
     expect(error).toMatchObject({
       file: "a.json",
-      field: "client_id",
       variable: "ID",
       mode: "preview",
     });
@@ -107,7 +140,7 @@ describe("the publish errors", () => {
   });
 
   it("keeps the hint of a wrong-kind variable free of flags", () => {
-    const error = new PublishConnectionVariableKindError("kind", {
+    const error = new PublishConnectionVariableNotSecretError("kind", {
       file: "a.json",
       variable: "X",
     });
@@ -119,8 +152,16 @@ describe("the publish errors", () => {
 describe("the publish errors' codes", () => {
   it.each([
     [
-      "a missing variable",
-      new PublishConnectionVariableMissingError("why", {
+      "a missing client id variable",
+      new PublishConnectionVariableClientIdMissingError("why", {
+        file: "a",
+        variable: "B",
+      }),
+      "E_CREDENTIAL_MISSING",
+    ],
+    [
+      "a missing client secret variable",
+      new PublishConnectionVariableClientSecretMissingError("why", {
         file: "a",
         variable: "B",
       }),
@@ -135,8 +176,16 @@ describe("the publish errors' codes", () => {
       "E_VALIDATION",
     ],
     [
-      "a variable of the wrong kind",
-      new PublishConnectionVariableKindError("why", {
+      "a client secret held plain",
+      new PublishConnectionVariableNotSecretError("why", {
+        file: "a",
+        variable: "B",
+      }),
+      "E_VALIDATION",
+    ],
+    [
+      "a client id held secret",
+      new PublishConnectionVariableNotPlainError("why", {
         file: "a",
         variable: "B",
       }),

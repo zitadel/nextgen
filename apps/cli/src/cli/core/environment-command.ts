@@ -1,4 +1,5 @@
 import { createZitadelClient } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import type { Consent } from "@/lib/consent";
 import {
   Environment,
@@ -6,9 +7,15 @@ import {
   EnvironmentServerInvalidError,
   EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
+  EnvironmentValueUnboundError,
   type ServerAddresses,
 } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
+import {
+  LocalServerNotRespondingElsewhereError,
+  LocalServerNotRespondingError,
+  LocalServerNotRunningError,
+} from "@/lib/server";
 import { BaseCommand, type Facts, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags } from "./environment-flags";
@@ -52,6 +59,44 @@ const VALUE_MISSING_UNBOUND_REFUSAL = {
   hint: "{hint} Set {key} in {boundFile} or the process environment, or run `zitadel env add {environment}`.",
   details: "{details}",
   next: ["{next}"],
+} as const satisfies Refusal;
+
+/** How a run is refused when no local server was started in the folder or a parent. */
+const LOCAL_SERVER_NOT_RUNNING_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
+  details: "{details}",
+  next: [
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local server this folder started does not answer. */
+const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No healthy local server responded at {server_url}. Run `zitadel start` to bring it back.",
+  details: "{details}",
+  next: [
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local server a parent folder started does not answer. */
+const LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No healthy local server responded at {server_url}. It was started in {directory}, so run `zitadel start --cwd {directory}` to bring it back.",
+  details: {
+    server_url: "{server_url}",
+    suggested_args: [["start", "--cwd", "{path}"]],
+  },
+  next: ["{start}"],
 } as const satisfies Refusal;
 
 /**
@@ -120,57 +165,69 @@ export abstract class EnvironmentCommand extends BaseCommand {
     if (options.environment === false) {
       return super.toMeta(given, { source: options.source });
     }
-    this.environment = await Environment.resolve({
-      servers: this.servers(),
-      cwd: resolveCwd(text(flags.cwd)),
-      env: process.env,
-      serverFlag: options.source ?? text(flags.server),
-      envName: text(flags.env),
-      envFile: text(flags.envFile),
-    })
-      .catch((error: unknown) => {
-        if (error instanceof EnvironmentSourcesConflictError) {
-          throw Object.assign(
-            refusalError(SOURCES_CONFLICT_REFUSAL, {
-              message: error.message,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof EnvironmentNameInvalidError) {
-          throw Object.assign(
-            refusalError(NAME_INVALID_REFUSAL, {
-              message: error.message,
-              hint: error.hint ?? "",
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof EnvironmentServerInvalidError) {
-          throw Object.assign(
-            refusalError(SERVER_INVALID_REFUSAL, {
-              message: error.message,
-              source: error.source,
-              example: error.example,
-              details: error.details ?? null,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
+    try {
+      this.environment = await Environment.resolve({
+        servers: this.servers(),
+        cwd: resolveCwd(text(flags.cwd)),
+        env: process.env,
+        serverFlag: options.source ?? text(flags.server),
+        envName: text(flags.env),
+        envFile: text(flags.envFile),
       });
+    } catch (error) {
+      if (error instanceof EnvironmentSourcesConflictError) {
+        throw refusalError(SOURCES_CONFLICT_REFUSAL, {
+          message: error.message,
+        });
+      }
+      if (error instanceof EnvironmentNameInvalidError) {
+        throw refusalError(NAME_INVALID_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+        });
+      }
+      if (error instanceof EnvironmentServerInvalidError) {
+        throw refusalError(SERVER_INVALID_REFUSAL, {
+          message: error.message,
+          source: error.source,
+          example: error.example,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerNotRunningError) {
+        throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+      if (error instanceof LocalServerNotRespondingError) {
+        throw refusalError(LOCAL_SERVER_NOT_RESPONDING_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+          server_url: error.serverUrl,
+        });
+      }
+      if (error instanceof LocalServerNotRespondingElsewhereError) {
+        throw refusalError(
+          LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL,
+          {
+            message: error.message,
+            server_url: error.serverUrl,
+            directory: Cmd.quote(error.directory),
+            path: error.directory,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {
+                cwd: error.directory,
+              },
+            },
+          },
+        );
+      }
+      throw error;
+    }
 
     return super.toMeta(given, {
       source: this.environment.values.ZITADEL_URL?.value ?? "",
@@ -279,88 +336,76 @@ export abstract class EnvironmentCommand extends BaseCommand {
       interactive: !this.nonInteractive && !this.meta.dryRun && options.prompt !== false,
       ask: this.ui.questions(),
     };
-    const { server, projectId, token } = await (async () => {
+    try {
+      const server = await environment.requireInteractive("ZITADEL_URL", ask);
+      const projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
+      const token = await environment.requireInteractive(CREDENTIALS[credential], ask);
+      this.ui.ranAgainst(projectId, server);
+
       return {
-        server: await environment.requireInteractive("ZITADEL_URL", ask),
-        projectId: await environment.requireInteractive("ZITADEL_PROJECT_ID", ask),
-        token: await environment.requireInteractive(CREDENTIALS[credential], ask),
+        client: createZitadelClient({
+          userAgent: Runtime.current().userAgent(),
+          baseUrl: server,
+          token,
+          signal: this.signal,
+          ...(options.timeoutMs === undefined
+            ? {}
+            : {
+                timeoutMs: options.timeoutMs,
+              }),
+        }),
+        projectId,
+        server,
+        environment,
       };
-    })().catch((error: unknown) => {
-      if (error instanceof EnvironmentValueMissingError && error.unbound) {
+    } catch (error) {
+      if (error instanceof EnvironmentValueUnboundError) {
         // Run in the directory this run addressed, which need not be the
         // shell's: `setup` and `env add` both write their files there.
         const elsewhere =
-          error.cwd === process.cwd()
+          this.cwd === process.cwd()
             ? {}
             : {
-                cwd: error.cwd,
+                cwd: this.cwd,
               };
-        throw Object.assign(
-          refusalError(
-            VALUE_MISSING_UNBOUND_REFUSAL,
-            {
-              message: error.message,
-              hint: error.hint ?? "",
-              key: error.key,
-              boundFile: error.boundFile,
-              environment: error.environment,
-              details: error.details ?? null,
-            },
-            {
-              next:
-                error.environment === "development"
-                  ? {
-                      id: "setup",
-                      flags: elsewhere,
-                    }
-                  : {
-                      id: "env:add",
-                      args: {
-                        name: error.environment,
-                      },
-                      flags: elsewhere,
-                    },
-            },
-          ),
+        throw refusalError(
+          VALUE_MISSING_UNBOUND_REFUSAL,
           {
-            cause: error,
+            message: error.message,
+            hint: error.hint ?? "",
+            key: error.key,
+            boundFile: error.boundFile,
+            environment: error.environment,
+            details: error.details ?? null,
+          },
+          {
+            next:
+              environment.name.value === "development"
+                ? {
+                    id: "setup",
+                    flags: elsewhere,
+                  }
+                : {
+                    id: "env:add",
+                    args: {
+                      name: environment.name.value,
+                    },
+                    flags: elsewhere,
+                  },
           },
         );
       }
       if (error instanceof EnvironmentValueMissingError) {
-        throw Object.assign(
-          refusalError(VALUE_MISSING_REFUSAL, {
-            message: error.message,
-            hint: error.hint ?? "",
-            key: error.key,
-            file: error.file ?? error.boundFile,
-            details: error.details ?? null,
-          }),
-          {
-            cause: error,
-          },
-        );
+        throw refusalError(VALUE_MISSING_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+          key: error.key,
+          file: error.file ?? error.boundFile,
+          details: error.details ?? null,
+        });
       }
       throw error;
-    });
-    this.ui.ranAgainst(projectId, server);
-
-    return {
-      client: createZitadelClient({
-        userAgent: Runtime.current().userAgent(),
-        baseUrl: server,
-        token,
-        signal: this.signal,
-        ...(options.timeoutMs === undefined
-          ? {}
-          : {
-              timeoutMs: options.timeoutMs,
-            }),
-      }),
-      projectId,
-      server,
-      environment,
-    };
+    }
   }
 }
 

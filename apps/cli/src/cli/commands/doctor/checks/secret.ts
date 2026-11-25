@@ -6,9 +6,8 @@ import { Project, ProjectSecretMissingError } from "@/lib/project";
 import { ZitadelRuntime } from "@/lib/server";
 import { Runtime } from "@/lib/runtime";
 
-import { refusalError, type Refusal } from "@/cli/core/refusal";
-
 import { AbstractSanityCheck, type CheckContext } from "./types";
+import { refusalError, type Refusal } from "@/cli/core/refusal";
 
 /** What a project with no `.zitadel/secret` is reported as. */
 const SECRET_MISSING_REFUSAL = {

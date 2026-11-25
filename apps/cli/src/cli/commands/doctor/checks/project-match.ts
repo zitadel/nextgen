@@ -1,6 +1,6 @@
 import { AbstractSanityCheck, type CheckContext } from "./types";
-import { refusalError, type Refusal } from "@/cli/core/refusal";
 import { Project, ProjectConfigMissingError, ProjectSecretMissingError } from "@/lib/project";
+import { refusalError, type Refusal } from "@/cli/core/refusal";
 
 /** What a directory with no `zitadel.json` is reported as. */
 const CONFIG_MISSING_REFUSAL = {

@@ -6,6 +6,7 @@ import {
   ZitadelConfigDeployTooLargeError,
   ZitadelConfigFileReadFailedError,
   ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigFlowsUncheckedError,
   CONFIG_DIRECTORIES,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
@@ -128,6 +129,31 @@ function refusalOf(
     uses,
   });
 }
+
+describe("ZitadelConfigFlowsUncheckedError", () => {
+  it("lists each issue under the heading and names the schema in its details", () => {
+    const error = new ZitadelConfigFlowsUncheckedError({
+      file: SCHEMA_PATH,
+      heading: "A login flow has errors, so it cannot be checked against the changed schema:",
+      hint: "Fix those errors first, then run the command again.",
+      issues: [BROKEN],
+    });
+
+    expect(error.message).toBe(
+      [
+        "A login flow has errors, so it cannot be checked against the changed schema:",
+        `  - ${FLOW_PATH}: broken`,
+      ].join("\n"),
+    );
+    expect(error.hint).toBe("Fix those errors first, then run the command again.");
+    expect(error.details).toEqual({
+      file: SCHEMA_PATH,
+      issues: [
+        { path: FLOW_PATH, rule: "schema/fields-resolve", message: "broken", step: "password" },
+      ],
+    });
+  });
+});
 
 describe("ZitadelConfigEditBreaksFlowsError", () => {
   it("lists each issue under the heading as the flow rules word it", () => {

@@ -18,4 +18,5 @@ export {
   EnvironmentServerInvalidError,
   EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
+  EnvironmentValueUnboundError,
 } from "./errors";

@@ -381,12 +381,8 @@ export class Orca {
     };
     return new OrcaFrameworkMismatchError(
       `Setup detects ${name(detected)} here, not ${name(requested)}`,
-      {
-        details: {
-          requested,
-          detected,
-        },
-      },
+      requested,
+      detected,
     );
   }
 }

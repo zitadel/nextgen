@@ -28,7 +28,7 @@ const valid = {
 
 /** The connection a command line describes, as the command would see it. */
 function custom(values: Parameters<typeof selectionFromFlags>[1], names = flag) {
-  const selection = selectionFromFlags("custom", values, names);
+  const selection = selectionFromFlags("custom", values, names, "e.g.");
   if (selection.kind !== "custom") {
     throw new Error("expected a custom selection");
   }
@@ -70,7 +70,7 @@ describe("selectionFromFlags for a custom connection", () => {
   });
 
   it("names every missing setting at once, with an example to copy", () => {
-    const error = refusal(() => selectionFromFlags("custom", {}, flag));
+    const error = refusal(() => selectionFromFlags("custom", {}, flag, "--provider custom ..."));
 
     expect(error.code).toBe("E_VALIDATION");
     expect(error.message).toBe("A custom connection needs --slug, --display-name, --issuer");
@@ -114,7 +114,7 @@ describe("selectionFromFlags for a custom connection", () => {
       scopes: "--sso-scopes",
     };
 
-    expect(refusal(() => selectionFromFlags("custom", {}, setup)).message).toContain(
+    expect(refusal(() => selectionFromFlags("custom", {}, setup, "e.g.")).message).toContain(
       "--sso-slug, --sso-display-name, --sso-issuer",
     );
   });
@@ -122,7 +122,7 @@ describe("selectionFromFlags for a custom connection", () => {
 
 describe("selectionFromFlags for a catalog provider", () => {
   it("is just the provider, named", () => {
-    expect(selectionFromFlags("google", {}, flag)).toEqual({
+    expect(selectionFromFlags("google", {}, flag, "e.g.")).toEqual({
       kind: "catalog",
       id: "google",
     });
@@ -137,6 +137,7 @@ describe("selectionFromFlags for a catalog provider", () => {
           scopes: "openid",
         },
         flag,
+        "e.g.",
       ),
     );
 
@@ -145,7 +146,7 @@ describe("selectionFromFlags for a catalog provider", () => {
   });
 
   it("refuses a name nothing answers to", () => {
-    expect(refusal(() => selectionFromFlags("okta", {}, flag)).message).toBe(
+    expect(refusal(() => selectionFromFlags("okta", {}, flag, "e.g.")).message).toBe(
       "Unknown provider okta",
     );
   });
@@ -247,6 +248,7 @@ describe("loopbackIssuerWarning", () => {
       "custom",
       { ...valid, issuer: "http://localhost:9100" },
       flag,
+      "e.g.",
     );
 
     expect(loopbackIssuerWarning(selection)).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
@@ -258,6 +260,7 @@ describe("loopbackIssuerWarning", () => {
       "custom",
       { ...valid, issuer: "http://localhost:9100" },
       flag,
+      "e.g.",
     );
 
     expect(loopbackIssuerWarning(selection, "allowed")).toBeUndefined();
@@ -268,6 +271,7 @@ describe("loopbackIssuerWarning", () => {
       "custom",
       { ...valid, issuer: "http://localhost:9100" },
       flag,
+      "e.g.",
     );
 
     expect(loopbackIssuerWarning(selection, "container")).toContain("binary runtime");
@@ -280,6 +284,7 @@ describe("loopbackIssuerWarning", () => {
         "custom",
         { ...valid, issuer: "http://localhost:9100" },
         flag,
+        "e.g.",
       );
 
       expect(loopbackIssuerWarning(selection, reach)).not.toContain("`");
@@ -287,8 +292,10 @@ describe("loopbackIssuerWarning", () => {
   );
 
   it("says nothing about an issuer elsewhere or about a catalog provider", () => {
-    expect(loopbackIssuerWarning(selectionFromFlags("custom", valid, flag))).toBeUndefined();
-    expect(loopbackIssuerWarning(selectionFromFlags("google", {}, flag))).toBeUndefined();
+    expect(
+      loopbackIssuerWarning(selectionFromFlags("custom", valid, flag, "e.g.")),
+    ).toBeUndefined();
+    expect(loopbackIssuerWarning(selectionFromFlags("google", {}, flag, "e.g."))).toBeUndefined();
   });
 });
 

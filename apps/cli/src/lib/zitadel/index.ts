@@ -60,6 +60,7 @@ export {
   ZitadelConfigDeployEmptyError,
   ZitadelConfigDeployTooLargeError,
   ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigFlowsUncheckedError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigEditRefusedError,
   ZitadelConfigError,

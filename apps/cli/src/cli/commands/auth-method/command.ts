@@ -25,6 +25,7 @@ import {
   type ForceOptions,
   ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditLockoutError,
+  ZitadelConfigFlowsUncheckedError,
   ZitadelConfigSchemaMissingError,
   type Schemas,
   type ToggleableMethod,
@@ -77,8 +78,7 @@ type SchemaFlags = {
 };
 
 /**
- * What a change that would break a login flow is refused for, without a
- * dry run to point at.
+ * What a change that would break a login flow is refused for.
  */
 const EDIT_BREAKS_FLOWS_REFUSAL = {
   message: "{message}",
@@ -87,12 +87,12 @@ const EDIT_BREAKS_FLOWS_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * What a change that would break a login flow is refused for, when a dry-run
- * deploy reports the same issues.
+ * What a change is refused for when a login flow already has errors, so it
+ * cannot be checked against the change: a dry-run deploy reports the same issues.
  */
-const EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL = {
+const FLOWS_UNCHECKED_REFUSAL = {
   message: "{message}",
-  hint: "{hint}",
+  hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
   details: "{details}",
   next: [
     {
@@ -828,17 +828,18 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         dryRun: true,
       });
     } catch (error) {
+      if (error instanceof ZitadelConfigFlowsUncheckedError) {
+        throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
       if (error instanceof ZitadelConfigEditBreaksFlowsError) {
-        throw refusalError(
-          error.hint?.includes("deploy --dry-run")
-            ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
-            : EDIT_BREAKS_FLOWS_REFUSAL,
-          {
-            message: error.message,
-            hint: error.hint ?? "",
-            details: error.details ?? null,
-          },
-        );
+        throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+          details: error.details ?? null,
+        });
       }
       if (!(error instanceof ZitadelConfigEditLockoutError)) {
         throw error;
@@ -888,17 +889,18 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         consent: undefined,
       };
     } catch (error) {
+      if (error instanceof ZitadelConfigFlowsUncheckedError) {
+        throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
       if (error instanceof ZitadelConfigEditBreaksFlowsError) {
-        throw refusalError(
-          error.hint?.includes("deploy --dry-run")
-            ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
-            : EDIT_BREAKS_FLOWS_REFUSAL,
-          {
-            message: error.message,
-            hint: error.hint ?? "",
-            details: error.details ?? null,
-          },
-        );
+        throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+          details: error.details ?? null,
+        });
       }
       if (!(error instanceof ZitadelConfigEditLockoutError)) {
         throw error;
@@ -1021,19 +1023,20 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
         true,
       );
     } catch (error) {
-      if (!(error instanceof ZitadelConfigEditBreaksFlowsError)) {
-        throw error;
+      if (error instanceof ZitadelConfigFlowsUncheckedError) {
+        throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
       }
-      throw refusalError(
-        error.hint?.includes("deploy --dry-run")
-          ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
-          : EDIT_BREAKS_FLOWS_REFUSAL,
-        {
+      if (error instanceof ZitadelConfigEditBreaksFlowsError) {
+        throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
           message: error.message,
           hint: error.hint ?? "",
           details: error.details ?? null,
-        },
-      );
+        });
+      }
+      throw error;
     }
   }
 
@@ -1054,19 +1057,20 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
         true,
       );
     } catch (error) {
-      if (!(error instanceof ZitadelConfigEditBreaksFlowsError)) {
-        throw error;
+      if (error instanceof ZitadelConfigFlowsUncheckedError) {
+        throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
+          message: error.message,
+          details: error.details ?? null,
+        });
       }
-      throw refusalError(
-        error.hint?.includes("deploy --dry-run")
-          ? EDIT_BREAKS_FLOWS_DRY_RUN_REFUSAL
-          : EDIT_BREAKS_FLOWS_REFUSAL,
-        {
+      if (error instanceof ZitadelConfigEditBreaksFlowsError) {
+        throw refusalError(EDIT_BREAKS_FLOWS_REFUSAL, {
           message: error.message,
           hint: error.hint ?? "",
           details: error.details ?? null,
-        },
-      );
+        });
+      }
+      throw error;
     }
   }
 }

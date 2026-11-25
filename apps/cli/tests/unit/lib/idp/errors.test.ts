@@ -13,7 +13,7 @@ describe("the identity-provider errors", () => {
   it.each([
     ["refused", new IdpSettingRefusedError("bad", "--slug"), "invalid"],
     ["conflict", new IdpSettingsConflictError("bad", ["--issuer"]), "invalid"],
-    ["missing", new IdpSettingsMissingError("bad", ["--slug"]), "invalid"],
+    ["missing", new IdpSettingsMissingError("bad", ["--slug"], "e.g."), "invalid"],
     ["unknown", new IdpProviderUnknownError("okta", ["google"]), "missing"],
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(IdpError);
@@ -46,11 +46,17 @@ describe("the identity-provider errors", () => {
   });
 
   it("keeps the settings a custom connection lacks", () => {
-    const error = new IdpSettingsMissingError("bad", ["--slug"]);
+    const error = new IdpSettingsMissingError("bad", ["--slug"], "e.g.");
 
     expect(toZitadelError(error).details).toEqual({
       missing: ["--slug"],
     });
+  });
+
+  it("keeps the example a command line to show", () => {
+    const error = new IdpSettingsMissingError("bad", ["--slug"], "--provider custom ...");
+
+    expect(error.example).toBe("--provider custom ...");
   });
 });
 
@@ -58,7 +64,7 @@ describe("the identity-provider errors' codes", () => {
   it.each([
     ["a refused setting", new IdpSettingRefusedError("bad", "--slug")],
     ["settings that conflict", new IdpSettingsConflictError("bad", ["--issuer"])],
-    ["settings that are missing", new IdpSettingsMissingError("bad", ["--slug"])],
+    ["settings that are missing", new IdpSettingsMissingError("bad", ["--slug"], "e.g.")],
     ["an unknown provider", new IdpProviderUnknownError("x", ["google"])],
   ] as const)("reports %s as a validation failure", (_name, error) => {
     expect(error.code).toBe("E_VALIDATION");

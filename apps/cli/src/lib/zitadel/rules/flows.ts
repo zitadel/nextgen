@@ -16,7 +16,10 @@
 
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
 
-import { ZitadelConfigEditBreaksFlowsError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigFlowsUncheckedError,
+} from "@/lib/zitadel/errors";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import { PASSWORD_FIELD } from "@/lib/zitadel/resources/flows/types";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
@@ -106,8 +109,8 @@ export const FLOW_RULES: readonly Rule[] = [
  * An edit that changes nothing breaks nothing.
  *
  * @param edit - The edit.
- * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow cannot be checked, or the edit
- *   breaks one, naming every issue.
+ * @throws {@link ZitadelConfigFlowsUncheckedError} When a flow cannot be checked.
+ * @throws {@link ZitadelConfigEditBreaksFlowsError} When the edit breaks a flow, naming every issue.
  */
 export function assertFlowsIntact(edit: SchemaEdit): void {
   const introduced = checkedIssues(edit);
@@ -134,8 +137,9 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
  *
  * @param edit - The edit that turns the method off.
  * @param method - The method.
- * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow cannot be checked, or a step
- *   still uses the method, naming every step that uses it.
+ * @throws {@link ZitadelConfigFlowsUncheckedError} When a flow cannot be checked.
+ * @throws {@link ZitadelConfigEditBreaksFlowsError} When a step still uses the method, naming every
+ *   step that uses it.
  */
 export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): void {
   const introduced = checkedIssues(edit);
@@ -182,7 +186,7 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
  *
  * @param edit - The edit.
  * @returns The errors it brings; none when it changes nothing.
- * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow cannot be checked.
+ * @throws {@link ZitadelConfigFlowsUncheckedError} When a flow cannot be checked.
  */
 function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
   if (edit.after.changedDocuments.length === 0) {
@@ -204,11 +208,10 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
     return check.issues;
   });
   if (unchecked.length > 0) {
-    throw new ZitadelConfigEditBreaksFlowsError({
-      kind: "broken",
+    throw new ZitadelConfigFlowsUncheckedError({
       file: edit.edited.path,
       heading: "A login flow has errors, so it cannot be checked against the changed schema:",
-      hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
+      hint: "Fix those errors first, then run the command again.",
       issues: unchecked,
     });
   }

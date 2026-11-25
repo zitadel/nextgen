@@ -1,7 +1,7 @@
 import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { askCustomSettings, type Fact, type SetupServices } from "@/cli/commands/setup/shared";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import {
   customExample,
   customFlagValues,
@@ -15,6 +15,7 @@ import {
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
 import { andTheRest, pipedFrom } from "@/lib/suggestion";
+import { tryCatch } from "@/lib/try-catch";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
@@ -146,65 +147,46 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: undefined,
       };
     }
-    const settings =
+    const [error, selection] = tryCatch(
+      selectionFromFlags,
+      flags.sso,
       flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
         ? await askCustomSettings(customValues, this.deps.ask)
-        : customValues;
-    const selection = await Promise.resolve(settings)
-      .then((given) => {
-        return selectionFromFlags(flags.sso ?? "", given, SETUP_FLAG_NAMES);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof IdpSettingRefusedError) {
-          throw Object.assign(
-            refusalError(SETTING_REFUSED_REFUSAL, {
-              message: error.message,
-              flag: error.flag,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof IdpSettingsConflictError) {
-          throw Object.assign(
-            refusalError(SETTINGS_CONFLICT_REFUSAL, {
-              message: error.message,
-              provider: SETUP_FLAG_NAMES.provider,
-              custom: CUSTOM_PROVIDER,
-              them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
-              flags: error.given,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof IdpSettingsMissingError) {
-          throw Object.assign(
-            refusalError(SETTINGS_MISSING_REFUSAL, {
-              message: error.message,
-              example: SSO_CUSTOM_EXAMPLE,
-              missing: error.missing,
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        if (error instanceof IdpProviderUnknownError) {
-          throw Object.assign(
-            refusalError(PROVIDER_UNKNOWN_REFUSAL, {
-              message: error.message,
-              known: error.known.join(", "),
-            }),
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
+        : customValues,
+      SETUP_FLAG_NAMES,
+      SSO_CUSTOM_EXAMPLE,
+    );
+    if (error instanceof IdpSettingRefusedError) {
+      throw refusalError(SETTING_REFUSED_REFUSAL, {
+        message: error.message,
+        flag: error.flag,
       });
+    }
+    if (error instanceof IdpSettingsConflictError) {
+      throw refusalError(SETTINGS_CONFLICT_REFUSAL, {
+        message: error.message,
+        provider: SETUP_FLAG_NAMES.provider,
+        custom: CUSTOM_PROVIDER,
+        them: new Intl.PluralRules("en").select(error.given.length) === "one" ? "it" : "them",
+        flags: error.given,
+      });
+    }
+    if (error instanceof IdpSettingsMissingError) {
+      throw refusalError(SETTINGS_MISSING_REFUSAL, {
+        message: error.message,
+        example: error.example,
+        missing: error.missing,
+      });
+    }
+    if (error instanceof IdpProviderUnknownError) {
+      throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
+        message: error.message,
+        known: error.known.join(", "),
+      });
+    }
+    if (error) {
+      throw error;
+    }
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
       warnings.report(loopback);

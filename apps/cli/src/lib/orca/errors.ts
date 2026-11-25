@@ -84,6 +84,30 @@ export class OrcaFrameworkMismatchError extends OrcaError {
   override readonly category: ErrorCategory = "conflict";
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
   override readonly retryable: boolean = false;
+
+  /** The framework setup was asked to set up. */
+  readonly requested: string;
+
+  /** The framework the directory holds. */
+  readonly detected: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong.
+   * @param requested - The framework setup was asked to set up.
+   * @param detected - The framework the directory holds.
+   */
+  constructor(message: string, requested: string, detected: string) {
+    super(message, {
+      details: {
+        requested,
+        detected,
+      },
+    });
+    this.requested = requested;
+    this.detected = detected;
+  }
 }
 
 /**

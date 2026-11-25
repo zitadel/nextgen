@@ -11,6 +11,7 @@ import {
   EnvironmentServerInvalidError,
   EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
+  EnvironmentValueUnboundError,
 } from "./errors";
 import { InitialRelease } from "./initial-release";
 import { ENVIRONMENT_KEYS, SECRET_KEYS } from "./keys";
@@ -229,6 +230,7 @@ export class Environment {
    * @returns The value, from the first source that supplied it.
    * @throws {@link EnvironmentValueMissingError} naming the environment, the
    *   variable and every source the chain looked in.
+   * @throws {@link EnvironmentValueUnboundError} When the environment has no project at all.
    */
   require(key: EnvironmentKey): string {
     const resolved = this.values[key];
@@ -249,6 +251,17 @@ export class Environment {
     });
     const file = this.envFile ?? (bound ? boundFile : undefined);
     const unbound = file === undefined && this.values.ZITADEL_PROJECT_ID === undefined;
+    if (unbound) {
+      throw new EnvironmentValueUnboundError(`${key} is not set for the ${name} environment`, {
+        key,
+        environment: name,
+        consulted: this.consulted.map((entry) => {
+          return entry.source;
+        }),
+        boundFile,
+        cwd: this.cwd,
+      });
+    }
     throw new EnvironmentValueMissingError(`${key} is not set for the ${name} environment`, {
       key,
       environment: name,
@@ -257,7 +270,6 @@ export class Environment {
       }),
       file,
       boundFile,
-      unbound,
       cwd: this.cwd,
     });
   }
