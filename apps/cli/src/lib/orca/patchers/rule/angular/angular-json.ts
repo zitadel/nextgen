@@ -1,4 +1,4 @@
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPatchFileMissingError, OrcaPatchFileUnsupportedError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject } from "@/lib/json";
 
 /**
@@ -6,7 +6,7 @@ import { isObject, parseJsonObject } from "@/lib/json";
  * wires a dev-server `proxyConfig` (and optional `port`) into the project's
  * `serve` target. The project name is discovered from the file (`defaultProject`,
  * else the sole project) rather than hardcoded, since it varies per app.
- * Idempotent — already-set values are left as-is. Throws `E_VALIDATION` when the
+ * Idempotent — already-set values are left as-is. Throws an OrcaPatchFile error when the
  * file is absent, the project/serve target cannot be located, or the workspace
  * has several projects with no `defaultProject` to disambiguate (rather than
  * guessing and wiring the proxy into an arbitrary one). `previousPort` moves
@@ -19,8 +19,9 @@ export function angularProxyEdit(opts: {
 }): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new ZitadelError("E_VALIDATION", "Cannot wire Angular proxy: angular.json not found", {
+      throw new OrcaPatchFileMissingError("Cannot wire Angular proxy: angular.json not found", {
         hint: "Run setup from an Angular project.",
+        details: { path: "angular.json" },
       });
     }
     const root = parseJsonObject(source, "angular.json");
@@ -29,8 +30,7 @@ export function angularProxyEdit(opts: {
       : undefined;
     const projectNames = Object.keys(projects ?? {});
     if (typeof root.defaultProject !== "string" && projectNames.length > 1) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaPatchFileUnsupportedError(
         "angular.json has multiple projects and no defaultProject to choose from",
         {
           hint: `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: ${projectNames.join(", ")}.`,
@@ -41,7 +41,7 @@ export function angularProxyEdit(opts: {
       typeof root.defaultProject === "string" ? root.defaultProject : projectNames[0];
     const project = projects && projectName ? projects[projectName] : undefined;
     if (!isObject(project)) {
-      throw new ZitadelError("E_VALIDATION", "No project found in angular.json", {
+      throw new OrcaPatchFileUnsupportedError("No project found in angular.json", {
         hint: 'Add "proxyConfig" to your serve target manually.',
       });
     }
@@ -54,7 +54,7 @@ export function angularProxyEdit(opts: {
     const serve =
       targets && isObject(targets.serve) ? (targets.serve as Record<string, unknown>) : undefined;
     if (!serve) {
-      throw new ZitadelError("E_VALIDATION", "No serve target in angular.json", {
+      throw new OrcaPatchFileUnsupportedError("No serve target in angular.json", {
         hint: 'Add "proxyConfig" to your serve options manually.',
       });
     }

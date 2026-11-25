@@ -49,7 +49,7 @@ describe("SolidStartDetector version floor", () => {
         await project(dir, { "solid-js": "^1", "@solidjs/start": "^1.3.5" }),
       ),
     ).rejects.toMatchObject({
-      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      category: "unsupported",
     });
   });
 

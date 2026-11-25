@@ -35,7 +35,7 @@ describe("AngularDetector", () => {
     await expect(
       new AngularDetector().detect(await project(dir, { "@angular/core": "^16.2.0" })),
     ).rejects.toMatchObject({
-      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      category: "unsupported",
       message: expect.stringContaining("Angular 17 and newer"),
     });
   });

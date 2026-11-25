@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 
 import { describe, expect } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPatchFileMissingError } from "@/lib/orca";
 import {
   appComponentTemplate,
   devScriptEdit,
@@ -270,7 +270,6 @@ describe("devScriptEdit", () => {
   it("fails fast when package.json is absent instead of fabricating one", () => {
     const refusal = thrownBy(() => devScriptEdit(undefined));
 
-    expect(refusal).toBeInstanceOf(ZitadelError);
-    expect(refusal).toMatchObject({ code: "E_VALIDATION" });
+    expect(refusal).toBeInstanceOf(OrcaPatchFileMissingError);
   });
 });

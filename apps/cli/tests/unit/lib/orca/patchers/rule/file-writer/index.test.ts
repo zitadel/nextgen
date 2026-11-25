@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaError, OrcaPatchFileMissingError } from "@/lib/orca";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer/index";
 import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -166,8 +166,8 @@ describe("scaffold - write", () => {
         force: false,
       }),
     );
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_CONFLICT");
+    expect(caught).toBeInstanceOf(OrcaError);
+    expect((caught as OrcaError).category).toBe("conflict");
     // file left untouched
     expect(await readFile(join(dir, "page.tsx"), "utf8")).toBe("user-authored");
   });
@@ -576,7 +576,7 @@ describe("scaffold - add-dep", () => {
     expect(result.depsAdded).toEqual([]);
   });
 
-  it("throws E_VALIDATION when package.json is missing", async ({ dir }) => {
+  it("throws OrcaPatchFileMissingError when package.json is missing", async ({ dir }) => {
     const caught = await rejectionOf(() =>
       scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
         cwd: dir,
@@ -584,8 +584,7 @@ describe("scaffold - add-dep", () => {
         force: false,
       }),
     );
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_VALIDATION");
+    expect(caught).toBeInstanceOf(OrcaPatchFileMissingError);
   });
 
   it("records the dep but does not write on dry-run", async ({ dir }) => {

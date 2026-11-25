@@ -58,7 +58,7 @@ describe("QwikDetector", () => {
     async (spec, { dir }) => {
       await expect(
         new QwikDetector().detect(await project(dir, { "@qwik.dev/core": spec, vite: "^8" })),
-      ).rejects.toMatchObject({ code: "E_UNSUPPORTED_PROJECT_SHAPE" });
+      ).rejects.toMatchObject({ category: "unsupported" });
     },
   );
 

@@ -62,7 +62,7 @@ describe("detectors", () => {
       const below = `${(floor?.major ?? 1) - 1}.0.0`;
 
       await expect(detector.detect(await project(dir, detector, below))).rejects.toMatchObject({
-        code: "E_UNSUPPORTED_PROJECT_SHAPE",
+        category: "unsupported",
       });
       await expect(
         detector.detect(await project(other, detector, `^${detector.versionFloor}`)),

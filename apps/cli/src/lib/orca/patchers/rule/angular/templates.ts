@@ -1,6 +1,6 @@
 import { posix } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPatchFileMissingError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import { ManagedFile } from "@/lib/orca/managed-file";
 import type { PatchContext } from "@/lib/orca/patchers/types";
@@ -186,8 +186,9 @@ function packageJson(source: string | undefined): {
   scripts: Record<string, unknown>;
 } {
   if (source === undefined) {
-    throw new ZitadelError("E_VALIDATION", "package.json is required to add the dev script", {
+    throw new OrcaPatchFileMissingError("package.json is required to add the dev script", {
       hint: "Run setup from a project that has a package.json.",
+      details: { path: "package.json" },
     });
   }
   const pkg = parseJsonObject(source, "package.json");

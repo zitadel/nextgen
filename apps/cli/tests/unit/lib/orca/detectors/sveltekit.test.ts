@@ -45,7 +45,7 @@ describe("SvelteKitDetector version floor", () => {
         await project(dir, { "@sveltejs/kit": "^2", svelte: "^5", vite: "^7" }),
       ),
     ).rejects.toMatchObject({
-      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      category: "unsupported",
     });
   });
 
@@ -55,7 +55,7 @@ describe("SvelteKitDetector version floor", () => {
         await project(dir, { "@sveltejs/kit": "^3", svelte: "^4", vite: "^5" }),
       ),
     ).rejects.toMatchObject({
-      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      category: "unsupported",
     });
   });
 

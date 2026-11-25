@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaRendererError } from "@/lib/orca";
 import {
   AVAILABLE_RENDERER_IDS,
   getRenderer,
@@ -57,23 +57,23 @@ describe("getRenderer", () => {
     expect(spec.status).toBe("available");
   });
 
-  it("throws E_NOT_IMPLEMENTED for the declared-but-unpublished web-component renderer", () => {
+  it("throws a pending OrcaRendererError for the declared-but-unpublished web-component renderer", () => {
     try {
       getRenderer("web-component");
       expect.unreachable("getRenderer should throw for a not-implemented renderer");
     } catch (error) {
-      expect(error).toBeInstanceOf(ZitadelError);
-      expect((error as ZitadelError).code).toBe("E_NOT_IMPLEMENTED");
+      expect(error).toBeInstanceOf(OrcaRendererError);
+      expect((error as OrcaRendererError).reason).toBe("pending");
     }
   });
 
-  it("throws E_VALIDATION for an unknown renderer id", () => {
+  it("throws an unknown OrcaRendererError for an unknown renderer id", () => {
     try {
       getRenderer("vue");
       expect.unreachable("getRenderer should throw for an unknown renderer");
     } catch (error) {
-      expect(error).toBeInstanceOf(ZitadelError);
-      expect((error as ZitadelError).code).toBe("E_VALIDATION");
+      expect(error).toBeInstanceOf(OrcaRendererError);
+      expect((error as OrcaRendererError).reason).toBe("unknown");
     }
   });
 
@@ -82,7 +82,7 @@ describe("getRenderer", () => {
       getRenderer("vue");
       expect.unreachable("getRenderer should throw for an unknown renderer");
     } catch (error) {
-      const hint = (error as ZitadelError).hint;
+      const hint = (error as OrcaRendererError).hint;
       expect(hint).toContain("react");
       expect(hint).not.toContain("web-component");
     }

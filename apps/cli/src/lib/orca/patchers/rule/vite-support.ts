@@ -183,7 +183,7 @@ const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] 
  * the issuer/origin requirement is about the port, not the bind host. Idempotent
  * — entries already present are left as-is, except the CLI's own earlier proxy
  * shapes, which are migrated in place: the unconditional bearer listener and
- * the host-keeping entry. Throws `E_VALIDATION` when the file is absent or the
+ * the host-keeping entry. Throws an OrcaPatchFile error when the file is absent or the
  * config object cannot be reached (function-built/exotic configs), with a hint
  * to add the block manually.
  *
@@ -403,7 +403,7 @@ function withCurrentHooks(text: string): string | undefined {
  * one whose bearer hook was changed and one whose hooks before ADR 083 were
  * changed are returned untouched; {@link viteSessionCookieVerdict} tells the
  * doctor which it is. Line ends are the file's own (CRLF or LF). Throws
- * `E_VALIDATION`, as {@link viteProxyEdit} does, when the file is absent or
+ * an OrcaPatchFile error, as {@link viteProxyEdit} does, when the file is absent or
  * unreadable.
  */
 export function viteSessionCookieEdit(): (source: string | undefined) => string {

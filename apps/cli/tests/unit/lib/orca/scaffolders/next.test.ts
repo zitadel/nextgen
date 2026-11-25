@@ -40,14 +40,12 @@ describe("NextScaffolder", () => {
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
   });
 
-  it("throws E_VALIDATION when the command exits non-zero", async () => {
+  it("throws a plain error when the command exits non-zero", async () => {
     mockSpawn.mockReturnValue(spawnResult(1, "boom", "hello"));
     await expect(
       new NextScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "next"),
     ).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      hint: expect.stringContaining("boom"),
-      details: expect.objectContaining({ stderr: "boom", stdout: "hello" }),
+      message: expect.stringContaining("boom"),
     });
   });
 
@@ -64,7 +62,8 @@ describe("NextScaffolder", () => {
     await expect(
       new NextScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "next"),
     ).rejects.toMatchObject({
-      code: "E_VALIDATION",
+      name: "OrcaScaffoldBlockedError",
+      reason: "command",
       message: expect.stringContaining("Command not found"),
       hint: expect.stringContaining("PATH"),
     });

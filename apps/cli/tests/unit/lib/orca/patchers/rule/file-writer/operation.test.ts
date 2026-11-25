@@ -49,7 +49,7 @@ describe("Operation", () => {
       new EditOp({ kind: "edit", path: [], edit: () => "" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({ code: "E_VALIDATION" });
+    expect(error).toMatchObject({ name: "OrcaInternalError" });
   });
 
   it("refuses a directory where a file is needed, before the op looks at it", async ({ dir }) => {
@@ -68,7 +68,7 @@ describe("Operation", () => {
     );
 
     expect(error).toMatchObject({
-      code: "E_VALIDATION",
+      name: "OrcaPatchFileConflictError",
       message: expect.stringContaining("not a regular file"),
     });
     expect(seen).toEqual([]);
@@ -81,7 +81,7 @@ describe("Operation", () => {
       new WriteOp({ kind: "write", path: "x", contents: "c" }).plan(workspaceIn(dir)),
     );
 
-    expect(error).toMatchObject({ code: "E_VALIDATION" });
+    expect(error).toMatchObject({ name: "OrcaPatchFileConflictError" });
   });
 
   it("lets a directory op act on a directory", async ({ dir }) => {

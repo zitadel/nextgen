@@ -1,4 +1,4 @@
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPatchFileMissingError, OrcaPatchFileUnsupportedError } from "@/lib/orca/errors";
 
 const MIDDLEWARE_PATH = "./src/middleware.ts";
 
@@ -21,19 +21,18 @@ const MIDDLEWARE_PATH = "./src/middleware.ts";
 export function solidStartConfigEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaPatchFileMissingError(
         "Cannot edit the SolidStart Vite config: file not found",
         {
           hint: "Run setup from a SolidStart project that has a vite.config.ts.",
+          details: { path: "vite.config.ts" },
         },
       );
     }
 
     const callIndex = source.indexOf("solidStart(");
     if (callIndex === -1) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaPatchFileUnsupportedError(
         "Cannot wire middleware: no solidStart() plugin call found in the Vite config",
         {
           hint: "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config.",
@@ -54,8 +53,7 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
     const option = `middleware: ${JSON.stringify(MIDDLEWARE_PATH)}`;
     if (inner !== "" && !inner.startsWith("{")) {
       // Unusual: a non-object argument (e.g. a variable). Don't guess — fail loud.
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaPatchFileUnsupportedError(
         "Cannot wire middleware: solidStart() is called with a non-object argument",
         {
           hint: 'Pass an options object to solidStart(), e.g. solidStart({ middleware: "./src/middleware.ts" }).',
@@ -115,5 +113,7 @@ function readBalanced(source: string, openParenIndex: number): { text: string; e
       }
     }
   }
-  throw new ZitadelError("E_VALIDATION", "Malformed Vite config: unbalanced solidStart() call");
+  throw new OrcaPatchFileUnsupportedError("Malformed Vite config: unbalanced solidStart() call", {
+    hint: "Fix the syntax of vite.config.ts and rerun.",
+  });
 }

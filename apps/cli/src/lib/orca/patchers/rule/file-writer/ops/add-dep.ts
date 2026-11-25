@@ -1,6 +1,6 @@
 import sortKeys from "sort-keys";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPatchFileMissingError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import {
   type Change,
@@ -70,10 +70,10 @@ export class AddDepOp extends Operation<"add-dep"> {
     );
 
     if (!source.before) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        "package.json is required to add Zitadel dependencies",
-      );
+      throw new OrcaPatchFileMissingError("package.json is required to add Zitadel dependencies", {
+        hint: "Run setup from a project that has a package.json.",
+        details: { path: "package.json" },
+      });
     }
     if (isNoop) {
       return this.file(source, text, extras);

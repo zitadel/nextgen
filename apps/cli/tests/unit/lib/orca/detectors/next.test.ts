@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 
 import { NextDetector } from "@/lib/orca/detectors/next";
-import { ZitadelError } from "@/lib/errors";
+import { OrcaError } from "@/lib/orca";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const detector = new NextDetector();
@@ -102,9 +102,9 @@ describe("NextDetector", () => {
   }) => {
     await writeNextPackageJson(dir);
     const caught = await rejectionOf(() => detector.detect(dir));
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
-    expect((caught as ZitadelError).message).toContain("Pages Router");
+    expect(caught).toBeInstanceOf(OrcaError);
+    expect((caught as OrcaError).category).toBe("unsupported");
+    expect((caught as OrcaError).message).toContain("Pages Router");
   });
 
   it("throws the version floor for Next 14, before the app-router shape check", async ({ dir }) => {
@@ -113,9 +113,9 @@ describe("NextDetector", () => {
     // the version wall (ADR 043).
     await writeNextPackageJson(dir, { dependencies: { next: "^14.2.0" } });
     const caught = await rejectionOf(() => detector.detect(dir));
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
-    expect((caught as ZitadelError).message).toContain("below the supported floor");
+    expect(caught).toBeInstanceOf(OrcaError);
+    expect((caught as OrcaError).category).toBe("unsupported");
+    expect((caught as OrcaError).message).toContain("below the supported floor");
   });
 
   it.for(["15.2.2", "~15.1.0", "15.1.7"])(
@@ -177,7 +177,7 @@ describe("NextDetector", () => {
     await installNext(dir, "15.2.2");
 
     await expect(detector.detect(dir)).rejects.toMatchObject({
-      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      category: "unsupported",
       hint: expect.stringContaining("Upgrade the app to Next.js 15.2.3 or later"),
     });
   });

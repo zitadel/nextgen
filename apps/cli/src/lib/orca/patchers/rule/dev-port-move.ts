@@ -1,4 +1,4 @@
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPatchFileMissingError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import type { FileOp } from "./file-writer/types";
 
@@ -34,8 +34,9 @@ export function configIssuerEdit(
 ): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
-        hint: "Run `zitadel setup` first.",
+      throw new OrcaPatchFileMissingError("zitadel.json was not found", {
+        hint: "Set the project up first.",
+        details: { path: "zitadel.json" },
       });
     }
     const config = parseJsonObject(source, "zitadel.json");

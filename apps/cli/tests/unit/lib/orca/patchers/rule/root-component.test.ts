@@ -129,7 +129,7 @@ describe("assertMountsRootComponent", () => {
     });
 
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
-      code: "E_CONFLICT",
+      category: "conflict",
       message: "src/main.jsx mounts src/App.jsx, not the src/App.tsx setup writes",
       hint: expect.stringContaining('import App from "./App.tsx"'),
       details: { path: "src/App.jsx", entry: "src/main.jsx", writes: "src/App.tsx" },

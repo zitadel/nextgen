@@ -9,6 +9,15 @@ import {
   LocalServerPortBusyError,
   LocalServerPortFullError,
 } from "./server/errors";
+import {
+  OrcaError,
+  OrcaFrameworkMissingError,
+  OrcaFrameworkUnsupportedError,
+  OrcaPatchFileConflictError,
+  OrcaPatchFileUnsupportedError,
+  OrcaRendererError,
+  OrcaScaffoldBlockedError,
+} from "./orca";
 import { ZitadelConfigError, ZitadelConfigEditBreaksFlowsError } from "./zitadel";
 
 /**
@@ -230,6 +239,79 @@ function localServerErrorCode(error: LocalServerError): ZitadelErrorCode {
   }
 }
 
+/**
+ * What closes every refusal of a patch's preflight: `--force` is the obvious
+ * next try after a conflict, and it changes nothing there.
+ */
+const PREFLIGHT_FORCE_NOTE =
+  "--force can't fix this: it only replaces files at the paths setup writes.";
+
+/**
+ * The code a failure of the app integration is reported with.
+ *
+ * @param error - The failure.
+ * @returns `E_FRAMEWORK_NOT_DETECTED` for no app or a framework with no detector,
+ *   `E_VALIDATION` for a file the patch cannot edit, `E_NOT_IMPLEMENTED` for a
+ *   renderer not published yet, and the code of its category for any other.
+ */
+function orcaErrorCode(error: OrcaError): ZitadelErrorCode {
+  if (
+    error instanceof OrcaFrameworkMissingError ||
+    (error instanceof OrcaFrameworkUnsupportedError && error.reason === "unknown")
+  ) {
+    return "E_FRAMEWORK_NOT_DETECTED";
+  } else if (error instanceof OrcaPatchFileUnsupportedError) {
+    return "E_VALIDATION";
+  } else if (error instanceof OrcaRendererError && error.reason === "pending") {
+    return "E_NOT_IMPLEMENTED";
+  } else {
+    return CATEGORY_CODES[error.category];
+  }
+}
+
+/**
+ * What to do about a failure of the app integration, worded with the CLI's
+ * commands and flags, which the library leaves out.
+ *
+ * @param error - The failure.
+ * @returns The advice, or `undefined` when there is none.
+ */
+function orcaErrorHint(error: OrcaError): string | undefined {
+  const advice = (() => {
+    if (error instanceof OrcaFrameworkMissingError) {
+      return "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.";
+    } else if (error instanceof OrcaFrameworkUnsupportedError && error.reason === "mismatch") {
+      const { requested, detected, requestedName } = error.details ?? {};
+
+      return (
+        `Rerun setup without --framework, or with --framework ${String(detected)}, to set up this ` +
+        `app, or point --cwd at the ${String(requestedName ?? requested)} app you meant. Setup never ` +
+        "scaffolds a new app over one it detects, --force or not."
+      );
+    } else if (error instanceof OrcaScaffoldBlockedError && error.reason === "occupied") {
+      return (
+        "Pass --force to scaffold into a non-empty directory, or run setup from an existing " +
+        "supported app project."
+      );
+    } else if (error instanceof OrcaPatchFileConflictError && error.force === "replaces") {
+      return "Rerun with --force if you want the CLI to replace this file.";
+    } else if (error instanceof OrcaPatchFileConflictError && error.force === "useless") {
+      return PREFLIGHT_FORCE_NOTE;
+    } else if (error instanceof OrcaRendererError && error.reason === "pending") {
+      return "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.";
+    } else {
+      return undefined;
+    }
+  })();
+  const hint = [error.hint, advice]
+    .filter((part) => {
+      return part !== undefined;
+    })
+    .join(" ");
+
+  return hint === "" ? undefined : hint;
+}
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
@@ -367,6 +449,17 @@ export function toZitadelError(error: unknown): ZitadelError {
   if (error instanceof LocalServerError) {
     return new ZitadelError(localServerErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
+      details: error.details ?? { original: pickErrorShape(error) },
+    });
+  }
+
+  // The app integration's own failures: each has the code it always had, except
+  // a file a patch needs that is missing, which is not found.
+  if (error instanceof OrcaError) {
+    const hint = orcaErrorHint(error);
+
+    return new ZitadelError(orcaErrorCode(error), error.message, {
+      ...(hint === undefined ? {} : { hint }),
       details: error.details ?? { original: pickErrorShape(error) },
     });
   }

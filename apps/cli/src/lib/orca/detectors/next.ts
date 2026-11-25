@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaFrameworkUnsupportedError } from "@/lib/orca/errors";
 
 import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
@@ -44,8 +44,8 @@ export class NextDetector implements Detector {
         ? "src/app"
         : undefined;
     if (!appDir) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
+      throw new OrcaFrameworkUnsupportedError(
+        "layout",
         "Next.js Pages Router projects are not supported in v1",
         { hint: "Create an App Router project with an app/ or src/app/ directory." },
       );

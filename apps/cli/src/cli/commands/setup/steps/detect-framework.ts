@@ -1,6 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca } from "@/lib/orca";
+import { createOrca, OrcaFrameworkMissingError, OrcaFrameworkUnsupportedError } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
@@ -114,7 +114,12 @@ export class DetectFramework extends WizardStep<
         };
       })
       .catch(async (error) => {
-        if (!(error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED")) {
+        if (
+          !(
+            error instanceof OrcaFrameworkMissingError ||
+            (error instanceof OrcaFrameworkUnsupportedError && error.reason === "unknown")
+          )
+        ) {
           detecting.fail();
           throw error;
         }
@@ -122,7 +127,7 @@ export class DetectFramework extends WizardStep<
         if (!target.scaffoldable && !this.deps.force) {
           detecting.fail();
           throw new ZitadelError(
-            error.code,
+            "E_FRAMEWORK_NOT_DETECTED",
             "Could not detect a supported app framework, and this directory is not empty",
             {
               hint: `${target.reason ?? "Directory is not empty."} Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.`,

@@ -1,4 +1,4 @@
-import { ZitadelError } from "@/lib/errors";
+import { OrcaRendererError } from "@/lib/orca/errors";
 import { litRenderer } from "./lit";
 import { reactRenderer } from "./react";
 import type { RendererId, RendererSpec } from "./types";
@@ -42,26 +42,23 @@ export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter((id) => 
 
 /**
  * Resolves a renderer id (an untrusted string from config) to its spec,
- * throwing a typed {@link ZitadelError} rather than returning `undefined`
+ * throwing a typed {@link OrcaRendererError} rather than returning `undefined`
  * so callers get an actionable message. Rejects ids that are unknown
- * (`E_VALIDATION`) or declared-but-unpublished (`E_NOT_IMPLEMENTED`),
+ * (`unknown`) or declared-but-unpublished (`pending`),
  * guaranteeing the returned spec is safe to scaffold from.
  */
 export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
-    throw new ZitadelError("E_VALIDATION", `Unknown renderer "${id}"`, {
+    throw new OrcaRendererError("unknown", `Unknown renderer "${id}"`, {
       hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}.`,
+      details: { id, available: AVAILABLE_RENDERER_IDS },
     });
   }
   const renderer = RENDERERS[id];
   if (renderer.status === "not-implemented") {
-    throw new ZitadelError(
-      "E_NOT_IMPLEMENTED",
-      `Renderer "${id}" is declared but not yet published`,
-      {
-        hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
-      },
-    );
+    throw new OrcaRendererError("pending", `Renderer "${id}" is declared but not yet published`, {
+      details: { id, available: AVAILABLE_RENDERER_IDS },
+    });
   }
   return renderer;
 }

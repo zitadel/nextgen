@@ -2,7 +2,7 @@ import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { execaSync } from "execa";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaScaffoldBlockedError } from "../errors";
 import { warnings } from "@/lib/ui";
 
 import {
@@ -119,8 +119,8 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
       );
     }
     if (support === "refused") {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaScaffoldBlockedError(
+        "node",
         `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}`,
         {
           hint: `Switch to Node ${describeAcceptedNode(range)} and rerun, or create the ${this.displayName} app with that Node and run setup inside it.`,
@@ -131,8 +131,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
   }
 
   /**
-   * Runs an external command in `cwd`, throwing a typed {@link ZitadelError} on
-   * failure so the cause surfaces as a categorized CLI error. Distinguishes
+   * Runs an external command in `cwd`, throwing on failure. Distinguishes
    * "binary not on PATH" (`ENOENT` from the spawn itself) from "binary ran but
    * exited non-zero" — the former is not masked as a generic
    * `exited with status 1`, which would leave users to guess. Tests stub
@@ -141,30 +140,25 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
   protected runCommand(command: string, args: ReadonlyArray<string>, cwd: string): void {
     const result = execaSync(command, [...args], { cwd, reject: false });
     if (result.code !== undefined) {
-      const notFound = result.code === "ENOENT";
-      throw new ZitadelError(
-        "E_VALIDATION",
-        notFound
-          ? `Command not found: ${command}`
-          : `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
-        {
-          hint: notFound ? `Ensure '${command}' is installed and on PATH.` : undefined,
+      if (result.code === "ENOENT") {
+        throw new OrcaScaffoldBlockedError("command", `Command not found: ${command}`, {
+          hint: `Ensure '${command}' is installed and on PATH.`,
           details: { command, args: [...args], code: result.code },
-        },
-      );
+        });
+      }
+      throw new Error(`Failed to spawn "${command}": ${result.originalMessage ?? result.message}`, {
+        cause: result,
+      });
     }
     const status = result.exitCode ?? 1;
     if (status !== 0) {
       const stdout = String(result.stdout);
       const stderr = String(result.stderr);
       const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `Command "${command} ${args.join(" ")}" exited with status ${String(status)}`,
-        {
-          hint: output ? `Command output:\n${output}` : "Run the command directly for more detail.",
-          details: { command, args: [...args], cwd, stdout, stderr },
-        },
+      throw new Error(
+        `Command "${command} ${args.join(" ")}" exited with status ${String(status)}${
+          output ? `\n${output}` : ""
+        }`,
       );
     }
   }

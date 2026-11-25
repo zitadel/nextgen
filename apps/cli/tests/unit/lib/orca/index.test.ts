@@ -85,7 +85,7 @@ describe("Orca selection", () => {
     expect(orca.patcherFor("angular").canPatch("angular")).toBe(true);
   });
 
-  it("throws E_VALIDATION for an unsupported framework", () => {
+  it("throws for an unsupported framework", () => {
     expect(() => orca.scaffolderFor("ember")).toThrowError(/No scaffolder/);
     expect(() => orca.patcherFor("ember")).toThrowError(/No patcher/);
   });
@@ -124,17 +124,21 @@ describe("Orca detection", () => {
     });
   });
 
-  it("throws E_FRAMEWORK_NOT_DETECTED when nothing matches", async ({ dir }) => {
+  it("throws OrcaFrameworkMissingError when nothing matches", async ({ dir }) => {
     await expect(orca.detect(dir)).rejects.toMatchObject({
-      code: "E_FRAMEWORK_NOT_DETECTED",
+      name: "OrcaFrameworkMissingError",
+      category: "not_found",
       message: "Could not detect a supported app framework",
-      hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
     });
   });
 
-  it("throws E_FRAMEWORK_NOT_DETECTED for an unsupported requested framework", async ({ dir }) => {
+  it("throws OrcaFrameworkUnsupportedError for an unsupported requested framework", async ({
+    dir,
+  }) => {
     await expect(orca.detect(dir, "svelte")).rejects.toMatchObject({
-      code: "E_FRAMEWORK_NOT_DETECTED",
+      name: "OrcaFrameworkUnsupportedError",
+      reason: "unknown",
+      details: { requested: "svelte" },
     });
   });
 
@@ -142,9 +146,9 @@ describe("Orca detection", () => {
   // --force would then scaffold a new app over this one.
   it("refuses a requested framework other than the app's own", async ({ dir }) => {
     await expect(orca.detect(await nextProject(dir), "react")).rejects.toMatchObject({
-      code: "E_CONFLICT",
+      category: "conflict",
       message: "Setup detects Next.js here, not React (Vite)",
-      hint: expect.stringContaining("--framework next"),
+      reason: "mismatch",
       details: { requested: "react", detected: "next" },
     });
   });
@@ -159,7 +163,7 @@ describe("Orca detection", () => {
     );
 
     await expect(orca.detect(pagesRouter, "react")).rejects.toMatchObject({
-      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      category: "unsupported",
     });
   });
 
@@ -393,13 +397,13 @@ describe("Orca.scaffold", () => {
   it("refuses a non-empty directory without force", async ({ dir }) => {
     const cwd = await tmpPackageSafe(dir);
     await writeFile(join(cwd, ".gitignore"), "x\n");
-    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_CONFLICT" });
+    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ category: "conflict" });
   });
 
   it("throws E_CONFLICT when the directory already contains a project", async ({ dir }) => {
     const cwd = dir;
     await writeFile(join(cwd, "package.json"), "{}");
-    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_CONFLICT" });
+    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ category: "conflict" });
   });
 
   it("leaves a folder with an invalid package name as it was when the scaffolder fails in its subfolder", async ({
@@ -582,7 +586,7 @@ describe("Orca.scaffold", () => {
       );
 
       await expect(undetectableOrca.scaffoldUndoably(cwd, "fake")).rejects.toMatchObject({
-        code: "E_FRAMEWORK_NOT_DETECTED",
+        name: "OrcaFrameworkMissingError",
       });
       await expect(readdir(cwd)).resolves.toEqual([".gitignore"]);
     });
@@ -627,7 +631,7 @@ describe("Orca.planScaffold", () => {
     const withoutPatchers = new Orca(detectors, scaffolders, [], LocalRuntime.DIR);
 
     await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
-      code: "E_VALIDATION",
+      category: "internal",
       message: 'No patcher supports "next"',
     });
   });

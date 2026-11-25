@@ -1,11 +1,11 @@
 import { basename, join } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPatchFileConflictError } from "@/lib/orca/errors";
 import { isFile } from "@/lib/fs";
 import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
-import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "@/lib/orca/patchers/rule/base";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
 import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { getRenderer } from "./renderers/registry";
@@ -337,18 +337,22 @@ function requestBoundaryFile(framework: PatchContext["framework"]): {
 const BOUNDARY_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
 
 /** Why the app's own request boundary at `existing` stops setup, which writes `target`. */
-function boundaryConflict(existing: string, target: string, unknownVersion: boolean): ZitadelError {
+function boundaryConflict(
+  existing: string,
+  target: string,
+  unknownVersion: boolean,
+): OrcaPatchFileConflictError {
   const existingName = basename(existing).split(".")[0];
   const targetName = basename(target, ".ts");
   const details = { path: existing, writes: target };
   if (existingName === targetName) {
-    return new ZitadelError(
-      "E_CONFLICT",
+    return new OrcaPatchFileConflictError(
       `Next.js runs one ${targetName} file, and this app already has ${existing}`,
       {
+        force: "useless",
         hint:
           `Setup writes ${target}, and one of the two would never run. Move ${existing} ` +
-          `aside and rerun setup, then merge it into ${target}. ${PREFLIGHT_FORCE_NOTE}`,
+          `aside and rerun setup, then merge it into ${target}.`,
         details,
       },
     );
@@ -363,9 +367,8 @@ function boundaryConflict(existing: string, target: string, unknownVersion: bool
       `Next 15 it leaves your ${existing} alone.`
     : "Next.js 16 renamed middleware.ts to proxy.ts. Move " +
       `${existing} aside and rerun setup, then merge it into ${target}.`;
-  return new ZitadelError(
-    "E_CONFLICT",
+  return new OrcaPatchFileConflictError(
     `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
-    { hint: `${remedy} ${PREFLIGHT_FORCE_NOTE}`, details },
+    { force: "useless", hint: remedy, details },
   );
 }
