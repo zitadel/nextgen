@@ -4,8 +4,7 @@
 -- release, and the origin that resolved it. NULL on an event no deployment
 -- served, such as a resource or project change. GET /events reads them as
 -- deployment_id, release_id and target, and filters by the first two, so the
--- events of one release (one variant of an A/B test of the sign-in) or of one
--- deployment read as a list.
+-- events of one release or of one deployment read as a list.
 --
 -- Nullable columns without a default change only the catalog, as in 000051.
 -- The events already stored are not filled in: they age out of retention.
