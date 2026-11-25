@@ -63,6 +63,43 @@ export async function listenersForPort(
 }
 
 /**
+ * The folder each of `pids` runs in, as `lsof -a -p <pids> -d cwd -F n` names it: for a dev server
+ * started with `npm run dev` and the like, the app's own folder, which its child processes keep.
+ *
+ * Never throws: a process lsof cannot see is left out, and lsof missing, failing or slower than
+ * `timeoutMs` (default 1000ms) leaves every one out.
+ */
+export async function workingDirectories(
+  pids: readonly number[],
+  opts?: { readonly timeoutMs?: number; readonly run?: Run },
+): Promise<ReadonlyMap<number, string>> {
+  if (pids.length === 0) {
+    return new Map();
+  }
+  const run = opts?.run ?? systemRun;
+  try {
+    const { stdout } = await run("lsof", ["-a", "-p", pids.join(","), "-d", "cwd", "-F", "n"], {
+      timeout: opts?.timeoutMs ?? 1000,
+    });
+    return new Map(
+      stdout.split(/\r?\n(?=p)/).flatMap((block): [number, string][] => {
+        const lines = block.split(/\r?\n/);
+        const pidLine = lines[0] ?? "";
+        const pid = Number.parseInt(pidLine.slice(1), 10);
+        const folder = lines
+          .find((line) => {
+            return line.startsWith("n");
+          })
+          ?.slice(1);
+        return pidLine.startsWith("p") && pid > 0 && folder ? [[pid, folder]] : [];
+      }),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+/**
  * Parse the pid (`p`), command (`c`), and name/address (`n`) records emitted by
  * `lsof -F pcn`. Address records end in `:<port>` (e.g. `n*:8080`,
  * `n127.0.0.1:3000`, `n[::1]:5050`). Only loopback/wildcard hosts are kept;
