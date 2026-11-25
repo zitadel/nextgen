@@ -1,4 +1,5 @@
 import { allowDestructive, type ZitadelClient } from "@/lib/backend";
+import { Ui } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { Confirmer } from "@/lib/ui/questions";
 
@@ -59,9 +60,10 @@ export type ConsentSession = Readonly<{
   /**
    * What asks the person, drawn the way the command presents itself. It also
    * answers for `--force` and refuses when nobody can be asked, so the gate
-   * and the question cannot disagree about either.
+   * and the question cannot disagree about either. A caller with no command
+   * to draw for leaves it out and gets the wizard's prompt.
    */
-  confirmer: Confirmer;
+  confirmer?: Confirmer;
 }>;
 
 /** Refusals {@link Consent.request} threw, so a best-effort caller can let them through. */
@@ -97,7 +99,7 @@ export class Consent {
    * and no `--force` the gate refuses (a {@link ConsentRequiredError}, which
    * only a person may agree to);
    * otherwise the person is asked, and `undefined` is their no. Ctrl-C
-   * cancels the run, as every prompt does.
+   * throws `E_CANCELLED`, as every prompt does.
    *
    * A dry run must answer before asking: it is a bug to ask during one, and
    * it throws rather than hand a dry run the means to change anything.
@@ -106,7 +108,8 @@ export class Consent {
    * @param session - Who can answer, and whether the run may change anything.
    * @returns The consent, or `undefined` when the person said no.
    * @throws {@link ConsentRequiredError} When nobody can be asked and
-   * `--force` was not given, unless the gate refuses in its own way.
+   * `--force` was not given, unless the gate refuses in its own way, or
+   * `E_CANCELLED` on Ctrl-C.
    * @throws {@link ConsentInternalError} When a dry run asks.
    */
   static async request(gate: Gate, session: ConsentSession): Promise<Consent | undefined> {
@@ -125,7 +128,7 @@ export class Consent {
         }
         throw new ConsentRequiredError(gate.name, gate.message);
       }
-      const agreed = await session.confirmer.confirm({
+      const agreed = await (session.confirmer ?? Ui.asker(session)).confirm({
         name: gate.name,
         message: gate.message,
         retry: gate.retry,

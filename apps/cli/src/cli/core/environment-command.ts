@@ -9,7 +9,6 @@ import {
   type ServerAddresses,
 } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
-import { Asker } from "./asker";
 import { BaseCommand, type Facts, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags } from "./environment-flags";
@@ -278,7 +277,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const ask = {
       cwd: this.cwd,
       interactive: !this.nonInteractive && !this.meta.dryRun && options.prompt !== false,
-      ask: Asker.for(this.ui.session()),
+      ask: this.ui.questions(),
     };
     const { server, projectId, token } = await (async () => {
       return {

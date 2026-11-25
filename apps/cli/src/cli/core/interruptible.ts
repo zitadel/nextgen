@@ -1,4 +1,4 @@
-import { CANCELLED, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import type { CommandClass } from "@/lib/oclif/command-class";
 
 /** How long a command may keep running after its first Ctrl-C before it is stopped. */
@@ -11,7 +11,7 @@ const GRACE_MS = 1_000;
  * Node exits on SIGINT only while nothing listens for it, and a spinner does
  * listen — clack's stops its animation and returns — so a request stalled
  * behind one outlives the keypress. A command that listens for itself
- * avoids that: its first Ctrl-C aborts {@link signal} with an `AbortError`
+ * avoids that: its first Ctrl-C aborts {@link signal} with an `E_CANCELLED`
  * reason, so every request bound to it rejects and the command unwinds through
  * its normal error path.
  *
@@ -36,7 +36,6 @@ export function Interruptible<TBase extends CommandClass>(Base: TBase) {
   abstract class InterruptibleCommand extends Base {
     private readonly controller = new AbortController();
     private grace: NodeJS.Timeout | undefined;
-    private interruption: ZitadelError | undefined;
 
     /**
      * Aborted once Ctrl-C has been pressed in this run, and stays aborted, so a
@@ -44,20 +43,6 @@ export function Interruptible<TBase extends CommandClass>(Base: TBase) {
      */
     protected get signal(): AbortSignal {
       return this.controller.signal;
-    }
-
-    /**
-     * How the run's cancellation is reported, once it has been cancelled: Ctrl-C
-     * in one word with its hint, a prompt walked away from as the person's
-     * decision. Nothing while the run goes on, or when it was aborted for any
-     * other reason.
-     */
-    protected get cancellation(): ZitadelError | undefined {
-      const reason: unknown = this.controller.signal.reason;
-      if (!this.controller.signal.aborted || !isCancellation(reason)) {
-        return undefined;
-      }
-      return this.interruption ?? toZitadelError(reason);
     }
 
     /** Starts listening as the command begins. Calling it again does not add a second listener. */
@@ -81,10 +66,11 @@ export function Interruptible<TBase extends CommandClass>(Base: TBase) {
       if (this.controller.signal.aborted) {
         process.exit(130);
       }
-      this.interruption = new ZitadelError("E_CANCELLED", CANCELLED, {
-        hint: "The command was cancelled with Ctrl-C.",
-      });
-      this.controller.abort(new DOMException(CANCELLED, "AbortError"));
+      this.controller.abort(
+        new ZitadelError("E_CANCELLED", "Cancelled", {
+          hint: "The command was cancelled with Ctrl-C.",
+        }),
+      );
       this.grace = setTimeout(() => {
         process.exit(130);
       }, GRACE_MS);

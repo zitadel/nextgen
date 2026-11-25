@@ -584,10 +584,6 @@ describe("errorMessage", () => {
 
 describe("isCancellation", () => {
   it("knows the error Ctrl-C aborts the run with", () => {
-    expect(isCancellation(new DOMException("Cancelled", "AbortError"))).toBe(true);
-  });
-
-  it("knows the boundary's own report of it", () => {
     expect(isCancellation(new ZitadelError("E_CANCELLED", "Cancelled."))).toBe(true);
   });
 
@@ -595,23 +591,6 @@ describe("isCancellation", () => {
     expect(isCancellation(new ZitadelError("E_NETWORK", "Unreachable."))).toBe(false);
     expect(isCancellation(new Error("Cancelled."))).toBe(false);
     expect(isCancellation(undefined)).toBe(false);
-  });
-});
-
-describe("toZitadelError for an AbortError", () => {
-  it("reports a prompt walked away from as the person's decision, exiting 130", () => {
-    expect(toZitadelError(new DOMException("Cancelled by user", "AbortError"))).toMatchObject({
-      code: "E_CANCELLED",
-      message: "Cancelled by user",
-      exitCode: 130,
-    });
-  });
-
-  it("reports any other abort, such as a timer's, as a cancellation too", () => {
-    expect(toZitadelError(new DOMException("aborted", "AbortError"))).toMatchObject({
-      code: "E_CANCELLED",
-      message: "Cancelled by user",
-    });
   });
 });
 

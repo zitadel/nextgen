@@ -3,7 +3,6 @@
  * {@link BaseCommand} (and the envelope types) from here so the wiring between
  * oclif and the Zitadel envelope contract (ADR 004) is in one place.
  */
-export { Asker, type Session } from "./asker";
 export { type Admitted, BaseCommand, type MetaOptions } from "./base";
 export { CREDENTIALS, type CredentialKind } from "./credentials";
 export {

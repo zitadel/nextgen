@@ -12,10 +12,6 @@ class Probe extends Interruptible(Command) {
     return this.signal;
   }
 
-  public get report() {
-    return this.cancellation;
-  }
-
   public listen(): void {
     this.listenForInterrupt();
   }
@@ -64,35 +60,14 @@ describe("Interruptible", () => {
     expect(command.cancel.aborted).toBe(false);
   });
 
-  it("aborts the command's signal with an AbortError on Ctrl-C", () => {
+  it("aborts the command's signal with E_CANCELLED on Ctrl-C", () => {
     stubExit();
     const command = listening();
 
     pressCtrlC();
 
     expect(command.cancel.aborted).toBe(true);
-    expect(command.cancel.reason).toMatchObject({
-      name: "AbortError",
-      message: "Cancelled",
-    });
-  });
-
-  it("reports nothing while the run goes on", () => {
-    expect(listening().report).toBeUndefined();
-  });
-
-  it("reports Ctrl-C as the one word it ends on, with a hint, exiting 130", () => {
-    stubExit();
-    const command = listening();
-
-    pressCtrlC();
-
-    expect(command.report).toMatchObject({
-      code: "E_CANCELLED",
-      message: "Cancelled",
-      hint: "The command was cancelled with Ctrl-C.",
-      exitCode: 130,
-    });
+    expect(command.cancel.reason).toMatchObject({ code: "E_CANCELLED", exitCode: 130 });
   });
 
   it("keeps the signal aborted after the first Ctrl-C", () => {

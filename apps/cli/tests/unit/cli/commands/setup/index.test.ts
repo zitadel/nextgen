@@ -46,7 +46,6 @@ import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { customExample, IdpSettingsMissingError, SETUP_FLAG_NAMES } from "@/lib/idp";
 import { Ui, warnings } from "@/lib/ui";
-import { Asker } from "@/cli/core";
 import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
 import { FakeMachine } from "@tests/helpers/local-machine";
 import { Orca, createOrca } from "@/lib/orca";
@@ -252,10 +251,7 @@ const CANCELLED = Symbol("cancelled");
  * @param question - The question.
  * @returns The answer.
  */
-const ask = Asker.for({
-  interactive: true,
-  force: false,
-});
+const ask = Ui.asker({ interactive: true, force: false });
 
 /**
  * A Vite React app.

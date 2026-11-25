@@ -9,7 +9,7 @@ import { isCancel, text } from "@clack/prompts";
 import { ChooseDevPort } from "@/cli/commands/setup/steps/choose-dev-port";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
-import { Asker } from "@/cli/core";
+import { Ui } from "@/lib/ui";
 import { FakeMachine } from "@tests/helpers/local-machine";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { aPromptDeps } from "@tests/helpers/setup";
@@ -32,10 +32,7 @@ const APP_DIR = "/tmp/app";
 /**
  * How the wizard asks: interactively, without `--force`.
  */
-const ask = Asker.for({
-  interactive: true,
-  force: false,
-});
+const ask = Ui.asker({ interactive: true, force: false });
 
 /**
  * The boxes a prompt drew, as setup's own context would have drawn them.

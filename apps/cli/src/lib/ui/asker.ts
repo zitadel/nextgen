@@ -2,31 +2,42 @@ import type { Parsed } from "@zitadel/config/idp";
 
 import { confirmationHint, ZitadelError } from "@/lib/errors";
 import { Stdin } from "@/lib/stdin";
-import {
-  type AnyQuestion,
-  type Confirmer,
-  type ConfirmQuestion,
-  DrawnPrompter,
-  type Kind,
-  type MultiselectQuestion,
-  type Optional,
-  type Prompter,
-  type Prompting,
-  type Questions,
-  type SecretQuestion,
-  type SelectQuestion,
-  type TextQuestion,
-  type YesNoQuestion,
-} from "@/lib/ui";
+
+import { type AnyQuestion, DrawnPrompter, type Kind, type Prompter } from "./prompter";
+import type {
+  Confirmer,
+  ConfirmQuestion,
+  MultiselectQuestion,
+  Optional,
+  Questions,
+  SecretQuestion,
+  SelectQuestion,
+  TextQuestion,
+  YesNoQuestion,
+} from "./questions";
 
 /** What the session says about who can answer, beyond the question itself. */
-export type Session = Prompting & {
+export type Session = {
   /** Whether a person is at a terminal to be asked. */
   interactive: boolean;
   /** The command's `--force`: it answers a `confirm` without asking. */
   force: boolean;
   /** The stream piped input is read from. Defaults to the process's stdin. */
   stdin?: NodeJS.ReadableStream & { isTTY?: boolean };
+  /**
+   * Whether a prompt is drawn with clack's guide, the gray `│` down its left
+   * side. A wizard's questions sit inside its chain and carry it; a normal
+   * command's are the same prompts with nothing beside them.
+   */
+  guide?: boolean;
+  /**
+   * Draws a prompt between the caller's own steps: what it does before `draw`
+   * opens the chain the prompt belongs to, and what it does once `draw`
+   * settles, answered or not, spaces what follows it.
+   *
+   * @typeParam T - What the prompt resolves to.
+   */
+  around?: <T>(draw: () => Promise<T>) => Promise<T>;
 };
 
 /**
@@ -69,10 +80,9 @@ export type Session = Prompting & {
  *   question in `details.question`, for an agent to put to a person.
  *   Only `Consent.request` asks it.
  *
- * Cancelling a prompt (Ctrl-C) throws an
- * `AbortError` instead of returning a sentinel, so a command never carries on
- * with a missing answer, and the run ends as `E_CANCELLED`, exiting 130 like
- * Ctrl-C anywhere else. A drawn prompt closes its chain with
+ * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
+ * sentinel, so a command never carries on with a missing answer, and exits
+ * 130 like Ctrl-C anywhere else. A drawn prompt closes its chain with
  * "Cancelled", which is all a person is shown: a cancel is their own
  * decision, not an error. A plain one has no chain to close, so the run says
  * "Cancelled" on a line of its own once the prompt is erased.
@@ -83,7 +93,7 @@ export type Session = Prompting & {
  * the method.
  *
  * @example
- * const clientId = await Asker.for(session).text({
+ * const clientId = await Ui.asker(session).text({
  *   name: "client id",
  *   message: "What is the client ID of your Google OAuth app?",
  *   flag: "--client-id",
@@ -189,14 +199,8 @@ export class Asker implements Questions, Confirmer {
           `Cannot ${q.name} without --force in non-interactive mode`,
           {
             hint: confirmationHint(q.message),
-            ...(q.retry === undefined
-              ? {}
-              : {
-                  nextCommands: [q.retry],
-                }),
-            details: {
-              question: q.message,
-            },
+            ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
+            details: { question: q.message },
           },
         );
       }
@@ -277,16 +281,8 @@ export class Asker implements Questions, Confirmer {
    */
   private refusal(q: AnyQuestion, message: string, hint?: string): ZitadelError {
     return new ZitadelError("E_VALIDATION", message, {
-      ...(hint === undefined
-        ? {}
-        : {
-            hint,
-          }),
-      ...(q.retry === undefined
-        ? {}
-        : {
-            nextCommands: [q.retry],
-          }),
+      ...(hint === undefined ? {} : { hint }),
+      ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
     });
   }
 

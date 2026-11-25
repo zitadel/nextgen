@@ -53,7 +53,6 @@ describe("which shape a command draws", () => {
 describe("the UI package", () => {
   it("hands out the ways to draw, and nothing it draws with", async () => {
     expect(Object.keys(ui).sort()).toEqual([
-      "DrawnPrompter",
       "Output",
       "Ui",
       "announce",
@@ -122,7 +121,7 @@ describe("saying what a command is doing", () => {
 });
 
 describe("asking a person", () => {
-  // Every question is a clack prompt asked through `cli/core/asker.ts`. A module
+  // Every question is a clack prompt asked through `lib/ui/asker.ts`. A module
   // that opens a line reader of its own would ask in a second way, with its
   // own look, its own echo and its own idea of Ctrl-C.
   it("is done with clack alone, so no module reads a line from the terminal itself", async () => {

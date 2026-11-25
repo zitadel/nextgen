@@ -169,6 +169,18 @@ export class ZitadelError extends Error {
 }
 
 /**
+ * A prompt the person walked away from. A drawn prompt closes its own chain
+ * when that happens, so whoever ends the run needs to tell this from any
+ * other cancellation, which leaves the chain open: the class says so, where a
+ * match on the message would break the day the message is reworded.
+ */
+export class PromptCancelled extends ZitadelError {
+  constructor() {
+    super("E_CANCELLED", "Cancelled by user");
+  }
+}
+
+/**
  * oclif's footer under a command line it refused. It is oclif's own name for
  * what this CLI calls `Next:`, and finding it is the only way to tell one of
  * its parse errors from an ordinary failure: they arrive as plain `Error`s
@@ -242,9 +254,8 @@ export function failureText(message: string): FailureText {
  * Normalises any thrown value into a {@link ZitadelError}.
  *
  * @remarks
- * A {@link ZitadelError} is returned as it is, an `AbortError` is the run
- * being cancelled, and an error a package raised on purpose (one carrying a `category` and a `code`)
- * is reported with the `code`, `hint` and `details` it carries itself: this
+ * A {@link ZitadelError} is returned as it is, and an error a package raised
+ * on purpose (one carrying a `category` and a `code`) is reported with the `code`, `hint` and `details` it carries itself: this
  * function knows no package and branches on no class. What is left is errno,
  * Zod-like and plain errors, which are reported as `E_VALIDATION` unless errno
  * says more, with the original shape under `details` for debugging without
@@ -256,12 +267,6 @@ export function failureText(message: string): FailureText {
 export function toZitadelError(error: unknown): ZitadelError {
   if (error instanceof ZitadelError) {
     return error;
-  }
-
-  // The run being stopped, by a prompt walked away from or by anything else
-  // that aborts, is the person's decision and not a failure.
-  if (error instanceof Error && error.name === "AbortError") {
-    return new ZitadelError("E_CANCELLED", "Cancelled by user");
   }
 
   // An error a package raised on purpose carries the code, hint and details
@@ -337,18 +342,11 @@ export function toZitadelError(error: unknown): ZitadelError {
  * finished. The counterpart of `isRefusal`, for the other failure nothing may
  * turn into an outcome.
  *
- * `Interruptible` aborts the run's signal with an `AbortError`, so every
- * request bound to it rejects with that; the `E_CANCELLED` error is the
- * boundary's own report of it, and counts too.
- *
- * @param error - Whatever was caught.
- * @returns True for an `AbortError` or an `E_CANCELLED` error.
+ * `Interruptible` aborts the run's signal with this error, so every request
+ * bound to it rejects with it.
  */
 export function isCancellation(error: unknown): boolean {
-  return (
-    (error instanceof Error && error.name === "AbortError") ||
-    (error instanceof ZitadelError && error.code === "E_CANCELLED")
-  );
+  return error instanceof ZitadelError && error.code === "E_CANCELLED";
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

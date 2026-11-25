@@ -679,13 +679,15 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
     }
     const known = early?.meta ?? this.meta;
     const meta: GlobalOptions = { ...known, command: this.id ?? known.command };
-    const cancelled = this.cancellation;
+    const reason: unknown = this.signal.reason;
+    const cancelled =
+      this.signal.aborted && reason instanceof ZitadelError && reason.code === "E_CANCELLED";
     const help =
       this.config.findCommand(meta.command) === undefined
         ? commandOf(["--help"], meta.cliVersion)
         : this.suggest(helpOf(meta.command));
     const failure = new Failure(
-      this.suggestions.renderedFailure(cancelled ?? toZitadelError(error)),
+      this.suggestions.renderedFailure(cancelled ? reason : toZitadelError(error)),
       meta,
       help,
     );

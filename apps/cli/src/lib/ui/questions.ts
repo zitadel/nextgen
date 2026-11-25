@@ -108,7 +108,7 @@ export type YesNoQuestion = Question & { initialValue?: boolean };
  * run's audience; `setup`'s prompts take it as `ctx.ask`. The sources are
  * tried in a fixed order, and the first that applies answers — a flag, piped
  * stdin, a prompt, and otherwise a refusal naming what was missing. See
- * `cli/core/asker.ts` for the whole rule.
+ * `lib/ui/asker.ts` for the whole rule.
  */
 export interface Questions {
   /** Free text. With `optional`, `undefined` when nothing was given. */
