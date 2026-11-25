@@ -27,9 +27,7 @@ export { callbackUriFor } from "./callback";
 export {
   IdpError,
   IdpProviderUnknownError,
-  IdpSettingRefusedError,
-  IdpSettingsConflictError,
-  IdpSettingsMissingError,
+  IdpSettingsInvalidError,
 } from "./errors";
 export {
   type CredentialNames,

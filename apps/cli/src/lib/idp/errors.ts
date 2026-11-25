@@ -12,27 +12,10 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 export abstract class IdpError extends ZitadelLibError {}
 
 /**
- * A setting of a custom connection that the platform refuses.
+ * A custom connection's settings the platform refuses, that conflict with a
+ * catalog provider, or that are missing.
  */
-export class IdpSettingRefusedError extends IdpError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
-/**
- * Settings that describe a custom connection, given with a catalog provider.
- */
-export class IdpSettingsConflictError extends IdpError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
-/**
- * A custom connection that lacks settings it needs.
- */
-export class IdpSettingsMissingError extends IdpError {
+export class IdpSettingsInvalidError extends IdpError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
