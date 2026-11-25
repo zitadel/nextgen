@@ -292,7 +292,7 @@ describe("withStartLock", () => {
       name: "LocalServerBusyError",
       code: "E_CONFLICT",
       retryable: true,
-      details: expect.objectContaining({ lock_file: lock }),
+      message: expect.stringContaining(lock),
     });
     await release?.();
   });

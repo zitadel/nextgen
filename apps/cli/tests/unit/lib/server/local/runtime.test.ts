@@ -170,13 +170,13 @@ describe("readNearestRuntimeMetadata", () => {
     await writeFile(join(dir, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
   }
 
-  it("names a malformed record in a parent by kind, aimed at nothing", async ({ dir: cwd }) => {
+  it("names a malformed record in a parent by kind", async ({ dir: cwd }) => {
     await malformedRecordAt(cwd);
     const app = join(cwd, "my-app");
     await mkdir(app);
 
     await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
-      name: "LocalServerRecordMalformedElsewhereError",
+      name: "LocalServerRecordMalformedError",
     });
   });
 

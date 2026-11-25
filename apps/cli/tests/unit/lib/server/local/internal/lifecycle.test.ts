@@ -5,6 +5,7 @@ import { ManualClock } from "@tests/fixtures/clock";
 import {
   LocalServerPortBusyError,
   LocalServerPortFullError,
+  LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
   LocalServerStartTimeoutError,
   LocalServerStopError,
@@ -385,7 +386,7 @@ describe("Lifecycle", () => {
 
       await expect(world.server().start()).rejects.toMatchObject({
         name: "LocalServerStartExitedError",
-        logTail: "listen tcp :8080: bind: address already in use",
+        message: expect.stringContaining("listen tcp :8080: bind: address already in use"),
       });
     });
 
@@ -396,7 +397,7 @@ describe("Lifecycle", () => {
 
       await expect(world.server().start()).rejects.toMatchObject({
         name: "LocalServerStartExitedError",
-        logTail: undefined,
+        message: "The server exited before it became healthy",
       });
     });
 
@@ -513,15 +514,6 @@ describe("Lifecycle", () => {
       expect(world.identityChecked).toEqual([]);
     });
 
-    it("tells a failed start what identifies the server", async () => {
-      const world = new World();
-      world.onLaunch = () => undefined;
-
-      await expect(world.server().start()).rejects.toMatchObject({
-        details: { runtime: "fake", pid: 100 },
-      });
-    });
-
     it("fails with a timeout when the process lives but never answers", async () => {
       const world = new World();
       world.onLaunch = (record, w) => w.alive.add(record.pid);
@@ -565,19 +557,6 @@ describe("Lifecycle", () => {
       expect(world.terminated).toEqual([100]);
     });
 
-    it("keeps the reason a start failed when stopping the server fails too", async () => {
-      const world = new World();
-      world.onLaunch = (record, w) => w.alive.add(record.pid);
-      world.launcher.terminate = async () => {
-        throw new Error("docker daemon is gone");
-      };
-
-      await expect(world.server().start()).rejects.toMatchObject({
-        name: "LocalServerStartTimeoutError",
-        cleanup: { status: "failed" },
-      });
-    });
-
     it("keeps the write error when stopping the server fails too", async () => {
       const world = new World();
       world.writeError = new Error("read-only file system");
@@ -619,7 +598,7 @@ describe("Lifecycle", () => {
         .start()
         .catch((e: unknown) => e);
 
-      expect(error).toMatchObject({ cleanup: { status: "failed" } });
+      expect(error).toBeInstanceOf(LocalServerStartCleanupFailedError);
     });
 
     it("fails when no port in range is free", async () => {

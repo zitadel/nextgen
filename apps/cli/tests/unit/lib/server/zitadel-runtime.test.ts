@@ -554,7 +554,8 @@ describe("LocalRuntime", () => {
       await expect(LocalRuntime.resolveUrl(app, answeringAt())).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
         name: "LocalServerNotRespondingElsewhereError",
-        details: { server_url: url, directory: cwd },
+        serverUrl: url,
+        directory: cwd,
       });
     });
 
@@ -719,7 +720,9 @@ describe("LocalRuntime launch", () => {
     const launching = at(dir, { docker: refusingDocker }).launch(request({}));
 
     await expect(launching).rejects.toBeInstanceOf(LocalServerDockerMissingError);
-    await expect(launching).rejects.toMatchObject({ detail: "no daemon" });
+    await expect(launching).rejects.toMatchObject({
+      message: "Docker is not reachable: no daemon",
+    });
   });
 
   it("refuses a Docker start when the daemon answers with a failure", async ({ dir }) => {
