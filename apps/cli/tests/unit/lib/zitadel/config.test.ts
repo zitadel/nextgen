@@ -272,7 +272,7 @@ describe("ZitadelConfig.load", () => {
       return ZitadelConfig.load(store);
     });
 
-    expect(error).toMatchObject({ problems: [expect.objectContaining({ path: BROKEN_SCHEMA })] });
+    expect(error).toMatchObject({ message: expect.stringContaining(`${BROKEN_SCHEMA}:`) });
   });
 
   it("refuses a file that could not be parsed, naming it", async () => {
@@ -283,7 +283,7 @@ describe("ZitadelConfig.load", () => {
       return ZitadelConfig.load(store);
     });
 
-    expect(error).toMatchObject({ problems: [expect.objectContaining({ path })] });
+    expect(error).toMatchObject({ message: expect.stringContaining(`${path}:`) });
   });
 
   it("leaves a broken policy test file to the command that runs it", async () => {
@@ -747,7 +747,9 @@ describe("ZitadelConfig.scaffold", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
-      expect(error).toMatchObject({ details: { file: PasswordPolicy.PATH } });
+      expect(error).toMatchObject({
+        message: expect.stringContaining(PasswordPolicy.PATH),
+      });
     });
   });
 
@@ -788,7 +790,9 @@ describe("ZitadelConfig.scaffold", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
-      expect(error).toMatchObject({ details: { file: SignupPolicy.PATH } });
+      expect(error).toMatchObject({
+        message: expect.stringContaining(SignupPolicy.PATH),
+      });
     });
   });
 
@@ -838,7 +842,7 @@ describe("ZitadelConfig.scaffold", () => {
       expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
     });
 
-    it("refuses one that connects to another issuer, saying to choose another slug", () => {
+    it("refuses one that connects to another issuer", () => {
       const config = aConfig({
         connections: {
           "acme.json": anOidcConnection({ oidc: { issuer: "https://sso.other.example" } }),
@@ -851,7 +855,7 @@ describe("ZitadelConfig.scaffold", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({
-        hint: expect.stringContaining("Choose another slug for this connection"),
+        message: expect.stringContaining("connects to https://sso.other.example"),
       });
     });
   });

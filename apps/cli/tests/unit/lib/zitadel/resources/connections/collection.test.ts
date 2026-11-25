@@ -849,15 +849,17 @@ describe("Connections.disable", () => {
           connections: { "github.json": anOidcConnection({ slug: "github" }) },
         }),
         {
-          message: "customers has no provider named gogle",
-          hint: "customers offers: github. Connections under .zitadel/idps/: github.",
-          details: { requested: "gogle", offered: ["github"], connections: ["github"] },
+          message:
+            "customers has no provider named gogle; it offers: github; connections under .zitadel/idps/: github",
         },
       ],
       [
         "says so when the schema offers none and no connection exists",
         aConfig(CUSTOMERS_PROJECT),
-        { hint: "customers offers: none. Connections under .zitadel/idps/: none." },
+        {
+          message:
+            "customers has no provider named gogle; it offers: none; connections under .zitadel/idps/: none",
+        },
       ],
     ])("%s", (_claim, config, fields) => {
       const error = thrownBy(() => {
@@ -1054,24 +1056,15 @@ describe("Connections.resolveExisting", () => {
         },
       });
 
-      it("points the refusal at the file and the schemas and flows, not at a flag", () => {
+      it("refuses it, naming the file", () => {
         const error = thrownBy(() => {
           return config.connections.resolveExisting(GOOGLE);
         });
 
         expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
         expect(error).toMatchObject({
-          hint: expect.stringContaining("in the schemas and flows that name it"),
+          message: expect.stringContaining(`${GOOGLE_FILE} is a connection called google`),
         });
-      });
-
-      it("names no flag in the refusal's hint", () => {
-        const error = thrownBy(() => {
-          return config.connections.resolveExisting(GOOGLE);
-        });
-
-        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
-        expect(error).toMatchObject({ hint: expect.not.stringContaining("--") });
       });
     });
   });
@@ -1219,7 +1212,7 @@ describe("Connections.resolveExisting", () => {
     });
 
     describe("when the slug belongs to a connection to another issuer", () => {
-      it("points the refusal at another slug, because an applied connection keeps its issuer", () => {
+      it("refuses it, naming the issuer the connection keeps", () => {
         const config = aConfig({ connections: { "acme-sso.json": anAcmeSsoConnection() } });
         const candidate = Connection.forProvider(
           anAcmeSsoProvider({ issuer: issuer("https://sso.other.example") }),
@@ -1231,12 +1224,14 @@ describe("Connections.resolveExisting", () => {
         });
 
         expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
-        expect(error).toMatchObject({ hint: expect.stringContaining("Choose another slug") });
+        expect(error).toMatchObject({
+          message: expect.stringContaining("not https://sso.other.example"),
+        });
       });
     });
 
     describe("when the file the connection would go to is taken", () => {
-      it("asks for another slug, naming no flag", () => {
+      it("refuses it, naming the file", () => {
         const config = aConfig({
           connections: { "acme-sso.json": anAcmeSsoConnection({ slug: "something-else" }) },
         });
@@ -1247,13 +1242,13 @@ describe("Connections.resolveExisting", () => {
 
         expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
         expect(error).toMatchObject({
-          hint: "Rename or remove that file, or choose another slug, then run the command again.",
+          message: `${ACME_SSO_FILE} already exists and is not the acme-sso connection`,
         });
       });
     });
 
     describe("when the file a catalog provider's connection would go to is taken", () => {
-      it("asks to move the file, not to choose another slug", () => {
+      it("refuses it, naming the file", () => {
         const config = aConfig({
           connections: {
             "google.json": aGoogleConnection({
@@ -1270,7 +1265,7 @@ describe("Connections.resolveExisting", () => {
 
         expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
         expect(error).toMatchObject({
-          hint: "Rename or remove that file, then run the command again.",
+          message: `${GOOGLE_FILE} already exists and is not the google connection`,
         });
       });
     });
@@ -1335,7 +1330,7 @@ describe("Connections.resolveBySlug", () => {
   });
 
   describe("when the issuer given is another", () => {
-    it("states both issuers for a --json reader", () => {
+    it("states both issuers", () => {
       const config = aConfig({ connections: { "acme-sso.json": ACME_SSO_ON_FILE } });
 
       const error = thrownBy(() => {
@@ -1344,12 +1339,9 @@ describe("Connections.resolveBySlug", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({
-        details: {
-          file: ACME_SSO_FILE,
-          slug: "acme-sso",
-          issuer: "https://sso.other.example",
-          existing_issuer: ACME_SSO_ISSUER,
-        },
+        message: expect.stringContaining(
+          `connects to ${ACME_SSO_ISSUER}, not https://sso.other.example`,
+        ),
       });
     });
   });

@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ZitadelConfigConnectionClientIdError,
-  ZitadelConfigConnectionNotOidcError,
-  ZitadelConfigConnectionUnusableError,
   ZitadelConfigError,
-  ZitadelConfigHandleInvalidError,
   ZitadelConfigResourceClashError,
   ZitadelConfigResourceMissingError,
   ZitadelConfigSchemaAmbiguousError,
@@ -41,11 +37,6 @@ const FLOW_PATH = `${CONFIG_DIRECTORIES.flows}/login.json`;
  * The Google connection's file.
  */
 const GOOGLE_PATH = `${CONFIG_DIRECTORIES.connections}/google.json`;
-
-/**
- * What the refusal tells the developer to do.
- */
-const HINT = "Fix the steps named above.";
 
 /**
  * What a schema left with no way to sign in is refused with.
@@ -118,32 +109,25 @@ const STAYING: readonly IncomingTransition[] = [
 function refusalOf(
   issues: readonly FlowIssue[],
   uses?: readonly FlowMethodUse[],
-): ZitadelConfigEditBreaksFlowsError {
-  const refused = {
-    file: SCHEMA_PATH,
-    heading: "A login flow would stop validating after this change:",
-    hint: HINT,
-    issues,
-  };
+): ZitadelConfigError {
+  const heading = "A login flow would stop validating after this change:";
   if (uses === undefined) {
     return new ZitadelConfigEditBreaksFlowsError({
-      ...refused,
-      kind: "broken",
+      heading,
+      issues,
     });
   }
-  return new ZitadelConfigEditBreaksFlowsError({
-    ...refused,
-    kind: "method-in-use",
+  return new ZitadelConfigEditMethodInUseError({
+    heading,
+    issues,
     uses,
   });
 }
 
 describe("ZitadelConfigFlowsUncheckedError", () => {
-  it("lists each issue under the heading and names the schema in its details", () => {
+  it("lists each issue under the heading", () => {
     const error = new ZitadelConfigFlowsUncheckedError({
-      file: SCHEMA_PATH,
       heading: "A login flow has errors, so it cannot be checked against the changed schema:",
-      hint: "Fix those errors first, then run the command again.",
       issues: [BROKEN],
     });
 
@@ -153,13 +137,6 @@ describe("ZitadelConfigFlowsUncheckedError", () => {
         `  - ${FLOW_PATH}: broken`,
       ].join("\n"),
     );
-    expect(error.hint).toBe("Fix those errors first, then run the command again.");
-    expect(error.details).toEqual({
-      file: SCHEMA_PATH,
-      issues: [
-        { path: FLOW_PATH, rule: "schema/fields-resolve", message: "broken", step: "password" },
-      ],
-    });
   });
 });
 
@@ -173,38 +150,6 @@ describe("ZitadelConfigEditBreaksFlowsError", () => {
         `  - ${FLOW_PATH}: step "password": no such field`,
       ].join("\n"),
     );
-  });
-
-  it("carries the hint it was given", () => {
-    const error = refusalOf([BROKEN]);
-
-    expect(error.hint).toBe(HINT);
-  });
-
-  it("names the schema and each issue in its details", () => {
-    const error = refusalOf([BROKEN]);
-
-    expect(error.details).toEqual({
-      file: SCHEMA_PATH,
-      issues: [
-        { path: FLOW_PATH, rule: "schema/fields-resolve", message: "broken", step: "password" },
-      ],
-    });
-  });
-
-  it("leaves out the step of an issue that names none", () => {
-    const error = refusalOf([issueOn(undefined, "steps: expected a list")]);
-
-    expect(error.details).toEqual({
-      file: SCHEMA_PATH,
-      issues: [{ path: FLOW_PATH, rule: "definition", message: "steps: expected a list" }],
-    });
-  });
-
-  it("has no steps in its details when no step uses a method", () => {
-    const error = refusalOf([BROKEN]);
-
-    expect(error.details).not.toHaveProperty("steps");
   });
 
   describe("with steps that use the method", () => {
@@ -277,32 +222,6 @@ describe("ZitadelConfigEditBreaksFlowsError", () => {
 
       expect(error.message).not.toMatch(unsaid);
     });
-
-    it("describes each step that uses the method in its details", () => {
-      const error = refusalOf(
-        [BROKEN],
-        [
-          useOf("password", {
-            keeps: ['field "email"'],
-            entryFor: ["login"],
-            targetedBy: [{ step: stepName("identifier"), transition: "submit" }],
-          }),
-        ],
-      );
-
-      expect(error.details).toMatchObject({
-        file: SCHEMA_PATH,
-        steps: [
-          {
-            path: FLOW_PATH,
-            step: "password",
-            keeps: ['field "email"'],
-            entry_for: ["login"],
-            targeted_by: [{ step: stepName("identifier"), transition: "submit" }],
-          },
-        ],
-      });
-    });
   });
 });
 
@@ -313,11 +232,10 @@ describe("ZitadelConfigEditLockoutError", () => {
     expect(error.message).toBe(`${SCHEMA_PATH} would have no way to sign in left`);
   });
 
-  it("names the schema, what it enabled and its alternatives in its details", () => {
+  it("keeps what it enabled and its alternatives", () => {
     const error = new ZitadelConfigEditLockoutError(NO_SIGN_IN_LEFT);
 
-    expect(error.details).toEqual({
-      file: SCHEMA_PATH,
+    expect(error).toMatchObject({
       usable: ["password"],
       alternatives: ["passkey"],
     });
@@ -371,18 +289,6 @@ describe("ZitadelConfigConnectionExistsError", () => {
     expect(error.message).toBe(`${GOOGLE_PATH} already exists`);
   });
 
-  it("never offers to replace the file", () => {
-    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
-
-    expect(error.hint).not.toContain("--force");
-  });
-
-  it("names the file in its details", () => {
-    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
-
-    expect(error.details).toEqual({ file: GOOGLE_PATH });
-  });
-
   it("keeps the provider as it was chosen", () => {
     const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
 
@@ -399,16 +305,10 @@ describe("ZitadelConfigFileExistsError", () => {
     });
   });
 
-  it("names no flag, as not every command that writes a file has one", () => {
+  it("keeps the path that is already taken", () => {
     const error = new ZitadelConfigFileExistsError(GOOGLE_PATH);
 
-    expect(error.hint).not.toContain("--");
-  });
-
-  it("names the file in its details", () => {
-    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH);
-
-    expect(error.details).toEqual({ file: GOOGLE_PATH });
+    expect(error.path).toBe(GOOGLE_PATH);
   });
 });
 
@@ -439,54 +339,32 @@ describe("ZitadelConfigInternalError", () => {
 });
 
 describe("ZitadelConfigError", () => {
-  it("is a validation failure that carries the hint and details it was given", () => {
-    const error = new ZitadelConfigError("boom", {
-      hint: "do this",
-      details: {
-        file: "a.json",
-      },
-    });
+  it("is a validation failure that carries the cause it was given", () => {
+    const cause = new Error("root");
+    const error = new ZitadelConfigError("boom", cause);
 
     expect(error).toMatchObject({
       name: "ZitadelConfigError",
       category: "invalid",
       retryable: false,
       code: "E_VALIDATION",
-      hint: "do this",
-      details: {
-        file: "a.json",
-      },
+      cause,
     });
   });
 });
 
 describe("ZitadelConfigEditMethodInUseError", () => {
-  it("is a validation failure that is also an edit that breaks flows", () => {
+  it("is a validation failure that is not an edit that breaks flows", () => {
     const error = new ZitadelConfigEditMethodInUseError({
-      file: SCHEMA_PATH,
       heading: "Disabling passkey would break a login flow that still uses it:",
-      hint: HINT,
       issues: [],
-      kind: "method-in-use",
       uses: [],
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).not.toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
     expect(error).toMatchObject({
       category: "invalid",
       code: "E_VALIDATION",
-    });
-  });
-});
-
-describe("ZitadelConfigHandleInvalidError", () => {
-  it("is a validation failure that names the handle in its details", () => {
-    expect(new ZitadelConfigHandleInvalidError("../x")).toMatchObject({
-      category: "invalid",
-      code: "E_VALIDATION",
-      details: {
-        handle: "../x",
-      },
     });
   });
 });
@@ -517,10 +395,7 @@ describe("ZitadelConfigSchemaMissingError", () => {
       category: "missing",
       code: "E_NOT_FOUND",
       message: "There is no user schema under .zitadel/schemas",
-      details: {
-        requested: "employees",
-        known: [],
-      },
+      known: [],
     });
   });
 });
@@ -532,60 +407,8 @@ describe("ZitadelConfigSchemaAmbiguousError", () => {
     expect(error).toMatchObject({
       category: "invalid",
       code: "E_VALIDATION",
-      requested: "customers",
-    });
-  });
-});
-
-describe("ZitadelConfigConnectionClientIdError", () => {
-  it("is a validation failure that names the file and both client ids", () => {
-    const error = new ZitadelConfigConnectionClientIdError(GOOGLE_PATH, "old", "new");
-
-    expect(error).toMatchObject({
-      category: "invalid",
-      code: "E_VALIDATION",
-      message: `${GOOGLE_PATH} already uses client id old, not new`,
-      details: {
-        file: GOOGLE_PATH,
-        stored_client_id: "old",
-        supplied_client_id: "new",
-      },
-    });
-  });
-});
-
-describe("ZitadelConfigConnectionNotOidcError", () => {
-  it("is a conflict that names the file and the slug", () => {
-    const error = new ZitadelConfigConnectionNotOidcError(GOOGLE_PATH, "google");
-
-    expect(error).toMatchObject({
-      category: "conflict",
-      code: "E_CONFLICT",
-      details: {
-        file: GOOGLE_PATH,
-        slug: "google",
-      },
-    });
-  });
-});
-
-describe("ZitadelConfigConnectionUnusableError", () => {
-  it("is a validation failure that names the setting and what is wrong with it", () => {
-    const error = new ZitadelConfigConnectionUnusableError(
-      GOOGLE_PATH,
-      "google",
-      "a display name",
-      "blank",
-    );
-
-    expect(error).toMatchObject({
-      category: "invalid",
-      code: "E_VALIDATION",
-      message: `${GOOGLE_PATH} holds a display name that cannot be used: blank`,
-      details: {
-        file: GOOGLE_PATH,
-        slug: "google",
-      },
+      message: "More than one user schema is named customers",
+      candidates: [],
     });
   });
 });

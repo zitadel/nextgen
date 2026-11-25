@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ZitadelConfigSchemaAmbiguousError,
-  ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigEditMethodInUseError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigError,
   ZitadelConfigSchemaMissingError,
@@ -229,8 +229,7 @@ describe("Schemas.enable", () => {
 
     expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
-      message: `${SCHEMA_PATH} has no x-identifier for password`,
-      details: { file: SCHEMA_PATH, method: "password" },
+      message: `${SCHEMA_PATH} has no x-identifier for password: set "x-identifier" to the property users sign in with, e.g. "email"`,
     });
   });
 });
@@ -277,9 +276,9 @@ describe("Schemas.disable", () => {
       return config.schemas.disable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
     expect(error).toMatchObject({
-      details: { steps: [{ path: FLOW_PATH, step: "password" }] },
+      message: expect.stringContaining(`${FLOW_PATH}: step "password"`),
     });
   });
 
@@ -310,7 +309,7 @@ describe("Schemas.disable", () => {
       return config.schemas.disable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
   });
 
   it("turns off the last way to sign in when forced", () => {
@@ -734,8 +733,8 @@ describe("Schemas.resolve", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigSchemaAmbiguousError);
       expect(error).toMatchObject({
-        requested: "customer",
-        details: { requested: "customer", candidates: ["customer", "customers"] },
+        message: "More than one user schema is named customer",
+        candidates: config.schemas.all.slice(0, 2),
       });
     });
 
@@ -748,9 +747,8 @@ describe("Schemas.resolve", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigSchemaAmbiguousError);
       expect(error).toMatchObject({
-        requested: undefined,
+        message: "There is more than one user schema, and none was named",
         candidates: config.schemas.all,
-        details: { requested: null },
       });
     });
 
@@ -764,8 +762,7 @@ describe("Schemas.resolve", () => {
       expect(error).toBeInstanceOf(ZitadelConfigSchemaMissingError);
       expect(error).toMatchObject({
         message: "No user schema is named staff",
-        requested: "staff",
-        details: { requested: "staff", known: ["customer", "customers", "employees"] },
+        known: config.schemas.all,
       });
     });
   });

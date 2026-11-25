@@ -137,21 +137,6 @@ describe("toZitadelError", () => {
     expect(toZitadelError(err).code).toBe(code);
   });
 
-  it("passes a ZitadelConfigError's message, hint and details on", () => {
-    const err = new ZitadelConfigError("boom", {
-      hint: "do this",
-      details: {
-        file: "a.json",
-      },
-    });
-    const result = toZitadelError(err);
-    expect([result.message, result.hint, result.details]).toEqual([
-      "boom",
-      "do this",
-      { file: "a.json" },
-    ]);
-  });
-
   it("leaves out the hint and details a ZitadelConfigError has none of", () => {
     const result = toZitadelError(new ZitadelConfigError("boom"));
     expect([result.hint, result.details]).toEqual([undefined, undefined]);

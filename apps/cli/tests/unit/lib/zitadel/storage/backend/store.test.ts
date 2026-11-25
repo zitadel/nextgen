@@ -4,6 +4,7 @@ import {
   CONFIG_DIRECTORIES,
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
+  ZitadelConfigFileUnreadableError,
   type JsonObject,
 } from "@/lib/zitadel";
 import type { Store } from "@/lib/zitadel/storage/backend/store";
@@ -203,7 +204,6 @@ describe("Store.read", () => {
 
       expect(error).toMatchObject({
         message: `${CONFIG_DIRECTORIES.connections} cannot be read (ENOTDIR)`,
-        details: { file: CONFIG_DIRECTORIES.connections, code: "ENOTDIR" },
       });
     });
 
@@ -218,7 +218,6 @@ describe("Store.read", () => {
 
       expect(error).toMatchObject({
         message: `${IDP_A} cannot be read (EACCES)`,
-        details: { file: IDP_A, code: "EACCES" },
       });
     });
 
@@ -235,7 +234,6 @@ describe("Store.read", () => {
 
         expect(error).toMatchObject({
           message: `${CONFIG_DIRECTORIES.connections} cannot be read (EACCES)`,
-          details: { file: CONFIG_DIRECTORIES.connections, code: "EACCES" },
         });
       },
     );
@@ -430,7 +428,9 @@ describe("Store.remove", () => {
         return store.remove(IDP_A);
       });
 
-      expect(error).toMatchObject({ details: { file: IDP_A, code: "EISDIR" } });
+      expect(error).toMatchObject({
+        message: `${IDP_A} cannot be removed (EISDIR): it is a directory where a file is expected`,
+      });
     });
 
     it("refuses a path outside .zitadel/", async ({ dir, other }) => {
@@ -505,7 +505,9 @@ describe("Store.assertRemovable", () => {
         store.assertRemovable(IDP_A);
       });
 
-      expect(error).toMatchObject({ details: { file: IDP_A, code: "EISDIR" } });
+      expect(error).toMatchObject({
+        message: `${IDP_A} cannot be removed (EISDIR): it is a directory where a file is expected`,
+      });
     });
 
     it("refuses a path outside .zitadel/", async ({ dir, other }) => {
@@ -554,9 +556,7 @@ describe("Store.writeText", () => {
 
         expect(error).toBeInstanceOf(ZitadelConfigError);
         expect(error).toMatchObject({
-          message: `${path} cannot be written (ENOTDIR)`,
-          hint: `Remove ${TEMPLATE}, which is a file where a directory is needed, then run the command again.`,
-          details: { file: path, code: "ENOTDIR", blocker: TEMPLATE },
+          message: `${path} cannot be written (ENOTDIR): ${TEMPLATE} is a file where a directory is needed`,
         });
       },
     );
@@ -726,7 +726,7 @@ describe("Store.inlineReferences", () => {
           return store.inlineReferences(aBrandingReferencing("./login.liquid"), "omit");
         });
 
-        expect(error).toMatchObject({ details: { code: "EACCES" } });
+        expect(error).toBeInstanceOf(ZitadelConfigFileUnreadableError);
       },
     );
 

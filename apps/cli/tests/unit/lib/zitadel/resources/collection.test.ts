@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CONFIG_DIRECTORIES,
   ZitadelConfigResourceClashError,
-  ZitadelConfigHandleInvalidError,
+  ZitadelConfigError,
   Policy,
   ZitadelConfig,
 } from "@/lib/zitadel";
@@ -209,7 +209,7 @@ describe("Collection.locate with a handle that is not a file name", () => {
 
       expect(() => {
         return config.schemas.locate(handle);
-      }).toThrow(ZitadelConfigHandleInvalidError);
+      }).toThrow(ZitadelConfigError);
     },
   );
 
@@ -218,7 +218,7 @@ describe("Collection.locate with a handle that is not a file name", () => {
 
     expect(() => {
       return config.schemas.placeRevision("../idps/x", HUMAN_USER_SCHEMA);
-    }).toThrow(ZitadelConfigHandleInvalidError);
+    }).toThrow(ZitadelConfigError);
   });
 
   it("keeps a dotted name that stays one segment", () => {

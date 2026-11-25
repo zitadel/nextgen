@@ -337,8 +337,7 @@ describe("ConfigDocument edits", () => {
 
     expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
-      message: `${PATH}: name is not a string`,
-      details: { file: PATH, region: "name is not a string" },
+      message: `${PATH}: name is not a string; fix it against the dialect in .zitadel/meta/`,
     });
   });
 

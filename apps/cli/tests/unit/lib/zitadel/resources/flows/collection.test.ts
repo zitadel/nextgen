@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigFlowsUncheckedError,
   ZitadelConfigResourceMissingError,
   type ConfigOptions,
   UserSchema,
@@ -305,8 +305,7 @@ describe("Flows.resolveForSso", () => {
 
     expect(error).toBeInstanceOf(ZitadelConfigResourceMissingError);
     expect(error).toMatchObject({
-      message: "No login flow runs against customers",
-      details: { schema: CUSTOMERS },
+      message: expect.stringContaining("No login flow runs against customers"),
     });
   });
 
@@ -320,7 +319,7 @@ describe("Flows.resolveForSso", () => {
       return config.flows.resolveForSso(customers(ssoSchema()), slug("acme-sso"));
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigFlowsUncheckedError);
   });
 });
 

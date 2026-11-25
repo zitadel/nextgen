@@ -112,6 +112,6 @@ describe("outsideProject", () => {
   it("says where a referenced file must be", () => {
     const error = outsideProject("../x");
 
-    expect(error.hint).toContain("inside the project");
+    expect(error.message).toContain("inside the project");
   });
 });

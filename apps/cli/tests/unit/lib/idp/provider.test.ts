@@ -120,8 +120,6 @@ describe("ProviderChoice.readStoredSettings", () => {
         message: expect.stringContaining(
           `${ACME_SSO_FILE} holds a display name that cannot be used: `,
         ),
-        hint: "Fix it in that file, or choose another slug.",
-        details: { file: ACME_SSO_FILE, slug: "acme-sso" },
       });
     });
   });
@@ -147,7 +145,6 @@ describe("ProviderChoice.readStoredSettings", () => {
       expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({
         message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
-        hint: "Fix the file, or choose another slug, then run the command again.",
       });
     });
   });

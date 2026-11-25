@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigEditMethodInUseError,
   ZitadelConfigFlowsUncheckedError,
   type JsonObject,
 } from "@/lib/zitadel";
@@ -107,13 +108,6 @@ const WARNED_FLOW = {
 };
 
 /**
- * The password flow whose password step also collects the email.
- */
-const PASSWORD_BESIDE_EMAIL_FLOW: JsonObject = withStepChanged(PASSWORD_FLOW, "password", {
-  fields: ["email", "x-auth-methods#password"],
-});
-
-/**
  * The passkey-first preset, cut to the steps and transitions that matter here.
  */
 const PASSKEY_FIRST_FLOW = {
@@ -198,7 +192,7 @@ describe("assertFlowsIntact", () => {
 
     expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
     expect(error).toMatchObject({
-      details: { file: SCHEMA_PATH, issues: [{ path: FLOW_PATH, step: "password" }] },
+      message: expect.stringContaining(`${FLOW_PATH}:`),
     });
   });
 
@@ -216,7 +210,6 @@ describe("assertFlowsIntact", () => {
     expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
     expect(error).toMatchObject({
       message: expect.stringContaining("A login flow would stop validating after this change:"),
-      hint: "Fix the steps named above, then run the command again.",
     });
   });
 
@@ -233,7 +226,7 @@ describe("assertFlowsIntact", () => {
 
     expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
     expect(error).toMatchObject({
-      details: { issues: [{ rule: "schema/passkey-actions", step: "passkey-first" }] },
+      message: expect.stringContaining(`${FLOW_PATH}:`),
     });
   });
 
@@ -292,7 +285,7 @@ describe("assertFlowsIntact", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-    expect(error).toMatchObject({ details: { issues: [{ step: "password" }] } });
+    expect(error).toMatchObject({ message: expect.stringContaining(`${FLOW_PATH}:`) });
   });
 
   it("refuses a structurally broken flow as unchecked rather than unaffected", () => {
@@ -311,7 +304,6 @@ describe("assertFlowsIntact", () => {
       message: expect.stringContaining(
         "A login flow has errors, so it cannot be checked against the changed schema:",
       ),
-      hint: "Fix those errors first, then run the command again.",
     });
   });
 
@@ -332,7 +324,7 @@ describe("assertFlowsIntact", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-    expect(error).toMatchObject({ details: { issues: [{ path: FLOW_PATH, step: "password" }] } });
+    expect(error).toMatchObject({ message: expect.stringContaining(`${FLOW_PATH}:`) });
   });
 
   it("breaks nothing with an edit that writes nothing, even beside a broken flow", () => {
@@ -363,7 +355,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "passkey");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           `Disabling passkey in ${SCHEMA_PATH} would break a login flow that still uses it:`,
@@ -382,69 +374,10 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "passkey");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
       expect(error).toMatchObject({
-        details: {
-          steps: [
-            { step: "passkey-first", keeps: [], entry_for: ["login"] },
-            { step: "identifier", keeps: ['field "email"'], entry_for: [] },
-          ],
-        },
+        message: expect.stringContaining(`${FLOW_PATH}: step "identifier"`),
       });
-    });
-
-    it.each([
-      "point the purposes key it is the entry step of at another step",
-      "one marked via purposes.<key> follows that key instead",
-      "remove its passkey actions and their transitions",
-    ])("says %s in its hint", (advice) => {
-      const config = aConfig({
-        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
-        flows: { [FLOW_FILE]: PASSKEY_FIRST_FLOW },
-      });
-      const edit = aMethodEdit(config, "passkey", false);
-
-      const error = thrownBy(() => {
-        assertMethodUnused(edit, "passkey");
-      });
-
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-      expect(error).toMatchObject({ hint: expect.stringContaining(advice) });
-    });
-  });
-
-  describe("when steps still collect the password being turned off", () => {
-    it.each([
-      "remove its x-auth-methods#password field",
-      "Delete a step left with no field or sign-in method: retarget the transitions listed for it.",
-    ])("says %s in its hint", (advice) => {
-      const config = aConfig({
-        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
-        flows: { [FLOW_FILE]: PASSKEY_FIRST_FLOW },
-      });
-      const edit = aMethodEdit(config, "password", false);
-
-      const error = thrownBy(() => {
-        assertMethodUnused(edit, "password");
-      });
-
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-      expect(error).toMatchObject({ hint: expect.stringContaining(advice) });
-    });
-
-    it("does not ask to delete a step that keeps something", () => {
-      const config = aConfig({
-        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
-        flows: { [FLOW_FILE]: PASSWORD_BESIDE_EMAIL_FLOW },
-      });
-      const edit = aMethodEdit(config, "password", false);
-
-      const error = thrownBy(() => {
-        assertMethodUnused(edit, "password");
-      });
-
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-      expect(error).toMatchObject({ hint: expect.not.stringContaining("Delete a step") });
     });
   });
 
@@ -460,31 +393,9 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
       expect(error).toMatchObject({
         message: expect.not.stringContaining("Targeted by first.submit"),
-      });
-    });
-
-    it("still lists that transition in the details", () => {
-      const config = aConfig({
-        schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
-        flows: { [FLOW_FILE]: CHAINED_PASSWORD_FLOW },
-      });
-      const edit = aMethodEdit(config, "password", false);
-
-      const error = thrownBy(() => {
-        assertMethodUnused(edit, "password");
-      });
-
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-      expect(error).toMatchObject({
-        details: {
-          steps: [
-            { step: "first", targeted_by: [] },
-            { step: "second", targeted_by: [{ step: "first", transition: "submit" }] },
-          ],
-        },
       });
     });
   });
@@ -515,7 +426,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
       expect(error).toMatchObject({
         message: expect.stringMatching(
           /b\.json: step "second"[^\n]*\n\s+Left with no field or sign-in method\. Targeted by first\.submit\./,
@@ -530,34 +441,12 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
       expect(error).toMatchObject({
         message: expect.stringMatching(
           /a\.json: step "second"[^\n]*\n\s+Left with no field or sign-in method\.(\n|$)/,
         ),
       });
-    });
-  });
-
-  describe("when the only step left with nothing is an entry nothing leads to", () => {
-    it("asks to repoint its purpose and not to retarget anything", () => {
-      const config = aConfig({
-        schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
-        flows: { [FLOW_FILE]: CHAINED_PASSWORD_FLOW },
-      });
-      const edit = aMethodEdit(config, "password", false);
-
-      const error = thrownBy(() => {
-        assertMethodUnused(edit, "password");
-      });
-
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-      expect(error).toMatchObject({
-        hint: expect.stringContaining(
-          "Delete a step left with no field or sign-in method: point the purposes key it is the entry step of at another step.",
-        ),
-      });
-      expect(error).toMatchObject({ hint: expect.not.stringContaining("retarget") });
     });
   });
 

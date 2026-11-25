@@ -5,9 +5,8 @@ import { idpProvider } from "@zitadel/config/idp";
 import {
   ZitadelConfigError,
   Connection,
-  ZitadelConfigConnectionNotOidcError,
+  ZitadelConfigResourceClashError,
   UserSchema,
-  ZitadelConfigConnectionUnusableError,
 } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
@@ -552,7 +551,7 @@ describe("Connection.refuseNonOidc", () => {
         return acme.refuseNonOidc();
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigConnectionNotOidcError);
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
     });
   });
 });
@@ -572,8 +571,10 @@ describe("Connection.readUsableDisplayName", () => {
         return acme.readUsableDisplayName();
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigConnectionUnusableError);
-      expect(error).toMatchObject({ details: { file: ACME_SSO_FILE, slug: "acme-sso" } });
+      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toMatchObject({
+        message: expect.stringContaining(ACME_SSO_FILE),
+      });
     });
   });
 });
