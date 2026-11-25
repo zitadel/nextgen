@@ -1,5 +1,7 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
+import type { Categorized, ErrorCategory } from "@/constants";
+
 /** What a failure carries beyond its message. */
 export type BackendErrorOptions = Readonly<{
   /** The HTTP status, when the failure is an answer from the server. */
@@ -27,8 +29,10 @@ export type BackendErrorOptions = Readonly<{
  * (it carries the status, the URL and the body), and a request the backend
  * itself would not make (it carries only a message and a hint).
  */
-export class BackendError extends Error {
+export class BackendError extends Error implements Categorized {
   override readonly name: string = "BackendError";
+  /** The kind of failure; `unexpected` for a failure no subclass names. */
+  readonly category: ErrorCategory;
   readonly status: number | undefined;
   readonly url: string | undefined;
   readonly body: unknown;
@@ -36,10 +40,15 @@ export class BackendError extends Error {
   readonly hint: string | undefined;
   readonly details: unknown;
 
-  constructor(message: string, options: BackendErrorOptions = {}) {
+  constructor(
+    message: string,
+    options: BackendErrorOptions = {},
+    category: ErrorCategory = "unexpected",
+  ) {
     super(message, {
       cause: options.cause,
     });
+    this.category = category;
     this.status = options.status;
     this.url = options.url;
     this.body = options.body;
@@ -65,18 +74,66 @@ export class BackendError extends Error {
 }
 
 /** Something that is not there: a `404`, or a name that matches nothing. */
-export class NotFoundError extends BackendError {
-  override readonly name: string = "NotFoundError";
+export class BackendNotFoundError extends BackendError {
+  override readonly name: string = "BackendNotFoundError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "not_found");
+  }
 }
 
 /** The state the server holds refused the request: a `409`, or content that can never be served. */
-export class ConflictError extends BackendError {
-  override readonly name: string = "ConflictError";
+export class BackendConflictError extends BackendError {
+  override readonly name: string = "BackendConflictError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "conflict");
+  }
 }
 
-/** The request was wrong: a rejected body, or a value the backend would not send. */
-export class InvalidError extends BackendError {
-  override readonly name: string = "InvalidError";
+/** The server rejected the request as wrong: a `400` or `422`, or an origin it refuses. */
+export class BackendRejectedError extends BackendError {
+  override readonly name: string = "BackendRejectedError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "validation");
+  }
+}
+
+/** The operation or path asked for names nothing the API has. */
+export class BackendOperationUnknownError extends BackendError {
+  override readonly name: string = "BackendOperationUnknownError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "not_found");
+  }
+}
+
+/** The path names several operations and the method does not pick one, or picks none. */
+export class BackendOperationAmbiguousError extends BackendError {
+  override readonly name: string = "BackendOperationAmbiguousError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "validation");
+  }
+}
+
+/** The server does not implement what was asked: a `501`. Retrying cannot help. */
+export class BackendUnsupportedError extends BackendError {
+  override readonly name: string = "BackendUnsupportedError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "unsupported");
+  }
+}
+
+/** A bug in the backend's own code: something that cannot happen unless the code is wrong. */
+export class BackendInternalError extends BackendError {
+  override readonly name: string = "BackendInternalError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "internal");
+  }
 }
 
 /**
@@ -84,8 +141,12 @@ export class InvalidError extends BackendError {
  * succeed until it presents one the server knows, so a caller that tolerates a
  * refusal of permission must not tolerate this.
  */
-export class UnauthorizedError extends BackendError {
-  override readonly name: string = "UnauthorizedError";
+export class BackendUnauthorizedError extends BackendError {
+  override readonly name: string = "BackendUnauthorizedError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "auth");
+  }
 }
 
 /**
@@ -93,27 +154,31 @@ export class UnauthorizedError extends BackendError {
  * carry on without what it asked for — a read it only wanted if allowed —
  * tolerates this one and nothing else.
  */
-export class ForbiddenError extends BackendError {
-  override readonly name: string = "ForbiddenError";
+export class BackendForbiddenError extends BackendError {
+  override readonly name: string = "BackendForbiddenError";
+
+  constructor(message: string, options: BackendErrorOptions = {}) {
+    super(message, options, "auth");
+  }
 }
 
 /** Why a request got no usable response. */
-export type UnavailableReason = "unreachable" | "unreadable" | "timeout";
+export type BackendUnavailableReason = "unreachable" | "unreadable" | "timeout";
 
-/** What an {@link UnavailableError} carries beyond a {@link BackendError}. */
-export type UnavailableErrorOptions = BackendErrorOptions &
+/** What a {@link BackendUnavailableError} carries beyond a {@link BackendError}. */
+export type BackendUnavailableErrorOptions = BackendErrorOptions &
   Readonly<{
     /** Why no response came, when none did. */
-    reason?: UnavailableReason | undefined;
+    reason?: BackendUnavailableReason | undefined;
   }>;
 
 /** The server could not be used: it did not answer, or it failed with a `5xx`. */
-export class UnavailableError extends BackendError {
-  override readonly name: string = "UnavailableError";
-  readonly reason: UnavailableReason | undefined;
+export class BackendUnavailableError extends BackendError {
+  override readonly name: string = "BackendUnavailableError";
+  readonly reason: BackendUnavailableReason | undefined;
 
-  constructor(message: string, options: UnavailableErrorOptions = {}) {
-    super(message, options);
+  constructor(message: string, options: BackendUnavailableErrorOptions = {}) {
+    super(message, options, "unavailable");
     this.reason = options.reason;
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { responseFailure } from "@/lib/backend/client";
-import { NotFoundError } from "@/lib/backend/errors";
+import { BackendNotFoundError } from "@/lib/backend/errors";
 import { SchemaService } from "@/lib/backend/services/schema";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
@@ -70,7 +70,7 @@ describe("SchemaService.get", () => {
 
     const schema = await service({
       getSchema: async () => {
-        throw new NotFoundError("no such schema", { status: 404 });
+        throw new BackendNotFoundError("no such schema", { status: 404 });
       },
       listSchemas: { pages },
     }).get("human-user");
@@ -88,12 +88,12 @@ describe("SchemaService.get", () => {
     await expect(
       service({
         getSchema: async () => {
-          throw new NotFoundError("no such schema", { status: 404 });
+          throw new BackendNotFoundError("no such schema", { status: 404 });
         },
         listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
       }).get("typo"),
     ).rejects.toMatchObject({
-      name: "NotFoundError",
+      name: "BackendNotFoundError",
       message: 'No schema named "typo"',
       hint: "Run `schema list` to see the object types this project has.",
     });

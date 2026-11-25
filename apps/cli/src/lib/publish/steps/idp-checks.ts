@@ -1,4 +1,4 @@
-import { ForbiddenError, type VariableService } from "@/lib/backend";
+import { BackendForbiddenError, type VariableService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
 import type { Suggestion } from "@/lib/suggestion";
@@ -35,7 +35,7 @@ const VARIABLE_KIND = {
  *   secret name one variable, or a variable is not the kind its field needs.
  * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a connection names a
  *   variable the project does not hold.
- * @throws {@link ForbiddenError} When a deploy's token may not read the
+ * @throws {@link BackendForbiddenError} When a deploy's token may not read the
  *   variables.
  */
 export async function validateConnections(ctx: StepContext): Promise<void> {
@@ -63,13 +63,13 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
  * @param ctx - The step's context.
  * @returns Each variable's name and whether it is a secret, or `undefined`
  *   when a preview's token may not read them.
- * @throws {@link ForbiddenError} When a deploy's token may not read them.
+ * @throws {@link BackendForbiddenError} When a deploy's token may not read them.
  */
 async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, boolean> | undefined> {
   try {
     return await ctx.variables.heldByName(VARIABLE_KIND[ctx.mode]);
   } catch (error) {
-    if (ctx.mode === "preview" && error instanceof ForbiddenError) {
+    if (ctx.mode === "preview" && error instanceof BackendForbiddenError) {
       return undefined;
     }
     throw error;

@@ -15,7 +15,7 @@ import {
   setupRetryFlags,
   signInOf,
 } from "@/cli/commands/setup/shared";
-import { createZitadelClient, InvalidError, PolicyService } from "@/lib/backend";
+import { createZitadelClient, BackendRejectedError, PolicyService } from "@/lib/backend";
 import { isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
 import { Spelling, WHAT_CHANGED } from "@/lib/suggestion";
 import { Runtime } from "@/lib/runtime";
@@ -131,7 +131,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
             if (isCancellation(error) || this.deps.signal.aborted) {
               throw error;
             }
-            return !(error instanceof InvalidError && error.serverCode === "req.invalid");
+            return !(error instanceof BackendRejectedError && error.serverCode === "req.invalid");
           },
         );
       const scaffold = await scaffoldOf(this.deps.cwd, this.deps.force, answers, signupPolicy);

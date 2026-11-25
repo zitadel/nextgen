@@ -19,14 +19,18 @@ export {
   type ZitadelClient,
 } from "./client";
 export {
+  BackendConflictError,
   BackendError,
-  ConflictError,
-  ForbiddenError,
-  InvalidError,
-  NotFoundError,
-  UnauthorizedError,
-  UnavailableError,
-  type UnavailableReason,
+  BackendForbiddenError,
+  BackendInternalError,
+  BackendNotFoundError,
+  BackendOperationAmbiguousError,
+  BackendOperationUnknownError,
+  BackendRejectedError,
+  BackendUnauthorizedError,
+  BackendUnavailableError,
+  type BackendUnavailableReason,
+  BackendUnsupportedError,
 } from "./errors";
 export {
   type AttemptFactor,

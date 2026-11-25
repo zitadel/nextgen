@@ -7,13 +7,15 @@ import { destructiveOperations } from "@zitadel/api/generated/operations";
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import {
-  type BackendError,
-  ConflictError,
-  ForbiddenError,
-  InvalidError,
-  NotFoundError,
-  UnauthorizedError,
-  UnavailableError,
+  BackendConflictError,
+  BackendError,
+  BackendForbiddenError,
+  BackendInternalError,
+  BackendNotFoundError,
+  BackendRejectedError,
+  BackendUnauthorizedError,
+  BackendUnavailableError,
+  BackendUnsupportedError,
 } from "./errors";
 
 /**
@@ -42,24 +44,37 @@ function refusalOf(error: ApiError): BackendError {
   // flow that already completed — but either way what was asked for is not
   // there, and neither is a request to correct and send again.
   if (error.status === 404 || error.status === 410) {
-    return new NotFoundError(message, options);
+    return new BackendNotFoundError(message, options);
   }
   if (error.status === 409) {
-    return new ConflictError(message, options);
+    return new BackendConflictError(message, options);
   }
   if (error.status === 401) {
-    return new UnauthorizedError(message, options);
+    return new BackendUnauthorizedError(message, options);
   }
-  if (error.status === 403 && apiErrorCode(error) !== "proj.origin_not_allowed") {
-    return new ForbiddenError(message, options);
+  // A 403 naming an origin the project does not hold is a refused target, not
+  // a bad credential: re-authenticating would never fix it.
+  if (error.status === 403) {
+    return apiErrorCode(error) === "proj.origin_not_allowed"
+      ? new BackendRejectedError(message, options)
+      : new BackendForbiddenError(message, options);
+  }
+  // Not implemented: the server will never do this, so retrying cannot help.
+  if (error.status === 501) {
+    return new BackendUnsupportedError(message, options);
   }
   // Too many requests: the server is telling the caller to come back, not that
   // the request was wrong, so it joins the failures a caller may retry rather
   // than the ones it must fix.
   if (error.status === 429 || error.status >= 500) {
-    return new UnavailableError(message, options);
+    return new BackendUnavailableError(message, options);
   }
-  return new InvalidError(message, options);
+  // The statuses that mean the body was wrong. Any other (a redirect, a 405, a
+  // 408) is one nobody anticipated, so it is not the user's to fix.
+  if (error.status === 400 || error.status === 422) {
+    return new BackendRejectedError(message, options);
+  }
+  return new BackendError(message, options);
 }
 
 /**
@@ -72,7 +87,7 @@ function refusalOf(error: ApiError): BackendError {
  */
 export function translateFailure(error: unknown): unknown {
   if (error instanceof NetworkError) {
-    return new UnavailableError(error.message, {
+    return new BackendUnavailableError(error.message, {
       url: error.url,
       reason: error.reason,
       cause: error,
@@ -120,7 +135,7 @@ const fullClients = new WeakMap<object, ZitadelClient>();
  */
 function withholdDestructive(client: ZitadelClient): ZitadelClient {
   const refuse = (what: string): never => {
-    throw new Error(`${what} is destructive: reach it through allowDestructive`);
+    throw new BackendInternalError(`${what} is destructive: reach it through allowDestructive`);
   };
   const narrowed = new Proxy(client, {
     get(target, property, receiver) {
@@ -152,7 +167,9 @@ function withholdDestructive(client: ZitadelClient): ZitadelClient {
 export function allowDestructive(client: ZitadelClient): ZitadelClient {
   const full = fullClients.get(client);
   if (full === undefined) {
-    throw new Error("Only a client createZitadelClient made can allow its destructive operations");
+    throw new BackendInternalError(
+      "Only a client createZitadelClient made can allow its destructive operations",
+    );
   }
   return full;
 }
@@ -238,7 +255,7 @@ const connections = new WeakMap<object, Connection>();
 export function connectionOf(client: ZitadelClient): Connection {
   const connection = connections.get(client);
   if (connection === undefined) {
-    throw new Error("Only a client createZitadelClient made has a connection");
+    throw new BackendInternalError("Only a client createZitadelClient made has a connection");
   }
   return connection;
 }

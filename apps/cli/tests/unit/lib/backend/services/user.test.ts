@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
+import { BackendForbiddenError, BackendNotFoundError } from "@/lib/backend/errors";
 import { UserService } from "@/lib/backend/services/user";
 import { fakeClient } from "@tests/helpers/fake-client";
 
@@ -60,7 +60,7 @@ describe("UserService.hasIdentityLink", () => {
     const userService = new UserService(
       fakeClient({
         listUserIdentityLinks: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw new BackendNotFoundError("usr_1 is gone", { status: 404 });
         },
       }),
     );
@@ -72,7 +72,7 @@ describe("UserService.hasIdentityLink", () => {
     const userService = new UserService(
       fakeClient({
         listUserIdentityLinks: async () => {
-          throw new ForbiddenError("not allowed", { status: 403 });
+          throw new BackendForbiddenError("not allowed", { status: 403 });
         },
       }),
     );
@@ -120,7 +120,7 @@ describe("UserService.credentials", () => {
     const userService = new UserService(
       client({
         listUserPasskeys: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw new BackendNotFoundError("usr_1 is gone", { status: 404 });
         },
       }),
     );
@@ -133,7 +133,7 @@ describe("UserService.credentials", () => {
       client({
         listUserPasskeys: async () => ({ passkeys: [{ id: "pk_1" }] }),
         getUserPasswordState: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw new BackendNotFoundError("usr_1 is gone", { status: 404 });
         },
       }),
     );
@@ -147,7 +147,7 @@ describe("UserService.credentials", () => {
     const userService = new UserService(
       client({
         listUserPasskeys: async () => {
-          throw new ForbiddenError("not allowed", { status: 403 });
+          throw new BackendForbiddenError("not allowed", { status: 403 });
         },
       }),
     );

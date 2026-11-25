@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ForbiddenError } from "@/lib/backend/errors";
+import { BackendForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
@@ -19,7 +19,10 @@ const ACME = aConfig({ connections: { "acme.json": anOidcConnection() } });
  */
 const FORBIDDEN: ClientStubs = {
   listVariables: async () => {
-    throw new ForbiddenError("Forbidden", { status: 403, url: "https://api.example/variables" });
+    throw new BackendForbiddenError("Forbidden", {
+      status: 403,
+      url: "https://api.example/variables",
+    });
   },
 };
 
@@ -184,7 +187,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ForbiddenError);
+      expect(error).toBeInstanceOf(BackendForbiddenError);
     });
   });
 

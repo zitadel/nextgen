@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ForbiddenError } from "@/lib/backend/errors";
+import { BackendForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { IdpService } from "@/lib/backend/services/idp";
 import { fakeClient } from "@tests/helpers/fake-client";
@@ -55,7 +55,7 @@ describe("IdpService.deployedSlugs", () => {
       fakeClient({
         queryIdps: {
           all: async () => {
-            throw new ForbiddenError("not allowed", { status: 403 });
+            throw new BackendForbiddenError("not allowed", { status: 403 });
           },
         },
       }),

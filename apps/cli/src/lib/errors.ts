@@ -1,15 +1,7 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import {
-  BackendError,
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  UnauthorizedError,
-  UnavailableError,
-  type UnavailableReason,
-} from "./backend";
-import { type ErrorCategory, isCategorized } from "./error-category";
+import { BackendError, BackendUnavailableError, type BackendUnavailableReason } from "./backend";
+import { type Categorized, ERROR_CATEGORIES, type ErrorCategory } from "@/constants";
 import { isObject } from "./json";
 import type { Suggested } from "./suggestion";
 import {
@@ -175,7 +167,7 @@ const CATEGORY_CODES: Record<ErrorCategory, ZitadelErrorCode> = {
 };
 
 /** What to do about a request that got no usable response, by its reason. */
-const NETWORK_HINTS: Record<UnavailableReason, string> = {
+const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
   timeout:
     "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
@@ -362,32 +354,19 @@ export function toZitadelError(error: unknown): ZitadelError {
  * its class, and its message, hint and details as they were given.
  */
 function fromBackendError(error: BackendError): ZitadelError {
-  if (error instanceof UnavailableError && error.reason !== undefined) {
+  if (error instanceof BackendUnavailableError && error.reason !== undefined) {
     return new ZitadelError("E_NETWORK", error.message, {
       hint: NETWORK_HINTS[error.reason],
       details: { url: error.url, reason: error.reason },
     });
   }
+  const code = CATEGORY_CODES[error.category];
   if (error.status === undefined || error.url === undefined) {
-    const code: ZitadelErrorCode =
-      error instanceof NotFoundError
-        ? "E_NOT_FOUND"
-        : error instanceof ConflictError
-          ? "E_CONFLICT"
-          : error instanceof UnauthorizedError || error instanceof ForbiddenError
-            ? "E_AUTH"
-            : error instanceof UnavailableError
-              ? "E_NETWORK"
-              : "E_VALIDATION";
-
     return new ZitadelError(code, error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
     });
   }
-  // `401`/`403` → bad or missing project secret; `404` → something is
-  // missing (see below); `5xx` → transport or server fault; everything
-  // else 4xx → the body the CLI sent was rejected (validation, conflict, …).
   const { status, url } = error;
   const details = { status, url, body: error.body };
   if (error.status === 404) {
@@ -414,28 +393,10 @@ function fromBackendError(error: BackendError): ZitadelError {
 
     return new ZitadelError("E_NOT_FOUND", message, { details });
   }
-  // A 409 is the platform refusing because of the state it holds — a
-  // release still served, a deploy that raced in, a revoked release — not
-  // because the request was malformed, so it is a conflict.
-  // A 403 naming an origin the project does not hold is a refused target,
-  // not a bad credential: re-authenticating would never fix it.
-  // A 410 is gone rather than never there — a closed claim window, a flow that
-  // already completed — which is still something missing and not a request to
-  // correct. A 429 is the server asking for less traffic, so it joins the
-  // failures worth retrying rather than the ones to fix, which is what
-  // `E_NETWORK` says and what its exit code means to a script.
-  const originRefused = error.status === 403 && error.serverCode === "proj.origin_not_allowed";
-  const code: ZitadelErrorCode = originRefused
-    ? "E_VALIDATION"
-    : error.status === 401 || error.status === 403
-      ? "E_AUTH"
-      : error.status === 409
-        ? "E_CONFLICT"
-        : error.status === 410
-          ? "E_NOT_FOUND"
-          : error.status === 429 || error.status >= 500
-            ? "E_NETWORK"
-            : "E_VALIDATION";
+  // Which code a status gets was decided once, where the response became a
+  // backend error: a 409 is a conflict, a 410 is gone, a 429 or a 5xx is worth
+  // retrying, an origin the project does not hold is a refused target and not
+  // a bad credential. The category it carries is that decision.
   // The platform names the fields it rejected, and the message does not
   // repeat them: `idp.field_immutable` says only "the field is fixed for the
   // life of the connection", which leaves the reader to guess which of a
@@ -564,6 +525,21 @@ function resourceLine(item: unknown): string | undefined {
  */
 export function isCancellation(error: unknown): boolean {
   return error instanceof ZitadelError && error.code === "E_CANCELLED";
+}
+
+/**
+ * Whether a caught value is an error that says what kind of failure it is.
+ *
+ * @param error - Whatever was caught.
+ * @returns True for an `Error` whose `category` is one of {@link ERROR_CATEGORIES}.
+ */
+export function isCategorized(error: unknown): error is Error & Categorized {
+  return (
+    error instanceof Error &&
+    ERROR_CATEGORIES.some((category) => {
+      return category === (error as Partial<Categorized>).category;
+    })
+  );
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

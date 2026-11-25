@@ -3,7 +3,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { NotFoundError } from "@/lib/backend/errors";
+import { BackendNotFoundError } from "@/lib/backend/errors";
 
 /** What narrows a query of the project's users: its filters, sorts and page size. */
 export type UserQuery = Readonly<QueryUsersBody>;
@@ -75,7 +75,7 @@ export class UserService extends ApiService {
    */
   async hasIdentityLink(userId: string): Promise<boolean> {
     const links = await this.identityLinks(userId).catch((error: unknown): IdentityLinks => {
-      if (error instanceof NotFoundError) {
+      if (error instanceof BackendNotFoundError) {
         return [];
       }
       throw error;
@@ -116,7 +116,7 @@ export class UserService extends ApiService {
         }
       } catch (error) {
         // Gone mid-read: what was read before belonged to a user who no longer exists.
-        if (error instanceof NotFoundError) {
+        if (error instanceof BackendNotFoundError) {
           return new Set();
         }
         throw error;
@@ -131,7 +131,7 @@ export class UserService extends ApiService {
    * @param userId - The user to read.
    * @param limit - How many to read, where the caller only counts them.
    * @returns The links the user holds.
-   * @throws NotFoundError when the project holds no such user.
+   * @throws BackendNotFoundError when the project holds no such user.
    */
   async identityLinks(userId: string, limit = 1): Promise<IdentityLinks> {
     const read = await this.client.listUserIdentityLinks(userId, {

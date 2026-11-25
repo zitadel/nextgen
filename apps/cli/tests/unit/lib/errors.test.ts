@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import { responseFailure } from "@/lib/backend";
-import { ERROR_CATEGORIES } from "@/lib/error-category";
+import { ERROR_CATEGORIES } from "@/constants";
 import { GitError } from "@/lib/git/errors";
-import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
+import {
+  BackendForbiddenError,
+  BackendUnauthorizedError,
+  BackendUnavailableError,
+} from "@/lib/backend/errors";
 import {
   EXIT_CODES,
   ZitadelError,
   errorMessage,
   failureText,
   isCancellation,
+  isCategorized,
   toZitadelError,
 } from "@/lib/errors";
 import { BrokenFlowsError, ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
@@ -172,8 +177,8 @@ describe("toZitadelError", () => {
   });
 
   it.each([
-    ["UnauthorizedError", new UnauthorizedError("the credential was not accepted")],
-    ["ForbiddenError", new ForbiddenError("the credential may not do this")],
+    ["BackendUnauthorizedError", new BackendUnauthorizedError("the credential was not accepted")],
+    ["BackendForbiddenError", new BackendForbiddenError("the credential may not do this")],
   ])("maps a %s the backend raised to E_AUTH", (_name, err) => {
     const result = toZitadelError(err);
 
@@ -182,7 +187,7 @@ describe("toZitadelError", () => {
   });
 
   it("maps a request that got no response to E_NETWORK", () => {
-    const err = new UnavailableError(
+    const err = new BackendUnavailableError(
       "GET http://localhost:8080/idps got no response (ECONNREFUSED)",
       {
         url: "http://localhost:8080/idps",
@@ -198,7 +203,7 @@ describe("toZitadelError", () => {
   });
 
   it("maps a request that timed out to E_NETWORK with a hint about the server", () => {
-    const err = new UnavailableError("GET … timed out", {
+    const err = new BackendUnavailableError("GET … timed out", {
       url: "http://localhost:8080/idps",
       reason: "timeout",
     });
@@ -210,7 +215,7 @@ describe("toZitadelError", () => {
   });
 
   it("maps a response whose body could not be read to E_NETWORK with a hint about proxies", () => {
-    const err = new UnavailableError(
+    const err = new BackendUnavailableError(
       "GET http://localhost:8080/idps answered 200, but its body could not be read",
       {
         url: "http://localhost:8080/idps",
@@ -695,5 +700,23 @@ describe("toZitadelError for an error that says its category", () => {
 
   it("names a code for every category", () => {
     expect(ERROR_CATEGORIES).toHaveLength(9);
+  });
+});
+
+describe("isCategorized", () => {
+  it.each(ERROR_CATEGORIES)("accepts an error whose category is %s", (category) => {
+    expect(isCategorized(Object.assign(new Error("why"), { category }))).toBe(true);
+  });
+
+  it("refuses an error with no category", () => {
+    expect(isCategorized(new Error("why"))).toBe(false);
+  });
+
+  it("refuses an error whose category is not one of the set", () => {
+    expect(isCategorized(Object.assign(new Error("why"), { category: "other" }))).toBe(false);
+  });
+
+  it("refuses a value that is not an error", () => {
+    expect(isCategorized({ category: "validation" })).toBe(false);
   });
 });

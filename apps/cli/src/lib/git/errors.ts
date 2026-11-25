@@ -1,4 +1,4 @@
-import type { Categorized, ErrorCategory } from "@/lib/error-category";
+import type { Categorized, ErrorCategory } from "@/constants";
 
 /**
  * Every error the git package throws.

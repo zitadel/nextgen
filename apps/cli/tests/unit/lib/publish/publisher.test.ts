@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { BackendConflictError, BackendForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
 import { Output } from "@/lib/ui";
@@ -120,7 +120,7 @@ function listing(...slugs: readonly string[]): ClientStubs["queryIdps"] {
  */
 const REFUSED_LISTING: ClientStubs["queryIdps"] = {
   all: async () => {
-    throw new ForbiddenError("not allowed", { status: 403 });
+    throw new BackendForbiddenError("not allowed", { status: 403 });
   },
 };
 
@@ -228,7 +228,7 @@ describe("Publisher.deploy", () => {
           },
         },
         createDeployment: async () => {
-          throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+          throw new BackendConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
         },
       }),
       PROJECT_ID,
@@ -262,7 +262,7 @@ describe("Publisher.deploy", () => {
         return publisher.deploy({ prepared: PREPARED });
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toBeInstanceOf(BackendConflictError);
     });
 
     it("deploys nothing", async () => {

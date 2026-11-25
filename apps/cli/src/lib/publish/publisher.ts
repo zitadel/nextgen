@@ -355,7 +355,7 @@ export class Publisher {
    *
    * @param request - The prepared bundle and the release's message.
    * @returns The release, new or the one the content already built.
-   * @throws ConflictError when the content matches a release that was revoked.
+   * @throws BackendConflictError when the content matches a release that was revoked.
    */
   async createRelease(request: ReleaseRequest): Promise<Release> {
     return this.releases.create({

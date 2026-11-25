@@ -1,7 +1,7 @@
 import { RevokeRelease409DetailsOriginsItemKind } from "@zitadel/api/generated/model";
 import { describe, expect, it, vi } from "vitest";
 
-import { ConflictError } from "@/lib/backend/errors";
+import { BackendConflictError } from "@/lib/backend/errors";
 import { ReleaseService } from "@/lib/backend/services/release";
 import { fakeClient } from "@tests/helpers/fake-client";
 import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
@@ -49,7 +49,7 @@ describe("ReleaseService.create", () => {
     const releaseService = new ReleaseService(fakeClient({ buildRelease }), "proj_1");
 
     await expect(releaseService.create(INPUT)).rejects.toMatchObject({
-      name: "ConflictError",
+      name: "BackendConflictError",
       message: expect.stringContaining("rel_1"),
     });
   });
@@ -110,7 +110,7 @@ describe("ReleaseService.revoke", () => {
      */
     function refusedWith(body: unknown): ReleaseService {
       const revokeRelease = async () => {
-        throw new ConflictError("release: still served by an origin", { status: 409, body });
+        throw new BackendConflictError("release: still served by an origin", { status: 409, body });
       };
 
       return new ReleaseService(fakeClient({ revokeRelease }), "proj_1");
@@ -150,7 +150,7 @@ describe("ReleaseService.revoke", () => {
         return releaseService.revoke("rel_1");
       });
 
-      expect(refusal).toBeInstanceOf(ConflictError);
+      expect(refusal).toBeInstanceOf(BackendConflictError);
     });
   });
 });

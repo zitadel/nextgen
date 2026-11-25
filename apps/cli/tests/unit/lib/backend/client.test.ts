@@ -9,7 +9,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { connectionOf, REQUEST_TIMEOUT_MS, translateFailure } from "@/lib/backend/client";
-import { InvalidError } from "@/lib/backend/errors";
+import { BackendRejectedError } from "@/lib/backend/errors";
 
 const signal = new AbortController().signal;
 
@@ -48,7 +48,7 @@ describe("createZitadelClient", () => {
       .getProject("p1")
       .catch((err: unknown) => err);
 
-    expect(error).toBeInstanceOf(InvalidError);
+    expect(error).toBeInstanceOf(BackendRejectedError);
     expect(error).toMatchObject({
       status: 400,
       body: {
@@ -141,16 +141,19 @@ describe("a client's destructive operations", () => {
 
 describe("responseFailure", () => {
   it.each([
-    [404, "NotFoundError"],
-    [410, "NotFoundError"],
-    [409, "ConflictError"],
-    [401, "UnauthorizedError"],
-    [403, "ForbiddenError"],
-    [400, "InvalidError"],
-    [422, "InvalidError"],
-    [429, "UnavailableError"],
-    [500, "UnavailableError"],
-    [503, "UnavailableError"],
+    [404, "BackendNotFoundError"],
+    [410, "BackendNotFoundError"],
+    [409, "BackendConflictError"],
+    [401, "BackendUnauthorizedError"],
+    [403, "BackendForbiddenError"],
+    [400, "BackendRejectedError"],
+    [422, "BackendRejectedError"],
+    [429, "BackendUnavailableError"],
+    [500, "BackendUnavailableError"],
+    [503, "BackendUnavailableError"],
+    [501, "BackendUnsupportedError"],
+    [405, "BackendError"],
+    [408, "BackendError"],
   ])("raises a %i as a %s", (status, name) => {
     expect(responseFailure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
       name,
@@ -166,7 +169,7 @@ describe("responseFailure", () => {
         { code: "proj.origin_not_allowed" },
         "refused",
       ),
-    ).toMatchObject({ name: "InvalidError" });
+    ).toMatchObject({ name: "BackendRejectedError" });
   });
 
   it("carries the status, the URL and the body the server answered with", () => {
@@ -218,7 +221,7 @@ describe("translateFailure", () => {
     (reason) => {
       expect(
         translateFailure(new NetworkError("http://localhost:8080", reason, "no answer")),
-      ).toMatchObject({ name: "UnavailableError", reason });
+      ).toMatchObject({ name: "BackendUnavailableError", reason });
     },
   );
 

@@ -95,7 +95,7 @@ describe("FlowService.get", () => {
         },
       }).get("typo"),
     ).rejects.toMatchObject({
-      name: "NotFoundError",
+      name: "BackendNotFoundError",
       message: 'No flow definition named "typo"',
       hint: "Run `flow-definition list` to see the flows this project has.",
     });

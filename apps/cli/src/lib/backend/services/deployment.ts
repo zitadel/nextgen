@@ -8,7 +8,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { isCancelled, pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { ConflictError } from "@/lib/backend/errors";
+import { BackendConflictError } from "@/lib/backend/errors";
 
 import { OriginService } from "./origin";
 import { Variable } from "./variable";
@@ -506,7 +506,7 @@ export class DeploymentService extends ApiService {
    *
    * @param input - The release, the targets and the optional guard.
    * @returns The deployment, new or the one the targets already served.
-   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   * @throws BackendConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async create(input: DeploymentInput): Promise<Deployment> {
     const record = await this.client.createDeployment(input, {
@@ -522,7 +522,7 @@ export class DeploymentService extends ApiService {
    * @param deploymentId - The deployment to re-apply.
    * @param options - A message, and the guard against a deploy that raced in.
    * @returns The deployment the rollback wrote, or the one already serving.
-   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   * @throws BackendConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async rollback(deploymentId: string, options: RollbackInput = {}): Promise<Deployment> {
     const record = await this.client.rollbackDeployment(
@@ -560,7 +560,7 @@ export class DeploymentService extends ApiService {
         deployment,
       };
     } catch (error) {
-      if (!(error instanceof ConflictError)) {
+      if (!(error instanceof BackendConflictError)) {
         throw error;
       }
       if (error.serverCode === "rel.revoked") {

@@ -5,11 +5,12 @@ import { ApiCall, type PathValues } from "@/cli/core/crud/api-call";
 import {
   type ApiRequest,
   createZitadelClient,
-  InvalidError,
+  BackendOperationAmbiguousError,
+  BackendOperationUnknownError,
   Operation,
   OperationService,
   type Target,
-  UnauthorizedError,
+  BackendUnauthorizedError,
   type ZitadelClient,
 } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
@@ -74,7 +75,10 @@ function resolveTarget(ref: string, method?: string): Target {
   try {
     return Operation.named(ref, method);
   } catch (error) {
-    if (error instanceof InvalidError) {
+    if (
+      error instanceof BackendOperationUnknownError ||
+      error instanceof BackendOperationAmbiguousError
+    ) {
       throw new ZitadelError("E_VALIDATION", error.message, {
         hint: error.hint,
         nextCommands: [
@@ -415,7 +419,7 @@ export default class Api extends Telemetered(
       ? operationService.callAll(request)
       : operationService.call(request)
     ).catch((error: unknown) => {
-      if (error instanceof UnauthorizedError && operation.auth === "secret") {
+      if (error instanceof BackendUnauthorizedError && operation.auth === "secret") {
         throw new ZitadelError("E_AUTH", error.message, {
           hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
           details: {

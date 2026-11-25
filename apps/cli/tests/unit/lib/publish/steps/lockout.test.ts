@@ -5,7 +5,7 @@ import type {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Credential } from "@/lib/backend";
-import { NotFoundError } from "@/lib/backend/errors";
+import { BackendNotFoundError } from "@/lib/backend/errors";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { warnings } from "@/lib/ui";
 import type { JsonObject, JsonValue } from "@/lib/zitadel";
@@ -149,7 +149,7 @@ function aPlatform(platform: Platform = {}): ClientStubs {
   } = platform;
   const reachable = (userId: string) => {
     if (gone.includes(userId)) {
-      throw new NotFoundError(`${userId} is gone`, { status: 404 });
+      throw new BackendNotFoundError(`${userId} is gone`, { status: 404 });
     }
     if (credentialsUnreadableFor.includes(userId)) {
       throw new Error("forbidden");
