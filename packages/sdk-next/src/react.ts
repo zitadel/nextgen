@@ -19,6 +19,8 @@
  * from client-side state (e.g. a `getSession()` read), render
  * {@link AuthContextProvider}, which only accepts the token-less
  * `ClientAuthResult`.
+ *
+ * @module
  */
 export { AuthContextProvider, useAuthContext } from "./context.js";
 export { useAuth } from "./useAuth.js";

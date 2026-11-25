@@ -64,3 +64,22 @@
   url={project?.url}
   post-sign-out-url={postSignOutUrl}
 ></zitadel-logout>
+
+<!--
+  @component
+  Renders the sign-out control as a `<zitadel-logout>` custom element.
+
+  Like the other wrappers it writes `projectId` and `proxyPath` as the
+  `project-id` and `proxy-path` attributes for server markup, assigns the
+  `project` handle as a property in the browser, and forwards the element's
+  `zitadel-signout` event to `onSignout`; a promise the callback returns delays
+  the post-sign-out navigation for up to two seconds.
+
+  Use it where the app offers a stand-alone sign-out button; use the session
+  card when the user's identity should be shown as well. Props are typed by
+  {@link ZitadelLogoutSvelteProps}. `getElement()` returns the underlying
+  element, or `undefined` before mount, via `bind:this`.
+
+  @example
+  <ZitadelLogout {project} postSignOutUrl="/login" />
+-->

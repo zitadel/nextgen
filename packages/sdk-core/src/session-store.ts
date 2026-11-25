@@ -20,7 +20,12 @@ export type SessionStatus = "loading" | "authenticated" | "unauthenticated" | "e
 export type SessionErrorCode = "session.no_project" | "session.read_failed";
 
 /** A failed read, as plain data. */
-export type SessionError = { code: SessionErrorCode; message: string };
+export type SessionError = {
+  /** A stable code to branch on. */
+  code: SessionErrorCode;
+  /** A human-readable description, for logs; not stable. */
+  message: string;
+};
 
 /**
  * The session as a store holds it: flat, plain data, so a framework can
@@ -32,6 +37,7 @@ export type SessionError = { code: SessionErrorCode; message: string };
  * transient failure. `error` clears on the next successful read.
  */
 export type SessionSnapshot = {
+  /** Where the read stands: `loading` until the first answer, then the last answer the server gave. */
   status: SessionStatus;
   /** The signed-in user's client-safe identity; `null` unless `status` is `authenticated`. */
   session: ClientSession | null;

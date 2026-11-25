@@ -337,9 +337,27 @@ function withNoStore(response: Response): Response {
  * else `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
  * Compose it with other hooks via `sequence()` from `@sveltejs/kit/hooks`.
  *
+ * For each request the hook, in order:
+ *
+ * 1. answers `400` to any request carrying `x-nextgen-auth-token`, an internal
+ *    header clients never send;
+ * 2. passes requests matching `ignoredRoutes` straight to `resolve`;
+ * 3. proxies `proxyPath` (`/__nextgen` by default) to `url`, so the browser
+ *    talks to the auth backend same-origin and the project secret stays on the
+ *    server;
+ * 4. verifies the session, stores the result in `event.locals.nextgenAuth`,
+ *    redirects to `loginPath` on a protected route with no session, and
+ *    answers `503` there when the backend cannot say whether the session is
+ *    live.
+ *
+ * It uses only Web APIs (`fetch`, Web Crypto) and reads `process.env`
+ * defensively, so it runs on Cloudflare Workers and other edge adapters.
+ *
  * @param options - Middleware configuration options. `projectSecret` is the
  *   project service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
  * @returns A SvelteKit `handle` hook.
+ * @throws Error when `loginPath` is not a relative path starting with a single
+ *   `/`, which would let the login redirect leave the app (open redirect).
  */
 export function createNextgenHandle(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},

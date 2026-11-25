@@ -68,3 +68,22 @@
   url={project?.url}
   post-sign-out-url={postSignOutUrl}
 ></zitadel-session>
+
+<!--
+  @component
+  Renders the signed-in session card as a `<zitadel-session>` custom element.
+
+  The card shows who is signed in and a sign-out action. Optional props
+  (`heading`, `logoutLabel`, `variant`, `theme`, `suppressHeader`) are assigned
+  only when set, so an unset prop keeps the element's own default instead of
+  blanking it. `projectId` and `proxyPath` are written as the `project-id` and
+  `proxy-path` attributes for server markup, and `onSignout` receives the
+  element's `zitadel-signout` event.
+
+  Use it to show the current user. Props are typed by
+  {@link ZitadelSessionSvelteProps}. `getElement()` returns the underlying
+  element, or `undefined` before mount, via `bind:this`.
+
+  @example
+  <ZitadelSession {project} postSignOutUrl="/login" />
+-->

@@ -26,35 +26,125 @@ const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
 
 /**
- * The slice of Qwik Router's `RequestEvent` this handler reads. `@qwik.dev/router`
- * is a peer, not a runtime dependency: typing only the handful of fields we
- * touch keeps the built output free of a Qwik import, the same way `sdk-nuxt`
- * shims Nuxt's `#imports`. The shape is structurally compatible with the real
- * `RequestEvent` (a type-level test asserts it), so the returned handler drops
- * straight into `export const onRequest = createNextgenOnRequest(...)`.
+ * A cookie as Qwik Router's `ev.cookie.get` returns it.
+ *
+ * Only the `value` is declared because it is the only field this handler
+ * reads; the real Qwik Router cookie object has more, and is structurally
+ * assignable to this one.
  */
 export interface QwikCookieValue {
+  /**
+   * The cookie's decoded value, as sent by the browser or set earlier in the
+   * same request.
+   */
   readonly value: string;
 }
 
-/** The options of `ev.cookie.set` this handler passes. */
+/**
+ * The options of `ev.cookie.set` this handler passes when it applies the
+ * session cookies a verdict asks for (see {@link createNextgenOnRequest}).
+ *
+ * The handler always sets `path: "/"`, `httpOnly: true` and `sameSite: "lax"`,
+ * so the session cookie is never readable from page scripts and is sent on
+ * top-level navigations back to the app.
+ */
 export interface QwikCookieOptions {
+  /**
+   * The path the cookie applies to. The handler always passes `"/"` so every
+   * route of the app sees the session.
+   */
   readonly path?: string;
+  /**
+   * Hides the cookie from `document.cookie`. The handler always passes
+   * `true`: the browser never needs to read the session token.
+   */
   readonly httpOnly?: boolean;
+  /**
+   * The `SameSite` policy. The handler always passes `"lax"`, which keeps the
+   * cookie on the redirect back from an identity provider.
+   */
   readonly sameSite?: "lax";
+  /**
+   * Restricts the cookie to HTTPS. Set from the verdict, so it follows the
+   * scheme the app is served on.
+   */
   readonly secure?: boolean;
+  /**
+   * Lifetime in seconds. Omitted for a session cookie that lives until the
+   * browser closes.
+   */
   readonly maxAge?: number;
 }
 
+/**
+ * The slice of Qwik Router's `RequestEvent` this handler reads.
+ *
+ * `@qwik.dev/router` is a peer, not a runtime dependency: typing only the
+ * handful of fields the handler touches keeps the built output free of a Qwik
+ * import, the same way `sdk-nuxt` shims Nuxt's `#imports`. The shape is
+ * structurally compatible with the real `RequestEvent` (a type-level test
+ * asserts it), so the returned handler drops straight into
+ * `export const onRequest = createNextgenOnRequest(...)`.
+ */
 export interface QwikRequestEvent {
+  /** The incoming request: its headers, cookies and body are what the handler judges or proxies. */
   readonly request: Request;
+  /**
+   * The parsed request URL. Its `pathname` decides whether the request is
+   * ignored, proxied or checked, and its host and protocol become the
+   * `X-Forwarded-*` headers on a proxied request.
+   */
   readonly url: URL;
+  /**
+   * Per-request storage shared with loaders, actions and endpoints. The
+   * handler stores the auth result here for {@link getAuth} to read.
+   */
   readonly sharedMap: Map<string, unknown>;
-  readonly clientConn: { readonly ip?: string };
+  /**
+   * What the platform adapter knows about the connection.
+   */
+  readonly clientConn: {
+    /**
+     * The client's IP address, appended to `X-Forwarded-For` on a proxied
+     * request so the auth server sees the real client. Absent when the
+     * adapter cannot tell.
+     */
+    readonly ip?: string;
+  };
+  /**
+   * Qwik Router's cookie jar. The handler reads the session cookie from it and
+   * writes or deletes the session cookies a verdict asks for; Qwik applies the
+   * changes to whichever response goes out.
+   */
   readonly cookie: {
+    /**
+     * Reads one cookie of the request.
+     *
+     * @param name - The cookie name.
+     * @returns The cookie, or `null` when the request carries none by that name.
+     */
     get(name: string): QwikCookieValue | null;
+    /**
+     * Reads every cookie of the request.
+     *
+     * @returns The cookies keyed by name.
+     */
     getAll(): Record<string, QwikCookieValue>;
+    /**
+     * Sets a cookie on the outgoing response.
+     *
+     * @param name - The cookie name.
+     * @param value - The cookie value.
+     * @param options - See {@link QwikCookieOptions}.
+     */
     set(name: string, value: string, options?: QwikCookieOptions): void;
+    /**
+     * Expires a cookie on the outgoing response. Used for a session the backend
+     * reports dead, so the browser stops replaying it.
+     *
+     * @param name - The cookie name.
+     * @param options - The `path` the cookie was set on.
+     */
     delete(name: string, options?: { path?: string }): void;
   };
   /**
@@ -62,9 +152,22 @@ export interface QwikRequestEvent {
    * included. Optional so that unit-test mocks need not stub it.
    */
   readonly headers?: Headers;
-  /** Sends a custom response and ends the chain. */
+  /**
+   * Sends a custom response and ends the chain. The handler uses it for the
+   * proxied answer, a `400` for a forged internal header and a `503` when the
+   * session cannot be judged.
+   *
+   * @param response - The response to send.
+   */
   send(response: Response): void;
-  /** Returns a redirect marker to be thrown. */
+  /**
+   * Returns a redirect marker to be thrown. The handler throws it to send an
+   * unauthenticated visitor of a protected route to the login page.
+   *
+   * @param statusCode - The HTTP redirect status.
+   * @param url - The target, always a path on this app.
+   * @returns The marker for the caller to `throw`.
+   */
   redirect(statusCode: number, url: string): unknown;
   /**
    * Qwik Router's platform env getter. This is how server env reaches the
@@ -73,7 +176,15 @@ export interface QwikRequestEvent {
    * (mirroring SvelteKit's `$env/dynamic/private`). Optional so unit-test mocks
    * that exercise only the auth path need not stub it.
    */
-  readonly env?: { get(key: string): string | undefined };
+  readonly env?: {
+    /**
+     * Reads one environment variable.
+     *
+     * @param key - The variable name.
+     * @returns The value, or `undefined` when it is not set.
+     */
+    get(key: string): string | undefined;
+  };
 }
 
 /** Parses a `Cookie` request header into a name→value map. */

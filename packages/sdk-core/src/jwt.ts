@@ -178,7 +178,9 @@ export interface JwtHeader {
  * raw data into the next step.
  */
 export interface DecodedJwt {
+  /** The protected header: the algorithm, key id and token type the signature claims. */
   readonly header: JwtHeader;
+  /** The claims. Unverified, so never trust them until {@link verifyJwt} accepts the token. */
   readonly payload: JwtPayload;
 }
 

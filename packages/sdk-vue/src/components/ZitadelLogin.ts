@@ -20,32 +20,100 @@ import "@zitadel/components";
 import type { WithZitadelWidgetAttributes } from "../types.js";
 import { forceAttr } from "./forceAttr";
 
-const Base = defineComponent({
+/**
+ * The un-augmented component that {@link ZitadelLogin} is typed from, before the
+ * standard HTML attributes are added to its props. It is exported only so the
+ * published declaration file can name it; import {@link ZitadelLogin} instead.
+ */
+export const Base = defineComponent({
   name: "ZitadelLogin",
   // The element takes only the standard attributes (see below), never the rest of `attrs`.
   inheritAttrs: false,
   props: {
+    /**
+     * The handle returned by `configureZitadel(...)`. Bound as a DOM property
+     * (raw, not Vue's reactive proxy, because the widget does identity checks
+     * on it), and its fields are also written as `project-id`, `proxy-path` and
+     * `url` attributes so server-rendered markup carries them. Wins over the
+     * discrete {@link projectId} and {@link proxyPath} props.
+     */
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
+    /**
+     * Project id, read when no {@link project} handle is passed. Written as the
+     * `project-id` attribute so it reaches server-rendered markup.
+     */
     projectId: { type: String, default: undefined },
+    /**
+     * Same-origin path prefix the widget calls (the `/__nextgen` proxy when
+     * unset). Read when no {@link project} handle is passed, and written as the
+     * `proxy-path` attribute so it reaches server-rendered markup.
+     */
     proxyPath: { type: String, default: undefined },
+    /**
+     * The flow purpose to start. Defaults to `"login"`.
+     */
     purpose: {
       type: String as PropType<CreateFlowBodyPurpose>,
       default: "login",
     },
+    /**
+     * Where to navigate after a completed sign-in. A same-origin `next` query
+     * parameter on the page wins over it unless {@link forcePostSignInUrl} is set.
+     */
     postSignInUrl: { type: String, default: undefined },
+    /**
+     * Navigate to {@link postSignInUrl} even when the page's `next` query
+     * parameter names a path, for a page that uses `next` for something of its own.
+     */
     forcePostSignInUrl: { type: Boolean, default: undefined },
+    /**
+     * An existing flow's id to resume instead of starting a new one. Unset,
+     * `null` or `""` falls back to the `flow` query parameter; an id that no
+     * longer resolves starts a new flow.
+     */
     resumeFlowId: { type: String as PropType<string | null>, default: undefined },
+    /**
+     * Copy overrides merged over the builtin dictionaries, keyed by primary
+     * language subtag. Handed to the widget as the raw object, not Vue's proxy.
+     */
     locales: {
       type: Object as PropType<Record<string, Partial<Record<string, string>>>>,
       default: undefined,
     },
+    /**
+     * BCP-47 language override; unset uses the browser language. Bound as an
+     * attribute so an unset prop is removed.
+     */
     lang: { type: String, default: undefined },
+    /**
+     * Runs the flow definition with this `name`; unset runs the project's
+     * default flow for the purpose.
+     */
     flowName: { type: String, default: undefined },
+    /**
+     * `widget` is content-sized and paints no page chrome; `page` claims the
+     * viewport and paints the surface background. Unset keeps the element's
+     * default (`widget`). Bound as an attribute so an unset prop is removed.
+     */
     variant: { type: String as PropType<"widget" | "page">, default: undefined },
+    /**
+     * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
+     * Unset follows the tenant's branding theme, then the variant default. Bound as an attribute so an unset prop keeps the element's default.
+     */
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
+    /**
+     * Visually hides the widget's own heading block while keeping it in the
+     * accessibility tree, for pages that already carry the heading. Unset keeps
+     * the element's default (`false`).
+     */
     suppressHeader: { type: Boolean, default: undefined },
+    /**
+     * Hides the show/hide button on password fields. Unset keeps the element's
+     * default (`false`).
+     */
     suppressPasswordToggle: { type: Boolean, default: undefined },
   },
+  // Each entry re-emits the widget's matching `zitadel-*` event with its `detail`.
   emits: ["flowStep", "flowInput", "flowComplete", "flowRedirect", "flowError"],
   setup(props, { attrs, emit, expose }) {
     // Template ref to the rendered Lit element. Exposed so a consumer's
@@ -129,7 +197,7 @@ const Base = defineComponent({
  *
  * A Vue `ref` on this component resolves to the component *instance*, not the
  * inner element, so the rendered `<zitadel-login>` DOM node is exposed as
- * `element` (a `Ref` whose `.value` is the {@link ZitadelLoginElement}, or
+ * `element` (a `Ref` whose `.value` is the `ZitadelLogin` element from `@zitadel/components`, or
  * `null` before mount). A consumer with `<ZitadelLogin ref="r" />` reads it via
  * `r.value.element`.
  */

@@ -1,0 +1,14 @@
+{
+  "extends": [
+    "../../typedoc.base.json"
+  ],
+  "name": "@zitadel/sdk-nuxt",
+  "entryPoints": [
+    "src/index.ts",
+    "src/module.ts",
+    "src/server.ts"
+  ],
+  "tsconfig": "tsconfig.lib.json",
+  "readme": "docs/cover.md",
+  "out": "dist/api-docs"
+}

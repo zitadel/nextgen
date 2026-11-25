@@ -30,11 +30,28 @@ const PROCESS_ENV: Record<string, string | undefined> =
  * resolved {@link AuthResult} attached to the router context.
  */
 export type NextgenRequestDecision =
-  | { readonly type: "proxy"; readonly response: Response }
-  | { readonly type: "redirect"; readonly response: Response }
-  | { readonly type: "reject"; readonly response: Response }
   | {
+      /** Discriminant: the request was a `/__nextgen/*` call forwarded to the auth backend. */
+      readonly type: "proxy";
+      /** The backend's answer, with the session cookie renamed for the browser. Send it as is. */
+      readonly response: Response;
+    }
+  | {
+      /** Discriminant: an unauthenticated request for a protected route. */
+      readonly type: "redirect";
+      /** A `302` to the login path, carrying the requested path in `?next=`. Send it as is. */
+      readonly response: Response;
+    }
+  | {
+      /** Discriminant: the request was refused. */
+      readonly type: "reject";
+      /** The refusal: `400` for the internal auth header, `503` when the session could not be checked. */
+      readonly response: Response;
+    }
+  | {
+      /** Discriminant: the request may proceed to the app. */
       readonly type: "continue";
+      /** Who the request is signed in as, or the signed-out result. Attach it to the router context. */
       readonly auth: AuthResult;
       /**
        * `Set-Cookie` values the response to this request must carry: a dead
@@ -319,10 +336,24 @@ export async function handleNextgenRequest(
  * middleware API. The shape is structurally compatible with the real context.
  */
 export interface RequestMiddlewareContext {
+  /** The incoming Web `Request`, as TanStack Start's request middleware receives it. */
   readonly request: Request;
+  /**
+   * Hands the request on to the rest of the app. Pass `context` to add values
+   * (here `nextgenAuth`) that server functions read from their own context.
+   */
   readonly next: (opts?: {
+    /** Values merged into the context the downstream handlers receive. */
     readonly context?: Record<string, unknown>;
-  }) => Promise<{ readonly response: Response }> | { readonly response: Response };
+  }) =>
+    | Promise<{
+        /** The app's response, which the middleware may add cookies to. */
+        readonly response: Response;
+      }>
+    | {
+        /** The app's response, which the middleware may add cookies to. */
+        readonly response: Response;
+      };
 }
 
 /** Key under which the auth result is placed on the router context. */

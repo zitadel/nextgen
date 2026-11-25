@@ -1,0 +1,14 @@
+{
+  "extends": [
+    "../../typedoc.base.json"
+  ],
+  "name": "@zitadel/sdk-sveltekit",
+  "entryPoints": [
+    "src/index.ts",
+    "src/server.ts",
+    "src/client.ts"
+  ],
+  "tsconfig": "tsconfig.lib.json",
+  "readme": "docs/cover.md",
+  "out": "dist/api-docs"
+}

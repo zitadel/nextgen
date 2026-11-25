@@ -1,0 +1,12 @@
+{
+  "extends": [
+    "../../typedoc.base.json"
+  ],
+  "name": "@zitadel/sdk-svelte",
+  "entryPoints": [
+    "dist/index.d.ts"
+  ],
+  "tsconfig": "tsconfig.docs.json",
+  "readme": "docs/cover.md",
+  "out": "dist/api-docs"
+}

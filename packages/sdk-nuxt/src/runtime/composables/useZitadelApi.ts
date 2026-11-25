@@ -9,7 +9,7 @@ import { getApi, getZitadelConfig } from "@zitadel/api/config";
  * Widgets and session reads run in the browser, so call it from there (for
  * example from `onMounted`).
  *
- * ```vue
+ * ```html
  * <script setup lang="ts">
  * onMounted(async () => {
  *   const session = await useZitadelApi().getMySession();

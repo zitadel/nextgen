@@ -3,7 +3,6 @@
   "excludeInternal": true,
   "excludePrivate": true,
   "excludeExternals": true,
-  "out": "dist/api-docs",
   "gitRevision": "main",
   "sourceLinkTemplate": "https://github.com/zitadel/nextgen/blob/main/{path}#L{line}",
   "githubPages": false,

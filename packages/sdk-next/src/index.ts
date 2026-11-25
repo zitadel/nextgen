@@ -4,6 +4,8 @@
  * module fails at build time. Client components import from
  * `@zitadel/sdk-next/react` (provider + hooks) or
  * `@zitadel/sdk-next/session` (`getSession()`) instead.
+ *
+ * @module
  */
 export * from "./types.js";
 export { nextgenMiddleware, createProxy } from "./middleware.js";

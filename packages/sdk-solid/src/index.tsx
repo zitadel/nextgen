@@ -124,24 +124,56 @@ function withDetail<Detail>(
   event.detail.waitUntil?.(result);
 }
 
-/** Props of `ZitadelLogin`: the widget's own plus the standard HTML attributes. */
+/**
+ * Props of {@link ZitadelLogin}: the widget's own props plus the standard HTML
+ * attributes ({@link ZitadelWidgetAttributes}), so the widget can be styled
+ * and labelled without a wrapper element.
+ */
 export type ZitadelLoginSolidProps = ZitadelLoginProps &
   ZitadelWidgetAttributes & {
+    /**
+     * Receives the underlying `<zitadel-login>` element, either as a variable
+     * or through a callback, so the app can reach the upgraded web component
+     * imperatively. Solid resolves it after the element is created, which is
+     * in the browser only: it is never called while rendering on the server.
+     */
     ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
   };
 
-/** Props of `ZitadelLogout`: the widget's own plus the standard HTML attributes. */
+/**
+ * Props of {@link ZitadelLogout}: the widget's own props plus the standard HTML
+ * attributes ({@link ZitadelWidgetAttributes}), so the widget can be styled
+ * and labelled without a wrapper element.
+ */
 export type ZitadelLogoutSolidProps = ZitadelLogoutProps &
   ZitadelWidgetAttributes & {
+    /**
+     * Receives the underlying `<zitadel-logout>` element, either as a variable
+     * or through a callback, so the app can reach the upgraded web component
+     * imperatively. Solid resolves it after the element is created, which is
+     * in the browser only: it is never called while rendering on the server.
+     */
     ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
   };
 
-/** Props of `ZitadelSession`: the widget's own plus the standard HTML attributes. */
+/**
+ * Props of {@link ZitadelSession}: the widget's own props plus the standard HTML
+ * attributes ({@link ZitadelWidgetAttributes}), so the widget can be styled
+ * and labelled without a wrapper element.
+ */
 export type ZitadelSessionSolidProps = ZitadelSessionProps &
   ZitadelWidgetAttributes & {
+    /**
+     * Receives the underlying `<zitadel-session>` element, either as a variable
+     * or through a callback, so the app can reach the upgraded web component
+     * imperatively. Solid resolves it after the element is created, which is
+     * in the browser only: it is never called while rendering on the server.
+     */
     ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
   };
 
+// Re-exported from @zitadel/api so an app needs no direct dependency on it:
+// `configureZitadel` creates the project handle the components take as `project`.
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types.js";

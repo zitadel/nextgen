@@ -5,6 +5,8 @@
  * ```tsx
  * import { auth, NextgenProvider } from "@zitadel/sdk-next/server";
  * ```
+ *
+ * @module
  */
 export { auth } from "./auth.js";
 export type { AuthOptions } from "./auth.js";

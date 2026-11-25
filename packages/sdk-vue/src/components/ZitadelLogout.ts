@@ -9,15 +9,41 @@ import "@zitadel/components";
 import type { WithZitadelWidgetAttributes } from "../types.js";
 import { forceAttr } from "./forceAttr";
 
-const Base = defineComponent({
+/**
+ * The un-augmented component that {@link ZitadelLogout} is typed from, before the
+ * standard HTML attributes are added to its props. It is exported only so the
+ * published declaration file can name it; import {@link ZitadelLogout} instead.
+ */
+export const Base = defineComponent({
   name: "ZitadelLogout",
   // The element takes only the standard attributes (see below), never the rest of `attrs`.
   inheritAttrs: false,
   props: {
+    /**
+     * The handle returned by `configureZitadel(...)`. Bound as a DOM property
+     * (raw, not Vue's reactive proxy, because the widget does identity checks
+     * on it), and its fields are also written as `project-id`, `proxy-path` and
+     * `url` attributes so server-rendered markup carries them. Wins over the
+     * discrete {@link projectId} and {@link proxyPath} props.
+     */
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
+    /**
+     * Project id, read when no {@link project} handle is passed. Written as the
+     * `project-id` attribute so it reaches server-rendered markup.
+     */
     projectId: { type: String, default: undefined },
+    /**
+     * Same-origin path prefix the widget calls (the `/__nextgen` proxy when
+     * unset). Read when no {@link project} handle is passed, and written as the
+     * `proxy-path` attribute so it reaches server-rendered markup.
+     */
     proxyPath: { type: String, default: undefined },
+    /** Where to navigate after sign-out. Unset leaves navigation to the widget's default. */
     postSignOutUrl: { type: String, default: undefined },
+    /**
+     * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
+     * Unset defaults to `auto`. Bound as an attribute so an unset prop keeps the element's default.
+     */
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
   },
   emits: ["signout"],
@@ -73,7 +99,7 @@ const Base = defineComponent({
  *
  * A Vue `ref` on this component resolves to the component *instance*, not the
  * inner element, so the rendered `<zitadel-logout>` DOM node is exposed as
- * `element` (a `Ref` whose `.value` is the {@link ZitadelLogoutElement}, or
+ * `element` (a `Ref` whose `.value` is the `ZitadelLogout` element from `@zitadel/components`, or
  * `null` before mount). A consumer with `<ZitadelLogout ref="r" />` reads it via
  * `r.value.element`.
  */

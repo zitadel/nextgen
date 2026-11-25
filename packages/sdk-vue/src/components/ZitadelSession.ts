@@ -9,19 +9,57 @@ import "@zitadel/components";
 import type { WithZitadelWidgetAttributes } from "../types.js";
 import { forceAttr } from "./forceAttr";
 
-const Base = defineComponent({
+/**
+ * The un-augmented component that {@link ZitadelSession} is typed from, before the
+ * standard HTML attributes are added to its props. It is exported only so the
+ * published declaration file can name it; import {@link ZitadelSession} instead.
+ */
+export const Base = defineComponent({
   name: "ZitadelSession",
   // The element takes only the standard attributes (see below), never the rest of `attrs`.
   inheritAttrs: false,
   props: {
+    /**
+     * The handle returned by `configureZitadel(...)`. Bound as a DOM property
+     * (raw, not Vue's reactive proxy, because the widget does identity checks
+     * on it), and its fields are also written as `project-id`, `proxy-path` and
+     * `url` attributes so server-rendered markup carries them. Wins over the
+     * discrete {@link projectId} and {@link proxyPath} props.
+     */
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
+    /**
+     * Project id, read when no {@link project} handle is passed. Written as the
+     * `project-id` attribute so it reaches server-rendered markup.
+     */
     projectId: { type: String, default: undefined },
+    /**
+     * Same-origin path prefix the widget calls (the `/__nextgen` proxy when
+     * unset). Read when no {@link project} handle is passed, and written as the
+     * `proxy-path` attribute so it reaches server-rendered markup.
+     */
     proxyPath: { type: String, default: undefined },
+    /** Where to navigate after sign-out. Unset leaves navigation to the widget's default. */
     postSignOutUrl: { type: String, default: undefined },
+    /** Heading text override; unset keeps the widget's own ("Signed in as"). */
     heading: { type: String, default: undefined },
+    /** Sign-out action label override; unset keeps the widget's own ("Sign out"). */
     logoutLabel: { type: String, default: undefined },
+    /**
+     * `widget` is content-sized and paints no page chrome; `page` claims the
+     * viewport and paints the surface background. Unset keeps the element's
+     * default (`widget`). Bound as an attribute so an unset prop is removed.
+     */
     variant: { type: String as PropType<"widget" | "page">, default: undefined },
+    /**
+     * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
+     * Unset follows the variant default (`dark` for `page`, `auto` for `widget`). Bound as an attribute so an unset prop keeps the element's default.
+     */
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
+    /**
+     * Visually hides the widget's own heading block while keeping it in the
+     * accessibility tree, for pages that already carry the heading. Unset keeps
+     * the element's default (`false`).
+     */
     suppressHeader: { type: Boolean, default: undefined },
   },
   emits: ["signout"],

@@ -7,9 +7,28 @@ export { ZitadelLogoutComponent } from "./lib/zitadel-logout.component.js";
 export { ZitadelSessionComponent } from "./lib/zitadel-session.component.js";
 export { configureZitadel } from "./lib/config.js";
 export type { ZitadelConfig, ZitadelProject } from "./lib/config.js";
-// The shared SPA widget types, re-exported wholesale so this surface can never
-// drift from the core contract (a new type is picked up automatically).
-export type * from "@zitadel/sdk-core/types";
+// The shared SPA widget types, named one by one so the public surface is a
+// deliberate list and core's internals (widget tags, standard-attribute
+// helpers, event-name constants) never leak through.
+export type {
+  CreateFlowBodyPurpose,
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowRedirectDetail,
+  ZitadelFlowStepDetail,
+  ZitadelLoginConfig,
+  ZitadelLoginHandlers,
+  ZitadelLoginProps,
+  ZitadelLogoutConfig,
+  ZitadelLogoutHandlers,
+  ZitadelLogoutProps,
+  ZitadelNavigationDetail,
+  ZitadelSessionConfig,
+  ZitadelSessionHandlers,
+  ZitadelSessionProps,
+  ZitadelSignoutDetail,
+} from "@zitadel/sdk-core/types";
 
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).

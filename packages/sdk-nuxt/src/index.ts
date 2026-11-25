@@ -8,6 +8,7 @@ export { businessLocales } from "@zitadel/components";
 
 export { createNextgenMiddleware, getAuth } from "./server.js";
 export { useZitadelProject } from "./runtime/composables/useZitadelProject.js";
+export type { ZitadelProject } from "@zitadel/api/config";
 export type {
   NextgenMiddlewareOptions,
   AuthResult,

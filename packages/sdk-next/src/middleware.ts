@@ -1,3 +1,11 @@
+/**
+ * Edge middleware entry of `@zitadel/sdk-next`: proxies `/__nextgen/*` to the
+ * Zitadel backend, verifies the session and protects routes. It uses only Web
+ * APIs, so it runs in the Next.js edge runtime. Import it from `proxy.ts` (or
+ * `middleware.ts` on Next.js 15), never from a component.
+ *
+ * @module
+ */
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { NextgenMiddlewareOptions, ResolveSessionOptions } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -351,11 +359,11 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
 
 /**
  * Options for {@link createProxy} that are separate from the shared
- * {@link ZitadelConfig}. These configure route protection, login
+ * `ZitadelProject` handle. These configure route protection, login
  * redirects, and JWT verification behaviour.
  *
  * `proxyPath` and `url` are omitted because they come from the
- * {@link ZitadelConfig} passed as the first argument.
+ * `ZitadelProject` handle passed as the first argument.
  */
 export type ProxyOptions = Omit<NextgenMiddlewareOptions, "proxyPath" | "url">;
 

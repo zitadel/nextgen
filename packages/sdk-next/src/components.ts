@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * React components for the Zitadel widgets in Next.js apps.
  *
@@ -12,7 +10,11 @@
  * ```tsx
  * import { ZitadelLogin } from "@zitadel/sdk-next/components";
  * ```
+ *
+ * @module
  */
+
+"use client";
 export {
   businessLocales,
   configureZitadel,
@@ -21,7 +23,25 @@ export {
   ZitadelSession,
 } from "@zitadel/sdk-react";
 export type {
+  CreateFlowBodyPurpose,
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowRedirectDetail,
+  ZitadelFlowStepDetail,
+  ZitadelLoginConfig,
+  ZitadelLoginHandlers,
+  ZitadelLoginProps,
   ZitadelLoginReactProps,
+  ZitadelLogoutConfig,
+  ZitadelLogoutHandlers,
+  ZitadelLogoutProps,
   ZitadelLogoutReactProps,
+  ZitadelNavigationDetail,
+  ZitadelSessionConfig,
+  ZitadelSessionHandlers,
+  ZitadelSessionProps,
   ZitadelSessionReactProps,
+  ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
 } from "@zitadel/sdk-react";

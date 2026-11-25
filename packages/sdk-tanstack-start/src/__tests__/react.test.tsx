@@ -182,9 +182,37 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expect(tanstackReact.businessLocales).toBe(sdkReact.businessLocales);
   });
 
-  it("exports every type @zitadel/sdk-react exports", () => {
-    expect(typeOnlyExports("@zitadel/sdk-tanstack-start/react", tanstackReact)).toEqual(
-      typeOnlyExports("@zitadel/sdk-react", sdkReact),
+  it("exports only the public types, all of them @zitadel/sdk-react's", () => {
+    const names = typeOnlyExports("@zitadel/sdk-tanstack-start/react", tanstackReact);
+    const sdkReactNames = typeOnlyExports("@zitadel/sdk-react", sdkReact);
+
+    expect(names.filter((name) => !sdkReactNames.includes(name))).toEqual([]);
+    expect(names).toEqual(
+      [
+        "CreateFlowBodyPurpose",
+        "ZitadelConfig",
+        "ZitadelFlowCompleteDetail",
+        "ZitadelFlowErrorDetail",
+        "ZitadelFlowInputDetail",
+        "ZitadelFlowRedirectDetail",
+        "ZitadelFlowStepDetail",
+        "ZitadelLoginConfig",
+        "ZitadelLoginHandlers",
+        "ZitadelLoginProps",
+        "ZitadelLoginReactProps",
+        "ZitadelLogoutConfig",
+        "ZitadelLogoutHandlers",
+        "ZitadelLogoutProps",
+        "ZitadelLogoutReactProps",
+        "ZitadelNavigationDetail",
+        "ZitadelProject",
+        "ZitadelSessionConfig",
+        "ZitadelSessionHandlers",
+        "ZitadelSessionProps",
+        "ZitadelSessionReactProps",
+        "ZitadelSignoutDetail",
+        "ZitadelWidgetAttributes",
+      ].sort(),
     );
   }, 120_000);
 

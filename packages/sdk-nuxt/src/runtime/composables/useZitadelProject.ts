@@ -7,7 +7,7 @@ import { getZitadelConfig, type ZitadelProject } from "@zitadel/api/config";
  * Nextgen Nuxt plugin. Pass the returned handle to web components
  * via the `:project` prop for explicit data flow.
  *
- * ```vue
+ * ```html
  * <script setup lang="ts">
  * import { useZitadelProject } from '@zitadel/sdk-nuxt';
  *

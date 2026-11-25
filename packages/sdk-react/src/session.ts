@@ -22,6 +22,7 @@ export type UseSessionResult = SessionSnapshot & {
  * card performs), and every component using the same project shares that
  * read. A server renders `loading` and reads nothing.
  *
+ * @example
  * ```tsx
  * import { useSession } from "@zitadel/sdk-react";
  *
@@ -38,6 +39,15 @@ export type UseSessionResult = SessionSnapshot & {
  * Sign-in and sign-out navigate (`postSignInUrl`, `postSignOutUrl`), and the
  * next page load reads the session again. To update in place instead, call
  * `refresh()` from the widgets' `onFlowComplete` or `onSignout` callback.
+ *
+ * @param options - Which project to read: `project`, `projectId` and
+ *   `proxyPath`, as the widgets take them. Unset, they fall back to
+ *   `configureZitadel(...)`. Without a project id the snapshot is an `error`
+ *   with code `session.no_project`, a misconfiguration rather than a signed-out
+ *   visitor.
+ * @returns The snapshot (`status`, `session`, `error`, `isRefreshing`) and
+ *   `refresh`. The session holds `userId`, `identifier`, `identifierProperty`
+ *   and `display`, never a token.
  */
 export function useSession(options: SessionStoreOptions = {}): UseSessionResult {
   const store = sessionStore(options);

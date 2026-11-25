@@ -35,7 +35,8 @@
     "typecheck": "svelte-check --tsconfig ./tsconfig.lib.json && svelte-check --tsconfig ./tsconfig.spec.json",
     "test": "vitest run",
     "lint": "biome check .",
-    "prepack": "publint --strict"
+    "prepack": "publint --strict",
+    "docs:api": "typedoc"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

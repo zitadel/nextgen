@@ -1,0 +1,17 @@
+{
+  "extends": [
+    "../../typedoc.base.json"
+  ],
+  "name": "@zitadel/sdk-vue",
+  "entryPoints": [
+    "src/index.ts"
+  ],
+  "tsconfig": "tsconfig.lib.json",
+  "readme": "docs/cover.md",
+  "intentionallyNotExported": [
+    "src/components/ZitadelLogin.ts:Base",
+    "src/components/ZitadelLogout.ts:Base",
+    "src/components/ZitadelSession.ts:Base"
+  ],
+  "out": "dist/api-docs"
+}

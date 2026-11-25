@@ -1,0 +1,12 @@
+{
+  "extends": [
+    "../../typedoc.base.json"
+  ],
+  "name": "@zitadel/sdk-qwik",
+  "entryPoints": [
+    "src/index.tsx"
+  ],
+  "tsconfig": "tsconfig.lib.json",
+  "readme": "docs/cover.md",
+  "out": "dist/api-docs"
+}

@@ -35,8 +35,27 @@ const PROCESS_ENV: Record<string, string | undefined> =
  * returned handler drops straight into `createMiddleware({ onRequest: [...] })`.
  */
 export interface SolidFetchEvent {
+  /**
+   * The incoming request. The middleware reads its URL, method, body and
+   * `cookie`, `authorization` and `x-forwarded-*` headers to proxy the
+   * `/__nextgen/*` calls and to judge the session. It rejects any request that
+   * carries the internal `x-nextgen-auth-token` header with a `400`.
+   */
   readonly request: Request;
-  readonly locals: Record<string, unknown> & { nextgenAuth?: AuthResult };
+  /**
+   * The per-request store SolidStart shares between the middleware and the
+   * server functions and routes that run after it. The middleware writes the
+   * session verdict to its `nextgenAuth` key on every request it does not
+   * ignore; read it back with {@link getAuth} rather than reaching into it.
+   */
+  readonly locals: Record<string, unknown> & {
+    /**
+     * The verdict on this request's session, set by the middleware. It is
+     * absent on a request the middleware skipped (a path in `ignoredRoutes`) or
+     * proxied, and {@link getAuth} reads that as signed out.
+     */
+    nextgenAuth?: AuthResult;
+  };
   /** Direct client address, when the platform adapter resolves one. */
   readonly clientAddress?: string;
   /**
@@ -45,7 +64,21 @@ export interface SolidFetchEvent {
    * On SolidStart 2 it is h3 v2's response, which sends `errHeaders` instead
    * of `headers` with an answer of status 400 or above and a thrown error.
    */
-  readonly response?: { readonly headers: Headers; readonly errHeaders?: Headers };
+  readonly response?: {
+    /**
+     * The headers SolidStart sends with a normal answer. The middleware
+     * appends the session `Set-Cookie` headers and a `Cache-Control` here when
+     * the session check asks for a cookie change and the request continues.
+     */
+    readonly headers: Headers;
+    /**
+     * The headers h3 v2 sends instead of `headers` when the answer is an error
+     * (status 400 or above) or a thrown one. The middleware writes the same
+     * cookies here so a failing page still carries them. Absent on
+     * SolidStart 1.
+     */
+    readonly errHeaders?: Headers;
+  };
 }
 
 /**
@@ -56,6 +89,13 @@ export interface SolidFetchEvent {
  * `createMiddleware` does not accept a readonly one.
  */
 export interface SolidMiddlewareConfig {
+  /**
+   * The handlers SolidStart runs for each request, in order. Each returns a
+   * `Response` to answer the request itself (the `/__nextgen/*` proxy, a
+   * redirect to the login page, a `503`) or `undefined` to let the request
+   * continue. {@link createNextgenMiddleware} returns one handler; spread this
+   * array into your own `onRequest` to run yours alongside it.
+   */
   readonly onRequest: Array<(event: SolidFetchEvent) => Promise<Response | undefined>>;
 }
 
@@ -304,6 +344,9 @@ async function handleAuth(
  * @param options - Middleware configuration. `projectSecret` is the project
  *   service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
  * @returns A SolidStart middleware config object.
+ * @throws Error when `loginPath` is not a relative path starting with a single
+ *   `/`. An absolute or protocol-relative URL would let a crafted config turn
+ *   the login redirect into an open redirect, so it is refused at setup time.
  */
 export function createNextgenMiddleware(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},

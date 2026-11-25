@@ -1,3 +1,10 @@
+/**
+ * Browser entry of `@zitadel/sdk-next` for reading the signed-in user from a
+ * Client Component on any page, including routes the middleware `matcher` does
+ * not cover, where the server-side `auth()` cannot see the session.
+ *
+ * @module
+ */
 import { getZitadelConfig } from "@zitadel/api/config";
 import { getSession as readSession } from "@zitadel/sdk-core/session";
 

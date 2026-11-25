@@ -59,30 +59,6 @@ export type { UseSessionResult } from "./session.js";
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";
 
-/**
- * React components for the Zitadel auth widgets.
- *
- * These wrap the framework-agnostic Lit web components from
- * `@zitadel/components` with `@lit/react`'s `createComponent`, so they are real
- * React components: the SDK `project` handle is bound as a DOM *property* (not
- * an attribute) — which is what the elements read at startup — and the widget's
- * `zitadel-*` events are registered as element listeners via the `events` map
- * and surfaced as optional callbacks receiving the event detail.
- *
- * In a client-side SPA, build the handle with `configureZitadel(...)` and pass
- * it as the `project` prop. Because the SPA renders after configuration, the
- * prop is present when the element upgrades:
- *
- * ```tsx
- * import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-react";
- *
- * const project = configureZitadel({ projectId: "…", proxyPath: "/__nextgen" });
- *
- * export function LoginPage() {
- *   return <ZitadelLogin project={project} purpose="login" postSignInUrl="/" />;
- * }
- * ```
- */
 /** What `createComponent` takes as the element class: a constructor and its prototype. */
 type ElementClass<Tag extends WidgetTag> = {
   new (): HTMLElementTagNameMap[Tag];
@@ -239,31 +215,63 @@ function withDetail<Detail>(
 }
 
 /**
- * React component wrapping the `<zitadel-login>` web component. Binds the
- * `ZitadelProject` handle as a DOM property (or the discrete project id /
- * proxy path as attributes) and forwards the widget's `zitadel-*` events as
- * optional callbacks.
- *
- * A forwarded `ref` resolves to the underlying `<zitadel-login>` DOM element,
- * so consumers can imperatively access the upgraded web component.
- */
-/**
- * `ZitadelLoginProps` is framework-agnostic, so it carries no `children`.
- * React hosts need them: the widget exposes slots (`attribution-trailing`)
- * that are filled with light-DOM content.
+ * The props of {@link ZitadelLogin}: the widget's own props and event
+ * callbacks ({@link ZitadelLoginProps}), the standard HTML attributes
+ * ({@link ZitadelWidgetAttributes}), `children` and the two preview props.
  */
 export type ZitadelLoginReactProps = ZitadelLoginProps &
   ZitadelWidgetAttributes & {
+    /**
+     * Light-DOM content for the widget's slots, such as the
+     * `attribution-trailing` slot. {@link ZitadelLoginProps} is
+     * framework-agnostic and carries no `children`, but a React host needs
+     * them to fill the slots. Unset, the widget renders its own content only.
+     */
     children?: React.ReactNode;
     /**
      * Preview mode, for an operator surface: the flow starts as usual, then the
-     * element shows the served step in this state and submits nothing.
+     * element shows the served step in this state and submits nothing. Unset,
+     * the widget runs the flow for real.
      */
     previewState?: ZitadelLoginElement["previewState"];
-    /** The terminal step the `success` preview paints; the element's `done` when unset. */
+    /**
+     * The terminal step the `success` preview paints. Only read when
+     * `previewState` is `success`; unset, the element's own `done` step is
+     * painted.
+     */
     previewSuccessStep?: string;
   };
 
+/**
+ * The sign-in flow, as a React component wrapping the `<zitadel-login>` web
+ * component. It binds the {@link ZitadelProject} handle as a DOM property (or
+ * the discrete `projectId` and `proxyPath` as attributes, which is what makes
+ * them appear in server-rendered markup) and forwards the widget's `zitadel-*`
+ * events as optional callbacks that receive the event's `detail`. A callback
+ * for `zitadel-flow-complete` or `zitadel-flow-redirect` may return a promise;
+ * the widget waits for it, up to two seconds, before it navigates.
+ *
+ * A forwarded `ref` resolves to the underlying `<zitadel-login>` element, so
+ * you can reach the upgraded web component imperatively. A project handle with
+ * a publishable key cannot travel as attributes, so for one the component
+ * renders nothing until it has mounted in the browser, and its first request
+ * then carries the key.
+ *
+ * In a client-side SPA, build the handle with {@link configureZitadel} and
+ * pass it as `project`. The SPA renders after configuration, so the prop is
+ * present when the element upgrades.
+ *
+ * @example
+ * ```tsx
+ * import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-react";
+ *
+ * const project = configureZitadel({ projectId: "…", proxyPath: "/__nextgen" });
+ *
+ * export function LoginPage() {
+ *   return <ZitadelLogin project={project} purpose="login" postSignInUrl="/" />;
+ * }
+ * ```
+ */
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
     {
@@ -323,11 +331,16 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
 
 ZitadelLogin.displayName = "ZitadelLogin";
 
-/** Props of `ZitadelLogout`: the widget's own plus the standard HTML attributes. */
+/**
+ * The props of {@link ZitadelLogout}: the widget's own props and its
+ * `onSignout` callback ({@link ZitadelLogoutProps}) plus the standard HTML
+ * attributes ({@link ZitadelWidgetAttributes}).
+ */
 export type ZitadelLogoutReactProps = ZitadelLogoutProps & ZitadelWidgetAttributes;
 
 /**
- * React component wrapping the `<zitadel-logout>` web component. Binds the
+ * The sign-out control, as a React component wrapping the `<zitadel-logout>`
+ * web component. Binds the
  * `ZitadelProject` handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-signout` event
  * as an optional callback.
@@ -357,12 +370,16 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
 
 ZitadelLogout.displayName = "ZitadelLogout";
 
-/** Props of `ZitadelSession`: the widget's own plus the standard HTML attributes. */
+/**
+ * The props of {@link ZitadelSession}: the widget's own props and its
+ * `onSignout` callback ({@link ZitadelSessionProps}) plus the standard HTML
+ * attributes ({@link ZitadelWidgetAttributes}).
+ */
 export type ZitadelSessionReactProps = ZitadelSessionProps & ZitadelWidgetAttributes;
 
 /**
- * React component wrapping the `<zitadel-session>` web component — the
- * post-sign-in "signed in as" card. Binds the `ZitadelProject` handle as a DOM
+ * The signed-in "signed in as" card with a sign-out action, as a React
+ * component wrapping the `<zitadel-session>` web component. Binds the `ZitadelProject` handle as a DOM
  * property (or the discrete project id / proxy path as attributes) and forwards
  * the widget's `zitadel-signout` event as an optional callback.
  *

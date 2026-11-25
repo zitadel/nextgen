@@ -9,26 +9,54 @@
  * the Angular library self-contained.
  */
 
-/** Frozen project handle passed to the widgets via the `project` input. */
+/**
+ * Frozen project handle passed to the widgets via their `project` input.
+ *
+ * Build it with {@link configureZitadel}. It is a plain object so the widgets
+ * can read it as a DOM property without this package importing `@zitadel/api`.
+ */
 export interface ZitadelProject {
+  /**
+   * Same-origin path the widgets call, `"/__nextgen"` unless overridden. In
+   * local development it may also be a backend origin, which makes the calls
+   * cross-origin.
+   */
   readonly proxyPath: string;
+  /** Id of the Zitadel project the widgets start flows for. */
   readonly projectId: string;
+  /**
+   * Full backend URL, written to the `url` attribute. Only the server side
+   * needs it; a client-side SPA leaves it unset.
+   */
   readonly url?: string;
 }
 
 /** Input options for {@link configureZitadel}. */
 export interface ZitadelConfig {
-  /** Proxy path for API requests. Defaults to `"/__nextgen"`. */
+  /**
+   * Same-origin path the widgets call. Defaults to `"/__nextgen"`, the
+   * proxy that fronts the API on the app's own origin.
+   */
   proxyPath?: string;
-  /** Project id passed to flow creation. */
+  /** Id of the Zitadel project; sent when a flow is created. */
   projectId: string;
-  /** Full backend URL (server-side only; optional for client SPAs). */
+  /**
+   * Full backend URL. Only server-side code needs it, so a client-side SPA
+   * leaves it unset.
+   */
   url?: string;
 }
 
 /**
  * Builds the project handle to pass to `<zitadel-auth-login [project]>`.
  *
+ * Call it once per app and share the result. The handle is frozen, and
+ * `proxyPath` falls back to `"/__nextgen"` when omitted.
+ *
+ * @param config - The project id and optional proxy path and backend URL.
+ * @returns The frozen {@link ZitadelProject} handle.
+ *
+ * @example
  * ```ts
  * const project = configureZitadel({ projectId: "…", proxyPath: "/__nextgen" });
  * ```

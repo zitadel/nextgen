@@ -2,14 +2,32 @@ import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
 import type { JSX } from "solid-js";
 
 /**
- * Re-exports the shared SPA widget types from `@zitadel/sdk-core`.
+ * The shared SPA widget types from `@zitadel/sdk-core`, re-exported by name.
  *
- * `export type *` keeps this surface in lockstep with the core SPA contract: a
- * type added there is re-exported here automatically, and none can be dropped by
- * hand. The server-middleware types live in a separate core module and stay out
- * of the browser SDK surface.
+ * The list is explicit so that the package's public surface is exactly what is
+ * documented: the core's internal helpers (widget tag names, standard-attribute
+ * tables, event-name constants) are never forwarded. The server-middleware
+ * types live in a separate core module and stay out of the browser SDK surface.
  */
-export type * from "@zitadel/sdk-core/types";
+export type {
+  CreateFlowBodyPurpose,
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowRedirectDetail,
+  ZitadelFlowStepDetail,
+  ZitadelLoginConfig,
+  ZitadelLoginHandlers,
+  ZitadelLoginProps,
+  ZitadelLogoutConfig,
+  ZitadelLogoutHandlers,
+  ZitadelLogoutProps,
+  ZitadelNavigationDetail,
+  ZitadelSessionConfig,
+  ZitadelSessionHandlers,
+  ZitadelSessionProps,
+  ZitadelSignoutDetail,
+} from "@zitadel/sdk-core/types";
 
 /**
  * The standard HTML attributes a widget wrapper accepts besides its own props,

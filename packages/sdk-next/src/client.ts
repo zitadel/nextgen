@@ -19,6 +19,8 @@
  * `@zitadel/api/config` (which strict package managers would not
  * resolve). Call it inside the same `"use client"` boundary before the
  * components mount.
+ *
+ * @module
  */
 // Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
 // The edge build of the components package has no elements, so this does nothing there.

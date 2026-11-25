@@ -5,7 +5,12 @@ import type {
   CreateFlowBodyPurpose,
 } from "@zitadel/api/generated/model";
 
-/** Re-exported so consumers can type the `purpose` prop without a deep import. */
+/**
+ * Re-exported so consumers can type the `purpose` prop without a deep import
+ * into the generated API client: the value set is owned by the OpenAPI
+ * contract and this alias follows it, so the prop can never drift from what
+ * the server accepts.
+ */
 export type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
 
 /**
@@ -17,14 +22,25 @@ export type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
  * live in `@zitadel/sdk-core/middleware`.
  */
 
-/** Payload of the `zitadel-flow-step` event. */
+/**
+ * Payload of the `zitadel-flow-step` event, fired each time the server moves
+ * the flow to a new step (identifier, password, MFA and so on). Listen to it to
+ * mirror progress in the host page or to record analytics.
+ */
 export interface ZitadelFlowStepDetail {
+  /** The step the flow has just entered, exactly as the server returned it. */
   readonly step: CreateFlow201Step;
 }
 
-/** Payload of the `zitadel-flow-input` event. */
+/**
+ * Payload of the `zitadel-flow-input` event, fired when the user changes a
+ * field in the current step. It lets a host page react to typing (for example
+ * to enable its own controls) without owning the form.
+ */
 export interface ZitadelFlowInputDetail {
+  /** The name of the field that changed, as the flow step declares it. */
   readonly name: string;
+  /** The field's new value as typed; it is not validated or trimmed. */
   readonly value: string;
 }
 
@@ -35,14 +51,33 @@ export interface ZitadelFlowInputDetail {
  * or after a short timeout.
  */
 export interface ZitadelNavigationDetail {
+  /**
+   * Registers work the widget must wait for before it navigates. Call it
+   * synchronously from the listener with the promise (or any value) the
+   * navigation depends on; it exists so an async handler, such as one that
+   * stores a session, is not cut off by the page unloading. The widget
+   * navigates after every registered promise settles, or after a short
+   * timeout, so a handler that never settles cannot block it.
+   */
   readonly waitUntil: (work: unknown) => void;
 }
 
-/** Payload of the `zitadel-flow-complete` event. */
+/**
+ * Payload of the `zitadel-flow-complete` event, fired when the flow finishes
+ * and the user is signed in. The widget navigates afterwards, so register any
+ * work that must finish first with {@link ZitadelNavigationDetail.waitUntil}.
+ */
 export interface ZitadelFlowCompleteDetail extends ZitadelNavigationDetail {
+  /** What the server asked the client to do on completion, as returned by the flow. */
   readonly behavior: CreateFlow201StepComplete;
+  /** Where the server sends the browser next; absent when the flow names no destination. */
   readonly redirect_uri?: string;
+  /**
+   * A short-lived token the server issues so a different origin can pick up
+   * the signed-in session. Absent unless the flow completed with a handoff.
+   */
   readonly handoff_token?: string;
+  /** When {@link handoff_token} stops being accepted, as an ISO 8601 timestamp. */
   readonly handoff_token_expires_at?: string;
 }
 
@@ -52,16 +87,26 @@ export interface ZitadelFlowCompleteDetail extends ZitadelNavigationDetail {
  * nobody is signed in yet, and the flow resumes when the provider returns.
  */
 export interface ZitadelFlowRedirectDetail extends ZitadelNavigationDetail {
+  /** The identity provider URL the widget is about to send the browser to. */
   readonly redirect_url: string;
+  /** The step that triggered the redirect, so a listener can tell which provider was chosen. */
   readonly step: CreateFlow201Step;
 }
 
-/** Payload of the `zitadel-flow-error` event. */
+/**
+ * Payload of the `zitadel-flow-error` event, fired when the flow fails in a way
+ * the widget cannot recover from by itself, such as a network or server error.
+ */
 export interface ZitadelFlowErrorDetail {
+  /** A human-readable description of what went wrong; not a stable code to branch on. */
   readonly message: string;
 }
 
-/** Payload of the `zitadel-signout` event. */
+/**
+ * Payload of the `zitadel-signout` event, fired by `<zitadel-logout>` and
+ * `<zitadel-session>` once the session has been ended and before the widget
+ * navigates away.
+ */
 export interface ZitadelSignoutDetail extends ZitadelNavigationDetail {
   /** The signed-out user's display rendering ("" when none was resolved). */
   readonly display: string;
@@ -79,7 +124,7 @@ export interface ZitadelSignoutDetail extends ZitadelNavigationDetail {
  * forwarding test all fail until every wrapper is brought back into line.
  * ───────────────────────────────────────────────────────────────────────── */
 
-/** Events emitted by `<zitadel-login>`, keyed to their detail payload. */
+/** @internal Events emitted by `<zitadel-login>`, keyed to their detail payload. */
 export interface ZitadelLoginEventMap {
   "zitadel-flow-step": ZitadelFlowStepDetail;
   "zitadel-flow-input": ZitadelFlowInputDetail;
@@ -88,13 +133,13 @@ export interface ZitadelLoginEventMap {
   "zitadel-flow-error": ZitadelFlowErrorDetail;
 }
 
-/** Events emitted by `<zitadel-logout>`, keyed to their detail payload. */
+/** @internal Events emitted by `<zitadel-logout>`, keyed to their detail payload. */
 export interface ZitadelLogoutEventMap {
   "zitadel-signout": ZitadelSignoutDetail;
 }
 
 /**
- * Events emitted by `<zitadel-session>`, keyed to their detail payload.
+ * @internal Events emitted by `<zitadel-session>`, keyed to their detail payload.
  * `zitadel-signout` reuses {@link ZitadelSignoutDetail} so the post-sign-in
  * card and the avatar menu speak the same sign-out contract.
  */
@@ -103,7 +148,7 @@ export interface ZitadelSessionEventMap {
 }
 
 /**
- * Maps each `<zitadel-login>` event to the callback prop the SDKs expose. The
+ * @internal Maps each `<zitadel-login>` event to the callback prop the SDKs expose. The
  * `satisfies Record<keyof ZitadelLoginEventMap, …>` is the drift lock: every
  * event needs exactly one handler entry — a missing one, or an extra one left
  * behind for a removed event, fails `tsc`. Everything below derives from this.
@@ -116,38 +161,53 @@ export const ZITADEL_LOGIN_EVENT_HANDLERS = {
   "zitadel-flow-error": "onFlowError",
 } as const satisfies Record<keyof ZitadelLoginEventMap, `on${string}`>;
 
-/** Maps the `<zitadel-logout>` event to the callback prop the SDKs expose. */
+/** @internal Maps the `<zitadel-logout>` event to the callback prop the SDKs expose. */
 export const ZITADEL_LOGOUT_EVENT_HANDLERS = {
   "zitadel-signout": "onSignout",
 } as const satisfies Record<keyof ZitadelLogoutEventMap, `on${string}`>;
 
-/** Maps the `<zitadel-session>` event to the callback prop the SDKs expose. */
+/** @internal Maps the `<zitadel-session>` event to the callback prop the SDKs expose. */
 export const ZITADEL_SESSION_EVENT_HANDLERS = {
   "zitadel-signout": "onSignout",
 } as const satisfies Record<keyof ZitadelSessionEventMap, `on${string}`>;
 
-/** Runtime list of `<zitadel-login>` event names (drives wiring + drift tests). */
+/** @internal Runtime list of `<zitadel-login>` event names (drives wiring + drift tests). */
 export const ZITADEL_LOGIN_EVENTS = Object.keys(
   ZITADEL_LOGIN_EVENT_HANDLERS,
 ) as (keyof ZitadelLoginEventMap)[];
 
-/** Runtime list of `<zitadel-logout>` event names. */
+/** @internal Runtime list of `<zitadel-logout>` event names. */
 export const ZITADEL_LOGOUT_EVENTS = Object.keys(
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 ) as (keyof ZitadelLogoutEventMap)[];
 
-/** Runtime list of `<zitadel-session>` event names. */
+/** @internal Runtime list of `<zitadel-session>` event names. */
 export const ZITADEL_SESSION_EVENTS = Object.keys(
   ZITADEL_SESSION_EVENT_HANDLERS,
 ) as (keyof ZitadelSessionEventMap)[];
 
-/** Configuration props shared by every `ZitadelLogin` wrapper. */
+/**
+ * Configuration props shared by every `ZitadelLogin` wrapper. They are the
+ * attributes of the `<zitadel-login>` element in camelCase, so the SDKs
+ * forward them one to one instead of each inventing its own names.
+ */
 export interface ZitadelLoginConfig {
-  /** The SDK handle from `configureZitadel(...)`. */
+  /**
+   * The SDK handle from `configureZitadel(...)`. When set, it supplies the
+   * project id and proxy path and the discrete props below are ignored.
+   */
   readonly project?: ZitadelProject;
-  /** Discrete project id, read when no {@link project} handle is supplied. */
+  /**
+   * The project the widget signs users in to, for apps that do not use a
+   * {@link project} handle. Ignored when {@link project} is set.
+   */
   readonly projectId?: string;
-  /** Reverse-proxy path prefix the widget calls. */
+  /**
+   * Path prefix of the same-origin proxy the widget calls instead of the auth
+   * backend directly, so the session cookie is first-party and no CORS setup
+   * is needed. The SDK's server middleware serves the proxy.
+   * @default "/__nextgen"
+   */
   readonly proxyPath?: string;
   /**
    * Sizing/chrome mode. `widget` (default) is content-sized and paints no
@@ -221,15 +281,32 @@ export interface ZitadelLoginConfig {
   readonly lang?: string;
 }
 
-/** Configuration props shared by every `ZitadelLogout` wrapper. */
+/**
+ * Configuration props shared by every `ZitadelLogout` wrapper, the
+ * attributes of the `<zitadel-logout>` element in camelCase.
+ */
 export interface ZitadelLogoutConfig {
-  /** The SDK handle from `configureZitadel(...)`. */
+  /**
+   * The SDK handle from `configureZitadel(...)`. When set, it supplies the
+   * project id and proxy path and the discrete props below are ignored.
+   */
   readonly project?: ZitadelProject;
-  /** Discrete project id, read when no {@link project} handle is supplied. */
+  /**
+   * The project the widget signs users in to, for apps that do not use a
+   * {@link project} handle. Ignored when {@link project} is set.
+   */
   readonly projectId?: string;
-  /** Reverse-proxy path prefix the widget calls. */
+  /**
+   * Path prefix of the same-origin proxy the widget calls instead of the auth
+   * backend directly, so the session cookie is first-party and no CORS setup
+   * is needed. The SDK's server middleware serves the proxy.
+   * @default "/__nextgen"
+   */
   readonly proxyPath?: string;
-  /** Where to navigate after sign-out. */
+  /**
+   * Where to navigate after sign-out. Unset leaves the page where it is once
+   * the session has ended.
+   */
   readonly postSignOutUrl?: string;
   /**
    * Colour mode. Unset defaults to `auto` (follow `prefers-color-scheme`) —
@@ -239,19 +316,36 @@ export interface ZitadelLogoutConfig {
   readonly theme?: "light" | "dark" | "auto";
 }
 
-/** Configuration props shared by every `ZitadelSession` wrapper. */
+/**
+ * Configuration props shared by every `ZitadelSession` wrapper, the
+ * attributes of the `<zitadel-session>` element in camelCase.
+ */
 export interface ZitadelSessionConfig {
-  /** The SDK handle from `configureZitadel(...)`. */
+  /**
+   * The SDK handle from `configureZitadel(...)`. When set, it supplies the
+   * project id and proxy path and the discrete props below are ignored.
+   */
   readonly project?: ZitadelProject;
-  /** Discrete project id, read when no {@link project} handle is supplied. */
+  /**
+   * The project the widget signs users in to, for apps that do not use a
+   * {@link project} handle. Ignored when {@link project} is set.
+   */
   readonly projectId?: string;
-  /** Reverse-proxy path prefix the widget calls. */
+  /**
+   * Path prefix of the same-origin proxy the widget calls instead of the auth
+   * backend directly, so the session cookie is first-party and no CORS setup
+   * is needed. The SDK's server middleware serves the proxy.
+   * @default "/__nextgen"
+   */
   readonly proxyPath?: string;
-  /** Where to navigate after sign-out. */
+  /**
+   * Where to navigate after sign-out. Unset leaves the page where it is once
+   * the session has ended.
+   */
   readonly postSignOutUrl?: string;
-  /** Heading text override. */
+  /** Replaces the card's heading, for copy or a language the builtin locales lack. */
   readonly heading?: string;
-  /** Logout action label override. */
+  /** Replaces the label of the sign-out action on the card. */
   readonly logoutLabel?: string;
   /**
    * Sizing/chrome mode. `widget` (default) is content-sized and paints no
@@ -277,9 +371,14 @@ export interface ZitadelSessionConfig {
 }
 
 /**
- * Plain-callback handlers for the `<zitadel-login>` events, derived from
- * {@link ZitadelLoginEventMap} and {@link ZITADEL_LOGIN_EVENT_HANDLERS} so the
- * prop set can never drift from the events it forwards.
+ * Callback props for the `<zitadel-login>` events: `onFlowStep`,
+ * `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and `onFlowError`, each
+ * receiving the matching detail type ({@link ZitadelFlowStepDetail} and its
+ * siblings). They are plain callbacks rather than DOM events so every
+ * framework wrapper exposes the same props. The set is derived from the
+ * widget's event list, so it cannot drift from the events the widget emits.
+ * A handler for an event that navigates afterwards may return a promise; the
+ * widget does not wait for it, use {@link ZitadelNavigationDetail.waitUntil}.
  */
 export type ZitadelLoginHandlers = {
   readonly [E in keyof ZitadelLoginEventMap as (typeof ZITADEL_LOGIN_EVENT_HANDLERS)[E]]?: (
@@ -287,27 +386,45 @@ export type ZitadelLoginHandlers = {
   ) => ZitadelLoginEventMap[E] extends ZitadelNavigationDetail ? unknown : void;
 };
 
-/** Plain-callback handler for the `<zitadel-logout>` event (derived, as above). */
+/**
+ * Callback prop for the `<zitadel-logout>` event: `onSignout`, receiving a
+ * {@link ZitadelSignoutDetail}. Derived from the widget's event list like
+ * {@link ZitadelLoginHandlers}.
+ */
 export type ZitadelLogoutHandlers = {
   readonly [E in keyof ZitadelLogoutEventMap as (typeof ZITADEL_LOGOUT_EVENT_HANDLERS)[E]]?: (
     detail: ZitadelLogoutEventMap[E],
   ) => ZitadelLogoutEventMap[E] extends ZitadelNavigationDetail ? unknown : void;
 };
 
-/** Plain-callback handlers for the `<zitadel-session>` events (derived, as above). */
+/**
+ * Callback prop for the `<zitadel-session>` event: `onSignout`, receiving a
+ * {@link ZitadelSignoutDetail}. Derived from the widget's event list like
+ * {@link ZitadelLoginHandlers}.
+ */
 export type ZitadelSessionHandlers = {
   readonly [E in keyof ZitadelSessionEventMap as (typeof ZITADEL_SESSION_EVENT_HANDLERS)[E]]?: (
     detail: ZitadelSessionEventMap[E],
   ) => ZitadelSessionEventMap[E] extends ZitadelNavigationDetail ? unknown : void;
 };
 
-/** Full prop set for a `ZitadelLogin` wrapper (config + plain-callback handlers). */
+/**
+ * The full prop set of a `ZitadelLogin` wrapper: the configuration
+ * ({@link ZitadelLoginConfig}) plus the event callbacks
+ * ({@link ZitadelLoginHandlers}). Each SDK's wrapper props type builds on it.
+ */
 export type ZitadelLoginProps = ZitadelLoginConfig & ZitadelLoginHandlers;
 
-/** Full prop set for a `ZitadelLogout` wrapper (config + plain-callback handlers). */
+/**
+ * The full prop set of a `ZitadelLogout` wrapper: {@link ZitadelLogoutConfig}
+ * plus {@link ZitadelLogoutHandlers}.
+ */
 export type ZitadelLogoutProps = ZitadelLogoutConfig & ZitadelLogoutHandlers;
 
-/** Full prop set for a `ZitadelSession` wrapper (config + plain-callback handlers). */
+/**
+ * The full prop set of a `ZitadelSession` wrapper: {@link ZitadelSessionConfig}
+ * plus {@link ZitadelSessionHandlers}.
+ */
 export type ZitadelSessionProps = ZitadelSessionConfig & ZitadelSessionHandlers;
 
 /* ───────────────────────  Standard element attributes  ───────────────────────
@@ -334,7 +451,7 @@ const STANDARD_NAMES = [
 ] as const;
 
 /**
- * The name of a standard HTML attribute: the fixed ones (`className` and
+ * @internal The name of a standard HTML attribute: the fixed ones (`className` and
  * `tabIndex` are the spellings React and Qwik use), `data-*` and `aria-*`.
  * Matching is exact and case-sensitive.
  */
@@ -344,7 +461,7 @@ export type StandardAttributeName =
   | `aria-${string}`;
 
 /**
- * The standard attributes among the props `Props`, each name with `Prefix`
+ * @internal The standard attributes among the props `Props`, each name with `Prefix`
  * before it, except the native names. Every value keeps the type it has in
  * `Props`.
  */
@@ -355,7 +472,7 @@ export type StandardAttributes<Props extends object, Prefix extends string = "">
 };
 
 /**
- * What a wrapper's props type adds to the widget's own: the standard attributes
+ * @internal What a wrapper's props type adds to the widget's own: the standard attributes
  * of the framework's element attributes type `Attributes`, and nothing else, so
  * no prop the type accepts is dropped.
  */
@@ -365,7 +482,7 @@ export type StandardAttributeProps<Attributes extends object> = Pick<
 >;
 
 /**
- * Whether `name` is the name of a standard HTML attribute (see
+ * @internal Whether `name` is the name of a standard HTML attribute (see
  * {@link StandardAttributeName}). A wrapper that needs to keep such a name away
  * from a property binding of its own asks this rather than listing the names.
  */
@@ -385,7 +502,7 @@ const isOmitted = (name: string, value: unknown): boolean =>
   value == null || (value === false && !isEnumerated(name));
 
 /**
- * The standard HTML attributes among the given props: `class`, `style`, `id`,
+ * @internal The standard HTML attributes among the given props: `class`, `style`, `id`,
  * `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`. A widget
  * element takes these as plain DOM attributes, so a wrapper passes the result to
  * the element. Anything else is left out, so no stray prop can reach the
@@ -417,14 +534,14 @@ export function standardAttributes(props: object, prefix = ""): Record<string, u
  * The widgets and the tag names of their elements, defined once.
  * ───────────────────────────────────────────────────────────────────────── */
 
-/** Every widget name, for code that loops over the widgets. */
+/** @internal Every widget name, for code that loops over the widgets. */
 export const widgetNames = ["login", "logout", "session"] as const;
 
-/** The name of a widget. */
+/** @internal The name of a widget. */
 export type WidgetName = (typeof widgetNames)[number];
 
 /**
- * The tag names of the widget elements. The elements register under these
+ * @internal The tag names of the widget elements. The elements register under these
  * names, and every SDK wrapper, spec and guard reads them from here rather than
  * spelling them out. The type ties each tag to its widget name.
  */
@@ -434,5 +551,5 @@ export const widgetTags = {
   session: "zitadel-session",
 } as const satisfies Record<WidgetName, `zitadel-${WidgetName}`>;
 
-/** One of the widget element tag names. */
+/** @internal One of the widget element tag names. */
 export type WidgetTag = (typeof widgetTags)[WidgetName];

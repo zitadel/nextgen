@@ -324,10 +324,16 @@ function isSessionCookie(name: string): boolean {
  * it.
  */
 export interface SessionCookie {
+  /** The cookie name; the app's own session cookie is `sessionCookieName`. */
   readonly name: string;
+  /** The cookie value, the opaque session token; `""` clears the cookie. */
   readonly value: string;
   /** Seconds the browser keeps it, or `undefined` for the browser session. */
   readonly maxAge: number | undefined;
+  /**
+   * Whether the cookie carries the `Secure` attribute. It is required for the
+   * `__Host-` prefixed name, which browsers only accept over HTTPS.
+   */
   readonly secure: boolean;
 }
 
@@ -487,6 +493,7 @@ function setCookieName(setCookie: string): string {
  * request URL and the forwarded headers decide whether a cookie needs `Secure`.
  */
 export interface ProxiedRequest extends BrowserRequest {
+  /** The HTTP method of the request the browser sent to the same-origin proxy. */
   readonly method: string;
   /** The path after the proxy prefix, e.g. `/sessions/me` or `/api/v1/sessions/me`. */
   readonly path: string;
@@ -506,7 +513,9 @@ export interface ProxyUpstream {
 
 /** What a proxied answer sends the browser. */
 export interface ProxiedAnswer {
+  /** The `Set-Cookie` header values to send the browser, already serialised. */
   readonly setCookies: string[];
+  /** The body to send the browser: the upstream stream, or text this layer had to read. */
   readonly body: ReadableStream<Uint8Array> | string | null;
 }
 
@@ -526,7 +535,7 @@ export interface ProxiedSessionCookies {
  * The session cookies of a call the app proxies to the server (ADR 073,
  * ADR 083). The server knows one session cookie,
  * {@link serverSessionCookieName}; the app keeps its project's session in
- * {@link sessionCookieName}, so it neither replaces nor reads the session of
+ * `sessionCookieName`, so it neither replaces nor reads the session of
  * another app or of the Console on the same host. Both names follow the app's
  * scheme: the `__Host-` names wherever the cookie is `Secure`, the unprefixed
  * ones over plain http to a loopback host. The app reads only its scheme's.
@@ -774,17 +783,27 @@ export type NextgenSession = {
 };
 
 /** Auth state when the user is signed in. */
-export type AuthState = { isAuthenticated: true; session: NextgenSession };
+export type AuthState = {
+  /** Always `true`; the discriminant that narrows an {@link AuthResult}. */
+  isAuthenticated: true;
+  /** The verified session, including the raw token for server-side use. */
+  session: NextgenSession;
+};
 
 /** Auth state when the user is not signed in. */
-export type UnauthState = { isAuthenticated: false; session: null };
+export type UnauthState = {
+  /** Always `false`; the discriminant that narrows an {@link AuthResult}. */
+  isAuthenticated: false;
+  /** Always `null`: there is no session to read. */
+  session: null;
+};
 
 /** Union of all possible auth states. */
 export type AuthResult = AuthState | UnauthState;
 
 /**
  * The client-safe session exposed to app UI (headers, account menus).
- * Identical to {@link NextgenSession} but omits `token` — the raw session
+ * Identical to `NextgenSession` but omits `token` — the raw session
  * token must never reach client-side JavaScript, whether through an SSR
  * payload or a client-side fetch result.
  */
@@ -800,7 +819,12 @@ export type ClientSession = {
 };
 
 /** Client-safe auth state when the user is signed in. */
-export type ClientAuthState = { isAuthenticated: true; session: ClientSession };
+export type ClientAuthState = {
+  /** Always `true`; the discriminant that narrows a {@link ClientAuthResult}. */
+  isAuthenticated: true;
+  /** The signed-in user's identity without the raw token. */
+  session: ClientSession;
+};
 
 /**
  * Union of all possible client-safe auth states. Returned by the client
@@ -831,7 +855,7 @@ export type NextgenMiddlewareOptions = {
    *
    * The app keeps its session in a cookie of its own,
    * `__Host-zitadel_session_<projectId>`, or `zitadel_session_<projectId>` over
-   * plain http to a loopback host ({@link sessionCookieName}), so signing in
+   * plain http to a loopback host (`sessionCookieName`), so signing in
    * here neither replaces nor reads the session of another app or of the
    * Console on the same host (ADR 073, ADR 083).
    *
@@ -963,9 +987,13 @@ export type NextgenMiddlewareOptions = {
  * signed it in.
  */
 export interface OpaqueSession {
+  /** The signed-in user's id in this app's project, or `null` for an anonymous or foreign session. */
   readonly userId: string | null;
+  /** The user's login identifier (for example an email address), or `null`. */
   readonly identifier: string | null;
+  /** The schema property {@link identifier} came from (for example `"email"`), or `null`. */
   readonly identifierProperty: string | null;
+  /** The user's display name rendering, or `null` when the schema designates none. */
   readonly display: string | null;
   /** When the session expires, as the backend reports it, or `null`. */
   readonly expiresAt: string | null;
@@ -1031,9 +1059,20 @@ function sessionAnswer(body: unknown, projectId: string): OpaqueSession {
  *   request counts as signed out, but the cookie is kept.
  */
 export type OpaqueSessionCheck =
-  | { readonly verdict: "live"; readonly session: OpaqueSession }
-  | { readonly verdict: "refused" }
-  | { readonly verdict: "undecided" };
+  | {
+      /** The backend holds a live session for the token. */
+      readonly verdict: "live";
+      /** What the backend reports about that session. */
+      readonly session: OpaqueSession;
+    }
+  | {
+      /** The backend judged the token and refused it; the cookie is dead. */
+      readonly verdict: "refused";
+    }
+  | {
+      /** The backend gave no verdict; the cookie is kept. */
+      readonly verdict: "undecided";
+    };
 
 /** The code the backend answers `GET /sessions/me` with when the session is gone. */
 const SESSION_NOT_FOUND = "sess.not_found";
@@ -1263,14 +1302,21 @@ export interface SessionRequest extends BrowserRequest {
 
 /** The settings {@link resolveSession} judges a request's session by. */
 export interface ResolveSessionOptions {
+  /** Base URL of the auth backend, the issuer the session is checked against. */
   readonly url: string;
   /** The project this app signs its users in to; see {@link NextgenMiddlewareOptions.projectId}. */
   readonly projectId: string | undefined;
+  /** JWT signing algorithms accepted; `undefined` accepts the verifier's default set. */
   readonly allowedAlgorithms: readonly string[] | undefined;
+  /** Clock difference, in milliseconds, tolerated when checking `exp` and `nbf`. */
   readonly clockSkewMs: number;
+  /** The `aud` value or values a JWT must carry; `undefined` skips the audience check. */
   readonly audience: string | readonly string[] | undefined;
+  /** The JWT `typ` header values accepted, so a token minted for another purpose is refused. */
   readonly allowedTokenTypes: readonly string[];
+  /** How long to wait for the JWKS document, in milliseconds; `undefined` uses the verifier's default. */
   readonly jwksTimeoutMs: number | undefined;
+  /** How long to wait for the backend to judge an opaque token, in milliseconds. */
   readonly opaqueTokenTimeoutMs: number;
   /**
    * Whether an opaque session cookie is checked with the backend, a call to
@@ -1285,6 +1331,7 @@ export interface ResolveSessionOptions {
 
 /** A request's session, as {@link resolveSession} judged it. */
 export interface ResolvedSession {
+  /** Whether the request is signed in, and as whom. */
   readonly auth: AuthResult;
   /**
    * Whether the backend gave no verdict on the session cookie
@@ -1334,7 +1381,7 @@ function warnMissingProject(): void {
 
 /**
  * The cookie a request's session is read from, under the names of the
- * request's scheme only: the project's own ({@link sessionCookieName}), else
+ * request's scheme only: the project's own (`sessionCookieName`), else
  * the server's ({@link serverSessionCookieName}), where, on `localhost`, the
  * Console keeps its own. Over https an unprefixed cookie is never read: any
  * sibling host can plant one.

@@ -38,6 +38,7 @@
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
+    "docs:api": "typedoc",
     "lint": "biome check .",
     "prepack": "publint --strict"
   },

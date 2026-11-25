@@ -72,6 +72,54 @@ function settingsLookup(rootDir: string): (name: string) => string | undefined {
   return (name) => process.env[name] || envLocal[name] || undefined;
 }
 
+/**
+ * The Nuxt module that wires Zitadel sign-in into an app. Add `"@zitadel/sdk-nuxt/module"`
+ * to `modules` in `nuxt.config.ts` and configure it under the `nextgen` key with
+ * {@link NextgenMiddlewareOptions}; no `server/middleware` file is needed.
+ *
+ * ```ts
+ * export default defineNuxtConfig({
+ *   modules: ["@zitadel/sdk-nuxt/module"],
+ *   nextgen: {
+ *     protectedRoutes: ["/dashboard*"],
+ *     loginPath: "/login",
+ *   },
+ * });
+ * ```
+ *
+ * What setup does:
+ *
+ * - Stores the options in the private `runtimeConfig.nextgen`, so the running
+ *   server can still change each one through `NUXT_NEXTGEN_*` environment
+ *   variables. `url` and `projectId` are never baked in from the build's
+ *   environment: the server reads `ZITADEL_URL` and `ZITADEL_PROJECT_ID` (or
+ *   `NUXT_PUBLIC_ZITADEL_PROJECT_ID`) when it runs, so one build works in
+ *   every environment. Only `nuxt dev` also reads `ZITADEL_URL`,
+ *   `ZITADEL_PROJECT_SECRET` and the public project id from `.env.local`,
+ *   where `zitadel setup` writes them.
+ * - Keeps the project secret server-only. It is read from
+ *   `NUXT_NEXTGEN_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET` at run time and
+ *   is sent upstream only on the session-exchange call, never copied into the
+ *   build output or the client bundle.
+ * - Publishes `proxyPath` and the project id in the public runtime config, so
+ *   the client plugin can hand them to the widgets and the browser calls the
+ *   path the server serves.
+ * - Registers a global Nitro server middleware that proxies `proxyPath`
+ *   (default `/__nextgen`) to the Zitadel backend on the app's own origin,
+ *   verifies the session on every other request, writes the result for
+ *   {@link server!getAuth} and `useAuth()`, and redirects visitors of
+ *   `protectedRoutes` to `loginPath`.
+ * - Registers a plugin that seeds `useAuth()` from the server-rendered state
+ *   and configures the API client, and a client-only plugin that loads the
+ *   `<zitadel-login>`, `<zitadel-logout>` and `<zitadel-session>` elements, so
+ *   the app does not depend on `@zitadel/components` itself. Custom elements
+ *   are registered in the browser only, never during SSR.
+ * - Auto-imports the composables and types `$zitadelBusinessLocales` in the
+ *   app's own `.nuxt/types`.
+ *
+ * A missing `url` falls back to `ZITADEL_URL`, then to `http://localhost:8080`,
+ * where `zitadel start` runs the local server.
+ */
 const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
   defineNuxtModule<NextgenMiddlewareOptions>({
     meta: {

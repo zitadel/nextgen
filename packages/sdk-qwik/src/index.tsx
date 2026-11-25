@@ -31,9 +31,31 @@ import {
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import type { ZitadelWidgetAttributes } from "./types.js";
 
+/**
+ * Re-exported from `@zitadel/api/config` so an app wires the API client from this
+ * one package: {@link configureZitadel} sets the project the SDK talks to,
+ * {@link getApi} returns the configured client and {@link getZitadelConfig}
+ * reads the configuration back.
+ */
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
-export * from "./types.js";
+export type {
+  CreateFlowBodyPurpose,
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowRedirectDetail,
+  ZitadelFlowStepDetail,
+  ZitadelLoginConfig,
+  ZitadelLoginHandlers,
+  ZitadelLogoutConfig,
+  ZitadelLogoutHandlers,
+  ZitadelNavigationDetail,
+  ZitadelSessionConfig,
+  ZitadelSessionHandlers,
+  ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
+} from "./types.js";
 
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).
@@ -205,44 +227,80 @@ function withDetail<Detail>(
 }
 
 /**
- * Wraps each plain-callback handler from the shared SPA contract in a Qwik
- * {@link QRL} and suffixes the prop name with `$`, so the Qwik prop set is
- * derived from `@zitadel/sdk-core` and can never drift from the events the
- * widget emits. Adding a contract event surfaces a new `on…$` QRL prop here.
+ * Turns the plain-callback handlers of the shared SPA contract into Qwik props:
+ * every handler becomes an optional `QRL` and its name gets a `$` suffix
+ * (`onFlowComplete` becomes `onFlowComplete$`).
+ *
+ * Qwik can only pass a function across the server/browser boundary as a QRL, a
+ * lazily loaded and serializable reference, which is why the props carry the
+ * `$` suffix. Deriving the prop set from `@zitadel/sdk-core` means it can never
+ * drift from the events the widget emits: a new contract event surfaces here as
+ * a new `on...$` prop with no change to this package.
+ *
+ * A QRL loads lazily and runs asynchronously, so the callback's promise is
+ * registered with the event's `waitUntil` and the widget holds its navigation
+ * until the callback settles. See {@link ZitadelNavigationDetail}.
+ *
+ * @typeParam H - A handler record from `@zitadel/sdk-core`, such as
+ * {@link ZitadelLoginHandlers}.
  */
-type Qrlify<H> = {
+export type Qrlify<H> = {
   readonly [K in keyof H as `${K & string}$`]?: H[K] extends ((detail: infer D) => void) | undefined
     ? QRL<(detail: D) => void>
     : never;
 };
 
 /**
- * Props for {@link ZitadelLogin}. Supply the SDK handle via {@link project}, or
- * the discrete `projectId` / `proxyPath` the widget reads as properties — the
- * widget uses whichever is present. The `on…$` QRL callbacks are derived from
- * the shared {@link ZitadelLoginHandlers} contract. Pass an optional {@link ref}
- * signal to obtain the underlying `<zitadel-login>` element imperatively.
+ * Props for {@link ZitadelLogin}: the shared {@link ZitadelLoginConfig}
+ * surface, the standard HTML attributes ({@link ZitadelWidgetAttributes}), the
+ * `on...$` QRL callbacks derived from {@link ZitadelLoginHandlers}, and `ref`.
+ *
+ * Supply the project through `project` (the {@link ZitadelProject} handle), or
+ * through the discrete `projectId` and `proxyPath`; the widget uses whichever is
+ * present. Every callback is a Qwik QRL and may be async: the widget waits for it
+ * before it navigates (see {@link ZitadelNavigationDetail}).
  */
 export type ZitadelLoginProps = ZitadelLoginConfig &
   ZitadelWidgetAttributes &
   Qrlify<ZitadelLoginHandlers> & {
     /**
-     * Optional signal populated with the underlying `<zitadel-login>` element
-     * once it mounts, mirroring React's `forwardRef`. Wired alongside the
-     * component's internal host signal, so event forwarding stays intact.
+     * Signal that receives the underlying `<zitadel-login>` element once it
+     * mounts, for code that needs the element itself (to focus it or call its
+     * methods). It mirrors React's `forwardRef`. Qwik cannot hand a ref to a
+     * custom element any other way, and the component fills it next to its own
+     * host signal, so event forwarding keeps working. Left unset, nothing is
+     * exposed.
      */
     readonly ref?: Signal<ZitadelLoginElement | undefined>;
   };
 
 /**
- * Qwik component wrapping the `<zitadel-login>` web component. Binds the
- * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
- * the surface config as DOM properties — Qwik's JSX cannot set these on a custom
- * element (see {@link setProp}). The `ref` callback applies them synchronously at
- * mount, before the widget's first render; the `useVisibleTask$` tracks the props
- * and re-applies them when any changes (so the widget stays reactive), and wires
- * the native listeners that forward the widget's `zitadel-*` events, which Qwik's
- * declarative `useOn` does not catch.
+ * Qwik component that renders the `<zitadel-login>` sign-in widget: the whole
+ * login flow in one element, driven by
+ * the Zitadel flow API through the same-origin `/__nextgen` proxy.
+ *
+ * The element is written statically in the component's JSX, not built at render
+ * time. Its attribute-backed configuration (`project-id`, `proxy-path`, `url`,
+ * `publishable-key`, `purpose`, `flow-name`, `resume-flow-id` and the rest) is
+ * emitted into the server-rendered markup, so a resumed widget can read it the
+ * moment it upgrades. Property-only configuration (the full `project` handle,
+ * `locales`) is applied in the browser: Qwik 2 binds custom-element props as
+ * attributes only, so a `ref` callback assigns the DOM properties at mount,
+ * before the widget's first render, and a `useVisibleTask$` re-applies them
+ * whenever a prop changes and wires the native listeners that forward the
+ * widget's `zitadel-*` events to the `on...$` callbacks.
+ *
+ * Use it on a login or register page, with `purpose` choosing which.
+ *
+ * @example
+ * ```tsx
+ * <ZitadelLogin
+ *   project={{ projectId: "my-project", proxyPath: "/__nextgen" }}
+ *   onFlowComplete$={async () => {
+ *     await markSignedIn();
+ *   }}
+ * />
+ * ```
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   // The standard HTML attributes are the only extra props the element takes.
@@ -292,29 +350,38 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
 });
 
 /**
- * Props for {@link ZitadelLogout}. Supply the SDK handle via {@link project}, or
- * the discrete `projectId` / `proxyPath` the widget reads as properties — the
- * widget uses whichever is present. The `on…$` QRL callbacks are derived from
- * the shared {@link ZitadelLogoutHandlers} contract. Pass an optional {@link ref}
- * signal to obtain the underlying `<zitadel-logout>` element imperatively.
+ * Props for {@link ZitadelLogout}: the shared {@link ZitadelLogoutConfig}
+ * surface, the standard HTML attributes ({@link ZitadelWidgetAttributes}), the
+ * `on...$` QRL callbacks derived from {@link ZitadelLogoutHandlers}, and `ref`.
+ *
+ * Supply the project through `project` (the {@link ZitadelProject} handle), or
+ * through the discrete `projectId` and `proxyPath`; the widget uses whichever is
+ * present. `onSignout$` may be async: the widget waits for it before it
+ * navigates (see {@link ZitadelNavigationDetail}).
  */
 export type ZitadelLogoutProps = ZitadelLogoutConfig &
   ZitadelWidgetAttributes &
   Qrlify<ZitadelLogoutHandlers> & {
     /**
-     * Optional signal populated with the underlying `<zitadel-logout>` element
-     * once it mounts, mirroring React's `forwardRef`. Wired alongside the
-     * component's internal host signal, so event forwarding stays intact.
+     * Signal that receives the underlying `<zitadel-logout>` element once it
+     * mounts, for code that needs the element itself. It mirrors React's
+     * `forwardRef`; the component fills it next to its own host signal, so event
+     * forwarding keeps working. Left unset, nothing is exposed.
      */
     readonly ref?: Signal<ZitadelLogoutElement | undefined>;
   };
 
 /**
- * Qwik component wrapping the `<zitadel-logout>` web component. Binds the
- * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
- * surface config as DOM properties (see {@link setProp}) — applied at mount in
- * the `ref` callback and re-applied reactively by the `useVisibleTask$` — and
- * forwards the widget's `zitadel-signout` event as an optional callback.
+ * Qwik component that renders the `<zitadel-logout>` widget: a sign-out button
+ * that ends the session through the same-origin `/__nextgen` proxy and then
+ * sends the browser to `postSignOutUrl`.
+ *
+ * Like {@link ZitadelLogin}, the element is static in the JSX, its
+ * attribute-backed config rides in the server-rendered markup, and the
+ * property-only config and the `zitadel-signout` listener are applied in the
+ * browser. `onSignout$` may be async: the widget navigates only after it has
+ * settled (or after a short timeout), so a lazily loaded QRL is not cut off by
+ * the page unloading.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   // The standard HTML attributes are the only extra props the element takes.
@@ -351,29 +418,35 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
 });
 
 /**
- * Props for {@link ZitadelSession}. Supply the SDK handle via {@link project},
- * or the discrete `projectId` / `proxyPath` the widget reads as properties. The
- * `on…$` QRL callbacks are derived from the shared {@link ZitadelSessionHandlers}
- * contract. Pass an optional {@link ref} signal to obtain the underlying
- * `<zitadel-session>` element imperatively.
+ * Props for {@link ZitadelSession}: the shared {@link ZitadelSessionConfig}
+ * surface, the standard HTML attributes ({@link ZitadelWidgetAttributes}), the
+ * `on...$` QRL callbacks derived from {@link ZitadelSessionHandlers}, and `ref`.
+ *
+ * Supply the project through `project` (the {@link ZitadelProject} handle), or
+ * through the discrete `projectId` and `proxyPath`; the widget uses whichever is
+ * present. `onSignout$` may be async: the widget waits for it before it
+ * navigates (see {@link ZitadelNavigationDetail}).
  */
 export type ZitadelSessionProps = ZitadelSessionConfig &
   ZitadelWidgetAttributes &
   Qrlify<ZitadelSessionHandlers> & {
     /**
-     * Optional signal populated with the underlying `<zitadel-session>` element
-     * once it mounts, mirroring React's `forwardRef`.
+     * Signal that receives the underlying `<zitadel-session>` element once it
+     * mounts, for code that needs the element itself. It mirrors React's
+     * `forwardRef`. Left unset, nothing is exposed.
      */
     readonly ref?: Signal<ZitadelSessionElement | undefined>;
   };
 
 /**
- * Qwik component wrapping the `<zitadel-session>` web component — the
- * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle (or
- * the discrete project id / proxy path) and surface config as DOM properties
- * (see {@link setProp}) — applied at mount in the `ref` callback and re-applied
- * reactively by the `useVisibleTask$` — and forwards the widget's
- * `zitadel-signout` event as an optional callback.
+ * Qwik component that renders the `<zitadel-session>` widget: the post-sign-in
+ * "signed in as" card with a sign-out button.
+ *
+ * Like {@link ZitadelLogin}, the element is static in the JSX, its
+ * attribute-backed config rides in the server-rendered markup, and the
+ * property-only config and the `zitadel-signout` listener are applied in the
+ * browser. `onSignout$` may be async: the widget navigates only after it has
+ * settled (or after a short timeout).
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   // The standard HTML attributes are the only extra props the element takes.

@@ -13,7 +13,7 @@ import type { ClientAuthResult } from "../types";
  * use {@link getAuth} in a server route or middleware when the token is
  * needed to call upstream APIs.
  *
- * ```vue
+ * ```html
  * <script setup lang="ts">
  * const auth = useAuth();
  * </script>

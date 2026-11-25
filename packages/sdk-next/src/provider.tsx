@@ -70,12 +70,22 @@ function toClientSession(session: ClientSession | NextgenSession): ClientSession
  * `identifierProperty` and `display`. When the raw token is needed
  * server-side (e.g. to call an upstream API), read it from `auth()` in a
  * Server Component or Route Handler — never through this provider.
+ *
+ * @param props - The `session` to seed and the `children` to render below it.
+ * @returns The children wrapped in an {@link AuthContextProvider} holding the
+ *   client-safe state.
  */
 export function NextgenProvider({
   session,
   children,
 }: {
+  /**
+   * The auth state to seed, normally the result of `auth()`. A bare session, a
+   * client-safe result or `null` (read as signed out) are accepted too. Only
+   * the client-safe fields survive: the raw token is dropped whatever the input.
+   */
   session: AuthResult | ClientAuthResult | ClientSession | NextgenSession | null;
+  /** The subtree whose client components read the state with {@link useAuth}. */
   children: ReactNode;
 }) {
   let value: ClientAuthResult;

@@ -26,12 +26,28 @@ export function AuthContextProvider({
   value,
   children,
 }: {
+  /**
+   * The client-safe auth state every {@link useAuth} call below this provider
+   * reads. Typed as {@link ClientAuthResult} so a token-bearing `auth()` result
+   * is a type error here.
+   */
   value: ClientAuthResult;
+  /** The client subtree that reads the state with {@link useAuth}. */
   children: ReactNode;
 }) {
   return <NextgenAuthContext.Provider value={value}>{children}</NextgenAuthContext.Provider>;
 }
 
+/**
+ * Reads the auth state from the nearest {@link AuthContextProvider}, or the
+ * signed-out state when none is rendered above the caller.
+ *
+ * {@link useAuth} is the same read under the name an app calls; this is the
+ * lower-level hook it is built on, exported for code that wants the context
+ * without the public hook name.
+ *
+ * @returns The client-safe {@link ClientAuthResult} of the nearest provider.
+ */
 export function useAuthContext(): ClientAuthResult {
   return useContext(NextgenAuthContext);
 }
