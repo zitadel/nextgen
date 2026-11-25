@@ -14,7 +14,9 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   jwtNamesProject,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   requiresProjectSecret,
   resolveSession,
   resolveZitadelUrl,
@@ -294,6 +296,144 @@ describe("a compressed upstream answer", () => {
     expect(proxied.headers.has("content-length")).toBe(false);
     expect(proxied.headers.get("content-type")).toBe("application/json");
     expect(await proxied.json()).toEqual(exchanged);
+  });
+});
+
+describe("proxyRoute", () => {
+  const options = { proxyPath: "/__nextgen", projectId: "proj_app", loginPath: "/login" };
+  const METADATA = "/.well-known/oauth-authorization-server";
+
+  it("sends a path under the proxy path to the server without the prefix", () => {
+    expect(proxyRoute("/__nextgen/api/v1/flows", options)).toMatchObject({
+      path: "/api/v1/flows",
+      refused: false,
+    });
+    expect(proxyRoute("/__nextgen", options)).toMatchObject({ path: "", refused: false });
+  });
+
+  it("leaves every other path to the app", () => {
+    expect(proxyRoute("/", options)).toBeUndefined();
+    expect(proxyRoute("/__nextgen-evil/resource", options)).toBeUndefined();
+    expect(proxyRoute("/.well-known/openid-configuration", options)).toBeUndefined();
+    expect(proxyRoute(METADATA, options)).toBeUndefined();
+    expect(proxyRoute(`${METADATA}/__nextgen/oauthx/proj_app`, options)).toBeUndefined();
+  });
+
+  it("forwards this project's OAuth issuer and what lies under it", () => {
+    for (const path of [
+      "/oauth/proj_app",
+      "/oauth/proj_app/authorize",
+      "/oauth/proj_app/.well-known/openid-configuration",
+    ]) {
+      expect(proxyRoute(`/__nextgen${path}`, options)).toMatchObject({ path, refused: false });
+    }
+  });
+
+  it.each([
+    ["another project's issuer", "/__nextgen/oauth/proj_other/authorize"],
+    ["a project whose id starts with this one's", "/__nextgen/oauth/proj_app2/authorize"],
+    ["the platform project's issuer", "/__nextgen/oauth"],
+    ["the platform project's endpoints", "/__nextgen/oauth/authorize"],
+    ["another project's metadata", `${METADATA}/__nextgen/oauth/proj_other`],
+    ["the platform project's metadata", `${METADATA}/__nextgen/oauth`],
+    ["a path under this project's metadata", `${METADATA}/__nextgen/oauth/proj_app/more`],
+  ])("refuses %s", (_name, pathname) => {
+    expect(proxyRoute(pathname, options)?.refused).toBe(true);
+  });
+
+  it("maps this project's issuer metadata onto the server's path", () => {
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, options)).toMatchObject({
+      path: `${METADATA}/oauth/proj_app`,
+      refused: false,
+    });
+  });
+
+  it("refuses every OAuth path when the app has no project", () => {
+    const anonymous = { ...options, projectId: undefined };
+    expect(proxyRoute("/__nextgen/oauth/proj_app/authorize", anonymous)?.refused).toBe(true);
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, anonymous)?.refused).toBe(true);
+    expect(proxyRoute("/__nextgen/api/v1/flows", anonymous)?.refused).toBe(false);
+  });
+
+  it("follows a proxy path of the app's own", () => {
+    const custom = { ...options, proxyPath: "/auth" };
+    expect(proxyRoute(`${METADATA}/auth/oauth/proj_app`, custom)).toMatchObject({
+      path: `${METADATA}/oauth/proj_app`,
+      refused: false,
+      headers: { "x-forwarded-prefix": "/auth" },
+    });
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, custom)).toBeUndefined();
+  });
+
+  it("names the proxy path and the login page's path in the headers", () => {
+    expect(
+      proxyRoute("/__nextgen/api/v1/flows", { ...options, loginPath: "/signin?from=app#top" })
+        ?.headers,
+    ).toEqual({ "x-forwarded-prefix": "/__nextgen", "x-zitadel-login-path": "/signin" });
+  });
+
+  describe("the app's server log", () => {
+    /** A fresh copy of the module, which has warned about nothing yet. */
+    async function fresh() {
+      vi.resetModules();
+      return (await import("./middleware.js")).proxyRoute;
+    }
+    let logged: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      logged.mockRestore();
+    });
+
+    it("says once that no project is configured when an OAuth path is asked for", async () => {
+      const route = await fresh();
+      const anonymous = { ...options, projectId: undefined };
+
+      route("/__nextgen/api/v1/flows", anonymous);
+      expect(logged).not.toHaveBeenCalled();
+
+      route("/__nextgen/oauth/proj_app/authorize", anonymous);
+      route(`${METADATA}/__nextgen/oauth/proj_app`, anonymous);
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged.mock.calls[0]?.[0]).toContain("ZITADEL_PROJECT_ID");
+    });
+
+    it("says once that a proxy path of the app's own makes it no issuer", async () => {
+      const route = await fresh();
+      const custom = { ...options, proxyPath: "/auth" };
+
+      route("/auth/api/v1/flows", custom);
+      route("/auth/oauth/proj_other/authorize", custom);
+      expect(logged).not.toHaveBeenCalled();
+
+      route("/auth/oauth/proj_app/authorize", custom);
+      route(`${METADATA}/auth/oauth/proj_app`, custom);
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged.mock.calls[0]?.[0]).toContain('"/auth"');
+    });
+
+    it("says nothing about another project's issuer", async () => {
+      const route = await fresh();
+
+      route("/__nextgen/oauth/proj_other/authorize", options);
+      route("/__nextgen/oauth/proj_app/authorize", options);
+      expect(logged).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("refusedProxyResponse", () => {
+  it("answers as the server does for an issuer it does not serve", async () => {
+    const response = refusedProxyResponse();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toBe("application/json");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      error: "invalid_request",
+      error_description: "no authorization server at this issuer",
+    });
   });
 });
 

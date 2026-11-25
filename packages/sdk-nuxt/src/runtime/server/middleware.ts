@@ -1,6 +1,7 @@
 import type {
   AuthResult,
   ZitadelMiddlewareOptions,
+  ProxyRoute,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -13,7 +14,9 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -30,6 +33,7 @@ import {
   getRequestHeaders,
   getRequestIP,
   getMethod,
+  sendWebResponse,
   setResponseStatus,
   toWebRequest,
 } from "h3";
@@ -202,11 +206,17 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
       return;
     }
 
-    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
+    const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+    // An OAuth issuer that is not this app's project: the app answers, so its
+    // origin never serves another project's issuer.
+    if (route?.refused) {
+      return sendWebResponse(event, refusedProxyResponse());
+    }
+    if (route) {
       return proxyRequest(
         event,
         url,
-        proxyPath,
+        route,
         urlObj,
         projectId,
         proxyTimeoutMs,
@@ -231,7 +241,7 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
 }
 
 /**
- * Forwards a request under the proxy path to the backend and streams the response back.
+ * Forwards a request that the proxy handles to the backend and streams the response back.
  *
  * The response keeps its `Set-Cookie` headers. Hop-by-hop headers are stripped in both directions,
  * and the session cookie travels under this project's name in the browser and under the server's
@@ -245,7 +255,7 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
  *
  * @param event - The current H3 event.
  * @param authUrl - The base URL of the backend.
- * @param proxyPath - The path prefix being proxied, for example `"/__nextgen"`.
+ * @param route - Where the request goes ({@link proxyRoute}).
  * @param url - The parsed request URL.
  * @param projectId - The project this app signs its users in to.
  * @param proxyTimeoutMs - How long the upstream request may take, in milliseconds, before it is
@@ -257,13 +267,13 @@ export function createZitadelMiddleware(options: ZitadelMiddlewareOptions = {}):
 async function proxyRequest(
   event: H3Event,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   url: URL,
   projectId: string | undefined,
   proxyTimeoutMs: number,
   projectSecretOption: string | undefined,
 ): Promise<ReadableStream<Uint8Array> | null> {
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = getMethod(event);
@@ -274,6 +284,9 @@ async function proxyRequest(
     rawBody !== undefined && rawBody.byteLength > 0 ? new Uint8Array(rawBody) : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,

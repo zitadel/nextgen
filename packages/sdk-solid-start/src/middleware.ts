@@ -1,6 +1,7 @@
 import type {
   AuthResult,
   ZitadelMiddlewareOptions,
+  ProxyRoute,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -12,7 +13,9 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   nonEmpty,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -207,8 +210,8 @@ function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
 }
 
 /**
- * Forwards a request under the same-origin proxy path to the Zitadel server and returns its
- * response, including its `Set-Cookie` headers.
+ * Forwards a request that the proxy handles to the Zitadel server and returns its response,
+ * including its `Set-Cookie` headers.
  *
  * Hop-by-hop headers are stripped in both directions. A `location` header is kept only when it
  * redirects back onto this app, so the proxy cannot be used to send a browser elsewhere. The
@@ -219,7 +222,7 @@ function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
  * @param event - The current request event.
  * @param url - The parsed URL of the incoming request.
  * @param authUrl - The base URL of the Zitadel server.
- * @param proxyPath - The proxy path prefix to strip from the request path.
+ * @param route - Where the request goes ({@link proxyRoute}).
  * @param projectId - The project id, or `undefined` when none is configured.
  * @param projectSecret - The project secret, or `undefined` when none is configured.
  * @param proxyTimeoutMs - The time in milliseconds after which the upstream call is aborted.
@@ -230,12 +233,12 @@ async function proxyRequest(
   event: SolidFetchEvent,
   url: URL,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = event.request.method;
@@ -243,6 +246,9 @@ async function proxyRequest(
   const body = hasBody ? await event.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event, url);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,
@@ -503,8 +509,14 @@ export function createZitadelMiddleware(
       return;
     }
 
-    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url2, url, proxyPath, projectId, projectSecret, proxyTimeoutMs);
+    const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+    // An OAuth issuer that is not this app's project: the app answers, so its
+    // origin never serves another project's issuer.
+    if (route?.refused) {
+      return refusedProxyResponse();
+    }
+    if (route) {
+      return proxyRequest(event, url2, url, route, projectId, projectSecret, proxyTimeoutMs);
     }
 
     return handleAuth(event, url2, {

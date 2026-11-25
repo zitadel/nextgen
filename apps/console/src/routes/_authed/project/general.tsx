@@ -58,6 +58,7 @@ function ProjectGeneral() {
     <div className={DETAIL_STACK}>
       <RenameCard
         id="project-name"
+        title="Project details"
         label="Project name"
         value={project.name}
         onSave={async (name) => {

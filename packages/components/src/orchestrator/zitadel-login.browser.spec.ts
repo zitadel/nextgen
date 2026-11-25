@@ -788,6 +788,15 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     expect(paired?.tabIndex).toBe(-1);
   });
 
+  it("carries an id", async () => {
+    setup([pairedPasswordStep]);
+    const element = await mount();
+    const form = element.shadowRoot?.querySelector("form");
+    const paired = form?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+
+    expect(paired?.id).toBe("zl-paired-identifier");
+  });
+
   it("renders nothing when the step carries no identifier", async () => {
     setup([unpairedPasswordStep]);
     const element = await mount();

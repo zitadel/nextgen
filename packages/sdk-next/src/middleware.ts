@@ -16,7 +16,11 @@
  * @module
  */
 import type { ZitadelProject } from "@zitadel/sdk-core/config";
-import type { ZitadelMiddlewareOptions, ResolveSessionOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  ProxyRoute,
+  ResolveSessionOptions,
+  ZitadelMiddlewareOptions,
+} from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 import type { NextRequest } from "next/server";
 
@@ -27,7 +31,9 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   nonEmpty,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -178,8 +184,14 @@ export async function zitadelMiddleware(
     return NextResponse.next();
   }
 
-  if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, url, proxyPath, projectId, proxyTimeoutMs, options.projectSecret);
+  const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+  // An OAuth issuer that is not this app's project: the app answers, so its
+  // origin never serves another project's issuer.
+  if (route?.refused) {
+    return refusedProxyResponse();
+  }
+  if (route) {
+    return proxyRequest(req, url, route, projectId, proxyTimeoutMs, options.projectSecret);
   }
 
   return handleAuth(req, {
@@ -198,8 +210,9 @@ export async function zitadelMiddleware(
 }
 
 /**
- * Forwards a request under the proxy path to the Zitadel backend and returns the response, with
- * hop-by-hop headers stripped in both directions.
+ * Forwards a request that the proxy handles to the Zitadel backend and returns the response, with
+ * hop-by-hop headers stripped in both directions. The session cookie travels under the name of this
+ * project in the browser and under the name of the server upstream ({@link proxySessionCookies}).
  *
  * The session cookie travels under the project's own name in the browser and under the server's
  * name upstream, so the proxy renames it each way and never forwards another project's session
@@ -219,7 +232,7 @@ export async function zitadelMiddleware(
  *
  * @param req - The incoming edge request.
  * @param authUrl - The base URL of the Zitadel backend.
- * @param proxyPath - The path prefix being proxied, for example `"/__nextgen"`.
+ * @param route - Where the request goes ({@link proxyRoute}).
  * @param projectId - The project this app signs its users in to.
  * @param proxyTimeoutMs - The time in milliseconds to wait for the backend.
  * @param projectSecretOption - The `projectSecret` option, which wins over the
@@ -229,13 +242,13 @@ export async function zitadelMiddleware(
 async function proxyRequest(
   req: NextRequest,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   projectId: string | undefined,
   proxyTimeoutMs: number,
   projectSecretOption: string | undefined,
 ): Promise<Response> {
   const url = new URL(req.url);
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const upstreamHeaders = new Headers();
@@ -262,6 +275,10 @@ async function proxyRequest(
 
   if (!upstreamHeaders.has("x-forwarded-proto")) {
     upstreamHeaders.set("x-forwarded-proto", url.protocol.replace(":", ""));
+  }
+
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
   }
 
   const sessionCookies = proxySessionCookies(

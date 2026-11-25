@@ -1,6 +1,7 @@
 import type {
   AuthResult,
   ZitadelMiddlewareOptions,
+  ProxyRoute,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
@@ -12,7 +13,9 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   nonEmpty,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -304,7 +307,7 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
 }
 
 /**
- * Forwards a request under the proxy path to the auth backend and returns its response.
+ * Forwards a request that the proxy handles to the auth backend and returns its response.
  *
  * The response keeps its `Set-Cookie` headers. Hop-by-hop headers are stripped in both
  * directions, and a `location` header is kept only when it is a redirect onto this app, so the
@@ -320,7 +323,7 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
  *
  * @param ev - The current request event.
  * @param authUrl - The base URL of the auth backend.
- * @param proxyPath - The same-origin proxy path, stripped from the request path before forwarding.
+ * @param route - Where the request goes ({@link proxyRoute}).
  * @param projectId - The project id the session cookie is scoped to, or `undefined` when none is
  *   configured.
  * @param projectSecret - The project secret, or `undefined` when none is configured.
@@ -332,12 +335,12 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
 async function proxyResponse(
   ev: QwikRequestEvent,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
-  const suffix = ev.url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${ev.url.search}`;
 
   const method = ev.request.method;
@@ -345,6 +348,9 @@ async function proxyResponse(
   const body = hasBody ? await ev.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(ev);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,
@@ -622,8 +628,15 @@ export function createZitadelOnRequest(
       return;
     }
 
-    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      ev.send(await proxyResponse(ev, url, proxyPath, projectId, projectSecret, proxyTimeoutMs));
+    const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+    // An OAuth issuer that is not this app's project: the app answers, so its
+    // origin never serves another project's issuer.
+    if (route?.refused) {
+      ev.send(refusedProxyResponse());
+      return;
+    }
+    if (route) {
+      ev.send(await proxyResponse(ev, url, route, projectId, projectSecret, proxyTimeoutMs));
       return;
     }
 

@@ -1,4 +1,8 @@
-import type { AuthResult, ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  ProxyRoute,
+  ZitadelMiddlewareOptions,
+} from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 
 import {
@@ -8,7 +12,9 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   nonEmpty,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -167,7 +173,7 @@ function buildUpstreamHeaders(
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend.
+ * Forwards a request that the proxy handles to the upstream auth backend.
  *
  * The session cookie travels under this project's name in the browser and under the server's
  * name upstream, see {@link proxySessionCookies}. Each project keeps its session in its own
@@ -181,7 +187,7 @@ function buildUpstreamHeaders(
  * @param request - The incoming Web `Request`.
  * @param url - The parsed URL of `request`.
  * @param authUrl - The base URL of the auth backend.
- * @param proxyPath - The same-origin proxy path prefix to strip.
+ * @param route - Where the request goes ({@link proxyRoute}).
  * @param projectId - The project id, used to name the project's session cookie.
  * @param projectSecret - The project secret, sent only on the session handoff.
  * @param clientAddress - The direct client address to append to `X-Forwarded-For`.
@@ -192,13 +198,13 @@ async function proxyRequest(
   request: Request,
   url: URL,
   authUrl: string,
-  proxyPath: string,
+  route: ProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   clientAddress: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = request.method;
@@ -206,6 +212,9 @@ async function proxyRequest(
   const body = hasBody ? await request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(request, url, clientAddress);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,
@@ -389,12 +398,18 @@ export async function handleZitadelRequest(
     return { type: "continue", auth: { isAuthenticated: false, session: null } };
   }
 
-  if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
+  const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+  // An OAuth issuer that is not this app's project: the app answers, so its
+  // origin never serves another project's issuer.
+  if (route?.refused) {
+    return { type: "reject", response: refusedProxyResponse() };
+  }
+  if (route) {
     const response = await proxyRequest(
       request,
       url2,
       url,
-      proxyPath,
+      route,
       projectId,
       projectSecret,
       clientAddress,
