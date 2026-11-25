@@ -15,7 +15,6 @@ import {
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
-  LocalServerRecordMalformedElsewhereError,
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
 } from "@/lib/server";
@@ -69,7 +68,6 @@ const LOCAL_SERVER_NOT_RUNNING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
   hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
-  details: "{details}",
   next: [
     {
       id: "start",
@@ -82,7 +80,6 @@ const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
   hint: "No healthy local server responded at {server_url}. Run `zitadel start` to bring it back.",
-  details: "{details}",
   next: [
     {
       id: "start",
@@ -107,7 +104,6 @@ const RECORD_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  details: "{details}",
   next: [
     {
       id: "reset",
@@ -121,21 +117,11 @@ const RECORD_MALFORMED_REFUSAL = {
   ],
 } as const satisfies Refusal;
 
-/** How a run is refused when the runtime record of a parent folder is not in the shape it is written in. */
-const RECORD_MALFORMED_ELSEWHERE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
-  details: "{details}",
-  next: ["{reset}", "{start}"],
-} as const satisfies Refusal;
-
 /** How a run is refused when the runtime record of this folder cannot be read. */
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-  details: "{details}",
+  hint: "Check that the runtime record and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /**
@@ -236,13 +222,11 @@ export abstract class EnvironmentCommand extends BaseCommand {
       if (error instanceof LocalServerNotRunningError) {
         throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerNotRespondingError) {
         throw refusalError(LOCAL_SERVER_NOT_RESPONDING_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
           server_url: error.serverUrl,
         });
       }
@@ -268,44 +252,11 @@ export abstract class EnvironmentCommand extends BaseCommand {
       if (error instanceof LocalServerRecordMalformedError) {
         throw refusalError(RECORD_MALFORMED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
-      }
-      if (error instanceof LocalServerRecordMalformedElsewhereError) {
-        throw refusalError(
-          RECORD_MALFORMED_ELSEWHERE_REFUSAL,
-          {
-            message: error.message,
-            details: {
-              ...error.details,
-              suggested_args: [
-                ["reset", "--force", "--cwd", error.directory],
-                ["start", "--cwd", error.directory],
-              ],
-            },
-          },
-          {
-            reset: {
-              id: "reset",
-              flags: {
-                force: true,
-                cwd: error.directory,
-              },
-            },
-            start: {
-              id: "start",
-              flags: {
-                cwd: error.directory,
-              },
-            },
-          },
-        );
       }
       if (error instanceof LocalServerRecordUnreadableError) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       throw error;

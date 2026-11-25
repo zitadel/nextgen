@@ -24,7 +24,7 @@ import { Project } from "@/lib/project";
 const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
-  hint: "{reason} Run `zitadel start`, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
@@ -168,7 +168,6 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         throw refusalError(
           NO_LOCAL_SERVER_REFUSAL,
           {
-            reason: error.hint ?? "",
             scripting,
             recovery: recovered,
           },

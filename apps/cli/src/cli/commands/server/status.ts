@@ -9,7 +9,6 @@ import {
   LocalServerRecordUnreadableError,
   ZitadelRuntime,
 } from "@/lib/server";
-import { Cmd } from "@/lib/cmd";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { CommandResult, Connection, MetaOptions } from "@/cli/core";
@@ -371,7 +370,6 @@ const RECORD_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  details: "{details}",
   next: [
     {
       id: "reset",
@@ -389,8 +387,7 @@ const RECORD_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-  details: "{details}",
+  hint: "Check that the runtime record and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /**
@@ -433,14 +430,11 @@ export default class Status extends Telemetered(ProjectCommand) {
       if (error instanceof LocalServerRecordMalformedError) {
         throw refusalError(RECORD_MALFORMED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerRecordUnreadableError) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       throw error;
@@ -463,14 +457,11 @@ export default class Status extends Telemetered(ProjectCommand) {
       if (error instanceof LocalServerRecordMalformedError) {
         throw refusalError(RECORD_MALFORMED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerRecordUnreadableError) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       throw error;

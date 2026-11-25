@@ -61,7 +61,6 @@ const RECORD_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  details: "{details}",
   next: [
     {
       id: "reset",
@@ -79,8 +78,7 @@ const RECORD_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-  details: "{details}",
+  hint: "Check that the runtime record and its directory are readable by you.",
 } as const satisfies Refusal;
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
@@ -771,14 +769,11 @@ export default class Doctor extends Telemetered(
       if (error instanceof LocalServerRecordMalformedError) {
         throw refusalError(RECORD_MALFORMED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerRecordUnreadableError) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       throw error;

@@ -20,7 +20,6 @@ import {
   LocalServerNotRunningError,
   ZitadelRuntime,
 } from "@/lib/server";
-import { shellCommand } from "@/lib/suggestion";
 import { section } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -58,7 +57,6 @@ const LOCAL_SERVER_NOT_RUNNING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
   hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
-  details: "{details}",
   next: [
     {
       id: "start",
@@ -71,7 +69,6 @@ const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
   hint: "No healthy local server responded at {server_url}. Run `zitadel start` to bring it back.",
-  details: "{details}",
   next: [
     {
       id: "start",
@@ -95,10 +92,8 @@ const LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL = {
 const ADMIN_FILE_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
-  details: "{details}",
+  hint: "Delete the local admin file and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
   next: [
-    "{remove}",
     {
       id: "reset",
       flags: {
@@ -115,8 +110,7 @@ const ADMIN_FILE_MALFORMED_REFUSAL = {
 const ADMIN_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that {path} is readable by you; `zitadel start` writes it owner-only.",
-  details: "{details}",
+  hint: "Check that the local admin file is readable by you; `zitadel start` writes it owner-only.",
 } as const satisfies Refusal;
 
 /** How a run is refused when the server does not know the local admin. */
@@ -136,7 +130,6 @@ const ADMIN_SESSION_REFUSAL = {
   code: "E_AUTH",
   message: "{message}",
   hint: "Check `zitadel logs` for why the local server refused the admin's session.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a run is refused when the server does not host the platform project. */
@@ -144,7 +137,6 @@ const PLATFORM_MISSING_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
-  details: "{details}",
   next: [
     {
       id: "stop",
@@ -219,13 +211,11 @@ export default class Console extends Telemetered(
         if (error instanceof LocalServerNotRunningError) {
           throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
             message: error.message,
-            details: error.details ?? null,
           });
         }
         if (error instanceof LocalServerNotRespondingError) {
           throw refusalError(LOCAL_SERVER_NOT_RESPONDING_REFUSAL, {
             message: error.message,
-            details: error.details ?? null,
             server_url: error.serverUrl,
           });
         }
@@ -351,13 +341,11 @@ export default class Console extends Telemetered(
       if (error instanceof LocalServerNotRunningError) {
         throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerNotRespondingError) {
         throw refusalError(LOCAL_SERVER_NOT_RESPONDING_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
           server_url: error.serverUrl,
         });
       }
@@ -388,13 +376,11 @@ export default class Console extends Telemetered(
       if (error instanceof LocalServerAdminSessionError) {
         throw refusalError(ADMIN_SESSION_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerAdminPlatformMissingError) {
         throw refusalError(PLATFORM_MISSING_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       throw error;
@@ -461,23 +447,13 @@ export default class Console extends Telemetered(
       };
     } catch (error) {
       if (error instanceof LocalServerAdminFileMalformedError) {
-        throw refusalError(
-          ADMIN_FILE_MALFORMED_REFUSAL,
-          {
-            message: error.message,
-            details: error.details ?? null,
-            path: Cmd.quote(error.path),
-          },
-          {
-            remove: shellCommand("rm", Cmd.quote(error.path)),
-          },
-        );
+        throw refusalError(ADMIN_FILE_MALFORMED_REFUSAL, {
+          message: error.message,
+        });
       }
       if (error instanceof LocalServerAdminUnreadableError) {
         throw refusalError(ADMIN_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       throw error;

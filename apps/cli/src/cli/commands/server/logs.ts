@@ -69,7 +69,6 @@ const DOCKER_FAILED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Check that Docker is installed, running, and reachable from this shell.",
-  details: "{details}",
   next: [
     {
       id: "doctor",
@@ -148,7 +147,6 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
         if (error instanceof LocalServerDockerFailedError) {
           throw refusalError(DOCKER_FAILED_REFUSAL, {
             message: error.message,
-            details: error.details ?? null,
           });
         }
         throw error;
@@ -189,7 +187,6 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
         if (error instanceof LocalServerDockerFailedError) {
           throw refusalError(DOCKER_FAILED_REFUSAL, {
             message: error.message,
-            details: error.details ?? null,
           });
         }
         throw error;

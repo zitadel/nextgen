@@ -8,7 +8,6 @@ import {
   LocalServerRecordUnreadableError,
   LocalServerStopError,
 } from "@/lib/server";
-import { Cmd } from "@/lib/cmd";
 import type { CommandResult } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Fact, section } from "@/lib/ui";
@@ -33,7 +32,6 @@ const PROCESSES_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a reset is refused when the machine cannot list its processes. */
@@ -41,7 +39,6 @@ const PROCESSES_UNLISTABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a reset is refused when the server is still running afterwards. */
@@ -49,7 +46,6 @@ const SERVER_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a reset is refused when its permit is for another folder. */
@@ -64,7 +60,6 @@ const ORPHANS_DID_NOT_STOP_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
-  details: "{details}",
 } as const satisfies Refusal;
 
 /** How a reset is refused when the runtime record of this folder is not in the shape it is written in. */
@@ -72,7 +67,6 @@ const RECORD_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  details: "{details}",
   next: [
     {
       id: "reset",
@@ -90,8 +84,7 @@ const RECORD_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-  details: "{details}",
+  hint: "Check that the runtime record and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /**
@@ -166,19 +159,16 @@ export default class Reset extends Telemetered(
           if (error instanceof LocalServerProcessesStopError) {
             throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
               message: error.message,
-              details: error.details ?? null,
             });
           }
           if (error instanceof LocalServerProcessesUnlistableError) {
             throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
               message: error.message,
-              details: error.details ?? null,
             });
           }
           if (error instanceof LocalServerStopError) {
             throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
               message: error.message,
-              details: error.details ?? null,
             });
           }
           if (error instanceof LocalServerPermitMismatchError) {
@@ -189,20 +179,16 @@ export default class Reset extends Telemetered(
           if (error instanceof LocalServerOrphansStopError) {
             throw refusalError(ORPHANS_DID_NOT_STOP_REFUSAL, {
               message: error.message,
-              details: error.details ?? null,
             });
           }
           if (error instanceof LocalServerRecordMalformedError) {
             throw refusalError(RECORD_MALFORMED_REFUSAL, {
               message: error.message,
-              details: error.details ?? null,
             });
           }
           if (error instanceof LocalServerRecordUnreadableError) {
             throw refusalError(RECORD_UNREADABLE_REFUSAL, {
               message: error.message,
-              details: error.details ?? null,
-              path: Cmd.quote(error.path),
             });
           }
           throw error;
@@ -238,14 +224,11 @@ export default class Reset extends Telemetered(
       if (error instanceof LocalServerRecordMalformedError) {
         throw refusalError(RECORD_MALFORMED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerRecordUnreadableError) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       throw error;

@@ -16,11 +16,11 @@ import {
   LocalServerPortFullError,
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
+  LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
   LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server";
-import { Cmd } from "@/lib/cmd";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
 import type { NextSteps } from "@/cli/core/next-steps";
@@ -66,7 +66,6 @@ const DOCKER_FAILED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Check that Docker is installed, running, and reachable from this shell.",
-  details: "{details}",
   next: [
     {
       id: "doctor",
@@ -81,7 +80,7 @@ const DOCKER_UNAVAILABLE_REFUSAL = {
   next: ["{check}", "{retry}"],
   details: {
     message:
-      "Docker is not reachable ({detail}); managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.",
+      "{message}; managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.",
   },
 } as const satisfies Refusal;
 
@@ -115,7 +114,6 @@ const NO_FREE_PORT_REFUSAL = {
       flags: { port: 9080 },
     },
   ],
-  details: { first_port: "{first}" },
 } as const satisfies Refusal;
 
 /** How a start is refused when the server it launched did not become ready. */
@@ -130,7 +128,6 @@ const SERVER_NOT_READY_REFUSAL = {
       flags: { force: true },
     },
   ],
-  details: "{details}",
 } as const satisfies Refusal;
 
 /**
@@ -139,7 +136,7 @@ const SERVER_NOT_READY_REFUSAL = {
  */
 const SERVER_NOT_READY_AND_RUNNING_REFUSAL = {
   code: "E_NETWORK",
-  message: "{message}; cleanup did not stop the spawned local runtime",
+  message: "{message}",
   hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
   next: [
     { id: "logs" },
@@ -152,21 +149,12 @@ const SERVER_NOT_READY_AND_RUNNING_REFUSAL = {
       flags: { all: true },
     },
   ],
-  details: {
-    startup_error: {
-      code: "E_NETWORK",
-      message: "{message}",
-      details: "{details}",
-    },
-    stop_result: "{stop}",
-  },
 } as const satisfies Refusal;
 
 /** How a start is refused when the server it had to replace would not stop. */
 const SERVER_WOULD_NOT_STOP_REFUSAL = {
   message: "Existing local Zitadel server did not stop",
   hint: "Stop the existing local runtime manually, then rerun start.",
-  details: { runtime: "{runtime}", stop_result: "{stop}" },
 } as const satisfies Refusal;
 
 /** How a start of the local server is refused: LocalServerBinaryMissingError. */
@@ -174,7 +162,6 @@ const BINARY_MISSING_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-  details: "{details}",
   next: ["{reinstall}"],
 } as const satisfies Refusal;
 
@@ -183,7 +170,6 @@ const BINARY_BLOCKED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-  details: "{details}",
   next: ["{reinstall}"],
 } as const satisfies Refusal;
 
@@ -191,8 +177,7 @@ const BINARY_BLOCKED_REFUSAL = {
 const START_IN_PROGRESS_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
-  hint: "Wait for it to finish, or delete {lock_file} if no start is running.",
-  details: "{details}",
+  hint: "Wait for it to finish, or delete the lock file named above if no start is running.",
 } as const satisfies Refusal;
 
 /** How a start of the local server is refused: LocalServerRecordMalformedError. */
@@ -200,7 +185,6 @@ const RECORD_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  details: "{details}",
   next: [
     {
       id: "reset",
@@ -218,10 +202,8 @@ const RECORD_MALFORMED_REFUSAL = {
 const ADMIN_FILE_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
-  details: "{details}",
+  hint: "Delete the local admin file and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
   next: [
-    "{remove}",
     {
       id: "reset",
       flags: {
@@ -238,24 +220,21 @@ const ADMIN_FILE_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-  details: "{details}",
+  hint: "Check that the runtime record and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /** How a start is refused when the local admin file cannot be read. */
 const ADMIN_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that {path} is readable by you; `zitadel start` writes it owner-only.",
-  details: "{details}",
+  hint: "Check that the local admin file is readable by you; `zitadel start` writes it owner-only.",
 } as const satisfies Refusal;
 
 /** How a start is refused when an environment file the local server reads cannot be read. */
 const ENV_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "The file {path} exists but could not be read; fix its permissions or remove it.",
-  details: "{details}",
+  hint: "The environment file exists but could not be read; fix its permissions or remove it.",
 } as const satisfies Refusal;
 
 /** How a start of the local server is refused: LocalServerAdminPlatformMissingError. */
@@ -263,7 +242,6 @@ const PLATFORM_MISSING_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
-  details: "{details}",
   next: [
     {
       id: "stop",
@@ -425,7 +403,7 @@ export default class Start extends Telemetered(
         throw refusalError(
           DOCKER_UNAVAILABLE_REFUSAL,
           {
-            detail: error.detail,
+            message: error.message,
           },
           {
             check: shellCommand("docker", "version"),
@@ -456,63 +434,33 @@ export default class Start extends Telemetered(
       if (error instanceof LocalServerPortFullError) {
         throw refusalError(NO_FREE_PORT_REFUSAL, {
           message: error.message,
-          first: error.firstPort,
+        });
+      }
+      if (error instanceof LocalServerStartCleanupFailedError) {
+        throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+          message: error.message,
         });
       }
       if (error instanceof LocalServerStartExitedError) {
-        const details = {
-          ...error.details,
-          server_url: error.record.server_url,
-          log_tail: error.logTail || undefined,
-        };
-
-        if (error.cleanup.status === "failed") {
-          throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
-            message: "Local Zitadel server process exited before becoming healthy",
-            details,
-            stop: error.cleanup,
-          });
-        } else {
-          throw refusalError(SERVER_NOT_READY_REFUSAL, {
-            message: "Local Zitadel server process exited before becoming healthy",
-            hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-            details,
-          });
-        }
+        throw refusalError(SERVER_NOT_READY_REFUSAL, {
+          message: error.message,
+          hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
+        });
       }
       if (error instanceof LocalServerStartTimeoutError) {
-        const details = {
-          ...error.details,
-          server_url: error.record.server_url,
-          log_tail: error.logTail || undefined,
-        };
-
-        if (error.cleanup.status === "failed") {
-          throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
-            message: "Local Zitadel server did not become healthy",
-            details,
-            stop: error.cleanup,
-          });
-        } else {
-          throw refusalError(SERVER_NOT_READY_REFUSAL, {
-            message: "Local Zitadel server did not become healthy",
-            hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
-            details,
-          });
-        }
+        throw refusalError(SERVER_NOT_READY_REFUSAL, {
+          message: error.message,
+          hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
+        });
       }
       if (error instanceof LocalServerStopError) {
-        throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
-          runtime: error.record ?? null,
-          stop: error.outcome ?? null,
-        });
+        throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {});
       }
       if (error instanceof LocalServerBinaryMissingError) {
         throw refusalError(
           BINARY_MISSING_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             reinstall: suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`])),
@@ -524,7 +472,6 @@ export default class Start extends Telemetered(
           BINARY_BLOCKED_REFUSAL,
           {
             message: error.message,
-            details: error.details ?? null,
           },
           {
             reinstall: suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`])),
@@ -534,60 +481,41 @@ export default class Start extends Telemetered(
       if (error instanceof LocalServerBusyError) {
         throw refusalError(START_IN_PROGRESS_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          lock_file: error.lockFile,
         });
       }
       if (error instanceof LocalServerRecordMalformedError) {
         throw refusalError(RECORD_MALFORMED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerAdminFileMalformedError) {
-        throw refusalError(
-          ADMIN_FILE_MALFORMED_REFUSAL,
-          {
-            message: error.message,
-            details: error.details ?? null,
-            path: Cmd.quote(error.path),
-          },
-          {
-            remove: shellCommand("rm", Cmd.quote(error.path)),
-          },
-        );
+        throw refusalError(ADMIN_FILE_MALFORMED_REFUSAL, {
+          message: error.message,
+        });
       }
       if (error instanceof LocalServerRecordUnreadableError) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       if (error instanceof LocalServerAdminUnreadableError) {
         throw refusalError(ADMIN_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       if (error instanceof LocalServerEnvUnreadableError) {
         throw refusalError(ENV_UNREADABLE_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
-          path: Cmd.quote(error.path),
         });
       }
       if (error instanceof LocalServerAdminPlatformMissingError) {
         throw refusalError(PLATFORM_MISSING_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       if (error instanceof LocalServerDockerFailedError) {
         throw refusalError(DOCKER_FAILED_REFUSAL, {
           message: error.message,
-          details: error.details ?? null,
         });
       }
       throw error;
