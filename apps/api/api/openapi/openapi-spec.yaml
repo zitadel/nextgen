@@ -356,6 +356,8 @@ webhooks:
     $ref: endpoints/events/webhooks/application-created.yaml
   application.updated:
     $ref: endpoints/events/webhooks/application-updated.yaml
+  application.client_secret.rotated:
+    $ref: endpoints/events/webhooks/application-client_secret-rotated.yaml
   auth.attempt.created:
     $ref: endpoints/events/webhooks/auth-attempt-created.yaml
   auth.attempt.handed_off:

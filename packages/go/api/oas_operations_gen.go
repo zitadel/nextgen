@@ -114,6 +114,7 @@ const (
 	UpdateTeamOperation                      OperationName = "UpdateTeam"
 	UpdateUserOperation                      OperationName = "UpdateUser"
 	VerifyAuthAttemptChallengeOperation      OperationName = "VerifyAuthAttemptChallenge"
+	ApplicationClientSecretRotatedOperation  OperationName = "ApplicationClientSecretRotated"
 	ApplicationCreatedOperation              OperationName = "ApplicationCreated"
 	ApplicationUpdatedOperation              OperationName = "ApplicationUpdated"
 	AuthAttemptCreatedOperation              OperationName = "AuthAttemptCreated"

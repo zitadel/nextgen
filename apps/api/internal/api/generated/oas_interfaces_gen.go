@@ -9,6 +9,10 @@ type AddProjectOriginRes interface {
 	addProjectOriginRes()
 }
 
+type ApplicationClientSecretRotatedRes interface {
+	applicationClientSecretRotatedRes()
+}
+
 type ApplicationCreatedRes interface {
 	applicationCreatedRes()
 }

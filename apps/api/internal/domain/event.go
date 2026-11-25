@@ -142,8 +142,9 @@ const (
 	EventTypeReleaseCreated EventType = "release.created"
 	EventTypeReleaseRevoked EventType = "release.revoked"
 
-	EventTypeApplicationCreated EventType = "application.created"
-	EventTypeApplicationUpdated EventType = "application.updated"
+	EventTypeApplicationCreated             EventType = "application.created"
+	EventTypeApplicationUpdated             EventType = "application.updated"
+	EventTypeApplicationClientSecretRotated EventType = "application.client_secret.rotated"
 
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"

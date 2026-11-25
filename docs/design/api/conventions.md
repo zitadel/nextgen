@@ -34,8 +34,17 @@ POST /auth_attempts/{id}/challenges/{challenge_id}/verify
 POST /auth_attempts/{id}/handoff
 ```
 
-Each endpoint documents its window in its description. No other endpoint
-accepts the header today.
+Each endpoint documents its window in its description.
+
+`POST /applications` (`publishApplication`) accepts the header too, with
+another meaning, because it stores no plaintext secret to return again. A key
+is kept per project for 24 hours from the first request. A retry with the same
+key and body writes no revision: it replaces the secrets of the clients the
+first request created and returns the new ones. The same key with another body
+is refused with `422 app.idempotency_key_reused`. The server stores only the
+hashes of the key and of the body.
+
+No other endpoint accepts the header today.
 
 ## Direction (not shipped)
 

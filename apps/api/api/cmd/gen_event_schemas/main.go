@@ -81,8 +81,9 @@ var payloadByEventType = map[string]string{
 	"release.created": "release-created-payload.yaml",
 	"release.revoked": "release-revoked-payload.yaml",
 
-	"application.created": "application-payload.yaml",
-	"application.updated": "application-payload.yaml",
+	"application.created":               "application-payload.yaml",
+	"application.updated":               "application-payload.yaml",
+	"application.client_secret.rotated": "application-payload.yaml",
 
 	"idp.created": "idp-payload.yaml",
 	"idp.updated": "idp-payload.yaml",
@@ -213,6 +214,9 @@ var webhookByEventType = map[string]webhookDoc{
 	"application.updated": {description: "An application was revised, through the API or by a release build. " +
 		"The payload holds the new " +
 		"revision, the name when it changed, and the clients the revision added."},
+	"application.client_secret.rotated": {description: "A retry of `publishApplication` (`POST /applications`) with the " +
+		"same `Idempotency-Key` replaced the secrets of the clients the first request created. The payload holds " +
+		"those clients and the application's newest revision."},
 
 	"idp.created": {description: "An identity provider (IdP) connection was created."},
 	"idp.updated": {description: "An IdP connection was revised. The payload holds the new " +

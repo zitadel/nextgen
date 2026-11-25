@@ -48,14 +48,26 @@ post:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/idempotency-key.yaml
       description: |
-        Optional. Once honored, a retry with the same key and body returns
-        the first request's status and a new secret for each client the first
-        request created, and writes no revision.
+        Optional. Send a key to retry the call safely, for example after its
+        response was lost. A key is kept per project for 24 hours from the
+        first request. A retry does not extend this time.
 
-        Not honored yet: sending the same request again, for example after
-        its response was lost, creates another revision and returns no
-        secret, because the clients the first request created are already
-        stored.
+        A retry with the same key and body writes no revision. It returns the
+        first request's status, the application at its newest revision, and
+        a new secret for each client the first request created. The secrets
+        those clients held before stop working, including the ones the first
+        response returned. A retry that replaces a secret fires the
+        `application.client_secret.rotated` webhook.
+
+        Two bodies are the same when they hold the same JSON. Whitespace, the
+        order of keys and the escaping of strings do not count. A field that
+        is left out and the same field sent with its default value make two
+        different bodies.
+
+        The same key with another body is refused with
+        `app.idempotency_key_reused`. After 24 hours, the same key is handled
+        like a new key. An empty key is handled like no key. Without a key,
+        every call creates a revision.
   requestBody:
     required: true
     content:
@@ -219,6 +231,15 @@ post:
 
         Or a release declares the application (`app.declared`). Change its
         file under `.zitadel/applications/` and deploy.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '422':
+      description: |
+        The `Idempotency-Key` was sent before with another body
+        (`app.idempotency_key_reused`). Send the first body again, or use a
+        new key.
       content:
         application/json:
           schema:

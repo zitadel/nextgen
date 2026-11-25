@@ -357,6 +357,17 @@ type ApplicationStatements interface {
 	// applicationClientID is the client's row id. An unknown client returns
 	// none.
 	ListApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) ([]*domain.ApplicationClientSecret, error)
+	// DeleteApplicationClientSecrets removes every secret of the client whose
+	// row id is applicationClientID. A client without secrets is no error.
+	DeleteApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) error
+	// GetApplicationIdempotencyKey returns the record of keyHash in the
+	// project when it expires after now. No such record returns
+	// *database.NoRowFoundError.
+	GetApplicationIdempotencyKey(ctx context.Context, projectID, keyHash string, now time.Time) (*domain.ApplicationIdempotencyKey, error)
+	// CreateApplicationIdempotencyKey stores key, replacing a record of the
+	// same key that expired by key.CreatedAt. A record that has not expired
+	// returns *database.UniqueError.
+	CreateApplicationIdempotencyKey(ctx context.Context, key *domain.ApplicationIdempotencyKey) error
 }
 
 // IDPIdentityLinkStatements stores which user a provider subject resolves to.
