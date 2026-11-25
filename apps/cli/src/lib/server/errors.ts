@@ -84,6 +84,14 @@ export class LocalServerError extends Error implements Categorized {
     return undefined;
   }
 
+  /**
+   * Whether the failure may be the server losing the port it was started on to
+   * someone else, so an automatic choice of port may try the next one.
+   */
+  get mayBePortRace(): boolean {
+    return true;
+  }
+
   /** What to do about it, when the package can say. */
   readonly hint: string | undefined;
 
@@ -229,6 +237,11 @@ const STOP_ADVICE: Record<LocalServerStopReason, LocalServerAdviceKey | undefine
  */
 export class LocalServerStopError<R = unknown> extends LocalServerError {
   override readonly retryable: boolean = false;
+
+  /** A server that would not stop did not lose its port. */
+  override get mayBePortRace(): boolean {
+    return false;
+  }
 
   /** The advice that goes with this failure, by its reason. */
   override get advice(): LocalServerAdviceKey | undefined {
@@ -516,6 +529,11 @@ const START_FAILURES = {
  */
 export class LocalServerStartError<R extends ServerRecord> extends LocalServerError {
   override readonly retryable: boolean = true;
+
+  /** A server that never answered kept its port; one that exited may have lost it. */
+  override get mayBePortRace(): boolean {
+    return this.reason === "exited";
+  }
 
   /** The advice that goes with this failure. */
   override get advice(): LocalServerAdviceKey | undefined {

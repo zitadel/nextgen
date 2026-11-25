@@ -5,7 +5,6 @@ import {
   ZitadelConfigDeployBlockedError,
   ZitadelConfigEditBreaksFlowsError,
   CONFIG_DIRECTORIES,
-  ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigFileUnreadableError,
@@ -329,33 +328,33 @@ describe("ZitadelConfigFileBrokenError", () => {
   });
 });
 
-describe("ZitadelConfigConnectionExistsError", () => {
+describe("ZitadelConfigFileExistsError for a connection", () => {
   it("is a conflict", () => {
-    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error).toMatchObject({ category: "conflict" });
   });
 
   it("says the connection file is already there", () => {
-    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.message).toBe(`${GOOGLE_PATH} already exists`);
   });
 
   it("never offers to replace the file", () => {
-    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.hint).not.toContain("--force");
   });
 
   it("names the file in its details", () => {
-    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.details).toEqual({ file: GOOGLE_PATH });
   });
 
   it("keeps the provider as it was chosen", () => {
-    const error = new ZitadelConfigConnectionExistsError(GOOGLE_PATH, googleSelection);
+    const error = new ZitadelConfigFileExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.selection).toBe(googleSelection);
   });

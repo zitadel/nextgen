@@ -18,7 +18,8 @@ import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Output, warnings } from "@/lib/ui";
 import {
-  ZitadelConfigSchemaAmbiguousError,
+  ZitadelConfigSchemaChoiceError,
+  type ZitadelConfigSchemaChoiceReason,
   ZitadelConfigFileBrokenError,
   type Change,
   CONFIG_DIRECTORIES,
@@ -26,7 +27,6 @@ import {
   DiskStore,
   type ForceOptions,
   ZitadelConfigEditLockoutError,
-  ZitadelConfigSchemaMissingError,
   type Schemas,
   type ToggleableMethod,
   type UserSchema,
@@ -179,7 +179,7 @@ export async function readSchemaTarget(input: {
   try {
     loaded.schemas.resolve(input.schema);
   } catch (error) {
-    if (error instanceof ZitadelConfigSchemaMissingError) {
+    if (error instanceof ZitadelConfigSchemaChoiceError && error.reason === "missing") {
       const brokenSchemas = loaded.broken.filter((file) => {
         return file.kind === "schema";
       });
@@ -356,41 +356,53 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
   try {
     return schemas.resolve(requested);
   } catch (error) {
-    if (error instanceof ZitadelConfigSchemaMissingError) {
-      const { requested } = error;
-      if (error.known.length === 0 || requested === undefined) {
-        throw refusalError(NO_SCHEMA_REFUSAL, {});
-      }
-      throw refusalError(UNKNOWN_SCHEMA_REFUSAL, {
-        requested,
-        labels: error.known.map(labelOf).join(", "),
-        known: namesOf(error.known),
-        schemas: detailsOf(error.known),
-      });
-    }
-    if (error instanceof ZitadelConfigSchemaAmbiguousError) {
-      const { requested } = error;
-      if (requested === undefined) {
-        throw refusalError(UNNAMED_SCHEMA_REFUSAL, {
-          labels: error.candidates.map(labelOf).join(", "),
-          known: namesOf(error.candidates),
-          schemas: detailsOf(error.candidates),
-        });
-      }
-      const flags = error.candidates.map((schema) => {
-        return Cmd.optionArgs("--schema", schemas.nameUniquely(schema)).join(" ");
-      });
-      throw refusalError(AMBIGUOUS_SCHEMA_REFUSAL, {
-        requested,
-        labels: error.candidates.map(labelOf).join(", "),
-        flags: flags.join(" or "),
-        candidates: namesOf(error.candidates),
-        schemas: detailsOf(error.candidates),
-      });
+    if (error instanceof ZitadelConfigSchemaChoiceError) {
+      throw SCHEMA_CHOICE_REFUSALS[error.reason](error, schemas);
     }
     throw error;
   }
 }
+
+/** How each way a schema cannot be chosen is refused in the command's words. */
+const SCHEMA_CHOICE_REFUSALS: Record<
+  ZitadelConfigSchemaChoiceReason,
+  (error: ZitadelConfigSchemaChoiceError, schemas: Schemas) => Error
+> = {
+  missing: (error) => {
+    const { requested, schemas } = error;
+    if (schemas.length === 0 || requested === undefined) {
+      return refusalError(NO_SCHEMA_REFUSAL, {});
+    }
+
+    return refusalError(UNKNOWN_SCHEMA_REFUSAL, {
+      requested,
+      labels: schemas.map(labelOf).join(", "),
+      known: namesOf(schemas),
+      schemas: detailsOf(schemas),
+    });
+  },
+  ambiguous: (error, all) => {
+    const { requested, schemas } = error;
+    if (requested === undefined) {
+      return refusalError(UNNAMED_SCHEMA_REFUSAL, {
+        labels: schemas.map(labelOf).join(", "),
+        known: namesOf(schemas),
+        schemas: detailsOf(schemas),
+      });
+    }
+    const flags = schemas.map((schema) => {
+      return Cmd.optionArgs("--schema", all.nameUniquely(schema)).join(" ");
+    });
+
+    return refusalError(AMBIGUOUS_SCHEMA_REFUSAL, {
+      requested,
+      labels: schemas.map(labelOf).join(", "),
+      flags: flags.join(" or "),
+      candidates: namesOf(schemas),
+      schemas: detailsOf(schemas),
+    });
+  },
+};
 
 /**
  * The kind of identity provider a command was asked about: the catalog's name

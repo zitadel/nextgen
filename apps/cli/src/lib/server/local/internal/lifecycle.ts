@@ -13,6 +13,7 @@
 import {
   LocalServerPortBusyError,
   LocalServerPortFullError,
+  LocalServerError,
   LocalServerStartError,
   LocalServerStopError,
 } from "@/lib/server/errors";
@@ -301,8 +302,7 @@ export class Lifecycle<R extends ServerRecord> {
         if (
           requested === undefined &&
           attempt < PORT_RACE_RETRIES &&
-          !(error instanceof LocalServerStopError) &&
-          (!(error instanceof LocalServerStartError) || error.reason === "exited") &&
+          (!(error instanceof LocalServerError) || error.mayBePortRace) &&
           !(await this.deps.ports.isFree(claim.port))
         ) {
           return undefined;

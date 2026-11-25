@@ -166,23 +166,22 @@ export class BackendRejectedError extends BackendError {
   }
 }
 
-/** The operation or path asked for names nothing the API has. */
-export class BackendOperationUnknownError extends BackendError {
+/** Why an operation cannot be chosen: it names nothing the API has, or it does not pick one. */
+export type BackendOperationReason = "unknown" | "ambiguous";
+
+/**
+ * The operation or path asked for cannot be chosen: it names nothing the API
+ * has, or it names several operations and the method does not pick one.
+ */
+export class BackendOperationError extends BackendError {
   override readonly retryable: boolean = false;
-  override readonly name: string = "BackendOperationUnknownError";
+  override readonly name: string = "BackendOperationError";
+  /** Why the operation cannot be chosen. */
+  readonly reason: BackendOperationReason;
 
-  constructor(message: string, options: BackendErrorOptions = {}) {
-    super(message, options, "missing");
-  }
-}
-
-/** The path names several operations and the method does not pick one, or picks none. */
-export class BackendOperationAmbiguousError extends BackendError {
-  override readonly retryable: boolean = false;
-  override readonly name: string = "BackendOperationAmbiguousError";
-
-  constructor(message: string, options: BackendErrorOptions = {}) {
-    super(message, options, "invalid");
+  constructor(reason: BackendOperationReason, message: string, options: BackendErrorOptions = {}) {
+    super(message, options, reason === "unknown" ? "missing" : "invalid");
+    this.reason = reason;
   }
 }
 

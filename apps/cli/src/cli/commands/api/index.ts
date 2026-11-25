@@ -5,8 +5,7 @@ import { ApiCall, type PathValues } from "@/cli/core/crud/api-call";
 import {
   type ApiRequest,
   createZitadelClient,
-  BackendOperationAmbiguousError,
-  BackendOperationUnknownError,
+  BackendOperationError,
   Operation,
   OperationService,
   type Target,
@@ -75,10 +74,7 @@ function resolveTarget(ref: string, method?: string): Target {
   try {
     return Operation.named(ref, method);
   } catch (error) {
-    if (
-      error instanceof BackendOperationUnknownError ||
-      error instanceof BackendOperationAmbiguousError
-    ) {
+    if (error instanceof BackendOperationError) {
       throw new ZitadelError("E_VALIDATION", error.message, {
         hint: error.hint,
         nextCommands: [

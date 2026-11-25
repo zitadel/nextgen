@@ -5,12 +5,7 @@ import { distance } from "fastest-levenshtein";
 
 import { ApiService } from "@/lib/backend/api-service";
 import { connectionOf, responseFailure } from "@/lib/backend/client";
-import {
-  BackendError,
-  BackendInternalError,
-  BackendOperationAmbiguousError,
-  BackendOperationUnknownError,
-} from "@/lib/backend/errors";
+import { BackendError, BackendInternalError, BackendOperationError } from "@/lib/backend/errors";
 import { request as fetchWithPolicy } from "@/lib/backend/transport";
 
 export type { ApiOperation };
@@ -239,7 +234,7 @@ export class Operation {
    * @param ref - An operation id, or a path.
    * @param method - With a path it picks among the path's methods; with an id it must be the operation's own.
    * @returns The operation, and what the path form carried.
-   * @throws BackendOperationUnknownError when nothing matches, and BackendOperationAmbiguousError when the method does not.
+   * @throws BackendOperationError when nothing matches, and BackendOperationError when the method does not.
    */
   static named(ref: string, method?: string): Target {
     const wanted = method?.toUpperCase();
@@ -251,7 +246,8 @@ export class Operation {
     if (!ref.startsWith("/")) {
       const operation = Operation.byId(ref);
       if (wanted !== undefined && wanted !== operation.method) {
-        throw new BackendOperationAmbiguousError(
+        throw new BackendOperationError(
+          "ambiguous",
           `${operation.id} is ${operation.method} ${operation.path}, not ${wanted}`,
           {
             hint: `Leave out -X, or pass -X ${operation.method}.`,
@@ -331,7 +327,7 @@ export class Operation {
    *
    * @param ref - The operation id.
    * @returns The operation.
-   * @throws BackendOperationUnknownError naming the nearest ids when none matches.
+   * @throws BackendOperationError naming the nearest ids when none matches.
    */
   private static byId(ref: string): Operation {
     const wanted = ref.toLowerCase();
@@ -349,7 +345,7 @@ export class Operation {
       .map((candidate) => {
         return candidate.id;
       });
-    throw new BackendOperationUnknownError(`No operation is called ${ref}`, {
+    throw new BackendOperationError("unknown", `No operation is called ${ref}`, {
       hint:
         near.length > 0
           ? `Did you mean ${near.slice(0, 5).join(", ")}? List them all with \`zitadel api ls\`.`
@@ -363,7 +359,7 @@ export class Operation {
    * @param ref - The path, with an optional query string.
    * @param method - The method to pick among the path's operations, when given.
    * @returns The operation, and what the path carried.
-   * @throws BackendOperationUnknownError when no template matches, and BackendOperationAmbiguousError when the method does not.
+   * @throws BackendOperationError when no template matches, and BackendOperationError when the method does not.
    */
   private static byPath(ref: string, method: string | undefined): Target {
     const at = ref.indexOf("?");
@@ -390,7 +386,7 @@ export class Operation {
       return candidate.match?.literals === best;
     });
     if (template?.match === undefined) {
-      throw new BackendOperationUnknownError(`No operation has the path ${path}`, {
+      throw new BackendOperationError("unknown", `No operation has the path ${path}`, {
         hint: "List the paths with `zitadel api ls`.",
       });
     }
@@ -404,7 +400,8 @@ export class Operation {
           return candidate.method;
         })
         .join(", ");
-      throw new BackendOperationAmbiguousError(
+      throw new BackendOperationError(
+        "ambiguous",
         method === undefined
           ? `${template.record.path} takes ${offered}; say which with -X`
           : `${template.record.path} takes ${offered}, not ${method}`,

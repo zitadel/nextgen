@@ -16,7 +16,6 @@ import {
   ZitadelConfigFileBrokenError,
   ZitadelConfigDeployBlockedError,
   ZitadelConfigError,
-  ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
 } from "@/lib/zitadel/errors";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
@@ -496,7 +495,7 @@ export class ZitadelConfig {
    *   connection.
    * @param options - What to scaffold, and whether files may be replaced.
    * @returns The change that writes it, and its documents.
-   * @throws {@link ZitadelConfigConnectionExistsError} When a chosen provider already has
+   * @throws {@link ZitadelConfigFileExistsError} When a chosen provider already has
    *   a connection.
    * @throws {@link ZitadelConfigFileExistsError} Without `force`, when the default schema,
    *   flow, password policy or sign-up policy file is already there.
@@ -523,7 +522,7 @@ export class ZitadelConfig {
       const existing =
         this.connections.resolveExisting(connection) ?? this.findBroken(connection.path);
       if (existing !== undefined) {
-        throw new ZitadelConfigConnectionExistsError(existing.path, scaffolded.chosen.selection);
+        throw new ZitadelConfigFileExistsError(existing.path, scaffolded.chosen.selection);
       }
     }
     const defaults = [

@@ -213,95 +213,81 @@ function namesOf(schemas: readonly UserSchema[]): readonly string[] {
 }
 
 /**
- * A user schema asked for by a name no schema has, or asked for in a
- * configuration that has none.
+ * Why a user schema cannot be chosen: `missing` is a name no schema has, or a
+ * configuration that has none; `ambiguous` is a name several schemas have, or
+ * several schemas and none named.
  */
-export class ZitadelConfigSchemaMissingError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigSchemaMissingError";
-  override readonly category: ErrorCategory = "missing";
-  override readonly retryable: boolean = false;
+export type ZitadelConfigSchemaChoiceReason = "missing" | "ambiguous";
 
-  /**
-   * The name asked for, without a `.json` suffix, or `undefined` when none
-   * was.
-   */
-  readonly requested: string | undefined;
-
-  /**
-   * Every schema the configuration has; none when it has no schema at all.
-   */
-  readonly known: readonly UserSchema[];
-
-  /**
-   * Make the failure for this name.
-   *
-   * @param requested - The name asked for, if any.
-   * @param known - Every schema the configuration has.
-   */
-  constructor(requested: string | undefined, known: readonly UserSchema[]) {
-    const unnamed = requested === undefined || known.length === 0;
-    const message = unnamed
-      ? "There is no user schema under .zitadel/schemas"
-      : `No user schema is named ${requested}`;
-    super(message, {
-      details: {
-        requested: requested ?? null,
-        known: namesOf(known),
-      },
-    });
-    this.requested = requested;
-    this.known = known;
-  }
-}
+/** The kind of failure each {@link ZitadelConfigSchemaChoiceReason} is. */
+const SCHEMA_CHOICE_CATEGORIES: Record<ZitadelConfigSchemaChoiceReason, ErrorCategory> = {
+  missing: "missing",
+  ambiguous: "invalid",
+};
 
 /**
- * A user schema asked for in a way more than one schema fits: by a name that
- * is one schema's file name and another's `objectType`, or by no name where
- * there are several.
- *
- * @remarks
- * Refused rather than guessed, since editing the wrong schema is worse than
- * asking which was meant.
+ * A user schema that cannot be chosen: none has the name asked for, or none
+ * was named and there is more than one.
  */
-export class ZitadelConfigSchemaAmbiguousError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigSchemaAmbiguousError";
+export class ZitadelConfigSchemaChoiceError extends ZitadelConfigError {
+  override readonly name: string = "ZitadelConfigSchemaChoiceError";
+  override readonly category: ErrorCategory;
+  override readonly retryable: boolean = false;
 
-  /**
-   * The name asked for, without a `.json` suffix, or `undefined` when none
-   * was.
-   */
+  /** Why no schema can be chosen. */
+  readonly reason: ZitadelConfigSchemaChoiceReason;
+
+  /** The name that was asked for, if one was. */
   readonly requested: string | undefined;
 
-  /**
-   * Every schema that fits.
-   */
-  readonly candidates: readonly UserSchema[];
+  /** Every schema there is for `missing`; the ones that fit for `ambiguous`. */
+  readonly schemas: readonly UserSchema[];
 
   /**
-   * Make the failure for these schemas.
+   * Make the error.
    *
-   * @param requested - The name asked for, if any.
-   * @param candidates - Every schema that fits.
+   * @param reason - Why no schema can be chosen.
+   * @param requested - The name that was asked for, if one was.
+   * @param schemas - Every schema for `missing`; the ones that fit for `ambiguous`.
    */
-  constructor(requested: string | undefined, candidates: readonly UserSchema[]) {
-    const message =
-      requested === undefined
-        ? "There is more than one user schema, and none was named"
-        : `More than one user schema is named ${requested}`;
-    super(message, {
+  constructor(
+    reason: ZitadelConfigSchemaChoiceReason,
+    requested: string | undefined,
+    schemas: readonly UserSchema[],
+  ) {
+    super(ZitadelConfigSchemaChoiceError.wording(reason, requested, schemas), {
       details: {
         requested: requested ?? null,
-        candidates: namesOf(candidates),
+        [reason === "missing" ? "known" : "candidates"]: namesOf(schemas),
       },
     });
+    this.reason = reason;
+    this.category = SCHEMA_CHOICE_CATEGORIES[reason];
     this.requested = requested;
-    this.candidates = candidates;
+    this.schemas = schemas;
+  }
+
+  /**
+   * What the failure says.
+   *
+   * @param reason - Why no schema can be chosen.
+   * @param requested - The name that was asked for, if one was.
+   * @param schemas - The schemas.
+   * @returns The message.
+   */
+  private static wording(
+    reason: ZitadelConfigSchemaChoiceReason,
+    requested: string | undefined,
+    schemas: readonly UserSchema[],
+  ): string {
+    if (reason === "ambiguous") {
+      return requested === undefined
+        ? "There is more than one user schema, and none was named"
+        : `More than one user schema is named ${requested}`;
+    }
+    return requested === undefined || schemas.length === 0
+      ? "There is no user schema under .zitadel/schemas"
+      : `No user schema is named ${requested}`;
   }
 }
 
@@ -404,71 +390,29 @@ export class ZitadelConfigEditLockoutError extends ZitadelConfigError implements
  * its own.
  */
 export class ZitadelConfigFileExistsError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
   override readonly name: string = "ZitadelConfigFileExistsError";
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
 
-  /**
-   * The project-relative path that is already taken.
-   */
+  /** The project-relative path that is taken. */
   readonly path: string;
 
+  /** The provider a connection file there would have been written for, when it is one. */
+  readonly selection: ProviderSelection | undefined;
+
   /**
-   * Make the failure for this path.
+   * Make the error.
    *
-   * @param path - The project-relative path that is already taken.
+   * @param path - The project-relative path that is taken.
+   * @param selection - The provider the file would have been written for, when it is a connection.
    */
-  constructor(path: string) {
-    super(`${path} already exists`, {
-      hint: "Move or rename the file that is already there, then run the command again.",
-      details: { file: path },
-    });
-    this.path = path;
-  }
-}
-
-/**
- * A provider a new project was to offer that already has a connection, which
- * a scaffold never replaces.
- *
- * @remarks
- * A connection may hold a client id someone registered with the vendor and a
- * slug the schemas and flows already name, so the file is the developer's,
- * with or without `force`. The provider is kept, so the caller can say how to
- * enable it with the connection that is there.
- */
-export class ZitadelConfigConnectionExistsError extends ZitadelConfigError {
-  /**
-   * The class's name, which a log or a stack trace shows.
-   */
-  override readonly name: string = "ZitadelConfigConnectionExistsError";
-  override readonly category: ErrorCategory = "conflict";
-  override readonly retryable: boolean = false;
-
-  /**
-   * The project-relative path of the connection already there.
-   */
-  readonly path: string;
-
-  /**
-   * The provider, as it was chosen.
-   */
-  readonly selection: ProviderSelection;
-
-  /**
-   * Make the failure for this connection.
-   *
-   * @param path - The project-relative path of the connection already there.
-   * @param selection - The provider, as it was chosen.
-   */
-  constructor(path: string, selection: ProviderSelection) {
+  constructor(path: string, selection?: ProviderSelection) {
     super(`${path} already exists`, {
       hint:
-        "A connection file is yours to keep, so it is never replaced or removed. " +
-        "Remove it to scaffold a fresh one, or keep it and enable the provider to reuse it.",
+        selection === undefined
+          ? "Move or rename the file that is already there, then run the command again."
+          : "A connection file is yours to keep, so it is never replaced or removed. " +
+            "Remove it to scaffold a fresh one, or keep it and enable the provider to reuse it.",
       details: { file: path },
     });
     this.path = path;
