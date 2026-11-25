@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { toZitadelError } from "@/lib/errors";
-import { SyncStateMalformedError } from "@/lib/sync/errors";
+import { SyncStateMalformedError } from "@/lib/sync";
 import { publishedIds, readState, updateScaffold, type ZitadelState } from "@/lib/sync/state";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
