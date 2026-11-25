@@ -27,6 +27,9 @@ export class LocalServerError extends Error implements Categorized {
   /** The kind of failure, which the boundary reports it as. */
   readonly category: ErrorCategory;
 
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
+
   /** What to do about it, when the package can say. */
   readonly hint: string | undefined;
 
@@ -57,6 +60,7 @@ export type LocalServerDownReason = "not-running" | "not-responding";
  * parent, or the one that was is not running.
  */
 export class LocalServerDownError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** Whether there is no record at all, or a record whose server does not answer. */
   readonly reason: LocalServerDownReason;
 
@@ -67,7 +71,7 @@ export class LocalServerDownError extends LocalServerError {
    * @param details - The address the record names and the folder that holds it.
    */
   constructor(reason: LocalServerDownReason, details: Readonly<Record<string, unknown>>) {
-    super("precondition", "Local Zitadel server is not running", { details });
+    super("conflict", "Local Zitadel server is not running", { details });
     this.name = "LocalServerDownError";
     this.reason = reason;
   }
@@ -81,6 +85,7 @@ export type LocalServerMalformedReason = "record" | "admin" | "url";
  * runtime record, the admin file, or the address a server was named by.
  */
 export class LocalServerMalformedError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** What is malformed. */
   readonly reason: LocalServerMalformedReason;
 
@@ -96,7 +101,7 @@ export class LocalServerMalformedError extends LocalServerError {
     message: string,
     options: LocalServerErrorOptions = {},
   ) {
-    super("validation", message, options);
+    super("invalid", message, options);
     this.name = "LocalServerMalformedError";
     this.reason = reason;
   }
@@ -104,13 +109,14 @@ export class LocalServerMalformedError extends LocalServerError {
 
 /** Another start is running in the folder, and still holds its lock. */
 export class LocalServerBusyError extends LocalServerError {
+  override readonly retryable: boolean = true;
   /**
    * Creates the error.
    *
    * @param details - The lock file and the pid that owns it.
    */
   constructor(details: Readonly<Record<string, unknown>>) {
-    super("conflict", "Another `zitadel start` is still running in this directory", { details });
+    super("unavailable", "Another `zitadel start` is still running in this directory", { details });
     this.name = "LocalServerBusyError";
   }
 }
@@ -123,6 +129,7 @@ export type LocalServerStopReason = "server" | "processes" | "unlistable";
  * machine could not say which processes were running.
  */
 export class LocalServerStopError<R = unknown> extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** A recorded server, the processes found on the data, or processes that cannot be listed. */
   readonly reason: LocalServerStopReason;
 
@@ -144,7 +151,7 @@ export class LocalServerStopError<R = unknown> extends LocalServerError {
     message: string,
     options: LocalServerErrorOptions & Readonly<{ record?: R; outcome?: unknown }> = {},
   ) {
-    super(reason === "unlistable" ? "unsupported" : "conflict", message, options);
+    super(reason === "unlistable" ? "invalid" : "conflict", message, options);
     this.name = "LocalServerStopError";
     this.reason = reason;
     this.record = options.record;
@@ -157,6 +164,7 @@ export class LocalServerStopError<R = unknown> extends LocalServerError {
  * that it happened and what Docker said.
  */
 export class LocalServerDockerMissingError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** What Docker said, or that it said nothing. */
   readonly detail: string;
 
@@ -178,6 +186,7 @@ export type LocalServerBinaryReason = "missing" | "blocked";
 
 /** The server program, `@zitadel/server`, is not installed or cannot be run. */
 export class LocalServerBinaryError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** Whether it is absent, or present and refused to start. */
   readonly reason: LocalServerBinaryReason;
 
@@ -193,7 +202,7 @@ export class LocalServerBinaryError extends LocalServerError {
     message: string,
     options: LocalServerErrorOptions = {},
   ) {
-    super("precondition", message, options);
+    super("invalid", message, options);
     this.name = "LocalServerBinaryError";
     this.reason = reason;
   }
@@ -204,6 +213,7 @@ export type LocalServerFileReason = "unreadable" | "blocked";
 
 /** A file or directory the local server needs exists but cannot be used. */
 export class LocalServerFileError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** Whether it cannot be read, or something else is in its way. */
   readonly reason: LocalServerFileReason;
 
@@ -226,8 +236,8 @@ export class LocalServerFileError extends LocalServerError {
 
   /**
    * The category a file failure is reported as: something in the way is a
-   * conflict, a permission the OS refused is an auth failure, and any other
-   * read failure is a precondition the person can fix.
+   * conflict, a permission the OS refused is a denial, and any other
+   * read failure is invalid.
    *
    * @param reason - Why the file cannot be used.
    * @param cause - The error the OS raised, if any.
@@ -237,9 +247,9 @@ export class LocalServerFileError extends LocalServerError {
     if (reason === "blocked") {
       return "conflict";
     } else if (isErrno(cause, "EACCES") || isErrno(cause, "EPERM")) {
-      return "auth";
+      return "denied";
     } else {
-      return "precondition";
+      return "invalid";
     }
   }
 }
@@ -249,6 +259,7 @@ export type LocalServerAdminReason = "rejected" | "session" | "platform-missing"
 
 /** The local admin cannot sign in to its server. */
 export class LocalServerAdminError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** Whether the server rejected the admin, refused its session, or has no platform project. */
   readonly reason: LocalServerAdminReason;
 
@@ -264,7 +275,7 @@ export class LocalServerAdminError extends LocalServerError {
     message: string,
     options: LocalServerErrorOptions = {},
   ) {
-    super(reason === "platform-missing" ? "precondition" : "auth", message, options);
+    super(reason === "platform-missing" ? "invalid" : "denied", message, options);
     this.name = "LocalServerAdminError";
     this.reason = reason;
   }
@@ -272,19 +283,21 @@ export class LocalServerAdminError extends LocalServerError {
 
 /** A bug in the package: something that cannot happen did. */
 export class LocalServerInternalError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /**
    * Creates the error.
    *
    * @param message - What went wrong.
    */
   constructor(message: string) {
-    super("internal", message);
+    super("fault", message);
     this.name = "LocalServerInternalError";
   }
 }
 
 /** A port that was explicitly asked for is held, so the start is refused rather than moved. */
 export class LocalServerPortBusyError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** The port that is held. */
   readonly port: number;
 
@@ -294,7 +307,7 @@ export class LocalServerPortBusyError extends LocalServerError {
    * @param port - The port that was asked for.
    */
   constructor(port: number) {
-    super("conflict", `Port ${String(port)} is already in use`, { details: { port } });
+    super("unavailable", `Port ${String(port)} is already in use`, { details: { port } });
     this.name = "LocalServerPortBusyError";
     this.port = port;
   }
@@ -302,6 +315,7 @@ export class LocalServerPortBusyError extends LocalServerError {
 
 /** Every port in the search range was taken. */
 export class LocalServerPortFullError extends LocalServerError {
+  override readonly retryable: boolean = false;
   /** The first port that was tried. */
   readonly firstPort: number;
 
@@ -312,7 +326,7 @@ export class LocalServerPortFullError extends LocalServerError {
    * @param lastPort - The last port of the range.
    */
   constructor(firstPort: number, lastPort: number) {
-    super("conflict", `No free port from ${String(firstPort)} to ${String(lastPort)}`, {
+    super("unavailable", `No free port from ${String(firstPort)} to ${String(lastPort)}`, {
       details: { first_port: firstPort },
     });
     this.name = "LocalServerPortFullError";
@@ -333,6 +347,7 @@ const START_FAILURES = {
  * only explanation of why it failed.
  */
 export class LocalServerStartError<R extends ServerRecord> extends LocalServerError {
+  override readonly retryable: boolean = true;
   /** Whether the server died, or never answered in time. */
   readonly reason: "exited" | "timeout";
 

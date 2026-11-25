@@ -2,7 +2,7 @@ import { posix } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { importsUnder } from "@tests/helpers/source-imports";
+import { importsUnder, isOwnErrorsTypeImport } from "@tests/helpers/source-imports";
 
 const LAYER = posix.join("lib", "backend");
 
@@ -14,7 +14,11 @@ describe("the backend's dependencies", () => {
     // written through the `@/` alias.
     const reached = (await importsUnder(LAYER))
       .filter((found) => {
-        return found.target !== LAYER && !found.target.startsWith(`${LAYER}/`);
+        return (
+          found.target !== LAYER &&
+          !found.target.startsWith(`${LAYER}/`) &&
+          !isOwnErrorsTypeImport(found, LAYER)
+        );
       })
       .map((found) => {
         return `${found.file} imports ${found.specifier}`;

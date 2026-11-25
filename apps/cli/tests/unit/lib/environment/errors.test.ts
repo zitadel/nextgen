@@ -10,10 +10,10 @@ import { toZitadelError } from "@/lib/errors";
 
 describe("the environment errors", () => {
   it.each([
-    ["both sources", new EnvironmentInvalidError("both-sources", "both"), "validation"],
-    ["name", new EnvironmentInvalidError("name", "bad", { source: "--env" }), "validation"],
-    ["server", new EnvironmentInvalidError("server-url", "bad", { source: ".env" }), "validation"],
-    ["file", new EnvironmentFileMissingError("a.env", "gone"), "not_found"],
+    ["both sources", new EnvironmentInvalidError("both-sources", "both"), "invalid"],
+    ["name", new EnvironmentInvalidError("name", "bad", { source: "--env" }), "invalid"],
+    ["server", new EnvironmentInvalidError("server-url", "bad", { source: ".env" }), "invalid"],
+    ["file", new EnvironmentFileMissingError("a.env", "gone"), "missing"],
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(EnvironmentError);
     expect(error.category).toBe(category);

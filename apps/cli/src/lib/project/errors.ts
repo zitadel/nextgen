@@ -36,7 +36,10 @@ export class ProjectError extends Error implements Categorized {
   override readonly name: string = "ProjectError";
 
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "validation";
+  readonly category: ErrorCategory = "invalid";
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
 
   /**
    * What to do about it.
@@ -75,7 +78,8 @@ export class ProjectFileMissingError extends ProjectError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "ProjectFileMissingError";
-  override readonly category: ErrorCategory = "not_found";
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
 
   /**
    * Which file is missing.
@@ -104,7 +108,8 @@ export class ProjectFileMalformedError extends ProjectError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "ProjectFileMalformedError";
-  override readonly category: ErrorCategory = "validation";
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * Which file is malformed.
@@ -138,7 +143,8 @@ export class ProjectEnvValueError extends ProjectError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "ProjectEnvValueError";
-  override readonly category: ErrorCategory = "validation";
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * Why the value cannot be kept.

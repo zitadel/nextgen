@@ -8,7 +8,7 @@ describe("the sync errors", () => {
     const error = new SyncStateMalformedError(".zitadel/state.json", "it is not valid JSON");
 
     expect(error).toBeInstanceOf(SyncError);
-    expect(error.category).toBe("validation");
+    expect(error.category).toBe("invalid");
     expect(toZitadelError(error)).toMatchObject({
       code: "E_VALIDATION",
       message: "Cannot read .zitadel/state.json: it is not valid JSON",

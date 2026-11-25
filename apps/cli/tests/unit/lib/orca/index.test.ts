@@ -127,7 +127,7 @@ describe("Orca detection", () => {
   it("throws OrcaFrameworkMissingError when nothing matches", async ({ dir }) => {
     await expect(orca.detect(dir)).rejects.toMatchObject({
       name: "OrcaFrameworkMissingError",
-      category: "not_found",
+      category: "missing",
       message: "Could not detect a supported app framework",
     });
   });
@@ -135,10 +135,10 @@ describe("Orca detection", () => {
   it("throws OrcaFrameworkUnsupportedError for an unsupported requested framework", async ({
     dir,
   }) => {
-    await expect(orca.detect(dir, "svelte")).rejects.toMatchObject({
+    await expect(orca.detect(dir, "cobol")).rejects.toMatchObject({
       name: "OrcaFrameworkUnsupportedError",
       reason: "unknown",
-      details: { requested: "svelte" },
+      details: { requested: "cobol" },
     });
   });
 
@@ -163,7 +163,7 @@ describe("Orca detection", () => {
     );
 
     await expect(orca.detect(pagesRouter, "react")).rejects.toMatchObject({
-      category: "unsupported",
+      category: "invalid",
     });
   });
 
@@ -631,7 +631,7 @@ describe("Orca.planScaffold", () => {
     const withoutPatchers = new Orca(detectors, scaffolders, [], LocalRuntime.DIR);
 
     await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
-      category: "internal",
+      category: "fault",
       message: 'No patcher supports "next"',
     });
   });

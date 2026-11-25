@@ -246,7 +246,7 @@ describe("local admin sign-in", () => {
       message: "The local server could not find the local admin",
       name: "LocalServerAdminError",
       reason: "rejected",
-      category: "auth",
+      category: "denied",
     });
   });
 

@@ -308,7 +308,7 @@ describe("Connections.enable", () => {
         return config.connections.enable(CUSTOMERS_SCHEMA, GOOGLE);
       });
 
-      expect(error).toMatchObject({ category: "not_found" });
+      expect(error).toMatchObject({ category: "missing" });
       expect(error).toMatchObject({ message: "No login flow runs against customers" });
     });
   });
@@ -862,7 +862,7 @@ describe("Connections.disable", () => {
         return config.connections.disable(config.schemas.resolve(), "gogle");
       });
 
-      expect(error).toMatchObject({ category: "not_found" });
+      expect(error).toMatchObject({ category: "missing" });
       expect(error).toMatchObject(fields);
     });
   });

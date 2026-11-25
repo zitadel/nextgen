@@ -17,28 +17,28 @@ describe("the publish errors", () => {
         literalSecret: false,
         refusedKey: false,
       }),
-      "validation",
+      "invalid",
       "E_VALIDATION",
     ],
     [
       "shared variable",
       new PublishConnectionError("shared-variable", "shared", { file: "a.json", variable: "X" }),
-      "validation",
+      "invalid",
       "E_VALIDATION",
     ],
     [
       "wrong kind",
       new PublishConnectionError("wrong-kind", "kind", { file: "a.json", variable: "X" }),
-      "validation",
+      "invalid",
       "E_VALIDATION",
     ],
     [
       "missing variable",
       new PublishConnectionError("missing-variable", "missing", { file: "a.json", variable: "X" }),
-      "precondition",
+      "conflict",
       "E_CREDENTIAL_MISSING",
     ],
-    ["rejected", new PublishReleaseRejectedError("no"), "validation", "E_VALIDATION"],
+    ["rejected", new PublishReleaseRejectedError("no"), "invalid", "E_VALIDATION"],
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
     expect(error).toBeInstanceOf(PublishError);
     expect(error.category).toBe(category);

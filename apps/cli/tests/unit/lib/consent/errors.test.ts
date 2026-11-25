@@ -5,8 +5,8 @@ import { toZitadelError } from "@/lib/errors";
 
 describe("the consent errors", () => {
   it.each([
-    ["required", new ConsentRequiredError("remove X", "Remove X?"), "precondition"],
-    ["internal", new ConsentInternalError("bug"), "internal"],
+    ["required", new ConsentRequiredError("remove X", "Remove X?"), "conflict"],
+    ["fault", new ConsentInternalError("bug"), "fault"],
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(ConsentError);
     expect(error.category).toBe(category);

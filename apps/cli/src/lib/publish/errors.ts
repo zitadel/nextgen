@@ -35,7 +35,10 @@ export class PublishError extends Error implements Categorized {
   override readonly name: string = "PublishError";
 
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "validation";
+  readonly category: ErrorCategory = "invalid";
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
 
   /**
    * What to do about it.
@@ -187,6 +190,7 @@ export class PublishConnectionError extends PublishError {
    */
   override readonly name: string = "PublishConnectionError";
   override readonly category: ErrorCategory;
+  override readonly retryable: boolean = false;
 
   /**
    * What is wrong with the variable.
@@ -228,7 +232,7 @@ export class PublishConnectionError extends PublishError {
   constructor(reason: PublishConnectionReason, message: string, options: PublishConnectionOptions) {
     super(message, options);
     this.reason = reason;
-    this.category = reason === "missing-variable" ? "precondition" : "validation";
+    this.category = reason === "missing-variable" ? "conflict" : "invalid";
     this.file = options.file;
     this.variable = options.variable;
     this.field = options.field;

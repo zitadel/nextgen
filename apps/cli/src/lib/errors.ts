@@ -1,6 +1,11 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import { BackendError, BackendUnavailableError, type BackendUnavailableReason } from "./backend";
+import {
+  BackendError,
+  BackendUnavailableError,
+  BackendUnsupportedError,
+  type BackendUnavailableReason,
+} from "./backend";
 import { ConsentRequiredError } from "./consent";
 import {
   EnvironmentError,
@@ -13,8 +18,10 @@ import { isObject } from "./json";
 import { ProjectError, ProjectFileMalformedError, ProjectFileMissingError } from "./project";
 import type { Suggested } from "./suggestion";
 import {
+  LocalServerBusyError,
   LocalServerDownError,
   LocalServerError,
+  LocalServerStopError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
 } from "./server/errors";
@@ -49,27 +56,32 @@ export const CANCELLED = "Cancelled";
  * that catches it, and the boundary that finally reports it, can say what
  * kind of failure it was without knowing which package raised it.
  *
- * - `validation`: what the user gave, or a file of theirs, is wrong.
- * - `not_found`: the thing asked for does not exist.
- * - `conflict`: the state of the world refuses the request.
- * - `auth`: not signed in, or not allowed.
- * - `unavailable`: no usable answer; trying again later may work.
- * - `unsupported`: a shape or version this CLI does not handle.
- * - `precondition`: something that has to be in place first is not.
- * - `internal`: a bug in our own code.
- * - `unexpected`: something failed that nobody anticipated; there is no
- *   guidance to give.
+ * Choose one by walking this list in order; the first yes wins.
+ *
+ * 1. `fault`: our own code is wrong (an internal guard).
+ * 2. `unknown`: nobody anticipated it, so there is no typed class. The
+ *    boundary assigns it to any error that is not categorized; a typed class
+ *    never uses it, except a package's own "<X>FailedError" generic wrapper.
+ * 3. `unavailable`: the request got no decision: no network, a timeout, a 429,
+ *    a 5xx, a server or machine that is not up, a port or lock that is held.
+ * 4. `denied`: the problem is identity: not signed in, or not allowed (401, 403).
+ * 5. `missing`: the thing it refers to is not there (404, 410).
+ * 6. `conflict`: it exists but its state refuses: already exists, a stale
+ *    write, a prerequisite not in place, a server not running.
+ * 7. `invalid`: whatever remains: the input can never work as given,
+ *    including an unsupported shape or version.
+ *
+ * Whether trying the identical request again may work is a separate trait,
+ * {@link Categorized.retryable}.
  */
 export const ERROR_CATEGORIES = [
-  "validation",
-  "not_found",
+  "invalid",
+  "missing",
   "conflict",
-  "auth",
+  "denied",
   "unavailable",
-  "unsupported",
-  "precondition",
-  "internal",
-  "unexpected",
+  "fault",
+  "unknown",
 ] as const;
 
 /** One of the {@link ERROR_CATEGORIES}. */
@@ -79,6 +91,13 @@ export type ErrorCategory = (typeof ERROR_CATEGORIES)[number];
 export interface Categorized {
   /** The kind of failure. */
   readonly category: ErrorCategory;
+  /**
+   * Whether the identical request, with nothing changed by anyone, may succeed
+   * on a later attempt: a network failure, a timeout, a 429 or 5xx, a lock
+   * another start holds, a server still starting. False for anything a person
+   * has to change first.
+   */
+  readonly retryable: boolean;
   /** What to do about it, when the package that raised it knows. */
   readonly hint?: string | undefined;
   /** Structured facts about the failure, for a `--json` reader. */
@@ -212,33 +231,36 @@ export class PromptCancelled extends ZitadelError {
  * The code each {@link ErrorCategory} is reported with.
  *
  * @remarks
- * `precondition`, `internal` and `unexpected` have no code of their own yet, so
- * they are reported as `E_VALIDATION`, as every unrecognised error always was.
- * Giving them their own codes, with exit codes that no longer collide, is a
- * separate decision; this table is the one place it lands.
+ * `fault` and `unknown` have no code of their own yet, so they are reported
+ * as `E_VALIDATION`, as every unrecognised error always was. Giving them their
+ * own codes, with exit codes that no longer collide, is a separate decision;
+ * this table is the one place it lands.
  */
 const CATEGORY_CODES: Record<ErrorCategory, ZitadelErrorCode> = {
-  validation: "E_VALIDATION",
-  not_found: "E_NOT_FOUND",
+  invalid: "E_VALIDATION",
+  missing: "E_NOT_FOUND",
   conflict: "E_CONFLICT",
-  auth: "E_AUTH",
+  denied: "E_AUTH",
   unavailable: "E_NETWORK",
-  unsupported: "E_UNSUPPORTED_PROJECT_SHAPE",
-  precondition: "E_VALIDATION",
-  internal: "E_VALIDATION",
-  unexpected: "E_VALIDATION",
+  fault: "E_VALIDATION",
+  unknown: "E_VALIDATION",
 };
 
 /**
  * The code a failure of the local server is reported with.
  *
  * @param error - The failure.
- * @returns `E_LOCAL_SERVER_NOT_RUNNING` for no server, `E_PORT_IN_USE` for a port that
+ * @returns `E_LOCAL_SERVER_NOT_RUNNING` for no server, `E_CONFLICT` for a start that holds the
+ *   lock, `E_UNSUPPORTED_PROJECT_SHAPE` for processes that cannot be listed, `E_PORT_IN_USE` for a port that
  *   is held or a range with none free, and the code of its category for any other.
  */
 function localServerErrorCode(error: LocalServerError): ZitadelErrorCode {
   if (error instanceof LocalServerDownError) {
     return "E_LOCAL_SERVER_NOT_RUNNING";
+  } else if (error instanceof LocalServerBusyError) {
+    return "E_CONFLICT";
+  } else if (error instanceof LocalServerStopError && error.reason === "unlistable") {
+    return "E_UNSUPPORTED_PROJECT_SHAPE";
   } else if (
     error instanceof LocalServerPortBusyError ||
     error instanceof LocalServerPortFullError
@@ -270,6 +292,8 @@ function orcaErrorCode(error: OrcaError): ZitadelErrorCode {
     (error instanceof OrcaFrameworkUnsupportedError && error.reason === "unknown")
   ) {
     return "E_FRAMEWORK_NOT_DETECTED";
+  } else if (error instanceof OrcaFrameworkUnsupportedError && error.reason !== "mismatch") {
+    return "E_UNSUPPORTED_PROJECT_SHAPE";
   } else if (error instanceof OrcaPatchFileUnsupportedError) {
     return "E_VALIDATION";
   } else if (error instanceof OrcaRendererError && error.reason === "pending") {
@@ -799,7 +823,10 @@ function fromBackendError(error: BackendError): ZitadelError {
       details: { url: error.url, reason: error.reason },
     });
   }
-  const code = CATEGORY_CODES[error.category];
+  const code =
+    error instanceof BackendUnsupportedError
+      ? "E_UNSUPPORTED_PROJECT_SHAPE"
+      : CATEGORY_CODES[error.category];
   if (error.status === undefined || error.url === undefined) {
     return new ZitadelError(code, error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),

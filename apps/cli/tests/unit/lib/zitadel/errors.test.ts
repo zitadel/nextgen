@@ -368,7 +368,7 @@ describe("ZitadelConfigFileExistsError", () => {
 describe("ZitadelConfigFileUnreadableError", () => {
   it("is an auth failure", () => {
     expect(new ZitadelConfigFileUnreadableError("x.json cannot be read")).toMatchObject({
-      category: "auth",
+      category: "denied",
     });
   });
 });
@@ -376,14 +376,14 @@ describe("ZitadelConfigFileUnreadableError", () => {
 describe("ZitadelConfigDeployBlockedError", () => {
   it("is a precondition when there is nothing to deploy", () => {
     expect(new ZitadelConfigDeployBlockedError("empty", "nothing here")).toMatchObject({
-      category: "precondition",
+      category: "invalid",
       reason: "empty",
     });
   });
 
   it("is a validation failure when there is too much to deploy", () => {
     expect(new ZitadelConfigDeployBlockedError("too-large", "too many")).toMatchObject({
-      category: "validation",
+      category: "invalid",
       reason: "too-large",
     });
   });
@@ -391,6 +391,6 @@ describe("ZitadelConfigDeployBlockedError", () => {
 
 describe("ZitadelConfigInternalError", () => {
   it("is an internal failure", () => {
-    expect(new ZitadelConfigInternalError("not an object")).toMatchObject({ category: "internal" });
+    expect(new ZitadelConfigInternalError("not an object")).toMatchObject({ category: "fault" });
   });
 });

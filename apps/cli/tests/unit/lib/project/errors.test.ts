@@ -10,10 +10,10 @@ import {
 
 describe("the project errors", () => {
   it.each([
-    ["missing config", new ProjectFileMissingError("config", "gone"), "not_found", "E_VALIDATION"],
-    ["missing secret", new ProjectFileMissingError("secret", "gone"), "not_found", "E_VALIDATION"],
-    ["malformed", new ProjectFileMalformedError("config", "bad"), "validation", "E_VALIDATION"],
-    ["env value", new ProjectEnvValueError("line-break", "KEY"), "validation", "E_VALIDATION"],
+    ["missing config", new ProjectFileMissingError("config", "gone"), "missing", "E_VALIDATION"],
+    ["missing secret", new ProjectFileMissingError("secret", "gone"), "missing", "E_VALIDATION"],
+    ["malformed", new ProjectFileMalformedError("config", "bad"), "invalid", "E_VALIDATION"],
+    ["env value", new ProjectEnvValueError("line-break", "KEY"), "invalid", "E_VALIDATION"],
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
     expect(error).toBeInstanceOf(ProjectError);
     expect(error.category).toBe(category);

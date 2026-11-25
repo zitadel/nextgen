@@ -35,7 +35,10 @@ export class ConsentError extends Error implements Categorized {
   override readonly name: string = "ConsentError";
 
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "precondition";
+  readonly category: ErrorCategory = "conflict";
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
 
   /**
    * What to do about it.
@@ -69,7 +72,8 @@ export class ConsentRequiredError extends ConsentError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "ConsentRequiredError";
-  override readonly category: ErrorCategory = "precondition";
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
 
   /**
    * The question a person would have been asked.
@@ -106,5 +110,6 @@ export class ConsentInternalError extends ConsentError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "ConsentInternalError";
-  override readonly category: ErrorCategory = "internal";
+  override readonly category: ErrorCategory = "fault";
+  override readonly retryable: boolean = false;
 }

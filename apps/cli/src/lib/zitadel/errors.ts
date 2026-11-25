@@ -34,7 +34,10 @@ export class ZitadelConfigError extends Error implements Categorized {
   override readonly name: string = "ZitadelConfigError";
 
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "validation";
+  readonly category: ErrorCategory = "invalid";
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
 
   /**
    * What to do about it.
@@ -163,6 +166,7 @@ export class ZitadelConfigResourceClashError extends ZitadelConfigError {
    */
   override readonly name: string = "ZitadelConfigResourceClashError";
   override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
 }
 
 /**
@@ -173,7 +177,8 @@ export class ZitadelConfigResourceMissingError extends ZitadelConfigError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "ZitadelConfigResourceMissingError";
-  override readonly category: ErrorCategory = "not_found";
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
 }
 
 /**
@@ -197,7 +202,8 @@ export class ZitadelConfigSchemaMissingError extends ZitadelConfigError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "ZitadelConfigSchemaMissingError";
-  override readonly category: ErrorCategory = "not_found";
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
 
   /**
    * The name asked for, without a `.json` suffix, or `undefined` when none
@@ -324,7 +330,8 @@ export class ZitadelConfigEditLockoutError extends ZitadelConfigError implements
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "ZitadelConfigEditLockoutError";
-  override readonly category: ErrorCategory = "precondition";
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * The schema's file.
@@ -383,6 +390,7 @@ export class ZitadelConfigFileExistsError extends ZitadelConfigError {
    */
   override readonly name: string = "ZitadelConfigFileExistsError";
   override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
 
   /**
    * The project-relative path that is already taken.
@@ -419,6 +427,7 @@ export class ZitadelConfigConnectionExistsError extends ZitadelConfigError {
    */
   override readonly name: string = "ZitadelConfigConnectionExistsError";
   override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
 
   /**
    * The project-relative path of the connection already there.
@@ -497,6 +506,7 @@ export class ZitadelConfigConnectionNotOidcError extends ZitadelConfigError {
    */
   override readonly name: string = "ZitadelConfigConnectionNotOidcError";
   override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
 
   /**
    * The project-relative path of the connection.
@@ -725,13 +735,15 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
  */
 export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
   override readonly name: string = "ZitadelConfigFileUnreadableError";
-  override readonly category: ErrorCategory = "auth";
+  override readonly category: ErrorCategory = "denied";
+  override readonly retryable: boolean = false;
 }
 
 /** The bundle cannot be built from what `.zitadel/` holds. */
 export class ZitadelConfigDeployBlockedError extends ZitadelConfigError {
   override readonly name: string = "ZitadelConfigDeployBlockedError";
-  override readonly category: ErrorCategory;
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /** Why the bundle cannot be built: there is nothing in it, or too much. */
   readonly reason: "empty" | "too-large";
@@ -750,12 +762,12 @@ export class ZitadelConfigDeployBlockedError extends ZitadelConfigError {
   ) {
     super(message, options);
     this.reason = reason;
-    this.category = reason === "empty" ? "precondition" : "validation";
   }
 }
 
 /** A bug in this package: something that cannot happen unless the code is wrong. */
 export class ZitadelConfigInternalError extends ZitadelConfigError {
   override readonly name: string = "ZitadelConfigInternalError";
-  override readonly category: ErrorCategory = "internal";
+  override readonly category: ErrorCategory = "fault";
+  override readonly retryable: boolean = false;
 }

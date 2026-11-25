@@ -35,7 +35,10 @@ export class EnvironmentError extends Error implements Categorized {
   override readonly name: string = "EnvironmentError";
 
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "validation";
+  readonly category: ErrorCategory = "invalid";
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
 
   /**
    * What to do about it.
@@ -91,7 +94,8 @@ export class EnvironmentInvalidError extends EnvironmentError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "EnvironmentInvalidError";
-  override readonly category: ErrorCategory = "validation";
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * What is wrong with it.
@@ -135,7 +139,8 @@ export class EnvironmentFileMissingError extends EnvironmentError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "EnvironmentFileMissingError";
-  override readonly category: ErrorCategory = "not_found";
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
 
   /**
    * The path that was given.
@@ -203,7 +208,8 @@ export class EnvironmentValueMissingError extends EnvironmentError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "EnvironmentValueMissingError";
-  override readonly category: ErrorCategory = "precondition";
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * The variable that is not set.

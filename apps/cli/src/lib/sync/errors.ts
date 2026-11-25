@@ -36,7 +36,10 @@ export class SyncError extends Error implements Categorized {
   override readonly name: string = "SyncError";
 
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "validation";
+  readonly category: ErrorCategory = "invalid";
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
 
   /**
    * What to do about it.
@@ -70,7 +73,8 @@ export class SyncStateMalformedError extends SyncError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "SyncStateMalformedError";
-  override readonly category: ErrorCategory = "validation";
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * The state file's path, relative to the project.

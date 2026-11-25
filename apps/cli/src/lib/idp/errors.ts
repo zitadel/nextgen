@@ -34,7 +34,10 @@ export class IdpError extends Error implements Categorized {
   override readonly name: string = "IdpError";
 
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "validation";
+  readonly category: ErrorCategory = "invalid";
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
 
   /**
    * What to do about it.
@@ -104,7 +107,8 @@ export class IdpSettingInvalidError extends IdpError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "IdpSettingInvalidError";
-  override readonly category: ErrorCategory = "validation";
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * What is wrong with the settings.
@@ -144,7 +148,8 @@ export class IdpProviderUnknownError extends IdpError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "IdpProviderUnknownError";
-  override readonly category: ErrorCategory = "not_found";
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
 
   /**
    * The name that was given.

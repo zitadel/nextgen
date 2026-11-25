@@ -14,6 +14,9 @@ export class GitError extends Error implements Categorized {
   /** The kind of failure, which the boundary reports it as. */
   readonly category: ErrorCategory;
 
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
+
   /**
    * Creates the error.
    *
@@ -68,13 +71,14 @@ export class GitError extends Error implements Categorized {
  * failure is thrown.
  */
 export class GitBinaryMissingError extends GitError {
+  override readonly retryable: boolean = false;
   /**
    * Creates the error.
    *
    * @param message - The message Node gave.
    */
   constructor(message: string) {
-    super("precondition", message);
+    super("invalid", message);
     this.name = "GitBinaryMissingError";
   }
 }
@@ -86,26 +90,28 @@ export class GitBinaryMissingError extends GitError {
  * Carries git's own words and no advice, because nothing knows why.
  */
 export class GitCommandFailedError extends GitError {
+  override readonly retryable: boolean = false;
   /**
    * Creates the error.
    *
    * @param message - What git said, or what this package says when git said nothing.
    */
   constructor(message: string) {
-    super("unexpected", message);
+    super("unknown", message);
     this.name = "GitCommandFailedError";
   }
 }
 
 /** A bug in this package: something that cannot happen unless the code is wrong. */
 export class GitInternalError extends GitError {
+  override readonly retryable: boolean = false;
   /**
    * Creates the error.
    *
    * @param message - What the code found impossible.
    */
   constructor(message: string) {
-    super("internal", message);
+    super("fault", message);
     this.name = "GitInternalError";
   }
 }

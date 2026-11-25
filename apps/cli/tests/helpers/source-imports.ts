@@ -23,6 +23,21 @@ export interface SourceImport {
   readonly specifier: string;
   /** Where it points, relative to `src`, with the extension as written. */
   readonly target: string;
+  /** Whether the statement is `import type`, which leaves no trace at run time. */
+  readonly typeOnly: boolean;
+}
+
+/**
+ * Whether `found` is the one import a package may take from outside itself: a
+ * type-only import of the shared error types, `@/lib/errors`, from the
+ * package's own `errors.ts`.
+ *
+ * @param found - An import of a file under `layer`.
+ * @param layer - The package's directory, relative to `src` (for example `lib/backend`).
+ * @returns True for that import and nothing else.
+ */
+export function isOwnErrorsTypeImport(found: SourceImport, layer: string): boolean {
+  return found.file === `${layer}/errors.ts` && found.target === "lib/errors" && found.typeOnly;
 }
 
 /**
@@ -62,7 +77,13 @@ export async function importsUnder(layer: string): Promise<readonly SourceImport
       if (specifier === undefined) {
         continue;
       }
-      imports.push({ file: path, specifier, target: resolveFromSrc(path, specifier) });
+      const statement = source.lastIndexOf("import", match.index);
+      imports.push({
+        file: path,
+        specifier,
+        target: resolveFromSrc(path, specifier),
+        typeOnly: source.startsWith("import type", statement),
+      });
     }
   }
   return imports;

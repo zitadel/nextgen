@@ -19,7 +19,7 @@ describe("OrcaError", () => {
     expect(new OrcaError("why", { hint: "do", details: { a: 1 }, cause })).toMatchObject({
       message: "why",
       name: "OrcaError",
-      category: "validation",
+      category: "invalid",
       hint: "do",
       details: { a: 1 },
       cause,
@@ -29,20 +29,20 @@ describe("OrcaError", () => {
 
 describe("the orca errors", () => {
   it.each([
-    [new OrcaFrameworkMissingError("why"), "OrcaFrameworkMissingError", "not_found"],
-    [new OrcaPatchFileMissingError("why"), "OrcaPatchFileMissingError", "not_found"],
+    [new OrcaFrameworkMissingError("why"), "OrcaFrameworkMissingError", "missing"],
+    [new OrcaPatchFileMissingError("why"), "OrcaPatchFileMissingError", "missing"],
     [new OrcaPatchFileConflictError("why"), "OrcaPatchFileConflictError", "conflict"],
-    [new OrcaPatchFileUnsupportedError("why"), "OrcaPatchFileUnsupportedError", "unsupported"],
-    [new OrcaInternalError("why"), "OrcaInternalError", "internal"],
+    [new OrcaPatchFileUnsupportedError("why"), "OrcaPatchFileUnsupportedError", "invalid"],
+    [new OrcaInternalError("why"), "OrcaInternalError", "fault"],
   ])("is an OrcaError named %#", (error, name, category) => {
     expect(error).toBeInstanceOf(OrcaError);
     expect(error).toMatchObject({ name, category });
   });
 
   it.each([
-    ["unknown", "unsupported"],
-    ["layout", "unsupported"],
-    ["outdated", "unsupported"],
+    ["unknown", "invalid"],
+    ["layout", "invalid"],
+    ["outdated", "invalid"],
     ["mismatch", "conflict"],
   ] as const)("an unsupported framework for %s is %s", (reason, category) => {
     expect(new OrcaFrameworkUnsupportedError(reason, "why")).toMatchObject({ reason, category });
@@ -50,15 +50,15 @@ describe("the orca errors", () => {
 
   it.each([
     ["occupied", "conflict"],
-    ["node", "precondition"],
-    ["command", "precondition"],
+    ["node", "invalid"],
+    ["command", "invalid"],
   ] as const)("a blocked scaffold for %s is %s", (reason, category) => {
     expect(new OrcaScaffoldBlockedError(reason, "why")).toMatchObject({ reason, category });
   });
 
   it.each([
-    ["unknown", "validation"],
-    ["pending", "unsupported"],
+    ["unknown", "invalid"],
+    ["pending", "invalid"],
   ] as const)("a renderer error for %s is %s", (reason, category) => {
     expect(new OrcaRendererError(reason, "why")).toMatchObject({ reason, category });
   });

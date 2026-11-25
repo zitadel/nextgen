@@ -708,21 +708,19 @@ describe("a failure as a person is shown it", () => {
 
 describe("toZitadelError for an error that says its category", () => {
   it.each([
-    ["validation", "E_VALIDATION"],
-    ["not_found", "E_NOT_FOUND"],
+    ["invalid", "E_VALIDATION"],
+    ["missing", "E_NOT_FOUND"],
     ["conflict", "E_CONFLICT"],
-    ["auth", "E_AUTH"],
+    ["denied", "E_AUTH"],
     ["unavailable", "E_NETWORK"],
-    ["unsupported", "E_UNSUPPORTED_PROJECT_SHAPE"],
-    ["precondition", "E_VALIDATION"],
-    ["internal", "E_VALIDATION"],
-    ["unexpected", "E_VALIDATION"],
+    ["fault", "E_VALIDATION"],
+    ["unknown", "E_VALIDATION"],
   ] as const)("reports %s as %s", (category, code) => {
     expect(toZitadelError(new GitError(category, "why"))).toMatchObject({ code, message: "why" });
   });
 
   it("names a code for every category", () => {
-    expect(ERROR_CATEGORIES).toHaveLength(9);
+    expect(ERROR_CATEGORIES).toHaveLength(7);
   });
 });
 
@@ -740,7 +738,7 @@ describe("isCategorized", () => {
   });
 
   it("refuses a value that is not an error", () => {
-    expect(isCategorized({ category: "validation" })).toBe(false);
+    expect(isCategorized({ category: "invalid" })).toBe(false);
   });
 });
 

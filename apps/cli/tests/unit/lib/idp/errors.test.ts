@@ -5,10 +5,10 @@ import { IdpError, IdpProviderUnknownError, IdpSettingInvalidError } from "@/lib
 
 describe("the identity-provider errors", () => {
   it.each([
-    ["invalid", new IdpSettingInvalidError("invalid", "bad", { field: "--slug" }), "validation"],
-    ["conflicting", new IdpSettingInvalidError("conflicting", "bad", {}), "validation"],
-    ["missing", new IdpSettingInvalidError("missing", "bad", {}), "validation"],
-    ["unknown", new IdpProviderUnknownError("okta", ["google"]), "not_found"],
+    ["invalid", new IdpSettingInvalidError("invalid", "bad", { field: "--slug" }), "invalid"],
+    ["conflicting", new IdpSettingInvalidError("conflicting", "bad", {}), "invalid"],
+    ["missing", new IdpSettingInvalidError("missing", "bad", {}), "invalid"],
+    ["unknown", new IdpProviderUnknownError("okta", ["google"]), "missing"],
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(IdpError);
     expect(error.category).toBe(category);

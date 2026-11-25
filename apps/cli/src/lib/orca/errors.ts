@@ -35,7 +35,10 @@ export class OrcaError extends Error implements Categorized {
   override readonly name: string = "OrcaError";
 
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "validation";
+  readonly category: ErrorCategory = "invalid";
+
+  /** Whether the same request may succeed on a later attempt, with nothing changed. */
+  readonly retryable: boolean = false;
 
   /**
    * What to do about it.
@@ -68,7 +71,8 @@ export class OrcaFrameworkMissingError extends OrcaError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "OrcaFrameworkMissingError";
-  override readonly category: ErrorCategory = "not_found";
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
 }
 
 /**
@@ -88,6 +92,7 @@ export class OrcaFrameworkUnsupportedError extends OrcaError {
    */
   override readonly name: string = "OrcaFrameworkUnsupportedError";
   override readonly category: ErrorCategory;
+  override readonly retryable: boolean = false;
 
   /**
    * Why the framework cannot be used.
@@ -108,7 +113,7 @@ export class OrcaFrameworkUnsupportedError extends OrcaError {
   ) {
     super(message, options);
     this.reason = reason;
-    this.category = reason === "mismatch" ? "conflict" : "unsupported";
+    this.category = reason === "mismatch" ? "conflict" : "invalid";
   }
 }
 
@@ -128,6 +133,7 @@ export class OrcaScaffoldBlockedError extends OrcaError {
    */
   override readonly name: string = "OrcaScaffoldBlockedError";
   override readonly category: ErrorCategory;
+  override readonly retryable: boolean = false;
 
   /**
    * What stands in the way.
@@ -144,7 +150,7 @@ export class OrcaScaffoldBlockedError extends OrcaError {
   constructor(reason: OrcaScaffoldBlockedReason, message: string, options: OrcaErrorOptions = {}) {
     super(message, options);
     this.reason = reason;
-    this.category = reason === "occupied" ? "conflict" : "precondition";
+    this.category = reason === "occupied" ? "conflict" : "invalid";
   }
 }
 
@@ -156,7 +162,8 @@ export class OrcaPatchFileMissingError extends OrcaError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "OrcaPatchFileMissingError";
-  override readonly category: ErrorCategory = "not_found";
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
 }
 
 /**
@@ -186,6 +193,7 @@ export class OrcaPatchFileConflictError extends OrcaError {
    */
   override readonly name: string = "OrcaPatchFileConflictError";
   override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
 
   /**
    * Whether replacing files would resolve it.
@@ -213,7 +221,8 @@ export class OrcaPatchFileUnsupportedError extends OrcaError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "OrcaPatchFileUnsupportedError";
-  override readonly category: ErrorCategory = "unsupported";
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 }
 
 /**
@@ -230,7 +239,8 @@ export class OrcaRendererError extends OrcaError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "OrcaRendererError";
-  override readonly category: ErrorCategory;
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
 
   /**
    * Why the renderer cannot be used.
@@ -247,7 +257,6 @@ export class OrcaRendererError extends OrcaError {
   constructor(reason: OrcaRendererReason, message: string, options: OrcaErrorOptions = {}) {
     super(message, options);
     this.reason = reason;
-    this.category = reason === "unknown" ? "validation" : "unsupported";
   }
 }
 
@@ -259,5 +268,6 @@ export class OrcaInternalError extends OrcaError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "OrcaInternalError";
-  override readonly category: ErrorCategory = "internal";
+  override readonly category: ErrorCategory = "fault";
+  override readonly retryable: boolean = false;
 }

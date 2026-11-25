@@ -39,7 +39,7 @@ describe("VueDetector", () => {
       new VueDetector().detect(await project(dir, { vue: "~3.1.0", vite: "^5" })),
     );
     expect(caught).toBeInstanceOf(OrcaError);
-    expect((caught as OrcaError).category).toBe("unsupported");
+    expect((caught as OrcaError).category).toBe("invalid");
   });
 
   it("accepts Vue 3.2", async ({ dir }) => {

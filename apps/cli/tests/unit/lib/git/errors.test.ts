@@ -9,17 +9,28 @@ import {
 
 describe("GitError", () => {
   it("carries its message, name and category", () => {
-    expect(new GitError("validation", "why")).toMatchObject({
+    expect(new GitError("invalid", "why")).toMatchObject({
       message: "why",
       name: "GitError",
-      category: "validation",
+      category: "invalid",
     });
   });
 
   it("keeps the error that caused it", () => {
     const cause = new Error("underneath");
 
-    expect(new GitError("unexpected", "why", { cause }).cause).toBe(cause);
+    expect(new GitError("unknown", "why", { cause }).cause).toBe(cause);
+  });
+});
+
+describe("the git errors' retryable trait", () => {
+  it.each([
+    new GitError("unknown", "why"),
+    new GitBinaryMissingError("why"),
+    new GitCommandFailedError("why"),
+    new GitInternalError("why"),
+  ])("is false for %#", (error) => {
+    expect(error.retryable).toBe(false);
   });
 });
 
@@ -31,7 +42,7 @@ describe("GitBinaryMissingError", () => {
   it("is a precondition under its own name", () => {
     expect(new GitBinaryMissingError("why")).toMatchObject({
       name: "GitBinaryMissingError",
-      category: "precondition",
+      category: "invalid",
     });
   });
 });
@@ -44,7 +55,7 @@ describe("GitCommandFailedError", () => {
   it("is unexpected, because nothing knows why git failed", () => {
     expect(new GitCommandFailedError("why")).toMatchObject({
       name: "GitCommandFailedError",
-      category: "unexpected",
+      category: "unknown",
     });
   });
 });
@@ -57,7 +68,7 @@ describe("GitInternalError", () => {
   it("is internal under its own name", () => {
     expect(new GitInternalError("why")).toMatchObject({
       name: "GitInternalError",
-      category: "internal",
+      category: "fault",
     });
   });
 });

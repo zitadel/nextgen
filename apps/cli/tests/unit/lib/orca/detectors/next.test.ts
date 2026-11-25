@@ -103,7 +103,7 @@ describe("NextDetector", () => {
     await writeNextPackageJson(dir);
     const caught = await rejectionOf(() => detector.detect(dir));
     expect(caught).toBeInstanceOf(OrcaError);
-    expect((caught as OrcaError).category).toBe("unsupported");
+    expect((caught as OrcaError).category).toBe("invalid");
     expect((caught as OrcaError).message).toContain("Pages Router");
   });
 
@@ -114,7 +114,7 @@ describe("NextDetector", () => {
     await writeNextPackageJson(dir, { dependencies: { next: "^14.2.0" } });
     const caught = await rejectionOf(() => detector.detect(dir));
     expect(caught).toBeInstanceOf(OrcaError);
-    expect((caught as OrcaError).category).toBe("unsupported");
+    expect((caught as OrcaError).category).toBe("invalid");
     expect((caught as OrcaError).message).toContain("below the supported floor");
   });
 
@@ -177,7 +177,7 @@ describe("NextDetector", () => {
     await installNext(dir, "15.2.2");
 
     await expect(detector.detect(dir)).rejects.toMatchObject({
-      category: "unsupported",
+      category: "invalid",
       hint: expect.stringContaining("Upgrade the app to Next.js 15.2.3 or later"),
     });
   });

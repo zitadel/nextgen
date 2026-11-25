@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { toZitadelError } from "@/lib/errors";
 import { LOCAL_ADMIN_FILE } from "@/lib/server/local/admin-credential";
 import {
   LOCAL_DATA_DIR,
@@ -319,7 +320,7 @@ describe("LocalRuntime", () => {
       ).rejects.toMatchObject({
         name: "LocalServerStopError",
         reason: "unlistable",
-        category: "unsupported",
+        category: "invalid",
       });
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
@@ -863,9 +864,14 @@ describe("ZitadelRuntime.resolve", () => {
   }) => {
     await writeLocalRuntime(dir, "http://localhost:9");
 
-    await expect(ZitadelRuntime.resolve({ cwd: dir, serverFlag: "local" })).rejects.toMatchObject({
-      code: "E_LOCAL_SERVER_NOT_RUNNING",
-    });
+    const error = await ZitadelRuntime.resolve({ cwd: dir, serverFlag: "local" }).catch(
+      (caught: unknown) => {
+        return caught;
+      },
+    );
+
+    expect(error).toMatchObject({ name: "LocalServerDownError", reason: "not-responding" });
+    expect(toZitadelError(error).code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
   });
 });
 
