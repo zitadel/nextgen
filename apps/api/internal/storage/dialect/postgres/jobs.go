@@ -19,7 +19,7 @@ const (
 	// Qualified for UPDATE…FROM CTE RETURNING: bare "id" is ambiguous with picked.id.
 	jobColumnsJ = `j.id, j.name, j.payload, j.unique_key, j.run_at, j.not_after, j.lease_until, j.lease_by, j.lease_token,` +
 		` j.attempt, j.max_attempts, j.last_error, j.status, j.completed_at`
-	jobScheduleColumns = `id, name, period, run_at, lease_until, lease_by, lease_token, last_error, attempt`
+	jobScheduleColumns  = `id, name, period, run_at, lease_until, lease_by, lease_token, last_error, attempt`
 	jobScheduleColumnsS = `s.id, s.name, s.period, s.run_at, s.lease_until, s.lease_by, s.lease_token, s.last_error, s.attempt`
 
 	insertJobStmt = `INSERT INTO zitadel_nextgen.jobs` +
