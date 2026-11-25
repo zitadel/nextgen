@@ -8,15 +8,17 @@ collects step fields, and runs the passkey and SSO ceremonies.
 It does not own:
 
 - flow definitions and their validation, which live in `domain`; it reads the
-  running flow's definition through `ActiveDefinition` (`state.go`), from the
-  `Definitions` the service builds per request;
-- persistence, policy and side effects, which it calls through the ports it
-  declares (`port_<subject>.go`) and `service` implements;
+  running flow's definition through `ActiveDefinition` (`definition.go`), from
+  the `Definitions` the service builds per request;
+- persistence, policy and side effects, which it calls through interfaces it
+  declares (`auth_attempt.go`, `on_success_handler.go`, `sso_services.go`,
+  `password_policy.go`, `CompletionPolicy` in `completion.go`) and `service`
+  implements;
 - keeping flow state: it takes and returns the `State` it declares
   (`state.go`), which lives in the browser cookie, sealed by the API layer.
 
 `flowengine` imports `domain`; `domain` never imports `flowengine`. Mocks of
-the ports are generated into `mock` (package `flowenginemock`).
+those interfaces are generated into `mock` (package `flowenginemock`).
 
 Files by concern: `state_machine.go` (the interface, start and process),
 `action.go` (the table of one handler per action kind, which `Process`

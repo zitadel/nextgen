@@ -17,8 +17,8 @@ graph TD
     Service["internal/service/flow.go<br>FlowService"]
     SM["internal/flowengine/state_machine.go<br>Runtime"]
     FR["internal/domain/flow_field_resolver*<br>FlowFieldResolver"]
-    OS["internal/flowengine/port_on_success.go<br>OnSuccessHandler"]
-    AA["internal/flowengine/port_auth_attempt.go<br>AuthAttemptService<br>(incl. passkey registration ceremony, ADR 056)"]
+    OS["internal/flowengine/on_success_handler.go<br>OnSuccessHandler"]
+    AA["internal/flowengine/auth_attempt.go<br>AuthAttemptService<br>(incl. passkey registration ceremony, ADR 056)"]
 
     AAImpl["service: auth-attempt<br>(FlowAuthAttemptAdapter)"]
     Repo["repository: flow_definitions"]
@@ -163,13 +163,13 @@ Interface (`Resolve` + `Validate`) plus a schema-backed implementation in `flow_
 
 `Validate` walks the resolved fields and returns `FlowFieldValidationErrors` on rule violations — the state machine surfaces those as step errors.
 
-### `flowengine.OnSuccessHandler` (`internal/flowengine/port_on_success.go`)
+### `flowengine.OnSuccessHandler` (`internal/flowengine/on_success_handler.go`)
 
 Interface every `on_success` mutation satisfies. One implementation today:
 
 - `FlowCreateUserWithPasswordHandler` (`internal/service/flow_create_user_with_password_handler.go`) — reads the identifier and password fields from the collected data, hashes the password (argon2id), and applies user creation, password persistence, and the attempt's verified user + password factors (with their `auth.check.succeeded` events) in one transaction. A handler that returns a `UserID` must persist the user's factors itself; the state machine only records the id in flow state.
 
-### `flowengine.AuthAttemptService` (`internal/flowengine/port_auth_attempt.go`)
+### `flowengine.AuthAttemptService` (`internal/flowengine/auth_attempt.go`)
 
 A narrow interface over the auth-attempt service. The state machine sees
 `Start`, `SubmitIdentifier`, `SubmitPassword`, the two legs of every
