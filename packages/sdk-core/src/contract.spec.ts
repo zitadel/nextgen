@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import ts from "typescript";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
 import { DISPATCHED_EVENTS } from "@zitadel/components/events";
 import { describe, expect, it } from "vitest";
@@ -775,5 +776,121 @@ describe("SDK specs ↔ the contract packages", () => {
       .filter((input) => /\.(spec|test)\.tsx?$/.test(input))
       .map((input) => input.replace("$TURBO_ROOT$/packages/", ""));
     expect(inputs.sort()).toEqual([...new Set(specs.map(([path]) => path))].sort());
+  });
+});
+
+/**
+ * The public API standard of every SDK (ADR 090).
+ *
+ * Each `sdk-*` package declares its entries in `public-api.json`. An entry has
+ * a kind, and the kind decides which names it must export; `extras` lists the
+ * names its framework needs beyond those. The spec reads the real exports of
+ * each entry's source file with the TypeScript compiler, so a name added,
+ * renamed or dropped in an SDK fails here until the standard, or the SDK's
+ * declared extras, say so.
+ */
+describe("SDK public API ↔ the standard", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const sdkDirs = readdirSync(packagesDir).filter(
+    (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
+  );
+
+  type Kind = "ui" | "widgets" | "client" | "server" | "other";
+  interface EntryDeclaration {
+    readonly source: string;
+    readonly kind: Kind;
+    readonly widgets?: boolean;
+    readonly componentSuffix?: string;
+    readonly extras?: ReadonlyArray<string>;
+  }
+  interface PublicApi {
+    readonly entries: Readonly<Record<string, EntryDeclaration>>;
+  }
+
+  const COMPONENTS = ["ZitadelLogin", "ZitadelLogout", "ZitadelSession"];
+  const WIDGET_TYPES = [
+    "ZitadelLoginProps",
+    "ZitadelLogoutProps",
+    "ZitadelSessionProps",
+    "ZitadelFlowStepDetail",
+    "ZitadelFlowInputDetail",
+    "ZitadelFlowCompleteDetail",
+    "ZitadelFlowRedirectDetail",
+    "ZitadelFlowErrorDetail",
+    "ZitadelSignoutDetail",
+    "CreateFlowBodyPurpose",
+  ];
+  const SETUP = ["configureZitadel", "getApi", "getZitadelConfig", "ZitadelProject", "ZitadelConfig"];
+  const SERVER = [
+    "createNextgenMiddleware",
+    "getAuth",
+    "NextgenMiddlewareOptions",
+    "NextgenSession",
+    "AuthResult",
+    "AuthState",
+    "UnauthState",
+    "ClientAuthResult",
+  ];
+
+  /** The names an entry must export, from its kind (ADR 090). */
+  function required(entry: EntryDeclaration): string[] {
+    const components = COMPONENTS.map((name) => `${name}${entry.componentSuffix ?? ""}`);
+    switch (entry.kind) {
+      case "ui":
+        return [...components, ...WIDGET_TYPES, ...SETUP, "businessLocales"];
+      case "widgets":
+        return [...components, ...WIDGET_TYPES];
+      case "client":
+        return [...SETUP, ...(entry.widgets ? ["businessLocales"] : [])];
+      case "server":
+        return SERVER;
+      case "other":
+        return [];
+    }
+  }
+
+  /** The names a source file exports, read with the package's own compiler options. */
+  function exportsOf(dir: string, source: string): string[] {
+    const configPath = `${packagesDir}${dir}/tsconfig.lib.json`;
+    const config = ts.readConfigFile(configPath, ts.sys.readFile);
+    const options = ts.parseJsonConfigFileContent(
+      config.config,
+      ts.sys,
+      `${packagesDir}${dir}`,
+    ).options;
+    const entryFile = `${packagesDir}${dir}/${source}`;
+    const program = ts.createProgram([entryFile], { ...options, noEmit: true, skipLibCheck: true });
+    const checker = program.getTypeChecker();
+    const file = program.getSourceFile(entryFile);
+    const symbol = file ? checker.getSymbolAtLocation(file) : undefined;
+    return symbol ? checker.getExportsOfModule(symbol).map((exported) => exported.name).sort() : [];
+  }
+
+  const read = (dir: string): PublicApi =>
+    JSON.parse(readFileSync(`${packagesDir}${dir}/public-api.json`, "utf8")) as PublicApi;
+
+  it.each(sdkDirs)("%s declares public-api.json", (dir) => {
+    expect(existsSync(`${packagesDir}${dir}/public-api.json`)).toBe(true);
+  });
+
+  it.each(sdkDirs)("%s declares every entry its package.json exports", (dir) => {
+    const exported = Object.keys(
+      (JSON.parse(readFileSync(`${packagesDir}${dir}/package.json`, "utf8")) as {
+        exports?: Record<string, unknown>;
+      }).exports ?? {},
+    ).filter((key) => key !== "./package.json");
+    expect(Object.keys(read(dir).entries).sort()).toEqual(exported.sort());
+  });
+
+  describe.each(sdkDirs)("%s", (dir) => {
+    const api = existsSync(`${packagesDir}${dir}/public-api.json`) ? read(dir) : { entries: {} };
+    it.each(Object.entries(api.entries))(
+      "entry %s exports the standard and its declared extras, nothing else",
+      (_entry, declaration) => {
+        const expected = [...required(declaration), ...(declaration.extras ?? [])].sort();
+        expect(exportsOf(dir, declaration.source)).toEqual(expected);
+      },
+      120_000,
+    );
   });
 });
