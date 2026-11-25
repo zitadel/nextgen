@@ -101,7 +101,11 @@ func TestHandlerPasswordLogin(t *testing.T) {
 	res = app.post("/login/?flow=flow_1", url.Values{"action": {"submit"}, "password": {"wrong"}})
 	assert.Equal(t, "/login/?error=error.invalid_credentials&flow=flow_1", res.Header.Get("Location"))
 	_, body = app.get(res.Header.Get("Location"))
-	assert.Contains(t, body, `<p class="error" role="alert">Wrong email or password.</p>`)
+	// The sentence is generated from the components catalogs and is reworded
+	// upstream; assert that the key resolved to its copy, not the wording.
+	invalid, ok := Texts{}.lookup("error.invalid_credentials")
+	assert.True(t, ok, "the catalog has the key")
+	assert.Contains(t, body, `<p class="error" role="alert">`+invalid+`</p>`)
 
 	// The right one completes the flow: session cookie set, flow cookie
 	// cleared, and off to the app.
