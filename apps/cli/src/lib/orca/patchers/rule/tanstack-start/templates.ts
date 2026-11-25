@@ -83,7 +83,7 @@ function Home() {
  * A login/register route. Configures the SDK once at module scope with
  * `configureZitadel` from the `/client` entry and passes the returned project
  * handle straight to the typed `<ZitadelLogin>` React wrapper from
- * `@zitadel/sdk-tanstack-start/react` as its `project` prop. The public project
+ * `@zitadel/sdk-tanstack-start/components` as its `project` prop. The public project
  * id comes from Vite's `import.meta.env.VITE_ZITADEL_PROJECT_ID`; the backend URL
  * never reaches the browser (the widget talks to the same-origin `${PROXY_PATH}`
  * proxy). The wrapper mounts the widget on the client only, after hydration, so
@@ -108,7 +108,7 @@ function authRoute(purpose: "login" | "register", ctx: PatchContext): string {
   const localesAttr = business ? " locales={businessLocales}" : "";
   return `${ManagedFile.MARKER}
 import { createFileRoute } from "@tanstack/react-router";
-import { ${reactImports} } from "@zitadel/sdk-tanstack-start/react";
+import { ${reactImports} } from "@zitadel/sdk-tanstack-start/components";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";${localesComment}
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
@@ -151,7 +151,7 @@ export function profileRouteTemplate(): string {
   return `${ManagedFile.MARKER}
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
+import { ZitadelSession } from "@zitadel/sdk-tanstack-start/components";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 import { getAuth } from "@zitadel/sdk-tanstack-start/server";
 

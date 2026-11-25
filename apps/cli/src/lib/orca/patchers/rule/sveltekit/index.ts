@@ -22,6 +22,9 @@ const SDK_DEPENDENCY = "@zitadel/sdk-sveltekit";
  * Svelte component (typed props, callback events) rather than the bare element.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-svelte";
+// The routes import the widgets from `@zitadel/sdk-sveltekit/components`, which re-exports
+// this package. The app still declares it: Vite's Svelte plugin finds the Svelte libraries to
+// compile from the app's own dependencies.
 
 /**
  * Rule-based patcher for a SvelteKit app. Like Next.js and Nuxt, SvelteKit

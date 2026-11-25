@@ -81,7 +81,7 @@ Qwik Router runs it on the server for `<Link>` navigation too.
 
 ```tsx
 import { component$ } from '@qwik.dev/core';
-import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik';
+import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik-router/components';
 
 const project = configureZitadel({
   projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID,

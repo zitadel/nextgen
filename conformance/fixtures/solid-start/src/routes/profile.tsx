@@ -2,7 +2,7 @@
 import { clientOnly } from "@solidjs/start";
 
 const ZitadelSession = clientOnly(() =>
-  import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelSession })),
+  import("@zitadel/sdk-solid-start/components").then((m) => ({ default: m.ZitadelSession })),
 );
 
 export default function Profile() {

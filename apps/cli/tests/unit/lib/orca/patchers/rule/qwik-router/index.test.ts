@@ -49,7 +49,9 @@ describe("QwikRouterPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/register/index.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("background:#0f0f11");
-    expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("@zitadel/sdk-qwik");
+    expect(writeContents(plan, "src/routes/login/index.tsx")).toContain(
+      "@zitadel/sdk-qwik-router/components",
+    );
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("ZitadelLogin");
   });
 
@@ -148,7 +150,7 @@ describe("QwikRouterPatcher.plan", () => {
       expect(
         writeContents(new QwikRouterPatcher().plan({ ...ctx(), useCase: "business" }), path),
       ).toContain(
-        'import { ZitadelLogin, businessLocales, configureZitadel } from "@zitadel/sdk-qwik";',
+        'import { ZitadelLogin, businessLocales, configureZitadel } from "@zitadel/sdk-qwik-router/components";',
       );
     },
   );

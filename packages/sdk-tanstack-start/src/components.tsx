@@ -47,7 +47,7 @@ export { businessLocales } from "@zitadel/components";
  * also never become `export type * from "@zitadel/sdk-react"`: tsup's declaration bundler
  * rewrites `export type * from` into a plain `export *`, which would declare sdk-react's
  * runtime exports (such as `configureZitadel`) on this entry without shipping them. The test
- * in `react.test.tsx` fails when a name listed here is not exported by sdk-react.
+ * in `components.test.tsx` fails when a name listed here is not exported by sdk-react.
  */
 export type {
   ZitadelFlowPurpose,
@@ -141,7 +141,7 @@ function clientOnly<P, R>(Component: Widget<P, R>, displayName: string): Widget<
  *
  * @example
  * ```tsx
- * import { ZitadelLogin } from "@zitadel/sdk-tanstack-start/react";
+ * import { ZitadelLogin } from "@zitadel/sdk-tanstack-start/components";
  * import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
  *
  * const project = configureZitadel({ projectId: "demo", proxyPath: "/__nextgen" });
@@ -164,7 +164,7 @@ export const ZitadelLogin: typeof ReactZitadelLogin = clientOnly(ReactZitadelLog
  *
  * @example
  * ```tsx
- * import { ZitadelLogout } from "@zitadel/sdk-tanstack-start/react";
+ * import { ZitadelLogout } from "@zitadel/sdk-tanstack-start/components";
  * import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
  *
  * const project = configureZitadel({ projectId: "demo", proxyPath: "/__nextgen" });
@@ -190,7 +190,7 @@ export const ZitadelLogout: typeof ReactZitadelLogout = clientOnly(
  *
  * @example
  * ```tsx
- * import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
+ * import { ZitadelSession } from "@zitadel/sdk-tanstack-start/components";
  * import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
  *
  * const project = configureZitadel({ projectId: "demo", proxyPath: "/__nextgen" });

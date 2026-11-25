@@ -2,7 +2,7 @@
 import { clientOnly } from "@solidjs/start";
 
 const ZitadelLogin = clientOnly(() =>
-  import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogin })),
+  import("@zitadel/sdk-solid-start/components").then((m) => ({ default: m.ZitadelLogin })),
 );
 
 export default function Register() {

@@ -101,7 +101,7 @@ export const Route = createFileRoute('/admin')({
 `/client`:
 
 ```tsx
-import { ZitadelLogin } from '@zitadel/sdk-tanstack-start/react';
+import { ZitadelLogin } from '@zitadel/sdk-tanstack-start/components';
 import { configureZitadel } from '@zitadel/sdk-tanstack-start/client';
 
 const project = configureZitadel({

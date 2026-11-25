@@ -5,7 +5,7 @@ The SDK rules: [`../AGENTS.md`](../AGENTS.md). The public API standard:
 
 ## This package re-exports the widgets of `@zitadel/sdk-react`
 
-- **Keep the re-export.** `src/react.tsx` exports the widget components, their props
+- **Keep the re-export.** `src/components.tsx` exports the widget components, their props
   types, the six event detail types, the three flow types, `businessLocales`
   and `configureZitadel` from `@zitadel/sdk-react`, by name and never
   `export *`. It looks redundant because the same names exist in
@@ -20,5 +20,5 @@ The SDK rules: [`../AGENTS.md`](../AGENTS.md). The public API standard:
 - **`@zitadel/sdk-react` is a runtime `dependency`, not a peer**, and this
   package's `build` and `dev` turbo tasks depend on its build.
 - **Change the two together.** A widget name added to or removed from
-  `sdk-react` changes `src/react.tsx` and `public-api.json` in the same change;
+  `sdk-react` changes `src/components.tsx` and `public-api.json` in the same change;
   `sdk-core`'s contract spec fails on a missing name.

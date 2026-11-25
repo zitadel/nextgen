@@ -55,7 +55,9 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/register/+page.svelte")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile/+page.svelte")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("background:#0f0f11");
-    expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("@zitadel/sdk-svelte");
+    expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain(
+      "@zitadel/sdk-sveltekit/components",
+    );
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("ZitadelLogin");
   });
 
@@ -147,7 +149,7 @@ describe("SvelteKitPatcher.plan", () => {
       expect(
         writeContents(new SvelteKitPatcher().plan({ ...ctx(), useCase: "business" }), path),
       ).toContain(
-        'import { ZitadelLogin, businessLocales, configureZitadel } from "@zitadel/sdk-svelte";',
+        'import { ZitadelLogin, businessLocales, configureZitadel } from "@zitadel/sdk-sveltekit/components";',
       );
     },
   );

@@ -97,7 +97,7 @@ Setup installs both packages. To add them yourself, run:
     ```svelte
     <script lang="ts">
       import { onMount } from "svelte";
-      import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-svelte";
+      import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-sveltekit/components";
 
       const project = configureZitadel({ projectId: "<project id>", proxyPath: "/__nextgen" });
 

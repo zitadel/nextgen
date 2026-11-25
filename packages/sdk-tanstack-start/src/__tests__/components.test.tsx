@@ -18,9 +18,9 @@ import type {
   ZitadelLogoutProps,
   ZitadelSessionProps,
   ZitadelSignoutDetail,
-} from "../react";
-import * as tanstackReact from "../react";
-import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "../react";
+} from "../components";
+import * as tanstackReact from "../components";
+import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "../components";
 import type {
   ZitadelLoginConfig,
   ZitadelLogoutConfig,
@@ -107,7 +107,7 @@ function typeOnlyExports(specifier: string, runtime: object): string[] {
 const register = () =>
   createElement(ZitadelLogin, { project, purpose: "register", variant: "page" });
 
-describe("@zitadel/sdk-tanstack-start/react", () => {
+describe("@zitadel/sdk-tanstack-start/components", () => {
   it.each([
     ["ZitadelLogin", ZitadelLogin],
     ["ZitadelLogout", ZitadelLogout],
@@ -182,7 +182,7 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
   });
 
   it("exports only the standard types, all of them @zitadel/sdk-react's", () => {
-    const names = typeOnlyExports("@zitadel/sdk-tanstack-start/react", tanstackReact);
+    const names = typeOnlyExports("@zitadel/sdk-tanstack-start/components", tanstackReact);
     const sdkReactNames = typeOnlyExports("@zitadel/sdk-react", sdkReact);
 
     expect(names.filter((name) => !sdkReactNames.includes(name))).toEqual([]);

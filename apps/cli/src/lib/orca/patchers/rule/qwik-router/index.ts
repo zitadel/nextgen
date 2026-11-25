@@ -20,6 +20,9 @@ const SDK_DEPENDENCY = "@zitadel/sdk-qwik-router";
  * Qwik component (typed props, callback events) rather than the bare element.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-qwik";
+// The routes import the widgets from `@zitadel/sdk-qwik-router/components`, which re-exports
+// this package. The app still declares it: Qwik's optimizer bundles the Qwik libraries it
+// finds in the app's own dependencies.
 
 /**
  * Rule-based patcher for a Qwik Router app. Like Next.js and SvelteKit, Qwik Router

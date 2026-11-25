@@ -54,7 +54,9 @@ describe("SolidStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("background:#0f0f11");
-    expect(writeContents(plan, "src/routes/login.tsx")).toContain("@zitadel/sdk-solid");
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain(
+      "@zitadel/sdk-solid-start/components",
+    );
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("ZitadelLogin");
     // The widget registers Lit custom elements (customElements.define) at import
     // time, which crashes SSR. It must be loaded via SolidStart's clientOnly, not
@@ -129,7 +131,7 @@ describe("SolidStartPatcher.plan", () => {
       expect(
         writeContents(new SolidStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
       ).toContain(
-        'import("@zitadel/sdk-solid").then(({ ZitadelLogin: Login, businessLocales }) =>',
+        'import("@zitadel/sdk-solid-start/components").then(({ ZitadelLogin: Login, businessLocales }) =>',
       );
     },
   );
@@ -141,13 +143,13 @@ describe("SolidStartPatcher.plan", () => {
   });
 
   // The overlay ships in the client-only module, so the loader must not pull
-  // @zitadel/sdk-solid in at module scope to reach it.
+  // @zitadel/sdk-solid-start/components in at module scope to reach it.
   it.each(businessPages)(
-    "keeps @zitadel/sdk-solid client-only in %s for business projects",
+    "keeps @zitadel/sdk-solid-start/components client-only in %s for business projects",
     (path) => {
       expect(
         writeContents(new SolidStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
-      ).not.toMatch(/^import .* from "@zitadel\/sdk-solid";$/m);
+      ).not.toMatch(/^import .* from "@zitadel\/sdk-solid-start\/components";$/m);
     },
   );
 });

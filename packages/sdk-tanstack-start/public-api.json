@@ -46,8 +46,8 @@
       "kind": "client",
       "extras": []
     },
-    "./react": {
-      "source": "src/react.tsx",
+    "./components": {
+      "source": "src/components.tsx",
       "kind": "widgets",
       "extras": [
         "businessLocales"

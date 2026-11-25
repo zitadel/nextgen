@@ -25,7 +25,7 @@ export default defineConfig({
           globals: true,
           environment: "node",
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/react.test.tsx", edgeSpecs],
+          exclude: ["src/**/components.test.tsx", edgeSpecs],
         },
       },
       {
@@ -35,7 +35,7 @@ export default defineConfig({
           name: "react",
           globals: true,
           environment: "jsdom",
-          include: ["src/**/react.test.tsx"],
+          include: ["src/**/components.test.tsx"],
         },
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.

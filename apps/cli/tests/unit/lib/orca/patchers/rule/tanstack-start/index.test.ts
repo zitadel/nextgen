@@ -52,7 +52,7 @@ describe("TanStackStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain(
-      "@zitadel/sdk-tanstack-start/react",
+      "@zitadel/sdk-tanstack-start/components",
     );
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
@@ -157,7 +157,7 @@ describe("TanStackStartPatcher.plan", () => {
       expect(
         writeContents(new TanStackStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
       ).toContain(
-        'import { ZitadelLogin, businessLocales } from "@zitadel/sdk-tanstack-start/react";',
+        'import { ZitadelLogin, businessLocales } from "@zitadel/sdk-tanstack-start/components";',
       );
     },
   );

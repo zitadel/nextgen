@@ -14,7 +14,7 @@ Client, from `@zitadel/sdk-tanstack-start/client`:
 
 - {@link client!configureZitadel} builds the `project` handle the widgets take. Use it once, with your project id and the proxy path.
 
-Browser, from `@zitadel/sdk-tanstack-start/react`:
+Browser, from `@zitadel/sdk-tanstack-start/components`:
 
 - {@link react!ZitadelLogin} renders the sign-in and sign-up widget. Use it on your login and register pages.
 - {@link react!ZitadelSession} renders the "signed in as" card with a sign-out button. Use it on a profile page.

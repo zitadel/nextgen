@@ -519,7 +519,7 @@ describe("client SDK entries ↔ @zitadel/components", () => {
     ["sdk-qwik", "sdk-qwik/src/index.tsx"],
     ["sdk-next", "sdk-next/src/client.ts"],
     ["sdk-nuxt", "sdk-nuxt/src/index.ts"],
-    ["sdk-tanstack-start", "sdk-tanstack-start/src/react.tsx"],
+    ["sdk-tanstack-start", "sdk-tanstack-start/src/components.tsx"],
   ];
 
   it.each(ENTRIES)("%s registers the elements and re-exports no element class", (_sdk, path) => {

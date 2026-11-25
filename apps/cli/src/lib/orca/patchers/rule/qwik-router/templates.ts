@@ -51,7 +51,7 @@ export default component$(() => (
 
 /**
  * A login/register page. Renders the idiomatic `<ZitadelLogin>` Qwik component
- * from `@zitadel/sdk-qwik` (typed props, callback events). `configureZitadel`
+ * from `@zitadel/sdk-qwik-router/components` (the widgets of `@zitadel/sdk-qwik`, re-exported: typed props, callback events). `configureZitadel`
  * returns the project handle at module scope; the public project id comes from
  * `PUBLIC_ZITADEL_PROJECT_ID` via Qwik's `import.meta.env`.
  *
@@ -74,7 +74,7 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
   const localesAttr = business ? " locales={businessLocales}" : "";
   return `${ManagedFile.MARKER}
 import { component$ } from "@qwik.dev/core";
-import { ${importNames} } from "@zitadel/sdk-qwik";${localesComment}
+import { ${importNames} } from "@zitadel/sdk-qwik-router/components";${localesComment}
 
 const project = configureZitadel({
   projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
@@ -103,7 +103,7 @@ export function registerPageTemplate(ctx: PatchContext): string {
 export function profilePageTemplate(): string {
   return `${ManagedFile.MARKER}
 import { component$ } from "@qwik.dev/core";
-import { ZitadelSession, configureZitadel } from "@zitadel/sdk-qwik";
+import { ZitadelSession, configureZitadel } from "@zitadel/sdk-qwik-router/components";
 
 const project = configureZitadel({
   projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "",

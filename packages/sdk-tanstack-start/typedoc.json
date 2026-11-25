@@ -8,7 +8,7 @@
     "src/index.ts",
     "src/server.ts",
     "src/client.ts",
-    "src/react.tsx"
+    "src/components.tsx"
   ],
   "tsconfig": "tsconfig.lib.json",
   "readme": "docs/cover.md",

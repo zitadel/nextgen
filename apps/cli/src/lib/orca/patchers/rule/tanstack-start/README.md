@@ -15,7 +15,7 @@ React detector, which excludes `@tanstack/react-start`.
   writing this file opts out of TanStack Start's default CSRF protection for server functions
 - `src/routes/index.tsx`, `src/routes/login.tsx`, `src/routes/register.tsx`,
   `src/routes/profile.tsx` — landing and auth routes, rendering the typed `<ZitadelLogin>`
-  and `<ZitadelSession>` wrappers from `@zitadel/sdk-tanstack-start/react`. The profile
+  and `<ZitadelSession>` wrappers from `@zitadel/sdk-tanstack-start/components`. The profile
   route also guards itself in `beforeLoad` through a server function, since client-side
   navigation never reaches the request middleware
 - `.env.example`, `.env.local` — `VITE_ZITADEL_PROJECT_ID` (client-exposed), plus

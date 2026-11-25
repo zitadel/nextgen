@@ -4,14 +4,13 @@
  * {@link ZitadelLogin}, {@link ZitadelLogout} and {@link ZitadelSession} wrap the
  * `<zitadel-login>`, `<zitadel-logout>` and `<zitadel-session>` custom elements. They come from
  * `@zitadel/sdk-vue`, which this entry re-exports by name. The re-export exists so that an app
- * installs and imports one package for everything Zitadel adds to Nuxt: the server middleware from
+ * imports everything Zitadel adds to Nuxt from one package: the server middleware from
  * the server entry, the browser configuration from the client entry and the typed widgets from this
  * one. An app that prefers the raw custom elements can keep using them, because the Nuxt module
  * still registers them. If the widgets ever move to another package, only this file changes and an
  * app's imports stay as they are.
  *
- * Nothing here renders on the server beyond the element tag and its plain attributes. The sign-in
- * form itself is drawn only in the browser. Call {@link configureZitadel} before the widgets mount,
+ * The sign-in form is drawn in the browser. Call {@link configureZitadel} before the widgets mount,
  * or pass a project handle to each one.
  *
  * @example

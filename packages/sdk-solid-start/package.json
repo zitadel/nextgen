@@ -28,6 +28,7 @@
     },
     "./components": {
       "types": "./dist/components.d.ts",
+      "solid": "./dist/components.js",
       "import": "./dist/components.js"
     }
   },

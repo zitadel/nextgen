@@ -4,7 +4,7 @@
  * It re-exports the server API from `@zitadel/sdk-tanstack-start/server` and the project
  * configuration from `@zitadel/sdk-tanstack-start/client`, so a server-only module can import
  * everything from one place. Import the React components from
- * `@zitadel/sdk-tanstack-start/react`, which loads the web components in the browser.
+ * `@zitadel/sdk-tanstack-start/components`, which loads the web components in the browser.
  *
  * @module
  */

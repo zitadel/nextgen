@@ -106,7 +106,7 @@ export default component$(() => {
 ### 3. Render the login widget
 
 Install the Qwik component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-qwik-router` is server-only; the widget comes from `@zitadel/sdk-qwik`.
+`@zitadel/sdk-qwik-router/components` re-exports the widgets of `@zitadel/sdk-qwik`, which the app declares as well.
 Qwik bundles ecosystem packages, so install it as a dev dependency:
 
 ```bash
@@ -115,7 +115,7 @@ pnpm add -D @zitadel/sdk-qwik@latest
 
 ```tsx
 import { component$ } from '@qwik.dev/core';
-import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik';
+import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik-router/components';
 
 const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
@@ -129,7 +129,7 @@ button, and `ZitadelLogout` a sign-out control on its own:
 
 ```tsx
 import { component$ } from '@qwik.dev/core';
-import { ZitadelSession, configureZitadel } from '@zitadel/sdk-qwik';
+import { ZitadelSession, configureZitadel } from '@zitadel/sdk-qwik-router/components';
 
 const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
@@ -141,7 +141,7 @@ export default component$(() => {
 The widgets' events surface as optional QRL callbacks: `onFlowStep$`,
 `onFlowInput$`, `onFlowComplete$`, `onFlowRedirect$` and `onFlowError$` on
 `ZitadelLogin`, and `onSignout$` on `ZitadelLogout` and `ZitadelSession`. Pass
-`locales={businessLocales}` (exported from `@zitadel/sdk-qwik`) to show
+`locales={businessLocales}` (exported from `@zitadel/sdk-qwik-router/components`) to show
 work-email copy for a business audience.
 
 ## Handler options

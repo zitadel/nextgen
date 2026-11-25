@@ -110,7 +110,7 @@ widget with every prop in place, so it never starts a flow with its defaults.
 The `/client` entry only configures the SDK; it exports no components.
 
 ```tsx
-import { ZitadelLogin } from '@zitadel/sdk-tanstack-start/react';
+import { ZitadelLogin } from '@zitadel/sdk-tanstack-start/components';
 import { configureZitadel } from '@zitadel/sdk-tanstack-start/client';
 
 const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
@@ -124,7 +124,7 @@ export function LoginPage() {
 button, and `ZitadelLogout` a sign-out control on its own:
 
 ```tsx
-import { ZitadelSession } from '@zitadel/sdk-tanstack-start/react';
+import { ZitadelSession } from '@zitadel/sdk-tanstack-start/components';
 
 export function ProfilePage() {
   return <ZitadelSession project={project} postSignOutUrl="/login" />;
@@ -141,7 +141,7 @@ for a business audience.
 typed without installing `@zitadel/sdk-react`:
 
 ```tsx
-import type { ZitadelFlowCompleteDetail } from '@zitadel/sdk-tanstack-start/react';
+import type { ZitadelFlowCompleteDetail } from '@zitadel/sdk-tanstack-start/components';
 
 const onFlowComplete = (detail: ZitadelFlowCompleteDetail) => console.log(detail.redirect_uri);
 ```

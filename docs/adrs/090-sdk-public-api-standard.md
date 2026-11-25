@@ -23,10 +23,10 @@ There are two families.
    `sdk-sveltekit`, `sdk-qwik-router`, `sdk-solid-start`) have a `./server`
    entry (kind `server`), a `./client` entry (kind `client`) and a
    `./components` entry (kind `widgets`) that re-exports the widgets of the
-   matching UI SDK (see "Widgets come through the framework SDK"). `sdk-next`
-   and `sdk-tanstack-start` keep their own widget entry names (`./components`
-   and `./react`). Any other entry has kind `other` and states every name it
-   exports.
+   matching UI SDK (see "Widgets come through the framework SDK"). The widget
+   entry has the same name, `./components`, in all six: an SDK never names it
+   after its renderer (`./react`). Any other entry has kind `other` and states
+   every name it exports.
 
 ## The names
 
@@ -101,9 +101,12 @@ The reasons, so that nobody removes the re-export as redundant:
   entries run on edge runtimes and must not pull the widget package and its
   custom-element registration into a server bundle.
 - **Nothing breaks.** The names are added, and the UI SDKs keep every export
-  they have. An app that imports from the UI SDK keeps working, and the CLI
-  scaffolders keep importing from it; moving them is a separate, deliberate
-  change because the Orca patchers are sensitive.
+  they have, so an app that imports from the UI SDK keeps working. The CLI
+  scaffolders for SvelteKit, SolidStart and Qwik Router import the widgets from
+  the framework SDK's `./components` entry, as the Next.js and TanStack Start
+  ones do, and still declare the UI SDK as a direct dependency of the app,
+  because the Svelte and Solid Vite plugins and Qwik's optimizer find the
+  libraries they compile in the app's own `package.json`.
 
 Rules that follow:
 
@@ -169,6 +172,7 @@ Rules that follow:
 | `CreateFlowBodyPurpose` (the type the API client is generated with) | `ZitadelFlowPurpose`, declared in `sdk-core` |
 | `CreateFlow201Step` and `CreateFlow201StepComplete` as the types of an event's `step` and `behavior` | `ZitadelFlowStep` and `ZitadelFlowBehavior`, declared in `sdk-core` |
 | `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelProject`, `ZitadelConfig` from `@zitadel/api/config` | the same names from `@zitadel/sdk-core/config` |
+| the `@zitadel/sdk-tanstack-start/react` widget entry | `@zitadel/sdk-tanstack-start/components`, the name every meta-framework SDK uses |
 | `createNextgenHandle`, `createNextgenOnRequest`, `createNextgenRequestMiddleware`, `createNextgenMiddleware`, `nextgenMiddleware`, `handleNextgenRequest` | `createZitadelHandle`, `createZitadelOnRequest`, `createZitadelRequestMiddleware`, `createZitadelMiddleware`, `zitadelMiddleware`, `handleZitadelRequest` |
 | `NextgenSession` | `ZitadelAuthSession` (`ZitadelSession` is the widget) |
 | `NextgenMiddlewareOptions`, `NextgenProvider`, `NextgenHandle`, `NextgenRequestOptions`, `NextgenRequestDecision` | `ZitadelMiddlewareOptions`, `ZitadelProvider`, `ZitadelHandle`, `ZitadelRequestOptions`, `ZitadelRequestDecision` |

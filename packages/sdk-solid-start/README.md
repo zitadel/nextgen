@@ -126,7 +126,7 @@ export default function Profile() {
 ### 3. Render the login widget
 
 Install the Solid component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-solid-start` is server-only; the widget comes from `@zitadel/sdk-solid`:
+`@zitadel/sdk-solid-start/components` re-exports the widgets of `@zitadel/sdk-solid`, which the app declares as well:
 
 ```bash
 pnpm add @zitadel/sdk-solid@latest
@@ -135,14 +135,14 @@ pnpm add @zitadel/sdk-solid@latest
 Load it with SolidStart's `clientOnly`, so the widget is created in the browser
 with its config in place: its config is set as element properties, which
 server-rendered markup cannot carry. `clientOnly` also keeps
-`@zitadel/sdk-solid`, which registers the custom elements when its module is
+`@zitadel/sdk-solid-start/components`, which registers the custom elements when its module is
 imported, out of the server render:
 
 ```tsx
 import { clientOnly } from '@solidjs/start';
 
 const ZitadelLogin = clientOnly(() =>
-  import('@zitadel/sdk-solid').then((m) => ({ default: m.ZitadelLogin })),
+  import('@zitadel/sdk-solid-start/components').then((m) => ({ default: m.ZitadelLogin })),
 );
 
 export default function Login() {
@@ -167,7 +167,7 @@ way:
 
 ```tsx
 const ZitadelSession = clientOnly(() =>
-  import('@zitadel/sdk-solid').then((m) => ({ default: m.ZitadelSession })),
+  import('@zitadel/sdk-solid-start/components').then((m) => ({ default: m.ZitadelSession })),
 );
 
 export default function Profile() {
@@ -185,11 +185,11 @@ The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
 `onSignout` on `ZitadelLogout` and `ZitadelSession`. To show work-email copy for
 a business audience, pass `locales={businessLocales}`; both come from
-`@zitadel/sdk-solid`, so wrap the widget inside the `clientOnly` loader:
+`@zitadel/sdk-solid-start/components`, so wrap the widget inside the `clientOnly` loader:
 
 ```tsx
 const ZitadelLogin = clientOnly(() =>
-  import('@zitadel/sdk-solid').then(({ ZitadelLogin: Login, businessLocales }) => ({
+  import('@zitadel/sdk-solid-start/components').then(({ ZitadelLogin: Login, businessLocales }) => ({
     default: (props: ComponentProps<typeof Login>) => (
       <Login {...props} locales={businessLocales} />
     ),

@@ -79,7 +79,7 @@ export function indexPageTemplate(): string {
 
 /**
  * A login/register page. Renders the idiomatic `<ZitadelLogin>` Svelte component
- * from `@zitadel/sdk-svelte` (typed props, callback events) behind an `onMount`
+ * from `@zitadel/sdk-sveltekit/components` (the widgets of `@zitadel/sdk-svelte`, re-exported: typed props, callback events) behind an `onMount`
  * guard so the widget only mounts on the client. `configureZitadel` returns the
  * project handle.
  *
@@ -106,7 +106,7 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
   return `<script lang="ts">
   ${ManagedFile.MARKER}
   import { onMount } from "svelte";
-  import { ${importNames} } from "@zitadel/sdk-svelte";${localesComment}
+  import { ${importNames} } from "@zitadel/sdk-sveltekit/components";${localesComment}
 
   const project = configureZitadel({
     projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",
@@ -141,7 +141,7 @@ export function profilePageTemplate(): string {
   return `<script lang="ts">
   ${ManagedFile.MARKER}
   import { onMount } from "svelte";
-  import { ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
+  import { ZitadelSession, configureZitadel } from "@zitadel/sdk-sveltekit/components";
 
   const project = configureZitadel({
     projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",

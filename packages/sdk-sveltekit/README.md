@@ -129,7 +129,7 @@ client-side navigation, where the hook's `locals` are not available.
 ### 4. Render the login widget
 
 Install the Svelte component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-sveltekit` is server-only; the widget comes from `@zitadel/sdk-svelte`:
+`@zitadel/sdk-sveltekit/components` re-exports the widgets of `@zitadel/sdk-svelte`, which the app declares as well:
 
 ```bash
 pnpm add @zitadel/sdk-svelte@latest
@@ -138,7 +138,7 @@ pnpm add @zitadel/sdk-svelte@latest
 ```svelte
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-svelte';
+  import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-sveltekit/components';
 
   const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
@@ -175,7 +175,7 @@ way:
 The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
 `onSignout` on `ZitadelLogout` and `ZitadelSession`. Pass
-`locales={businessLocales}` (exported from `@zitadel/sdk-svelte`) to show
+`locales={businessLocales}` (exported from `@zitadel/sdk-sveltekit/components`) to show
 work-email copy for a business audience.
 
 ## Middleware options

@@ -22,6 +22,9 @@ const SDK_DEPENDENCY = "@zitadel/sdk-solid-start";
  * Solid component (typed props, callback events) rather than the bare element.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-solid";
+// The routes import the widgets from `@zitadel/sdk-solid-start/components`, which re-exports
+// this package. The app still declares it: Solid's Vite plugin finds the Solid libraries to
+// compile from the app's own dependencies.
 
 const VITE_CONFIG_PATHS = configCandidates("vite.config");
 

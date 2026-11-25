@@ -38,7 +38,7 @@
         "$TURBO_ROOT$/packages/sdk-qwik/src/index.tsx",
         "$TURBO_ROOT$/packages/sdk-next/src/client.ts",
         "$TURBO_ROOT$/packages/sdk-nuxt/src/index.ts",
-        "$TURBO_ROOT$/packages/sdk-tanstack-start/src/react.tsx",
+        "$TURBO_ROOT$/packages/sdk-tanstack-start/src/components.tsx",
         "$TURBO_ROOT$/packages/sdk-react/src/index.edge.spec.tsx",
         "$TURBO_ROOT$/packages/sdk-vue/src/index.edge.spec.ts",
         "$TURBO_ROOT$/packages/sdk-angular/src/public-api.edge.spec.ts",
