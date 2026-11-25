@@ -90,7 +90,7 @@ The use-case surface the HTTP handler depends on. Four methods:
 
 | Method | Responsibility |
 |---|---|
-| `Resolve` | Pick the `FlowDefinition` to run from the revisions the release pins. `Name` → direct lookup; otherwise audience-based (`Hint` plumbed through but not yet honored). |
+| `Resolve` | Read the revisions the release pins and let the engine pick the `FlowDefinition` to run: `Name` → the one pinned under it, checked by `flowengine.EntryByName`; otherwise all of them, ranked by `flowengine.EntryByAudience` (`entry_definition.go`). |
 | `Start` | Mint a fresh `flowengine.State`, ask the state machine to bootstrap it, mint and attach `flow_*` and `sess_*` ids. |
 | `Submit` | Load the definition `state.DefinitionID` names, hand the request's `flowengine.Definitions` to `stateMachine.Process`. |
 | `GetStep` | Hand the request's `flowengine.Definitions` to `stateMachine.Render` (no advancement). |

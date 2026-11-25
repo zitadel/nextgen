@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -66,15 +65,11 @@ type ResolveFlowRequest struct {
 	SchemaVersion *string // nil = the revision the release pins
 	AuthRequestID *string
 	// Hint scopes audience resolution (ignored when Name is set); see
-	// flowAudienceScore.
+	// [flowengine.EntryByAudience].
 	Hint ResolveFlowHint
 }
 
-type ResolveFlowHint struct {
-	AppID        *string
-	TeamID       *string
-	UserSchemaID *string
-}
+type ResolveFlowHint = flowengine.EntryHint
 
 func NewFlowService(
 	v2Pool *DB,
@@ -101,9 +96,9 @@ type flowService struct {
 
 var _ FlowService = (*flowService)(nil)
 
-// Resolve picks the definition from the revisions the request's release
-// pins: by name, the one under that handle; by audience, the set scored by
-// flowAudienceScore.
+// Resolve reads the revisions the request's release pins and lets the flow
+// engine choose among them: by name, the one under that handle; by audience,
+// all of them.
 func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Resolve")
 	defer end(&err)
@@ -118,6 +113,7 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 		return nil, domain.ErrFlowDefinitionNotFound().
 			WithMessage("flow definition: the deployed release pins none; deploy a release with a flow")
 	}
+	criteria := flowengine.EntryCriteria{Purpose: req.Purpose, SchemaVersion: req.SchemaVersion, Hint: req.Hint}
 	if req.Name != nil {
 		pin, ok := pinned[*req.Name]
 		if !ok {
@@ -130,13 +126,7 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 			}
 			return nil, err
 		}
-		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
-			return nil, domain.ErrFlowDefinitionNotFound()
-		}
-		if !flowServesPurpose(def, req.Purpose) {
-			return nil, domain.ErrFlowDefinitionPurposeMismatch()
-		}
-		return def, nil
+		return flowengine.EntryByName(def, criteria)
 	}
 
 	revisionIDs := make([]string, 0, len(pinned))
@@ -149,54 +139,7 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 	if err != nil {
 		return nil, err
 	}
-
-	var best *domain.FlowDefinition
-	bestScore := -1
-	for _, def := range result.Items {
-		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
-			continue
-		}
-		if !flowServesPurpose(def, req.Purpose) {
-			continue
-		}
-		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
-			continue
-		}
-		score := flowAudienceScore(def, req.Hint)
-		if score > bestScore || (score == bestScore && flowCreatedAfter(def, best)) {
-			best, bestScore = def, score
-		}
-	}
-	if best == nil {
-		return nil, domain.ErrFlowDefinitionNotFound()
-	}
-	return best, nil
-}
-
-// flowAudienceScore ranks def for the hinted request: 3 for a hinted-app
-// match, 2 for a hinted-team match, 1 for an unscoped (project-wide)
-// definition, 0 for a definition scoped to apps/teams the hint does not
-// identify.
-func flowAudienceScore(def *domain.FlowDefinition, hint ResolveFlowHint) int {
-	switch {
-	case hint.AppID != nil && slices.Contains(def.Audience.AppIDs, *hint.AppID):
-		return 3
-	case hint.TeamID != nil && slices.Contains(def.Audience.TeamIDs, *hint.TeamID):
-		return 2
-	case len(def.Audience.AppIDs) == 0 && len(def.Audience.TeamIDs) == 0:
-		return 1
-	default:
-		return 0
-	}
-}
-
-// flowCreatedAfter reports whether the flow definition `a` was created after `b` (id as the
-// timestamp tie-break).
-func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
-	if !a.CreatedAt.Equal(b.CreatedAt) {
-		return a.CreatedAt.After(b.CreatedAt)
-	}
-	return a.ID > b.ID
+	return flowengine.EntryByAudience(result.Items, criteria)
 }
 
 // resolveFlowSession returns the id of the session the flow runs against:
@@ -406,11 +349,6 @@ func (d *flowDefinitions) Definition(ctx context.Context, id string) (*domain.Fl
 	}
 	d.loaded[id] = def
 	return def, nil
-}
-
-func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
-	_, ok := def.Purposes[purpose]
-	return ok
 }
 
 // attachSignupGate announces the sign-up gate on a step whose next submit

@@ -27,7 +27,8 @@ dispatches to), `action_<kind>.go` (one per action kind's handler),
 submit dispatches to), `challenge.go` (the table of one declaration per
 two-phase ceremony method, which every ceremony is issued and verified
 through), `completion.go` (the one point every completing route passes, which
-asks the completion policy and mints the handoff), `routing.go`, `render.go`,
+asks the completion policy and mints the handoff), `entry_definition.go`
+(which pinned definition a new flow starts on), `routing.go`, `render.go`,
 `back.go`, `fields.go`, `passkey.go` and `sso.go`. Each test file is named after the concern it covers.
 
 The design lives in [docs/design/flowengine](../../../../docs/design/flowengine/).

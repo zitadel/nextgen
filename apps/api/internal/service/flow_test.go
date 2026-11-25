@@ -223,20 +223,6 @@ func TestResolve_NoReleaseIsNotDeployed(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
 }
 
-func TestResolve_ResolveByName_ExactVersion(t *testing.T) {
-	want := newDef("login", "1.2.3", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubGetFlowDefinition(t, want)
-
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, want), service.ResolveFlowRequest{
-		ProjectID:     "proj",
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Name:          new("login"),
-		SchemaVersion: new("1.2.3"),
-	})
-	require.NoError(t, err)
-	assert.Same(t, want, got)
-}
-
 // A newer revision of the same name is not a candidate. The release names the one that serves.
 func TestResolve_ResolveByName_ServesThePinnedRevision(t *testing.T) {
 	older := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
@@ -301,56 +287,6 @@ func TestResolve_ResolveByName_NoPinsSaysTheReleasePinsNone(t *testing.T) {
 	assert.ErrorContains(t, err, "the deployed release pins none")
 }
 
-func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
-	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubGetFlowDefinition(t, def)
-
-	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, def), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeRegister,
-		Name:      new("login"),
-	})
-	assert.ErrorIs(t, err, domain.ErrFlowDefinitionPurposeMismatch())
-}
-
-func TestResolve_ResolveByAudience_ReturnsFirstMatchingPurpose(t *testing.T) {
-	first := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	second := newDef("alt", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{first, second})
-
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, first, second), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-	})
-	require.NoError(t, err)
-	assert.Same(t, first, got, "want first definition")
-}
-
-func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
-	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
-
-	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, def), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeRegister,
-	})
-	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
-}
-
-func TestResolve_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
-	v1 := newDef("login-v1", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	v2 := newDef("login-v2", "2.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2})
-
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, v1, v2), service.ResolveFlowRequest{
-		ProjectID:     "proj",
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		SchemaVersion: new("1.0.0"),
-	})
-	require.NoError(t, err)
-	assert.Same(t, v1, got, "want v1 (exact match)")
-}
-
 func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 	sentinel := errors.New("boom")
 	ctrl := gomock.NewController(t)
@@ -367,130 +303,36 @@ func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 	assert.ErrorIs(t, err, sentinel)
 }
 
-func TestResolve_ResolveByAudience_AppHintOutranksTeamAndDefault(t *testing.T) {
+// The flow engine chooses among the pinned revisions by the request's
+// purpose, version and hint; each one here changes the pick.
+func TestResolve_ChoosesByTheRequestsCriteria(t *testing.T) {
+	login := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	byApp := newDef("by-app", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
-	byTeam := newDef("by-team", "1.0.0", domain.FlowDefinitionAudience{TeamIDs: []string{"team-1"}}, domain.FlowDefinitionPurposeLogin)
-	fallback := newDef("default", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{fallback, byTeam, byApp})
+	v2 := newDef("login-v2", "2.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	svc := service.NewFlowService(stubListFlowDefinitions(t, []*domain.FlowDefinition{login, byApp, v2}), nil, domain.BuiltinSchemaBases{}, nil)
+	ctx := pinnedDefs(t, login, byApp, v2)
 
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, fallback, byTeam, byApp), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{AppID: new("app-1"), TeamID: new("team-1")},
-	})
-	require.NoError(t, err)
-	assert.Same(t, byApp, got, "want the app-scoped definition")
-}
-
-func TestResolve_ResolveByAudience_TeamHintOutranksDefault(t *testing.T) {
-	byTeam := newDef("by-team", "1.0.0", domain.FlowDefinitionAudience{TeamIDs: []string{"team-1"}}, domain.FlowDefinitionPurposeLogin)
-	fallback := newDef("default", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{fallback, byTeam})
-
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, fallback, byTeam), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{TeamID: new("team-1")},
-	})
-	require.NoError(t, err)
-	assert.Same(t, byTeam, got, "want the team-scoped definition")
-}
-
-// A definition scoped to an app must not capture unhinted requests just by
-// being newer — the unscoped project default outranks it.
-func TestResolve_ResolveByAudience_ScopedFlowDoesNotCaptureDefault(t *testing.T) {
-	fallback := newDef("default", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	fallback.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	scoped := newDef("kiosk", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
-	scoped.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{scoped, fallback})
-
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, scoped, fallback), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-	})
-	require.NoError(t, err)
-	assert.Same(t, fallback, got, "want the unscoped default")
-}
-
-// Hints are routing suggestions, not a security boundary: when only scoped
-// definitions exist and none matches the hint, resolution still succeeds
-// rather than failing the login.
-func TestResolve_ResolveByAudience_UnmatchedHintFallsBackToScoped(t *testing.T) {
-	scoped := newDef("kiosk", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{scoped})
-
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, scoped), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{AppID: new("app-2")},
-	})
-	require.NoError(t, err)
-	assert.Same(t, scoped, got, "want the only remaining definition")
-}
-
-func TestResolve_ResolveByAudience_UserSchemaHintFilters(t *testing.T) {
-	human := newDef("human", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	human.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
-	machine := newDef("machine", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	machine.UserSchema = *testMachineSchema.ObjectType
-	machine.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{human, machine})
-
-	svc := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil)
-	ctx := pinnedDefs(t, human, machine)
 	got, err := svc.Resolve(ctx, service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{UserSchemaID: testMachineSchema.ObjectType},
+		ProjectID:     "proj",
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		SchemaVersion: new("1.0.0"),
+		Hint:          service.ResolveFlowHint{AppID: new("app-1")},
 	})
 	require.NoError(t, err)
-	assert.Same(t, machine, got, "want the machine-schema definition despite being older")
+	assert.Same(t, byApp, got)
 
-	_, err = svc.Resolve(ctx, service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{UserSchemaID: new("visitor")},
-	})
-	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound(), "unmatched schema hint")
-}
+	got, err = svc.Resolve(ctx, service.ResolveFlowRequest{ProjectID: "proj", Purpose: domain.FlowDefinitionPurposeLogin, SchemaVersion: new("2.0.0")})
+	require.NoError(t, err)
+	assert.Same(t, v2, got)
 
-func TestResolve_ResolveByAudience_NoHintPicksNewestDeterministically(t *testing.T) {
-	older := newDef("older", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	older.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	newer := newDef("newer", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	newer.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	_, err = svc.Resolve(ctx, service.ResolveFlowRequest{ProjectID: "proj", Purpose: domain.FlowDefinitionPurposeRegister})
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
 
-	// Both list orders yield the same pick — the newest definition.
-	for _, defs := range [][]*domain.FlowDefinition{{older, newer}, {newer, older}} {
-		repo := stubListFlowDefinitions(t, defs)
-		got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, older, newer), service.ResolveFlowRequest{
-			ProjectID: "proj",
-			Purpose:   domain.FlowDefinitionPurposeLogin,
-		})
-		require.NoError(t, err)
-		assert.Same(t, newer, got, "want the newest definition")
-	}
-}
-
-// Colliding created_at timestamps (one bulk apply writing several flows)
-// still yield a stable pick: the higher id wins.
-func TestResolve_ResolveByAudience_TimestampCollisionBreaksOnID(t *testing.T) {
-	at := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
-	a := newDef("aaa", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	a.CreatedAt = at
-	b := newDef("bbb", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	b.CreatedAt = at
-
-	for _, defs := range [][]*domain.FlowDefinition{{a, b}, {b, a}} {
-		repo := stubListFlowDefinitions(t, defs)
-		got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}, nil).Resolve(pinnedDefs(t, a, b), service.ResolveFlowRequest{
-			ProjectID: "proj",
-			Purpose:   domain.FlowDefinitionPurposeLogin,
-		})
-		require.NoError(t, err)
-		assert.Same(t, b, got, "want the definition with the higher id")
-	}
+	byName := service.NewFlowService(stubGetFlowDefinition(t, login), nil, domain.BuiltinSchemaBases{}, nil)
+	_, err = byName.Resolve(pinnedDefs(t, login), service.ResolveFlowRequest{ProjectID: "proj", Purpose: domain.FlowDefinitionPurposeRegister, Name: new("login")})
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionPurposeMismatch())
+	_, err = byName.Resolve(pinnedDefs(t, login), service.ResolveFlowRequest{ProjectID: "proj", Purpose: domain.FlowDefinitionPurposeLogin, Name: new("login"), SchemaVersion: new("2.0.0")})
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
 }
 
 // fakeStateMachine captures inputs and returns pre-loaded results.
