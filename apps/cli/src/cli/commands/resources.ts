@@ -2,6 +2,7 @@ import type { Interfaces } from "@oclif/core";
 import { isVariableReference } from "@zitadel/config/idp";
 
 import {
+  BackendNotFoundError,
   BrandingService,
   FlowService,
   PolicyService,
@@ -66,6 +67,7 @@ import {
 } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
 import type { LooseArgs } from "@/lib/suggestion";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import {
   buildResourceCommands,
   type CreateSpec,
@@ -85,6 +87,18 @@ import { CommandGroups } from "@/cli/commands/groups";
 import type { Tabulate } from "@/cli/core/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
 import { Telemetered } from "@/cli/telemetry/telemetered";
+
+const SCHEMA_NOT_FOUND_REFUSAL = {
+  code: "E_NOT_FOUND",
+  message: "{message}",
+  hint: "Run `schema list` to see the object types this project has.",
+} as const satisfies Refusal;
+
+const FLOW_NOT_FOUND_REFUSAL = {
+  code: "E_NOT_FOUND",
+  message: "{message}",
+  hint: "Run `flow-definition list` to see the flows this project has.",
+} as const satisfies Refusal;
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
 const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
@@ -983,9 +997,18 @@ export const RESOURCES = {
     }),
     get: get({
       response: GetSchemaResponse,
-      call: ({ client, projectId }, reference) => {
+      call: async ({ client, projectId }, reference) => {
         const schemaService = new SchemaService(client, projectId);
-        return schemaService.get(reference);
+        try {
+          return await schemaService.get(reference);
+        } catch (error) {
+          if (error instanceof BackendNotFoundError) {
+            throw refusalError(SCHEMA_NOT_FOUND_REFUSAL, {
+              message: error.message,
+            });
+          }
+          throw error;
+        }
       },
     }),
   }),
@@ -1072,9 +1095,18 @@ export const RESOURCES = {
     }),
     get: get({
       response: GetFlowDefinitionResponse,
-      call: ({ client, projectId }, reference) => {
+      call: async ({ client, projectId }, reference) => {
         const flowService = new FlowService(client, projectId);
-        return flowService.get(reference);
+        try {
+          return await flowService.get(reference);
+        } catch (error) {
+          if (error instanceof BackendNotFoundError) {
+            throw refusalError(FLOW_NOT_FOUND_REFUSAL, {
+              message: error.message,
+            });
+          }
+          throw error;
+        }
       },
     }),
   }),

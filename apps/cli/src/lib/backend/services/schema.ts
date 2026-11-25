@@ -124,9 +124,7 @@ export class SchemaService extends ApiService {
     });
     const current = first.items[0];
     if (current === undefined) {
-      throw new BackendNotFoundError(`No schema named "${reference}"`, {
-        hint: "Run `schema list` to see the object types this project has.",
-      });
+      throw new BackendNotFoundError(`No schema named "${reference}"`);
     }
     return current;
   }

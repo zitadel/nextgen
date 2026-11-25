@@ -403,12 +403,7 @@ export class VariableService extends ApiService {
     });
     const value = response[kind];
     if (value === undefined) {
-      throw new BackendNotFoundError(`Variable ${name} has no ${kind} value.`, {
-        hint:
-          kind === "preview"
-            ? "A name has a preview value only once one is set with `--preview`."
-            : "Set one with `variable set`.",
-      });
+      throw new BackendNotFoundError(`Variable ${name} has no ${kind} value.`);
     }
     return Variable.of(name, value);
   }

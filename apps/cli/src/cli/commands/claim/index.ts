@@ -3,6 +3,7 @@ import pRetry, { AbortError } from "p-retry";
 import { z } from "zod";
 
 import { ClaimService } from "@/lib/backend";
+import { EnvironmentValueMissingError, EnvironmentValueUnboundError } from "@/lib/environment";
 import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
@@ -21,6 +22,21 @@ import { Project } from "@/lib/project";
 import { Spelling } from "@/lib/suggestion";
 import { ChangeCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
+
+/** How a value set in no source is refused when its environment has a project to add it to. */
+const VALUE_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: "{hint} Set {key} in {file} or the process environment.",
+  details: "{details}",
+} as const satisfies Refusal;
+
+/** How a value set in no source is refused when its environment has no project at all. */
+const VALUE_MISSING_UNBOUND_REFUSAL = {
+  message: "{message}",
+  hint: "{hint} Set {key} in {boundFile} or the process environment, or run `zitadel env add {environment}`.",
+  details: "{details}",
+  next: ["{next}"],
+} as const satisfies Refusal;
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -410,17 +426,66 @@ export default class Claim extends Telemetered(ChangeCommand) {
             id: "claim",
             flags: { noOpen: flags.noOpen, timeout: flags.timeout },
           });
-    const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
-    const localSecret = (await Project.at(this.cwd).hasSecret())
-      ? await Project.at(this.cwd).secret()
-      : undefined;
-    const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
+    try {
+      const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
+      const localSecret = (await Project.at(this.cwd).hasSecret())
+        ? await Project.at(this.cwd).secret()
+        : undefined;
+      const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
 
-    return {
-      startOver,
-      projectId,
-      localRecord,
-    };
+      return {
+        startOver,
+        projectId,
+        localRecord,
+      };
+    } catch (error) {
+      if (error instanceof EnvironmentValueUnboundError) {
+        // Run in the directory this run addressed, which need not be the
+        // shell's: `setup` and `env add` both write their files there.
+        const elsewhere =
+          this.cwd === process.cwd()
+            ? {}
+            : {
+                cwd: this.cwd,
+              };
+        throw refusalError(
+          VALUE_MISSING_UNBOUND_REFUSAL,
+          {
+            message: error.message,
+            hint: error.hint ?? "",
+            key: error.key,
+            boundFile: error.boundFile,
+            environment: error.environment,
+            details: error.details ?? null,
+          },
+          {
+            next:
+              this.environment.name.value === "development"
+                ? {
+                    id: "setup",
+                    flags: elsewhere,
+                  }
+                : {
+                    id: "env:add",
+                    args: {
+                      name: this.environment.name.value,
+                    },
+                    flags: elsewhere,
+                  },
+          },
+        );
+      }
+      if (error instanceof EnvironmentValueMissingError) {
+        throw refusalError(VALUE_MISSING_REFUSAL, {
+          message: error.message,
+          hint: error.hint ?? "",
+          key: error.key,
+          file: error.file ?? error.boundFile,
+          details: error.details ?? null,
+        });
+      }
+      throw error;
+    }
   }
 
   /**

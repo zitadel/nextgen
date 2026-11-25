@@ -29,7 +29,7 @@ export {
   BackendRejectedError,
   BackendUnauthorizedError,
   BackendUnavailableError,
-  type BackendUnavailableReason,
+  type UnavailableReason,
 } from "./errors";
 export {
   type AttemptFactor,

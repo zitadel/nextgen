@@ -99,7 +99,6 @@ describe("SchemaService.get", () => {
     ).rejects.toMatchObject({
       name: "BackendNotFoundError",
       message: 'No schema named "typo"',
-      hint: "Run `schema list` to see the object types this project has.",
     });
   });
 

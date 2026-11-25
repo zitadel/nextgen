@@ -56,31 +56,6 @@ export abstract class ConsentError extends Error {
 }
 
 /**
- * Nobody can be asked and consent was not given in advance, so the action is
- * refused: only a person may agree to it.
- */
-export class ConsentRequiredError extends ConsentError {
-  override readonly category = "conflict";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_CONFIRMATION_REQUIRED";
-
-  /**
-   * Make the failure.
-   *
-   * @param action - The action as a lowercase phrase.
-   * @param question - The question a person would have been asked.
-   */
-  constructor(action: string, question: string) {
-    super(`Cannot ${action} without --force in non-interactive mode`, {
-      hint: question,
-      details: {
-        question,
-      },
-    });
-  }
-}
-
-/**
  * A bug in this package: something that cannot happen unless the code is wrong.
  */
 export class ConsentInternalError extends ConsentError {

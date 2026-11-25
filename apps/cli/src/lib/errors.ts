@@ -7,7 +7,7 @@ import {
   BackendNotFoundError,
   BackendUnauthorizedError,
   BackendUnavailableError,
-  type BackendUnavailableReason,
+  type UnavailableReason,
 } from "./backend";
 import { ConsentError } from "./consent";
 import { EnvironmentError } from "./environment";
@@ -204,7 +204,7 @@ export class PromptCancelled extends ZitadelError {
 }
 
 /** What to do about a request that got no usable response, by its reason. */
-const NETWORK_HINTS: Record<BackendUnavailableReason, string> = {
+const NETWORK_HINTS: Record<UnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
   timeout:
     "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",

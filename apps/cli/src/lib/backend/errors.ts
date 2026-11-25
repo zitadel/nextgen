@@ -137,13 +137,13 @@ export class BackendForbiddenError extends BackendError {
 }
 
 /** Why a request got no usable response. */
-export type BackendUnavailableReason = "unreachable" | "unreadable" | "timeout";
+export type UnavailableReason = "unreachable" | "unreadable" | "timeout";
 
 /** What a {@link BackendUnavailableError} carries beyond a {@link BackendError}. */
-export type BackendUnavailableErrorOptions = BackendErrorOptions &
+export type UnavailableErrorOptions = BackendErrorOptions &
   Readonly<{
     /** Why no response came, when none did. */
-    reason?: BackendUnavailableReason | undefined;
+    reason?: UnavailableReason | undefined;
   }>;
 
 /** The server could not be used: it did not answer, or it failed with a `5xx`. */
@@ -152,9 +152,9 @@ export class BackendUnavailableError extends BackendError {
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 
-  readonly reason: BackendUnavailableReason | undefined;
+  readonly reason: UnavailableReason | undefined;
 
-  constructor(message: string, options: BackendUnavailableErrorOptions = {}) {
+  constructor(message: string, options: UnavailableErrorOptions = {}) {
     super(message, options);
     this.reason = options.reason;
   }

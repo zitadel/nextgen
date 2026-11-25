@@ -254,7 +254,7 @@ export class Operation {
         throw new BackendOperationAmbiguousError(
           `${operation.id} is ${operation.method} ${operation.path}, not ${wanted}`,
           {
-            hint: `Leave out -X, or pass -X ${operation.method}.`,
+            hint: operation.method,
           },
         );
       }
@@ -350,10 +350,7 @@ export class Operation {
         return candidate.id;
       });
     throw new BackendOperationUnknownError(`No operation is called ${ref}`, {
-      hint:
-        near.length > 0
-          ? `Did you mean ${near.slice(0, 5).join(", ")}? List them all with \`zitadel api ls\`.`
-          : "List them with `zitadel api ls`, or give a path such as /users/query.",
+      hint: near.length > 0 ? `Did you mean ${near.slice(0, 5).join(", ")}?` : undefined,
     });
   }
 
@@ -390,9 +387,7 @@ export class Operation {
       return candidate.match?.literals === best;
     });
     if (template?.match === undefined) {
-      throw new BackendOperationUnknownError(`No operation has the path ${path}`, {
-        hint: "List the paths with `zitadel api ls`.",
-      });
+      throw new BackendOperationUnknownError(`No operation has the path ${path}`);
     }
     const methods = operations.filter((record) => {
       return record.path === template.record.path;
@@ -409,7 +404,7 @@ export class Operation {
           ? `${template.record.path} takes ${offered}; say which with -X`
           : `${template.record.path} takes ${offered}, not ${method}`,
         {
-          hint: `Pass -X with one of ${offered}.`,
+          hint: offered,
         },
       );
     }
