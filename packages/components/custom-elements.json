@@ -5840,8 +5840,16 @@
               "type": {
                 "text": "CreateFlowBody"
               }
+            },
+            {
+              "name": "release",
+              "optional": true,
+              "type": {
+                "text": "string"
+              }
             }
-          ]
+          ],
+          "description": "Starts a flow. `release` pins it to the release the bundle was built\nagainst (`X-Zitadel-Release`), sent as given: the server judges the value\nand serves it only when it was deployed to the page's origin."
         },
         {
           "kind": "function",
@@ -8292,6 +8300,30 @@
             },
             {
               "kind": "field",
+              "name": "release",
+              "type": {
+                "text": "string"
+              },
+              "default": "\"\"",
+              "description": "The release this bundle was built against, as `zitadel deploy` or\n`zitadel preview` printed it, sent as `X-Zitadel-Release` when the flow\nstarts. The server serves it only when it was deployed to this page's\norigin and is not revoked; it never deploys one. Unset, the origin's\nnewest deployment is served. A `project` handle or `configureZitadel()`\ncarries its own `release` instead.",
+              "attribute": "release"
+            },
+            {
+              "kind": "field",
+              "name": "projectAttrs",
+              "type": {
+                "text": "ProjectAttrs"
+              },
+              "privacy": "protected",
+              "description": "Declarative config read from this element's attributes, the pin included.",
+              "readonly": true,
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "kind": "field",
               "name": "postSignInUrl",
               "type": {
                 "text": "string"
@@ -9395,20 +9427,6 @@
                 "name": "ZitadelConfigured",
                 "module": "src/orchestrator/surface.ts"
               }
-            },
-            {
-              "kind": "field",
-              "name": "projectAttrs",
-              "type": {
-                "text": "ProjectAttrs"
-              },
-              "privacy": "protected",
-              "description": "Declarative config read from this element's attributes.",
-              "readonly": true,
-              "inheritedFrom": {
-                "name": "ZitadelConfigured",
-                "module": "src/orchestrator/surface.ts"
-              }
             }
           ],
           "events": [
@@ -9465,6 +9483,15 @@
               "default": "\"\"",
               "description": "Name of the flow definition to run, matching the `name` in its flow\nfile. When set, the server resolves that definition directly instead\nof picking one by audience. Omit to run the project's default flow.",
               "fieldName": "flowName"
+            },
+            {
+              "name": "release",
+              "type": {
+                "text": "string"
+              },
+              "default": "\"\"",
+              "description": "The release this bundle was built against, as `zitadel deploy` or\n`zitadel preview` printed it, sent as `X-Zitadel-Release` when the flow\nstarts. The server serves it only when it was deployed to this page's\norigin and is not revoked; it never deploys one. Unset, the origin's\nnewest deployment is served. A `project` handle or `configureZitadel()`\ncarries its own `release` instead.",
+              "fieldName": "release"
             },
             {
               "name": "post-sign-in-url",
