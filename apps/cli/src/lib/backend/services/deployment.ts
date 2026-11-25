@@ -563,7 +563,7 @@ export class DeploymentService extends ApiService {
       if (!(error instanceof BackendConflictError)) {
         throw error;
       }
-      if (error.serverCode === "rel.revoked") {
+      if (error.isServerCode("rel.revoked")) {
         return {
           outcome: "revoked",
         };

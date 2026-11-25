@@ -189,6 +189,20 @@ describe("responseFailure", () => {
     ).toBe("rel.revoked");
   });
 
+  it("tells whether the server answered with one code", () => {
+    const error = responseFailure(
+      409,
+      "http://localhost:8080/p",
+      { code: "rel.revoked" },
+      "refused",
+    );
+
+    expect([error.isServerCode("rel.revoked"), error.isServerCode("rel.in_use")]).toEqual([
+      true,
+      false,
+    ]);
+  });
+
   it("reads no code off a body that is not the platform's error envelope", () => {
     expect(
       responseFailure(502, "http://localhost:8080/p", "<html>proxy</html>", "refused").serverCode,

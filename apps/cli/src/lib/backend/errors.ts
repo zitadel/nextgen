@@ -87,6 +87,17 @@ export class BackendError extends Error implements Categorized {
   get serverCode(): string | undefined {
     return apiErrorCode(this.body);
   }
+
+  /**
+   * Whether the server answered with `code`, the one test a caller may add to
+   * the class for a condition the server defines no category for.
+   *
+   * @param code - A server code, such as `rel.in_use`.
+   * @returns True when the answer carried exactly that code.
+   */
+  isServerCode(code: string): boolean {
+    return this.serverCode === code;
+  }
 }
 
 /** Something that is not there: a `404`, or a name that matches nothing. */

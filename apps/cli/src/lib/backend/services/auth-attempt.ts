@@ -98,7 +98,7 @@ export class AuthAttemptService extends ApiService {
         outcome: "proved",
       };
     } catch (error) {
-      if (error instanceof BackendError && error.serverCode === "att.proof_rejected") {
+      if (error instanceof BackendError && error.isServerCode("att.proof_rejected")) {
         return {
           outcome: "rejected",
           cause: error,

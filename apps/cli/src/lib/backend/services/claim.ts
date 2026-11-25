@@ -133,7 +133,7 @@ export class ClaimService extends ApiService {
       if (!(error instanceof BackendError)) {
         throw error;
       }
-      if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
+      if (error.status === 410 && error.isServerCode("proj.claim_window_expired")) {
         return {
           outcome: "window-expired",
         };
@@ -175,7 +175,7 @@ export class ClaimService extends ApiService {
       if (!(error instanceof BackendError)) {
         throw error;
       }
-      if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
+      if (error.status === 410 && error.isServerCode("proj.claim_window_expired")) {
         return {
           outcome: "window-expired",
         };
@@ -185,7 +185,7 @@ export class ClaimService extends ApiService {
           outcome: "expired",
         };
       }
-      if (error.status === 404 && error.serverCode === "claim_challenge.not_found") {
+      if (error.status === 404 && error.isServerCode("claim_challenge.not_found")) {
         return {
           outcome: "not-found",
         };

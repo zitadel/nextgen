@@ -170,7 +170,7 @@ export class ReleaseService extends ApiService {
       });
       return { outcome: "revoked", release };
     } catch (error) {
-      if (error instanceof BackendConflictError && error.serverCode === "rel.in_use") {
+      if (error instanceof BackendConflictError && error.isServerCode("rel.in_use")) {
         const served = InUseBody.safeParse(error.body);
         if (served.success) {
           return { outcome: "in-use", origins: served.data.details.origins };
