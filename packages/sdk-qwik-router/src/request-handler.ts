@@ -18,103 +18,138 @@ import {
 } from "@zitadel/sdk-core/middleware";
 
 /**
- * `process` is undefined in some edge/serverless runtimes; read env defensively
- * so the `process.env` fallback never throws a ReferenceError (Qwik Router's
- * `ev.env` is the primary source).
+ * The process environment, or an empty map when there is none.
+ *
+ * `process` is undefined in some edge and serverless runtimes, so the environment is read
+ * defensively. That way the `process.env` fallback never throws a `ReferenceError`. The Qwik
+ * Router environment getter ({@link QwikRequestEvent.env}) is the primary source; this is only
+ * the fallback.
  */
 const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
 
 /**
- * A cookie as Qwik Router's `ev.cookie.get` returns it.
+ * A cookie as `ev.cookie.get` of Qwik Router returns it.
  *
- * Only the `value` is declared because it is the only field this handler
- * reads; the real Qwik Router cookie object has more, and is structurally
- * assignable to this one.
+ * Only the value is declared because it is the only field the handler reads. The real Qwik
+ * Router cookie object has more fields and is structurally assignable to this type, so you never
+ * build one yourself.
  */
 export interface QwikCookieValue {
   /**
-   * The cookie's decoded value, as sent by the browser or set earlier in the
-   * same request.
+   * The decoded value of the cookie, as sent by the browser or set earlier in the same request.
    */
   readonly value: string;
 }
 
 /**
- * The options of `ev.cookie.set` this handler passes when it applies the
- * session cookies a verdict asks for (see {@link createNextgenOnRequest}).
+ * The options of `ev.cookie.set` that the handler passes when it applies the session cookies a
+ * verdict asks for.
  *
- * The handler always sets `path: "/"`, `httpOnly: true` and `sameSite: "lax"`,
- * so the session cookie is never readable from page scripts and is sent on
- * top-level navigations back to the app.
+ * The handler always sets `path: "/"`, `httpOnly: true` and `sameSite: "lax"`, so the session
+ * cookie is never readable from page scripts and is still sent on a top-level navigation back
+ * to the app, for example the redirect from an identity provider. You never build this type; it
+ * documents what {@link createNextgenMiddleware} writes. Only `secure` and `maxAge` vary, and
+ * both come from the session verdict.
  */
 export interface QwikCookieOptions {
   /**
-   * The path the cookie applies to. The handler always passes `"/"` so every
-   * route of the app sees the session.
+   * The path the cookie applies to.
+   *
+   * The handler always passes `"/"`, so every route of the app sees the session.
    */
   readonly path?: string;
   /**
-   * Hides the cookie from `document.cookie`. The handler always passes
-   * `true`: the browser never needs to read the session token.
+   * Whether the cookie is hidden from `document.cookie`.
+   *
+   * The handler always passes `true`: the browser never needs to read the session token, and
+   * keeping it away from page scripts limits what a script injection can steal.
    */
   readonly httpOnly?: boolean;
   /**
-   * The `SameSite` policy. The handler always passes `"lax"`, which keeps the
-   * cookie on the redirect back from an identity provider.
+   * The `SameSite` policy of the cookie.
+   *
+   * The handler always passes `"lax"`, which keeps the cookie on the top-level redirect back
+   * from an identity provider and still withholds it from cross-site subrequests.
    */
   readonly sameSite?: "lax";
   /**
-   * Restricts the cookie to HTTPS. Set from the verdict, so it follows the
-   * scheme the app is served on.
+   * Whether the cookie is restricted to HTTPS.
+   *
+   * The handler takes this from the session verdict, so it follows the scheme the app is served
+   * on, and a plain HTTP development server still receives its cookie.
    */
   readonly secure?: boolean;
   /**
-   * Lifetime in seconds. Omitted for a session cookie that lives until the
-   * browser closes.
+   * The lifetime of the cookie in seconds.
+   *
+   * The handler omits it for a browser-session cookie that lives until the browser closes. A
+   * verdict that asks for a lifetime of `0` is applied as a deletion instead of a `set`.
    */
   readonly maxAge?: number;
 }
 
 /**
- * The slice of Qwik Router's `RequestEvent` this handler reads.
+ * The slice of the Qwik Router `RequestEvent` that the handler reads.
  *
- * `@qwik.dev/router` is a peer, not a runtime dependency: typing only the
- * handful of fields the handler touches keeps the built output free of a Qwik
- * import, the same way `sdk-nuxt` shims Nuxt's `#imports`. The shape is
- * structurally compatible with the real `RequestEvent` (a type-level test
- * asserts it), so the returned handler drops straight into
- * `export const onRequest = createNextgenOnRequest(...)`.
+ * `@qwik.dev/router` is a peer dependency, not a runtime dependency. Typing only the handful of
+ * fields the handler touches keeps the built output free of a Qwik import, the same way
+ * `sdk-nuxt` shims the imports of Nuxt. The shape is structurally compatible with the real
+ * `RequestEvent` (a type-level test asserts it), so the handler that
+ * {@link createNextgenMiddleware} returns drops straight into an `onRequest` export. You never
+ * build one; Qwik passes the real event. Use this type only to type a test double for the
+ * handler.
+ *
+ * @example
+ * ```ts
+ * import type { QwikRequestEvent } from "@zitadel/sdk-qwik-router/server";
+ *
+ * function clientAddress(ev: Pick<QwikRequestEvent, "clientConn">): string | undefined {
+ *   return ev.clientConn.ip;
+ * }
+ * ```
  */
 export interface QwikRequestEvent {
-  /** The incoming request: its headers, cookies and body are what the handler judges or proxies. */
+  /**
+   * The incoming request.
+   *
+   * Its headers, cookies and body are what the handler judges or proxies.
+   */
   readonly request: Request;
   /**
-   * The parsed request URL. Its `pathname` decides whether the request is
-   * ignored, proxied or checked, and its host and protocol become the
-   * `X-Forwarded-*` headers on a proxied request.
+   * The parsed request URL.
+   *
+   * Its `pathname` decides whether the request is ignored, proxied or checked. Its host and
+   * protocol become the `X-Forwarded-Host` and `X-Forwarded-Proto` headers of a proxied request
+   * when the incoming request does not already carry them.
    */
   readonly url: URL;
   /**
-   * Per-request storage shared with loaders, actions and endpoints. The
-   * handler stores the auth result here for {@link getAuth} to read.
+   * The per-request storage shared with loaders, actions and endpoints.
+   *
+   * The handler stores the auth result here under a fixed key for {@link getAuth} to read. The
+   * map lives for one request only, so nothing in it outlives the response.
    */
   readonly sharedMap: Map<string, unknown>;
   /**
-   * What the platform adapter knows about the connection.
+   * The facts the platform adapter knows about the connection.
    */
   readonly clientConn: {
     /**
-     * The client's IP address, appended to `X-Forwarded-For` on a proxied
-     * request so the auth server sees the real client. Absent when the
-     * adapter cannot tell.
+     * The IP address of the client.
+     *
+     * The handler appends it to `X-Forwarded-For` on a proxied request, after any chain already
+     * present, so the auth server sees the real client. It is `undefined` when the adapter
+     * cannot tell, and then the header is left as received.
      */
     readonly ip?: string;
   };
   /**
-   * Qwik Router's cookie jar. The handler reads the session cookie from it and
-   * writes or deletes the session cookies a verdict asks for; Qwik applies the
-   * changes to whichever response goes out.
+   * The cookie jar of Qwik Router.
+   *
+   * The handler reads the session cookie from it and writes or deletes the session cookies that
+   * a verdict asks for. Qwik applies the changes to whichever response goes out, including a
+   * redirect the handler throws.
    */
   readonly cookie: {
     /**
@@ -139,8 +174,10 @@ export interface QwikRequestEvent {
      */
     set(name: string, value: string, options?: QwikCookieOptions): void;
     /**
-     * Expires a cookie on the outgoing response. Used for a session the backend
-     * reports dead, so the browser stops replaying it.
+     * Expires a cookie on the outgoing response.
+     *
+     * The handler uses it for a session that the backend reports dead, so the browser stops
+     * replaying it and every replay stops costing a backend session check.
      *
      * @param name - The cookie name.
      * @param options - The `path` the cookie was set on.
@@ -148,21 +185,29 @@ export interface QwikRequestEvent {
     delete(name: string, options?: { path?: string }): void;
   };
   /**
-   * The headers of the response that goes out, a redirect this handler throws
-   * included. Optional so that unit-test mocks need not stub it.
+   * The headers of the response that goes out, including those of a redirect the handler throws.
+   *
+   * The handler sets `cache-control: private, no-store` here whenever it writes or clears a
+   * session cookie, the same value the Zitadel server sends on its own session answers, so a
+   * shared cache never hands one visitor's cookie, or its clearing, to the next visitor. It is
+   * optional only so that unit-test doubles need not stub it; when it is absent the header is
+   * not set.
    */
   readonly headers?: Headers;
   /**
-   * Sends a custom response and ends the chain. The handler uses it for the
-   * proxied answer, a `400` for a forged internal header and a `503` when the
-   * session cannot be judged.
+   * Sends a custom response and ends the request chain.
+   *
+   * The handler uses it for the proxied answer, for a `400` when the request carries the
+   * internal auth header, and for a `503` when a protected route's session cannot be judged.
    *
    * @param response - The response to send.
    */
   send(response: Response): void;
   /**
-   * Returns a redirect marker to be thrown. The handler throws it to send an
-   * unauthenticated visitor of a protected route to the login page.
+   * Returns a redirect marker for the caller to throw.
+   *
+   * The handler throws it to send an unauthenticated visitor of a protected route to the login
+   * page.
    *
    * @param statusCode - The HTTP redirect status.
    * @param url - The target, always a path on this app.
@@ -170,11 +215,14 @@ export interface QwikRequestEvent {
    */
   redirect(statusCode: number, url: string): unknown;
   /**
-   * Qwik Router's platform env getter. This is how server env reaches the
-   * handler: Vite/Qwik load `.env`/`.env.local` into `ev.env`, NOT into
-   * `process.env`, so `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET` are read here
-   * (mirroring SvelteKit's `$env/dynamic/private`). Optional so unit-test mocks
-   * that exercise only the auth path need not stub it.
+   * The platform environment getter of Qwik Router.
+   *
+   * This is how server environment reaches the handler. Vite and Qwik load `.env` and
+   * `.env.local` into this getter, not into `process.env`, so the handler reads `ZITADEL_URL`,
+   * `ZITADEL_PROJECT_SECRET` and the project id here first and falls back to `process.env` only
+   * for production adapters that set it. This mirrors how SvelteKit reads
+   * `$env/dynamic/private`. It is optional only so that unit-test doubles that exercise only the
+   * auth path need not stub it; the history records no other reason.
    */
   readonly env?: {
     /**
@@ -187,7 +235,15 @@ export interface QwikRequestEvent {
   };
 }
 
-/** Parses a `Cookie` request header into a name→value map. */
+/**
+ * Parses a `Cookie` request header into a map from cookie name to value.
+ *
+ * Entries without an `=` or with an empty name are skipped. It is the fallback for a cookie that
+ * the Qwik cookie jar does not report.
+ *
+ * @param header - The raw `Cookie` header, or `null` when the request has none.
+ * @returns The cookies keyed by name; empty when the header is absent.
+ */
 function parseCookieHeader(header: string | null): Map<string, string> {
   const jar = new Map<string, string>();
   if (!header) return jar;
@@ -202,10 +258,15 @@ function parseCookieHeader(header: string | null): Map<string, string> {
 }
 
 /**
- * Builds the upstream request headers: copies all incoming headers, drops
- * hop-by-hop and SDK-internal headers, and sets `X-Forwarded-*` so the auth
- * server sees the real client origin. The client IP comes from
- * `ev.clientConn.ip` (or any existing `X-Forwarded-For` chain).
+ * Builds the headers of the upstream request.
+ *
+ * It copies all incoming headers, drops the hop-by-hop headers and the headers that are internal
+ * to the SDK, and sets `X-Forwarded-Host` and `X-Forwarded-Proto` when they are missing, so the
+ * auth server sees the real client origin. The client IP comes from
+ * {@link QwikRequestEvent.clientConn} and is appended to any existing `X-Forwarded-For` chain.
+ *
+ * @param ev - The current request event.
+ * @returns The headers to send to the auth backend.
  */
 function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
   const headers = new Headers();
@@ -235,11 +296,30 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend and returns the
- * upstream response, including its `Set-Cookie` headers. Hop-by-hop headers are
- * stripped in both directions, a `location` is kept only as a redirect onto this
- * app, and the session cookie travels under this project's name in the browser
- * and the server's name upstream ({@link proxySessionCookies}).
+ * Forwards a request under the proxy path to the auth backend and returns its response.
+ *
+ * The response keeps its `Set-Cookie` headers. Hop-by-hop headers are stripped in both
+ * directions, and a `location` header is kept only when it is a redirect onto this app, so the
+ * backend cannot send the browser to another origin. The session cookie travels under the name
+ * of this project in the browser and under the name of the server upstream. The project secret
+ * is attached as a bearer only on the session handoff exchange, because attaching it to every
+ * operation would turn this public boundary into an open relay with project authority; a
+ * credential supplied by the caller is preserved. Redirects are not followed, so the browser
+ * sees them. The target is built by joining the backend URL and the path, so a trailing slash on
+ * the configured backend URL is harmless; plain concatenation used to produce a double slash and
+ * an issuer mismatch on every token. Another project's session cookie is never forwarded
+ * upstream: the cookie of this project is sent under the name the server expects.
+ *
+ * @param ev - The current request event.
+ * @param authUrl - The base URL of the auth backend.
+ * @param proxyPath - The same-origin proxy path, stripped from the request path before forwarding.
+ * @param projectId - The project id the session cookie is scoped to, or `undefined` when none is
+ *   configured.
+ * @param projectSecret - The project secret, or `undefined` when none is configured.
+ * @param proxyTimeoutMs - The time in milliseconds after which the upstream call is aborted.
+ * @returns The response to send to the browser.
+ * @throws The `TimeoutError` of `AbortSignal.timeout` when the backend does not answer within
+ *   `proxyTimeoutMs`, and the network error of `fetch` when it is unreachable.
  */
 async function proxyResponse(
   ev: QwikRequestEvent,
@@ -312,24 +392,50 @@ async function proxyResponse(
   });
 }
 
-/** Key under which the auth result is stored on `ev.sharedMap`. */
+/**
+ * The key under which the auth result is stored on {@link QwikRequestEvent.sharedMap}.
+ */
 const SHARED_MAP_KEY = "nextgenAuth";
 
 /**
- * The route policy, plus what the shared {@link resolveSession} judges the
- * session by.
+ * The route policy, plus what the shared session resolution judges the session by.
  */
 interface AuthHandlerOptions extends ResolveSessionOptions {
+  /**
+   * The route patterns that require a signed-in session.
+   */
   readonly protectedRoutes: readonly string[];
+  /**
+   * The path of the login page that an unauthenticated visitor is sent to.
+   */
   readonly loginPath: string;
 }
 
 /**
- * Judges the session and writes the auth result to `ev.sharedMap`. Sets the
- * session cookies the judgement asks for, and on a protected route with nobody
- * signed in throws `ev.redirect(...)` to send the browser to the login page.
- * When the backend cannot say whether the session is live, a protected route
- * answers `503` instead.
+ * Judges the session and writes the auth result to {@link QwikRequestEvent.sharedMap}.
+ *
+ * It sets the session cookies the judgement asks for. On a protected route with nobody signed in
+ * it throws the redirect to the login page, with the requested path in `?next=`. When the
+ * backend cannot say whether the session is live, a protected route answers `503` instead, so a
+ * visitor who may well be signed in is not sent to the login page. A `503` is the status that
+ * clients and fetch wrappers retry, whereas a redirect would also drop a non-GET request such as
+ * a form post.
+ *
+ * Cookies are cleared only when Zitadel refuses the session: a `401`, or a `404` that reports the
+ * session as gone. A `5xx`, a timeout, a network error or an unreadable answer is no verdict and
+ * keeps the cookie, because the server answers `500` when it cannot decide, so a database blip
+ * must not sign every user out. A live anonymous session, whose sign-in may still complete, and a
+ * live session of another project keep their cookie too. A session counts only in the project
+ * of the app, because a browser sends one host's cookies to every app on it; with no project
+ * configured nobody is signed in. A session found under the shared old cookie name is copied to
+ * the cookie of this project, and the old cookie stays, because another app on the host, such as
+ * the Console, may still rely on it.
+ *
+ * @param ev - The current request event.
+ * @param opts - The route policy and the verification options.
+ * @returns A promise that resolves when the request may continue, or after the `503` was sent.
+ * @throws The redirect marker of `ev.redirect` for an unauthenticated visitor of a protected
+ *   route.
  */
 async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promise<void> {
   const { protectedRoutes, loginPath, ...verification } = opts;
@@ -394,30 +500,58 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
 }
 
 /**
- * Creates a Qwik Router `RequestHandler` that handles proxying, JWT verification,
- * and route protection in a single `onRequest` pass.
+ * Creates the Qwik Router `onRequest` handler that proxies, verifies sessions and guards routes
+ * in a single pass.
  *
- * Place it in a layout or root plugin, e.g. `src/routes/plugin@nextgen.ts`:
+ * Use it once per app, in a root plugin such as `src/routes/plugin@nextgen.ts` or in a root
+ * layout, so it runs before every route. It replaces hand-written auth plumbing: without it the
+ * browser cannot reach the same-origin proxy path, {@link getAuth} has nothing to read, and no
+ * route is guarded. On each request it works in this order. It answers `400` when the request
+ * carries the internal `x-nextgen-auth-token` header. That header is an internal channel that
+ * only the SDK writes after verifying a session, so refusing it outright, on every route
+ * including ignored routes and the proxy path, is safer than trying to strip it. A client that
+ * copies headers from an earlier response and sends it is rejected, not ignored. It skips paths
+ * matched by `ignoredRoutes`. It proxies the proxy path to the Zitadel backend. For every other
+ * request it judges the session, stores the result for {@link getAuth}, applies the session
+ * cookies the verdict asks for, and redirects an unauthenticated visitor of a protected route.
  *
+ * The backend URL, the project secret and the project id are read on every request, never once
+ * when the handler is built. The order is the explicit option, then the Qwik Router environment
+ * getter ({@link QwikRequestEvent.env}, where Vite loads `.env` and `.env.local`), then
+ * `process.env`. A factory-time read would miss `.env` files, because Qwik does not put them on
+ * `process.env`, and the proxy would fall back to the default `http://localhost:8080` and fail
+ * with "fetch failed". The project id resolves from the `projectId` option, then
+ * `ZITADEL_PROJECT_ID`, then `PUBLIC_ZITADEL_PROJECT_ID`, and a session counts only when it
+ * belongs to that project; the session cookie is the one named for that project, not a cookie
+ * shared with other apps on the host. The backend URL may end in a slash. The project secret is attached as a bearer only on the session
+ * handoff exchange and never reaches the browser.
+ *
+ * `protectedRoutes` guards full page loads only. A client-side `<Link>` navigation does not load
+ * the page from the server, so guard those routes with a `routeLoader$` that calls
+ * {@link getAuth}. When the backend cannot say whether a session is live, a protected route
+ * answers `503` instead of redirecting.
+ *
+ * @param options - See {@link NextgenMiddlewareOptions}. The extra `projectSecret` is the project
+ *   service key, sent as the bearer on the `POST /sessions/exchange` handoff only. It takes
+ *   precedence over `ZITADEL_PROJECT_SECRET`.
+ * @returns The `onRequest` handler to export from a root plugin or layout.
+ * @throws An `Error` when `loginPath` is not a relative path that starts with a single `/`. An
+ *   absolute or protocol-relative URL would allow an open redirect, so it is refused when the
+ *   handler is built rather than at the first redirect.
+ * @defaultValue `{}`, which uses the defaults of {@link NextgenMiddlewareOptions} and the
+ *   environment.
+ * @example
  * ```ts
- * import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
+ * // src/routes/plugin@nextgen.ts
+ * import { createNextgenMiddleware } from "@zitadel/sdk-qwik-router/server";
  *
- * export const onRequest = createNextgenOnRequest({
+ * export const onRequest = createNextgenMiddleware({
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
  * ```
- *
- * `url` and `projectSecret` default to `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET`,
- * read per request from `ev.env` (where Vite loads `.env.local`), then
- * `process.env`. A session counts only in the app's own project: `projectId`,
- * else `ZITADEL_PROJECT_ID`, else `PUBLIC_ZITADEL_PROJECT_ID`, read the same way.
- *
- * @param options - Configuration. `projectSecret` is the project service-key
- *   sent as the bearer on the `POST /sessions/exchange` handoff only.
- * @returns A Qwik Router `RequestHandler`.
  */
-export function createNextgenOnRequest(
+export function createNextgenMiddleware(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
 ): (ev: QwikRequestEvent) => Promise<void> {
   const {
@@ -499,21 +633,33 @@ export function createNextgenOnRequest(
 }
 
 /**
- * Reads the auth state from a Qwik Router request event after the handler has run.
- * Call it inside a `routeLoader$`, `routeAction$`, or endpoint:
+ * Reads the auth result that the handler left on the request.
  *
+ * Call it in a `routeLoader$`, a `routeAction$` or an endpoint to learn who is signed in, and
+ * use it to guard client-side navigations, which the handler's `protectedRoutes` does not cover.
+ * It reads from {@link QwikRequestEvent.sharedMap}, so it works only after the handler from
+ * {@link createNextgenMiddleware} ran earlier in the same request. When no handler ran, for
+ * example on a path matched by `ignoredRoutes`, it returns the unauthenticated result rather
+ * than throwing. An unauthenticated result also means that the check could not decide on a
+ * route that is not protected, so do not treat it as proof that the user has no session. The result holds the session token, so do not return it from a loader to the
+ * browser; return only the fields the page needs.
+ *
+ * @param ev - The current Qwik Router request event, or any object with a `sharedMap`.
+ * @returns The current {@link AuthResult}, unauthenticated with a `null` session when the
+ *   handler stored nothing.
+ * @example
  * ```ts
+ * import { routeLoader$ } from "@qwik.dev/router";
  * import { getAuth } from "@zitadel/sdk-qwik-router/server";
  *
  * export const useUser = routeLoader$((ev) => {
  *   const auth = getAuth(ev);
- *   if (!auth.isAuthenticated) throw ev.redirect(302, "/login");
+ *   if (!auth.isAuthenticated) {
+ *     throw ev.redirect(302, "/login");
+ *   }
  *   return auth.session.userId;
  * });
  * ```
- *
- * @param ev - The current Qwik Router request event.
- * @returns The current {@link AuthResult}.
  */
 export function getAuth(ev: { sharedMap: Map<string, unknown> }): AuthResult {
   return (

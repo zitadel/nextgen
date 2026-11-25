@@ -42,7 +42,9 @@ describe("QwikRouterPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(
       "@zitadel/sdk-qwik-router/server",
     );
-    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain("createNextgenOnRequest");
+    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(
+      "createNextgenMiddleware",
+    );
 
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain('purpose="login"');

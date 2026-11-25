@@ -9,5 +9,15 @@
   ],
   "tsconfig": "tsconfig.lib.json",
   "readme": "docs/cover.md",
-  "out": "dist/api-docs"
+  "out": "dist/api-docs",
+  "externalSymbolLinkMappings": {
+    "@zitadel/sdk-core": {
+      "ZitadelLoginConfig": "https://github.com/zitadel/nextgen/blob/main/packages/sdk-core/src/types.ts",
+      "ZitadelLoginHandlers": "https://github.com/zitadel/nextgen/blob/main/packages/sdk-core/src/types.ts",
+      "ZitadelLogoutConfig": "https://github.com/zitadel/nextgen/blob/main/packages/sdk-core/src/types.ts",
+      "ZitadelLogoutHandlers": "https://github.com/zitadel/nextgen/blob/main/packages/sdk-core/src/types.ts",
+      "ZitadelSessionConfig": "https://github.com/zitadel/nextgen/blob/main/packages/sdk-core/src/types.ts",
+      "ZitadelSessionHandlers": "https://github.com/zitadel/nextgen/blob/main/packages/sdk-core/src/types.ts"
+    }
+  }
 }

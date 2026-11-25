@@ -5,11 +5,25 @@ import { useRuntimeConfig } from "#imports";
 import { resolveUrl } from "../lib/settings";
 import { createNextgenMiddleware } from "./middleware";
 
+/**
+ * Narrows a value to a non-empty string.
+ *
+ * @param value - The value to check.
+ * @returns The value when it is a non-empty string, otherwise `undefined`.
+ */
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value !== "" ? value : undefined;
 }
 
-/** A list of strings; a single string counts as a one-entry list. */
+/**
+ * Reads a list of strings from a runtime-config value.
+ *
+ * A single non-empty string counts as a one-entry list, because an environment variable that is
+ * not valid JSON arrives as a plain string.
+ *
+ * @param value - The value to read.
+ * @returns The list, or `undefined` when the value is empty or of another type.
+ */
 function stringList(value: unknown): string[] | undefined {
   if (Array.isArray(value)) {
     return value.map(String);
@@ -18,17 +32,35 @@ function stringList(value: unknown): string[] | undefined {
   return single === undefined ? undefined : [single];
 }
 
+/**
+ * Narrows a value to a finite number.
+ *
+ * @param value - The value to check.
+ * @returns The value when it is a finite number, otherwise `undefined`.
+ */
 function finiteNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 /**
- * Turns the module's `runtimeConfig.nextgen` into middleware options. Nitro
- * stores an option the app left unset as `""`, which keeps it settable at
- * runtime through `NUXT_NEXTGEN_*`, and those variables arrive parsed (a JSON
- * list, a number, else a string). So `""` or a value of the wrong type counts
- * as unset, and the middleware's own default applies: passed through, `""`
- * would make every timeout zero and reject every token for audience `""`.
+ * Turns the module's `runtimeConfig.nextgen` into middleware options.
+ *
+ * Nitro stores an option the app left unset as an empty string, which keeps it settable at
+ * run time through a `NUXT_NEXTGEN_<NAME>` environment variable. Those variables arrive parsed:
+ * a JSON list becomes a list, a number becomes a number, anything else stays a string. So an
+ * empty string, or a value of the wrong type, counts as unset and the middleware's own default
+ * applies. Passed through, an empty string would make every timeout zero and would reject every
+ * token for the audience `""`.
+ *
+ * The project id is `nextgen.projectId`, then the public project id the widgets sign users in
+ * to. With neither, the middleware falls back to `ZITADEL_PROJECT_ID`. A session counts only in
+ * that project. The `jwtKey` option is not passed on, because offline verification is reserved
+ * and unused.
+ *
+ * @param nextgen - The private `runtimeConfig.nextgen` object. Defaults to an empty object.
+ * @param publicConfig - The `runtimeConfig.public` object, for the public project id. Defaults
+ *   to an empty object.
+ * @returns The options for {@link createNextgenMiddleware}.
  */
 export function middlewareOptions(
   nextgen: Record<string, unknown> = {},
@@ -60,9 +92,11 @@ const config = useRuntimeConfig() as {
 };
 
 /**
- * Default Nitro/H3 event handler registered by the `@zitadel/sdk-nuxt` module
- * via {@link addServerHandler}. Reads middleware options from Nuxt runtime
- * config (`nuxt.config.ts → nextgen`) so consumers do not need to create
- * their own `server/middleware/auth.ts` when using the module.
+ * The global Nitro event handler that the module registers as server middleware.
+ *
+ * It builds {@link createNextgenMiddleware} from the runtime config once, when the server starts,
+ * so an app that uses the module does not write its own `server/middleware` file. Because the
+ * options come from `runtimeConfig.nextgen`, the `nextgen` key in `nuxt.config.ts` and the
+ * `NUXT_NEXTGEN_*` environment variables both reach it.
  */
 export default createNextgenMiddleware(middlewareOptions(config.nextgen, config.public));

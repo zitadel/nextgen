@@ -12,7 +12,7 @@ import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
 /**
- * Next.js request-boundary file at the project root. Wires `nextgenMiddleware` so the
+ * Next.js request-boundary file at the project root. Wires `createNextgenMiddleware` so the
  * generated project config's `/__nextgen` proxy path is same-origin proxied
  * to `ZITADEL_URL` and `/profile` is gated. Next 16 renamed this convention to
  * `proxy.ts`; older projects keep `middleware.ts`.
@@ -23,11 +23,11 @@ import type { RendererSpec } from "./renderers/types";
  */
 function requestBoundaryTemplate(functionName: "middleware" | "proxy"): string {
   return `${ManagedFile.MARKER}
-import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
+import { createNextgenMiddleware } from "@zitadel/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
 export function ${functionName}(req: NextRequest) {
-  return nextgenMiddleware(req, {
+  return createNextgenMiddleware(req, {
     url: process.env.ZITADEL_URL,
     // The routes that need a sign-in. To protect another, add it here; a
     // trailing * covers every path that starts with it, as in "/orders*".
@@ -38,7 +38,7 @@ export function ${functionName}(req: NextRequest) {
 
 export const config = {
   // Every route but Next.js's build files and favicon.ico, so the list above
-  // alone decides what needs a sign-in, and auth() sees the session on every
+  // alone decides what needs a sign-in, and getAuth() sees the session on every
   // page. A protected route that a narrower matcher leaves out stays public.
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

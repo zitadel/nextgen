@@ -10,9 +10,11 @@ import type { WithZitadelWidgetAttributes } from "../types.js";
 import { forceAttr } from "./forceAttr";
 
 /**
- * The un-augmented component that {@link ZitadelSession} is typed from, before the
- * standard HTML attributes are added to its props. It is exported only so the
- * published declaration file can name it; import {@link ZitadelSession} instead.
+ * The component that {@link ZitadelSession} is typed from, before the standard HTML attributes are added to
+ * its props.
+ *
+ * It is exported only so that the published declaration file can name it. Import
+ * {@link ZitadelSession} instead, which has the same runtime value and the complete props type.
  */
 export const Base = defineComponent({
   name: "ZitadelSession",
@@ -20,48 +22,104 @@ export const Base = defineComponent({
   inheritAttrs: false,
   props: {
     /**
-     * The handle returned by `configureZitadel(...)`. Bound as a DOM property
-     * (raw, not Vue's reactive proxy, because the widget does identity checks
-     * on it), and its fields are also written as `project-id`, `proxy-path` and
-     * `url` attributes so server-rendered markup carries them. Wins over the
-     * discrete {@link projectId} and {@link proxyPath} props.
+     * The project handle that the widget signs users out of.
+     *
+     * Pass the value that {@link configureZitadel} returns. The component binds it as a DOM
+     * property, raw and not as Vue's reactive proxy, because the widget compares it by identity.
+     * It also writes the handle's fields as the `project-id`, `proxy-path` and `url` attributes, so
+     * server-rendered markup carries them before hydration. It wins over
+     * {@link ZitadelSessionProps.projectId} and {@link ZitadelSessionProps.proxyPath}.
+     *
+     * @example
+     * ```html
+     * <ZitadelSession :project="project" />
+     * ```
      */
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
     /**
-     * Project id, read when no {@link project} handle is passed. Written as the
-     * `project-id` attribute so it reaches server-rendered markup.
+     * The project id that the widget belongs to.
+     *
+     * Use it in an app that has no project handle. It is ignored when {@link ZitadelSessionProps.project} is set.
+     * The component writes it as the `project-id` attribute, so it reaches server-rendered markup.
+     *
+     * @example
+     * ```html
+     * <ZitadelSession project-id="296547382910273" />
+     * ```
      */
     projectId: { type: String, default: undefined },
     /**
-     * Same-origin path prefix the widget calls (the `/__nextgen` proxy when
-     * unset). Read when no {@link project} handle is passed, and written as the
-     * `proxy-path` attribute so it reaches server-rendered markup.
+     * The same-origin proxy path that the widget calls.
+     *
+     * Use it in an app that has no project handle. It is ignored when {@link ZitadelSessionProps.project} is set.
+     * The component writes it as the `proxy-path` attribute, so it reaches server-rendered markup.
+     * The host or dev server of the app must serve the path.
+     *
+     * @defaultValue "/__nextgen"
      */
     proxyPath: { type: String, default: undefined },
-    /** Where to navigate after sign-out. Unset leaves navigation to the widget's default. */
+    /**
+     * The address to navigate to after a completed sign-out.
+     *
+     * Unset, the widget uses its own default navigation. The widget navigates right after it emits
+     * `signout`, so a handler must run synchronously or register its work with the `waitUntil` hook
+     * of the event detail, which delays the navigation for at most two seconds.
+     *
+     * @example
+     * ```html
+     * <ZitadelSession :project="project" post-sign-out-url="/" />
+     * ```
+     */
     postSignOutUrl: { type: String, default: undefined },
-    /** Heading text override; unset keeps the widget's own ("Signed in as"). */
+    /**
+     * The text of the heading of the card.
+     *
+     * Unset, the widget keeps its own text, "Signed in as". The component binds it as an
+     * attribute, so an unset prop removes the attribute. Bound as a property, Vue would have
+     * rendered an empty heading.
+     */
     heading: { type: String, default: undefined },
-    /** Sign-out action label override; unset keeps the widget's own ("Sign out"). */
+    /**
+     * The label of the sign-out action.
+     *
+     * Unset, the widget keeps its own label, "Sign out". The component binds it as an attribute,
+     * so an unset prop removes the attribute.
+     */
     logoutLabel: { type: String, default: undefined },
     /**
-     * `widget` is content-sized and paints no page chrome; `page` claims the
-     * viewport and paints the surface background. Unset keeps the element's
-     * default (`widget`). Bound as an attribute so an unset prop is removed.
+     * The layout of the widget: `"widget"` or `"page"`.
+     *
+     * The `"widget"` layout is sized by its content and paints no page chrome. The `"page"` layout
+     * claims the viewport and paints the surface background. The component binds it as an
+     * attribute, so an unset prop removes the attribute and the element keeps its default.
+     *
+     * @defaultValue "widget"
      */
     variant: { type: String as PropType<"widget" | "page">, default: undefined },
     /**
-     * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
-     * Unset follows the variant default (`dark` for `page`, `auto` for `widget`). Bound as an attribute so an unset prop keeps the element's default.
+     * The color mode of the widget: `"light"`, `"dark"` or `"auto"`.
+     *
+     * The value `"auto"` follows `prefers-color-scheme`. Unset, the widget follows the default of
+     * the {@link ZitadelSessionProps.variant}: `"dark"` for `"page"` and `"auto"` for `"widget"`.
+     * The component binds it as an attribute, so an unset prop keeps the default of the element.
      */
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
     /**
-     * Visually hides the widget's own heading block while keeping it in the
-     * accessibility tree, for pages that already carry the heading. Unset keeps
-     * the element's default (`false`).
+     * Whether to hide the heading block of the widget visually while keeping it in the accessibility
+     * tree.
+     *
+     * Set it on a page that already carries its own heading. The component binds it as a property.
+     * Vue turns an unset boolean into `false`, which is the default, so an unset prop is safe.
+     *
+     * @defaultValue false
      */
     suppressHeader: { type: Boolean, default: undefined },
   },
+  /**
+   * The events that the component re-emits from the widget.
+   *
+   * The `signout` event carries a {@link ZitadelSignoutDetail} when the sign-out completes.
+   */
   emits: ["signout"],
   setup(props, { attrs, emit, expose }) {
     const element = ref<ZitadelSessionElement | null>(null);
@@ -106,14 +164,35 @@ export const Base = defineComponent({
 });
 
 /**
- * Vue wrapper for the `<zitadel-session>` Lit web component — the post-sign-in
- * "signed in as" card. See {@link ZitadelLogin} for the rendering strategy.
- * Supply the SDK handle from `configureZitadel(...)` as `:project`, or the
- * discrete `:project-id` / `:proxy-path` the widget reads instead. The widget's
- * `zitadel-signout` event is re-emitted with its detail as `signout`.
+ * Renders the "signed in as" card, the `<zitadel-session>` web component, inside a Vue template.
  *
- * A Vue `ref` on this component resolves to the component *instance*; the
- * rendered `<zitadel-session>` DOM node is exposed as `element`.
+ * Use it after sign-in to show who is signed in and to offer the sign-out action. It renders the
+ * same way as {@link ZitadelLogin}: a render function creates the element by its string tag, and
+ * the server markup carries the `project-id` and `proxy-path` attributes with nothing inside until
+ * hydration.
+ *
+ * Pass the project handle from {@link configureZitadel} as `project`, or the discrete `project-id`
+ * and `proxy-path` props. The widget event is re-emitted with its detail as `signout`. Unset
+ * string props are bound as attributes on the client and removed, so the element keeps its own
+ * default, and a server render writes plain attributes. The kebab-case attributes are the form the
+ * widget reads when it upgrades before Vue hydrates.
+ *
+ * A Vue `ref` on this component resolves to the component instance and not to the inner element.
+ * The rendered element is exposed as `element`, a `Ref` whose value is the `ZitadelSession`
+ * element from `@zitadel/components`, or `null` before mount.
+ *
+ * @example
+ * ```html
+ * <script setup lang="ts">
+ * import { ZitadelSession, configureZitadel } from "@zitadel/sdk-vue";
+ *
+ * const project = configureZitadel({ projectId: "296547382910273" });
+ * </script>
+ *
+ * <template>
+ *   <ZitadelSession :project="project" heading="Your account" @signout="onSignout" />
+ * </template>
+ * ```
  */
 const ZitadelSession: WithZitadelWidgetAttributes<typeof Base> = Base;
 

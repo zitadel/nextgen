@@ -66,9 +66,9 @@ Setup installs both packages. To add them yourself, install them as dev dependen
     Create `src/routes/plugin@nextgen.ts`. The handler reads `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` per request from the request event's `env`, which is where Vite loads `.env.local`:
 
     ```ts
-    import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
+    import { createNextgenMiddleware } from "@zitadel/sdk-qwik-router/server";
 
-    export const onRequest = createNextgenOnRequest({
+    export const onRequest = createNextgenMiddleware({
       protectedRoutes: ["/profile"],
       loginPath: "/login",
     });

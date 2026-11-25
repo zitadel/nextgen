@@ -13,7 +13,7 @@ import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contra
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
 
-import { createNextgenHandle, getAuth } from "../handle";
+import { createNextgenMiddleware, getAuth } from "../handle";
 
 async function serve(
   url: string,
@@ -58,7 +58,7 @@ async function serve(
     },
   } as unknown as RequestEvent;
   const resolve = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
-  const response = (await createNextgenHandle(options)({
+  const response = (await createNextgenMiddleware(options)({
     event,
     resolve,
   } as unknown as Parameters<Handle>[0])) as Response;
@@ -111,7 +111,7 @@ async function readAuth(context: unknown): Promise<AuthResult> {
 }
 
 function expectHandlerType(): void {
-  expectTypeOf(createNextgenHandle({ url: "http://localhost:4000" })).toExtend<Handle>();
+  expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toExtend<Handle>();
 }
 
 describeServerMiddleware({

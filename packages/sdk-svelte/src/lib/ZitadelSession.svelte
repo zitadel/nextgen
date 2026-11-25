@@ -3,7 +3,7 @@
   import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
-  import type { ZitadelSessionSvelteProps } from './types';
+  import type { ZitadelSessionProps } from './types';
   import { assignGiven } from './given';
   import { withDetail } from './events';
   import { onClient, proxyPathAttr } from './attributes';
@@ -20,7 +20,7 @@
     suppressHeader,
     onSignout,
     ...rest
-  }: ZitadelSessionSvelteProps = $props();
+  }: ZitadelSessionProps = $props();
 
   // The standard HTML attributes are the only extra props the element takes.
   const attributes = $derived(standardAttributes(rest));
@@ -73,17 +73,22 @@
   @component
   Renders the signed-in session card as a `<zitadel-session>` custom element.
 
-  The card shows who is signed in and a sign-out action. Optional props
-  (`heading`, `logoutLabel`, `variant`, `theme`, `suppressHeader`) are assigned
-  only when set, so an unset prop keeps the element's own default instead of
-  blanking it. `projectId` and `proxyPath` are written as the `project-id` and
-  `proxy-path` attributes for server markup, and `onSignout` receives the
-  element's `zitadel-signout` event.
+  The card shows who is signed in and offers a sign-out action. Optional props such as `heading`,
+  `logoutLabel`, `variant`, `theme` and `suppressHeader` are assigned only when set, so an unset
+  prop keeps the element's own default instead of blanking it. `projectId` and `proxyPath` are
+  written as the `project-id` and `proxy-path` attributes so server-rendered markup carries them;
+  the project handle is assigned as a property in the browser and wins over the plain values when
+  both are given. `onSignout` receives the element's `zitadel-signout` event, and a promise it
+  returns delays the post-sign-out navigation for up to two seconds.
 
-  Use it to show the current user. Props are typed by
-  {@link ZitadelSessionSvelteProps}. `getElement()` returns the underlying
-  element, or `undefined` before mount, via `bind:this`.
+  Use it to show the current user, for example on a profile or dashboard page. Props are typed by
+  {@link ZitadelSessionProps}. `getElement()` returns the underlying element, or `undefined`
+  before mount, and is reachable through `bind:this`.
 
   @example
+  <script lang="ts">
+    import { ZitadelSession } from '@zitadel/sdk-svelte';
+  </script>
+
   <ZitadelSession {project} postSignOutUrl="/login" />
 -->

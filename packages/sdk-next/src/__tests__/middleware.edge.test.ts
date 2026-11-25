@@ -1,4 +1,4 @@
-import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
+import { createNextgenMiddleware } from "@zitadel/sdk-next/middleware";
 import { NextRequest } from "next/server";
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
@@ -10,7 +10,7 @@ async function serve(request: Request, options: NextgenMiddlewareOptions): Promi
   const incoming = new NextRequest(request);
   // Next 15 exposes the runtime-provided address as `request.ip`.
   Object.defineProperty(incoming, "ip", { value: CLIENT_ADDRESS });
-  const answer = await nextgenMiddleware(incoming, options);
+  const answer = await createNextgenMiddleware(incoming, options);
   return answer.headers.has("x-middleware-next") ? new Response("ok") : answer;
 }
 

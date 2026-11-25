@@ -15,8 +15,10 @@ import type {
 // Installs the early event buffer before the elements register (and so before any
 // of them can emit); keep it directly above the components import.
 import "./early-events";
-// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
-// The edge build of the components package has no elements, so this does nothing there.
+/*
+ * Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+ * The edge build of the components package has no elements, so this does nothing there.
+ */
 import "@zitadel/components";
 import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
 import { standardAttributes } from "@zitadel/sdk-core/types";
@@ -32,48 +34,57 @@ import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import type { ZitadelWidgetAttributes } from "./types.js";
 
 /**
- * Re-exported from `@zitadel/api/config` so an app wires the API client from this
- * one package: {@link configureZitadel} sets the project the SDK talks to,
- * {@link getApi} returns the configured client and {@link getZitadelConfig}
- * reads the configuration back.
+ * Re-exports {@link configureZitadel}, {@link getApi} and {@link getZitadelConfig} from
+ * `@zitadel/api/config`, so an app wires the API client from this one package.
+ *
+ * {@link configureZitadel} sets the project the SDK talks to and returns the project handle,
+ * {@link getApi} returns the configured API client, and {@link getZitadelConfig} reads the
+ * configuration back. They exist here so a Qwik app needs no direct dependency on
+ * `@zitadel/api`, which strict package managers would otherwise require it to declare.
+ *
+ * @example
+ * ```ts
+ * import { configureZitadel } from "@zitadel/sdk-qwik";
+ *
+ * export const project = configureZitadel({ projectId: "my-project", proxyPath: "/__nextgen" });
+ * ```
  */
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export type {
-  CreateFlowBodyPurpose,
+  ZitadelFlowPurpose,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowRedirectDetail,
   ZitadelFlowStepDetail,
-  ZitadelLoginConfig,
-  ZitadelLoginHandlers,
-  ZitadelLogoutConfig,
-  ZitadelLogoutHandlers,
-  ZitadelNavigationDetail,
-  ZitadelSessionConfig,
-  ZitadelSessionHandlers,
   ZitadelSignoutDetail,
-  ZitadelWidgetAttributes,
 } from "./types.js";
 
-// Re-exported so scaffolded apps can wire the business copy overlay without a
-// direct @zitadel/components dependency (strict package managers reject those).
+/*
+ * Re-exported so scaffolded apps can wire the business copy overlay without a
+ * direct @zitadel/components dependency (strict package managers reject those).
+ */
 export { businessLocales } from "@zitadel/components";
 
 /**
- * Assigns a widget config value as a DOM *property*. An `undefined` value is
- * assigned too, not skipped: the widget elements restore their own default when
- * a prop is unset, so a cleared prop (e.g. the session card's `heading`) goes
- * back to "Signed in as" instead of keeping its last value.
+ * Assigns a widget config value to the element as a DOM property.
  *
- * Qwik 2 binds custom-element JSX props as *attributes* only — its client
- * renderer has no property-setting path for elements — and the widgets expose
- * their config as property-only members (`project`/`locales` are
- * `@property({ attribute: false })`) or as camelCase properties backed by
- * kebab-case attributes (`projectId` ↔ `project-id`). Neither survives Qwik's
- * lower-cased attribute binding, so all configuration is applied imperatively on
- * the element — see the `bind*Config` binders.
+ * An `undefined` value is assigned too, not skipped. The widget elements restore their own default
+ * when a property is unset, so a cleared prop, for example the session card's heading, goes back
+ * to "Signed in as" instead of keeping its last value.
+ *
+ * Qwik 2 binds custom-element JSX props as attributes only, because its client renderer has no
+ * property-setting path for elements. The widgets expose their config as property-only members
+ * (`project` and `locales` are not attribute-backed) or as camelCase properties backed by
+ * kebab-case attributes (`projectId` and `project-id`). Neither survives Qwik's lower-cased
+ * attribute binding, so all configuration is applied imperatively on the element by the binders.
+ *
+ * @typeParam E - The element type.
+ * @typeParam K - A property key of the element.
+ * @param el - The widget element to write to.
+ * @param key - The property to assign.
+ * @param value - The value to assign, or `undefined` to restore the element's default.
  */
 function setProp<E extends Element, K extends keyof E>(
   el: E,
@@ -84,19 +95,31 @@ function setProp<E extends Element, K extends keyof E>(
 }
 
 /**
- * The attribute-backed config, emitted declaratively in the JSX. Under SSR
- * (Qwik Router) the widget arrives as server-rendered markup and Qwik *resumes*
- * it rather than re-rendering, so the `ref` binder never runs and the
- * `useVisibleTask$` re-binds only after the widget has upgraded and rendered
- * "requires a configured project" (and booted a `login` flow on a register
- * page). Attributes are serialised into the SSR'd HTML, so the widget reads them
- * the instant it upgrades. Qwik renders lower-case kebab-case attributes
- * verbatim; `undefined` omits one, and a boolean attribute is present-or-absent.
- * The property binders still run on the client, so property-only config (the
- * full `project` handle, `locales`) is applied on top.
+ * The attribute-backed config of a widget, as a record from attribute name to value.
+ *
+ * It is emitted declaratively in the JSX. Under server rendering in Qwik Router the widget arrives
+ * as server-rendered markup and Qwik resumes it instead of re-rendering, so the `ref` binder never
+ * runs, and the visible task re-binds only after the widget has upgraded and rendered "requires a
+ * configured project" (and booted a `login` flow on a register page). Attributes are serialized
+ * into the server HTML, so the widget reads them the moment it upgrades.
+ *
+ * Qwik renders lower-case kebab-case attributes verbatim. An `undefined` value omits the
+ * attribute, and a boolean attribute is present or absent. The property binders still run in the
+ * browser, so property-only config (the full project handle, `locales`) is applied on top.
  */
 type Attrs = Record<string, string | undefined>;
 
+/**
+ * Builds the project attributes shared by every widget.
+ *
+ * The project handle wins over the discrete `projectId` and `proxyPath` props when both are set.
+ * The `publishable-key` attribute is browser-safe by design, so it can ride in server markup.
+ * Without it a resumed widget would start its first flow, or run a single-sign-on handoff
+ * exchange, with no bearer token before the property handle is restored in the browser.
+ *
+ * @param props - The project handle and the discrete project props.
+ * @returns The project attributes, with unset values omitted.
+ */
 function projectAttrs(props: {
   readonly project?: ZitadelProject;
   readonly projectId?: string;
@@ -106,7 +129,7 @@ function projectAttrs(props: {
     "project-id": props.project?.projectId ?? props.projectId,
     "proxy-path": proxyPathAttr(props.project?.proxyPath ?? props.proxyPath),
     url: props.project?.url,
-    // Browser-safe by construction (ADR 036), so it can ride in server markup.
+    // Browser-safe by construction, so it can ride in server markup.
     // Without it a resumed widget would start its first flow, or run an SSO
     // handoff exchange, with no bearer before the property handle is restored.
     "publishable-key": props.project?.publishableKey,
@@ -114,18 +137,38 @@ function projectAttrs(props: {
 }
 
 /**
- * An explicit empty proxy path means "the origin root" (the API client strips
- * trailing slashes), but a widget treats an empty `proxy-path` attribute as
- * unset and falls back to `/__nextgen`. `/` survives that and normalizes to root.
+ * Maps a proxy path to the value its attribute must carry.
+ *
+ * An explicit empty proxy path means the origin root, because the API client strips trailing
+ * slashes. A widget, however, treats an empty `proxy-path` attribute as unset and falls back to
+ * `/__nextgen`. The value `/` survives that and normalizes to the root.
+ *
+ * @param path - The proxy path, or `undefined` when unset.
+ * @returns `/` for an empty path, otherwise the path unchanged.
  */
 function proxyPathAttr(path: string | undefined): string | undefined {
   return path === "" ? "/" : path;
 }
 
+/**
+ * Maps a boolean prop to a boolean attribute value.
+ *
+ * @param value - The prop value.
+ * @returns An empty string (attribute present) when `true`, otherwise `undefined` (omitted).
+ */
 function flag(value: boolean | undefined): string | undefined {
   return value ? "" : undefined;
 }
 
+/**
+ * Builds the server-renderable attributes of the sign-in widget.
+ *
+ * The purpose defaults to `login`. The resume flow handle is emitted so a resumed widget boots
+ * with it instead of starting a new flow.
+ *
+ * @param props - The sign-in props.
+ * @returns The attributes, with unset values omitted.
+ */
 function loginAttrs(props: ZitadelLoginProps): Attrs {
   return {
     ...projectAttrs(props),
@@ -143,6 +186,12 @@ function loginAttrs(props: ZitadelLoginProps): Attrs {
   };
 }
 
+/**
+ * Builds the server-renderable attributes of the sign-out widget.
+ *
+ * @param props - The sign-out props.
+ * @returns The attributes, with unset values omitted.
+ */
 function logoutAttrs(props: ZitadelLogoutProps): Attrs {
   return {
     ...projectAttrs(props),
@@ -151,6 +200,12 @@ function logoutAttrs(props: ZitadelLogoutProps): Attrs {
   };
 }
 
+/**
+ * Builds the server-renderable attributes of the session widget.
+ *
+ * @param props - The session props.
+ * @returns The attributes, with unset values omitted.
+ */
 function sessionAttrs(props: ZitadelSessionProps): Attrs {
   return {
     ...projectAttrs(props),
@@ -163,7 +218,19 @@ function sessionAttrs(props: ZitadelSessionProps): Attrs {
   };
 }
 
-/** Applies the `<zitadel-login>` surface config to the element as DOM properties. */
+/**
+ * Applies the `<zitadel-login>` configuration to the element as DOM properties.
+ *
+ * This is the only place property-only config, such as the project handle, reaches the widget.
+ * It runs in the `ref` callback at mount and again in the visible task whenever a prop changes.
+ *
+ * Boolean props are written as concrete booleans and the resume flow handle as a concrete string.
+ * An `undefined` value would not clear the old state, so going from a handle or from `true` back
+ * to unset would keep the previous value.
+ *
+ * @param el - The widget element.
+ * @param props - The props to apply.
+ */
 function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): void {
   setProp(el, "project", props.project);
   setProp(el, "projectId", props.projectId);
@@ -186,7 +253,14 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "lang", props.lang);
 }
 
-/** Applies the `<zitadel-logout>` surface config to the element as DOM properties. */
+/**
+ * Applies the `<zitadel-logout>` configuration to the element as DOM properties.
+ *
+ * This is the only place property-only config, such as the project handle, reaches the widget.
+ * It runs in the `ref` callback at mount and again in the visible task whenever a prop changes.
+ * @param el - The widget element.
+ * @param props - The props to apply.
+ */
 function bindLogoutConfig(el: ZitadelLogoutElement, props: ZitadelLogoutProps): void {
   setProp(el, "project", props.project);
   setProp(el, "projectId", props.projectId);
@@ -195,7 +269,14 @@ function bindLogoutConfig(el: ZitadelLogoutElement, props: ZitadelLogoutProps): 
   setProp(el, "theme", props.theme);
 }
 
-/** Applies the `<zitadel-session>` surface config to the element as DOM properties. */
+/**
+ * Applies the `<zitadel-session>` configuration to the element as DOM properties.
+ *
+ * This is the only place property-only config, such as the project handle, reaches the widget.
+ * It runs in the `ref` callback at mount and again in the visible task whenever a prop changes.
+ * @param el - The widget element.
+ * @param props - The props to apply.
+ */
 function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps): void {
   setProp(el, "project", props.project);
   setProp(el, "projectId", props.projectId);
@@ -209,11 +290,19 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
 }
 
 /**
- * Forwards a widget event's detail to the app callback, and registers the
- * callback's returned promise — from an async handler or a Qwik QRL — on the
- * detail's `waitUntil`. The three navigating events (flow-complete,
- * flow-redirect, signout) then wait for it before the widget navigates; other
- * events carry no `waitUntil`, so the call is a no-op.
+ * Forwards a widget event's detail to the app callback and registers the callback's promise on the
+ * detail's `waitUntil`.
+ *
+ * The callback is a Qwik QRL, which loads lazily and runs asynchronously, and the three navigating
+ * events (`zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout`) are followed
+ * immediately by a page navigation. Registering the returned promise makes the widget wait for the
+ * callback, for at most two seconds, before it navigates, so a callback is not cut off by the page
+ * unloading. Other events carry no `waitUntil`, so for them the registration is skipped. A callback
+ * that returns nothing delays nothing, and a rejected promise does not block the navigation.
+ *
+ * @typeParam Detail - The event detail type the handler receives.
+ * @param event - The widget event. Anything that is not a `CustomEvent` is ignored.
+ * @param handler - The app callback, or `undefined` when the app registered none.
  */
 function withDetail<Detail>(
   event: Event,
@@ -227,80 +316,112 @@ function withDetail<Detail>(
 }
 
 /**
- * Turns the plain-callback handlers of the shared SPA contract into Qwik props:
- * every handler becomes an optional `QRL` and its name gets a `$` suffix
- * (`onFlowComplete` becomes `onFlowComplete$`).
+ * Turns the plain-callback handlers of the shared single-page-app contract into Qwik props.
  *
- * Qwik can only pass a function across the server/browser boundary as a QRL, a
- * lazily loaded and serializable reference, which is why the props carry the
- * `$` suffix. Deriving the prop set from `@zitadel/sdk-core` means it can never
- * drift from the events the widget emits: a new contract event surfaces here as
- * a new `on...$` prop with no change to this package.
+ * Every handler becomes an optional QRL and its name gets a `$` suffix, so `onFlowComplete`
+ * becomes `onFlowComplete$`. Qwik can pass a function across the server and browser boundary only
+ * as a QRL, a lazily loaded and serializable reference, which is why the props carry the suffix.
+ * Deriving the prop set from the handlers in `@zitadel/sdk-core` means it cannot drift from the
+ * events the widget emits: a new event in the contract surfaces here as a new `on...$` prop with no
+ * change to this package.
  *
- * A QRL loads lazily and runs asynchronously, so the callback's promise is
- * registered with the event's `waitUntil` and the widget holds its navigation
- * until the callback settles. See {@link ZitadelNavigationDetail}.
+ * A QRL loads lazily and runs asynchronously, so the wrapper registers the callback's promise on
+ * the event's `waitUntil`, and the widget holds its navigation until the callback settles.
  *
- * @typeParam H - A handler record from `@zitadel/sdk-core`, such as
- * {@link ZitadelLoginHandlers}.
+ * @typeParam H - A handler record from `@zitadel/sdk-core`, such as `ZitadelLoginHandlers`.
  */
-export type Qrlify<H> = {
+type Qrlify<H> = {
   readonly [K in keyof H as `${K & string}$`]?: H[K] extends ((detail: infer D) => void) | undefined
     ? QRL<(detail: D) => void>
     : never;
 };
 
 /**
- * Props for {@link ZitadelLogin}: the shared {@link ZitadelLoginConfig}
- * surface, the standard HTML attributes ({@link ZitadelWidgetAttributes}), the
- * `on...$` QRL callbacks derived from {@link ZitadelLoginHandlers}, and `ref`.
+ * The props of {@link ZitadelLogin}.
  *
- * Supply the project through `project` (the {@link ZitadelProject} handle), or
- * through the discrete `projectId` and `proxyPath`; the widget uses whichever is
- * present. Every callback is a Qwik QRL and may be async: the widget waits for it
- * before it navigates (see {@link ZitadelNavigationDetail}).
+ * It combines the shared sign-in configuration from `@zitadel/sdk-core`, the standard HTML
+ * attributes, the `on...$` QRL callbacks derived from the sign-in handlers, and {@link ZitadelLoginProps | ref}.
+ *
+ * Supply the project through `project` (the project handle that {@link configureZitadel}
+ * returns), or through the discrete `projectId` and `proxyPath` props. The widget uses whichever
+ * is present, and the handle wins when both are set. Every callback is a Qwik QRL and may be
+ * async: the widget waits for it, for at most two seconds, before it navigates.
+ *
+ * @example
+ * ```tsx
+ * const props: ZitadelLoginProps = {
+ *   project,
+ *   purpose: "register",
+ *   onFlowComplete$: $(async (detail) => {
+ *     await exchangeHandoff(detail.handoff_token);
+ *   }),
+ * };
+ * ```
  */
 export type ZitadelLoginProps = ZitadelLoginConfig &
   ZitadelWidgetAttributes &
   Qrlify<ZitadelLoginHandlers> & {
     /**
-     * Signal that receives the underlying `<zitadel-login>` element once it
-     * mounts, for code that needs the element itself (to focus it or call its
-     * methods). It mirrors React's `forwardRef`. Qwik cannot hand a ref to a
-     * custom element any other way, and the component fills it next to its own
-     * host signal, so event forwarding keeps working. Left unset, nothing is
-     * exposed.
+     * A signal that receives the underlying `<zitadel-login>` element once it mounts.
+     *
+     * Use it for code that needs the element itself, for example to focus it or call its methods.
+     * It plays the role of a forwarded ref in other frameworks: Qwik cannot hand a ref to a custom
+     * element any other way, and the component fills the signal next to its own host signal, so
+     * event forwarding keeps working. The value is `undefined` until the element mounts, and on
+     * the server. Left unset, nothing is exposed.
+     *
+     * @example
+     * ```tsx
+     * const login = useSignal<HTMLElement>();
+     * <ZitadelLogin project={project} ref={login} />;
+     * ```
      */
     readonly ref?: Signal<ZitadelLoginElement | undefined>;
   };
 
 /**
- * Qwik component that renders the `<zitadel-login>` sign-in widget: the whole
- * login flow in one element, driven by
- * the Zitadel flow API through the same-origin `/__nextgen` proxy.
+ * Renders the `<zitadel-login>` sign-in widget: the whole login flow in one element, driven by the
+ * Zitadel flow API through the same-origin proxy path.
  *
- * The element is written statically in the component's JSX, not built at render
- * time. Its attribute-backed configuration (`project-id`, `proxy-path`, `url`,
- * `publishable-key`, `purpose`, `flow-name`, `resume-flow-id` and the rest) is
- * emitted into the server-rendered markup, so a resumed widget can read it the
- * moment it upgrades. Property-only configuration (the full `project` handle,
- * `locales`) is applied in the browser: Qwik 2 binds custom-element props as
- * attributes only, so a `ref` callback assigns the DOM properties at mount,
- * before the widget's first render, and a `useVisibleTask$` re-applies them
- * whenever a prop changes and wires the native listeners that forward the
- * widget's `zitadel-*` events to the `on...$` callbacks.
+ * Use it on a login or register page, with `purpose` choosing which. For a bare sign-out button
+ * use {@link ZitadelLogout}, and for a signed-in card use {@link ZitadelSession}.
  *
- * Use it on a login or register page, with `purpose` choosing which.
+ * The element is written statically in the component's JSX, not built at render time. Its
+ * attribute-backed configuration (`project-id`, `proxy-path`, `url`, `publishable-key`, `purpose`,
+ * `flow-name`, `resume-flow-id` and the rest) is emitted into the server-rendered markup, so a
+ * resumed widget can read it the moment it upgrades. The publishable key is browser-safe by
+ * design. Property-only configuration (the full project handle, `locales`) is applied in the
+ * browser: Qwik 2 binds custom-element props as attributes only, so a `ref` callback assigns the
+ * DOM properties at mount, before the widget's first render, and a visible task re-applies them
+ * whenever a prop changes and wires the native listeners that forward the widget's `zitadel-*`
+ * events to the `on...$` callbacks.
+ *
+ * Callbacks are QRLs, which load lazily. For `onFlowComplete$` and `onFlowRedirect$` the wrapper
+ * hands the callback's promise to the event's `waitUntil`, so the widget waits for it before it
+ * navigates. Terminal events that fire before the listeners attach, which happens when the widget
+ * boots from a resume flow handle under server rendering, are buffered and replayed in order, so a
+ * callback such as a handoff-token exchange is not missed. Input events are never buffered because
+ * they can carry passwords.
+ *
+ * The element is defined only in the browser. On the server, and on edge runtimes without a DOM,
+ * the component renders the unknown tag with its attributes.
  *
  * @example
  * ```tsx
- * <ZitadelLogin
- *   project={{ projectId: "my-project", proxyPath: "/__nextgen" }}
- *   onFlowComplete$={async () => {
- *     await markSignedIn();
- *   }}
- * />
+ * import { $ } from "@qwik.dev/core";
+ * import { ZitadelLogin } from "@zitadel/sdk-qwik";
+ *
+ * export default () => (
+ *   <ZitadelLogin
+ *     project={{ projectId: "my-project", proxyPath: "/__nextgen" }}
+ *     onFlowComplete$={async () => {
+ *       await markSignedIn();
+ *     }}
+ *   />
+ * );
  * ```
+ *
+ * @see {@link ZitadelLoginProps}
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   // The standard HTML attributes are the only extra props the element takes.
@@ -350,38 +471,53 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
 });
 
 /**
- * Props for {@link ZitadelLogout}: the shared {@link ZitadelLogoutConfig}
- * surface, the standard HTML attributes ({@link ZitadelWidgetAttributes}), the
- * `on...$` QRL callbacks derived from {@link ZitadelLogoutHandlers}, and `ref`.
+ * The props of {@link ZitadelLogout}.
  *
- * Supply the project through `project` (the {@link ZitadelProject} handle), or
- * through the discrete `projectId` and `proxyPath`; the widget uses whichever is
- * present. `onSignout$` may be async: the widget waits for it before it
- * navigates (see {@link ZitadelNavigationDetail}).
+ * It combines the shared sign-out configuration from `@zitadel/sdk-core`, the standard HTML
+ * attributes, the `onSignout$` QRL callback, and {@link ZitadelLogoutProps | ref}.
+ *
+ * Supply the project through `project` (the project handle that {@link configureZitadel}
+ * returns), or through the discrete `projectId` and `proxyPath` props. The widget uses whichever
+ * is present, and the handle wins when both are set. `onSignout$` may be async: the widget waits
+ * for it, for at most two seconds, before it navigates.
  */
 export type ZitadelLogoutProps = ZitadelLogoutConfig &
   ZitadelWidgetAttributes &
   Qrlify<ZitadelLogoutHandlers> & {
     /**
-     * Signal that receives the underlying `<zitadel-logout>` element once it
-     * mounts, for code that needs the element itself. It mirrors React's
-     * `forwardRef`; the component fills it next to its own host signal, so event
-     * forwarding keeps working. Left unset, nothing is exposed.
+     * A signal that receives the underlying `<zitadel-logout>` element once it mounts.
+     *
+     * Use it for code that needs the element itself. It plays the role of a forwarded ref in other
+     * frameworks, and the component fills the signal next to its own host signal, so event
+     * forwarding keeps working. The value is `undefined` until the element mounts, and on the
+     * server. Left unset, nothing is exposed.
      */
     readonly ref?: Signal<ZitadelLogoutElement | undefined>;
   };
 
 /**
- * Qwik component that renders the `<zitadel-logout>` widget: a sign-out button
- * that ends the session through the same-origin `/__nextgen` proxy and then
- * sends the browser to `postSignOutUrl`.
+ * Renders the `<zitadel-logout>` widget: a sign-out button that ends the session through the
+ * same-origin proxy path and then sends the browser to `postSignOutUrl`.
  *
- * Like {@link ZitadelLogin}, the element is static in the JSX, its
- * attribute-backed config rides in the server-rendered markup, and the
- * property-only config and the `zitadel-signout` listener are applied in the
- * browser. `onSignout$` may be async: the widget navigates only after it has
- * settled (or after a short timeout), so a lazily loaded QRL is not cut off by
- * the page unloading.
+ * Use it wherever a bare "Sign out" action is enough. To also show who is signed in, use
+ * {@link ZitadelSession}.
+ *
+ * Like {@link ZitadelLogin}, the element is static in the JSX, its attribute-backed config rides in
+ * the server-rendered markup, and the property-only config and the `zitadel-signout` listener are
+ * applied in the browser. `onSignout$` may be async: the widget navigates only after the callback
+ * has settled, or after a two-second timeout, so a lazily loaded QRL is not cut off by the page
+ * unloading. A signout event that fires before the listener attaches is buffered and replayed.
+ *
+ * @example
+ * ```tsx
+ * import { ZitadelLogout } from "@zitadel/sdk-qwik";
+ *
+ * export default () => (
+ *   <ZitadelLogout project={project} postSignOutUrl="/login" onSignout$={async () => clearCache()} />
+ * );
+ * ```
+ *
+ * @see {@link ZitadelLogoutProps}
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   // The standard HTML attributes are the only extra props the element takes.
@@ -418,35 +554,49 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
 });
 
 /**
- * Props for {@link ZitadelSession}: the shared {@link ZitadelSessionConfig}
- * surface, the standard HTML attributes ({@link ZitadelWidgetAttributes}), the
- * `on...$` QRL callbacks derived from {@link ZitadelSessionHandlers}, and `ref`.
+ * The props of {@link ZitadelSession}.
  *
- * Supply the project through `project` (the {@link ZitadelProject} handle), or
- * through the discrete `projectId` and `proxyPath`; the widget uses whichever is
- * present. `onSignout$` may be async: the widget waits for it before it
- * navigates (see {@link ZitadelNavigationDetail}).
+ * It combines the shared session configuration from `@zitadel/sdk-core`, the standard HTML
+ * attributes, the `onSignout$` QRL callback, and {@link ZitadelSessionProps | ref}.
+ *
+ * Supply the project through `project` (the project handle that {@link configureZitadel}
+ * returns), or through the discrete `projectId` and `proxyPath` props. The widget uses whichever
+ * is present, and the handle wins when both are set. `onSignout$` may be async: the widget waits
+ * for it, for at most two seconds, before it navigates.
  */
 export type ZitadelSessionProps = ZitadelSessionConfig &
   ZitadelWidgetAttributes &
   Qrlify<ZitadelSessionHandlers> & {
     /**
-     * Signal that receives the underlying `<zitadel-session>` element once it
-     * mounts, for code that needs the element itself. It mirrors React's
-     * `forwardRef`. Left unset, nothing is exposed.
+     * A signal that receives the underlying `<zitadel-session>` element once it mounts.
+     *
+     * Use it for code that needs the element itself. The value is `undefined` until the element
+     * mounts, and on the server. Left unset, nothing is exposed.
      */
     readonly ref?: Signal<ZitadelSessionElement | undefined>;
   };
 
 /**
- * Qwik component that renders the `<zitadel-session>` widget: the post-sign-in
- * "signed in as" card with a sign-out button.
+ * Renders the `<zitadel-session>` widget: the post-sign-in "signed in as" card with a sign-out
+ * button.
  *
- * Like {@link ZitadelLogin}, the element is static in the JSX, its
- * attribute-backed config rides in the server-rendered markup, and the
- * property-only config and the `zitadel-signout` listener are applied in the
- * browser. `onSignout$` may be async: the widget navigates only after it has
- * settled (or after a short timeout).
+ * Use it on pages that confirm who is signed in. For a bare sign-out button use
+ * {@link ZitadelLogout}.
+ *
+ * Like {@link ZitadelLogin}, the element is static in the JSX, its attribute-backed config rides in
+ * the server-rendered markup, and the property-only config and the `zitadel-signout` listener are
+ * applied in the browser. `onSignout$` may be async: the widget navigates only after the callback
+ * has settled, or after a two-second timeout. A signout event that fires before the listener
+ * attaches is buffered and replayed.
+ *
+ * @example
+ * ```tsx
+ * import { ZitadelSession } from "@zitadel/sdk-qwik";
+ *
+ * export default () => <ZitadelSession project={project} heading="Welcome back" />;
+ * ```
+ *
+ * @see {@link ZitadelSessionProps}
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   // The standard HTML attributes are the only extra props the element takes.

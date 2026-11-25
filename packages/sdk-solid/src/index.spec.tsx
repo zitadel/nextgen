@@ -26,11 +26,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   businessLocales,
   ZitadelLogin,
-  type ZitadelLoginSolidProps,
+  type ZitadelLoginProps,
   ZitadelLogout,
-  type ZitadelLogoutSolidProps,
+  type ZitadelLogoutProps,
   ZitadelSession,
-  type ZitadelSessionSolidProps,
+  type ZitadelSessionProps,
 } from "./index";
 
 import {
@@ -452,9 +452,9 @@ type ForwardedAttributes = {
 };
 
 type WidgetProps = {
-  login: ZitadelLoginSolidProps;
-  logout: ZitadelLogoutSolidProps;
-  session: ZitadelSessionSolidProps;
+  login: ZitadelLoginProps;
+  logout: ZitadelLogoutProps;
+  session: ZitadelSessionProps;
 };
 
 const staleOnRemoval: readonly string[] = [];

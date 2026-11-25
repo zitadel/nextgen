@@ -42,14 +42,14 @@ CSRF protection for server functions, so list `createCsrfMiddleware` before auth
 
 ```ts
 import { createCsrfMiddleware, createMiddleware, createStart } from '@tanstack/react-start';
-import { createNextgenRequestMiddleware } from '@zitadel/sdk-tanstack-start/server';
+import { createNextgenMiddleware } from '@zitadel/sdk-tanstack-start/server';
 
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === 'serverFn',
 });
 
 const authMiddleware = createMiddleware({ type: 'request' }).server(
-  createNextgenRequestMiddleware({
+  createNextgenMiddleware({
     url: process.env.ZITADEL_URL,
     projectSecret: process.env.ZITADEL_PROJECT_SECRET,
     protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths

@@ -1,8 +1,11 @@
 /**
- * Re-exports shared SDK types from `@zitadel/sdk-core`.
+ * Re-exports the shared auth and middleware types from `@zitadel/sdk-core`.
  *
- * These types are defined once in sdk-core and shared by both sdk-next
- * and sdk-nuxt.
+ * The types are defined once in `@zitadel/sdk-core` and shared by every server SDK, so the session
+ * shapes an app reads are identical across frameworks. The client-safe shapes
+ * ({@link ClientSession}, {@link ClientAuthState} and {@link ClientAuthResult}) leave the raw
+ * token out on purpose: it must not be serialized into the Nuxt server-rendered payload, where
+ * scripts on the page could read it. Use `getAuth` on the server when the raw token is needed.
  */
 export type {
   NextgenSession,
@@ -10,10 +13,6 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
-  // Client-safe auth shapes (token intentionally absent — it must not be
-  // serialised into the Nuxt SSR payload where third-party scripts can read
-  // it; use getAuth server-side when the raw JWT is needed). Defined in
-  // sdk-core so sdk-next's getSession() returns the identical shape.
   ClientSession,
   ClientAuthState,
   ClientAuthResult,

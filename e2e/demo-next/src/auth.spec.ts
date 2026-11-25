@@ -13,7 +13,7 @@ const DEMO_PROJECT_ID = process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo
  * 4. The demo project's session cookie is set on the demo origin, and
  *    `<zitadel-login>`'s full-page navigation lands on the protected `/admin`
  *    route.
- * 5. `nextgenMiddleware` validates the opaque session cookie via
+ * 5. `createNextgenMiddleware` validates the opaque session cookie via
  *    `GET /sessions/me` and the client-side `SessionDetails` component
  *    fetches the email through the `/__nextgen` proxy.
  * 6. The root layout seeds `NextgenProvider` from `auth()` and the client

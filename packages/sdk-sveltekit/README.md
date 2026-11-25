@@ -38,9 +38,9 @@ Then create (or extend) `src/hooks.server.ts`:
 
 ```ts
 import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from '$app/env/private';
-import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
+import { createNextgenMiddleware } from '@zitadel/sdk-sveltekit/server';
 
-export const handle = createNextgenHandle({
+export const handle = createNextgenMiddleware({
   url: ZITADEL_URL,
   projectSecret: ZITADEL_PROJECT_SECRET,
   projectId: ZITADEL_PROJECT_ID,
@@ -65,9 +65,9 @@ Compose it with your existing hooks via `sequence()`:
 
 ```ts
 import { sequence } from '@sveltejs/kit/hooks';
-import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
+import { createNextgenMiddleware } from '@zitadel/sdk-sveltekit/server';
 
-export const handle = sequence(createNextgenHandle({ /* … */ }), myOtherHandle);
+export const handle = sequence(createNextgenMiddleware({ /* … */ }), myOtherHandle);
 ```
 
 ### 2. Type the auth locals

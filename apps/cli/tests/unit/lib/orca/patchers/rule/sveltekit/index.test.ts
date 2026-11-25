@@ -40,7 +40,7 @@ describe("SvelteKitPatcher.plan", () => {
 
     expect(writeContents(plan, "src/hooks.server.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/hooks.server.ts")).toContain("@zitadel/sdk-sveltekit/server");
-    expect(writeContents(plan, "src/hooks.server.ts")).toContain("createNextgenHandle");
+    expect(writeContents(plan, "src/hooks.server.ts")).toContain("createNextgenMiddleware");
     const envEdit = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "edit" }> =>
         op.kind === "edit" && Array.isArray(op.path) && op.path[0] === "src/env.ts",

@@ -4,7 +4,7 @@ The server half of the Zitadel SDK for Qwik 2 apps. It is a single Qwik Router `
 
 ## Main components
 
-- {@link index.createNextgenOnRequest | createNextgenOnRequest} builds the `onRequest` handler you export from a root plugin such as `src/routes/plugin@nextgen.ts`. Use it once per app; it proxies, verifies and guards in one pass.
+- {@link index.createNextgenMiddleware | createNextgenMiddleware} builds the `onRequest` handler you export from a root plugin such as `src/routes/plugin@nextgen.ts`. Use it once per app; it proxies, verifies and guards in one pass.
 - {@link index.getAuth | getAuth} reads the auth result the handler left on the request. Call it in a `routeLoader$`, `routeAction$` or endpoint to learn who is signed in.
 - {@link index.configureZitadel | configureZitadel}, {@link index.getApi | getApi} and {@link index.getZitadelConfig | getZitadelConfig} configure and read the project the SDK talks to. They are re-exported so an app that depends only on this package needs no other import for them.
 - {@link index.QwikRequestEvent | QwikRequestEvent} is the slice of Qwik Router's `RequestEvent` the handler reads. You do not build one; it is documented so you can see exactly which fields the handler depends on.
@@ -31,4 +31,4 @@ The handler is written against Web standards only (`Request`, `Response`, `fetch
 ## Where to go next
 
 - The [README on GitHub](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-router#readme) has installation, the handler options table and setup steps.
-- Start from {@link index.createNextgenOnRequest | createNextgenOnRequest}, then {@link index.getAuth | getAuth}.
+- Start from {@link index.createNextgenMiddleware | createNextgenMiddleware}, then {@link index.getAuth | getAuth}.

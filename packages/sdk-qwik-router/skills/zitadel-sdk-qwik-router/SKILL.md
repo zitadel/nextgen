@@ -43,9 +43,9 @@ must migrate to `@qwik.dev/*` first.
 **1. Request handler.** Add a root plugin, e.g. `src/routes/plugin@nextgen.ts`:
 
 ```ts
-import { createNextgenOnRequest } from '@zitadel/sdk-qwik-router/server';
+import { createNextgenMiddleware } from '@zitadel/sdk-qwik-router/server';
 
-export const onRequest = createNextgenOnRequest({
+export const onRequest = createNextgenMiddleware({
   protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
   loginPath: '/login',
 });
@@ -57,7 +57,7 @@ read per request from Qwik Router's `requestEvent.env` (where Vite loads
 Sessions count only in the app's own project: `projectId`, else
 `ZITADEL_PROJECT_ID`, else `PUBLIC_ZITADEL_PROJECT_ID`, read the same way. With
 none set, nobody is signed in. To run
-alongside your own handler, export an array: `[createNextgenOnRequest({...}), myOnRequest]`.
+alongside your own handler, export an array: `[createNextgenMiddleware({...}), myOnRequest]`.
 
 **2. Read auth server-side** with `getAuth(ev)` in a `routeLoader$`, action, or
 endpoint:

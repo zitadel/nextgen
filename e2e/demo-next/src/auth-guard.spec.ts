@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 /**
  * Middleware redirect contract. The Vitest suite stubs the SDK; this test
- * exercises the real `nextgenMiddleware` running inside Next, including
+ * exercises the real `createNextgenMiddleware` running inside Next, including
  * its matcher config and the JWKS verification short-circuit.
  */
 test("redirects unauthenticated requests to /admin back to /login", async ({ page }) => {

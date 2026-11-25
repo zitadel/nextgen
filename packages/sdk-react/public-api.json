@@ -1,0 +1,24 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.tsx",
+      "kind": "ui",
+      "extras": [
+        "ClientAuthResult",
+        "ClientAuthState",
+        "ClientSession",
+        "GetSessionOptions",
+        "SessionError",
+        "SessionErrorCode",
+        "SessionSnapshot",
+        "SessionStatus",
+        "SessionStore",
+        "SessionStoreOptions",
+        "UseSessionResult",
+        "getSession",
+        "sessionStore",
+        "useSession"
+      ]
+    }
+  }
+}

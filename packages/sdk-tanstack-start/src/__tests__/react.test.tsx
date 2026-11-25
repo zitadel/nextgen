@@ -14,19 +14,18 @@ import type {
   ZitadelFlowInputDetail,
   ZitadelFlowRedirectDetail,
   ZitadelFlowStepDetail,
-  ZitadelLoginConfig,
   ZitadelLoginProps,
-  ZitadelLoginReactProps,
-  ZitadelLogoutConfig,
   ZitadelLogoutProps,
-  ZitadelLogoutReactProps,
-  ZitadelSessionConfig,
   ZitadelSessionProps,
-  ZitadelSessionReactProps,
   ZitadelSignoutDetail,
 } from "../react";
 import * as tanstackReact from "../react";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "../react";
+import type {
+  ZitadelLoginConfig,
+  ZitadelLogoutConfig,
+  ZitadelSessionConfig,
+} from "@zitadel/sdk-core/types";
 import { widgetTags } from "@zitadel/sdk-core/types";
 
 // React only flushes effects synchronously inside act() when it knows it runs
@@ -182,36 +181,23 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expect(tanstackReact.businessLocales).toBe(sdkReact.businessLocales);
   });
 
-  it("exports only the public types, all of them @zitadel/sdk-react's", () => {
+  it("exports only the standard types, all of them @zitadel/sdk-react's", () => {
     const names = typeOnlyExports("@zitadel/sdk-tanstack-start/react", tanstackReact);
     const sdkReactNames = typeOnlyExports("@zitadel/sdk-react", sdkReact);
 
     expect(names.filter((name) => !sdkReactNames.includes(name))).toEqual([]);
     expect(names).toEqual(
       [
-        "CreateFlowBodyPurpose",
-        "ZitadelConfig",
+        "ZitadelFlowPurpose",
         "ZitadelFlowCompleteDetail",
         "ZitadelFlowErrorDetail",
         "ZitadelFlowInputDetail",
         "ZitadelFlowRedirectDetail",
         "ZitadelFlowStepDetail",
-        "ZitadelLoginConfig",
-        "ZitadelLoginHandlers",
         "ZitadelLoginProps",
-        "ZitadelLoginReactProps",
-        "ZitadelLogoutConfig",
-        "ZitadelLogoutHandlers",
         "ZitadelLogoutProps",
-        "ZitadelLogoutReactProps",
-        "ZitadelNavigationDetail",
-        "ZitadelProject",
-        "ZitadelSessionConfig",
-        "ZitadelSessionHandlers",
         "ZitadelSessionProps",
-        "ZitadelSessionReactProps",
         "ZitadelSignoutDetail",
-        "ZitadelWidgetAttributes",
       ].sort(),
     );
   }, 120_000);
@@ -224,11 +210,8 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expectTypeOf<ZitadelFlowErrorDetail>().toEqualTypeOf<sdkReact.ZitadelFlowErrorDetail>();
     expectTypeOf<ZitadelSignoutDetail>().toEqualTypeOf<sdkReact.ZitadelSignoutDetail>();
     expectTypeOf<ZitadelLoginProps>().toEqualTypeOf<sdkReact.ZitadelLoginProps>();
-    expectTypeOf<ZitadelLoginReactProps>().toEqualTypeOf<sdkReact.ZitadelLoginReactProps>();
     expectTypeOf<ZitadelLogoutProps>().toEqualTypeOf<sdkReact.ZitadelLogoutProps>();
-    expectTypeOf<ZitadelLogoutReactProps>().toEqualTypeOf<sdkReact.ZitadelLogoutReactProps>();
     expectTypeOf<ZitadelSessionProps>().toEqualTypeOf<sdkReact.ZitadelSessionProps>();
-    expectTypeOf<ZitadelSessionReactProps>().toEqualTypeOf<sdkReact.ZitadelSessionReactProps>();
   });
 });
 

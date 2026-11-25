@@ -9,7 +9,7 @@ widgets are not in this package: they come from `@zitadel/sdk-svelte`.
 
 ## Main components
 
-- {@link server!createNextgenHandle} builds the `handle` hook for `src/hooks.server.ts`.
+- {@link server!createNextgenMiddleware} builds the `handle` hook for `src/hooks.server.ts`.
   Use it once per app; compose it with your own hooks through `sequence()`.
 - {@link server!getAuth} reads the verified auth state from a request event in a load
   function, endpoint or action, after the hook has run.
@@ -33,13 +33,13 @@ front of every request:
   the `POST /sessions/exchange` handoff alone and never reaches the browser.
 - Every other request has its session token verified against the server's
   JWKS with Web Crypto, and the result is written to `event.locals.nextgenAuth`.
-  `App.Locals` is augmented for you, so `getAuth(event)` is typed.
+  `App.Locals` is augmented for you, so {@link server!getAuth} is typed.
 - On a protected route with no valid session the hook redirects to `loginPath`
   with the requested path in `?next=`. If the backend cannot say whether the
   session is live, the route answers `503` instead of sending a signed-in
   user to the login page.
 - Protection covers full page loads. Client-side navigation does not reach the
-  hook, so guard such pages with a load function that calls `getAuth`.
+  hook, so guard such pages with a load function that calls {@link server!getAuth}.
 
 The hook settings are read from the options you pass; when left out, `url`,
 `projectSecret` and `projectId` fall back to `process.env`, which SvelteKit
@@ -58,4 +58,4 @@ nothing.
 
 - The [README](https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit#readme)
   has install and setup steps.
-- Start from {@link server!createNextgenHandle}, then {@link server!getAuth}.
+- Start from {@link server!createNextgenMiddleware}, then {@link server!getAuth}.

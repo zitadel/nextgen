@@ -41,8 +41,8 @@ where the code runs, not the root, from client modules:
 
 | Import                         | Runs in                           | Provides                           |
 | ------------------------------ | --------------------------------- | ---------------------------------- |
-| `@zitadel/sdk-next/middleware` | Edge middleware                   | `nextgenMiddleware`, `createProxy` |
-| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `NextgenProvider`        |
+| `@zitadel/sdk-next/middleware` | Edge middleware                   | `createNextgenMiddleware`, `createProxy` |
+| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `getAuth()`, `NextgenProvider`        |
 | `@zitadel/sdk-next/react`      | Client Components                 | `useAuth()`, `AuthContextProvider` |
 | `@zitadel/sdk-next/session`    | Client Components                 | `getSession()`                     |
 | `@zitadel/sdk-next/client`     | Client boundary                   | `configureZitadel()`, web components |
@@ -62,11 +62,11 @@ The body is the same either way (only the file and function name change):
 ```ts
 // Next 16+: src/proxy.ts, exporting `proxy`.
 // Next 15:  src/middleware.ts, exporting `middleware` (rename the function).
-import { nextgenMiddleware } from '@zitadel/sdk-next/middleware';
+import { createNextgenMiddleware } from '@zitadel/sdk-next/middleware';
 import type { NextRequest } from 'next/server';
 
 export function proxy(req: NextRequest) {
-  return nextgenMiddleware(req, {
+  return createNextgenMiddleware(req, {
     url: process.env.ZITADEL_URL,
     protectedRoutes: ['/admin', '/dashboard*'],
     loginPath: '/login',
@@ -81,16 +81,16 @@ export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)
 When unsure which the installed Next.js uses, check the CLI's own output — its
 patcher emits `middleware.ts` for Next 15 and `proxy.ts` for Next 16+.
 
-**2. Read the session server-side** with `auth()` (it re-verifies the tunnelled
+**2. Read the session server-side** with `getAuth()` (it re-verifies the tunnelled
 token — the header alone is never trusted):
 
 ```tsx
-import { auth } from '@zitadel/sdk-next/server';
+import { getAuth } from '@zitadel/sdk-next/server';
 
 // Render <Greeting /> inside <Suspense>: with Cache Components on (the
 // create-next-app default), Next.js refuses request data outside it.
 async function Greeting() {
-  const session = await auth();
+  const session = await getAuth();
   if (!session.isAuthenticated) return <p>Not signed in</p>;
   return <p>Hello {session.session.display ?? session.session.userId}</p>;
 }
@@ -147,7 +147,7 @@ Confirm names against those before writing code.
 ## Gotchas
 
 - **Never import the package root from a `"use client"` module.** The root
-  re-exports the server-only `auth()`; pulling it into a client graph fails the
+  re-exports the server-only `getAuth()`; pulling it into a client graph fails the
   build. Client code imports from `/react` or `/session` only.
 - **`NextgenProvider` is server-only** and must not be re-exported through a
   `"use client"` `providers.tsx` wrapper — that would leak the unstripped token
@@ -159,14 +159,14 @@ Confirm names against those before writing code.
 - **A protected route must be in the matcher too.** Next.js runs the
   middleware only on routes the matcher covers, so a `protectedRoutes` entry a
   narrower matcher misses is never redirected. Keep the every-route matcher.
-- **`auth()` only sees a session on routes the matcher covers.** A header on an
+- **`getAuth()` only sees a session on routes the matcher covers.** A header on an
   unmatched public page always looks signed out — use `getSession()` there.
 - **A rejected `getSession()` means *unknown*, not signed out** (broken proxy /
   network / 5xx). Render a neutral or error state, never the signed-out CTA.
 - **Config handles:** `ZITADEL_URL` (backend, server-side),
   `ZITADEL_PROJECT_ID` (server-side) and `NEXT_PUBLIC_ZITADEL_PROJECT_ID`
   (passed to `configureZitadel`). If the middleware runs with custom
-  verification options, pass the same ones to `auth()` so both layers accept
+  verification options, pass the same ones to `getAuth()` so both layers accept
   the same tokens.
 - **Sessions count only in the app's own project:** `projectId`, else
   `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`. With none set,

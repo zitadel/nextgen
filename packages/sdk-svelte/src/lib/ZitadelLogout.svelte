@@ -3,7 +3,7 @@
   import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
-  import type { ZitadelLogoutSvelteProps } from './types';
+  import type { ZitadelLogoutProps } from './types';
   import { assignGiven } from './given';
   import { withDetail } from './events';
   import { onClient, proxyPathAttr } from './attributes';
@@ -16,7 +16,7 @@
     theme,
     onSignout,
     ...rest
-  }: ZitadelLogoutSvelteProps = $props();
+  }: ZitadelLogoutProps = $props();
 
   // The standard HTML attributes are the only extra props the element takes.
   const attributes = $derived(standardAttributes(rest));
@@ -69,17 +69,22 @@
   @component
   Renders the sign-out control as a `<zitadel-logout>` custom element.
 
-  Like the other wrappers it writes `projectId` and `proxyPath` as the
-  `project-id` and `proxy-path` attributes for server markup, assigns the
-  `project` handle as a property in the browser, and forwards the element's
-  `zitadel-signout` event to `onSignout`; a promise the callback returns delays
-  the post-sign-out navigation for up to two seconds.
+  Like the other wrappers, it writes `projectId` and `proxyPath` as the `project-id` and
+  `proxy-path` attributes so server-rendered markup carries them, assigns the project handle as a
+  property in the browser (the handle wins over the plain values when both are given), and
+  forwards the element's `zitadel-signout` event to `onSignout`. A promise the callback returns
+  delays the post-sign-out navigation for up to two seconds. `theme` is assigned only when set, so
+  an unset prop keeps the element's own default.
 
-  Use it where the app offers a stand-alone sign-out button; use the session
-  card when the user's identity should be shown as well. Props are typed by
-  {@link ZitadelLogoutSvelteProps}. `getElement()` returns the underlying
-  element, or `undefined` before mount, via `bind:this`.
+  Use it where the application offers a stand-alone sign-out button. Use the session card instead
+  when the signed-in identity should be shown as well. Props are typed by
+  {@link ZitadelLogoutProps}. `getElement()` returns the underlying element, or `undefined`
+  before mount, and is reachable through `bind:this`.
 
   @example
+  <script lang="ts">
+    import { ZitadelLogout } from '@zitadel/sdk-svelte';
+  </script>
+
   <ZitadelLogout {project} postSignOutUrl="/login" />
 -->

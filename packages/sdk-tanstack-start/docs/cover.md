@@ -6,7 +6,7 @@ The Zitadel SDK for TanStack Start apps. It is for developers who want sign-in, 
 
 Server, from `@zitadel/sdk-tanstack-start/server`:
 
-- {@link server!createNextgenRequestMiddleware} builds the request-middleware handler you register in `src/start.ts`. Use it for every app: it proxies auth traffic, verifies the session and guards protected routes in one pass.
+- {@link server!createNextgenMiddleware} builds the request-middleware handler you register in `src/start.ts`. Use it for every app: it proxies auth traffic, verifies the session and guards protected routes in one pass.
 - {@link server!getAuth} reads the signed-in user from the context a server function receives. Use it in a server function, and call that function from a route's `beforeLoad` to guard the route.
 - {@link server!handleNextgenRequest} is the same proxy, verify and protect decision as a plain function from a `Request` to a {@link server!NextgenRequestDecision}. Use it when you wire a custom server entry instead of TanStack Start's middleware.
 
@@ -37,4 +37,4 @@ The `/react` entry loads without a DOM: `@zitadel/components` has an edge build 
 ## Where to go next
 
 - The [README on GitHub](https://github.com/zitadel/nextgen/tree/main/packages/sdk-tanstack-start#readme) has the install steps and the full middleware option table.
-- Start from {@link server!createNextgenRequestMiddleware} for the server and {@link react!ZitadelLogin} for the browser.
+- Start from {@link server!createNextgenMiddleware} for the server and {@link react!ZitadelLogin} for the browser.

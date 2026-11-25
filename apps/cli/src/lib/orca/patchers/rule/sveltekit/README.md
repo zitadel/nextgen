@@ -1,7 +1,7 @@
 # SvelteKit patcher
 
 Integrates Zitadel auth into a SvelteKit app. Like Next and Nuxt, SvelteKit proxies and
-verifies the session server-side — here through the `createNextgenHandle` hook from
+verifies the session server-side — here through the `createNextgenMiddleware` hook from
 `@zitadel/sdk-sveltekit`.
 
 The detector requires `@sveltejs/kit` 3 or newer (for `$app/env/private`) and `svelte` 5 or newer (the widgets come

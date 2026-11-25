@@ -12,7 +12,7 @@ import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contra
 
 import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
 
-import { nextgenMiddleware } from "../middleware";
+import { createNextgenMiddleware } from "../middleware";
 
 const mockHeaders = vi.hoisted(() => new Map<string, string>());
 
@@ -31,7 +31,7 @@ async function serve(
   });
   // Next 15 exposes the runtime-provided address as `request.ip`; a header never stands in for it.
   Object.defineProperty(request, "ip", { value: init.clientIp });
-  const response = await nextgenMiddleware(request, options);
+  const response = await createNextgenMiddleware(request, options);
   const continued = response.headers.has("x-middleware-next");
   // Next.js hands server components the request headers with the middleware's overrides applied.
   const inbound = new Headers(request.headers);
@@ -40,7 +40,7 @@ async function serve(
       inbound.set(name.slice("x-middleware-request-".length), value);
     }
   }
-  // A server component reads the session with auth(), which checks the token
+  // A server component reads the session with getAuth(), which checks the token
   // the middleware handed on: off a protected route, an opaque one unchecked.
   const auth = continued
     ? await readAuth({ "x-nextgen-auth-token": inbound.get("x-nextgen-auth-token") ?? "" }, options)
@@ -73,12 +73,12 @@ async function readAuth(context: unknown, options: ServeOptions = {}): Promise<A
   for (const [name, value] of Object.entries((context ?? {}) as Record<string, string>)) {
     mockHeaders.set(name, value);
   }
-  const { auth } = await import("../auth.js");
-  return auth(options);
+  const { getAuth } = await import("../auth.js");
+  return getAuth(options);
 }
 
 function expectHandlerType(): void {
-  expectTypeOf(nextgenMiddleware).toExtend<(request: NextRequest) => Promise<Response>>();
+  expectTypeOf(createNextgenMiddleware).toExtend<(request: NextRequest) => Promise<Response>>();
 }
 
 describeServerMiddleware({

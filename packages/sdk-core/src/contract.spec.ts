@@ -451,14 +451,18 @@ describe("SDK READMEs ↔ opening structure", () => {
  * would make one SDK export what the others do not.
  */
 const IMPORT_BLOCK = [
-  "// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.",
-  "// The edge build of the components package has no elements, so this does nothing there.",
+  "/*",
+  " * Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.",
+  " * The edge build of the components package has no elements, so this does nothing there.",
+  " */",
   'import "@zitadel/components";',
 ].join("\n");
 
 const EXPORT_BLOCK = [
-  "// Re-exported so scaffolded apps can wire the business copy overlay without a",
-  "// direct @zitadel/components dependency (strict package managers reject those).",
+  "/*",
+  " * Re-exported so scaffolded apps can wire the business copy overlay without a",
+  " * direct @zitadel/components dependency (strict package managers reject those).",
+  " */",
   'export { businessLocales } from "@zitadel/components";',
 ].join("\n");
 
@@ -818,9 +822,15 @@ describe("SDK public API ↔ the standard", () => {
     "ZitadelFlowRedirectDetail",
     "ZitadelFlowErrorDetail",
     "ZitadelSignoutDetail",
-    "CreateFlowBodyPurpose",
+    "ZitadelFlowPurpose",
   ];
-  const SETUP = ["configureZitadel", "getApi", "getZitadelConfig", "ZitadelProject", "ZitadelConfig"];
+  const SETUP = [
+    "configureZitadel",
+    "getApi",
+    "getZitadelConfig",
+    "ZitadelProject",
+    "ZitadelConfig",
+  ];
   const SERVER = [
     "createNextgenMiddleware",
     "getAuth",
@@ -863,7 +873,12 @@ describe("SDK public API ↔ the standard", () => {
     const checker = program.getTypeChecker();
     const file = program.getSourceFile(entryFile);
     const symbol = file ? checker.getSymbolAtLocation(file) : undefined;
-    return symbol ? checker.getExportsOfModule(symbol).map((exported) => exported.name).sort() : [];
+    return symbol
+      ? checker
+          .getExportsOfModule(symbol)
+          .map((exported) => exported.name)
+          .sort()
+      : [];
   }
 
   const read = (dir: string): PublicApi =>
@@ -875,9 +890,11 @@ describe("SDK public API ↔ the standard", () => {
 
   it.each(sdkDirs)("%s declares every entry its package.json exports", (dir) => {
     const exported = Object.keys(
-      (JSON.parse(readFileSync(`${packagesDir}${dir}/package.json`, "utf8")) as {
-        exports?: Record<string, unknown>;
-      }).exports ?? {},
+      (
+        JSON.parse(readFileSync(`${packagesDir}${dir}/package.json`, "utf8")) as {
+          exports?: Record<string, unknown>;
+        }
+      ).exports ?? {},
     ).filter((key) => key !== "./package.json");
     expect(Object.keys(read(dir).entries).sort()).toEqual(exported.sort());
   });
@@ -892,5 +909,35 @@ describe("SDK public API ↔ the standard", () => {
       },
       120_000,
     );
+  });
+});
+
+/**
+ * The documentation standard of every SDK (ADR 090): a doc comment is always a multi-line block.
+ *
+ * A one-line `/** text *\/` leaves no room for the reason, the behaviour or an example, and the
+ * SDKs' references are read by people and by coding agents that have nothing else to go on. The
+ * check reads the source of every `sdk-*` package, specs and tests excluded.
+ */
+describe("SDK doc comments ↔ the documentation standard", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const sdkDirs = readdirSync(packagesDir).filter((dir) => dir.startsWith("sdk-"));
+  const SINGLE_LINE_DOC = /\/\*\*[^\n*][^\n]*\*\//;
+  const TEST_FILE = /\.(spec|test)\.[cm]?[jt]sx?$|__tests__|test-setup|\.d\.ts$/;
+  const SOURCE_FILE = /\.(ts|tsx|vue|svelte)$/;
+
+  /** Every source file below `dir`, as paths relative to the packages directory. */
+  const sourcesOf = (dir: string): string[] =>
+    readdirSync(`${packagesDir}${dir}/src`, { recursive: true, encoding: "utf8" })
+      .filter((file) => SOURCE_FILE.test(file) && !TEST_FILE.test(file))
+      .map((file) => `${dir}/src/${file}`);
+
+  it.each(sdkDirs)("%s has no single-line doc comment", (dir) => {
+    const offenders = sourcesOf(dir).flatMap((path) =>
+      readFileSync(`${packagesDir}${path}`, "utf8")
+        .split("\n")
+        .flatMap((line, at) => (SINGLE_LINE_DOC.test(line) ? [`${path}:${at + 1}`] : [])),
+    );
+    expect(offenders).toEqual([]);
   });
 });

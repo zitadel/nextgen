@@ -28,11 +28,7 @@ import { createServer } from "vite";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
-import type {
-  ZitadelLoginSvelteProps,
-  ZitadelLogoutSvelteProps,
-  ZitadelSessionSvelteProps,
-} from "./lib/types";
+import type { ZitadelLoginProps, ZitadelLogoutProps, ZitadelSessionProps } from "./lib/types";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
@@ -570,9 +566,9 @@ type ForwardedAttributes = {
 };
 
 type WidgetProps = {
-  login: ZitadelLoginSvelteProps;
-  logout: ZitadelLogoutSvelteProps;
-  session: ZitadelSessionSvelteProps;
+  login: ZitadelLoginProps;
+  logout: ZitadelLogoutProps;
+  session: ZitadelSessionProps;
 };
 
 // Svelte assigns `title` to the element as a property and leaves "null" there when it is removed.

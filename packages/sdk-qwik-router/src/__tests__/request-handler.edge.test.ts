@@ -1,4 +1,4 @@
-import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
+import { createNextgenMiddleware } from "@zitadel/sdk-qwik-router/server";
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
@@ -8,7 +8,7 @@ import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract
 async function serve(request: Request, options: NextgenMiddlewareOptions): Promise<Response> {
   let sent: Response | undefined;
   try {
-    await createNextgenOnRequest(options)({
+    await createNextgenMiddleware(options)({
       request,
       url: new URL(request.url),
       sharedMap: new Map(),

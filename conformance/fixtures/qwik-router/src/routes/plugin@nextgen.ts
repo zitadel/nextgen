@@ -1,7 +1,7 @@
 // zitadel-cli: managed-file v1
-import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
+import { createNextgenMiddleware } from "@zitadel/sdk-qwik-router/server";
 
-export const onRequest = createNextgenOnRequest({
+export const onRequest = createNextgenMiddleware({
   protectedRoutes: ["/profile"],
   loginPath: "/login",
 });

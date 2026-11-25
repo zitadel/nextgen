@@ -11,20 +11,23 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "./config.js";
+import type { ZitadelProject } from "@zitadel/api/config";
 
 import "@zitadel/components";
 
 /**
- * Angular wrapper for the `<zitadel-session>` Lit web component — the
- * post-sign-in "signed in as" card. See {@link ZitadelLoginComponent} for the
- * strategy. The widget's `zitadel-signout` event is re-emitted with its detail
- * as the `signout` output. The underlying `<zitadel-session>` custom element is
- * exposed via the {@link element} getter.
+ * Renders the signed-in "signed in as" card with a sign-out action inside an Angular template.
  *
+ * The component wraps the `<zitadel-session>` widget and has the selector `zitadel-auth-session`.
+ * Use it after sign-in, on a page that shows who is signed in. The inputs and the server-render
+ * behavior are the same as for {@link ZitadelLoginComponent}. The widget fires `zitadel-signout`,
+ * and the component re-emits its detail on {@link ZitadelSessionComponent.signout}. The underlying
+ * element is reachable through {@link ZitadelSessionComponent.element}.
+ *
+ * @example
  * ```html
- * <zitadel-auth-session [project]="project" postSignOutUrl="/login"
- *   (signout)="onSignout($event)" />
+ * <zitadel-auth-session [project]="project" postSignOutUrl="/login" (signout)="onSignout($event)"
+ * />
  * ```
  */
 @Component({
@@ -50,70 +53,160 @@ import "@zitadel/components";
 })
 export class ZitadelSessionComponent {
   /**
-   * The handle from {@link configureZitadel}. When set it wins over the discrete
-   * `projectId` and `proxyPath`, as it does inside the element. Bound as a DOM
-   * property, and its `projectId`, `proxyPath` and `url` are also written as
-   * attributes so server-rendered markup carries them before hydration.
+   * The project handle that tells the widget which project to talk to.
+   *
+   * Create it once with {@link configureZitadel} and pass it here. When set, it wins over {@link
+   * ZitadelSessionComponent.projectId} and {@link ZitadelSessionComponent.proxyPath}, as it does
+   * inside the widget. It is bound as a DOM property, and its project id, proxy path and `url` are
+   * also written as the `project-id`, `proxy-path` and `url` attributes, so server-rendered markup
+   * carries them before hydration. Unset, the widget falls back to the discrete inputs and then to
+   * the globally registered project.
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session [project]="project" />
+   * ```
    */
   @Input() project?: ZitadelProject;
   /**
-   * Project id, read only when no `project` handle is set. Written as the
-   * `project-id` attribute so it survives server rendering. Unset leaves the widget
-   * to fall back to the globally configured project.
+   * The id of the project the widget works with.
+   *
+   * Use it when you do not have a project handle. It is read only when {@link
+   * ZitadelSessionComponent.project} is unset, and it is written as the `project-id` attribute so
+   * it survives server rendering. Unset, the widget falls back to the globally registered project.
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session projectId="123456789" />
+   * ```
    */
   @Input() projectId?: string;
   /**
-   * Same-origin path the widget calls, read only when no `project` handle is set.
-   * Written as the `proxy-path` attribute. Unset means `"/__nextgen"`, the
-   * same-origin proxy that fronts the API.
+   * The same-origin proxy path the widget calls instead of the Zitadel API directly.
+   *
+   * The widget requests `${proxyPath}/...` on your app's own origin, so the browser never calls
+   * Zitadel across origins and no credentials leave your origin. It is read only when {@link
+   * ZitadelSessionComponent.project} is unset, and it is written as the `proxy-path` attribute.
+   * Your hosting platform must route this path to Zitadel.
+   *
+   * @defaultValue "/__nextgen"
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session proxyPath="/auth-proxy" />
+   * ```
    */
   @Input() proxyPath?: string;
   /**
-   * Where to navigate after sign-out. Unset leaves navigation to your `signout`
-   * handler.
+   * The URL the widget navigates to after sign-out.
+   *
+   * Unset leaves navigation to your `signout` handler, so use it when the destination is static.
+   * Navigation waits for any promise registered through `waitUntil` on the event detail. It is
+   * written as the `post-sign-out-url` attribute.
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session postSignOutUrl="/login" />
+   * ```
    */
   @Input() postSignOutUrl?: string;
   /**
-   * Heading text override. Unset keeps the widget's `"Signed in as"`.
+   * The heading text of the card.
+   *
+   * Unset keeps the widget's built-in heading, "Signed in as". It is written as the `heading`
+   * attribute.
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session heading="Current account" />
+   * ```
    */
   @Input() heading?: string;
   /**
-   * Label of the sign-out action. Unset keeps the widget's `"Sign out"`.
+   * The label of the sign-out action.
+   *
+   * Unset keeps the widget's built-in label, "Sign out". It is written as the `logout-label`
+   * attribute.
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session logoutLabel="Leave" />
+   * ```
    */
   @Input() logoutLabel?: string;
   /**
-   * Surface variant. `"widget"` is content-sized and paints no page chrome;
-   * `"page"` claims the viewport, paints the surface background and loads the brand
-   * font. Unset keeps the widget's default, `"widget"`.
+   * The surface variant of the widget.
+   *
+   * `"widget"` is content-sized and paints no page chrome, so it fits inside your own layout.
+   * `"page"` claims the viewport, paints the surface background and loads the brand font, so it
+   * suits a page that holds nothing else. Unset omits the `variant` attribute and the widget uses
+   * its default.
+   *
+   * @defaultValue "widget"
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session variant="page" />
+   * ```
    */
   @Input() variant?: "widget" | "page";
   /**
-   * Colour mode: `"light"`, `"dark"` or `"auto"` (follows `prefers-color-scheme`).
-   * Unset lets the widget decide from its own defaults.
+   * The colour mode of the widget.
+   *
+   * Use `"auto"` to follow the operating system through `prefers-color-scheme`, or `"light"` or
+   * `"dark"` to pin one mode. Unset omits the `theme` attribute and the widget decides from its own
+   * defaults.
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session theme="dark" />
+   * ```
    */
   @Input() theme?: "light" | "dark" | "auto";
   /**
-   * Visually hides the widget's own heading block while keeping it in the
-   * accessibility tree, for pages that already carry the heading. Unset keeps it
-   * visible.
+   * Whether the widget hides its own heading block.
+   *
+   * The heading stays in the accessibility tree and is only hidden visually, so use it on a page
+   * that already carries its own heading. Unset keeps the heading visible.
+   *
+   * @defaultValue false
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session [suppressHeader]="true" />
+   * ```
    */
   @Input() suppressHeader?: boolean;
   /**
-   * Emits the `zitadel-signout` detail when the user signs out. The detail carries
-   * `waitUntil(promise)`; call it to make the widget wait for your async work before
-   * it navigates.
+   * Emits the `zitadel-signout` detail when the user signs out.
+   *
+   * Use it to clear your own app state. The detail carries `waitUntil(promise)`: call it to make
+   * the widget wait for your asynchronous work before it navigates to the post-sign-out URL.
+   *
+   * @example
+   * ```html
+   * <zitadel-auth-session (signout)="onSignout($event)" />
+   * ```
    */
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelSessionElement>;
 
-  /** The underlying `<zitadel-session>` custom element, or `null` before view init. */
+  /**
+   * The underlying `<zitadel-auth-session>` custom element, or `null` before the view is
+   * initialized.
+   *
+   * Use it for what the inputs do not cover, such as calling a method on the element or attaching
+   * an extra listener. It is `null` until Angular has rendered the template.
+   */
   get element(): ZitadelSessionElement | null {
     return this.elementRef?.nativeElement ?? null;
   }
 
   /**
-   * Re-emits a `zitadel-signout` DOM event's detail on {@link signout}.
+   * Re-emits a `zitadel-signout` DOM event's detail on {@link ZitadelSessionComponent.signout}.
+   *
+   * The template calls it, so you do not. It is public only because Angular templates read it.
    *
    * @param event - The DOM event; anything that is not a `CustomEvent` is ignored.
    */

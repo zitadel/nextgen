@@ -4,9 +4,9 @@ Svelte 5 components for the Zitadel auth UI, for client-side single-page apps (V
 
 ## Main components
 
-- {@link ZitadelLogin} renders the sign-in flow. Use it on the page that signs a visitor in; its props are {@link ZitadelLoginSvelteProps}.
-- {@link ZitadelLogout} renders a sign-out control. Use it where the app needs a stand-alone sign-out button; its props are {@link ZitadelLogoutSvelteProps}.
-- {@link ZitadelSession} renders the signed-in session card with a sign-out action. Use it to show who is signed in; its props are {@link ZitadelSessionSvelteProps}.
+- {@link ZitadelLogin} renders the sign-in flow. Use it on the page that signs a visitor in; its props are {@link ZitadelLoginProps}.
+- {@link ZitadelLogout} renders a sign-out control. Use it where the app needs a stand-alone sign-out button; its props are {@link ZitadelLogoutProps}.
+- {@link ZitadelSession} renders the signed-in session card with a sign-out action. Use it to show who is signed in; its props are {@link ZitadelSessionProps}.
 - {@link configureZitadel} creates the {@link ZitadelProject} handle that the components take as `project`, and {@link getZitadelConfig} and {@link getApi} read it back.
 - {@link businessLocales} is the business copy overlay for the `locales` prop. It is re-exported so apps need no direct `@zitadel/components` dependency.
 

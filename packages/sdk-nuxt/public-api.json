@@ -1,0 +1,30 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.ts",
+      "kind": "other",
+      "extras": [
+        "AuthResult",
+        "AuthState",
+        "ClientAuthResult",
+        "NextgenMiddlewareOptions",
+        "NextgenSession",
+        "UnauthState",
+        "ZitadelProject",
+        "businessLocales",
+        "createNextgenMiddleware",
+        "getAuth",
+        "useZitadelProject"
+      ]
+    },
+    "./module": {
+      "source": "src/module.ts",
+      "kind": "other",
+      "extras": ["default"]
+    },
+    "./server": {
+      "source": "src/server.ts",
+      "kind": "server"
+    }
+  }
+}

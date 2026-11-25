@@ -14,7 +14,7 @@ The detector requires `next` 15.2.3 or newer; older versions are refused.
 - `<appDir>/profile/page.tsx` — profile route (renderer-dependent)
 - `<appDir>/{login,register,profile}/layout.tsx` — each route's browser tab
   title (`metadata`), which the client-component pages cannot export
-- `middleware.ts` — runs `nextgenMiddleware`; on Next 16+ the file is
+- `middleware.ts` — runs `createNextgenMiddleware`; on Next 16+ the file is
   `proxy.ts` instead, and the patcher handles the migration conflict when
   both exist
 - renderer extras — a provider component and/or `custom-elements.d.ts`
@@ -23,6 +23,6 @@ The detector requires `next` 15.2.3 or newer; older versions are refused.
 ## How the proxy works
 
 The middleware file (`middleware.ts`, or `proxy.ts` on Next 16+) runs
-`nextgenMiddleware` server-side: it proxies `/__nextgen/*` to `ZITADEL_URL`
+`createNextgenMiddleware` server-side: it proxies `/__nextgen/*` to `ZITADEL_URL`
 and gates `/profile`. There is no dev-only proxy, so it works the same in
 production.

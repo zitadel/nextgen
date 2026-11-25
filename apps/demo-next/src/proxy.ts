@@ -1,10 +1,10 @@
-import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
+import { createNextgenMiddleware } from "@zitadel/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
 import { DEMO_PROJECT_ID } from "./project";
 
 export function proxy(req: NextRequest) {
-  return nextgenMiddleware(req, {
+  return createNextgenMiddleware(req, {
     url: process.env.ZITADEL_URL ?? "http://localhost:8080",
     projectId: DEMO_PROJECT_ID,
     // `/dashboard` is not the login page's post-sign-in URL, so a sign-in

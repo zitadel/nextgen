@@ -8,5 +8,9 @@
   ],
   "tsconfig": "tsconfig.lib.json",
   "readme": "docs/cover.md",
+  "intentionallyNotExported": [
+    "Qrlify",
+    "ZitadelWidgetAttributes"
+  ],
   "out": "dist/api-docs"
 }

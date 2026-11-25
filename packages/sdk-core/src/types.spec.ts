@@ -1,6 +1,13 @@
+import type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { standardAttributes } from "./types.js";
+import { standardAttributes, type ZitadelFlowPurpose } from "./types.js";
+
+describe("ZitadelFlowPurpose", () => {
+  it("is exactly the set of purposes the API accepts", () => {
+    expectTypeOf<ZitadelFlowPurpose>().toEqualTypeOf<CreateFlowBodyPurpose>();
+  });
+});
 
 describe("standardAttributes", () => {
   it("keeps the standard attributes", () => {

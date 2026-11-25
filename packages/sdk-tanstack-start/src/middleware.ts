@@ -15,65 +15,137 @@ import {
 } from "@zitadel/sdk-core/middleware";
 
 /**
- * `process` is undefined in some edge/serverless runtimes; read env defensively
- * so omitting `url`/`projectSecret` falls back to the default instead of throwing
- * a ReferenceError.
+ * The environment, read defensively.
+ *
+ * `process` is undefined in some edge and serverless runtimes. Reading it only when it exists
+ * lets an omitted `url` or `projectSecret` fall back to its default instead of throwing a
+ * `ReferenceError`.
  */
 const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
 
 /**
- * The decision produced by {@link handleNextgenRequest}: either a ready-to-send
- * `Response` (proxy, login redirect, or a refusal: `400` for a request carrying
- * the internal auth header, `503` for a protected route whose session the
- * backend could not check) or an instruction to continue the request with the
- * resolved {@link AuthResult} attached to the router context.
+ * The decision {@link handleNextgenRequest} makes for one request.
+ *
+ * It is either a ready-to-send `Response` (a proxied answer, a login redirect, or a refusal) or
+ * an instruction to continue the request with the resolved {@link AuthResult}, which the caller
+ * attaches to the router context. Branch on `type`.
  */
 export type NextgenRequestDecision =
   | {
-      /** Discriminant: the request was a `/__nextgen/*` call forwarded to the auth backend. */
+      /**
+       * The discriminant for a request that was a call under the proxy path, forwarded to the
+       * auth backend.
+       */
       readonly type: "proxy";
-      /** The backend's answer, with the session cookie renamed for the browser. Send it as is. */
+      /**
+       * The backend's answer, with the session cookie renamed for the browser.
+       *
+       * Send it as is.
+       */
       readonly response: Response;
     }
   | {
-      /** Discriminant: an unauthenticated request for a protected route. */
+      /**
+       * The discriminant for an unauthenticated request for a protected route.
+       */
       readonly type: "redirect";
-      /** A `302` to the login path, carrying the requested path in `?next=`. Send it as is. */
+      /**
+       * A `302` to the login path that carries the requested path in `?next=`.
+       *
+       * Send it as is. It also carries the cookie updates and `Cache-Control: private,
+       * no-store` when there are any. Only the pathname goes into `next`, so the query string of
+       * a deep link is not restored after sign-in, and the widget follows `next` only when it
+       * is a path on the page's own origin. A `302` turns a non-GET request into a GET, which is
+       * why an undecided session answers `503` instead.
+       */
       readonly response: Response;
     }
   | {
-      /** Discriminant: the request was refused. */
+      /**
+       * The discriminant for a refused request.
+       */
       readonly type: "reject";
-      /** The refusal: `400` for the internal auth header, `503` when the session could not be checked. */
+      /**
+       * The refusal: `400` for a request that carries the internal auth header, or `503` when
+       * the backend could not check the session of a protected route.
+       *
+       * Send it as is. The `503` is deliberate. The backend answers `500`, never `401`, when it
+       * cannot decide, because the SDKs clear the session cookie on a `401`. A redirect would
+       * tell a visitor who may well be signed in that they are signed out, add load to a
+       * struggling backend, and drop a non-GET request. A `503` is the status that clients and
+       * fetch wrappers retry, and the cookie is kept so the next request checks again.
+       */
       readonly response: Response;
     }
   | {
-      /** Discriminant: the request may proceed to the app. */
+      /**
+       * The discriminant for a request that may proceed to the app.
+       */
       readonly type: "continue";
-      /** Who the request is signed in as, or the signed-out result. Attach it to the router context. */
+      /**
+       * Who the request is signed in as, or the signed-out result.
+       *
+       * Attach it to the router context.
+       */
       readonly auth: AuthResult;
       /**
-       * `Set-Cookie` values the response to this request must carry: a dead
-       * session cookie cleared, or a session of this project copied out of the
-       * shared cookie into the project's own. Empty or absent when there are
-       * none. A response that carries them also sends
-       * `Cache-Control: private, no-store`, so no shared cache keeps them.
+       * The `Set-Cookie` values the response to this request must carry.
+       *
+       * A dead session cookie is cleared so the browser stops replaying it, or a session of
+       * this project is copied out of the shared cookie into the project's own. The array is
+       * empty or absent when there is nothing to set. A response that carries these cookies
+       * also sends `Cache-Control: private, no-store`, so no shared cache keeps them.
        */
       readonly setCookies?: readonly string[];
     };
 
-/** Options accepted by {@link handleNextgenRequest} and the middleware factory. */
+/**
+ * The options accepted by {@link handleNextgenRequest} and {@link createNextgenMiddleware}.
+ *
+ * It is the shared {@link NextgenMiddlewareOptions} plus two members that only this adapter
+ * needs.
+ */
 export type NextgenRequestOptions = NextgenMiddlewareOptions & {
-  /** Project secret, sent as the bearer on the `POST /sessions/exchange` handoff only. */
+  /**
+   * The project secret, sent as the bearer on the session handoff only.
+   *
+   * Attaching it to every operation would make the public proxy an open relay with project
+   * authority, so it goes only to the handoff.
+   *
+   * It is attached to the `POST /sessions/exchange` call and to no other proxied operation,
+   * and it is never sent to the browser. A credential the caller supplied is kept instead.
+   * Read it from a server-only environment variable.
+   *
+   * @defaultValue The `ZITADEL_PROJECT_SECRET` environment variable, or none when it is unset.
+   */
   readonly projectSecret?: string;
   /**
-   * Direct client address appended to the `X-Forwarded-For` chain. Supply the
-   * address your server runtime provides; a request header is never used.
+   * The direct client address, appended to the `X-Forwarded-For` chain.
+   *
+   * Supply the address your server runtime provides. A request header is never used, because a
+   * client could forge it. An edge runtime hands the address over instead of the middleware
+   * reading a header, so pass it here on edge runtimes. A client-supplied `x-real-ip`, or any
+   * other request header, is never taken as the client address, because anyone can set it when
+   * the app is reachable directly. The address is appended to an existing `X-Forwarded-For`
+   * chain, and when none is supplied the chain is forwarded as it is.
+   *
+   * @defaultValue None, so the chain is forwarded unchanged.
    */
   readonly clientAddress?: string;
 };
 
+/**
+ * Builds the headers sent upstream: the request's own, minus hop-by-hop and internal ones.
+ *
+ * The client address is appended to `X-Forwarded-For`, and `X-Forwarded-Host` and
+ * `X-Forwarded-Proto` are set from the request URL when the request has none.
+ *
+ * @param request - The incoming Web `Request`.
+ * @param url - The parsed URL of `request`.
+ * @param clientAddress - The direct client address, or `undefined` when the runtime gives none.
+ * @returns The headers for the upstream request.
+ */
 function buildUpstreamHeaders(
   request: Request,
   url: URL,
@@ -106,9 +178,26 @@ function buildUpstreamHeaders(
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend. The session
- * cookie travels under this project's name in the browser and the server's name
- * upstream ({@link proxySessionCookies}).
+ * Forwards a `/__nextgen/*` request to the upstream auth backend.
+ *
+ * The session cookie travels under this project's name in the browser and under the server's
+ * name upstream, see {@link proxySessionCookies}. Each project keeps its session in its own
+ * cookie, because a browser shares one cookie jar across every port of a host, and apps and the
+ * Console on `localhost` would otherwise sign each other out. Another project's session cookie
+ * is never forwarded. The backend url and path are joined so a trailing slash on the url is
+ * ignored. Cookies set on the response add `Cache-Control: private, no-store`. The project secret is attached as a bearer
+ * only to the session handoff, and a credential the caller supplied is preserved. Redirects
+ * are not followed, and the upstream call is aborted after `proxyTimeoutMs`.
+ *
+ * @param request - The incoming Web `Request`.
+ * @param url - The parsed URL of `request`.
+ * @param authUrl - The base URL of the auth backend.
+ * @param proxyPath - The same-origin proxy path prefix to strip.
+ * @param projectId - The project id, used to name the project's session cookie.
+ * @param projectSecret - The project secret, sent only on the session handoff.
+ * @param clientAddress - The direct client address to append to `X-Forwarded-For`.
+ * @param proxyTimeoutMs - The upstream timeout in milliseconds.
+ * @returns The backend's answer, with the session cookie renamed for the browser.
  */
 async function proxyRequest(
   request: Request,
@@ -183,6 +272,12 @@ async function proxyRequest(
   });
 }
 
+/**
+ * Parses a `Cookie` request header into a map of cookie names to values.
+ *
+ * @param header - The raw `Cookie` header, or `null` when the request has none.
+ * @returns A map from cookie name to value, empty when the header is absent.
+ */
 function parseCookieHeader(header: string | null): Map<string, string> {
   const jar = new Map<string, string>();
   if (!header) return jar;
@@ -197,19 +292,62 @@ function parseCookieHeader(header: string | null): Map<string, string> {
 }
 
 /**
- * Framework-agnostic core that proxies, verifies the session JWT, and decides
- * route protection for a single request. The TanStack Start middleware is a thin
- * wrapper over this; the function is pure (a Web `Request` in, a
- * {@link NextgenRequestDecision} out) so it carries the full, independently
- * testable auth contract regardless of TanStack's evolving middleware surface.
+ * Decides what to do with a single request: proxy it, redirect it, refuse it, or let it
+ * through with the resolved session.
  *
- * A session counts only in the app's own project: `projectId`, else
- * `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
+ * This is the framework-agnostic core that {@link createNextgenMiddleware} wraps. It takes a
+ * Web `Request` and returns a {@link NextgenRequestDecision}, so the full auth contract is
+ * testable without TanStack Start, and a custom server entry can use it directly. The checks
+ * run in this order:
+ *
+ * 1. A request that carries the internal `x-nextgen-auth-token` header is refused with `400` on
+ *    every route, including ignored routes and the proxy path, and before anything else runs.
+ *    The header is an internal channel that only an SDK writes after verifying a session.
+ *    Refusing it outright is safer than removing it, because no framework's header
+ *    mutability matters and no code path can forget a route.
+ * 2. A path in {@link NextgenMiddlewareOptions.ignoredRoutes} continues signed out, without any
+ *    session check.
+ * 3. A path under {@link NextgenMiddlewareOptions.proxyPath} is forwarded to the auth backend.
+ *    The project secret is attached only to the session handoff and never sent to the browser,
+ *    because on every operation it would turn this public boundary into an open relay with
+ *    project authority. The client address comes only from
+ *    {@link NextgenRequestOptions | clientAddress}, never from a request header, so a client
+ *    cannot forge it.
+ * 4. Any other path has its session resolved from the `Authorization` bearer token or the
+ *    session cookie. A session counts only in the app's own project: the project id comes from
+ *    {@link NextgenMiddlewareOptions.projectId}, else the `ZITADEL_PROJECT_ID` environment
+ *    variable, else `VITE_ZITADEL_PROJECT_ID`. A signed-out request for a protected route
+ *    redirects to the login path with the requested path in `?next=`, and a protected route
+ *    whose session the backend could not check answers `503` instead, because the visitor may
+ *    well be signed in. The session cookie is cleared only when the backend refuses the session
+ *    (a `401`, or a `404` that says the session is gone). A timeout, a `5xx` or a network error
+ *    gives no verdict, so the cookie stays and a public route renders signed out. A live
+ *    session that signs no one in, such as an anonymous one or one of another project, keeps
+ *    its cookie, and an anonymous session does not pass a protected route. A bearer token is
+ *    judged before the cookie. With no project id configured, nobody is signed in.
+ *
+ * Options left unset fall back to the shared defaults, and `url` and `projectSecret` also read
+ * `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` when `process` exists. On an edge runtime without
+ * `process` they fall back to the defaults instead of throwing.
  *
  * @param request - The incoming Web `Request`.
- * @param options - Configuration; `projectSecret` and `clientAddress` augment
- *   the shared {@link NextgenMiddlewareOptions}.
- * @returns A {@link NextgenRequestDecision}.
+ * @param options - The configuration, defaulting to an empty object.
+ * @returns A {@link NextgenRequestDecision} that tells the caller what to send or do next.
+ * @throws Error when {@link NextgenMiddlewareOptions.loginPath} is not a relative path starting
+ *   with a single `/`, which would allow open-redirect attacks.
+ *
+ * @example
+ * ```ts
+ * import { handleNextgenRequest } from "@zitadel/sdk-tanstack-start/server";
+ *
+ * export async function handle(request: Request): Promise<Response> {
+ *   const decision = await handleNextgenRequest(request, { protectedRoutes: ["/admin*"] });
+ *   if (decision.type !== "continue") {
+ *     return decision.response;
+ *   }
+ *   return render(request, decision.auth);
+ * }
+ * ```
  */
 export async function handleNextgenRequest(
   request: Request,
@@ -330,46 +468,76 @@ export async function handleNextgenRequest(
 }
 
 /**
- * The slice of TanStack Start's request-middleware context this adapter uses.
- * TanStack Start is not a dependency of this package — typing the two fields we
- * touch keeps the install light and resilient to TanStack's evolving server
- * middleware API. The shape is structurally compatible with the real context.
+ * The slice of TanStack Start's request-middleware context that this package uses.
+ *
+ * TanStack Start is not a dependency of this package. Typing only the two fields the handler
+ * touches keeps the install light and resilient to changes in TanStack's server middleware
+ * API, and the shape stays structurally compatible with the real context.
  */
 export interface RequestMiddlewareContext {
-  /** The incoming Web `Request`, as TanStack Start's request middleware receives it. */
+  /**
+   * The incoming Web `Request`, as TanStack Start's request middleware receives it.
+   */
   readonly request: Request;
   /**
-   * Hands the request on to the rest of the app. Pass `context` to add values
-   * (here `nextgenAuth`) that server functions read from their own context.
+   * Hands the request on to the rest of the app.
+   *
+   * Pass `context` to add values that server functions read from their own context. The
+   * handler adds `nextgenAuth`. TanStack Start returns the result with or without a promise,
+   * so the type accepts both, and the handler awaits the result either way. The type is
+   * hand-written, and not imported, so it stays free of TanStack's changing middleware generics.
    */
   readonly next: (opts?: {
-    /** Values merged into the context the downstream handlers receive. */
+    /**
+     * The values merged into the context that downstream handlers receive.
+     */
     readonly context?: Record<string, unknown>;
   }) =>
     | Promise<{
-        /** The app's response, which the middleware may add cookies to. */
+        /**
+         * The app's response, which the middleware may add cookies to.
+         */
         readonly response: Response;
       }>
     | {
-        /** The app's response, which the middleware may add cookies to. */
+        /**
+         * The app's response, which the middleware may add cookies to.
+         */
         readonly response: Response;
       };
 }
 
-/** Key under which the auth result is placed on the router context. */
+/**
+ * The key under which the auth result is placed on the router context.
+ */
 const CONTEXT_KEY = "nextgenAuth";
 
 /**
- * Creates a TanStack Start request-middleware server handler that proxies,
- * verifies the session JWT, and protects routes. Register it as a global
- * request middleware from the framework server entry, `src/start.ts`:
+ * Creates a TanStack Start request-middleware server handler that proxies auth traffic,
+ * verifies the session, and protects routes.
  *
+ * Register the handler as a global request middleware in the framework server entry,
+ * `src/start.ts`. It wraps {@link handleNextgenRequest}: a proxy, redirect or refusal decision
+ * is returned as the response, and a `continue` decision calls `next` with the result under the
+ * `nextgenAuth` context key, so loaders and server functions read it with {@link getAuth}. When
+ * the decision carries cookies to set, the handler copies the downstream response (its headers
+ * may be immutable), appends them, and marks it `Cache-Control: private, no-store` so no shared
+ * cache keeps them. The login redirect and the cookie rules are those of
+ * {@link handleNextgenRequest}. TanStack Start is not a dependency of this package, so the handler is typed
+ * against {@link RequestMiddlewareContext} instead.
+ *
+ * @param options - The middleware configuration, see {@link NextgenRequestOptions}.
+ * @returns A request-middleware server handler that resolves to the response to send.
+ * @throws Error when {@link NextgenMiddlewareOptions.loginPath} is not a relative path. The
+ *   error surfaces on the first request that reaches the handler.
+ *
+ * @example
  * ```ts
  * import { createMiddleware, createStart } from "@tanstack/react-start";
- * import { createNextgenRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
+ * import { createNextgenMiddleware } from "@zitadel/sdk-tanstack-start/server";
  *
  * const authMiddleware = createMiddleware({ type: "request" }).server(
- *   createNextgenRequestMiddleware({
+ *   createNextgenMiddleware({
  *     url: process.env.ZITADEL_URL,
  *     projectSecret: process.env.ZITADEL_PROJECT_SECRET,
  *     protectedRoutes: ["/admin*"],
@@ -381,15 +549,8 @@ const CONTEXT_KEY = "nextgenAuth";
  *   requestMiddleware: [authMiddleware],
  * }));
  * ```
- *
- * On an authenticated request it calls `next({ context: { nextgenAuth } })` so
- * loaders and server functions can read the session via {@link getAuth}. On a
- * proxy or protected-route miss it returns the `Response` directly.
- *
- * @param options - Configuration; see {@link NextgenRequestOptions}.
- * @returns A request-middleware server handler.
  */
-export function createNextgenRequestMiddleware(
+export function createNextgenMiddleware(
   options: NextgenRequestOptions = {},
 ): (ctx: RequestMiddlewareContext) => Promise<Response> {
   return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
@@ -413,15 +574,31 @@ export function createNextgenRequestMiddleware(
 }
 
 /**
- * Reads the auth state from the request context populated by
- * {@link createNextgenRequestMiddleware}. Pass the `context` a server function
- * handler receives. A route's `beforeLoad` context does not carry it (TanStack
- * nests request-middleware context under `serverContext`, and on client-side
- * navigation `beforeLoad` runs in the browser) — call a server function from
- * `beforeLoad` instead.
+ * Reads the auth state that {@link createNextgenMiddleware} placed on the request context.
  *
- * @param context - The router/middleware context.
- * @returns The current {@link AuthResult}.
+ * A server function receives the request-middleware context, and this function picks the
+ * `nextgenAuth` value out of it. Use it in a server function to learn who is signed in, and
+ * call that server function from a route's `beforeLoad` to guard the route. Do not read the
+ * route's own `beforeLoad` context directly: TanStack Start nests request-middleware context
+ * under `serverContext`, and on a client-side navigation `beforeLoad` runs in the browser, where
+ * the value does not exist.
+ *
+ * When the context is `undefined` or carries no `nextgenAuth` (the middleware is not registered,
+ * or the route is in {@link NextgenMiddlewareOptions.ignoredRoutes}), the result is the
+ * signed-out value, so a caller never has to check for a missing result.
+ *
+ * @param context - The context a server function handler receives, or `undefined`.
+ * @returns The current {@link AuthResult}, signed out when the context carries none.
+ *
+ * @example
+ * ```ts
+ * import { createServerFn } from "@tanstack/react-start";
+ * import { getAuth } from "@zitadel/sdk-tanstack-start/server";
+ *
+ * export const getUser = createServerFn().handler(({ context }) => {
+ *   return getAuth(context).session;
+ * });
+ * ```
  */
 export function getAuth(context: { readonly nextgenAuth?: AuthResult } | undefined): AuthResult {
   return context?.nextgenAuth ?? { isAuthenticated: false, session: null };

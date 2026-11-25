@@ -12,7 +12,7 @@ import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middlewar
 
 import type { RequestMiddlewareContext } from "../middleware";
 
-import { createNextgenRequestMiddleware, getAuth } from "../middleware";
+import { createNextgenMiddleware, getAuth } from "../middleware";
 
 async function serve(
   url: string,
@@ -22,7 +22,7 @@ async function serve(
   const request = new Request(url, { method: init.method ?? "GET", headers: init.headers });
   let continued = false;
   let auth: AuthResult | undefined;
-  const response = await createNextgenRequestMiddleware({
+  const response = await createNextgenMiddleware({
     ...options,
     clientAddress: init.clientIp,
   })({
@@ -58,11 +58,11 @@ async function readAuth(context: unknown): Promise<AuthResult> {
 }
 
 function expectHandlerType(): void {
-  expectTypeOf(createNextgenRequestMiddleware({ url: "http://localhost:4000" })).toExtend<
+  expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toExtend<
     (ctx: RequestMiddlewareContext) => Promise<Response>
   >();
   // TanStack Start types next() as returning its result with or without a promise.
-  expectTypeOf(createNextgenRequestMiddleware({ url: "http://localhost:4000" })).toBeCallableWith({
+  expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toBeCallableWith({
     request: new Request("http://localhost:3000/"),
     next: () => ({ response: new Response("ok") }),
   });

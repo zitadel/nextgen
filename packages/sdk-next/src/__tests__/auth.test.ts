@@ -1,7 +1,7 @@
 /**
- * Unit tests for auth().
+ * Unit tests for getAuth().
  *
- * auth() reads the `x-nextgen-auth-token` request header and must treat it as
+ * getAuth() reads the `x-nextgen-auth-token` request header and must treat it as
  * **untrusted input**: on routes outside the middleware `matcher` the header
  * arrives straight from the client, so every value is re-verified — JWTs
  * cryptographically (signature via a real RSA key pair and a mocked JWKS
@@ -107,8 +107,8 @@ function routeFetch(kid: string, sessionsMe: (url: string) => Response | Promise
 }
 
 async function importAuth() {
-  const { auth } = await import("../auth.js");
-  return auth;
+  const { getAuth } = await import("../auth.js");
+  return getAuth;
 }
 
 beforeEach(() => {
@@ -126,17 +126,17 @@ afterEach(() => {
   _resetConfigForTesting();
 });
 
-describe("auth()", () => {
+describe("getAuth()", () => {
   it("returns unauthenticated when the x-nextgen-auth-token header is absent", async () => {
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("returns unauthenticated for the middleware's empty-string tunnel value", async () => {
     mockHeadersMap.set("x-nextgen-auth-token", "");
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -150,8 +150,8 @@ describe("auth()", () => {
       makeForgedJwt({ sub: "attacker", iss: ISSUER, exp: ts(3600) }, kid),
     );
 
-    const auth = await importAuth();
-    const result = await auth(OPTIONS);
+    const getAuth = await importAuth();
+    const result = await getAuth(OPTIONS);
 
     expect(result).toEqual({ isAuthenticated: false, session: null });
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("failed JWT verification"));
@@ -173,8 +173,8 @@ describe("auth()", () => {
     );
     mockHeadersMap.set("x-nextgen-auth-token", token);
 
-    const auth = await importAuth();
-    const result = await auth(OPTIONS);
+    const getAuth = await importAuth();
+    const result = await getAuth(OPTIONS);
 
     expect(result).toEqual({
       isAuthenticated: true,
@@ -196,8 +196,8 @@ describe("auth()", () => {
       makeSignedJwt({ sub: "user-xyz", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid),
     );
 
-    const auth = await importAuth();
-    const result = await auth(OPTIONS);
+    const getAuth = await importAuth();
+    const result = await getAuth(OPTIONS);
 
     expect(result.isAuthenticated).toBe(true);
     if (result.isAuthenticated) {
@@ -214,9 +214,9 @@ describe("auth()", () => {
       makeSignedJwt({ email: "nosub@example.com", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid),
     );
 
-    const auth = await importAuth();
+    const getAuth = await importAuth();
     // Must NOT fall through to the opaque path and come back authenticated.
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
   });
 
   it("rejects an expired signed JWT", async () => {
@@ -227,8 +227,8 @@ describe("auth()", () => {
       makeSignedJwt({ sub: "user-late", iss: ISSUER, aud: PROJECT, exp: ts(-3600) }, kid),
     );
 
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
   });
 
   // ── Opaque path: backend validation, not blind trust ─────────────────
@@ -237,8 +237,8 @@ describe("auth()", () => {
     routeFetch(nextKid(), () => jsonResponse({ error: "unauthenticated" }, 401));
     mockHeadersMap.set("x-nextgen-auth-token", "attacker-supplied-junk");
 
-    const auth = await importAuth();
-    const result = await auth(OPTIONS);
+    const getAuth = await importAuth();
+    const result = await getAuth(OPTIONS);
 
     expect(result).toEqual({ isAuthenticated: false, session: null });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -269,8 +269,8 @@ describe("auth()", () => {
     const token = makeJweShapedToken();
     mockHeadersMap.set("x-nextgen-auth-token", token);
 
-    const auth = await importAuth();
-    const result = await auth(OPTIONS);
+    const getAuth = await importAuth();
+    const result = await getAuth(OPTIONS);
 
     // Identity comes from the backend response — no more userId "unknown".
     expect(result).toEqual({
@@ -291,16 +291,16 @@ describe("auth()", () => {
     );
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
   });
 
   it("fails closed and warns on unexpected backend statuses", async () => {
     routeFetch(nextKid(), () => jsonResponse({ error: "boom" }, 500));
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("HTTP 500"));
   });
 
@@ -308,8 +308,8 @@ describe("auth()", () => {
     fetchMock.mockRejectedValue(new TypeError("fetch failed"));
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining("Could not check the session cookie"),
     );
@@ -328,8 +328,8 @@ describe("auth()", () => {
     );
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    const result = await auth({ ...OPTIONS, opaqueTokenTimeoutMs: 5 });
+    const getAuth = await importAuth();
+    const result = await getAuth({ ...OPTIONS, opaqueTokenTimeoutMs: 5 });
 
     expect(result).toEqual({ isAuthenticated: false, session: null });
     expect(console.warn).toHaveBeenCalledWith(
@@ -350,8 +350,8 @@ describe("auth()", () => {
     );
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    const result = await auth();
+    const getAuth = await importAuth();
+    const result = await getAuth();
 
     expect(result.isAuthenticated).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
@@ -366,8 +366,8 @@ describe("auth()", () => {
     const token = makeSignedJwt({ sub: "user-abc", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid);
     mockHeadersMap.set("x-nextgen-auth-token", token);
 
-    const auth = await importAuth();
-    const result = await auth({ ...OPTIONS, url: `${ISSUER}/` });
+    const getAuth = await importAuth();
+    const result = await getAuth({ ...OPTIONS, url: `${ISSUER}/` });
 
     expect(result.isAuthenticated).toBe(true);
   });
@@ -378,8 +378,8 @@ describe("auth()", () => {
     );
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    const result = await auth({ ...OPTIONS, url: `${ISSUER}/` });
+    const getAuth = await importAuth();
+    const result = await getAuth({ ...OPTIONS, url: `${ISSUER}/` });
 
     expect(result.isAuthenticated).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
@@ -398,8 +398,8 @@ describe("auth()", () => {
       makeSignedJwt({ sub: "user-abc", iss: ISSUER, aud: OTHER_PROJECT, exp: ts(3600) }, kid),
     );
 
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     // Not a forgery: the token verified, it only belongs elsewhere.
     expect(console.warn).not.toHaveBeenCalled();
   });
@@ -415,8 +415,8 @@ describe("auth()", () => {
     );
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
   });
 
   it("treats the backend's refusal of another project's session as signed out, quietly", async () => {
@@ -425,8 +425,8 @@ describe("auth()", () => {
     );
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(console.warn).not.toHaveBeenCalled();
   });
 
@@ -436,13 +436,13 @@ describe("auth()", () => {
     routeFetch(nextKid(), () => jsonResponse({ code: "auth.csrf_invalid" }, 403));
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("HTTP 403"));
   });
 
   // A middleware built with createProxy(config) holds sessions to the handle's
-  // project; auth() reads it from the same handle when no variable names one.
+  // project; getAuth() reads it from the same handle when no variable names one.
   it("falls back to the project of configureZitadel()", async () => {
     vi.stubEnv("ZITADEL_PROJECT_ID", "");
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_PROJECT_ID", "");
@@ -452,8 +452,8 @@ describe("auth()", () => {
     );
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-    const auth = await importAuth();
-    expect((await auth({ url: ISSUER })).isAuthenticated).toBe(true);
+    const getAuth = await importAuth();
+    expect((await getAuth({ url: ISSUER })).isAuthenticated).toBe(true);
   });
 
   it("signs no one in, and says why, when no project is configured", async () => {
@@ -466,8 +466,8 @@ describe("auth()", () => {
       makeSignedJwt({ sub: "user-abc", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid),
     );
 
-    const auth = await importAuth();
-    expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
+    const getAuth = await importAuth();
+    expect(await getAuth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("no project id"));
   });
 
@@ -481,8 +481,8 @@ describe("auth()", () => {
       );
       mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
-      const auth = await importAuth();
-      expect((await auth({ url: ISSUER })).isAuthenticated).toBe(true);
+      const getAuth = await importAuth();
+      expect((await getAuth({ url: ISSUER })).isAuthenticated).toBe(true);
     },
   );
 });

@@ -19,62 +19,88 @@ import {
 } from "@zitadel/sdk-core/middleware";
 
 /**
- * `process` is undefined in some edge/serverless runtimes; read env defensively
- * so omitting `url`/`projectSecret` falls back to the default instead of throwing
- * a ReferenceError.
+ * The process environment, or an empty map where there is no `process`.
+ *
+ * Some edge and serverless runtimes do not define `process`. Reading the environment through
+ * this map lets an omitted `url`, `projectId` or `projectSecret` fall back to its default
+ * instead of throwing a `ReferenceError` when the middleware is created.
  */
 const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
 
 /**
- * The slice of SolidStart's `FetchEvent` this middleware reads. SolidStart (and
- * its Vinxi/Nitro substrate) is not a dependency of this package — typing the
- * handful of fields we touch keeps the install light and resilient to the
- * framework's bundler churn, the same way `sdk-nuxt` shims Nuxt's `#imports`.
- * The shape is structurally compatible with the real `FetchEvent`, so the
- * returned handler drops straight into `createMiddleware({ onRequest: [...] })`.
+ * The slice of SolidStart's request event that the middleware reads and writes.
+ *
+ * SolidStart and its Vinxi and Nitro substrate are not dependencies of this package. Typing only
+ * the few fields the middleware touches keeps the install light and independent of the
+ * framework's bundler changes. The shape is structurally compatible with the real `FetchEvent`,
+ * so the handler that {@link createNextgenMiddleware} returns can be passed straight to
+ * SolidStart's `createMiddleware`.
+ *
+ * @example
+ * ```ts
+ * import type { SolidFetchEvent } from "@zitadel/sdk-solid-start/server";
+ *
+ * async function logRequests(event: SolidFetchEvent): Promise<Response | undefined> {
+ *   console.log(event.request.method, new URL(event.request.url).pathname);
+ *   return undefined;
+ * }
+ * ```
  */
 export interface SolidFetchEvent {
   /**
-   * The incoming request. The middleware reads its URL, method, body and
-   * `cookie`, `authorization` and `x-forwarded-*` headers to proxy the
-   * `/__nextgen/*` calls and to judge the session. It rejects any request that
-   * carries the internal `x-nextgen-auth-token` header with a `400`.
+   * The incoming request.
+   *
+   * The middleware reads its URL, method, body and the `cookie`, `authorization` and
+   * `x-forwarded-*` headers to proxy the same-origin proxy path and to judge the session. It
+   * rejects with a `400` any request that carries the internal `x-nextgen-auth-token` header,
+   * because only the middleware itself may set that header.
    */
   readonly request: Request;
   /**
-   * The per-request store SolidStart shares between the middleware and the
-   * server functions and routes that run after it. The middleware writes the
-   * session verdict to its `nextgenAuth` key on every request it does not
-   * ignore; read it back with {@link getAuth} rather than reaching into it.
+   * The per-request store that SolidStart shares between the middleware and the server functions
+   * and routes that run after it.
+   *
+   * The middleware writes the session verdict to the `nextgenAuth` key on every request it does
+   * not ignore. Read the verdict back with {@link getAuth} instead of reaching into the store.
    */
   readonly locals: Record<string, unknown> & {
     /**
-     * The verdict on this request's session, set by the middleware. It is
-     * absent on a request the middleware skipped (a path in `ignoredRoutes`) or
-     * proxied, and {@link getAuth} reads that as signed out.
+     * The verdict on this request's session, set by the middleware.
+     *
+     * It is absent on a request the middleware skipped because the path matched an ignored route,
+     * or proxied, and {@link getAuth} reads an absent verdict as signed out.
      */
     nextgenAuth?: AuthResult;
   };
-  /** Direct client address, when the platform adapter resolves one. */
+  /**
+   * The direct client address, when the platform adapter resolves one.
+   *
+   * The middleware appends it to the `x-forwarded-for` chain of a proxied request so the Zitadel
+   * server sees the real client. When it is absent, the chain is forwarded as received.
+   */
   readonly clientAddress?: string;
   /**
-   * The response stub SolidStart merges into the response it eventually sends;
-   * a middleware that continues sets headers (here, session cookies) on it.
-   * On SolidStart 2 it is h3 v2's response, which sends `errHeaders` instead
-   * of `headers` with an answer of status 400 or above and a thrown error.
+   * The response stub that SolidStart merges into the response it eventually sends.
+   *
+   * A middleware that lets the request continue sets headers on it. Here the headers are the
+   * session cookies and a `Cache-Control` that keeps them out of shared caches. When it is
+   * absent, a continuing request carries no cookie changes.
    */
   readonly response?: {
     /**
-     * The headers SolidStart sends with a normal answer. The middleware
-     * appends the session `Set-Cookie` headers and a `Cache-Control` here when
+     * The headers that SolidStart sends with a normal answer.
+     *
+     * The middleware appends the session `Set-Cookie` headers and a `Cache-Control` here when
      * the session check asks for a cookie change and the request continues.
      */
     readonly headers: Headers;
     /**
-     * The headers h3 v2 sends instead of `headers` when the answer is an error
-     * (status 400 or above) or a thrown one. The middleware writes the same
-     * cookies here so a failing page still carries them. Absent on
+     * The headers that h3 version 2 sends instead of the normal `headers`
+     * when the answer is an error or a thrown one.
+     *
+     * On SolidStart 2 an answer with status 400 or above drops the normal headers. The middleware
+     * writes the same cookies here so a failing page still carries them. It is absent on
      * SolidStart 1.
      */
     readonly errHeaders?: Headers;
@@ -82,25 +108,42 @@ export interface SolidFetchEvent {
 }
 
 /**
- * The `{ onRequest }` config `createNextgenMiddleware` returns. On SolidStart 2
- * pass it to `createMiddleware` from `@solidjs/start/middleware` and export
- * that as the default of the file named by `solidStart({ middleware })` — a
- * bare config object registers nothing. `onRequest` is a mutable array because
- * `createMiddleware` does not accept a readonly one.
+ * The `{ onRequest }` config that {@link createNextgenMiddleware} returns.
+ *
+ * On SolidStart 2, pass it to `createMiddleware` from `@solidjs/start/middleware` and export the
+ * result as the default of the file that `solidStart({ middleware })` names. A bare config object
+ * registers nothing, so the proxy path would answer `404`.
+ *
+ * @example
+ * ```ts
+ * import { createMiddleware } from "@solidjs/start/middleware";
+ * import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+ *
+ * const nextgen = createNextgenMiddleware({ protectedRoutes: ["/admin*"] });
+ *
+ * export default createMiddleware({ onRequest: [...nextgen.onRequest] });
+ * ```
  */
 export interface SolidMiddlewareConfig {
   /**
-   * The handlers SolidStart runs for each request, in order. Each returns a
-   * `Response` to answer the request itself (the `/__nextgen/*` proxy, a
-   * redirect to the login page, a `503`) or `undefined` to let the request
-   * continue. {@link createNextgenMiddleware} returns one handler; spread this
-   * array into your own `onRequest` to run yours alongside it.
+   * The handlers that SolidStart runs for each request, in order.
+   *
+   * Each handler returns a `Response` to answer the request itself, such as the proxy answer, a
+   * redirect to the login page or a `503`, or `undefined` to let the request continue.
+   * {@link createNextgenMiddleware} returns one handler. Spread this array into your own
+   * `onRequest` to run your handlers alongside it, and put it first if later handlers need the
+   * session verdict. It is a mutable array because `createMiddleware` does not accept a readonly
+   * one.
    */
   readonly onRequest: Array<(event: SolidFetchEvent) => Promise<Response | undefined>>;
 }
 
 /**
- * Parses a `Cookie` request header into a name→value map.
+ * Parses a `Cookie` request header into a map from cookie name to value.
+ *
+ * @param header - The raw `Cookie` header, or `null` when the request has none.
+ * @returns The cookies by name; empty when the header is absent. Parts without an `=` and
+ *   parts with an empty name are skipped, and values are returned as sent, without decoding.
  */
 function parseCookieHeader(header: string | null): Map<string, string> {
   const jar = new Map<string, string>();
@@ -116,10 +159,17 @@ function parseCookieHeader(header: string | null): Map<string, string> {
 }
 
 /**
- * Builds the upstream request headers: copies all incoming headers, drops
- * hop-by-hop and SDK-internal headers, and sets `X-Forwarded-*` so the auth
- * server sees the real client origin. The client IP comes from
- * `event.clientAddress` (or any existing `X-Forwarded-For` chain).
+ * Builds the headers for the request that the middleware forwards to the Zitadel server.
+ *
+ * It copies the incoming headers and drops the hop-by-hop headers and the SDK-internal ones, so
+ * a client cannot smuggle an internal channel upstream. It then sets the `x-forwarded-*` headers
+ * so the server sees the real client origin. The client address comes from
+ * {@link SolidFetchEvent.clientAddress}, appended to any existing `x-forwarded-for` chain.
+ *
+ * @param event - The current request event.
+ * @param url - The parsed URL of the incoming request, the source of the host and protocol that
+ *   fill `x-forwarded-host` and `x-forwarded-proto` when the request lacks them.
+ * @returns The upstream request headers.
  */
 function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
   const headers = new Headers();
@@ -149,11 +199,24 @@ function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend and returns the
- * upstream response, including its `Set-Cookie` headers. Hop-by-hop headers are
- * stripped in both directions, a `location` is kept only as a redirect onto this
- * app, and the session cookie travels under this project's name in the browser
- * and the server's name upstream ({@link proxySessionCookies}).
+ * Forwards a request under the same-origin proxy path to the Zitadel server and returns its
+ * response, including its `Set-Cookie` headers.
+ *
+ * Hop-by-hop headers are stripped in both directions. A `location` header is kept only when it
+ * redirects back onto this app, so the proxy cannot be used to send a browser elsewhere. The
+ * session cookie travels under this project's name in the browser and under the server's own
+ * name upstream, as {@link proxySessionCookies} translates it. Redirects are never followed
+ * here; they are returned to the browser.
+ *
+ * @param event - The current request event.
+ * @param url - The parsed URL of the incoming request.
+ * @param authUrl - The base URL of the Zitadel server.
+ * @param proxyPath - The proxy path prefix to strip from the request path.
+ * @param projectId - The project id, or `undefined` when none is configured.
+ * @param projectSecret - The project secret, or `undefined` when none is configured.
+ * @param proxyTimeoutMs - The time in milliseconds after which the upstream call is aborted.
+ * @returns The response to send to the browser.
+ * @throws Error when the upstream call fails or times out.
  */
 async function proxyRequest(
   event: SolidFetchEvent,
@@ -191,9 +254,9 @@ async function proxyRequest(
     upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
   }
 
-  // ADR 036: attach the project secret only to the handoff exchange — on every
-  // operation it would make this public boundary an open relay with project
-  // authority. A caller-supplied credential is preserved.
+  // Attach the project secret only to the session handoff exchange. On every operation it would
+  // make this public boundary an open relay with project authority. A credential the caller
+  // supplied is preserved.
   if (
     requiresProjectSecret(method, suffix) &&
     !upstreamHeaders.has("authorization") &&
@@ -228,20 +291,32 @@ async function proxyRequest(
 }
 
 /**
- * The route policy, plus what the shared {@link resolveSession} judges the
- * session by.
+ * The options that {@link handleAuth} needs: the route policy, plus what {@link resolveSession}
+ * judges the session by.
  */
 interface AuthHandlerOptions extends ResolveSessionOptions {
+  /**
+   * The route patterns that require a signed-in session.
+   */
   readonly protectedRoutes: readonly string[];
+  /**
+   * The relative path that signed-out visitors are redirected to.
+   */
   readonly loginPath: string;
 }
 
 /**
- * Judges the session, writes the auth result to `event.locals`, and returns a
- * redirect `Response` on a protected route when nobody is signed in (otherwise
- * `undefined` to continue). Either way the response carries the session
- * cookies the judgement asks for. When the backend cannot say whether the
- * session is live, a protected route answers `503` instead.
+ * Judges the session, writes the verdict to the event's `locals`, and redirects signed-out
+ * visitors away from protected routes.
+ *
+ * Either way the response carries the session cookies that the judgement asks for. When the
+ * Zitadel server cannot say whether the session is live, a protected route answers `503`
+ * instead of redirecting, because the user may well be signed in.
+ *
+ * @param event - The current request event.
+ * @param url2 - The parsed URL of the incoming request.
+ * @param opts - The route policy and the session verification options.
+ * @returns A redirect or `503` response, or `undefined` to let the request continue.
  */
 async function handleAuth(
   event: SolidFetchEvent,
@@ -311,13 +386,33 @@ async function handleAuth(
 }
 
 /**
- * Creates a SolidStart middleware config that handles proxying, JWT
- * verification, and route protection in a single `onRequest` pass.
+ * Creates a SolidStart middleware config that proxies the auth calls, verifies the session and
+ * protects routes in a single `onRequest` pass.
  *
- * Reference it from the `middleware` option (the `solidStart()` plugin in
- * `vite.config.ts`, or `app.config.ts` on older setups), then in that file wrap
- * the config in SolidStart's own `createMiddleware`:
+ * Use it once per app. Reference the module that exports it from the `middleware` option of the
+ * `solidStart()` plugin in `vite.config.ts`, or from `app.config.ts` on older setups, and wrap
+ * the config in SolidStart's own `createMiddleware` there. SolidStart 2 registers the default
+ * export of that module as an array of h3 middleware, and `createMiddleware` turns the
+ * `{ onRequest }` config into that array. Exporting the bare config registers nothing, so the
+ * proxy path answers `404`.
  *
+ * For each request the handler does three things in order. It rejects with `400` any request
+ * that carries the internal `x-nextgen-auth-token` header. It forwards everything under the proxy
+ * path to the Zitadel server, so the browser only ever talks to the app's own origin. It judges
+ * the session of every other request and stores the verdict where {@link getAuth} reads it.
+ * Requests that match `ignoredRoutes` skip all of this, and carry no verdict.
+ *
+ * The project secret is sent as the bearer on the session handoff exchange only. It is never sent
+ * on other proxied calls, which would turn the public proxy into an open relay with project
+ * authority, and it never reaches the browser. A session counts only in the app's own project:
+ * `projectId`, else the `ZITADEL_PROJECT_ID` variable, else `VITE_ZITADEL_PROJECT_ID`. When the
+ * server cannot say whether a session is live, a protected route answers `503` rather than
+ * redirecting a signed-in user to the login page. The handler uses only Web APIs and reads
+ * `process.env` defensively, so it runs on edge runtimes.
+ *
+ * To compose with your own handlers, pass them in the same call, as in the second example.
+ *
+ * @example
  * ```ts
  * import { createMiddleware } from "@solidjs/start/middleware";
  * import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
@@ -332,21 +427,25 @@ async function handleAuth(
  * );
  * ```
  *
- * SolidStart 2 registers the middleware module's default export as an array of
- * h3 middleware, and `createMiddleware` turns the `{ onRequest }` config into
- * that array. Exporting the bare config registers nothing, so `/__nextgen/*`
- * would 404. To compose with your own handlers, pass them in the same call:
- * `createMiddleware({ onRequest: [...createNextgenMiddleware(...).onRequest, mine] })`.
+ * @example
+ * ```ts
+ * import { createMiddleware } from "@solidjs/start/middleware";
+ * import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
  *
- * A session counts only in the app's own project: `projectId`, else
- * `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
+ * const nextgen = createNextgenMiddleware({ protectedRoutes: ["/admin*"] });
  *
- * @param options - Middleware configuration. `projectSecret` is the project
- *   service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
- * @returns A SolidStart middleware config object.
- * @throws Error when `loginPath` is not a relative path starting with a single
- *   `/`. An absolute or protocol-relative URL would let a crafted config turn
- *   the login redirect into an open redirect, so it is refused at setup time.
+ * export default createMiddleware({
+ *   onRequest: [...nextgen.onRequest, async () => undefined],
+ * });
+ * ```
+ *
+ * @param options - The middleware configuration, which is {@link NextgenMiddlewareOptions} plus
+ *   `projectSecret`. The `url` defaults to `ZITADEL_URL`, else `http://localhost:8080`, and the
+ *   `projectSecret` to `ZITADEL_PROJECT_SECRET`. The secret is the project service key.
+ * @returns The SolidStart middleware config.
+ * @throws Error when `loginPath` is not a relative path starting with a single `/`. An absolute
+ *   or protocol-relative URL would turn the login redirect into an open redirect, so it is
+ *   refused when the middleware is created.
  */
 export function createNextgenMiddleware(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
@@ -413,19 +512,31 @@ export function createNextgenMiddleware(
 }
 
 /**
- * Reads the auth state from a SolidStart `FetchEvent` after the middleware has
- * run. Inside a server function or route, obtain the event via
- * `getRequestEvent()` from `solid-js/web`.
+ * Reads the session verdict from a SolidStart request event after the middleware has run.
  *
+ * Call it in a server function or route to guard data and pages. Inside one, obtain the event
+ * with `getRequestEvent()` from `solid-js/web`. It is safe on a request the middleware did not
+ * judge, such as an ignored route: an absent verdict reads as signed out, so a guard fails
+ * closed.
+ *
+ * @example
  * ```ts
  * import { getRequestEvent } from "solid-js/web";
  * import { getAuth } from "@zitadel/sdk-solid-start/server";
  *
- * const auth = getAuth(getRequestEvent()!);
+ * export async function loadProfile() {
+ *   "use server";
+ *   const auth = getAuth(getRequestEvent()!);
+ *   if (!auth.isAuthenticated) {
+ *     throw new Error("Not signed in");
+ *   }
+ *   return auth.session;
+ * }
  * ```
  *
  * @param event - The current SolidStart request event.
- * @returns The current {@link AuthResult}.
+ * @returns The {@link AuthResult} for the request: the session when signed in, or a signed-out
+ *   result when the middleware found no valid session or did not run.
  */
 export function getAuth(event: SolidFetchEvent): AuthResult {
   return event.locals.nextgenAuth ?? { isAuthenticated: false, session: null };

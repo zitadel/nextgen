@@ -6,7 +6,7 @@ import type { AuthResult, ClientAuthResult, NextgenSession } from "../types";
 
 // useAuth/AuthContextProvider come through the public client entry — the same
 // path consumers use. NextgenProvider is server-only (it accepts the
-// token-bearing auth() result), so its public homes are /server and the root;
+// token-bearing getAuth() result), so its public homes are /server and the root;
 // tests import the defining module directly (the vitest alias stubs the
 // server-only guard).
 import { NextgenProvider } from "../provider";

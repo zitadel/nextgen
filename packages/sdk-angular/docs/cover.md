@@ -6,9 +6,10 @@ Angular components for the Zitadel sign-in UI, for client-side single-page apps.
 - {@link ZitadelLogoutComponent} renders the sign-out widget (`<zitadel-auth-logout>`). Use it where a user ends their session.
 - {@link ZitadelSessionComponent} renders the signed-in "signed in as" card with a sign-out action (`<zitadel-auth-session>`). Use it after sign-in.
 - {@link configureZitadel} builds the frozen {@link ZitadelProject} handle you pass to each component through `[project]`. Call it once per app.
+- {@link getApi} and {@link getZitadelConfig} are re-exported from `@zitadel/api/config`: the typed API client for a project handle, and the handle registered by that package's `configureZitadel`.
 - `businessLocales` is the business copy overlay of `@zitadel/components`, re-exported so a scaffolded app can pass it as `locales` without depending on that package directly.
 
-The types for the props, the event details and the handlers are listed under the package's type aliases and interfaces, for example {@link ZitadelProject}, {@link ZitadelConfig} and {@link CreateFlowBodyPurpose}.
+The types for the props, the event details and the handlers are listed under the package's type aliases and interfaces, for example {@link ZitadelProject}, {@link ZitadelConfig} and {@link ZitadelFlowPurpose}.
 
 ## How it works
 

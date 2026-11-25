@@ -9,6 +9,8 @@
   "tsconfig": "tsconfig.lib.json",
   "readme": "docs/cover.md",
   "intentionallyNotExported": [
+    "src/types.ts:ZitadelWidgetAttributes",
+    "src/types.ts:WithZitadelWidgetAttributes",
     "src/components/ZitadelLogin.ts:Base",
     "src/components/ZitadelLogout.ts:Base",
     "src/components/ZitadelSession.ts:Base"

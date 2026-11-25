@@ -25,10 +25,11 @@ button without building any of the screens yourself.
 The wrappers are dynamic. Each component builds its element at render time
 with Solid's `Dynamic`, using the tag name (`zitadel-login`, `zitadel-logout`,
 `zitadel-session`), instead of a DOM template that Solid's compiler would
-create when the module is imported. This is deliberate (#2099): a template
+create when the module is imported. This is deliberate: a template
 compiled at import time needs a DOM, so the published dist could not load or
-server-render on edge runtimes. With `Dynamic` the dist loads anywhere and
-renders to a plain custom element tag.
+server-render on edge runtimes such as Cloudflare Workers and Vercel Edge. With
+`Dynamic` the dist loads anywhere and renders to a plain custom element tag.
+Do not replace `Dynamic` with a literal widget tag in the components.
 
 Server-rendered markup contains the tag and its attributes only. The project
 coordinates are written as the `project-id` and `proxy-path` attributes (and

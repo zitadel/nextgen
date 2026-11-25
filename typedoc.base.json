@@ -3,8 +3,6 @@
   "excludeInternal": true,
   "excludePrivate": true,
   "excludeExternals": true,
-  "gitRevision": "main",
-  "sourceLinkTemplate": "https://github.com/zitadel/nextgen/blob/main/{path}#L{line}",
   "githubPages": false,
   "hideGenerator": true,
   "treatWarningsAsErrors": true,
@@ -25,5 +23,6 @@
     "Constructor",
     "Enum",
     "EnumMember"
-  ]
+  ],
+  "disableSources": true
 }

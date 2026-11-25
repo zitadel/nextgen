@@ -1,13 +1,19 @@
 /**
- * Browser entry of the Qwik Router SDK.
+ * The browser entry of the Qwik Router SDK.
  *
- * Client-side SDK configuration for Qwik Router apps.
+ * This entry carries only the project configuration helpers ({@link configureZitadel},
+ * {@link getApi}, {@link getZitadelConfig}). They are re-exported so an app that declares
+ * `@zitadel/sdk-qwik-router` as its only direct dependency can configure the SDK without
+ * importing `@zitadel/api/config`. It contains no server code and no secrets, so it is safe in a
+ * browser bundle. The `<ZitadelLogin>` and `<ZitadelLogout>` Qwik components live in
+ * `@zitadel/sdk-qwik`, not here.
  *
- * SDK configuration is done via `configureZitadel()`, re-exported here so a
- * consuming app that only declares `@zitadel/sdk-qwik-router` as a direct
- * dependency can configure the SDK without reaching into `@zitadel/api/config`.
- * The idiomatic `<ZitadelLogin>` / `<ZitadelLogout>` Qwik components live in
- * `@zitadel/sdk-qwik`.
+ * @example
+ * ```ts
+ * import { configureZitadel } from "@zitadel/sdk-qwik-router/client";
+ *
+ * configureZitadel({ url: "https://auth.example.com", projectId: "123456789" });
+ * ```
  *
  * @module
  */

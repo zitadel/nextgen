@@ -29,8 +29,8 @@ There are two families.
 
 | Kind | Required exports |
 | --- | --- |
-| `ui` | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession` (Angular: the same with a `Component` suffix), `ZitadelLoginProps`, `ZitadelLogoutProps`, `ZitadelSessionProps`, `ZitadelFlowStepDetail`, `ZitadelFlowInputDetail`, `ZitadelFlowCompleteDetail`, `ZitadelFlowRedirectDetail`, `ZitadelFlowErrorDetail`, `ZitadelSignoutDetail`, `CreateFlowBodyPurpose`, `configureZitadel`, `getApi`, `getZitadelConfig`, `businessLocales`, `ZitadelProject`, `ZitadelConfig` |
-| `widgets` | the components, the three props types, the six detail types and `CreateFlowBodyPurpose` of `ui` |
+| `ui` | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession` (Angular: the same with a `Component` suffix), `ZitadelLoginProps`, `ZitadelLogoutProps`, `ZitadelSessionProps`, `ZitadelFlowStepDetail`, `ZitadelFlowInputDetail`, `ZitadelFlowCompleteDetail`, `ZitadelFlowRedirectDetail`, `ZitadelFlowErrorDetail`, `ZitadelSignoutDetail`, `ZitadelFlowPurpose`, `configureZitadel`, `getApi`, `getZitadelConfig`, `businessLocales`, `ZitadelProject`, `ZitadelConfig` |
+| `widgets` | the components, the three props types, the six detail types and `ZitadelFlowPurpose` of `ui` |
 | `client` | `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelProject`, `ZitadelConfig`, plus `businessLocales` when the SDK renders widgets |
 | `server` | `createNextgenMiddleware`, `getAuth`, `NextgenMiddlewareOptions`, `NextgenSession`, `AuthResult`, `AuthState`, `UnauthState`, `ClientAuthResult` |
 | `other` | nothing is required |
@@ -58,6 +58,11 @@ every export to be required or listed as an extra.
 - **One name for the server entry.** The middleware factory is
   `createNextgenMiddleware` and the auth reader is `getAuth` in every
   meta-framework SDK; what the factory returns is the framework's own.
+- **No generated name is public.** A name in an SDK's public API is declared by hand in
+  `sdk-core`, never re-exported from the generated API client, so an OpenAPI change cannot rename
+  or reshape an SDK export unnoticed. `ZitadelFlowPurpose` is one: `types.spec.ts` in `sdk-core`
+  fails when it stops being identical to the generated purpose type. The reference build lists no
+  source paths (`disableSources`), so no page names a file of another package.
 - **Session reading is not standard.** `useSession`, `getSession`, `sessionStore`
   and their types are extras of `sdk-react` and `sdk-next` until a second
   framework needs them.
@@ -72,6 +77,7 @@ every export to be required or listed as an extra.
 | `createNextgenHandle` (`sdk-sveltekit`) | `createNextgenMiddleware` |
 | `createNextgenOnRequest` (`sdk-qwik-router`) | `createNextgenMiddleware` |
 | `ZitadelLoginSolidProps`, `…ReactProps`, `…SvelteProps` (and Logout, Session) | `ZitadelLoginProps` (and Logout, Session) |
+| `CreateFlowBodyPurpose` (the type the API client is generated with) | `ZitadelFlowPurpose`, declared in `sdk-core` |
 
 `sdk-angular` gains `getApi` and `getZitadelConfig`, and `sdk-next` gains
 `getZitadelConfig`.

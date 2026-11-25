@@ -1,8 +1,10 @@
 /**
- * Re-exports shared JWT verification from `@zitadel/sdk-core`.
+ * Re-exports the shared JWT verification from `@zitadel/sdk-core`.
  *
- * The JWT module is runtime-agnostic (uses `atob` which is available in both
- * Edge and Node.js 16+) and is defined once in sdk-core.
+ * The JWT module is runtime-agnostic: it uses `atob` and Web Crypto, which both the Next.js edge
+ * runtime and Node.js provide, so the middleware and {@link server!getAuth | getAuth} verify a
+ * token by the same rules. It is defined once in `@zitadel/sdk-core`. This file is internal to the
+ * package and is not an entry point.
  */
 export {
   JWKS_TTL_MS,

@@ -1,0 +1,41 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.ts",
+      "kind": "other",
+      "extras": [
+        "AuthResult",
+        "AuthState",
+        "ClientAuthResult",
+        "NextgenMiddlewareOptions",
+        "NextgenRequestDecision",
+        "NextgenRequestOptions",
+        "NextgenSession",
+        "RequestMiddlewareContext",
+        "UnauthState",
+        "ZitadelConfig",
+        "ZitadelProject",
+        "configureZitadel",
+        "createNextgenMiddleware",
+        "getApi",
+        "getAuth",
+        "getZitadelConfig",
+        "handleNextgenRequest"
+      ]
+    },
+    "./server": {
+      "source": "src/server.ts",
+      "kind": "server",
+      "extras": ["NextgenRequestDecision", "NextgenRequestOptions", "RequestMiddlewareContext", "handleNextgenRequest"]
+    },
+    "./client": {
+      "source": "src/client.ts",
+      "kind": "client"
+    },
+    "./react": {
+      "source": "src/react.tsx",
+      "kind": "widgets",
+      "extras": ["businessLocales"]
+    }
+  }
+}

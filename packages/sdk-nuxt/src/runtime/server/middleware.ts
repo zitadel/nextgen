@@ -39,31 +39,31 @@ import { resolveProjectSecret, resolveUrl } from "../lib/settings";
 declare module "h3" {
   interface H3EventContext {
     /**
-     * Set by the middleware on every request it runs for. Absent where it did
-     * not run (an ignored route, a handler outside its reach), so read it
-     * through {@link getAuth}, which answers signed out then.
+     * The verified session of the request.
+     *
+     * The middleware sets it on every request it judges. It is absent where the middleware did
+     * not run, for example on an ignored route or in a handler outside its reach, so read it
+     * through {@link getAuth}, which answers signed out in that case.
      */
     nextgenAuth?: AuthResult;
   }
 }
 
 /**
- * Builds the set of upstream request headers by copying all incoming headers,
- * dropping hop-by-hop headers, and setting `X-Forwarded-*` headers so the
- * upstream auth server can see the real client origin.
+ * Builds the request headers sent to the backend.
  *
- * All non-hop-by-hop headers from the incoming request are forwarded as-is,
- * including any `X-Forwarded-For` chain already set by an upstream CDN or load
- * balancer. When `X-Forwarded-For` is absent (direct connection with no upstream
- * proxy), it is initialised from the raw socket address so the auth server always
- * receives origin information. `X-Forwarded-Host` and `X-Forwarded-Proto` are set
- * only when absent, preserving values injected by an upstream CDN.
+ * It copies the incoming headers, drops the hop-by-hop headers and the internal ones, and sets
+ * `X-Forwarded-*` so the backend sees the real client origin. An `X-Forwarded-For` chain that a
+ * CDN or load balancer already set is kept, and the socket address of this hop is appended, so the
+ * backend sees the full proxy path. `X-Forwarded-Host` and `X-Forwarded-Proto` are set only when
+ * absent, which preserves values that an upstream CDN injected. The socket address comes from the
+ * runtime, never from a client-supplied header.
  *
- * The request is read through h3's accessors, never `event.node`, so this runs
- * wherever Nitro does: h3 joins a repeated header with `", "` into one value.
+ * The request is read through h3's accessors, never `event.node`, so this runs wherever Nitro
+ * does. h3 joins a repeated header into one value with `", "`.
  *
  * @param event - The current H3 event.
- * @returns A `Headers` instance safe to forward to the upstream service.
+ * @returns The headers to forward to the backend.
  */
 function buildUpstreamHeaders(event: H3Event): Headers {
   const headers = new Headers();
@@ -101,12 +101,47 @@ function buildUpstreamHeaders(event: H3Event): Headers {
 }
 
 /**
- * Creates an H3 event handler that handles proxying, JWT verification, and
- * route protection in a single pass.
+ * Creates the H3 event handler that proxies, verifies the session and protects routes in one
+ * pass.
  *
- * Register it as a Nitro server middleware in `server/middleware/auth.ts`:
+ * Use it when the app registers the middleware itself in `server/middleware`. An app that adds
+ * the `@zitadel/sdk-nuxt/module` module does not call it, because the module registers an
+ * equivalent handler that reads its options from the runtime config.
  *
+ * For each request the handler works in this order:
+ *
+ * 1. A request that carries the internal `x-nextgen-auth-token` header is refused with `400`.
+ *    Clients never send it, and it is checked on every route, before anything else, so it cannot
+ *    be used to inject a session.
+ * 2. A path that matches `ignoredRoutes` is skipped: no proxy, no verification, no protection.
+ * 3. A path under `proxyPath` is forwarded to the backend on the app's own origin, so the
+ *    browser calls only the app and the widgets need no CORS setup.
+ * 4. Any other request has its session judged from the session cookie or a `Bearer` token. The
+ *    result is stored for {@link getAuth}. On a path in `protectedRoutes`, a visitor who is not
+ *    signed in is redirected with `302` to `loginPath`, with the requested path in `next`. When
+ *    the backend cannot say whether the session is live, the protected route answers `503`
+ *    instead, because the user may well be signed in.
+ *
+ * A session counts only in the app's own project: `projectId`, else `ZITADEL_PROJECT_ID`, else
+ * `NUXT_PUBLIC_ZITADEL_PROJECT_ID`. A session of another project reads as signed out, and its
+ * cookie is left alone. With no project configured, nobody is signed in.
+ *
+ * The cookie travels in the browser under this project's own name, so two apps on one host do not
+ * share a session. A cookie whose session the backend says is dead is cleared, and one the backend
+ * gave no verdict on is kept.
+ *
+ * The factory works on Node and on edge runtimes such as Cloudflare Workers and Vercel Edge.
+ *
+ * @param options - The middleware options, described by {@link NextgenMiddlewareOptions}. Every
+ *   field is optional. An empty `url` counts as unset and falls back to `ZITADEL_URL`, then
+ *   `http://localhost:8080`.
+ * @returns An H3 event handler suitable as a global server middleware.
+ * @throws When `loginPath` is not a relative path starting with a single `/`. An absolute or
+ *   protocol-relative URL would allow an open redirect.
+ *
+ * @example
  * ```ts
+ * // server/middleware/auth.ts
  * import { createNextgenMiddleware } from "@zitadel/sdk-nuxt/server";
  *
  * export default createNextgenMiddleware({
@@ -115,13 +150,6 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  *   loginPath: "/login",
  * });
  * ```
- *
- * A session counts only in the app's own project: `projectId`, else
- * `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID`. The module's
- * handler passes `nextgen.projectId`, else the public project id.
- *
- * @param options - Middleware configuration options.
- * @returns An H3 event handler suitable for use as a global server middleware.
  */
 export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}): EventHandler {
   const {
@@ -190,17 +218,25 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
- * the response back, including its `Set-Cookie` headers. Hop-by-hop headers are
- * stripped in both directions, and the session cookie travels under this
- * project's name in the browser and the server's name upstream
- * ({@link proxySessionCookies}).
+ * Forwards a request under the proxy path to the backend and streams the response back.
  *
- * @param event      - The current H3 event.
- * @param authUrl    - Base URL of the auth backend.
- * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
- * @param url        - The parsed request URL.
- * @param projectId  - The project this app signs its users in to.
+ * The response keeps its `Set-Cookie` headers. Hop-by-hop headers are stripped in both directions,
+ * and the session cookie travels under this project's name in the browser and under the server's
+ * name upstream ({@link proxySessionCookies}). A redirect from the backend is passed on to the
+ * browser, never followed, and the response headers are filtered against the app's own origin. The body is read through the web
+ * `Request`, because `Buffer` is not available on every runtime.
+ *
+ * The project secret is sent as a bearer only on the session-exchange call, which needs it, and
+ * only when the caller sent no `Authorization` header of its own. The public proxy therefore never
+ * relays operator-capable calls on the server's behalf.
+ *
+ * @param event - The current H3 event.
+ * @param authUrl - The base URL of the backend.
+ * @param proxyPath - The path prefix being proxied, for example `"/__nextgen"`.
+ * @param url - The parsed request URL.
+ * @param projectId - The project this app signs its users in to.
+ * @param proxyTimeoutMs - How long the upstream request may take, in milliseconds, before it is
+ *   aborted.
  * @returns The upstream response body stream.
  */
 async function proxyRequest(
@@ -296,9 +332,10 @@ async function proxyRequest(
 }
 
 /**
- * Options passed internally to {@link handleAuth} after destructuring the
- * public-facing {@link NextgenMiddlewareOptions}: the route policy, plus what
- * the shared {@link resolveSession} judges the session by.
+ * The options {@link handleAuth} takes after the public {@link NextgenMiddlewareOptions} is
+ * destructured.
+ *
+ * It holds the route policy, plus what the shared {@link resolveSession} judges the session by.
  */
 interface AuthHandlerOptions extends ResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
@@ -307,14 +344,16 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 }
 
 /**
- * Judges the session and writes the auth result to `event.context`, sets the
- * session cookies the judgement asks for, and redirects to the login page on
- * protected routes when nobody is signed in. When the backend cannot say
- * whether the session is live, a protected route answers `503` instead.
+ * Judges the session, stores the result on the event and applies the route policy.
+ *
+ * It writes the auth result to `event.context`, sets the session cookies the judgement asks for,
+ * and redirects to the login page on a protected route when nobody is signed in. When the backend
+ * cannot say whether the session is live, a protected route answers `503` instead.
  *
  * @param event - The current H3 event.
- * @param opts  - Auth handler options.
- * @returns The body of a response this handler answers itself, if any.
+ * @param opts - The auth handler options.
+ * @returns The body of a response this handler answers itself, or `undefined` to let the request
+ *   continue.
  */
 async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<string | undefined> {
   const { protectedRoutes, loginPath, pathname, ...verification } = opts;
@@ -361,22 +400,29 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
 }
 
 /**
- * Reads the auth state from a Nitro/H3 event context.
+ * Reads the verified session of a request in a server route or API handler.
  *
- * Call this inside any server route or API handler after the middleware has run:
+ * Call it after the middleware has run, which the module arranges for every request that is not
+ * on an ignored route. Unlike `useAuth()`, the result includes the raw token, so use it when the
+ * token is needed to call an upstream API on the visitor's behalf. Never forward it to the
+ * browser.
  *
+ * @param event - The current H3 event.
+ * @returns The current {@link AuthResult}. It is signed out, with a `null` session, when the
+ *   middleware did not run for the request or nobody is signed in.
+ *
+ * @example
  * ```ts
  * import { getAuth } from "@zitadel/sdk-nuxt/server";
  *
  * export default defineEventHandler((event) => {
  *   const auth = getAuth(event);
- *   if (!auth.isAuthenticated) throw createError({ statusCode: 401 });
+ *   if (!auth.isAuthenticated) {
+ *     throw createError({ statusCode: 401 });
+ *   }
  *   return { userId: auth.session.userId };
  * });
  * ```
- *
- * @param event - The current H3 event.
- * @returns The current {@link AuthResult}.
  */
 export function getAuth(event: H3Event): AuthResult {
   return event.context.nextgenAuth ?? { isAuthenticated: false, session: null };

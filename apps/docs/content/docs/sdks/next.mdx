@@ -8,7 +8,7 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The Next.js SDK (`@zitadel/sdk-next`) is middleware for App Router apps. It proxies `/__nextgen/*` to Zitadel on your app's origin and validates the session on each request. Server components read the signed-in user with `auth()`.
+The Next.js SDK (`@zitadel/sdk-next`) is middleware for App Router apps. It proxies `/__nextgen/*` to Zitadel on your app's origin and validates the session on each request. Server components read the signed-in user with `getAuth()`.
 
 <Callout title="Generated setup" type="info">
   Let the CLI generate this setup first. Use the manual setup to review or adapt the generated files.
@@ -47,7 +47,7 @@ Setup installs the SDK. To add it yourself, run:
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds the SDK package, creates auth routes, writes a profile page, and adds the request boundary, the file Next.js runs before each matching request, that runs `nextgenMiddleware`: `proxy.ts` when the `next` version in `package.json` is 16 or later, otherwise `middleware.ts` (also for a tag such as `latest`). With a `src/app` directory, the pages, the request boundary, and `custom-elements.d.ts` go under `src/`; the `.env` files and `package.json` stay at the project root.
+    The CLI adds the SDK package, creates auth routes, writes a profile page, and adds the request boundary, the file Next.js runs before each matching request, that runs `createNextgenMiddleware`: `proxy.ts` when the `next` version in `package.json` is 16 or later, otherwise `middleware.ts` (also for a tag such as `latest`). With a `src/app` directory, the pages, the request boundary, and `custom-elements.d.ts` go under `src/`; the `.env` files and `package.json` stay at the project root.
 
     <Files>
       <File name="app/login/page.tsx" />
@@ -66,11 +66,11 @@ Setup installs the SDK. To add it yourself, run:
     Create `proxy.ts` next to your `app` directory (at the project root, or in `src/` when you use `src/app`) and call the middleware. On Next 15, name the file `middleware.ts` and the function `middleware`.
 
     ```ts
-    import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
+    import { createNextgenMiddleware } from "@zitadel/sdk-next/middleware";
     import type { NextRequest } from "next/server";
 
     export function proxy(req: NextRequest) {
-      return nextgenMiddleware(req, {
+      return createNextgenMiddleware(req, {
         url: process.env.ZITADEL_URL,
         protectedRoutes: ["/profile"],
         loginPath: "/login",
@@ -82,7 +82,7 @@ Setup installs the SDK. To add it yourself, run:
     };
     ```
 
-    Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET` and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`, where setup writes them. The middleware adds the project secret to the session exchange, the call that turns a completed sign-in into a session. Without the secret, sign-in cannot finish. The middleware and `auth()` count a session only when it belongs to `ZITADEL_PROJECT_ID` (else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`); with neither, nobody is signed in. See [SDK proxy](/docs/sdks/proxy).
+    Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET` and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`, where setup writes them. The middleware adds the project secret to the session exchange, the call that turns a completed sign-in into a session. Without the secret, sign-in cannot finish. The middleware and `getAuth()` count a session only when it belongs to `ZITADEL_PROJECT_ID` (else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`); with neither, nobody is signed in. See [SDK proxy](/docs/sdks/proxy).
   </Tab>
 </Tabs>
 
@@ -102,7 +102,7 @@ Don't change the port in only one of these places. Starting the app with `PORT=3
 
 <Steps>
   <Step>Proxy `/__nextgen/*` requests to the Zitadel backend.</Step>
-  <Step>On a protected route, validate the encrypted session token against `GET /sessions/me`. On any other route, `auth()` validates it when the page reads the session, so a page that never reads it costs no call to the backend.</Step>
+  <Step>On a protected route, validate the encrypted session token against `GET /sessions/me`. On any other route, `getAuth()` validates it when the page reads the session, so a page that never reads it costs no call to the backend.</Step>
   <Step>Redirect unauthenticated users from protected routes to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in.</Step>
 </Steps>
 
@@ -112,7 +112,7 @@ To protect another route, add it to `protectedRoutes` in `proxy.ts`:
 
 ```ts
 export function proxy(req: NextRequest) {
-  return nextgenMiddleware(req, {
+  return createNextgenMiddleware(req, {
     url: process.env.ZITADEL_URL,
     protectedRoutes: ["/profile", "/orders*"],
     loginPath: "/login",
@@ -129,7 +129,7 @@ The `matcher` that setup writes covers every route but Next.js's build files, so
 Read auth state in a server component:
 
 ```tsx
-import { auth } from "@zitadel/sdk-next/server";
+import { getAuth } from "@zitadel/sdk-next/server";
 import { Suspense } from "react";
 
 export default function Page() {
@@ -141,7 +141,7 @@ export default function Page() {
 }
 
 async function Greeting() {
-  const session = await auth();
+  const session = await getAuth();
   if (!session.isAuthenticated) return <p>Not signed in</p>;
 
   const { display, identifier, userId } = session.session;
@@ -149,9 +149,9 @@ async function Greeting() {
 }
 ```
 
-`auth()` reads the request, so the component that calls it renders inside `<Suspense>`: with Cache Components on, which `create-next-app` enables, Next.js refuses request data outside it.
+`getAuth()` reads the request, so the component that calls it renders inside `<Suspense>`: with Cache Components on, which `create-next-app` enables, Next.js refuses request data outside it.
 
-`auth()` sees a session only on routes the middleware's `matcher` covers. The `matcher` that setup writes covers every page; a narrower one has to include the page's route, for example `"/dashboard/:path*"`.
+`getAuth()` sees a session only on routes the middleware's `matcher` covers. The `matcher` that setup writes covers every page; a narrower one has to include the page's route, for example `"/dashboard/:path*"`.
 
 ## Component events
 

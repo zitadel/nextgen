@@ -1,0 +1,34 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.ts",
+      "kind": "other",
+      "extras": [
+        "AuthResult",
+        "AuthState",
+        "ClientAuthResult",
+        "NextgenMiddlewareOptions",
+        "NextgenSession",
+        "SolidFetchEvent",
+        "SolidMiddlewareConfig",
+        "UnauthState",
+        "ZitadelConfig",
+        "ZitadelProject",
+        "configureZitadel",
+        "createNextgenMiddleware",
+        "getApi",
+        "getAuth",
+        "getZitadelConfig"
+      ]
+    },
+    "./server": {
+      "source": "src/server.ts",
+      "kind": "server",
+      "extras": ["SolidFetchEvent", "SolidMiddlewareConfig"]
+    },
+    "./client": {
+      "source": "src/client.ts",
+      "kind": "client"
+    }
+  }
+}

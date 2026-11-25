@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 
-import { nextgenMiddleware } from "../middleware";
+import { createNextgenMiddleware } from "../middleware";
 
 const PROJECT = "proj_app";
 const SESSION = `zitadel_session_${PROJECT}`;
@@ -27,7 +27,7 @@ async function copied(path: string): Promise<NextResponse> {
   const request = new NextRequest(`http://localhost:3000${path}`, {
     headers: { cookie: "zitadel_session=tok" },
   });
-  return (await nextgenMiddleware(request, {
+  return (await createNextgenMiddleware(request, {
     url: "http://localhost:4000",
     projectId: PROJECT,
     protectedRoutes: [path],

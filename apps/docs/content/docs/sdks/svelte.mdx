@@ -87,7 +87,7 @@ Setup installs the SDK. To add it yourself, run:
 | `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle that `configureZitadel` returns. Wins over `projectId` and `proxyPath`. |
 | `projectId` | `string` | unset | Login, Logout, Session | The project ID. Read when you pass no `project` handle. |
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | The same-origin path the component calls. |
-| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | The purpose of the flow. |
+| `purpose` | `ZitadelFlowPurpose` | `"login"` | Login | The purpose of the flow. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`. Unset runs the project's default flow for the `purpose`. |
 | `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. If the page's `next` query parameter names a path on the same origin, the component goes there instead. The server SDKs' middleware sets `next` when a signed-out visitor requests a protected route. |
 | `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when `next` names a path. Use it on a page that uses `next` for something of its own. |

@@ -1,4 +1,4 @@
-export { createNextgenHandle, getAuth } from "./handle";
+export { createNextgenMiddleware, getAuth } from "./handle";
 export type { NextgenHandle } from "./handle";
 export type {
   NextgenMiddlewareOptions,

@@ -40,7 +40,7 @@ describe("TanStackStartPatcher.plan", () => {
 
     expect(writeContents(plan, "src/start.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/start.ts")).toContain("@zitadel/sdk-tanstack-start/server");
-    expect(writeContents(plan, "src/start.ts")).toContain("createNextgenRequestMiddleware");
+    expect(writeContents(plan, "src/start.ts")).toContain("createNextgenMiddleware");
     // src/start.ts is TanStack's reserved server entry: it must export a
     // `startInstance` from `createStart`, not call `registerGlobalMiddleware`.
     expect(writeContents(plan, "src/start.ts")).toContain("createStart");

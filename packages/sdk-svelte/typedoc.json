@@ -8,5 +8,8 @@
   ],
   "tsconfig": "tsconfig.docs.json",
   "readme": "docs/cover.md",
-  "out": "dist/api-docs"
+  "out": "dist/api-docs",
+  "intentionallyNotExported": [
+    "ZitadelWidgetAttributes"
+  ]
 }

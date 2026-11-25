@@ -2,7 +2,7 @@
  * Where the Next.js middleware asks the backend about a session, beyond the
  * contract every server SDK shares: only on a protected route, the one place it
  * decides anything by the session. Elsewhere it hands an opaque session token
- * on to auth(), so a page that never reads the session costs no call to the
+ * on to getAuth(), so a page that never reads the session costs no call to the
  * server (ADR 036).
  */
 
@@ -11,8 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 
-import { auth } from "../auth";
-import { nextgenMiddleware } from "../middleware";
+import { getAuth } from "../auth";
+import { createNextgenMiddleware } from "../middleware";
 
 const mockHeaders = vi.hoisted(() => new Map<string, string>());
 
@@ -46,20 +46,23 @@ describe("session checks in the Next.js middleware", () => {
     mockHeaders.clear();
   });
 
-  it("asks nothing about a session on a public page, and auth() signs its user in", async () => {
+  it("asks nothing about a session on a public page, and getAuth() signs its user in", async () => {
     const calls = sessionsMe();
     const request = new NextRequest("http://localhost:3000/cart", {
       headers: { cookie: `zitadel_session_${PROJECT}=opaque-session-token` },
     });
 
-    const response = await nextgenMiddleware(request, OPTIONS);
+    const response = await createNextgenMiddleware(request, OPTIONS);
 
     expect(calls).toEqual([]);
     const token = response.headers.get("x-middleware-request-x-nextgen-auth-token");
     expect(token).toBe("opaque-session-token");
 
     mockHeaders.set("x-nextgen-auth-token", token ?? "");
-    expect(await auth(OPTIONS)).toMatchObject({ isAuthenticated: true, session: { userId: "u1" } });
+    expect(await getAuth(OPTIONS)).toMatchObject({
+      isAuthenticated: true,
+      session: { userId: "u1" },
+    });
     expect(calls).toEqual([`http://localhost:4000/api/v1/sessions/me?project_id=${PROJECT}`]);
   });
 });

@@ -4,8 +4,8 @@ import * as root from "../index";
 
 describe("package root", () => {
   it("loads and exports the server helpers", () => {
-    expect(root.auth).toBeTypeOf("function");
+    expect(root.getAuth).toBeTypeOf("function");
     expect(root.NextgenProvider).toBeTypeOf("function");
-    expect(root.nextgenMiddleware).toBeTypeOf("function");
+    expect(root.createNextgenMiddleware).toBeTypeOf("function");
   });
 });

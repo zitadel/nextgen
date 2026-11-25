@@ -1,8 +1,14 @@
 /**
- * Re-exports shared SDK types from `@zitadel/sdk-core`.
+ * Shared auth and middleware types of `@zitadel/sdk-next`, re-exported from `@zitadel/sdk-core`.
  *
- * These types are defined once in sdk-core and shared by both sdk-next
- * and sdk-nuxt.
+ * The types are defined once in `@zitadel/sdk-core` and shared with the other server SDKs, so the
+ * shape that {@link server!getAuth | getAuth} returns here matches the one the Nuxt, SvelteKit and
+ * other SDKs return. They are documented in core, and this file adds nothing of its own.
+ *
+ * The token-bearing shapes ({@link NextgenSession}, {@link AuthResult}) are for server code. The
+ * client-safe shapes ({@link ClientSession}, {@link ClientAuthResult}) carry no token and are what
+ * client components, {@link server!NextgenProvider | NextgenProvider} and
+ * {@link session!getSession | getSession} deal in.
  */
 export type {
   NextgenSession,
@@ -10,8 +16,8 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
-  // Client-safe auth shapes returned by getSession() — same shape as
-  // sdk-nuxt's useAuth(), token intentionally absent.
+  // Client-safe auth shapes returned by getSession() and read by useAuth(): the token is absent
+  // on purpose.
   ClientSession,
   ClientAuthState,
   ClientAuthResult,

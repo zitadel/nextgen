@@ -1,8 +1,12 @@
 /**
- * Shared constants and utility functions for the SDK middleware proxy layer.
+ * The shared middleware layer of the server SDKs.
  *
- * These are consumed by every server SDK to avoid duplicating
- * framework-agnostic logic.
+ * It holds the constants and the framework-agnostic logic that every server SDK uses: route
+ * matching, the login redirect, the header filter and cookie handling of the same-origin proxy,
+ * and {@link resolveSession}, which judges who a request is signed in as. Keeping one
+ * implementation here means the SDKs cannot drift apart on who counts as signed in.
+ *
+ * @packageDocumentation
  */
 
 import type { JwtPayload } from "./jwt.js";
@@ -12,12 +16,26 @@ import { joinURL } from "ufo";
 
 import { isJwtShaped, verifyJwt } from "./jwt.js";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
 /**
- * Headers that must never be forwarded to an upstream service.
- * These are connection-level headers that are meaningful only between
- * two directly connected peers and become invalid when proxied.
+ * The names of the headers that a proxy must never forward to the upstream service.
+ *
+ * Most are connection-level headers that are meaningful only between two directly connected peers
+ * and become invalid when proxied. Three are not hop-by-hop headers in the strict sense and are
+ * listed on purpose: `accept-encoding`, because the proxy decodes the body that `fetch` returns, so
+ * only the codings that `fetch` advertises itself may be chosen; `content-length`, because the
+ * proxy re-sends a freshly buffered body and a forwarded value makes the fetch implementation
+ * reject the request with an opaque "fetch failed"; and `host`, because the upstream host must come
+ * from the upstream URL, or the SNI and virtual-host routing mismatch. All names are lower case.
+ *
+ * @example
+ * ```ts
+ * const forwarded = new Headers();
+ * request.headers.forEach((value, name) => {
+ *   if (!HOP_BY_HOP.has(name.toLowerCase()) && !INTERNAL_HEADERS.has(name.toLowerCase())) {
+ *     forwarded.set(name, value);
+ *   }
+ * });
+ * ```
  */
 export const HOP_BY_HOP: ReadonlySet<string> = new Set([
   // accept-encoding is not hop-by-hop per RFC 7230, but the browser's value
@@ -46,26 +64,38 @@ export const HOP_BY_HOP: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * SDK-internal headers that must never be forwarded to the upstream backend.
- * These headers carry session data between the middleware and server components;
- * forwarding them upstream would expose internal state and allow header injection.
+ * The names of the SDK-internal headers that a proxy must never forward to the backend.
+ *
+ * These headers carry session data between the middleware and the server components of an app.
+ * Forwarding one upstream would expose internal state and allow header injection. Treat the value
+ * of such a header on an incoming request as untrusted: a client can send it, so a server
+ * component must verify what it reads and never trust it as set by the middleware.
  */
 export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-token"]);
 
-// ─── Route matching ──────────────────────────────────────────────────────────
-
 /**
- * Returns `true` when `pathname` matches at least one entry in `routes`.
+ * Returns whether a pathname matches at least one route pattern.
  *
- * An entry ending with `*` matches any path that starts with the prefix
- * before the `*`. All other entries match exactly, ignoring a trailing slash
- * on either side: `/profile` and `/profile/` name the same route, and several
- * frameworks (Qwik Router by default) serve the slashed form as canonical. An
- * exact compare would let `/profile/` past a `protectedRoutes: ["/profile"]`.
+ * An entry that ends with `*` matches any path that starts with the text before the `*`. All other
+ * entries match exactly, ignoring a trailing slash on either side: `/profile` and `/profile/` name
+ * the same route, and several frameworks, Qwik Router by default, serve the slashed form as the
+ * canonical one. An exact comparison would let `/profile/` past a protected `/profile`. The
+ * pathname is attacker-controlled, so the function trims slashes with a linear scan and not with a
+ * regular expression that backtracks on a long run of slashes.
+ *
+ * The match is on the pathname only: it does not decode percent escapes or collapse dot segments,
+ * so pass the pathname that the framework routes on.
  *
  * @param pathname - The URL pathname to test.
- * @param routes   - The list of route patterns to match against.
- * @returns `true` if at least one pattern matches.
+ * @param routes - The route patterns to match against.
+ * @returns `true` when at least one pattern matches.
+ *
+ * @example
+ * ```ts
+ * matchesRoutes("/profile/", ["/profile"]); // true
+ * matchesRoutes("/admin/users", ["/admin*"]); // true
+ * matchesRoutes("/public", ["/admin*"]); // false
+ * ```
  */
 export function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
   // A linear scan, not /\/+$/: that regex backtracks quadratically on a long
@@ -87,31 +117,37 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
   });
 }
 
-// ─── Login redirect ──────────────────────────────────────────────────────────
-
 /**
- * The query parameter that brings a signed-out request's path to the login
- * page, where `<zitadel-login>` returns after sign-in.
+ * The name of the query parameter that carries the path of a signed-out request to the login page.
+ *
+ * The `<zitadel-login>` widget reads it and returns there after sign-in.
  */
 const RETURN_PATH_PARAM = "next";
 
 /**
- * Where a signed-out request for a protected route is sent: `loginPath`, with
- * the requested path and query string in `next`, so `<zitadel-login>` returns
- * to the page as it was asked for, filters and tabs included. The fragment
- * never reaches the server, so it cannot be carried.
+ * Builds the address that a signed-out request for a protected route is redirected to.
  *
- * A `next` the request carries itself is left out, so a redirect never nests
- * an earlier one: should the login page be protected by mistake, each pass of
- * the redirect loop would otherwise wrap the last and grow the URL. The rest
- * of the query keeps the encoding it was sent with.
+ * The result is the login path with the requested path and query string in the `next` parameter, so
+ * that `<zitadel-login>` returns to the page as it was asked for, filters and tabs included. The
+ * fragment never reaches the server, so it cannot be carried.
  *
- * Whatever query `loginPath` has of its own is kept, except a `next`, which
- * this replaces.
+ * A `next` that the request itself carries is left out, so a redirect never nests an earlier one:
+ * should the login page be protected by mistake, each pass of the redirect loop would otherwise
+ * wrap the last and grow the URL. The rest of the query keeps the encoding it was sent with.
+ * Whatever query the login path has of its own is kept, except a `next`, which this replaces.
  *
- * @param loginPath  - The login page, a path starting with a single `/`.
+ * The result is on the origin of the request, and the widget follows `next` only when it is a plain
+ * path on its own origin, so the redirect cannot be turned into an open redirect.
+ *
+ * @param loginPath - The login page, a path that starts with a single `/`.
  * @param requestUrl - The full URL of the signed-out request.
- * @returns The URL to redirect to, on the request's origin.
+ * @returns The URL to redirect to, on the origin of the request.
+ *
+ * @example
+ * ```ts
+ * loginRedirectUrl("/login", "https://app.example.com/reports?tab=open").toString();
+ * // "https://app.example.com/login?next=%2Freports%3Ftab%3Dopen"
+ * ```
  */
 export function loginRedirectUrl(loginPath: string, requestUrl: string | URL): URL {
   // A copy made from the whole URL, never the caller's `search`: SvelteKit
@@ -130,13 +166,15 @@ export function loginRedirectUrl(loginPath: string, requestUrl: string | URL): U
   return loginUrl;
 }
 
-// ─── Proxy credentials ───────────────────────────────────────────────────────
-
 /**
- * The operation a proxied path names: the path without the API prefix
- * (ADR 077), so `/api/v1/sessions/me` and `/sessions/me` name the same one.
- * Until 1.0.0 the server answers both spellings, and so every check here that
- * decides by path accepts both.
+ * Returns the operation that a proxied path names: the path without the API prefix.
+ *
+ * `/api/v1/sessions/me` and `/sessions/me` name the same operation. Until version 1.0.0 the server
+ * answers both spellings, so every check here that decides by path accepts both. A doubled prefix,
+ * another version prefix and look-alikes such as `/api/v1x` are not the prefix and do not match.
+ *
+ * @param path - The path after the proxy prefix.
+ * @returns The path without the API prefix.
  */
 function operationPath(path: string): string {
   if (path === API_PREFIX) {
@@ -146,49 +184,50 @@ function operationPath(path: string): string {
 }
 
 /**
- * Whether a proxied call may carry the confidential project secret.
+ * Returns whether a proxied call may carry the confidential project secret.
  *
- * ADR 036: the browser flow needs the secret only for the handoff exchange
- * (`POST /sessions/exchange`). Stamping it onto every proxied operation would
- * turn the app's public `/__nextgen/*` boundary into an open relay carrying
- * project-level authority for any anonymous caller.
+ * The browser flow needs the secret only for the handoff exchange, `POST /sessions/exchange`.
+ * Adding it to every proxied operation would turn the public proxy boundary of the app into an
+ * open relay that carries project-level authority for any anonymous caller, so a proxy asks this
+ * function before it attaches the secret. The path matches with or without the API prefix.
  *
- * @param method   - The proxied request's HTTP method.
- * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`
- *   or `/api/v1/sessions/exchange`.
+ * @param method - The HTTP method of the proxied request, in any case.
+ * @param pathname - The path after the proxy prefix, for example `/sessions/exchange` or
+ * `/api/v1/sessions/exchange`.
  * @returns `true` only for the handoff exchange.
+ *
+ * @example
+ * ```ts
+ * if (requiresProjectSecret(request.method, pathAfterProxyPrefix)) {
+ *   headers.set("authorization", `Bearer ${projectSecret}`);
+ * }
+ * ```
  */
 export function requiresProjectSecret(method: string, pathname: string): boolean {
   return method.toUpperCase() === "POST" && operationPath(pathname) === "/sessions/exchange";
 }
 
-// ─── Response header filtering ───────────────────────────────────────────────
-
 /**
- * An upstream `Location`, pointed back at this app.
+ * Re-bases an upstream `Location` onto this app.
  *
- * Only the path, query and fragment survive; whatever origin the upstream
- * named is discarded and the result is re-based onto the request's own URL.
- * That keeps both properties the blanket strip was protecting -- an internal
- * hostname can never reach the browser, and the redirect can only ever land on
- * this app -- without needing to know what this app's public origin is.
+ * Only the path, the query and the fragment survive. Whatever origin the upstream named is
+ * discarded, and the result is based on the request's own URL. That keeps both properties that the
+ * blanket removal of `Location` protected: an internal host name can never reach the browser, and
+ * the redirect can only land on this app. It does so without knowing the public origin of the app,
+ * which has no reliable source: `X-Forwarded-Host` can be set by an attacker on a direct request,
+ * and the host of the request is wrong behind a proxy that terminates TLS or rewrites it. A
+ * redirect to another origin becomes the same path on this one instead of being dropped, so a
+ * deployment behind such a proxy works and does not land on a blank page.
  *
- * Comparing origins instead would have required that knowledge, and there is
- * no reliable source for it: `X-Forwarded-Host` is attacker-settable on a
- * direct request, and the request's own host is wrong behind a proxy that
- * terminates TLS or rewrites it. Discarding the origin sidesteps the question
- * -- a redirect to another origin becomes the same path on this one rather
- * than being dropped, so a deployment behind such a proxy works instead of
- * landing on a blank page.
+ * Nothing legitimate on this path points off-origin: an outbound redirect to an identity provider
+ * travels as `step.redirect_url` in a JSON body and the widget performs it, never as a proxied
+ * header. A relative reference resolves against the path it came from, so `next?flow=x` answered
+ * to `/__nextgen/idp/google/callback` means `/__nextgen/idp/google/next?flow=x`. An unparseable
+ * value has nothing to forward.
  *
- * Nothing legitimate on this path points off-origin anyway: an outbound
- * redirect to a provider travels as `step.redirect_url` in a JSON body and the
- * widget performs it, never as a proxied header.
- *
- * A relative reference resolves against the path it came from (RFC 3986 §5),
- * so `next?flow=x` answered to `/__nextgen/idp/google/callback` means
- * `/__nextgen/idp/google/next?flow=x`. An unparseable value is the one case with
- * nothing to forward.
+ * @param location - The `Location` value of the upstream response.
+ * @param selfUrl - The own request URL of the app.
+ * @returns The re-based address, or `undefined` when there is nothing to forward.
  */
 function ontoThisApp(location: string, selfUrl: string | undefined): string | undefined {
   if (selfUrl === undefined || selfUrl === "") {
@@ -204,29 +243,37 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
 }
 
 /**
- * Filters upstream response headers for proxying: strips hop-by-hop headers,
- * `content-encoding` and `set-cookie` (handled separately via `getSetCookie()`),
- * and reduces `location` to a redirect that can only land on this app.
+ * Filters the headers of an upstream response for proxying.
  *
- * `content-encoding` describes the bytes the upstream sent, but `fetch` has
- * already decoded them, so the proxy passes on a plain body. Forwarding the
- * header labels that body as compressed: the browser fails to decode it, and a
- * `200` reaches the caller as a request that got no response. `content-length`
- * goes for the same reason, as a hop-by-hop header.
+ * It removes the hop-by-hop headers, `content-encoding` and `set-cookie`, and it reduces `location`
+ * to a redirect that can only land on this app. Cookies are handled separately, with
+ * {@link proxySessionCookies}, because a response can carry several and the app must rewrite them.
  *
- * `location` was stripped outright until the identity-provider callback
- * needed it: the provider returns the browser to `/__nextgen/idp/{slug}/callback`,
- * and the engine answers `303` back to the page the sign-in started on. That
- * is a top-level navigation with no JavaScript in the loop, so a dropped
- * `Location` leaves the browser on an empty page. Outbound redirects to a
- * provider do not travel this way -- they arrive as `step.redirect_url` in a
- * JSON body and the widget navigates -- so nothing legitimate points off-origin.
+ * The `content-encoding` header describes the bytes that the upstream sent, but `fetch` has
+ * already decoded them, so the proxy passes on a plain body. Forwarding the header would label that
+ * body as compressed: the browser fails to decode it, and a successful answer, such as the session
+ * exchange behind a compressing edge, reaches the caller as a request that got no response. The
+ * `content-length` header goes for the same reason.
  *
- * @param upstream - The upstream response headers.
- * @param selfUrl - The app's own request URL, which is both the origin a
- *   redirect must land on and the base a relative one resolves against.
- *   Omitting it keeps the old behaviour of dropping every redirect.
- * @returns A new `Headers` object with filtered headers.
+ * The `location` header is kept only because the identity-provider callback needs it. The provider
+ * returns the browser to `/__nextgen/idp/{slug}/callback`, and the server answers `303` back to the
+ * page where the sign-in started. That is a top-level navigation with no JavaScript in the loop, so
+ * a dropped `Location` leaves the browser on an empty page.
+ *
+ * @param upstream - The headers of the upstream response.
+ * @param selfUrl - The own request URL of the app, which is both the origin that a redirect must
+ * land on and the base that a relative one resolves against. When it is omitted, every redirect is
+ * dropped.
+ * @returns A new `Headers` object with the filtered headers.
+ *
+ * @example
+ * ```ts
+ * const upstream = await fetch(target, { headers: forwarded });
+ * return new Response(upstream.body, {
+ *   status: upstream.status,
+ *   headers: filterResponseHeaders(upstream.headers, request.url),
+ * });
+ * ```
  */
 export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Headers {
   const filtered = new Headers();
@@ -247,50 +294,83 @@ export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Head
   return filtered;
 }
 
-// ─── Session cookies ─────────────────────────────────────────────────────────
-
-/** The prefix a browser accepts only from this host, over a secure response (ADR 083). */
+/**
+ * The prefix that a browser accepts only from this host, over a secure response.
+ *
+ * A cookie with this prefix cannot be planted by a sibling host, which is why the session cookie
+ * carries it wherever it is `Secure`.
+ */
 const HOST_PREFIX = "__Host-";
 
-/** The session cookie's name without the prefix, as it goes over loopback http. */
+/**
+ * The name of the session cookie without the prefix, as it goes over plain http to a loopback host.
+ *
+ * Safari drops a `Secure` cookie on that transport, so the cookie has no `Secure` attribute there
+ * and cannot carry the `__Host-` prefix.
+ */
 const LOOPBACK_SERVER_SESSION_COOKIE = "zitadel_session";
 
 /**
- * The server's session cookie under its canonical name, the one the server
- * reads on every request (ADR 083). A proxy sends a session upstream under
- * this name only, whichever transport it reaches the server over.
+ * The name of the server's session cookie, the canonical one that the server reads on every
+ * request.
+ *
+ * A proxy sends a session upstream under this name only, whichever transport it reaches the server
+ * over. In a browser the name depends on the transport; use {@link serverSessionCookieName} for the
+ * name a browser holds.
  */
 export const SERVER_SESSION_COOKIE = `${HOST_PREFIX}${LOOPBACK_SERVER_SESSION_COOKIE}`;
 
 /**
- * The session cookies before ADR 083, the server's and every app's own. They
- * are never read, renamed or passed on: a proxy strips them on the way up and
- * discards their `Set-Cookie` on the way back.
+ * The name of the session cookie that earlier versions used, the server's and every app's own.
+ *
+ * It is never read, renamed or passed on: a proxy strips it on the way up and discards its
+ * `Set-Cookie` on the way back.
  */
 const LEGACY_SESSION_COOKIE = "__nextgen_session";
 
 /**
- * The name the server's session cookie has in a browser: the canonical
- * {@link SERVER_SESSION_COOKIE} wherever it is `Secure`, and `zitadel_session`
- * over plain http to a loopback host, where it has no `Secure` for Safari and
- * so cannot carry the `__Host-` prefix (ADR 083). On `localhost` the Console of
- * a local server keeps its session under this name.
+ * Returns the name that the session cookie of the server has in a browser.
+ *
+ * It is the canonical {@link SERVER_SESSION_COOKIE} wherever the cookie is `Secure`, and
+ * `zitadel_session` over plain http to a loopback host, where the cookie has no `Secure` attribute
+ * for Safari and so cannot carry the `__Host-` prefix. On `localhost` the Console of a local server
+ * keeps its session under this name.
+ *
+ * @param secure - Whether the cookie is `Secure`, that is whether the request is not plain http to
+ * a loopback host.
+ * @returns The cookie name.
+ *
+ * @example
+ * ```ts
+ * serverSessionCookieName(true); // "__Host-zitadel_session"
+ * serverSessionCookieName(false); // "zitadel_session"
+ * ```
  */
 export function serverSessionCookieName(secure: boolean): string {
   return secure ? SERVER_SESSION_COOKIE : LOOPBACK_SERVER_SESSION_COOKIE;
 }
 
 /**
- * The cookie an app keeps its project's session in: the server's name for the
- * app's scheme with the project id appended (ADR 073, ADR 083),
- * `__Host-zitadel_session_<project id>` wherever it is `Secure` and
- * `zitadel_session_<project id>` over plain http to a loopback host. A browser
- * shares one cookie jar across every port of a host, so under the server's
- * name alone the Console of a local server and every app on `localhost` would
- * hold their sessions in one slot and replace each other's.
+ * Returns the name of the cookie in which an app keeps the session of its project.
  *
- * Every byte of the id outside `[A-Za-z0-9_-]` is percent-encoded, so any
- * configured id makes a valid cookie name. Ids the server mints need none.
+ * The name is the server's name for the scheme of the app with the project id appended:
+ * `__Host-zitadel_session_<project id>` wherever the cookie is `Secure`, and
+ * `zitadel_session_<project id>` over plain http to a loopback host. A browser shares one cookie jar
+ * across every port of a host, so under the name of the server alone the Console of a local server
+ * and every app on `localhost` would hold their sessions in one slot and replace each other's.
+ *
+ * Every byte of the id outside `[A-Za-z0-9_-]` is percent-encoded, so any configured id makes a
+ * valid cookie name. The ids that the server mints need no encoding.
+ *
+ * @param projectId - The project id that the app signs its users in to.
+ * @param secure - Whether the cookie is `Secure`.
+ * @returns The cookie name.
+ *
+ * @example
+ * ```ts
+ * sessionCookieName("296547382910273", true); // "__Host-zitadel_session_296547382910273"
+ * sessionCookieName("296547382910273", false); // "zitadel_session_296547382910273"
+ * ```
  */
 export function sessionCookieName(projectId: string, secure: boolean): string {
   let name = `${serverSessionCookieName(secure)}_`;
@@ -303,14 +383,22 @@ export function sessionCookieName(projectId: string, secure: boolean): string {
   return name;
 }
 
-/** Whether `name` is one of the server's session cookie names, on either transport. */
+/**
+ * Returns whether a name is one of the server's session cookie names, on either transport.
+ *
+ * @param name - The cookie name.
+ * @returns `true` for the canonical name and the loopback name.
+ */
 function isServerSessionCookie(name: string): boolean {
   return name === SERVER_SESSION_COOKIE || name === LOOPBACK_SERVER_SESSION_COOKIE;
 }
 
 /**
- * Whether `name` is a session cookie: the server's or any app's own, under
- * either transport's name, or one from before ADR 083.
+ * Returns whether a name is a session cookie: the server's or any app's own, under the name of
+ * either transport, or one of the earlier name.
+ *
+ * @param name - The cookie name.
+ * @returns `true` for any session cookie.
  */
 function isSessionCookie(name: string): boolean {
   const bare = name.startsWith(HOST_PREFIX) ? name.slice(HOST_PREFIX.length) : name;
@@ -320,15 +408,31 @@ function isSessionCookie(name: string): boolean {
 }
 
 /**
- * A session cookie a response sets. An empty `value` with `maxAge: 0` clears
- * it.
+ * A session cookie that a response sets.
+ *
+ * An empty value with a `maxAge` of zero clears the cookie. {@link serializeSessionCookie} turns it
+ * into a `Set-Cookie` value. The result carries `Path=/`, `HttpOnly` and `SameSite=Lax`, and never
+ * a `Domain`.
  */
 export interface SessionCookie {
-  /** The cookie name; the app's own session cookie is `sessionCookieName`. */
+  /**
+   * The name of the cookie.
+   *
+   * The session cookie of the app has the name that {@link sessionCookieName} returns.
+   */
   readonly name: string;
-  /** The cookie value, the opaque session token; `""` clears the cookie. */
+  /**
+   * The value of the cookie, the opaque session token.
+   *
+   * An empty string clears the cookie.
+   */
   readonly value: string;
-  /** Seconds the browser keeps it, or `undefined` for the browser session. */
+  /**
+   * The number of seconds that the browser keeps the cookie.
+   *
+   * It is `undefined` for a cookie that lasts as long as the browser session, and `0` to clear the
+   * cookie.
+   */
   readonly maxAge: number | undefined;
   /**
    * Whether the cookie carries the `Secure` attribute. It is required for the
@@ -338,8 +442,25 @@ export interface SessionCookie {
 }
 
 /**
- * The `Set-Cookie` value for `cookie`, with the attributes the server gives its
- * own session cookie: `Path=/`, `HttpOnly`, `SameSite=Lax`.
+ * Serializes a session cookie into a `Set-Cookie` value.
+ *
+ * The attributes are the ones that the server gives its own session cookie: `Path=/`, `HttpOnly`
+ * and `SameSite=Lax`, plus `Max-Age` when the cookie has one and `Secure` when the cookie is
+ * secure. `HttpOnly` keeps the token away from client JavaScript. The function does not escape the
+ * value, so pass the opaque token as the server issued it.
+ *
+ * @param cookie - The cookie to serialize.
+ * @returns The `Set-Cookie` header value.
+ *
+ * @example
+ * ```ts
+ * serializeSessionCookie({
+ *   name: sessionCookieName("296547382910273", true),
+ *   value: token,
+ *   maxAge: 3600,
+ *   secure: true,
+ * });
+ * ```
  */
 export function serializeSessionCookie(cookie: SessionCookie): string {
   const attributes = [`${cookie.name}=${cookie.value}`, "Path=/"];
@@ -354,35 +475,64 @@ export function serializeSessionCookie(cookie: SessionCookie): string {
 }
 
 /**
- * The `Cache-Control` of a response that sets a session cookie, as the server
- * sends on its session answers: a shared cache must not hand the cookie, the
- * session token it carries or its clearing, to the next visitor.
+ * The `Cache-Control` value for a response that sets a session cookie.
+ *
+ * It is the value that the server sends on its own session answers. A shared cache must not hand
+ * the cookie, the session token that it carries or its clearing to the next visitor, so set this
+ * header on every response that sets or clears a session cookie.
  */
 export const SESSION_COOKIE_CACHE_CONTROL = "private, no-store";
 
-/** The browser's request as the app sees it, and as a proxy in front of it forwarded it. */
+/**
+ * The request of the browser as the app sees it, and as a proxy in front of the app forwarded it.
+ *
+ * It decides whether a session cookie needs `Secure`: the scheme and host that a proxy in front of
+ * the app forwarded win over the request URL, so an app behind a TLS proxy that talks to it over
+ * loopback keeps `Secure`.
+ */
 export interface BrowserRequest {
-  /** The app's own request URL. */
+  /**
+   * The own request URL of the app.
+   *
+   * It is used when no forwarded header names the scheme or host. An unparseable value counts as
+   * secure.
+   */
   readonly requestUrl: string | URL;
-  /** The request's `X-Forwarded-Proto`, or `null`. */
+  /**
+   * The `X-Forwarded-Proto` header of the request, or `null` when absent.
+   *
+   * Only the first entry counts. Pass it only when the header comes from a proxy that you trust.
+   */
   readonly forwardedProto?: string | null;
-  /** The request's `X-Forwarded-Host`, or `null`. */
+  /**
+   * The `X-Forwarded-Host` header of the request, or `null` when absent.
+   *
+   * Only the first entry counts. Pass it only when the header comes from a proxy that you trust.
+   */
   readonly forwardedHost?: string | null;
 }
 
-/** The first entry of a forwarded header a chain of proxies appended to, if any. */
+/**
+ * Returns the first entry of a forwarded header that a chain of proxies appended to.
+ *
+ * @param value - The header value.
+ * @returns The first non-empty entry, or `undefined`.
+ */
 function firstForwarded(value: string | null | undefined): string | undefined {
   const first = value?.split(",")[0]?.trim();
   return first ? first : undefined;
 }
 
 /**
- * Whether a session cookie this app sets needs `Secure`, by the rule the server
- * applies to its own (`cookieSecureFromContext`): always, except over plain
- * http to a loopback host, where Safari would drop a `Secure` cookie. The
- * scheme and host are what a proxy in front of the app forwarded (the first
- * `X-Forwarded-Proto` and `X-Forwarded-Host`), else the app's request URL's,
- * so an app behind a TLS proxy that talks to it over loopback keeps `Secure`.
+ * Returns whether a session cookie that this app sets needs `Secure`.
+ *
+ * The rule is the one the server applies to its own cookie: always, except over plain http to a
+ * loopback host, where Safari would drop a `Secure` cookie. The scheme and host are what a proxy in
+ * front of the app forwarded, the first `X-Forwarded-Proto` and `X-Forwarded-Host`, else those of
+ * the request URL of the app.
+ *
+ * @param request - The request of the browser.
+ * @returns `true` when the cookie needs `Secure`.
  */
 function secureFor(request: BrowserRequest): boolean {
   let url: URL;
@@ -405,25 +555,44 @@ function secureFor(request: BrowserRequest): boolean {
   return !(host === "localhost" || host === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(host));
 }
 
-/** Seconds from now until `epochMs`, at least one, or `undefined` when unknown. */
+/**
+ * Returns the seconds from now until a time, at least one, or `undefined` when the time is unknown.
+ *
+ * @param epochMs - The time in milliseconds since the Unix epoch.
+ * @returns The number of seconds.
+ */
 function secondsUntil(epochMs: number): number | undefined {
   return Number.isFinite(epochMs)
     ? Math.max(1, Math.floor((epochMs - Date.now()) / 1000))
     : undefined;
 }
 
-/** Clears the cookie `name`. */
+/**
+ * Builds the cookie that clears a session cookie.
+ *
+ * @param name - The cookie name.
+ * @param secure - Whether the cookie is `Secure`.
+ * @returns The clearing cookie.
+ */
 function clearedCookie(name: string, secure: boolean): SessionCookie {
   return { name, value: "", maxAge: 0, secure };
 }
 
 /**
- * Copies a session of this project found in the server's cookie into the
- * project's own. The server's cookie keeps it: on a server without platform
- * bootstrap the Console signs in to the app's project, and clearing the cookie
- * would sign it out. The proxy retires the server's cookie when the app signs
- * a user in or out ({@link proxySessionCookies}), so it cannot sign its user
- * back in once the app's own cookie is gone.
+ * Copies a session of this project that was found in the cookie of the server into the cookie of
+ * the project.
+ *
+ * The cookie of the server keeps the session: on a server without platform bootstrap the Console
+ * signs in to the project of the app, and clearing the cookie would sign the Console out. The proxy
+ * retires the cookie of the server when the app signs a user in or out, see
+ * {@link proxySessionCookies}, so it cannot sign the user back in once the cookie of the app is
+ * gone.
+ *
+ * @param token - The opaque session token.
+ * @param projectId - The project id.
+ * @param maxAge - The lifetime in seconds, or `undefined`.
+ * @param secure - Whether the cookie is `Secure`.
+ * @returns The cookie to set.
  */
 function copiedToProjectCookie(
   token: string,
@@ -435,11 +604,16 @@ function copiedToProjectCookie(
 }
 
 /**
- * The app's own session cookie for a `Set-Cookie` of the server's, which sets
- * or clears it: its value and expiry under `name`, with the attributes of the
- * app's scheme rather than those the server chose for its own transport
- * (ADR 083). `Max-Age` wins over `Expires`, as in a browser; an `Expires`
- * alone becomes the `Max-Age` it amounts to.
+ * Rewrites a `Set-Cookie` of the server's session cookie into one of the app's own.
+ *
+ * The result keeps the value and the expiry under the given name, with the attributes of the scheme
+ * of the app and not those that the server chose for its own transport. `Max-Age` wins over
+ * `Expires`, as in a browser, and an `Expires` alone becomes the `Max-Age` that it amounts to.
+ *
+ * @param setCookie - The `Set-Cookie` value of the server.
+ * @param name - The name of the cookie of the app.
+ * @param secure - Whether the cookie is `Secure`.
+ * @returns The `Set-Cookie` value for the browser.
  */
 function projectSetCookie(setCookie: string, name: string, secure: boolean): string {
   const [pair = "", ...attributes] = setCookie.split(";");
@@ -462,7 +636,12 @@ function projectSetCookie(setCookie: string, name: string, secure: boolean): str
   return serializeSessionCookie({ name, value, maxAge, secure });
 }
 
-/** The pieces of a `Cookie` header, each with the name it carries. */
+/**
+ * Splits a `Cookie` header into its pieces, each with the name that it carries.
+ *
+ * @param header - The header value, or `null`.
+ * @returns The pieces.
+ */
 function cookiePieces(header: string | null): { name: string; piece: string }[] {
   const pieces: { name: string; piece: string }[] = [];
   for (const raw of (header ?? "").split(";")) {
@@ -475,53 +654,108 @@ function cookiePieces(header: string | null): { name: string; piece: string }[] 
   return pieces;
 }
 
-/** The value of the first cookie named `name`, or `null` when it is absent or empty. */
+/**
+ * Returns the value of the first cookie with a name, or `null` when it is absent or empty.
+ *
+ * @param pieces - The pieces of a `Cookie` header.
+ * @param name - The cookie name.
+ * @returns The value, or `null`.
+ */
 function cookieValue(pieces: { name: string; piece: string }[], name: string): string | null {
   const found = pieces.find((candidate) => candidate.name === name);
   const value = found ? found.piece.slice(found.piece.indexOf("=") + 1).trim() : "";
   return value === "" ? null : value;
 }
 
-/** The name a `Set-Cookie` value sets. */
+/**
+ * Returns the name that a `Set-Cookie` value sets.
+ *
+ * @param setCookie - The `Set-Cookie` value.
+ * @returns The cookie name, or an empty string.
+ */
 function setCookieName(setCookie: string): string {
   const index = setCookie.indexOf("=");
   return index === -1 ? "" : setCookie.slice(0, index).trim();
 }
 
 /**
- * What a proxied request carries that decides its session cookies. The
- * request URL and the forwarded headers decide whether a cookie needs `Secure`.
+ * What a proxied request carries that decides its session cookies.
+ *
+ * It extends {@link BrowserRequest}, whose request URL and forwarded headers decide whether a
+ * cookie needs `Secure`. Build it from the request that the browser sent to the same-origin proxy.
  */
 export interface ProxiedRequest extends BrowserRequest {
-  /** The HTTP method of the request the browser sent to the same-origin proxy. */
+  /**
+   * The HTTP method of the request that the browser sent to the same-origin proxy.
+   *
+   * The match is case-insensitive.
+   */
   readonly method: string;
-  /** The path after the proxy prefix, e.g. `/sessions/me` or `/api/v1/sessions/me`. */
+  /**
+   * The path after the proxy prefix.
+   *
+   * It may carry the API prefix or not, for example `/sessions/me` or `/api/v1/sessions/me`.
+   */
   readonly path: string;
-  /** The query string, with its leading `?`, or `""`. */
+  /**
+   * The query string with its leading `?`, or an empty string.
+   *
+   * The `project_id` parameter of a session probe is read from it.
+   */
   readonly search: string;
-  /** The request's `Cookie` header, or `null`. */
+  /**
+   * The `Cookie` header of the request, or `null` when absent.
+   */
   readonly cookie: string | null;
 }
 
-/** The server a proxy forwards to, for the calls it makes of its own. */
+/**
+ * The server that a proxy forwards to, for the calls that the proxy makes of its own.
+ *
+ * Those calls ask the server about a session that is kept under the name of the server, and revoke
+ * it on sign-out.
+ */
 export interface ProxyUpstream {
-  /** Base URL of the auth backend. */
+  /**
+   * The base URL of the auth backend.
+   *
+   * A trailing slash and an existing API prefix are handled.
+   *
+   * @example "https://auth.example.com"
+   */
   readonly url: string;
-  /** How long to wait for an answer. */
+  /**
+   * The time to wait for an answer, in milliseconds.
+   *
+   * A call that does not answer in time counts as having given no verdict, and the cookie stays.
+   */
   readonly timeoutMs: number;
 }
 
-/** What a proxied answer sends the browser. */
+/**
+ * What a proxied answer sends the browser.
+ */
 export interface ProxiedAnswer {
-  /** The `Set-Cookie` header values to send the browser, already serialised. */
+  /**
+   * The `Set-Cookie` header values to send the browser, already serialized.
+   */
   readonly setCookies: string[];
-  /** The body to send the browser: the upstream stream, or text this layer had to read. */
+  /**
+   * The body to send the browser.
+   *
+   * It is the upstream stream, or the text that this layer had to read. Send this body and never
+   * the body of the upstream response, which this layer may already have consumed.
+   */
   readonly body: ReadableStream<Uint8Array> | string | null;
 }
 
-/** A proxied call's session cookies, on the way up and on the way back. */
+/**
+ * The session cookies of a proxied call, on the way up and on the way back.
+ */
 export interface ProxiedSessionCookies {
-  /** The `Cookie` header to send upstream, or `null` to send none. */
+  /**
+   * The `Cookie` header to send upstream, or `null` to send none.
+   */
   readonly upstreamCookie: string | null;
   /**
    * The upstream answer's way back to the browser: the `Set-Cookie` values and
@@ -532,43 +766,62 @@ export interface ProxiedSessionCookies {
 }
 
 /**
- * The session cookies of a call the app proxies to the server (ADR 073,
- * ADR 083). The server knows one session cookie,
- * {@link serverSessionCookieName}; the app keeps its project's session in
- * `sessionCookieName`, so it neither replaces nor reads the session of
- * another app or of the Console on the same host. Both names follow the app's
- * scheme: the `__Host-` names wherever the cookie is `Secure`, the unprefixed
- * ones over plain http to a loopback host. The app reads only its scheme's.
+ * Computes the session cookies of a call that the app proxies to the server.
  *
- * - On the way up, the app's own session cookie goes once, under the server's
- *   canonical {@link SERVER_SESSION_COOKIE}, and every other session cookie
- *   stays behind: both names of the server's and of every app's, and those
- *   from before ADR 083. Other cookies pass unchanged.
+ * The server knows one session cookie, named by {@link serverSessionCookieName}. The app keeps the
+ * session of its project in the cookie that {@link sessionCookieName} names, so it neither replaces
+ * nor reads the session of another app or of the Console on the same host. Both names follow the
+ * scheme of the app: the `__Host-` names wherever the cookie is `Secure`, and the unprefixed ones
+ * over plain http to a loopback host. The app reads only the names of its scheme, because any
+ * sibling host can plant an unprefixed cookie.
+ *
+ * - On the way up, the own session cookie of the app goes once, under the canonical
+ *   {@link SERVER_SESSION_COOKIE}, and every other session cookie stays behind: both names of the
+ *   server's and of every app's, and those of the earlier name. Other cookies pass unchanged.
  * - On the way back, a `Set-Cookie` of the server's session cookie under either
  *   name, which sets or clears it, becomes one of the app's own for its scheme:
  *   the value and expiry kept, `Path=/`, `HttpOnly`, `SameSite=Lax`, no
  *   `Domain`, and `Secure` as the app's scheme needs. A `Set-Cookie` of any
- *   other session cookie, one from before ADR 083 included, is dropped.
- * - A session kept under the server's name goes up to one call only, the
- *   session probe `GET /sessions/me?project_id=<project>`, which the server
- *   refuses for another project's session. When the answer signs a user of
- *   this project in, the session is copied to the app's cookie; the server's
- *   cookie keeps it, since the Console may share the project.
- * - When the app signs a user in (`POST /sessions/exchange`) or out
- *   (`DELETE /sessions/me`), a session still kept under the server's name is
- *   retired, or it would sign its user back in once the app's own cookie is
- *   gone: the server is asked about it in this project, and a session of this
- *   project is cleared (and on sign-out also ended), a dead one cleared, and
- *   one of another project, the Console's on `localhost`, left alone.
- * - Each of these calls is known by its path with or without the API prefix
- *   (`/api/v1`), which the server answers both ways until 1.0.0.
- * - Without a project the cookies pass as they are: nothing says which session
- *   is the app's.
+ *   other session cookie, one of the earlier name included, is dropped.
+ * - A session kept under the server's name goes up to one call only, the session probe
+ *   `GET /sessions/me?project_id=<project>`, which the server refuses for the session of another
+ *   project. When the answer signs a user of this project in, the session is copied to the cookie
+ *   of the app, and the cookie of the server keeps it, since the Console may share the project.
+ * - When the app signs a user in, `POST /sessions/exchange`, or out, `DELETE /sessions/me`, a
+ *   session that is still kept under the server's name is retired, or it would sign its user back
+ *   in once the cookie of the app is gone. The server is asked about it in this project: a session
+ *   of this project is cleared, and on sign-out also ended; a dead one is cleared; and one of
+ *   another project, such as the Console's on `localhost`, is left alone.
+ * - Each of these calls is known by its path with or without the API prefix `/api/v1`, which the
+ *   server answers both ways until version 1.0.0.
+ * - Without a project the cookies pass as they are, because nothing says which session is the
+ *   session of the app.
  *
- * @param request   - The proxied request.
- * @param projectId - The project this app signs its users in to.
- * @param upstream  - The server the proxy forwards to, which it asks about a
- *   session kept under the server's name.
+ * @param request - The proxied request.
+ * @param projectId - The project id that the app signs its users in to.
+ * @param upstream - The server that the proxy forwards to, which it asks about a session kept
+ * under the server's name.
+ * @returns The cookie to send upstream and a function that turns the upstream answer into what the
+ * browser receives.
+ *
+ * @example
+ * ```ts
+ * const cookies = proxySessionCookies(
+ *   {
+ *     method: request.method,
+ *     path: pathAfterProxyPrefix,
+ *     search: url.search,
+ *     cookie: request.headers.get("cookie"),
+ *     requestUrl: request.url,
+ *     forwardedProto: request.headers.get("x-forwarded-proto"),
+ *     forwardedHost: request.headers.get("x-forwarded-host"),
+ *   },
+ *   "296547382910273",
+ *   { url: "https://auth.example.com", timeoutMs: 5000 },
+ * );
+ * const upstream = await fetch(target, { headers: { cookie: cookies.upstreamCookie ?? "" } });
+ * const answer = await cookies.toBrowser(upstream);
+ * ```
  */
 export function proxySessionCookies(
   request: ProxiedRequest,
@@ -653,12 +906,19 @@ export function proxySessionCookies(
 }
 
 /**
- * Whether the session kept under the server's name goes when the app signs a
- * user in or out: the server is asked about it in this project. A session of
- * this project goes, and on sign-out it is ended too, so that it cannot sign
- * its user back in; one the server no longer holds goes as well. One of another
- * project, the Console's on `localhost`, stays, and so does one the server gave
- * no verdict on, and a JWT, which the middleware judges itself.
+ * Returns whether the session that is kept under the server's name goes when the app signs a user
+ * in or out.
+ *
+ * The server is asked about the session in this project. A session of this project goes, and on
+ * sign-out it is ended too, so that it cannot sign its user back in. One that the server no longer
+ * holds goes as well. One of another project, such as the Console's on `localhost`, stays, and so
+ * does one that the server gave no verdict on, and a JWT, which the middleware judges itself.
+ *
+ * @param token - The opaque session token.
+ * @param projectId - The project id.
+ * @param upstream - The server to ask.
+ * @param signsOut - Whether the app signs the user out, which also revokes the session.
+ * @returns `true` when the cookie of the server is cleared.
  */
 async function retiresSharedSession(
   token: string,
@@ -706,15 +966,24 @@ async function retiresSharedSession(
   return true;
 }
 
-/** The header the session's CSRF token travels in (ADR 053 §5). */
+/**
+ * The name of the header that carries the CSRF token of the session.
+ *
+ * Sign-out is a write, so the server requires the token even for a call without an `Origin`.
+ */
 const CSRF_HEADER = "X-Zitadel-CSRF";
 
 /**
- * Ends the session `cookie` carries, as `@zitadel/components` ends its own.
- * Sign-out is a write, so it carries the session's CSRF token (ADR 053 §5),
- * read first from `GET /sessions/me/csrf` in this project: a call without an
- * Origin passes the server's cross-site check, but not its token check.
- * Without a token it sends no revoke, which the server would refuse.
+ * Ends the session that a cookie carries, as the components package ends its own.
+ *
+ * Sign-out is a write, so it carries the CSRF token of the session, which it reads first from
+ * `GET /sessions/me/csrf` in this project. A call without an `Origin` passes the cross-site check
+ * of the server but not its token check. Without a token it sends no revoke, which the server would
+ * refuse. A failure is swallowed, because the caller clears the cookie all the same.
+ *
+ * @param cookie - The `Cookie` header value that carries the session.
+ * @param projectId - The project id.
+ * @param upstream - The server to call.
  */
 async function revokeSession(
   cookie: string,
@@ -746,7 +1015,12 @@ async function revokeSession(
   }
 }
 
-/** `text` as JSON, or `undefined` when it is not JSON. */
+/**
+ * Parses text as JSON.
+ *
+ * @param text - The text to parse.
+ * @returns The parsed value, or `undefined` when the text is not JSON.
+ */
 function parsedJson(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -755,257 +1029,420 @@ function parsedJson(text: string): unknown {
   }
 }
 
-// ─── Middleware types ──────────────────────────────────────────────────────────
-
 /**
- * The authenticated session for a signed-in user. Identity follows the
- * user-ref vocabulary (ADR 058): render `display`, falling back to
- * `identifier`, then `userId`.
+ * The session of a signed-in user, as server code sees it.
+ *
+ * Identity follows the user-reference vocabulary of the API: render {@link NextgenSession.display},
+ * fall back to {@link NextgenSession.identifier}, then to {@link NextgenSession.userId}. The
+ * session carries the raw token for server-side use, so it must never be serialized into a page, a
+ * server-rendered payload or a client fetch result. Convert it to a client-safe session without the token first.
+ *
+ * @example
+ * ```ts
+ * const name = session.display ?? session.identifier ?? session.userId;
+ * ```
  */
 export type NextgenSession = {
-  /** The user's unique identifier (`sub` claim). */
+  /**
+   * The unique identifier of the user, the `sub` claim.
+   */
   userId: string;
   /**
-   * The user schema's designated identifier value (the login identifier,
-   * e.g. an email address or username), or `null` when unresolved. On the
-   * JWT path this carries the `email` claim.
+   * The user schema's designated identifier value, the login identifier such as an email address
+   * or a username, or `null` when it is unresolved.
+   *
+   * On the JWT path it carries the `email` claim.
    */
   identifier: string | null;
   /**
-   * The schema property `identifier` came from (e.g. `"email"`), or `null`
-   * when unknown — JWT-claim identities carry no property attribution.
+   * The schema property that the identifier came from, for example `"email"`, or `null` when it is
+   * unknown.
+   *
+   * An identity from JWT claims carries no property attribution, so it is `null` there.
    */
   identifierProperty: string | null;
-  /** The user's display name rendering, or `null` when the schema designates none. */
+  /**
+   * The display name rendering of the user, or `null` when the schema designates none.
+   */
   display: string | null;
-  /** The raw verified JWT. */
+  /**
+   * The raw session token.
+   *
+   * It is the verified JWT, or the opaque session token that the backend confirmed. It is a
+   * credential: keep it on the server and out of any client payload.
+   */
   token: string;
 };
 
-/** Auth state when the user is signed in. */
+/**
+ * The auth state of a user who is signed in.
+ *
+ * It is one half of {@link AuthResult}; check {@link AuthState.isAuthenticated} to narrow.
+ */
 export type AuthState = {
-  /** Always `true`; the discriminant that narrows an {@link AuthResult}. */
+  /**
+   * Always `true`.
+   *
+   * It is the discriminant that narrows an {@link AuthResult}.
+   */
   isAuthenticated: true;
-  /** The verified session, including the raw token for server-side use. */
+  /**
+   * The verified session, including the raw token for server-side use.
+   */
   session: NextgenSession;
 };
 
-/** Auth state when the user is not signed in. */
+/**
+ * The auth state of a user who is not signed in.
+ *
+ * It is the other half of {@link AuthResult}. It is also what a request gets when the backend gave
+ * no verdict on the session cookie; the session resolution reports that case separately.
+ */
 export type UnauthState = {
-  /** Always `false`; the discriminant that narrows an {@link AuthResult}. */
+  /**
+   * Always `false`.
+   *
+   * It is the discriminant that narrows an {@link AuthResult}.
+   */
   isAuthenticated: false;
-  /** Always `null`: there is no session to read. */
+  /**
+   * Always `null`, because there is no session to read.
+   */
   session: null;
 };
 
-/** Union of all possible auth states. */
+/**
+ * The union of the possible auth states of a request, signed in or signed out.
+ *
+ * @example
+ * ```ts
+ * function greeting(auth: AuthResult): string {
+ *   return auth.isAuthenticated ? `Hello ${auth.session.display ?? auth.session.userId}` : "Hello";
+ * }
+ * ```
+ */
 export type AuthResult = AuthState | UnauthState;
 
 /**
- * The client-safe session exposed to app UI (headers, account menus).
- * Identical to `NextgenSession` but omits `token` — the raw session
- * token must never reach client-side JavaScript, whether through an SSR
- * payload or a client-side fetch result.
+ * The client-safe session that is exposed to the UI of an app, such as headers and account menus.
+ *
+ * It is identical to the session of a signed-in user on the server but omits the token: the raw session token must never
+ * reach client-side JavaScript, whether through a server-rendered payload or a client fetch result.
  */
 export type ClientSession = {
-  /** The user's unique identifier (`sub` claim). */
+  /**
+   * The unique identifier of the user, the `sub` claim.
+   */
   userId: string;
-  /** The designated identifier value (login identifier), or `null`. */
+  /**
+   * The designated identifier value, the login identifier, or `null` when it is unresolved.
+   */
   identifier: string | null;
-  /** The schema property the identifier came from, or `null`. */
+  /**
+   * The schema property that the identifier came from, or `null` when it is unknown.
+   */
   identifierProperty: string | null;
-  /** The display name rendering, or `null`. */
+  /**
+   * The display name rendering of the user, or `null` when the schema designates none.
+   */
   display: string | null;
 };
 
-/** Client-safe auth state when the user is signed in. */
+/**
+ * The client-safe auth state of a user who is signed in.
+ */
 export type ClientAuthState = {
-  /** Always `true`; the discriminant that narrows a {@link ClientAuthResult}. */
+  /**
+   * Always `true`.
+   *
+   * It is the discriminant that narrows a {@link ClientAuthResult}.
+   */
   isAuthenticated: true;
-  /** The signed-in user's identity without the raw token. */
+  /**
+   * The identity of the signed-in user, without the raw token.
+   */
   session: ClientSession;
 };
 
 /**
- * Union of all possible client-safe auth states. Returned by the client
- * session reads (`getSession()` in `./session`, which sdk-next and the SPA
- * SDKs re-export, and `useAuth()` in sdk-nuxt).
- * Token is intentionally absent — use the server-side helpers when the raw
- * token is needed.
+ * The union of the client-safe auth states.
+ *
+ * The client session reads return it, such as `getSession` in `@zitadel/sdk-core/session` and the
+ * helpers that the framework SDKs re-export. The token is absent on purpose: use the server-side
+ * helpers when the raw token is needed.
+ *
+ * @example
+ * ```ts
+ * const auth: ClientAuthResult = await getSession();
+ * if (!auth.isAuthenticated) {
+ *   showSignInButton();
+ * }
+ * ```
  */
 export type ClientAuthResult = ClientAuthState | UnauthState;
 
 /**
- * Options passed to the SDK middleware factory (`nextgenMiddleware` in
- * sdk-next, `createNextgenMiddleware` in sdk-nuxt).
+ * The options of the SDK middleware factory.
+ *
+ * Every server SDK passes them to `createNextgenMiddleware`, or to the equivalent of its
+ * framework, so the options have one meaning everywhere. Every option is optional, but a project id
+ * is needed for any session to count as signed in. The middleware resolves the session of each
+ * request with `resolveSession`, serves the same-origin proxy under
+ * {@link NextgenMiddlewareOptions.proxyPath}, and redirects signed-out requests for protected
+ * routes to the login page.
+ *
+ * @example
+ * ```ts
+ * const options: NextgenMiddlewareOptions = {
+ *   url: "https://auth.example.com",
+ *   projectId: "296547382910273",
+ *   protectedRoutes: ["/dashboard*", "/settings"],
+ *   ignoredRoutes: ["/api/webhooks*"],
+ *   loginPath: "/login",
+ * };
+ * ```
  */
 export type NextgenMiddlewareOptions = {
   /**
-   * Full URL of the Zitadel auth backend.
-   * @default process.env.ZITADEL_URL ?? "http://localhost:8080"
+   * The full URL of the Zitadel auth backend.
+   *
+   * It is the issuer that JWTs are checked against, the host of the JWKS, and the target of the
+   * same-origin proxy. A trailing slash is ignored.
+   *
+   * @defaultValue process.env.ZITADEL_URL ?? "http://localhost:8080"
+   * @example "https://auth.example.com"
    */
   url?: string;
 
   /**
-   * The project this app signs its users in to. A session counts as signed in
-   * only when it belongs to this project. A session of any other project on the
-   * same server (a second app, or the Console, whose cookie the browser sends
-   * to every port of a shared host) reads as signed out, and its cookie is left
-   * alone.
+   * The project id that the app signs its users in to.
    *
-   * The app keeps its session in a cookie of its own,
-   * `__Host-zitadel_session_<projectId>`, or `zitadel_session_<projectId>` over
-   * plain http to a loopback host (`sessionCookieName`), so signing in
-   * here neither replaces nor reads the session of another app or of the
-   * Console on the same host (ADR 073, ADR 083).
+   * A session counts as signed in only when it belongs to this project. A session of any other
+   * project on the same server, such as a second app or the Console whose cookie the browser sends
+   * to every port of a shared host, reads as signed out, and its cookie is left alone.
    *
-   * An opaque session token is checked by the backend
-   * (`GET /sessions/me?project_id=…`) and against the project its answer names;
-   * a JWT must name the project in its `aud` claim.
+   * The app keeps its session in a cookie of its own, `__Host-zitadel_session_<projectId>`, or
+   * `zitadel_session_<projectId>` over plain http to a loopback host, so signing in here neither
+   * replaces nor reads the session of another app or of the Console on the same host. The name is
+   * what `sessionCookieName` returns.
    *
-   * Required: with no project, no session counts as signed in, and the proxy
-   * passes the server's session cookie through unchanged. Each SDK falls back
-   * to the `ZITADEL_PROJECT_ID` environment variable, then to its framework's
-   * public project id variable, which `zitadel setup` writes to `.env.local`.
+   * An opaque session token is checked by the backend, with
+   * `GET /sessions/me?project_id=...`, and against the project that the answer names. A JWT must
+   * name the project in its `aud` claim.
+   *
+   * It is required in practice: with no project, no session counts as signed in, a warning is
+   * logged once, and the proxy passes the session cookie of the server through unchanged. Each SDK
+   * falls back to the `ZITADEL_PROJECT_ID` environment variable, then to the public project id
+   * variable of its framework, which `zitadel setup` writes to `.env.local`.
+   *
+   * @defaultValue process.env.ZITADEL_PROJECT_ID
+   * @example "296547382910273"
    */
   projectId?: string;
 
   /**
-   * URL path prefix that is reverse-proxied to the auth backend.
+   * The URL path prefix that is reverse-proxied to the auth backend.
    *
-   * Sign-in with an external provider currently requires the default: the
-   * provider returns to `/__nextgen/idp/{slug}/callback`, which is proxied only under
-   * the default prefix.
-   * @default "/__nextgen"
+   * The widgets call this prefix on the origin of the app, so the session cookie is first-party and
+   * no CORS setup is needed. Keep it equal to the `proxyPath` of the widgets. Sign-in with an
+   * external identity provider currently requires the default, because the provider returns to
+   * `/__nextgen/idp/{slug}/callback`, which is proxied only under the default prefix.
+   *
+   * @defaultValue "/__nextgen"
+   * @example "/__nextgen"
    */
   proxyPath?: string;
 
   /**
-   * Pathnames that require a valid session. Requests to these routes without
-   * a valid token are redirected to {@link loginPath}.
-   * Entries ending with `*` match any sub-path (e.g. `"/admin*"`).
+   * The pathnames that require a valid session.
    *
-   * When the backend cannot say whether a session cookie is live (it answers
-   * `5xx`, does not answer in time, or cannot be reached), the route answers
-   * `503 Service Unavailable` instead: the user may well be signed in, and the
-   * login page would tell them they are not.
-   * @default []
+   * A request to one of these routes without a valid session is redirected to
+   * {@link NextgenMiddlewareOptions.loginPath}, with the requested path in the `next` query
+   * parameter. An entry that ends with `*` matches any sub-path, for example `"/admin*"`. An entry
+   * without it matches exactly, with or without a trailing slash. Matching is done by
+   * `matchesRoutes`.
+   *
+   * When the backend cannot say whether a session cookie is live, because it answers `5xx`, does
+   * not answer in time or cannot be reached, the route answers `503 Service Unavailable` and does
+   * not redirect: the user may well be signed in, and the login page would tell them they are not.
+   *
+   * Some SDKs ask the backend about an opaque session only on these routes and leave the check to
+   * the render layer elsewhere, so a route that is not listed is not guarded by the middleware.
+   * List every route that must be private.
+   *
+   * @defaultValue []
+   * @example ["/dashboard*", "/settings"]
    */
   protectedRoutes?: string[];
 
   /**
-   * Pathnames that are completely skipped by the middleware — no JWT
-   * verification, no protection check, no header tunnelling.
-   * Useful for webhooks, health-check endpoints, or any route where
-   * running auth logic is undesirable.
-   * Entries ending with `*` match any sub-path (e.g. `"/public*"`).
-   * @default []
+   * The pathnames that the middleware skips completely.
+   *
+   * A skipped route gets no JWT verification, no protection check and no header tunnelling. Use it
+   * for webhooks, health-check endpoints and any other route where running auth logic is
+   * undesirable. An entry that ends with `*` matches any sub-path, for example `"/public*"`. A
+   * route listed here is unauthenticated, so never put a route there that reads a session.
+   *
+   * @defaultValue []
+   * @example ["/api/webhooks*", "/healthz"]
    */
   ignoredRoutes?: string[];
 
   /**
-   * Pathname to redirect unauthenticated users to.
-   * A `next` query parameter carries the requested path and query string,
-   * where `<zitadel-login>` returns after sign-in.
-   * @default "/login"
+   * The pathname that unauthenticated users are redirected to.
+   *
+   * The redirect carries the requested path and query string in the `next` query parameter, and
+   * `<zitadel-login>` returns there after sign-in. The login page itself must not be a protected
+   * route.
+   *
+   * @defaultValue "/login"
+   * @example "/sign-in"
    */
   loginPath?: string;
 
   /**
-   * Reserved for future use. Local PEM public key for offline JWT verification.
+   * A local PEM public key for offline JWT verification.
+   *
+   * It is reserved for future use and has no effect today: JWTs are verified against the JWKS of
+   * the backend.
+   *
+   * @defaultValue undefined
+   * @example "-----BEGIN PUBLIC KEY-----..."
    */
   jwtKey?: string;
 
   /**
-   * Restrict accepted JWT `alg` header values. Tokens whose algorithm is not
-   * in this list are rejected before JWKS is fetched.
-   * @default ["RS256", "ES256"]
+   * The accepted values of the JWT `alg` header.
+   *
+   * A token whose algorithm is not in the list is rejected before the JWKS is fetched. The `none`
+   * algorithm is always rejected.
+   *
+   * @defaultValue ["RS256", "ES256"]
+   * @example ["ES256"]
    */
   allowedAlgorithms?: string[];
 
   /**
-   * Clock skew tolerance in milliseconds applied to `exp`, `nbf`, and `iat`
-   * claim validation.
-   * @default 5000
+   * The clock-skew tolerance in milliseconds.
+   *
+   * It applies to the validation of the `exp`, `nbf` and `iat` claims, so a small difference
+   * between the clocks of the issuer and the app does not reject a valid token.
+   *
+   * @defaultValue 5000
+   * @example 10000
    */
   clockSkewMs?: number;
 
   /**
-   * Expected value(s) of the `aud` claim. When omitted, audience is not
-   * validated. Pass a single string or an array when a token may carry
-   * multiple audiences.
+   * The expected value or values of the `aud` claim.
+   *
+   * When it is omitted, the audience is not validated by the token check. Pass a single string, or
+   * an array when a token may carry several audiences. The project check of the session is
+   * separate: a JWT must always name the project in its `aud`.
+   *
+   * @defaultValue undefined
+   * @example "296547382910273"
    */
   audience?: string | string[];
 
   /**
-   * Accepted values for the JWT header `typ` claim (case-insensitive).
-   * Tokens whose `typ` is not in this list are rejected.
-   * Set to `[]` to disable token-type checking entirely.
-   * @default ["JWT", "at+JWT"]
+   * The accepted values of the JWT `typ` header, compared case-insensitively.
+   *
+   * A token whose `typ` is not in the list is rejected. It guards against the use of another kind
+   * of token where an access token is expected. Set it to `[]` to disable the check.
+   *
+   * @defaultValue ["JWT", "at+JWT"]
    */
   allowedTokenTypes?: string[];
 
   /**
-   * Timeout in milliseconds for JWKS endpoint requests.
-   * Requests that do not complete within this window are aborted and the
-   * token is rejected, treating the request as unauthenticated.
-   * @default 5000
+   * The timeout of a JWKS request, in milliseconds.
+   *
+   * A request that does not complete within the window is aborted, and the token is rejected, so
+   * the request counts as unauthenticated.
+   *
+   * @defaultValue 5000
+   * @example 2000
    */
   jwksTimeoutMs?: number;
 
   /**
-   * Timeout in milliseconds for upstream proxy requests.
-   * Requests that do not complete within this window are aborted with a
-   * network error. Defaults to 5 000 ms.
-   * @default 5000
+   * The timeout of an upstream proxy request, in milliseconds.
+   *
+   * A request that does not complete within the window is aborted with a network error.
+   *
+   * @defaultValue 5000
+   * @example 10000
    */
   proxyTimeoutMs?: number;
 
   /**
-   * Timeout in milliseconds for opaque (non-JWT) session token validation
-   * via the backend's `GET /sessions/me` endpoint. A token the backend does
-   * not answer for within this window is not refused: the request counts as
-   * signed out, its session cookie is kept, and a protected route answers
-   * `503` (see {@link protectedRoutes}).
-   * @default 5000
+   * The timeout, in milliseconds, of the validation of an opaque session token.
+   *
+   * The validation is a call to `GET /sessions/me` at the backend. A token that the backend does not
+   * answer for within this window is not refused: the request counts as signed out, its session
+   * cookie is kept, and a protected route answers `503`, see
+   * {@link NextgenMiddlewareOptions.protectedRoutes}. A slow backend therefore never signs users
+   * out.
+   *
+   * @defaultValue 5000
+   * @example 3000
    */
   opaqueTokenTimeoutMs?: number;
 };
 
-// ─── Opaque session tokens ───────────────────────────────────────────────────
-
 /**
- * What the backend reports for an opaque (non-JWT) session token.
+ * What the backend reports for an opaque, non-JWT, session token.
  *
- * `userId` is `null` when the session names no user of this app's project.
- * That is an anonymous session — `CreateSession` sets the session cookie
- * before any user factor is verified, so an abandoned or in-progress sign-in
- * holds a live session that names no user — or a live session of another
- * project. Such a session is **not** signed in, but it is not dead either, so
- * callers keep its cookie instead of clearing it: an anonymous sign-in may
- * still complete, and the other project's session belongs to the app that
- * signed it in.
+ * The user id is `null` when the session names no user of the project of this app. That is an
+ * anonymous session, because the server sets the session cookie before any user factor is verified,
+ * so an abandoned or in-progress sign-in holds a live session that names no user. It is also a live
+ * session of another project. Such a session is not signed in, but it is not dead either, so
+ * callers keep its cookie and do not clear it: an anonymous sign-in may still complete, and the
+ * session of the other project belongs to the app that signed it in.
  */
 export interface OpaqueSession {
-  /** The signed-in user's id in this app's project, or `null` for an anonymous or foreign session. */
+  /**
+   * The id of the signed-in user in the project of this app.
+   *
+   * It is `null` for an anonymous session and for a session of another project.
+   */
   readonly userId: string | null;
-  /** The user's login identifier (for example an email address), or `null`. */
+  /**
+   * The login identifier of the user, for example an email address, or `null`.
+   */
   readonly identifier: string | null;
-  /** The schema property {@link identifier} came from (for example `"email"`), or `null`. */
+  /**
+   * The schema property that {@link OpaqueSession.identifier} came from, for example `"email"`, or
+   * `null`.
+   */
   readonly identifierProperty: string | null;
-  /** The user's display name rendering, or `null` when the schema designates none. */
+  /**
+   * The display name rendering of the user, or `null` when the schema designates none.
+   */
   readonly display: string | null;
-  /** When the session expires, as the backend reports it, or `null`. */
+  /**
+   * The time at which the session expires, as the backend reports it, or `null`.
+   *
+   * The lifetime of the cookie that the middleware sets follows it.
+   */
   readonly expiresAt: string | null;
 }
 
 /**
- * The error code the backend answers a session read with when the session
- * belongs to another project than the one the read names.
+ * The error code that the backend answers a session read with when the session belongs to another
+ * project than the one that the read names.
+ *
+ * A client treats an answer with this code as a live session that signs no one in, and keeps the
+ * cookie.
  */
 export const SESSION_PROJECT_MISMATCH = "sess.project_mismatch";
 
-/** A live session that names no user of this app's project. */
+/**
+ * Returns a live session that names no user of the project of this app.
+ *
+ * @returns The session.
+ */
 function noUser(): OpaqueSession {
   return {
     userId: null,
@@ -1017,9 +1454,14 @@ function noUser(): OpaqueSession {
 }
 
 /**
- * What a `GET /sessions/me` answer says about this app's project. A session of
- * another project names no user here: a backend that predates `project_id`
- * answers for any project, so the project the answer names is checked too.
+ * Reads what a `GET /sessions/me` answer says about the project of this app.
+ *
+ * A session of another project names no user here. A backend that predates the `project_id`
+ * parameter answers for any project, so the project that the answer names is checked too.
+ *
+ * @param body - The parsed answer.
+ * @param projectId - The project id of this app.
+ * @returns The session.
  */
 function sessionAnswer(body: unknown, projectId: string): OpaqueSession {
   const answer = (typeof body === "object" && body !== null ? body : {}) as {
@@ -1043,71 +1485,96 @@ function sessionAnswer(body: unknown, projectId: string): OpaqueSession {
 }
 
 /**
- * The backend's verdict on an opaque session token, from
- * {@link checkOpaqueSessionToken}.
+ * The verdict of the backend on an opaque session token, from {@link checkOpaqueSessionToken}.
  *
- * - `live`: the backend holds a live session for the token. Its `userId` is
- *   `null` when the session names no user of this app's project: an anonymous
- *   one, or one of another project (see {@link OpaqueSession}).
- * - `refused`: the backend judged the token and refused it (`401`), or found
- *   the session it names gone (`404` with the `sess.not_found` code). Only
- *   this verdict makes the cookie dead.
- * - `undecided`: the backend gave no verdict: a `5xx` or any other answer, no
- *   answer in time, a network error, or a body that cannot be read. The
- *   backend answers `500`, never `401`, when it cannot decide (its token or
- *   key store failed), so that an outage does not sign its users out. The
- *   request counts as signed out, but the cookie is kept.
+ * - `live`: the backend holds a live session for the token. Its user id is `null` when the session
+ *   names no user of the project of this app, because it is an anonymous one or one of another
+ *   project, see {@link OpaqueSession}.
+ * - `refused`: the backend judged the token and refused it with `401`, or found the session that it
+ *   names gone, with `404` and the `sess.not_found` code. Only this verdict makes the cookie dead.
+ * - `undecided`: the backend gave no verdict. The cause is a `5xx` or any other answer, no answer
+ *   in time, a network error, or a body that cannot be read. The backend answers `500`, never
+ *   `401`, when it cannot decide, for example because its token or key store failed, so that an
+ *   outage does not sign its users out. The request counts as signed out, but the cookie is kept.
  */
 export type OpaqueSessionCheck =
   | {
-      /** The backend holds a live session for the token. */
+      /**
+       * The backend holds a live session for the token.
+       */
       readonly verdict: "live";
-      /** What the backend reports about that session. */
+      /**
+       * What the backend reports about that session.
+       */
       readonly session: OpaqueSession;
     }
   | {
-      /** The backend judged the token and refused it; the cookie is dead. */
+      /**
+       * The backend judged the token and refused it, so the cookie is dead.
+       */
       readonly verdict: "refused";
     }
   | {
-      /** The backend gave no verdict; the cookie is kept. */
+      /**
+       * The backend gave no verdict, so the cookie is kept.
+       */
       readonly verdict: "undecided";
     };
 
-/** The code the backend answers `GET /sessions/me` with when the session is gone. */
+/**
+ * The error code that the backend answers `GET /sessions/me` with when the session is gone.
+ */
 const SESSION_NOT_FOUND = "sess.not_found";
 
-/** The code the backend answers a path no operation of its version has with (ADR 076). */
+/**
+ * The error code that the backend answers a path with when no operation of its version has it.
+ *
+ * Seen on a session check, it means that the server is older than the SDK and does not serve the
+ * API under its prefix.
+ */
 const ROUTE_NOT_FOUND = "req.not_found";
 
 /**
- * Asks the backend (`GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`)
- * whether an opaque session token names a live session in this app's project,
- * telling a refusal apart from no verdict.
+ * Asks the backend whether an opaque session token names a live session in the project of this app,
+ * and tells a refusal apart from no verdict.
  *
- * A live session of another project comes back with no user, like an
- * anonymous one: it signs no one in here, and its cookie is not dead. The
- * backend refuses such a session itself (`403 sess.project_mismatch`); the
- * project its answer names is checked as well, because a backend that predates
- * the parameter answers for any project.
+ * The call is `GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`. It exists because the
+ * server SDKs must clear a session cookie only when the backend refuses it: an earlier version
+ * cleared the cookie on any failed check, so a database blip or a slow backend signed every user
+ * out. The backend deliberately answers `500`, never `401`, when it cannot decide, and this
+ * function keeps that distinction.
  *
- * A `404` is a refusal only with the `sess.not_found` code. With
- * `req.not_found` the backend knows no such operation: it is older than this
- * SDK and does not serve the API under its prefix. Without a code, the answer
- * came from something in front of the backend (a proxy, a `url` with the
- * wrong path). Neither judged anything.
+ * A live session of another project comes back with no user, like an anonymous one: it signs no
+ * one in here, and its cookie is not dead. The backend refuses such a session itself, with `403`
+ * and `sess.project_mismatch`, and the project that its answer names is checked as well, because a
+ * backend that predates the parameter answers for any project. The tokens that belong to another
+ * project are remembered for five minutes, so a request that is signed out here does not ask again
+ * about the session that another app, or on `localhost` the Console, keeps under the cookie of the
+ * server. The memo holds a hash of the token and never the token.
  *
- * When there is no verdict, it logs why: the request it was asked for then
- * renders signed out, or answers `503` on a protected route, and nothing else
- * would say what went wrong.
+ * A `404` is a refusal only with the `sess.not_found` code. With `req.not_found` the backend knows
+ * no such operation, which means that it is older than this SDK and does not serve the API under
+ * its prefix. Without a code, the answer came from something in front of the backend, such as a
+ * proxy or a URL with the wrong path. Neither judged anything.
  *
- * @param token     - The opaque session token from the app's session cookie.
- * @param issuerUrl - Base URL of the auth backend.
- * @param timeoutMs - How long to wait for the backend before giving up.
- * @param projectId - The project this app signs its users in to. Without one,
- *   no session can be shown to belong here: the backend is not asked, and the
- *   session reads as live with no user, so its cookie is kept.
- * @returns The backend's {@link OpaqueSessionCheck | verdict}.
+ * When there is no verdict, the function logs why with `console.warn`. The request then renders
+ * signed out, or answers `503` on a protected route, and nothing else would say what went wrong.
+ *
+ * @param token - The opaque session token from the session cookie of the app.
+ * @param issuerUrl - The base URL of the auth backend.
+ * @param timeoutMs - How long to wait for the backend before giving up, in milliseconds.
+ * @param projectId - The project id that the app signs its users in to. Without one, no session can
+ * be shown to belong here: the backend is not asked, and the session reads as live with no user, so
+ * its cookie is kept.
+ * @returns The verdict of the backend.
+ *
+ * @example
+ * ```ts
+ * const check = await checkOpaqueSessionToken(token, "https://auth.example.com", 5000, projectId);
+ * if (check.verdict === "refused") {
+ *   clearSessionCookie();
+ * }
+ * ```
  */
 export async function checkOpaqueSessionToken(
   token: string,
@@ -1162,10 +1629,11 @@ export async function checkOpaqueSessionToken(
 }
 
 /**
- * The opaque session tokens the backend placed in another project, so that a
- * request signed out here does not ask again about the session another app,
- * or on `localhost` the Console, keeps under the server's cookie: a session
- * never changes its project. Each is known for a while, and only so many.
+ * The opaque session tokens that the backend placed in another project.
+ *
+ * A request that is signed out here does not ask again about the session that another app, or on
+ * `localhost` the Console, keeps under the cookie of the server, because a session never changes
+ * its project. Each token is remembered for a while, and only so many tokens are kept.
  */
 const otherProjectSessions = (() => {
   const TTL_MS = 5 * 60_000;
@@ -1199,7 +1667,15 @@ const otherProjectSessions = (() => {
   };
 })();
 
-/** The memo key of a token in a project: a hash, so that the memo holds no session token. */
+/**
+ * Returns the memo key of a token in a project.
+ *
+ * The key is a hash, so that the memo holds no session token.
+ *
+ * @param token - The session token.
+ * @param projectId - The project id.
+ * @returns The key.
+ */
 async function otherProjectKey(token: string, projectId: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
   let hex = "";
@@ -1210,31 +1686,36 @@ async function otherProjectKey(token: string, projectId: string): Promise<string
 }
 
 /**
- * Forgets which session tokens the backend placed in another project
- * ({@link checkOpaqueSessionToken} remembers them for a while). For tests that
- * answer for the same token differently.
+ * Forgets which session tokens the backend placed in another project.
+ *
+ * {@link checkOpaqueSessionToken} remembers them for a while. Call it in tests that answer for the
+ * same token differently.
  */
 export function clearSessionCheckCache(): void {
   otherProjectSessions.clear();
 }
 
 /**
- * Validates an opaque session token by asking the backend
- * (`GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`) whether the session is
- * live in this app's project.
+ * Validates an opaque session token by asking the backend whether the session is live in the
+ * project of this app.
  *
- * `null` folds a refusal and no verdict together, so it says whether the
- * request is signed in, not whether the cookie is dead: clearing the cookie on
- * `null` signs users out whenever the backend fails. To decide that, use
- * {@link checkOpaqueSessionToken}.
+ * The call is `GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`. The value `null` folds a
+ * refusal and no verdict together, so it says whether the request is signed in and not whether the
+ * cookie is dead. Clearing the cookie on `null` signs users out whenever the backend fails. To
+ * decide that, use {@link checkOpaqueSessionToken}.
  *
- * @param token     - The opaque session token from the app's session cookie.
- * @param issuerUrl - Base URL of the auth backend.
- * @param timeoutMs - How long to wait for the backend before giving up.
- * @param projectId - The project this app signs its users in to.
- * @returns The live session — with a `null` `userId` when it names no user of
- *   this project — or `null` when the backend did not confirm one: it refused
- *   the token, or gave no verdict.
+ * @param token - The opaque session token from the session cookie of the app.
+ * @param issuerUrl - The base URL of the auth backend.
+ * @param timeoutMs - How long to wait for the backend before giving up, in milliseconds.
+ * @param projectId - The project id that the app signs its users in to.
+ * @returns The live session, with a `null` user id when it names no user of this project, or `null`
+ * when the backend did not confirm one because it refused the token or gave no verdict.
+ *
+ * @example
+ * ```ts
+ * const session = await validateOpaqueSessionToken(token, issuerUrl, 5000, projectId);
+ * const signedIn = session?.userId != null;
+ * ```
  */
 export async function validateOpaqueSessionToken(
   token: string,
@@ -1246,7 +1727,12 @@ export async function validateOpaqueSessionToken(
   return check.verdict === "live" ? check.session : null;
 }
 
-/** The `code` of an error envelope, or `undefined` when the body is not one. */
+/**
+ * Reads the `code` of an error envelope.
+ *
+ * @param res - The response to read.
+ * @returns The code, or `undefined` when the body is not an error envelope.
+ */
 async function errorCode(res: Response): Promise<string | undefined> {
   try {
     const body = (await res.json()) as { code?: unknown };
@@ -1256,7 +1742,13 @@ async function errorCode(res: Response): Promise<string | undefined> {
   }
 }
 
-/** Why a session check failed, for the log. */
+/**
+ * Describes why a session check failed, for the log.
+ *
+ * @param err - The error that the call threw.
+ * @param timeoutMs - The timeout of the call.
+ * @returns The cause as text.
+ */
 function failureCause(err: unknown, timeoutMs: number): string {
   if ((err as { name?: unknown } | null)?.name === "TimeoutError") {
     return `no answer within ${timeoutMs} ms`;
@@ -1266,7 +1758,13 @@ function failureCause(err: unknown, timeoutMs: number): string {
   return cause instanceof Error ? `${String(err)}: ${cause.message}` : String(err);
 }
 
-/** Logs why the backend gave no verdict on a session cookie, and returns that. */
+/**
+ * Logs why the backend gave no verdict on a session cookie, and returns that verdict.
+ *
+ * @param endpoint - The endpoint that was called.
+ * @param cause - Why there is no verdict.
+ * @returns The `undecided` verdict.
+ */
 function undecided(endpoint: string, cause: string): OpaqueSessionCheck {
   console.warn(
     `[nextgen] Could not check the session cookie against ${endpoint} (${cause}). ` +
@@ -1276,47 +1774,98 @@ function undecided(endpoint: string, cause: string): OpaqueSessionCheck {
 }
 
 /**
- * Whether a verified JWT names `projectId` in its `aud` claim, the one place a
- * self-contained token can say which project it was issued for.
+ * Returns whether a verified JWT names a project in its `aud` claim.
+ *
+ * The audience is the one place where a self-contained token can say which project it was issued
+ * for, so a JWT signs a user in only when it names the project of the app. An empty project id
+ * never matches.
+ *
+ * @param payload - The verified payload.
+ * @param projectId - The project id of the app.
+ * @returns `true` when the audience contains the project id.
+ *
+ * @example
+ * ```ts
+ * jwtNamesProject({ aud: ["296547382910273"] }, "296547382910273"); // true
+ * ```
  */
 export function jwtNamesProject(payload: JwtPayload, projectId: string): boolean {
   const audience = payload.aud === undefined ? [] : [payload.aud].flat();
   return projectId !== "" && audience.includes(projectId);
 }
 
-// ─── Session resolution ──────────────────────────────────────────────────────
-
 /**
- * What a request carries that decides its session. The request URL and the
- * forwarded headers decide whether a cookie needs `Secure`.
+ * What a request carries that decides its session.
+ *
+ * It extends {@link BrowserRequest}, whose request URL and forwarded headers decide whether a
+ * cookie needs `Secure`.
  */
 export interface SessionRequest extends BrowserRequest {
   /**
-   * The `Authorization: Bearer` token, or `null`. It takes precedence: when it
-   * signs a user of this project in, the cookie is not consulted.
+   * The `Authorization: Bearer` token, or `null` when absent.
+   *
+   * It takes precedence: when it signs a user of this project in, the cookie is not consulted. It is
+   * judged as a JWT only, and a bearer token that is not a JWT of this project leaves the cookie to
+   * be judged on its own.
    */
   readonly bearer: string | null;
-  /** Reads one of the request's cookies by name. */
+  /**
+   * Reads one of the cookies of the request by name.
+   *
+   * It returns `null` or `undefined` when the cookie is absent.
+   */
   readonly cookie: (name: string) => string | null | undefined;
 }
 
-/** The settings {@link resolveSession} judges a request's session by. */
+/**
+ * The settings that {@link resolveSession} judges the session of a request by.
+ *
+ * The server SDKs build it from {@link NextgenMiddlewareOptions} after they apply the defaults, so
+ * each field here has the meaning of the option of the same name.
+ */
 export interface ResolveSessionOptions {
-  /** Base URL of the auth backend, the issuer the session is checked against. */
+  /**
+   * The base URL of the auth backend, which is the issuer that the session is checked against.
+   */
   readonly url: string;
-  /** The project this app signs its users in to; see {@link NextgenMiddlewareOptions.projectId}. */
+  /**
+   * The project id that the app signs its users in to.
+   *
+   * With `undefined`, no session counts as signed in. See {@link NextgenMiddlewareOptions.projectId}.
+   */
   readonly projectId: string | undefined;
-  /** JWT signing algorithms accepted; `undefined` accepts the verifier's default set. */
+  /**
+   * The accepted JWT signing algorithms.
+   *
+   * With `undefined`, the verifier accepts every algorithm that it supports.
+   */
   readonly allowedAlgorithms: readonly string[] | undefined;
-  /** Clock difference, in milliseconds, tolerated when checking `exp` and `nbf`. */
+  /**
+   * The clock difference, in milliseconds, that is tolerated when `exp` and `nbf` are checked.
+   */
   readonly clockSkewMs: number;
-  /** The `aud` value or values a JWT must carry; `undefined` skips the audience check. */
+  /**
+   * The `aud` value or values that a JWT must carry.
+   *
+   * With `undefined`, the audience check of the token is skipped. The project check still applies.
+   */
   readonly audience: string | readonly string[] | undefined;
-  /** The JWT `typ` header values accepted, so a token minted for another purpose is refused. */
+  /**
+   * The accepted values of the JWT `typ` header, so that a token minted for another purpose is
+   * refused.
+   */
   readonly allowedTokenTypes: readonly string[];
-  /** How long to wait for the JWKS document, in milliseconds; `undefined` uses the verifier's default. */
+  /**
+   * How long to wait for the JWKS document, in milliseconds.
+   *
+   * With `undefined`, the verifier uses its default of 5000.
+   */
   readonly jwksTimeoutMs: number | undefined;
-  /** How long to wait for the backend to judge an opaque token, in milliseconds. */
+  /**
+   * How long to wait for the backend to judge an opaque token, in milliseconds.
+   *
+   * A token that is not judged in time counts as undecided and its cookie is kept.
+   */
   readonly opaqueTokenTimeoutMs: number;
   /**
    * Whether an opaque session cookie is checked with the backend, a call to
@@ -1324,14 +1873,23 @@ export interface ResolveSessionOptions {
    * checks the session itself, as sdk-next's `auth()` does: the result hands
    * the token on as {@link ResolvedSession.unchecked}. A JWT is judged either
    * way, without a call.
-   * @default true
+   *
+   * Use `false` in a framework whose middleware runs on every route, including prefetches, so that
+   * a signed-in visitor does not cost a backend call on every page. Protected routes should still
+   * check, because they decide between a redirect and a `503`.
+   *
+   * @defaultValue true
    */
   readonly checkOpaqueSession?: boolean;
 }
 
-/** A request's session, as {@link resolveSession} judged it. */
+/**
+ * The session of a request, as {@link resolveSession} judged it.
+ */
 export interface ResolvedSession {
-  /** Whether the request is signed in, and as whom. */
+  /**
+   * Whether the request is signed in, and as whom.
+   */
   readonly auth: AuthResult;
   /**
    * Whether the backend gave no verdict on the session cookie
@@ -1361,13 +1919,23 @@ export interface ResolvedSession {
   readonly unchecked?: string;
 }
 
+/**
+ * Returns the signed-out auth state.
+ *
+ * @returns The state.
+ */
 function signedOut(): UnauthState {
   return { isAuthenticated: false, session: null };
 }
 
+/**
+ * Whether the missing-project warning has been logged in this process.
+ */
 let warnedMissingProject = false;
 
-/** Says once per process why no session counts: no project is configured. */
+/**
+ * Logs once per process why no session counts: no project id is configured.
+ */
 function warnMissingProject(): void {
   if (warnedMissingProject) {
     return;
@@ -1380,11 +1948,17 @@ function warnMissingProject(): void {
 }
 
 /**
- * The cookie a request's session is read from, under the names of the
- * request's scheme only: the project's own (`sessionCookieName`), else
- * the server's ({@link serverSessionCookieName}), where, on `localhost`, the
- * Console keeps its own. Over https an unprefixed cookie is never read: any
- * sibling host can plant one.
+ * Finds the cookie that the session of a request is read from.
+ *
+ * Only the names of the scheme of the request are tried: the project's own, which
+ * {@link sessionCookieName} returns, else the server's, which {@link serverSessionCookieName}
+ * returns and where, on `localhost`, the Console keeps its own. Over https an unprefixed cookie is
+ * never read, because any sibling host can plant one.
+ *
+ * @param cookie - Reads a cookie by name.
+ * @param projectId - The project id.
+ * @param secure - Whether the cookie is `Secure`.
+ * @returns The cookie name and token, or `null` when there is none.
  */
 function storedSession(
   cookie: SessionRequest["cookie"],
@@ -1401,22 +1975,35 @@ function storedSession(
 }
 
 /**
- * What {@link judgeJwt} makes of a JWT: who it signs in, whether a cookie
- * holding it is dead, and how long it lives.
+ * What {@link judgeJwt} makes of a JWT: who it signs in, whether a cookie that holds it is dead, and
+ * how long it lives.
  */
 interface JwtVerdict {
+  /**
+   * Who the JWT signs in.
+   */
   readonly auth: AuthResult;
-  /** Whether a cookie holding the JWT is dead, so the browser can drop it. */
+  /**
+   * Whether a cookie that holds the JWT is dead, so that the browser can drop it.
+   */
   readonly dead: boolean;
-  /** Seconds until a JWT that signs its user in expires, if it says. */
+  /**
+   * The seconds until a JWT that signs its user in expires, if it says.
+   */
   readonly maxAge: number | undefined;
 }
 
 /**
- * Judges a JWT. It signs its `sub` in when it verifies and its `aud` names
- * this project. Held in a cookie, it is dead when it fails verification or
- * names no user of this project; a verified JWT of another project is live
- * there, so its cookie stays.
+ * Judges a JWT.
+ *
+ * It signs its `sub` in when it verifies and its `aud` names this project. Held in a cookie, it is
+ * dead when it fails verification or names no user of this project. A verified JWT of another
+ * project is live there, so its cookie stays.
+ *
+ * @param token - The token.
+ * @param projectId - The project id of the app.
+ * @param options - The settings.
+ * @returns The verdict.
  */
 async function judgeJwt(
   token: string,
@@ -1457,27 +2044,56 @@ async function judgeJwt(
 }
 
 /**
- * Judges which user, if any, a request is signed in as in this app's project.
- * The one implementation behind every server SDK's middleware, so they cannot
- * drift on who counts as signed in.
+ * Judges which user, if any, a request is signed in as in the project of this app.
  *
- * - A Bearer token is judged first, as a JWT. When it signs a user of this
- *   project in, that is the answer and the cookie is not judged; otherwise the
- *   cookie speaks for itself.
- * - The session cookie is the project's own, else the server's. A session of
- *   this project found in the server's cookie is copied to the project's own.
- * - A JWT-shaped session cookie signs its `sub` in when it verifies and its
- *   `aud` names the project. It never reaches the backend, which does not
- *   re-check JWT claims.
- * - Any other session cookie is checked by the backend
- *   ({@link checkOpaqueSessionToken}) and signs its user in when the session
- *   is live in this project. With `checkOpaqueSession: false` it is not: the
- *   result hands it on unchecked, and touches no cookie.
- * - Only a cookie that held a dead session is cleared: one the backend refused,
- *   or a JWT that fails verification or names no user of this project. When
- *   the backend gives no verdict, the result says so
- *   ({@link ResolvedSession.undecided}) and the cookie stays.
- * - Without a project nothing signs in, and no cookie is touched.
+ * It is the one implementation behind the middleware of every server SDK, so they cannot drift
+ * apart on who counts as signed in. It runs on the server and on the edge, and it never throws for
+ * a bad token: a bad token is a signed-out request.
+ *
+ * - A bearer token is judged first, as a JWT. When it signs a user of this project in, that is the
+ *   answer and the cookie is not judged. Otherwise the cookie speaks for itself.
+ * - The session cookie is the project's own, else the server's. A session of this project that is
+ *   found in the cookie of the server is copied to the cookie of the project.
+ * - A session cookie that has the shape of a JWT signs its `sub` in when it verifies and its `aud`
+ *   names the project. It never reaches the backend, which does not re-check JWT claims.
+ * - Any other session cookie is checked by the backend, with {@link checkOpaqueSessionToken}, and
+ *   signs its user in when the session is live in this project. With
+ *   {@link ResolveSessionOptions.checkOpaqueSession} set to `false` it is not checked: the result
+ *   hands it on unchecked and touches no cookie.
+ * - Only a cookie that held a dead session is cleared: one that the backend refused, or a JWT that
+ *   fails verification or names no user of this project. When the backend gives no verdict, the
+ *   result says so, see {@link ResolvedSession.undecided}, and the cookie stays.
+ * - Without a project, nothing signs in, a warning is logged once, and no cookie is touched.
+ *
+ * @param request - What the request carries: the bearer token, a cookie reader and the data that
+ * decides whether a cookie is `Secure`.
+ * @param options - The settings to judge by.
+ * @returns The auth state, whether the backend was undecided, and the cookies that the response
+ * must set.
+ *
+ * @example
+ * ```ts
+ * const resolved = await resolveSession(
+ *   {
+ *     bearer: null,
+ *     cookie: (name) => cookies.get(name) ?? null,
+ *     requestUrl: request.url,
+ *   },
+ *   {
+ *     url: "https://auth.example.com",
+ *     projectId: "296547382910273",
+ *     allowedAlgorithms: ["RS256", "ES256"],
+ *     clockSkewMs: 5000,
+ *     audience: undefined,
+ *     allowedTokenTypes: ["JWT", "at+JWT"],
+ *     jwksTimeoutMs: undefined,
+ *     opaqueTokenTimeoutMs: 5000,
+ *   },
+ * );
+ * if (resolved.auth.isAuthenticated) {
+ *   console.log(resolved.auth.session.userId);
+ * }
+ * ```
  */
 export async function resolveSession(
   request: SessionRequest,

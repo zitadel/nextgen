@@ -1,0 +1,92 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.ts",
+      "kind": "other",
+      "extras": [
+        "AuthContextProvider",
+        "AuthOptions",
+        "AuthResult",
+        "AuthState",
+        "ClientAuthResult",
+        "ClientAuthState",
+        "ClientSession",
+        "NextgenMiddlewareOptions",
+        "NextgenProvider",
+        "NextgenSession",
+        "ProxyHandler",
+        "ProxyOptions",
+        "UnauthState",
+        "createNextgenMiddleware",
+        "createProxy",
+        "getAuth",
+        "useAuth",
+        "useAuthContext"
+      ]
+    },
+    "./server": {
+      "source": "src/server.ts",
+      "kind": "server",
+      "extras": [
+        "AuthOptions",
+        "NextgenProvider"
+      ]
+    },
+    "./client": {
+      "source": "src/client.ts",
+      "kind": "client",
+      "widgets": true,
+      "extras": []
+    },
+    "./components": {
+      "source": "src/components.ts",
+      "kind": "widgets",
+      "extras": [
+        "businessLocales",
+        "configureZitadel"
+      ]
+    },
+    "./react": {
+      "source": "src/react.ts",
+      "kind": "other",
+      "extras": [
+        "AuthContextProvider",
+        "AuthResult",
+        "AuthState",
+        "ClientAuthResult",
+        "ClientAuthState",
+        "ClientSession",
+        "NextgenSession",
+        "UnauthState",
+        "useAuth",
+        "useAuthContext"
+      ]
+    },
+    "./middleware": {
+      "source": "src/middleware.ts",
+      "kind": "other",
+      "extras": [
+        "ProxyHandler",
+        "ProxyOptions",
+        "createNextgenMiddleware",
+        "createProxy"
+      ]
+    },
+    "./jsx": {
+      "source": "src/jsx.d.ts",
+      "kind": "other",
+      "extras": []
+    },
+    "./session": {
+      "source": "src/session.ts",
+      "kind": "other",
+      "extras": [
+        "ClientAuthResult",
+        "ClientAuthState",
+        "ClientSession",
+        "GetSessionOptions",
+        "getSession"
+      ]
+    }
+  }
+}

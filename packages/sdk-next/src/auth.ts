@@ -11,13 +11,25 @@ import type { AuthResult, NextgenMiddlewareOptions } from "./types.js";
 import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
 
 /**
- * Options for {@link auth}.
+ * Options for {@link getAuth}, the token-verification subset of the middleware options.
  *
- * These mirror the token-verification subset of the middleware options. When
- * the middleware runs with custom verification settings (a non-default
- * `audience`, `allowedAlgorithms`, …), pass the same values here — otherwise
- * a token the middleware accepted can fail re-verification in `auth()` and
- * render as signed out.
+ * The middleware verifies a session token before it tunnels it, and {@link getAuth} verifies it
+ * again, so both must apply the same rules. When the middleware runs with custom verification
+ * settings, such as a non-default `audience` or `allowedAlgorithms`, pass the same values here.
+ * Otherwise a token the middleware accepted can fail re-verification in {@link getAuth} and render
+ * as signed out, with only a console warning to explain it. Each option has the meaning and the
+ * default documented on {@link NextgenMiddlewareOptions}.
+ *
+ * @example
+ * ```ts
+ * import { getAuth, type AuthOptions } from "@zitadel/sdk-next/server";
+ *
+ * const options: AuthOptions = {
+ *   projectId: process.env.ZITADEL_PROJECT_ID,
+ *   audience: "https://api.example.com",
+ * };
+ * const auth = await getAuth(options);
+ * ```
  */
 export type AuthOptions = Pick<
   NextgenMiddlewareOptions,
@@ -32,13 +44,13 @@ export type AuthOptions = Pick<
 >;
 
 /**
- * Checks an opaque (non-JWT) session token against the backend's
- * `GET /sessions/me`, held to `projectId` (see `checkOpaqueSessionToken` in
- * `@zitadel/sdk-core`, which the middleware uses too).
+ * Checks an opaque (non-JWT) session token against the backend's `GET /api/v1/sessions/me`, held
+ * to `projectId`.
  *
- * Wrapped in React's `cache()` so that many components calling `auth()` in
- * the same render pass share a single backend round-trip. Arguments are
- * primitives on purpose — `cache()` memoises by argument identity.
+ * It wraps `checkOpaqueSessionToken` from `@zitadel/sdk-core`, which the middleware uses too, in
+ * React's `cache()`. Many components that call {@link getAuth} in the same render pass then share a
+ * single backend round trip. The arguments are primitives on purpose, because `cache()` memoizes
+ * by argument identity: an options object would defeat the deduplication.
  */
 const checkOpaqueSession = cache(
   (token: string, issuerUrl: string, timeoutMs: number, projectId: string) =>
@@ -46,75 +58,77 @@ const checkOpaqueSession = cache(
 );
 
 /**
- * Reads the auth state in a React Server Component or Next.js Route Handler.
+ * Reads and verifies the auth state in a React Server Component or a Next.js Route Handler.
  *
- * The session token arrives on the `x-nextgen-auth-token` request header,
- * tunnelled there by the middleware — and `auth()` **verifies it before
- * trusting it**:
+ * The middleware tunnels the session token to the render on the internal `x-nextgen-auth-token`
+ * request header, and this function verifies the token before it trusts it. The header alone is
+ * never proof of anything, so every value it reads is verified:
  *
- * - **JWT tokens** are verified cryptographically (signature via JWKS,
- *   issuer, expiry, algorithm and type allow-lists) using the same rules and
- *   defaults as the middleware. The JWKS is cached in-process, so this does
- *   not add a backend round-trip after the first call.
- * - **Opaque encrypted tokens** are validated against the backend's
- *   `GET /sessions/me`, which also supplies the user's identity (`userId`,
- *   `identifier`, `identifierProperty`, `display`). The lookup is deduplicated
- *   per render pass via React `cache()`.
+ * - A JWT is verified cryptographically: signature through the JWKS, issuer, expiry, and the
+ *   algorithm and type allow-lists, by the same rules and defaults as the middleware. The JWKS is
+ *   cached in the process, so this adds no backend round trip after the first call.
+ * - An opaque encrypted token is checked against the backend's `GET /api/v1/sessions/me`, which
+ *   also supplies the identity (`userId`, `identifier`, `identifierProperty`, `display`). The
+ *   check is deduplicated per render pass through React `cache()`, so many calls cost one request.
  *
- * The header alone is never proof of anything, so `auth()` verifies every
- * value it reads. Off a protected route the middleware hands an opaque token
- * on unchecked, so that a page that never reads the session costs no call to
- * the backend: there `auth()` is the one check. On routes the middleware
- * `matcher` does not cover, the middleware cannot refuse a forged
- * client-supplied header. A header value that fails verification is treated
- * as signed out.
+ * Off a protected route the middleware hands an opaque token on unchecked, so a page that never
+ * reads the session costs no backend call. There this function is the one check, and a page that
+ * calls it pays one request for a live session. On a protected route the middleware has already
+ * checked the token, so the render checks it a second time.
  *
- * Either way a session counts only in the app's own project: `projectId`,
- * else `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, else the
- * project of `configureZitadel()` when it has run in this server runtime. A
- * JWT must name it in `aud`; an opaque token must be a session of that
- * project. With no project, nobody is signed in. A middleware built with
- * `createProxy(config)` holds sessions to `config.projectId`: pass the same
- * project here unless it comes from one of those variables.
+ * A session counts only in the app's own project. The project is `options.projectId`, else
+ * `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, else the project of
+ * `configureZitadel()` when it has run in this server runtime. A JWT must name the project in
+ * `aud`. An opaque token must belong to a session of that project. A session of another project on
+ * the same host reads as signed out, because a browser sends one host's cookies to every app on
+ * it. With no project known, nobody is signed in and the first call logs a warning. A middleware
+ * built with {@link createProxy} holds sessions to `config.projectId`, so pass the same project
+ * here unless it comes from one of those variables. The middleware's handle may not be configured
+ * in the server runtime, which is why the project is not taken from it automatically.
  *
- * A backend that answers with an unexpected status, or not at all, reads as
- * signed out and is logged, so a broken proxy or an unreachable backend is
- * distinguishable from a missing session.
+ * A header value that fails verification reads as signed out. A backend that answers with an
+ * unexpected status, or does not answer within `opaqueTokenTimeoutMs`, also reads as signed out
+ * and is logged, so a broken proxy or an unreachable backend can be told apart from a missing
+ * session. A failed JWT check logs a warning that names the usual causes: a forged header on a
+ * route the `matcher` does not cover, an unreachable JWKS endpoint, or verification options that
+ * differ from the middleware's.
  *
- * **Matcher precondition (read this):** the middleware only tunnels the
- * session token on routes covered by its `matcher`. On uncovered routes the
- * cookie never reaches `auth()`, so `auth()` reports signed out even when a
- * live session exists. Either extend the `matcher` to every route that calls
- * `auth()`, or — for app chrome like headers and account menus — read the
- * session client-side with `getSession()` from `@zitadel/sdk-next/session`,
- * which works on any page.
+ * Matcher precondition: the middleware tunnels the token only on routes its `matcher` covers. On
+ * an uncovered route the cookie never reaches this function, so it reports signed out even when a
+ * live session exists, and the middleware cannot refuse a client-forged header there either. Make
+ * the `matcher` cover every route that calls this function. The recommended pattern covers every
+ * route except the Next.js build files. For app chrome such as headers and account menus, read the
+ * session in the browser with {@link session!getSession | getSession} from
+ * `@zitadel/sdk-next/session` instead, which works on any page.
  *
- * The backend URL comes from `options.url`, falling back to the same
- * `ZITADEL_URL` environment variable the middleware uses. If the middleware
- * runs with custom verification options (`audience`, `allowedAlgorithms`, …),
- * pass the same values here; see {@link AuthOptions}.
+ * The backend URL comes from `options.url`, else the `ZITADEL_URL` environment variable the
+ * middleware reads, else `http://localhost:8080`. Reading `headers()` makes the route dynamic,
+ * so a page that calls this function is rendered per request and cannot be statically generated.
  *
- * This module is server-only: importing it (or the package root) from a
- * client component fails at build time. Client components read auth state
- * from `@zitadel/sdk-next/react` (`useAuth()`) or
- * `@zitadel/sdk-next/session` (`getSession()`).
+ * This module is server-only. Importing it, or the package root, from a client component fails
+ * the build. Client components read the state through {@link useAuth} from
+ * `@zitadel/sdk-next/react` or through {@link session!getSession | getSession}.
  *
- * ```ts
- * import { auth } from "@zitadel/sdk-next/server";
+ * @param options - Verification settings, which must match the middleware's; see
+ *   {@link AuthOptions}.
+ * @returns The current {@link AuthResult}. The `session.token` is the raw session token, for
+ *   calling upstream APIs from the server. Never forward it into a client component:
+ *   {@link NextgenProvider} strips it for you.
+ *
+ * @example
+ * ```tsx
+ * import { getAuth } from "@zitadel/sdk-next/server";
  *
  * export default async function Page() {
- *   const session = await auth();
- *   if (!session.isAuthenticated) return <p>Not signed in</p>;
- *   return <p>Hello {session.session.userId}</p>;
+ *   const auth = await getAuth();
+ *   if (!auth.isAuthenticated) {
+ *     return <p>Not signed in</p>;
+ *   }
+ *   return <p>Hello {auth.session.userId}</p>;
  * }
  * ```
- *
- * @param options - Optional verification settings; see {@link AuthOptions}.
- * @returns The current {@link AuthResult}. `session.token` is the raw session
- *   token for calling upstream APIs server-side — never forward it into
- *   client components (the `NextgenProvider` strips it for you).
  */
-export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
+export async function getAuth(options: AuthOptions = {}): Promise<AuthResult> {
   const headerStore = await headers();
   const token = headerStore.get("x-nextgen-auth-token");
 
@@ -172,12 +186,12 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
     // same checks moments earlier). Reaching this branch means the header was
     // NOT vetted by the middleware — a route outside the `matcher` received a
     // client-forged header — or the JWKS endpoint is unreachable from this
-    // runtime, or auth() runs with verification options that diverge from the
+    // runtime, or getAuth() runs with verification options that diverge from the
     // middleware's.
     console.warn(
-      "[nextgen] auth(): rejected an x-nextgen-auth-token header that failed JWT " +
+      "[nextgen] getAuth(): rejected an x-nextgen-auth-token header that failed JWT " +
         "verification. If this route is not covered by the middleware matcher, this was " +
-        "a forged client header; otherwise check that auth() and the middleware use the " +
+        "a forged client header; otherwise check that getAuth() and the middleware use the " +
         `same verification options and that the JWKS endpoint at ${joinURL(url, "/auth/keys")} is reachable.`,
     );
     return { isAuthenticated: false, session: null };
@@ -204,15 +218,18 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
 
 let warnedMissingProject = false;
 
-/** Says once per process why `auth()` signs no one in: no project is configured. */
+/**
+ * Warns once per process that no project id is configured, which is why {@link getAuth} signs no
+ * one in. Logging once keeps a misconfigured app from flooding its server log on every render.
+ */
 function warnMissingProject(): void {
   if (warnedMissingProject) {
     return;
   }
   warnedMissingProject = true;
   console.warn(
-    "[nextgen] auth(): no project id is configured, so no session counts as signed in. " +
-      "Set ZITADEL_PROJECT_ID, or pass the middleware's `projectId` to auth() (with " +
+    "[nextgen] getAuth(): no project id is configured, so no session counts as signed in. " +
+      "Set ZITADEL_PROJECT_ID, or pass the middleware's `projectId` to getAuth() (with " +
       "createProxy(config), that is config.projectId).",
   );
 }
