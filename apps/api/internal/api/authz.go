@@ -524,21 +524,20 @@ func ProjectRoleCheck(platformProjectID string) service.ProjectRoleCheck {
 			}
 			return dec == resolver.DecisionAllow, nil
 		}
-		// Roles are additive, so the weakest answers whether there is any; most
-		// redeemers hold none.
-		if ok, err := holds(domain.ProjectRoles[0]); err != nil || !ok {
-			return "", err
-		}
-		for _, role := range slices.Backward(domain.ProjectRoles[1:]) {
+		// Roles are additive, so walk them weakest first and stop at the first
+		// miss: most redeemers hold none, which costs one check.
+		held := ""
+		for _, role := range domain.ProjectRoles {
 			ok, err := holds(role)
 			if err != nil {
 				return "", err
 			}
-			if ok {
-				return role, nil
+			if !ok {
+				break
 			}
+			held = role
 		}
-		return domain.ProjectRoles[0], nil
+		return held, nil
 	}
 }
 

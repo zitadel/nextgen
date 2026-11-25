@@ -51273,7 +51273,8 @@ type InvitationLookupProjectMemberResponse struct {
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 	// The access the signed-in user already has to the project. A user with access can neither accept nor
 	// decline the invitation: both answer `409 inv.already_member` and leave it pending for the person it
-	// was meant for. Null when the user has no access.
+	// was meant for. Its inviter gets `inv.self_accept` or `inv.self_reject` instead. Null when the user
+	// has no access.
 	Membership OptNilInvitationLookupMembership `json:"membership"`
 }
 

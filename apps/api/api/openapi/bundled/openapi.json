@@ -9551,7 +9551,7 @@
       "post": {
         "operationId": "acceptInvitation",
         "summary": "Accept an invitation",
-        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nA user who already has access to the project, through a grant to them or\nto a team they're in, the owning team, or operating the deployment, gets\n`409 inv.already_member` with their strongest role as\n`details.details.relation`: no grant is written and the invitation stays\npending. `lookupInvitation` (`POST /invitations/lookup`) returns the same\nrole as `membership` before accept is called.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nA user who already has access to the project gets\n`409 inv.already_member` with their strongest role as\n`details.details.relation`: no grant is written and the invitation stays\npending. `lookupInvitation` (`POST /invitations/lookup`) returns the same\nrole as `membership` before accept is called.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -23303,7 +23303,7 @@
                 "$ref": "#/components/schemas/invitation-project-member-payload"
               },
               "membership": {
-                "description": "The access the signed-in user already has to the project. A user\nwith access can neither accept nor decline the invitation: both\nanswer `409 inv.already_member` and leave it pending for the person\nit was meant for. Null when the user has no access.\n",
+                "description": "The access the signed-in user already has to the project. A user\nwith access can neither accept nor decline the invitation: both\nanswer `409 inv.already_member` and leave it pending for the person\nit was meant for. Its inviter gets `inv.self_accept` or\n`inv.self_reject` instead. Null when the user has no access.\n",
                 "oneOf": [
                   {
                     "$ref": "#/components/schemas/invitation-lookup-membership"

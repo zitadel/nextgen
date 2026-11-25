@@ -17,10 +17,10 @@ type Handler interface {
 	// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
 	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
-	// A user who already has access to the project, through a grant to them or to a team they're in, the
-	// owning team, or operating the deployment, gets `409 inv.already_member` with their strongest role as
-	// `details.details.relation`: no grant is written and the invitation stays pending. `lookupInvitation`
-	// (`POST /invitations/lookup`) returns the same role as `membership` before accept is called.
+	// A user who already has access to the project gets `409 inv.already_member` with their strongest role
+	// as `details.details.relation`: no grant is written and the invitation stays pending.
+	// `lookupInvitation` (`POST /invitations/lookup`) returns the same role as `membership` before accept
+	// is called.
 	//
 	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
 	// that scheme's CSRF rules.

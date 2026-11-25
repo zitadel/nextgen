@@ -12,8 +12,7 @@ post:
     inviter cannot accept their own invitation. Every unknown or finished token
     answers the same opaque `404`.
 
-    A user who already has access to the project, through a grant to them or
-    to a team they're in, the owning team, or operating the deployment, gets
+    A user who already has access to the project gets
     `409 inv.already_member` with their strongest role as
     `details.details.relation`: no grant is written and the invitation stays
     pending. `lookupInvitation` (`POST /invitations/lookup`) returns the same

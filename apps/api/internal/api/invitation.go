@@ -215,9 +215,9 @@ func (h *Handler) LookupInvitation(ctx context.Context, req *api.InvitationToken
 	} else {
 		view.Inviter.SetToNull()
 	}
-	if found.HeldRelation != "" {
+	if found.HeldRole != "" {
 		view.Membership.SetTo(api.InvitationLookupMembership{
-			Relation: api.InvitationLookupMembershipRelation(found.HeldRelation),
+			Relation: api.InvitationLookupMembershipRelation(found.HeldRole),
 		})
 	} else {
 		view.Membership.SetToNull()

@@ -573,6 +573,7 @@ holds, and the same-relation rule of the first 2026-11-12 amendment (#3330).
   of Accept and Decline. Each type's variant carries its own, so access to a
   project never blocks a team invitation.
 - **The grant call writes; it no longer ensures.** `EnsureUserGrant` becomes
-  `WriteUserGrant`: the redeemer holds no unexpired grant, so it only revokes
-  an expired grant of the same relation before writing. §4's "a different
+  `WriteUserGrant`: the redeemer holds no unexpired grant, so it revokes any
+  leftover grant of the same relation before writing, without re-reading its
+  expiry against another clock. §4's "a different
   relation already held: a second grant is created" no longer happens.

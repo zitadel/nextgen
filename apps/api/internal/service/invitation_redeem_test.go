@@ -67,10 +67,7 @@ func expectStatusChange(s *servicemocks.MockAllStatements, entity *domain.Invita
 // projectRoles answers each user's strongest role on the invitation's project
 // from roles; a user it does not name holds none.
 func projectRoles(roles map[string]string) service.ProjectRoleCheck {
-	return func(_ context.Context, _ service.AllStatements, projectID, userID string) (string, error) {
-		if projectID != invitationProjectID {
-			return "", nil
-		}
+	return func(_ context.Context, _ service.AllStatements, _, userID string) (string, error) {
 		return roles[userID], nil
 	}
 }
@@ -91,7 +88,7 @@ func TestInvitationService_Lookup(t *testing.T) {
 		assert.Equal(t, "inv_1", got.ID)
 		require.NotNil(t, got.Inviter)
 		assert.Equal(t, "Ada Lovelace", got.Inviter.Display)
-		assert.Empty(t, got.HeldRelation, "a colleague without access can accept")
+		assert.Empty(t, got.HeldRole, "a colleague without access can accept")
 	})
 
 	t.Run("names the role a user with access already holds", func(t *testing.T) {
@@ -103,7 +100,7 @@ func TestInvitationService_Lookup(t *testing.T) {
 
 		got, err := svc.Lookup(t.Context(), invitationToken, "user_colleague")
 		require.NoError(t, err)
-		assert.Equal(t, "editor", got.HeldRelation)
+		assert.Equal(t, "editor", got.HeldRole)
 	})
 
 	t.Run("an inviter that no longer resolves degrades to its id", func(t *testing.T) {
@@ -224,6 +221,25 @@ func TestInvitationService_Accept(t *testing.T) {
 			held:       []*domain.AuthzAssignment{managed("asgn_admin", "admin", &expired)},
 			revokes:    "asgn_admin",
 			revokeErr:  database.NewNoRowFoundError(nil),
+			wantCreate: true,
+			wantEvents: []domain.EventType{domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
+		},
+		{
+			// The refusal read expiry by the database's clock; this clock may
+			// still be before it, and the row still blocks the write.
+			name:       "a grant this clock thinks active but the role check didn't count: revoked",
+			held:       []*domain.AuthzAssignment{managed("asgn_admin", "admin", new(time.Now().Add(time.Minute)))},
+			revokes:    "asgn_admin",
+			wantCreate: true,
+			wantEvents: []domain.EventType{domain.EventTypeAuthzRevoked, domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
+		},
+		{
+			name: "a delegated grant of the same relation: left alone",
+			held: []*domain.AuthzAssignment{func() *domain.AuthzAssignment {
+				asgn := managed("asgn_delegated", "admin", &expired)
+				asgn.DelegationID = new("dlg_1")
+				return asgn
+			}()},
 			wantCreate: true,
 			wantEvents: []domain.EventType{domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
 		},

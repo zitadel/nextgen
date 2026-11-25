@@ -187,10 +187,10 @@ func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, inpu
 
 // WriteUserGrant gives userID relation on the project inside the caller's
 // transaction, for invitation acceptance (ADR 086 §4), which has refused a
-// user with any access already. An expired grant of the same relation is
-// revoked first: it still holds the unique binding, and a unique violation
-// would abort a Postgres transaction.
-func (s *GrantService) WriteUserGrant(ctx context.Context, stmts AllStatements, projectID, userID, relation string, now time.Time) (err error) {
+// user with any access already. A leftover grant of the same relation, which
+// for such a user can only be expired, is revoked first: it still holds the
+// unique binding, and a unique violation would abort a Postgres transaction.
+func (s *GrantService) WriteUserGrant(ctx context.Context, stmts AllStatements, projectID, userID, relation string) (err error) {
 	ctx, end := startSpan(ctx, "GrantService.WriteUserGrant")
 	defer end(&err)
 
@@ -210,12 +210,12 @@ func (s *GrantService) WriteUserGrant(ctx context.Context, stmts AllStatements, 
 	if err != nil {
 		return err
 	}
-	// An expired managed, direct grant of the same relation still holds the
-	// unique binding the write targets, so clear it first; delegated rows sit
+	// Any unrevoked managed, direct grant of the same relation holds the unique
+	// binding the write targets, so clear it first, without comparing expiry to
+	// this clock: the refusal compared it to the database's. Delegated rows sit
 	// outside that binding.
 	for _, asgn := range held {
-		if !isManagedGrant(asgn) || asgn.DelegationID != nil || asgn.Relation != relation ||
-			asgn.ExpiresAt == nil || now.Before(*asgn.ExpiresAt) {
+		if !isManagedGrant(asgn) || asgn.DelegationID != nil || asgn.Relation != relation {
 			continue
 		}
 		if err := stmts.RevokeAuthzAssignment(ctx, projectID, asgn.ID); err != nil {

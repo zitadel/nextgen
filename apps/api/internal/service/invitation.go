@@ -291,9 +291,9 @@ type InvitationLookup struct {
 	// Inviter names CreatedBy for a redeemer who cannot read platform users.
 	// Nil when a project secret created the invitation.
 	Inviter *domain.UserRef
-	// HeldRelation is the role the redeemer already holds on the project,
+	// HeldRole is the role the redeemer already holds on the project,
 	// which refuses accept and decline. Empty when they hold none.
-	HeldRelation string
+	HeldRole string
 }
 
 // resolveInviters sets each invitation's Inviter from its CreatedBy.
@@ -381,7 +381,7 @@ func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_
 		}
 		found.Inviter = new(refs[*entity.CreatedBy])
 	}
-	if found.HeldRelation, err = s.heldAccess(ctx, stmts, entity, userID); err != nil {
+	if found.HeldRole, err = s.heldRole(ctx, stmts, entity, userID); err != nil {
 		return nil, mapInvitationError(err, "failed to look up invitation")
 	}
 	return found, nil
@@ -414,7 +414,7 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
 			return err
 		}
-		if err := s.refuseHeldAccess(ctx, stmts, entity, userID); err != nil {
+		if err := s.refuseHeldRole(ctx, stmts, entity, userID); err != nil {
 			return err
 		}
 		// The lock can wait; the guarded change rechecks expiry at this time.
@@ -442,7 +442,7 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 		if err != nil {
 			return notPendingOnMiss(err)
 		}
-		if err := s.grantInvited(ctx, stmts, entity, userID, now); err != nil {
+		if err := s.grantInvited(ctx, stmts, entity, userID); err != nil {
 			return err
 		}
 		return emitInvitationAccepted(ctx, stmts, accepted, userID)
@@ -459,13 +459,13 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 
 // grantInvited is the invitation type's adapter: it calls the service that
 // owns the target, and acceptance continues only on its success.
-func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string, now time.Time) error {
+func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) error {
 	switch entity.Type {
 	case domain.InvitationTypeProjectMember:
 		if entity.ProjectMember == nil {
 			return domain.ErrInternal(fmt.Errorf("invitation %q has no project_member object", entity.ID))
 		}
-		err := s.grants.WriteUserGrant(ctx, stmts, entity.ProjectID, userID, entity.ProjectMember.Relation, now)
+		err := s.grants.WriteUserGrant(ctx, stmts, entity.ProjectID, userID, entity.ProjectMember.Relation)
 		// Create validated the relation, so a refusal here is a stored fault.
 		if errors.Is(err, domain.ErrGrantInvalid()) {
 			return domain.ErrInternal(err).WithMessage("invitation holds an invalid relation")
@@ -480,22 +480,20 @@ func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatement
 	}
 }
 
-// heldAccess is the type's adapter for what userID already holds of what the
+// heldRole is the type's adapter for what userID already holds of what the
 // invitation grants: for project_member, their strongest role on the project
 // by any path. Empty when they hold none, and for a type with no check yet.
-func (s *InvitationService) heldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (string, error) {
-	switch entity.Type {
-	case domain.InvitationTypeProjectMember:
-		return s.projectRole(ctx, stmts, entity.ProjectID, userID)
-	default:
+func (s *InvitationService) heldRole(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (string, error) {
+	if entity.Type != domain.InvitationTypeProjectMember {
 		return "", nil
 	}
+	return s.projectRole(ctx, stmts, entity.ProjectID, userID)
 }
 
-// refuseHeldAccess refuses redeeming for a user who already has access, so the
+// refuseHeldRole refuses redeeming for a user who already has access, so the
 // invitation stays pending for the person it was meant for.
-func (s *InvitationService) refuseHeldAccess(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) error {
-	held, err := s.heldAccess(ctx, stmts, entity, userID)
+func (s *InvitationService) refuseHeldRole(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) error {
+	held, err := s.heldRole(ctx, stmts, entity, userID)
 	if err != nil {
 		return err
 	}
@@ -527,7 +525,7 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
 			return err
 		}
-		if err := s.refuseHeldAccess(ctx, stmts, entity, userID); err != nil {
+		if err := s.refuseHeldRole(ctx, stmts, entity, userID); err != nil {
 			return err
 		}
 		rejected, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusRejected, userID, now)
