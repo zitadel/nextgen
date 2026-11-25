@@ -67,7 +67,7 @@ func TestSigningKey_Signer(t *testing.T) {
 		key, err := NewSigningKey("proj", SigningKeyPurposeToken, jose.EdDSA, kek)
 		require.NoError(t, err)
 
-		signer, err := key.Signer(kek)
+		signer, err := key.Signer(kek, nil)
 		require.NoError(t, err)
 
 		payload := []byte(`{"sub":"user-1"}`)
@@ -96,7 +96,7 @@ func TestSigningKey_Signer(t *testing.T) {
 		require.NoError(t, err)
 		key.ID = "sig_key_test"
 
-		signer, err := key.Signer(kek)
+		signer, err := key.Signer(kek, nil)
 		require.NoError(t, err)
 
 		jws, err := signer.Sign([]byte("payload"))
@@ -112,13 +112,37 @@ func TestSigningKey_Signer(t *testing.T) {
 		assert.Equal(t, key.ID, parsed.Signatures[0].Header.KeyID)
 	})
 
+	t.Run("carries the options' headers", func(t *testing.T) {
+		kek := &crypto.InverseCrypter{}
+
+		key, err := NewSigningKey("proj", SigningKeyPurposeToken, jose.EdDSA, kek)
+		require.NoError(t, err)
+		key.ID = "sig_key_test"
+
+		signer, err := key.Signer(kek, (&jose.SignerOptions{}).WithType("at+jwt"))
+		require.NoError(t, err)
+
+		jws, err := signer.Sign([]byte("payload"))
+		require.NoError(t, err)
+		serialized, err := jws.CompactSerialize()
+		require.NoError(t, err)
+
+		parsed, err := jose.ParseSigned(serialized, []jose.SignatureAlgorithm{jose.EdDSA})
+		require.NoError(t, err)
+		require.Len(t, parsed.Signatures, 1)
+		header := parsed.Signatures[0].Header
+		assert.Equal(t, "at+jwt", header.ExtraHeaders[jose.HeaderType])
+		assert.Equal(t, key.ID, header.KeyID)
+		assert.Equal(t, string(jose.EdDSA), header.Algorithm)
+	})
+
 	t.Run("decrypt error", func(t *testing.T) {
 		sentinel := errors.New("no can do")
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Decrypt(gomock.Any()).Return("", sentinel)
 
 		key := &SigningKey{Key: "whatever", Algorithm: jose.EdDSA}
-		_, err := key.Signer(kek)
+		_, err := key.Signer(kek, nil)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)
 	})
@@ -129,7 +153,7 @@ func TestSigningKey_Signer(t *testing.T) {
 		require.NoError(t, err)
 
 		key := &SigningKey{Key: encrypted, Algorithm: jose.EdDSA}
-		_, err = key.Signer(kek)
+		_, err = key.Signer(kek, nil)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)
 	})

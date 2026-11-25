@@ -6888,6 +6888,587 @@ func (s *AuthRequestCreatedPayload) SetClientID(val string) {
 
 // Merged schema.
 // Ref: #
+type AuthRequestExchangeFailedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category AuthRequestExchangeFailedEventCategory `json:"category"`
+	// When the action happened, on the server's clock, to the millisecond.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock, to the millisecond.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilAuthRequestExchangeFailedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a session, a token, a sign-in
+	// check or a credential belongs to, or the user a change was made to. Absent on an event that concerns
+	// no user.
+	UserID OptNilString `json:"user_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptAuthRequestExchangeFailedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                       `json:"delegation_id"`
+	Grantor        OptString                                       `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
+	// `request.api` event of a request carries `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString                     `json:"flow_id"`
+	Metadata OptEventMetadata                 `json:"metadata"`
+	Payload  AuthRequestExchangeFailedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *AuthRequestExchangeFailedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *AuthRequestExchangeFailedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *AuthRequestExchangeFailedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *AuthRequestExchangeFailedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *AuthRequestExchangeFailedEvent) GetCategory() AuthRequestExchangeFailedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *AuthRequestExchangeFailedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *AuthRequestExchangeFailedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *AuthRequestExchangeFailedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *AuthRequestExchangeFailedEvent) GetActorType() OptNilAuthRequestExchangeFailedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *AuthRequestExchangeFailedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *AuthRequestExchangeFailedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthRequestExchangeFailedEvent) GetUserID() OptNilString {
+	return s.UserID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AuthRequestExchangeFailedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *AuthRequestExchangeFailedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *AuthRequestExchangeFailedEvent) GetDelegationType() OptAuthRequestExchangeFailedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *AuthRequestExchangeFailedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *AuthRequestExchangeFailedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *AuthRequestExchangeFailedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *AuthRequestExchangeFailedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *AuthRequestExchangeFailedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *AuthRequestExchangeFailedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *AuthRequestExchangeFailedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *AuthRequestExchangeFailedEvent) GetPayload() AuthRequestExchangeFailedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *AuthRequestExchangeFailedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *AuthRequestExchangeFailedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *AuthRequestExchangeFailedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *AuthRequestExchangeFailedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *AuthRequestExchangeFailedEvent) SetCategory(val AuthRequestExchangeFailedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *AuthRequestExchangeFailedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *AuthRequestExchangeFailedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *AuthRequestExchangeFailedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *AuthRequestExchangeFailedEvent) SetActorType(val OptNilAuthRequestExchangeFailedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *AuthRequestExchangeFailedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *AuthRequestExchangeFailedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthRequestExchangeFailedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthRequestExchangeFailedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *AuthRequestExchangeFailedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *AuthRequestExchangeFailedEvent) SetDelegationType(val OptAuthRequestExchangeFailedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *AuthRequestExchangeFailedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *AuthRequestExchangeFailedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *AuthRequestExchangeFailedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *AuthRequestExchangeFailedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *AuthRequestExchangeFailedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *AuthRequestExchangeFailedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *AuthRequestExchangeFailedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *AuthRequestExchangeFailedEvent) SetPayload(val AuthRequestExchangeFailedPayload) {
+	s.Payload = val
+}
+
+type AuthRequestExchangeFailedEventActorType string
+
+const (
+	AuthRequestExchangeFailedEventActorTypeHuman   AuthRequestExchangeFailedEventActorType = "human"
+	AuthRequestExchangeFailedEventActorTypeService AuthRequestExchangeFailedEventActorType = "service"
+	AuthRequestExchangeFailedEventActorTypeSystem  AuthRequestExchangeFailedEventActorType = "system"
+	AuthRequestExchangeFailedEventActorTypeAgent   AuthRequestExchangeFailedEventActorType = "agent"
+)
+
+// AllValues returns all AuthRequestExchangeFailedEventActorType values.
+func (AuthRequestExchangeFailedEventActorType) AllValues() []AuthRequestExchangeFailedEventActorType {
+	return []AuthRequestExchangeFailedEventActorType{
+		AuthRequestExchangeFailedEventActorTypeHuman,
+		AuthRequestExchangeFailedEventActorTypeService,
+		AuthRequestExchangeFailedEventActorTypeSystem,
+		AuthRequestExchangeFailedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestExchangeFailedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestExchangeFailedEventActorTypeHuman:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventActorTypeService:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventActorTypeSystem:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestExchangeFailedEventActorType) UnmarshalText(data []byte) error {
+	switch AuthRequestExchangeFailedEventActorType(data) {
+	case AuthRequestExchangeFailedEventActorTypeHuman:
+		*s = AuthRequestExchangeFailedEventActorTypeHuman
+		return nil
+	case AuthRequestExchangeFailedEventActorTypeService:
+		*s = AuthRequestExchangeFailedEventActorTypeService
+		return nil
+	case AuthRequestExchangeFailedEventActorTypeSystem:
+		*s = AuthRequestExchangeFailedEventActorTypeSystem
+		return nil
+	case AuthRequestExchangeFailedEventActorTypeAgent:
+		*s = AuthRequestExchangeFailedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type AuthRequestExchangeFailedEventCategory string
+
+const (
+	AuthRequestExchangeFailedEventCategoryRequest AuthRequestExchangeFailedEventCategory = "request"
+	AuthRequestExchangeFailedEventCategoryAuth    AuthRequestExchangeFailedEventCategory = "auth"
+	AuthRequestExchangeFailedEventCategorySession AuthRequestExchangeFailedEventCategory = "session"
+	AuthRequestExchangeFailedEventCategoryAdmin   AuthRequestExchangeFailedEventCategory = "admin"
+	AuthRequestExchangeFailedEventCategoryEntity  AuthRequestExchangeFailedEventCategory = "entity"
+	AuthRequestExchangeFailedEventCategorySignal  AuthRequestExchangeFailedEventCategory = "signal"
+)
+
+// AllValues returns all AuthRequestExchangeFailedEventCategory values.
+func (AuthRequestExchangeFailedEventCategory) AllValues() []AuthRequestExchangeFailedEventCategory {
+	return []AuthRequestExchangeFailedEventCategory{
+		AuthRequestExchangeFailedEventCategoryRequest,
+		AuthRequestExchangeFailedEventCategoryAuth,
+		AuthRequestExchangeFailedEventCategorySession,
+		AuthRequestExchangeFailedEventCategoryAdmin,
+		AuthRequestExchangeFailedEventCategoryEntity,
+		AuthRequestExchangeFailedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestExchangeFailedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestExchangeFailedEventCategoryRequest:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategoryAuth:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategorySession:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategoryAdmin:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategoryEntity:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestExchangeFailedEventCategory) UnmarshalText(data []byte) error {
+	switch AuthRequestExchangeFailedEventCategory(data) {
+	case AuthRequestExchangeFailedEventCategoryRequest:
+		*s = AuthRequestExchangeFailedEventCategoryRequest
+		return nil
+	case AuthRequestExchangeFailedEventCategoryAuth:
+		*s = AuthRequestExchangeFailedEventCategoryAuth
+		return nil
+	case AuthRequestExchangeFailedEventCategorySession:
+		*s = AuthRequestExchangeFailedEventCategorySession
+		return nil
+	case AuthRequestExchangeFailedEventCategoryAdmin:
+		*s = AuthRequestExchangeFailedEventCategoryAdmin
+		return nil
+	case AuthRequestExchangeFailedEventCategoryEntity:
+		*s = AuthRequestExchangeFailedEventCategoryEntity
+		return nil
+	case AuthRequestExchangeFailedEventCategorySignal:
+		*s = AuthRequestExchangeFailedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type AuthRequestExchangeFailedEventDelegationType string
+
+const (
+	AuthRequestExchangeFailedEventDelegationTypeDirect    AuthRequestExchangeFailedEventDelegationType = "direct"
+	AuthRequestExchangeFailedEventDelegationTypeDelegated AuthRequestExchangeFailedEventDelegationType = "delegated"
+	AuthRequestExchangeFailedEventDelegationTypePatShared AuthRequestExchangeFailedEventDelegationType = "pat_shared"
+	AuthRequestExchangeFailedEventDelegationTypeExchanged AuthRequestExchangeFailedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all AuthRequestExchangeFailedEventDelegationType values.
+func (AuthRequestExchangeFailedEventDelegationType) AllValues() []AuthRequestExchangeFailedEventDelegationType {
+	return []AuthRequestExchangeFailedEventDelegationType{
+		AuthRequestExchangeFailedEventDelegationTypeDirect,
+		AuthRequestExchangeFailedEventDelegationTypeDelegated,
+		AuthRequestExchangeFailedEventDelegationTypePatShared,
+		AuthRequestExchangeFailedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestExchangeFailedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestExchangeFailedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestExchangeFailedEventDelegationType) UnmarshalText(data []byte) error {
+	switch AuthRequestExchangeFailedEventDelegationType(data) {
+	case AuthRequestExchangeFailedEventDelegationTypeDirect:
+		*s = AuthRequestExchangeFailedEventDelegationTypeDirect
+		return nil
+	case AuthRequestExchangeFailedEventDelegationTypeDelegated:
+		*s = AuthRequestExchangeFailedEventDelegationTypeDelegated
+		return nil
+	case AuthRequestExchangeFailedEventDelegationTypePatShared:
+		*s = AuthRequestExchangeFailedEventDelegationTypePatShared
+		return nil
+	case AuthRequestExchangeFailedEventDelegationTypeExchanged:
+		*s = AuthRequestExchangeFailedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `auth.request.exchange.failed` events. The code, the `code_verifier` and the
+// `redirect_uri` the client sent stay out.
+// Ref: #
+type AuthRequestExchangeFailedPayload struct {
+	// The client that presented the code.
+	ClientID string `json:"client_id"`
+	// The check that refused the code.
+	Reason AuthRequestExchangeFailedPayloadReason `json:"reason"`
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AuthRequestExchangeFailedPayload) GetClientID() string {
+	return s.ClientID
+}
+
+// GetReason returns the value of Reason.
+func (s *AuthRequestExchangeFailedPayload) GetReason() AuthRequestExchangeFailedPayloadReason {
+	return s.Reason
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthRequestExchangeFailedPayload) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *AuthRequestExchangeFailedPayload) SetReason(val AuthRequestExchangeFailedPayloadReason) {
+	s.Reason = val
+}
+
+// The check that refused the code.
+type AuthRequestExchangeFailedPayloadReason string
+
+const (
+	AuthRequestExchangeFailedPayloadReasonClientMismatch         AuthRequestExchangeFailedPayloadReason = "client_mismatch"
+	AuthRequestExchangeFailedPayloadReasonCodeExpired            AuthRequestExchangeFailedPayloadReason = "code_expired"
+	AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch    AuthRequestExchangeFailedPayloadReason = "redirect_uri_mismatch"
+	AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing    AuthRequestExchangeFailedPayloadReason = "code_verifier_missing"
+	AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid    AuthRequestExchangeFailedPayloadReason = "code_verifier_invalid"
+	AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected AuthRequestExchangeFailedPayloadReason = "code_verifier_unexpected"
+	AuthRequestExchangeFailedPayloadReasonReleaseRevoked         AuthRequestExchangeFailedPayloadReason = "release_revoked"
+	AuthRequestExchangeFailedPayloadReasonSessionNotActive       AuthRequestExchangeFailedPayloadReason = "session_not_active"
+	AuthRequestExchangeFailedPayloadReasonUserNotActive          AuthRequestExchangeFailedPayloadReason = "user_not_active"
+)
+
+// AllValues returns all AuthRequestExchangeFailedPayloadReason values.
+func (AuthRequestExchangeFailedPayloadReason) AllValues() []AuthRequestExchangeFailedPayloadReason {
+	return []AuthRequestExchangeFailedPayloadReason{
+		AuthRequestExchangeFailedPayloadReasonClientMismatch,
+		AuthRequestExchangeFailedPayloadReasonCodeExpired,
+		AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch,
+		AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing,
+		AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid,
+		AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected,
+		AuthRequestExchangeFailedPayloadReasonReleaseRevoked,
+		AuthRequestExchangeFailedPayloadReasonSessionNotActive,
+		AuthRequestExchangeFailedPayloadReasonUserNotActive,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestExchangeFailedPayloadReason) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestExchangeFailedPayloadReasonClientMismatch:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonCodeExpired:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonReleaseRevoked:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonSessionNotActive:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonUserNotActive:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestExchangeFailedPayloadReason) UnmarshalText(data []byte) error {
+	switch AuthRequestExchangeFailedPayloadReason(data) {
+	case AuthRequestExchangeFailedPayloadReasonClientMismatch:
+		*s = AuthRequestExchangeFailedPayloadReasonClientMismatch
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonCodeExpired:
+		*s = AuthRequestExchangeFailedPayloadReasonCodeExpired
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch:
+		*s = AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing:
+		*s = AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid:
+		*s = AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected:
+		*s = AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonReleaseRevoked:
+		*s = AuthRequestExchangeFailedPayloadReasonReleaseRevoked
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonSessionNotActive:
+		*s = AuthRequestExchangeFailedPayloadReasonSessionNotActive
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonUserNotActive:
+		*s = AuthRequestExchangeFailedPayloadReasonUserNotActive
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
 type AuthSSOAuthorizationFailedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
@@ -8730,6 +9311,8 @@ func (s *AuthTokenIssuedEventDelegationType) UnmarshalText(data []byte) error {
 // Ref: #
 type AuthTokenIssuedPayload struct {
 	Scopes []string `json:"scopes"`
+	// The client that redeemed the authorization code. Only a token issued for a code has it.
+	ClientID OptString `json:"client_id"`
 }
 
 // GetScopes returns the value of Scopes.
@@ -8737,9 +9320,19 @@ func (s *AuthTokenIssuedPayload) GetScopes() []string {
 	return s.Scopes
 }
 
+// GetClientID returns the value of ClientID.
+func (s *AuthTokenIssuedPayload) GetClientID() OptString {
+	return s.ClientID
+}
+
 // SetScopes sets the value of Scopes.
 func (s *AuthTokenIssuedPayload) SetScopes(val []string) {
 	s.Scopes = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthTokenIssuedPayload) SetClientID(val OptString) {
+	s.ClientID = val
 }
 
 // Merged schema.
@@ -27725,6 +28318,7 @@ type Event struct {
 	AuthFactorPasskeyEnrolledEvent   AuthFactorPasskeyEnrolledEvent
 	AuthFactorPasswordSetEvent       AuthFactorPasswordSetEvent
 	AuthRequestCreatedEvent          AuthRequestCreatedEvent
+	AuthRequestExchangeFailedEvent   AuthRequestExchangeFailedEvent
 	AuthSSOAuthorizationFailedEvent  AuthSSOAuthorizationFailedEvent
 	AuthSSOExchangeFailedEvent       AuthSSOExchangeFailedEvent
 	AuthSSOExchangeSucceededEvent    AuthSSOExchangeSucceededEvent
@@ -27786,6 +28380,7 @@ const (
 	AuthFactorPasskeyEnrolledEventEvent   EventType = "auth.factor.passkey.enrolled"
 	AuthFactorPasswordSetEventEvent       EventType = "auth.factor.password.set"
 	AuthRequestCreatedEventEvent          EventType = "auth.request.created"
+	AuthRequestExchangeFailedEventEvent   EventType = "auth.request.exchange.failed"
 	AuthSSOAuthorizationFailedEventEvent  EventType = "auth.sso.authorization.failed"
 	AuthSSOExchangeFailedEventEvent       EventType = "auth.sso.exchange.failed"
 	AuthSSOExchangeSucceededEventEvent    EventType = "auth.sso.exchange.succeeded"
@@ -27861,6 +28456,11 @@ func (s Event) IsAuthFactorPasswordSetEvent() bool { return s.Type == AuthFactor
 
 // IsAuthRequestCreatedEvent reports whether Event is AuthRequestCreatedEvent.
 func (s Event) IsAuthRequestCreatedEvent() bool { return s.Type == AuthRequestCreatedEventEvent }
+
+// IsAuthRequestExchangeFailedEvent reports whether Event is AuthRequestExchangeFailedEvent.
+func (s Event) IsAuthRequestExchangeFailedEvent() bool {
+	return s.Type == AuthRequestExchangeFailedEventEvent
+}
 
 // IsAuthSSOAuthorizationFailedEvent reports whether Event is AuthSSOAuthorizationFailedEvent.
 func (s Event) IsAuthSSOAuthorizationFailedEvent() bool {
@@ -28193,6 +28793,27 @@ func (s Event) GetAuthRequestCreatedEvent() (v AuthRequestCreatedEvent, ok bool)
 func NewAuthRequestCreatedEventEvent(v AuthRequestCreatedEvent) Event {
 	var s Event
 	s.SetAuthRequestCreatedEvent(v)
+	return s
+}
+
+// SetAuthRequestExchangeFailedEvent sets Event to AuthRequestExchangeFailedEvent.
+func (s *Event) SetAuthRequestExchangeFailedEvent(v AuthRequestExchangeFailedEvent) {
+	s.Type = AuthRequestExchangeFailedEventEvent
+	s.AuthRequestExchangeFailedEvent = v
+}
+
+// GetAuthRequestExchangeFailedEvent returns AuthRequestExchangeFailedEvent and true boolean if Event is AuthRequestExchangeFailedEvent.
+func (s Event) GetAuthRequestExchangeFailedEvent() (v AuthRequestExchangeFailedEvent, ok bool) {
+	if !s.IsAuthRequestExchangeFailedEvent() {
+		return v, false
+	}
+	return s.AuthRequestExchangeFailedEvent, true
+}
+
+// NewAuthRequestExchangeFailedEventEvent returns new Event from AuthRequestExchangeFailedEvent.
+func NewAuthRequestExchangeFailedEventEvent(v AuthRequestExchangeFailedEvent) Event {
+	var s Event
+	s.SetAuthRequestExchangeFailedEvent(v)
 	return s
 }
 
@@ -61668,6 +62289,52 @@ func (o OptAuthRequestCreatedEventDelegationType) Or(d AuthRequestCreatedEventDe
 	return d
 }
 
+// NewOptAuthRequestExchangeFailedEventDelegationType returns new OptAuthRequestExchangeFailedEventDelegationType with value set to v.
+func NewOptAuthRequestExchangeFailedEventDelegationType(v AuthRequestExchangeFailedEventDelegationType) OptAuthRequestExchangeFailedEventDelegationType {
+	return OptAuthRequestExchangeFailedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthRequestExchangeFailedEventDelegationType is optional AuthRequestExchangeFailedEventDelegationType.
+type OptAuthRequestExchangeFailedEventDelegationType struct {
+	Value AuthRequestExchangeFailedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptAuthRequestExchangeFailedEventDelegationType was set.
+func (o OptAuthRequestExchangeFailedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthRequestExchangeFailedEventDelegationType) Reset() {
+	var v AuthRequestExchangeFailedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthRequestExchangeFailedEventDelegationType) SetTo(v AuthRequestExchangeFailedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthRequestExchangeFailedEventDelegationType) Get() (v AuthRequestExchangeFailedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthRequestExchangeFailedEventDelegationType) Or(d AuthRequestExchangeFailedEventDelegationType) AuthRequestExchangeFailedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAuthSSOAuthorizationFailedEventDelegationType returns new OptAuthSSOAuthorizationFailedEventDelegationType with value set to v.
 func NewOptAuthSSOAuthorizationFailedEventDelegationType(v AuthSSOAuthorizationFailedEventDelegationType) OptAuthSSOAuthorizationFailedEventDelegationType {
 	return OptAuthSSOAuthorizationFailedEventDelegationType{
@@ -69634,6 +70301,74 @@ func (o OptNilAuthRequestCreatedEventActorType) Get() (v AuthRequestCreatedEvent
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilAuthRequestCreatedEventActorType) Or(d AuthRequestCreatedEventActorType) AuthRequestCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilAuthRequestExchangeFailedEventActorType returns new OptNilAuthRequestExchangeFailedEventActorType with value set to v.
+func NewOptNilAuthRequestExchangeFailedEventActorType(v AuthRequestExchangeFailedEventActorType) OptNilAuthRequestExchangeFailedEventActorType {
+	return OptNilAuthRequestExchangeFailedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilAuthRequestExchangeFailedEventActorType is optional nullable AuthRequestExchangeFailedEventActorType.
+type OptNilAuthRequestExchangeFailedEventActorType struct {
+	Value AuthRequestExchangeFailedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilAuthRequestExchangeFailedEventActorType was set.
+func (o OptNilAuthRequestExchangeFailedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilAuthRequestExchangeFailedEventActorType) Reset() {
+	var v AuthRequestExchangeFailedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilAuthRequestExchangeFailedEventActorType) SetTo(v AuthRequestExchangeFailedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilAuthRequestExchangeFailedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilAuthRequestExchangeFailedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v AuthRequestExchangeFailedEventActorType
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilAuthRequestExchangeFailedEventActorType) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilAuthRequestExchangeFailedEventActorType) Get() (v AuthRequestExchangeFailedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilAuthRequestExchangeFailedEventActorType) Or(d AuthRequestExchangeFailedEventActorType) AuthRequestExchangeFailedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -116052,6 +116787,7 @@ func (*WebhookDelivered) authCheckSucceededRes()          {}
 func (*WebhookDelivered) authFactorPasskeyEnrolledRes()   {}
 func (*WebhookDelivered) authFactorPasswordSetRes()       {}
 func (*WebhookDelivered) authRequestCreatedRes()          {}
+func (*WebhookDelivered) authRequestExchangeFailedRes()   {}
 func (*WebhookDelivered) authSsoAuthorizationFailedRes()  {}
 func (*WebhookDelivered) authSsoExchangeFailedRes()       {}
 func (*WebhookDelivered) authSsoExchangeSucceededRes()    {}
@@ -116122,6 +116858,7 @@ func (*WebhookNotDelivered) authCheckSucceededRes()          {}
 func (*WebhookNotDelivered) authFactorPasskeyEnrolledRes()   {}
 func (*WebhookNotDelivered) authFactorPasswordSetRes()       {}
 func (*WebhookNotDelivered) authRequestCreatedRes()          {}
+func (*WebhookNotDelivered) authRequestExchangeFailedRes()   {}
 func (*WebhookNotDelivered) authSsoAuthorizationFailedRes()  {}
 func (*WebhookNotDelivered) authSsoExchangeFailedRes()       {}
 func (*WebhookNotDelivered) authSsoExchangeSucceededRes()    {}
