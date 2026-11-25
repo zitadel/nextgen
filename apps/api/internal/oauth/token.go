@@ -19,6 +19,10 @@ import (
 // maxClientIDLength is the maxLength of client_id in application.json.
 const maxClientIDLength = 255
 
+// maxDeploymentIDLength is above the longest deployment ID: `dep_` and a
+// UUID, 40 characters.
+const maxDeploymentIDLength = 64
+
 // VerifyClient authenticates the client of a token request with its client
 // secret, sent with HTTP Basic or in the form (RFC 6749 §2.3.1). The request
 // comes from the client's backend, not through the SDK proxy, so it carries no
@@ -61,17 +65,26 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 	if !storable(r.Data.ClientID) || len(r.Data.ClientID) > maxClientIDLength {
 		return nil, refused(nil)
 	}
-	served, err := s.clients.AuthenticateClient(ctx, projectID, r.Data.ClientID, r.Data.ClientSecret)
+	// The code names the deployment that served its authorization request
+	// (domain.NewAuthCode). A declared client's secret is a variable of that
+	// deployment; a registered client ignores it. Text no dialect stores, or
+	// longer than any deployment ID, names none.
+	deploymentID := domain.AuthCodeDeploymentID(r.Form.Get("code"))
+	// Every grant comes here: a stray code on another grant must not choose
+	// the deployment.
+	if r.Form.Get("grant_type") != string(oidc.GrantTypeCode) ||
+		!storable(deploymentID) || len(deploymentID) > maxDeploymentIDLength {
+		deploymentID = ""
+	}
+	served, err := s.clients.AuthenticateClient(ctx, projectID, deploymentID, r.Data.ClientID, r.Data.ClientSecret)
 	switch {
-	// A revoked release serves no client, as at the authorization endpoint.
-	case errors.Is(err, domain.ErrApplicationClientNotFound()), errors.Is(err, domain.ErrApplicationClientSecretInvalid()),
-		errors.Is(err, domain.ErrReleaseRevoked()):
+	case errors.Is(err, domain.ErrApplicationClientNotFound()), errors.Is(err, domain.ErrApplicationClientSecretInvalid()):
 		return nil, refused(err)
-	// A declared client's secret is a variable of the deployment that serves
-	// it, and a token request names no deployment, so the lookup finds no
-	// release. Until that is decided, the client is refused like an unknown
-	// one.
-	case errors.Is(err, domain.ErrReleaseNotDeployed(nil)):
+	// The request names no deployment that serves a declared client: none,
+	// one the project does not have, or one whose release was revoked, as at
+	// the authorization endpoint.
+	case errors.Is(err, domain.ErrReleaseNotDeployed(nil)), errors.Is(err, domain.ErrDeploymentNotFound()),
+		errors.Is(err, domain.ErrReleaseRevoked()):
 		return nil, refused(err)
 	case errors.Is(err, domain.ErrUnavailable()):
 		return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
@@ -98,13 +111,17 @@ func (s opServer) CodeExchange(ctx context.Context, r *op.ClientRequest[oidc.Acc
 	if err != nil {
 		return nil, codeError(err)
 	}
-	return op.NewResponse(&oidc.AccessTokenResponse{
+	response := op.NewResponse(&oidc.AccessTokenResponse{
 		AccessToken: token,
 		TokenType:   oidc.BearerToken,
 		// Whole seconds, rounded down, so a client never holds the token
 		// longer than its session.
 		ExpiresIn: uint64(expiresIn / time.Second),
-	}), nil
+	})
+	// RFC 6749 section 5.1; Cache-Control: no-store is set for every OAuth
+	// route (httputil.WithForwardedNoStore).
+	response.Header.Set("Pragma", "no-cache")
+	return response, nil
 }
 
 // codeError is the answer to a redemption that failed with err. A refusal is

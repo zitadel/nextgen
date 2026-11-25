@@ -3,6 +3,7 @@ package oauth
 import (
 	"cmp"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -22,23 +23,27 @@ import (
 const (
 	tokenPath    = "/oauth/proj_123/token"
 	clientSecret = "s3cret"
+	// specialSecret has the characters HTTP Basic URL-encodes (RFC 6749
+	// section 2.3.1).
+	specialSecret = "p@ss:w%rd +/&="
 	// verifier is the PKCE verifier of RFC 7636 appendix B.
 	verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 )
 
-// AuthenticateClient knows one secret for every client of the fake.
-func (c clients) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*service.ServedApplicationClient, error) {
+// AuthenticateClient knows clientSecret and specialSecret for every client
+// of the fake. Its clients are registered, so it ignores deploymentID.
+func (c clients) AuthenticateClient(ctx context.Context, projectID, _, clientID, secret string) (*service.ServedApplicationClient, error) {
 	doc, err := c.Client(ctx, projectID, "", clientID)
 	if err != nil {
 		return nil, err
 	}
-	if secret != clientSecret {
+	if secret != clientSecret && secret != specialSecret {
 		return nil, domain.ErrApplicationClientSecretInvalid()
 	}
 	return &service.ServedApplicationClient{Document: doc}, nil
 }
 
-func (f failing) AuthenticateClient(context.Context, string, string, string) (*service.ServedApplicationClient, error) {
+func (f failing) AuthenticateClient(context.Context, string, string, string, string) (*service.ServedApplicationClient, error) {
 	return nil, f.err
 }
 
@@ -47,16 +52,47 @@ func (a *authRequests) RedeemCode(context.Context, service.RedeemCodeInput) (str
 	return "", 0, errors.New("authRequests redeems no codes")
 }
 
-// recording is a ClientResolver over clients that records the project each
-// authentication looks the client up in.
-type recording struct {
-	clients
-	projectIDs []string
+// declared is a ClientResolver for client shop as a deployment declares it.
+// It answers each deployment a code may name as the service does: dep_1
+// serves the client, dep_revoked has a revoked release, any other is not a
+// deployment of the project, and none leaves the client unserved.
+type declared struct{}
+
+func (declared) Client(context.Context, string, string, string) (domain.ApplicationClientDocument, error) {
+	return shop["shop"], nil
 }
 
-func (r *recording) AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*service.ServedApplicationClient, error) {
+func (declared) AuthenticateClient(_ context.Context, _, deploymentID, clientID, secret string) (*service.ServedApplicationClient, error) {
+	switch deploymentID {
+	case "dep_1":
+	case "":
+		return nil, domain.ErrReleaseNotDeployed(nil)
+	case "dep_revoked":
+		return nil, domain.ErrReleaseRevoked()
+	default:
+		return nil, domain.ErrDeploymentNotFound()
+	}
+	if clientID != "shop" {
+		return nil, domain.ErrApplicationClientNotFound()
+	}
+	if secret != clientSecret {
+		return nil, domain.ErrApplicationClientSecretInvalid()
+	}
+	return &service.ServedApplicationClient{Document: shop["shop"]}, nil
+}
+
+// recording is a ClientResolver that records the project and the deployment
+// each authentication names.
+type recording struct {
+	ClientResolver
+	projectIDs    []string
+	deploymentIDs []string
+}
+
+func (r *recording) AuthenticateClient(ctx context.Context, projectID, deploymentID, clientID, secret string) (*service.ServedApplicationClient, error) {
 	r.projectIDs = append(r.projectIDs, projectID)
-	return r.clients.AuthenticateClient(ctx, projectID, clientID, secret)
+	r.deploymentIDs = append(r.deploymentIDs, deploymentID)
+	return r.ClientResolver.AuthenticateClient(ctx, projectID, deploymentID, clientID, secret)
 }
 
 // codes is a fake AuthRequestStore that records the redemptions it gets and
@@ -100,11 +136,22 @@ func tokenForm(set map[string]string) url.Values {
 // authentication when user is set.
 func postToken(t *testing.T, h http.Handler, method, path string, form url.Values, user, password string) *httptest.ResponseRecorder {
 	t.Helper()
+	authorization := ""
+	if user != "" {
+		authorization = "Basic " + base64.StdEncoding.EncodeToString([]byte(url.QueryEscape(user)+":"+url.QueryEscape(password)))
+	}
+	return sendToken(t, h, method, path, form, authorization)
+}
+
+// sendToken sends form to path as a back-channel request, with authorization
+// as its Authorization header when set.
+func sendToken(t *testing.T, h http.Handler, method, path string, form url.Values, authorization string) *httptest.ResponseRecorder {
+	t.Helper()
 	r := httptest.NewRequest(method, path, strings.NewReader(form.Encode()))
 	r.Host = "api.example.com"
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if user != "" {
-		r.SetBasicAuth(url.QueryEscape(user), url.QueryEscape(password))
+	if authorization != "" {
+		r.Header.Set("Authorization", authorization)
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
@@ -140,8 +187,36 @@ func TestTokenExchangesACode(t *testing.T) {
 		// when unset.
 		expiresIn     time.Duration
 		wantExpiresIn float64
+		// clients replaces shop when set.
+		clients ClientResolver
+		// wantDeploymentID is the deployment the authentication is asked for:
+		// the one the code names.
+		wantDeploymentID string
 	}{
 		{name: "client_secret_basic", user: "shop", password: clientSecret},
+		{
+			// The library URL-decodes a Basic secret (RFC 6749 section 2.3.1).
+			name:     "secret_with_special_characters",
+			user:     "shop",
+			password: specialSecret,
+		},
+		{
+			// A registered client ignores the deployment the code names.
+			name:             "registered_client_with_a_deployment_in_the_code",
+			set:              map[string]string{"code": "dep_1.the-code"},
+			user:             "shop",
+			password:         clientSecret,
+			wantDeploymentID: "dep_1",
+		},
+		{
+			// A declared client is served by the deployment its code names.
+			name:             "declared_client",
+			set:              map[string]string{"code": "dep_1.the-code"},
+			user:             "shop",
+			password:         clientSecret,
+			clients:          declared{},
+			wantDeploymentID: "dep_1",
+		},
 		{
 			// The session expires first: expires_in is its rest, in whole
 			// seconds rounded down.
@@ -160,7 +235,10 @@ func TestTokenExchangesACode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			store := &codes{token: "the-access-token", expiresIn: cmp.Or(tt.expiresIn, domain.AccessTokenTTL)}
-			resolver := &recording{clients: shop}
+			resolver := &recording{ClientResolver: shop}
+			if tt.clients != nil {
+				resolver.ClientResolver = tt.clients
+			}
 			mux := newMux(t, Config{PlatformEnabled: tt.platform, Clients: resolver, AuthRequests: store})
 			path := tokenPath
 			if tt.path != "" {
@@ -175,6 +253,7 @@ func TestTokenExchangesACode(t *testing.T) {
 
 			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 			assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+			assert.Equal(t, "no-cache", rec.Header().Get("Pragma"), "RFC 6749 section 5.1")
 			var body map[string]any
 			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 			assert.Equal(t, map[string]any{
@@ -187,10 +266,11 @@ func TestTokenExchangesACode(t *testing.T) {
 				wantVerifier = ""
 			}
 			assert.Equal(t, []string{wantProjectID}, resolver.projectIDs, "the client is looked up in the path's project")
+			assert.Equal(t, []string{tt.wantDeploymentID}, resolver.deploymentIDs)
 			assert.Equal(t, []service.RedeemCodeInput{{
 				ProjectID:    wantProjectID,
 				ClientID:     "shop",
-				Code:         "the-code",
+				Code:         cmp.Or(tt.set["code"], "the-code"),
 				RedirectURI:  callback,
 				CodeVerifier: wantVerifier,
 			}}, store.got)
@@ -213,11 +293,60 @@ func TestTokenRefusesTheClient(t *testing.T) {
 		clients        ClientResolver
 		wantStatus     int
 		want           tokenError
+		// authorization is sent as the Authorization header when set.
+		authorization string
+		// wantDeploymentIDs, when set, are the deployments the authentications
+		// were asked for.
+		wantDeploymentIDs []string
+		// wantChallenge expects the Basic challenge: only a 401 to Basic
+		// credentials gets it.
+		wantChallenge bool
 	}{
-		{name: "unknown_client_basic", user: "nobody", password: clientSecret, wantStatus: http.StatusUnauthorized, want: refused},
-		{name: "wrong_secret_basic", user: "shop", password: "wrong", wantStatus: http.StatusUnauthorized, want: refused},
+		{name: "unknown_client_basic", user: "nobody", password: clientSecret, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true},
+		{name: "wrong_secret_basic", user: "shop", password: "wrong", wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true},
 		{name: "unknown_client_post", set: map[string]string{"client_id": "nobody", "client_secret": clientSecret}, wantStatus: http.StatusUnauthorized, want: refused},
 		{name: "wrong_secret_post", set: map[string]string{"client_id": "shop", "client_secret": "wrong"}, wantStatus: http.StatusUnauthorized, want: refused},
+		{
+			// Another scheme is not Basic credentials: no challenge.
+			name:          "wrong_secret_post_with_bearer_header",
+			set:           map[string]string{"client_id": "shop", "client_secret": "wrong"},
+			authorization: "Bearer x",
+			wantStatus:    http.StatusUnauthorized,
+			want:          refused,
+		},
+		// A declared client is served only by the deployment its code names,
+		// so a request that names none that serves it gets the answer of an
+		// unknown client.
+		{name: "declared_without_code", set: map[string]string{"code": ""}, user: "shop", password: clientSecret, clients: declared{}, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true, wantDeploymentIDs: []string{""}},
+		{name: "declared_code_without_deployment", user: "shop", password: clientSecret, clients: declared{}, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true, wantDeploymentIDs: []string{""}},
+		{
+			// A NUL byte is text no dialect stores: the deployment is not
+			// looked up.
+			name: "declared_deployment_not_storable", set: map[string]string{"code": "dep\x001.the-code"}, user: "shop", password: clientSecret,
+			clients: declared{}, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true, wantDeploymentIDs: []string{""},
+		},
+		{
+			name: "declared_deployment_too_long", set: map[string]string{"code": strings.Repeat("d", 65) + ".the-code"}, user: "shop", password: clientSecret,
+			clients: declared{}, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true, wantDeploymentIDs: []string{""},
+		},
+		{
+			name: "declared_unknown_deployment", set: map[string]string{"code": "dep_gone.the-code"}, user: "shop", password: clientSecret,
+			clients: declared{}, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true, wantDeploymentIDs: []string{"dep_gone"},
+		},
+		{
+			// Only an authorization code names a deployment; another grant
+			// with a stray code names none.
+			name: "declared_other_grant_with_a_code", set: map[string]string{"grant_type": "refresh_token", "refresh_token": "a-token", "code": "dep_1.the-code"}, user: "shop", password: clientSecret,
+			clients: declared{}, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true, wantDeploymentIDs: []string{""},
+		},
+		{
+			name: "declared_release_revoked", set: map[string]string{"code": "dep_revoked.the-code"}, user: "shop", password: clientSecret,
+			clients: declared{}, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true, wantDeploymentIDs: []string{"dep_revoked"},
+		},
+		{
+			name: "declared_wrong_secret", set: map[string]string{"code": "dep_1.the-code"}, user: "shop", password: "wrong",
+			clients: declared{}, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true, wantDeploymentIDs: []string{"dep_1"},
+		},
 		{
 			name:       "no_secret",
 			set:        map[string]string{"client_id": "shop"},
@@ -248,26 +377,16 @@ func TestTokenRefusesTheClient(t *testing.T) {
 			want:       refused,
 		},
 		{
-			// A declared client needs a deployment, which a token request does
-			// not name yet: it is refused like an unknown client.
-			name:       "declared_client",
-			user:       "shop",
-			password:   clientSecret,
-			clients:    failing{err: domain.ErrReleaseNotDeployed(nil)},
-			wantStatus: http.StatusUnauthorized,
-			want:       refused,
-		},
-		{
 			// A revoked release serves no client.
 			name:       "release_revoked",
 			user:       "shop",
 			password:   clientSecret,
 			clients:    failing{err: domain.ErrReleaseRevoked()},
 			wantStatus: http.StatusUnauthorized,
-			want:       refused,
+			want:       refused, wantChallenge: true,
 		},
-		{name: "project_id_malformed", path: "/oauth/not-a-project/token", user: "shop", password: clientSecret, wantStatus: http.StatusUnauthorized, want: refused},
-		{name: "platform_issuer_off", path: "/oauth/token", user: "shop", password: clientSecret, wantStatus: http.StatusUnauthorized, want: refused},
+		{name: "project_id_malformed", path: "/oauth/not-a-project/token", user: "shop", password: clientSecret, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true},
+		{name: "platform_issuer_off", path: "/oauth/token", user: "shop", password: clientSecret, wantStatus: http.StatusUnauthorized, want: refused, wantChallenge: true},
 		{
 			name:       "lookup_unavailable",
 			user:       "shop",
@@ -289,9 +408,9 @@ func TestTokenRefusesTheClient(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			store := &codes{token: "the-access-token"}
-			resolver := tt.clients
-			if resolver == nil {
-				resolver = shop
+			resolver := &recording{ClientResolver: shop}
+			if tt.clients != nil {
+				resolver.ClientResolver = tt.clients
 			}
 			mux := newMux(t, Config{Clients: resolver, AuthRequests: store})
 			path := tokenPath
@@ -299,12 +418,20 @@ func TestTokenRefusesTheClient(t *testing.T) {
 				path = tt.path
 			}
 
-			rec := postToken(t, mux, http.MethodPost, path, tokenForm(tt.set), tt.user, tt.password)
+			var rec *httptest.ResponseRecorder
+			if tt.authorization != "" {
+				rec = sendToken(t, mux, http.MethodPost, path, tokenForm(tt.set), tt.authorization)
+			} else {
+				rec = postToken(t, mux, http.MethodPost, path, tokenForm(tt.set), tt.user, tt.password)
+			}
 
 			require.Equal(t, tt.wantStatus, rec.Code, rec.Body.String())
 			assert.Equal(t, tt.want, decodeTokenError(t, rec))
 			assert.Empty(t, store.got, "the code is not read")
-			if tt.wantStatus == http.StatusUnauthorized {
+			if tt.wantDeploymentIDs != nil {
+				assert.Equal(t, tt.wantDeploymentIDs, resolver.deploymentIDs)
+			}
+			if tt.wantChallenge {
 				assert.Equal(t, `Basic realm="oauth"`, rec.Header().Get("WWW-Authenticate"))
 			} else {
 				assert.Empty(t, rec.Header().Get("WWW-Authenticate"))
@@ -324,9 +451,21 @@ func TestTokenRefusesTheRequest(t *testing.T) {
 		// inQuery sends form in the URL query instead of the body.
 		inQuery        bool
 		user, password string
-		wantStatus     int
-		wantError      string
+		// authorization replaces the Basic header built from user and
+		// password when set.
+		authorization string
+		wantStatus    int
+		wantError     string
 	}{
+		{
+			// "shop:%zz": the library cannot URL-decode the secret. Its
+			// invalid_client still leaves as a 401 with the challenge.
+			name:          "basic_not_url_encoded",
+			form:          tokenForm(nil),
+			authorization: "Basic " + base64.StdEncoding.EncodeToString([]byte("shop:%zz")),
+			wantStatus:    http.StatusUnauthorized,
+			wantError:     "invalid_client",
+		},
 		{
 			name:       "parameter_repeated",
 			form:       url.Values{"grant_type": {"authorization_code"}, "code": {"a", "b"}, "redirect_uri": {callback}},
@@ -385,11 +524,19 @@ func TestTokenRefusesTheRequest(t *testing.T) {
 				tt.form = nil
 			}
 
-			rec := postToken(t, mux, method, path, tt.form, tt.user, tt.password)
+			var rec *httptest.ResponseRecorder
+			if tt.authorization != "" {
+				rec = sendToken(t, mux, method, path, tt.form, tt.authorization)
+			} else {
+				rec = postToken(t, mux, method, path, tt.form, tt.user, tt.password)
+			}
 
 			require.Equal(t, tt.wantStatus, rec.Code, rec.Body.String())
 			assert.Equal(t, tt.wantError, decodeTokenError(t, rec).Error)
 			assert.Empty(t, store.got, "the code is not read")
+			if tt.wantStatus == http.StatusUnauthorized {
+				assert.Equal(t, `Basic realm="oauth"`, rec.Header().Get("WWW-Authenticate"))
+			}
 		})
 	}
 }
@@ -487,16 +634,4 @@ func TestRevocationIsNotServed(t *testing.T) {
 	assert.Equal(t, right.Code, wrong.Code)
 	assert.Equal(t, right.Body.String(), wrong.Body.String())
 	assert.Empty(t, wrong.Header().Get("WWW-Authenticate"))
-}
-
-// The Basic challenge belongs to the token endpoint's 401 only. Userinfo,
-// which takes a bearer token (RFC 6750), gets none.
-func TestUserinfoRefusalNamesNoBasicChallenge(t *testing.T) {
-	t.Parallel()
-	mux := newMux(t, Config{Clients: shop, AuthRequests: &codes{}})
-
-	rec := send(t, mux, http.MethodGet, "/oauth/proj_123/userinfo", "api.example.com", nil)
-
-	require.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
-	assert.Empty(t, rec.Header().Get("WWW-Authenticate"))
 }

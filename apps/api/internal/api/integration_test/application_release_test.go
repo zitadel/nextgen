@@ -4,6 +4,10 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -95,19 +99,101 @@ func TestDeclaredApplication(t *testing.T) {
 	applications := harness.EnsureApplicationService(t)
 
 	t.Run("the deployment authenticates the client against the variable", func(t *testing.T) {
-		served, err := applications.AuthenticateClient(servedByV1, f.project, "shop-web", "s3cr3t")
+		served, err := applications.AuthenticateClient(servedByV1, f.project, "", "shop-web", "s3cr3t")
 		require.NoError(t, err)
 		assert.Equal(t, "web", served.Document.Slug)
 
-		_, err = applications.AuthenticateClient(servedByV1, f.project, "shop-web", "guess")
+		_, err = applications.AuthenticateClient(servedByV1, f.project, "", "shop-web", "guess")
 		assert.ErrorIs(t, err, domain.ErrApplicationClientSecretInvalid())
 	})
 
-	// The token endpoint authenticates a client before it knows a deployment,
-	// and refuses this error like an unknown client.
-	t.Run("without a deployment a declared client is not served", func(t *testing.T) {
-		_, err := applications.AuthenticateClient(t.Context(), f.project, "shop-web", "s3cr3t")
-		assert.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
+	// The code names the deployment that served its authorization request,
+	// and the token endpoint checks the client's secret against that
+	// deployment's variable.
+	t.Run("the token endpoint authenticates the client against its code's deployment", func(t *testing.T) {
+		deploymentID := string(deployedV1.(*api.CreateDeploymentCreated).ID)
+		requests := service.NewAuthRequestService(harness.EnsureServiceDB(t), harness.EnsureKeyService(t))
+		issueAt := func(t *testing.T, deploymentID string) string {
+			t.Helper()
+			userID := harness.CreateUserWithTeam(t, f.project)
+			session := harness.CreateActiveSession(t, f.project, userID)
+			request := &domain.AuthRequest{
+				ProjectID:    f.project,
+				ClientID:     "shop-web",
+				RedirectURI:  "https://web.example.com/callback",
+				State:        "xyz",
+				Issuer:       "https://web.example.com/oauth/" + f.project,
+				DeploymentID: deploymentID,
+				ReleaseID:    string(v1.ID),
+			}
+			_, err := requests.Create(t.Context(), request)
+			require.NoError(t, err)
+			code, err := requests.IssueCode(t.Context(), f.project, request.ID, userID, session.ID)
+			require.NoError(t, err)
+			return code
+		}
+		issue := func(t *testing.T) string { return issueAt(t, deploymentID) }
+		exchange := func(t *testing.T, code, secret string) (*http.Response, map[string]any) {
+			t.Helper()
+			form := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {"https://web.example.com/callback"}}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.EnsureTestServer(t).URL+"/oauth/"+f.project+"/token", strings.NewReader(form.Encode()))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.SetBasicAuth("shop-web", url.QueryEscape(secret))
+			//egress:allow integration-test harness talking to the server under test
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			return resp, body
+		}
+
+		code := issue(t)
+		assert.Equal(t, deploymentID, domain.AuthCodeDeploymentID(code))
+
+		resp, body := exchange(t, code, "guess")
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, body)
+		assert.Equal(t, "invalid_client", body["error"])
+		assert.Equal(t, `Basic realm="oauth"`, resp.Header.Get("WWW-Authenticate"))
+
+		resp, body = exchange(t, code, "s3cr3t")
+		require.Equal(t, http.StatusOK, resp.StatusCode, body)
+		assert.NotEmpty(t, body["access_token"])
+
+		// The right secret with a code that names another deployment, or none,
+		// gets the answer of a wrong secret: no deployment serves the client.
+		_, random, _ := strings.Cut(issue(t), ".")
+		for _, changed := range []string{"dep_other." + random, random} {
+			resp, body := exchange(t, changed, "s3cr3t")
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "code %q: %v", changed, body)
+			assert.Equal(t, map[string]any{"error": "invalid_client", "error_description": "client authentication failed"}, body)
+			assert.Equal(t, `Basic realm="oauth"`, resp.Header.Get("WWW-Authenticate"))
+		}
+
+		// A second deployment froze another value of the same variable. Each
+		// code is checked against its own deployment's value only.
+		f.setPrimaryVariables(t, api.UpdateVariablesRequest{
+			"SHOP_WEB_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+				Value:  api.NewStringVariableScalar("s3cr3t-2"),
+				Secret: true,
+			}),
+		})
+		deployedAgain := f.deploy(t, v1.ID)
+		require.IsType(t, &api.CreateDeploymentCreated{}, deployedAgain, helpers.MustMarshal(t, deployedAgain))
+		secondID := string(deployedAgain.(*api.CreateDeploymentCreated).ID)
+		for _, tc := range []struct {
+			deploymentID, secret string
+			wantStatus           int
+		}{
+			{deploymentID: deploymentID, secret: "s3cr3t-2", wantStatus: http.StatusUnauthorized},
+			{deploymentID: secondID, secret: "s3cr3t", wantStatus: http.StatusUnauthorized},
+			{deploymentID: deploymentID, secret: "s3cr3t", wantStatus: http.StatusOK},
+			{deploymentID: secondID, secret: "s3cr3t-2", wantStatus: http.StatusOK},
+		} {
+			resp, body := exchange(t, issueAt(t, tc.deploymentID), tc.secret)
+			assert.Equal(t, tc.wantStatus, resp.StatusCode, "deployment %s, secret %s: %v", tc.deploymentID, tc.secret, body)
+		}
 	})
 
 	moved := shopApplication(declaredClient("web", "shop-web", "SHOP_WEB_SECRET"))
@@ -240,11 +326,11 @@ func TestRegisteredApplicationClient(t *testing.T) {
 	web := created.ClientSecrets[0]
 	applications := harness.EnsureApplicationService(t)
 
-	served, err := applications.AuthenticateClient(t.Context(), f.project.ID, web.ClientID, web.Secret)
+	served, err := applications.AuthenticateClient(t.Context(), f.project.ID, "", web.ClientID, web.Secret)
 	require.NoError(t, err)
 	assert.Equal(t, created.RevisionID, served.Application.RevisionID)
 
-	_, err = applications.AuthenticateClient(t.Context(), f.project.ID, web.ClientID, "guess")
+	_, err = applications.AuthenticateClient(t.Context(), f.project.ID, "", web.ClientID, "guess")
 	assert.ErrorIs(t, err, domain.ErrApplicationClientSecretInvalid())
 	_, err = applications.ServedClient(t.Context(), f.project.ID, "unknown")
 	assert.ErrorIs(t, err, domain.ErrApplicationClientNotFound())

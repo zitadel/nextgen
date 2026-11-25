@@ -64,13 +64,14 @@ type AuthRequestStore interface {
 type answeredErrorKey struct{}
 
 // errorWriter records an error status and the body the library writes after
-// it. With page set it holds both back, so the error page can take their
-// place.
+// it. With page or token set it holds both back, so the error page can take
+// their place, or the token endpoint can answer an invalid_client as a 401.
 type errorWriter struct {
 	http.ResponseWriter
 	page bool
 	// token is set at the token endpoint, the only one that authenticates
-	// clients with HTTP Basic.
+	// clients with HTTP Basic. /revoke authenticates the client the same way
+	// and needs the challenge when it is served.
 	token  bool
 	status int
 	body   bytes.Buffer
@@ -339,7 +340,24 @@ func withErrorPages(next http.Handler) http.Handler {
 		refusal := new(oidc.Error)
 		// A body that is not the library's JSON leaves the line and the page without a description.
 		_ = json.Unmarshal(ew.body.Bytes(), refusal)
+		if ew.token && ew.status != 0 {
+			// RFC 6749 section 5.2: a client that fails to authenticate gets a
+			// 401, also when the library answers 400 invalid_client (a Basic
+			// header with broken percent-encoding).
+			if refusal.ErrorType == oidc.InvalidClient {
+				ew.status = http.StatusUnauthorized
+			}
+			// The challenge only when the client sent Basic credentials, as the
+			// RFC asks: a browser may open its own login dialog for it.
+			if _, _, basic := r.BasicAuth(); basic && ew.status == http.StatusUnauthorized {
+				w.Header().Set("WWW-Authenticate", `Basic realm="oauth"`)
+			}
+		}
 		logError(r.Context(), answered, ew.status, refusal)
+		if ew.token && !ew.page && ew.status != 0 {
+			w.WriteHeader(ew.status)
+			_, _ = w.Write(ew.body.Bytes())
+		}
 		if ew.page && ew.status != 0 {
 			// The token and revocation endpoints quote the request in their
 			// descriptions, so their pages get no sentence.
@@ -352,13 +370,9 @@ func withErrorPages(next http.Handler) http.Handler {
 }
 
 func (w *errorWriter) WriteHeader(status int) {
-	// RFC 6749 §5.2: a 401 names the scheme the client authenticates with.
-	if status == http.StatusUnauthorized && w.token {
-		w.Header().Set("WWW-Authenticate", `Basic realm="oauth"`)
-	}
 	if status >= http.StatusBadRequest {
 		w.status = status
-		if w.page {
+		if w.page || w.token {
 			return
 		}
 	}
@@ -368,7 +382,7 @@ func (w *errorWriter) WriteHeader(status int) {
 func (w *errorWriter) Write(b []byte) (int, error) {
 	if w.status != 0 {
 		w.body.Write(b)
-		if w.page {
+		if w.page || w.token {
 			return len(b), nil
 		}
 	}

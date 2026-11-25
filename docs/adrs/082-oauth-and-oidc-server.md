@@ -43,8 +43,11 @@
 > `code_verifier` for a request that sent no `code_challenge`, and its
 > response has no `scope` while the server grants none. §7 lists what it
 > checks before a code becomes an access token. A replayed code revokes
-> nothing, and an access token never outlives its session
-> (zitadel/nextgen#2796).
+> nothing, and an access token never outlives its session. A client that
+> fails to authenticate gets `401 invalid_client`, with the Basic challenge
+> only when it sent Basic credentials. The code names the deployment that
+> served its request, so a declared client authenticates against that
+> deployment's variable (zitadel/nextgen#2796).
 
 ## TL;DR
 
@@ -373,10 +376,25 @@ The access token expires after five minutes or when the session expires,
 whichever is earlier, and `expires_in` says when. An authorization request
 that has expired gets no code.
 
-The token endpoint does not serve a declared client yet: a token request
-names no deployment, so the server cannot tell which deployment's variable
-holds the secret. Such a client is refused like an unknown one
-(zitadel/nextgen#2796).
+An authorization code is `<deployment_id>.<random>`: the ID of the
+deployment that served its authorization request, then 32 random bytes. The
+server stores the hash of the whole code, so a code with a changed prefix
+finds nothing. The prefix only names a deployment and is not a credential.
+It tells the token endpoint which deployment serves the client, because a
+token request comes from the client's backend and names no deployment
+otherwise. A registered client is checked against its stored secrets and
+ignores the prefix. A declared client is checked against the variable its
+`secret` names, as the deployment the code names froze it. A code that names
+no deployment, a deployment the project does not have, one whose release was
+revoked, or one that does not serve the client, is refused like an unknown
+client (zitadel/nextgen#2796).
+
+A client that fails to authenticate gets `401` with `invalid_client`, and
+an unknown client gets the same body as a wrong secret. The answer carries
+`WWW-Authenticate: Basic realm="oauth"` only when the request sent HTTP
+Basic credentials, as
+[RFC 6749 §5.2](https://www.rfc-editor.org/rfc/rfc6749#section-5.2) asks: a
+browser may open its own login dialog for the challenge.
 
 An unknown code, or a code sent to another project's token endpoint, is
 refused without being used up or recorded. The token endpoint does not read

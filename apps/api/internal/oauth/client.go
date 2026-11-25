@@ -19,13 +19,16 @@ import (
 type ClientResolver interface {
 	// Client finds the client for the release of deploymentID.
 	Client(ctx context.Context, projectID, deploymentID, clientID string) (domain.ApplicationClientDocument, error)
-	// AuthenticateClient finds the client for the deployment on ctx, when it
-	// is confidential and secret is its secret: one of a registered client's
-	// stored secrets, or the variable a declared client names. A public
-	// client, or a wrong or empty secret, is
+	// AuthenticateClient finds the client when it is confidential and secret
+	// is its secret: one of a registered client's stored secrets, or the
+	// variable a declared client names in the deployment that serves it. That
+	// deployment is the one on ctx, or else deploymentID, which a registered
+	// client ignores. A public client, or a wrong or empty secret, is
 	// [domain.ErrApplicationClientSecretInvalid]. A declared client with no
-	// deployment on ctx is [domain.ErrReleaseNotDeployed].
-	AuthenticateClient(ctx context.Context, projectID, clientID, secret string) (*service.ServedApplicationClient, error)
+	// deployment is [domain.ErrReleaseNotDeployed], and one whose
+	// deploymentID the project does not have is
+	// [domain.ErrDeploymentNotFound].
+	AuthenticateClient(ctx context.Context, projectID, deploymentID, clientID, secret string) (*service.ServedApplicationClient, error)
 }
 
 // client is a client as the library reads it, for one request.
