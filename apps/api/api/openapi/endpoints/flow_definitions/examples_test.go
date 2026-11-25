@@ -115,6 +115,9 @@ func TestExampleFlowDefinitions(t *testing.T) {
 func TestPresetFlowDefinitions(t *testing.T) {
 	t.Parallel()
 
+	// The presets live in the configdefaults module, which does not embed them,
+	// so they are read from disk relative to this package.
+	// TODO: embed presets/ in configdefaults and read them through it.
 	const presets = "../../../../../../packages/config/defaults/presets"
 	flows, err := filepath.Glob(filepath.Join(presets, "*", "login.json"))
 	require.NoError(t, err)
