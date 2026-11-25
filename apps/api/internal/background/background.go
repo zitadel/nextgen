@@ -6,7 +6,7 @@
 // no timer, and one whose last instance the platform stops runs a timer only
 // while an instance is up. Every task therefore says what it does in each,
 // and one that does not say fails the start wherever the server runs
-// (ADR 089).
+// (ADR 097).
 //
 // What a timer would do there, a scheduler outside the process does: it calls
 // the wake-up endpoint, and each call runs every periodic task once.
@@ -217,7 +217,7 @@ func (t Task) answered() error {
 			(answer.kind == onWakeUp && t.Once == nil) ||
 			(answer.kind == whileUp && declared.lifecycle == RequestOnly)
 		if missing {
-			return fmt.Errorf("background task %q does not say what it does where server.lifecycle is %s: set %s (ADR 089)", t.Name, declared.lifecycle, declared.field)
+			return fmt.Errorf("background task %q does not say what it does where server.lifecycle is %s: set %s (ADR 097)", t.Name, declared.lifecycle, declared.field)
 		}
 	}
 	return nil

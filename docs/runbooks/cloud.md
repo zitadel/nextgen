@@ -97,7 +97,7 @@ by it.
 A function is paused between requests. The launcher tells a deployment's
 server so with `server.lifecycle: request_only`, and nothing else: what the
 server does differently is its own
-([ADR 089](../adrs/089-server-lifecycle.md),
+([ADR 097](../adrs/097-server-lifecycle.md),
 [configuration](../quick-start/configuration.md#where-the-server-runs)).
 A setting that needs background work the server cannot do there, such as
 `NEXTGEN_SERVICE_PING_ENABLED`, fails the function's start, not its build:

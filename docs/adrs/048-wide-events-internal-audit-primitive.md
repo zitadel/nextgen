@@ -776,7 +776,7 @@ met the batch's own rows and logged it as dropped.
   flushes as soon as it holds an event, and requests in flight together
   share a write. Unset, the default, Path A is as §4 has it. Two seconds is
   the default where `server.lifecycle` is `request_only`
-  ([ADR 089](089-server-lifecycle.md)), as on the hosted cloud.
+  ([ADR 097](097-server-lifecycle.md)), as on the hosted cloud.
 - **Path A stays best-effort.** Past the wait, or when the flush gives up,
   the request ends without its event.
 - **A duplicate after a failed attempt is a written batch.** An event keeps

@@ -11,7 +11,7 @@
 > a dedicated one. See
 > [the amendment](#amendment-2026-10-27-who-starts-the-purge-and-as-which-role).
 > The request is the server's wake-up call since
-> [ADR 089](089-server-lifecycle.md) §5.
+> [ADR 097](097-server-lifecycle.md) §5.
 >
 > **Amendment (2026-10-30):** §3's shipper and §1's ascending pages list only
 > settled events, so no cursor skips an event whose transaction commits late.
@@ -437,7 +437,7 @@ while connecting to the database.
 
 **Trigger.** A scheduler outside the process can run the purge: each call
 that wakes the server runs one (`server.wake_up.secret` and `/cron/wake-up`,
-[ADR 089](089-server-lifecycle.md) §5). The purge first had a secret and a
+[ADR 097](097-server-lifecycle.md) §5). The purge first had a secret and a
 path of its own, `events.retention.trigger_secret` and
 `/cron/events-retention`, which that endpoint replaced.
 

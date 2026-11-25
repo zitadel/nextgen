@@ -445,7 +445,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// Everything the server does outside a request starts through this
 	// group, which holds each task to what it does in the server's lifecycle
-	// (ADR 089).
+	// (ADR 097).
 	tasks := background.NewGroup(cfg.Server.Lifecycle, cfg.Server.WakeUp)
 	defer tasks.Close()
 
@@ -921,7 +921,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 }
 
 // lifecycleDefaults sets the defaults that depend on server.lifecycle
-// (ADR 089). A value the configuration sets itself outranks them, as it does
+// (ADR 097). A value the configuration sets itself outranks them, as it does
 // every default.
 //
 // A paused process measures time it did not run: it wakes with its idle
@@ -1085,7 +1085,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 		)
 	}
 	// The wake-up endpoint, when a scheduler outside the process runs the
-	// server's periodic work (server.wake_up.secret, ADR 089): the
+	// server's periodic work (server.wake_up.secret, ADR 097): the
 	// operator's, not the API's, so it takes the request ID and the request
 	// line but none of the middleware a client's request passes.
 	if wakeUp != nil {

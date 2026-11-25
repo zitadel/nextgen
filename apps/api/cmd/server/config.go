@@ -219,12 +219,12 @@ type ServerConfig struct {
 	// process between requests. It turns nothing on by itself. Each
 	// background task says what it does in each (internal/background), and
 	// the settings a pause changes take their defaults from it: IdleTimeout
-	// and events.request.flush_wait (ADR 089).
+	// and events.request.flush_wait (ADR 097).
 	Lifecycle background.Lifecycle `mapstructure:"lifecycle"`
 	// WakeUp opens the endpoint a scheduler outside the process calls to run
 	// the server's periodic work: all of it where Lifecycle is request_only,
 	// and what an idle deployment would otherwise leave until its next
-	// request where it is scale_to_zero (ADR 089).
+	// request where it is scale_to_zero (ADR 097).
 	WakeUp background.WakeUpConfig `mapstructure:"wake_up"`
 }
 
