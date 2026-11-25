@@ -1,3 +1,4 @@
+import { WizardInternalError } from "./errors";
 import type { EndStep, WizardStep } from "./step";
 
 /**
@@ -106,18 +107,26 @@ type Runner<Initial extends object, State extends object, Result> = (
 ) => Promise<Progress<State, Result>>;
 
 /**
- * Refuses a wizard that is put together wrongly, such as two steps of one name.
+ * Takes back what ran, then throws the error that stopped the run. When the
+ * undo itself fails, the error that stopped the run is kept as the cause of the
+ * failure thrown in its place, so it is never lost.
+ *
+ * @param error - What stopped the run.
+ * @param undo - Takes back what ran.
+ * @returns Never: it always throws.
+ * @throws The error that stopped the run, or a {@link WizardInternalError} with
+ *   it as the cause when the undo failed.
  */
-export class WizardDefinitionError extends Error {
-  /**
-   * Describe how the wizard is wrong.
-   *
-   * @param message - What is wrong.
-   */
-  constructor(message: string) {
-    super(message);
-    this.name = "WizardDefinitionError";
+async function undoneThrowing(error: unknown, undo: Undo): Promise<never> {
+  try {
+    await undo();
+  } catch (failure) {
+    throw new WizardInternalError("A step could not be undone after the run failed", {
+      cause: error,
+      details: { undoFailure: failure instanceof Error ? failure.message : String(failure) },
+    });
   }
+  throw error;
 }
 
 /**
@@ -218,7 +227,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
    * @param rest - The observer, if any; or, only when the step needs what is
    *   not known, the argument that names what is missing.
    * @returns The wizard with the step added, knowing what it adds.
-   * @throws {@link WizardDefinitionError} When a step already has its name.
+   * @throws {@link WizardInternalError} When a step already has its name.
    */
   step<Out extends object, Needs extends object>(
     step: WizardStep<string, Out, Needs>,
@@ -259,16 +268,14 @@ export class Wizard<Initial extends object, State extends object, Result> {
       };
       const finished = await attempt().catch(async (error: unknown) => {
         told(() => options.watch?.failed?.(step.key, error));
-        await before.undo();
-        throw error;
+        return undoneThrowing(error, before.undo);
       });
       if (finished.kind === "continue") {
         told(() => options.watch?.finished?.(step.key, finished.state));
         try {
           observe?.(finished.state);
         } catch (error) {
-          await finished.undo();
-          throw error;
+          return undoneThrowing(error, finished.undo);
         }
       }
       return finished;
@@ -282,7 +289,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
    * @param step - The step.
    * @param _unmet - Present only when the step needs what is not known.
    * @returns The wizard with the step added.
-   * @throws {@link WizardDefinitionError} When a step already has its name.
+   * @throws {@link WizardInternalError} When a step already has its name.
    */
   endWhen<Needs extends object>(
     step: EndStep<string, Result, Needs>,
@@ -311,8 +318,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
       };
       return attempt().catch(async (error: unknown) => {
         told(() => options.watch?.failed?.(step.key, error));
-        await before.undo();
-        throw error;
+        return undoneThrowing(error, before.undo);
       });
     };
     return new Wizard(this.name, keys, runner);
@@ -362,8 +368,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
 
         return answered;
       } catch (error) {
-        await progress.undo();
-        throw error;
+        return undoneThrowing(error, progress.undo);
       }
     });
   }
@@ -373,11 +378,11 @@ export class Wizard<Initial extends object, State extends object, Result> {
    *
    * @param key - The name.
    * @returns The names taken, with this one.
-   * @throws {@link WizardDefinitionError} When the name is taken.
+   * @throws {@link WizardInternalError} When the name is taken.
    */
   private claim(key: string): ReadonlySet<string> {
     if (this.keys.has(key)) {
-      throw new WizardDefinitionError(`The wizard "${this.name}" already has a step "${key}"`);
+      throw new WizardInternalError(`The wizard "${this.name}" already has a step "${key}"`);
     }
     return new Set([...this.keys, key]);
   }
