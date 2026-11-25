@@ -4,7 +4,7 @@ import { text } from "node:stream/consumers";
 
 import { Flags, type Command, type Interfaces, Parser } from "@oclif/core";
 
-import { errorMessage, ZitadelError } from "@/lib/errors";
+import { errorMessage, isLibError, ZitadelError } from "@/lib/errors";
 import { parseJsonObject, wordOf } from "@/lib/json";
 import { kebab } from "@/lib/names";
 import { environmentFlags } from "./environment-flags";
@@ -360,7 +360,7 @@ export class Input {
     try {
       await this.check(await Input.textOf(source));
     } catch (error) {
-      if (error instanceof ZitadelError) {
+      if (error instanceof ZitadelError || isLibError(error)) {
         throw error;
       }
       throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
