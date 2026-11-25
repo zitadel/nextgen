@@ -34,6 +34,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/jobs"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
@@ -79,7 +80,7 @@ func TestBuildHTTPMuxTracesTheAuditEventUnderTheServerSpan(t *testing.T) {
 			require.NoError(t, err)
 			events := audit.NewRequestBuffer(audit.BatchInserter(func(context.Context, []*domain.Event) error { return nil }), audit.RequestBufferConfig{})
 			t.Cleanup(events.Close)
-			mux, err := buildHTTPMux(ServerConfig{}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, events, nil, nil)
+			mux, err := buildHTTPMux(ServerConfig{}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, events, nil, nil, nil)
 			require.NoError(t, err)
 			handler := withTracing(instrumentation.TraceConfig{}, propagation.TraceContext{}, muxTracerProvider, mux)
 
@@ -123,8 +124,9 @@ func TestBuildHTTPMuxGivesEveryRequestOneServerSpan(t *testing.T) {
 		apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), nil, 0)...)
 	require.NoError(t, err)
 	retention := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
+	jobsDrain := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
 	mux, err := buildHTTPMux(ServerConfig{}, idgen.NewULID(), apiServers, idpCallbackEcho(),
-		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil), nil, retention, nil)
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil), nil, retention, jobsDrain, nil)
 	require.NoError(t, err)
 	handler := withTracing(instrumentation.TraceConfig{TrustRemoteSpans: true}, propagation.TraceContext{}, muxTracerProvider, mux)
 
@@ -157,6 +159,7 @@ func TestBuildHTTPMuxGivesEveryRequestOneServerSpan(t *testing.T) {
 		{name: "the console's runtime document", method: http.MethodGet, path: consoleRuntimePath, wantStatus: http.StatusOK},
 		{name: "a policy report", method: http.MethodPost, path: securityheaders.ReportPath, wantStatus: http.StatusNoContent},
 		{name: "the retention trigger", method: http.MethodPost, path: audit.RetentionTriggerPath, wantStatus: http.StatusAccepted},
+		{name: "the jobs trigger", method: http.MethodPost, path: jobs.TriggerPath, wantStatus: http.StatusAccepted},
 		{name: "the IdP callback", method: http.MethodGet, path: api.IDPCallbackPath("google"), wantStatus: http.StatusTeapot},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -213,7 +216,7 @@ func TestBuildHTTPMuxLogsARequestUnderItsServerSpan(t *testing.T) {
 		apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), nil, 0)...)
 	require.NoError(t, err)
 	mux, err := buildHTTPMux(ServerConfig{}, idgen.NewULID(), apiServers, idpCallbackEcho(),
-		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil), nil, nil, nil)
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil), nil, nil, nil, nil)
 	require.NoError(t, err)
 	handler := withTracing(instrumentation.TraceConfig{}, propagation.TraceContext{}, muxTracerProvider, mux)
 

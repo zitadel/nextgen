@@ -156,6 +156,7 @@ func (c Config) Validate() error {
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
 		c.Events.Retention.Validate,
+		c.Jobs.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err

@@ -19,6 +19,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/jobs"
 	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
@@ -89,7 +90,7 @@ func newTestMux(t *testing.T, cfg ServerConfig) http.Handler {
 	t.Helper()
 	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil, nil, nil)
+		nil, nil, nil, nil)
 	require.NoError(t, err)
 	return mux
 }
@@ -208,7 +209,7 @@ func TestBuildHTTPMuxMountsTheOAuthServer(t *testing.T) {
 	handlers := oauth.New(oauth.Config{PublicBase: publicBase, Admission: denyAll{}, Settings: notEnabled{}})
 	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil, nil, handlers)
+		nil, nil, nil, handlers)
 	require.NoError(t, err)
 
 	for _, tt := range []struct {
@@ -279,7 +280,7 @@ func TestBuildHTTPMuxHandsTheCallbackItsConnectionSlug(t *testing.T) {
 		recorder := &slugRecorder{}
 		mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), api.NewIDPCallbackHandler(recorder),
 			staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-			nil, nil, nil)
+			nil, nil, nil, nil)
 		require.NoError(t, err)
 
 		rec := get(t, mux, path+"?state=s&code=c")
@@ -315,7 +316,7 @@ func TestBuildHTTPMuxMountsTheRetentionTriggerOnlyWhenGiven(t *testing.T) {
 	})
 	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
-		nil, trigger, nil)
+		nil, trigger, nil, nil)
 	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodGet, audit.RetentionTriggerPath, nil)
@@ -328,6 +329,30 @@ func TestBuildHTTPMuxMountsTheRetentionTriggerOnlyWhenGiven(t *testing.T) {
 	assert.Equal(t, "root", get(t, mux, audit.RetentionTriggerPath+"/x").Header().Get("X-Test-Handler"))
 
 	assert.Equal(t, "root", get(t, newTestMux(t, cfg), audit.RetentionTriggerPath).Header().Get("X-Test-Handler"),
+		"without a trigger the path falls through to the API's root alias")
+}
+
+// The jobs Cron drain is a mount only when jobs.trigger_secret is set;
+// otherwise its path falls through to the API like retention's.
+func TestBuildHTTPMuxMountsTheJobsTriggerOnlyWhenGiven(t *testing.T) {
+	cfg := ServerConfig{RequestIDHeader: "x-vercel-id"}
+	trigger := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Test-Handler", "jobs-trigger")
+	})
+	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
+		nil, nil, trigger, nil)
+	require.NoError(t, err)
+
+	r := httptest.NewRequest(http.MethodGet, jobs.TriggerPath, nil)
+	r.Header.Set("x-vercel-id", "fra1::2vxlh-1792820352212-3ce3eb4ad630")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, r)
+	assert.Equal(t, "jobs-trigger", rec.Header().Get("X-Test-Handler"))
+	assert.Equal(t, "2vxlh-1792820352212-3ce3eb4ad630", rec.Header().Get("X-Request-Id"))
+	assert.Equal(t, "root", get(t, mux, jobs.TriggerPath+"/x").Header().Get("X-Test-Handler"))
+
+	assert.Equal(t, "root", get(t, newTestMux(t, cfg), jobs.TriggerPath).Header().Get("X-Test-Handler"),
 		"without a trigger the path falls through to the API's root alias")
 }
 
@@ -347,7 +372,7 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 		}),
 		idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil, nil, nil)
+		nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	for _, path := range []string{"/api/v1/teams", "/teams", "/livez"} {
@@ -378,7 +403,7 @@ func TestBuildHTTPMuxHandsTheAPITheLoopbackSessionCookie(t *testing.T) {
 		}),
 		idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil, nil, nil)
+		nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	// Under the prefix and at the root alias (ADR 077).

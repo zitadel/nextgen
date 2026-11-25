@@ -542,11 +542,11 @@ func parseServing(env string) (*serving, error) {
 		s.adminID = admin.Header.ID
 	}
 
-	// Without it a deployment would never purge: the cron job is the only
-	// caller of the purge, and the server refuses a call without the secret.
+	// Without it a deployment would never purge or drain jobs: the cron jobs
+	// are the only callers, and the server refuses a call without the secret.
 	s.cronSecret = os.Getenv("CRON_SECRET")
 	if s.cronSecret == "" && deployed(env) {
-		return nil, fmt.Errorf("CRON_SECRET must be set for a %s deployment: the cron job that purges expired audit events authenticates with it", env)
+		return nil, fmt.Errorf("CRON_SECRET must be set for a %s deployment: the cron jobs that purge expired audit events and drain due background jobs authenticate with it", env)
 	}
 	if s.cronSecret != "" {
 		if err := audit.CheckTriggerSecret(s.cronSecret); err != nil {
@@ -869,6 +869,7 @@ func renderConfig(s *serving) ([]byte, error) {
 	}
 	if s.cronSecret != "" {
 		config["events"] = map[string]any{"retention": map[string]any{"trigger_secret": s.cronSecret}}
+		config["jobs"] = map[string]any{"trigger_secret": s.cronSecret}
 	}
 	return yaml.Marshal(config)
 }
