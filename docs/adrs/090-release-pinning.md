@@ -10,8 +10,16 @@
 
 An app's code and its sign-in configuration are deployed separately. Zitadel
 serves each sign-in the newest release deployed to the app's origin. So the
-two can fall out of step: when the app is rolled back on its host, or when a
-browser tab still runs an older build of the app.
+two can fall out of step, a problem known as version skew: when the app is
+rolled back on its host, or when a browser tab still runs an older build of
+the app. For example, a new release adds a required field to the sign-up step,
+and an older build of the app does not know how to show it.
+
+Hosts solve the same problem for the app's own backend. Vercel's
+[skew protection](https://vercel.com/docs/skew-protection) keeps an older
+client talking to the deployment it was built with, by sending that
+deployment's ID with each request. Release pinning does the same for the
+sign-in configuration, which the host does not deploy.
 
 A rollback, for example:
 
@@ -82,6 +90,9 @@ The header is not a secret. Anyone can send it with any release ID.
 - So after a deploy that tightens security, the older releases must be
   revoked. Revoking works one release at a time, and a revoked release can no
   longer be deployed or rolled back to.
+- Hosts face the same risk: Vercel keeps an older deployment reachable only
+  for a maximum age, 12 hours by default, and a deployment with a bug stays
+  reachable until it is deleted. Release pinning has no such limit yet.
 
 ## Future possibilities
 
@@ -92,7 +103,9 @@ The header is not a secret. Anyone can send it with any release ID.
   choosing one per visitor.
 - **A pinnable flag.** Only releases marked as pinnable could be pinned. This
   limits what a forged header can reach, and can be undone, unlike revoking.
-- **A limit on how far back a pin reaches**, such as the last few deployments
-  to the origin.
+- **A limit on how far back a pin reaches**, such as a maximum age as Vercel
+  has, or the last few deployments to the origin. Past its limit Vercel serves
+  the newest deployment; whether a pin past the limit gets the newest release
+  or an error is open.
 - **Pinning by content.** A digest of the release's content, instead of its
   ID, would let the same build work across projects.
