@@ -3,6 +3,7 @@ package flowengine_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -149,6 +150,8 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
 	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
 	authAttemptService := flowenginemock.NewMockAuthAttemptService(mock)
+	// Every submission first asks whether its attempt is still usable.
+	authAttemptService.EXPECT().Usable(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	createUser := flowenginemock.NewMockOnSuccessHandler(mock)
 	ssoProviders := flowenginemock.NewMockSSOProviderResolver(mock)
 	ssoIdentities := flowenginemock.NewMockSSOIdentityService(mock)
@@ -673,6 +676,46 @@ func TestFlowStateMachine_Process_UndeclaredActionRefusedBeforeIdentifierLookup(
 				Fields: map[string]any{"email": "alice@example.com"},
 			})
 			require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
+		})
+	}
+}
+
+// A submission to a flow whose attempt expired or was handed off restarts
+// the flow before the step runs. The definition is read first, and a failed
+// read of the attempt is the submission's error.
+func TestFlowStateMachine_Process_DeadAttemptRestartsFlow(t *testing.T) {
+	t.Parallel()
+	readFailed := errors.New("read failed")
+	for _, tc := range []struct {
+		name    string
+		usable  bool
+		readErr error
+		want    error
+	}{
+		{name: "dead attempt", want: domain.ErrFlowRestartRequired()},
+		{name: "read fails", readErr: readFailed, want: readFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			def := signupDefinition()
+			defs := &definitionsByID{defs: map[string]*domain.FlowDefinition{def.ID: def}}
+			attempts := flowenginemock.NewMockAuthAttemptService(gomock.NewController(t))
+			attempts.EXPECT().Usable(gomock.Any(), testProjectID, "att-1").DoAndReturn(func(context.Context, string, string) (bool, error) {
+				assert.Equal(t, []string{def.ID}, defs.asked, "the definition is read before the attempt")
+				return tc.usable, tc.readErr
+			})
+			// No other expectation: the controller fails the test on any call
+			// the step would make.
+			sm := flowengine.New(flowengine.Deps{AuthAttempts: attempts})
+
+			state := &flowengine.State{
+				ID:            "flow-1",
+				ProjectID:     testProjectID,
+				Progress:      flowengine.Progress{DefinitionID: def.ID, CurrentStep: "credentials"},
+				AuthAttemptID: "att-1",
+			}
+			_, err := sm.Process(t.Context(), defs, state, flowengine.SubmitInput{Action: flowengine.ActionSubmit})
+			require.ErrorIs(t, err, tc.want)
 		})
 	}
 }

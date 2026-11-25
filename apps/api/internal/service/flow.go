@@ -241,20 +241,6 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res fl
 	}
 	defs := s.flowDefinitions(req.State.ProjectID)
 	// todo: gracefully handle when the definition was updated (status, steps, etc.,) since the flow started
-	// Loaded before the attempt is read; Process reads the loaded one.
-	if _, err := flowengine.ActiveDefinition(ctx, defs, req.State); err != nil {
-		return flowengine.StepResult{}, err
-	}
-	// A dead attempt fails every submission that reaches it, so the flow
-	// restarts here, as a render does. A handoff racing this read still ends
-	// in att.already_handed_off.
-	attempt, err := s.v2Pool.Statements().GetAuthAttemptByID(ctx, req.State.ProjectID, req.State.AuthAttemptID)
-	if err != nil {
-		return flowengine.StepResult{}, fmt.Errorf("flow service: read auth attempt: %w", err)
-	}
-	if attempt.IsExpired() || attempt.IsHandedOff() {
-		return flowengine.StepResult{}, domain.ErrFlowRestartRequired()
-	}
 	in := flowengine.SubmitInput{
 		Action:            req.Action,
 		Fields:            req.Fields,

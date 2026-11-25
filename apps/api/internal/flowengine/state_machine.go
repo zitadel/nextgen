@@ -466,6 +466,16 @@ func (r *Runtime) Process(ctx context.Context, defs Definitions, state *State, i
 	if err != nil {
 		return StepResult{}, err
 	}
+	// A dead attempt fails every submission that reaches it, so the flow
+	// restarts here, as a render does. A handoff racing this read still ends
+	// in att.already_handed_off.
+	usable, err := r.authAttempts.Usable(ctx, state.ProjectID, state.AuthAttemptID)
+	if err != nil {
+		return StepResult{}, err
+	}
+	if !usable {
+		return StepResult{}, domain.ErrFlowRestartRequired()
+	}
 
 	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {

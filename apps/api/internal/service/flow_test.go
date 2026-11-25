@@ -420,15 +420,13 @@ func stubGetFlowDefinition(t *testing.T, defs ...*domain.FlowDefinition) *servic
 	return service.NewPool(pool)
 }
 
-// stubSubmitDB serves the two reads Submit makes before Process: the
-// definition, then the flow's auth attempt.
-func stubSubmitDB(t *testing.T, def *domain.FlowDefinition, attempt *domain.AuthAttempt) *service.DB {
+// stubSubmitDB serves the one read a submission makes: the definition, once.
+func stubSubmitDB(t *testing.T, def *domain.FlowDefinition) *service.DB {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), def.ProjectID, def.ID).Return(def, nil).Times(1)
-	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), attempt.ProjectID, attempt.ID).Return(attempt, nil).Times(1)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }
@@ -634,7 +632,7 @@ func TestFlowService_Start_PropagatesStateMachineError(t *testing.T) {
 
 func TestFlowService_Submit_RefetchesDefinitionAndCallsProcess(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att_1"})
+	repo := stubSubmitDB(t, def)
 	processedState := &flowengine.State{ID: "flow_1"}
 	sm := &fakeStateMachine{processResult: flowengine.StepResult{State: processedState, Step: &flowengine.Step{Name: "next"}}}
 
@@ -658,7 +656,7 @@ func TestFlowService_Submit_RefetchesDefinitionAndCallsProcess(t *testing.T) {
 
 func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att_1"})
+	repo := stubSubmitDB(t, def)
 	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
 	sm := &fakeStateMachine{processResult: flowengine.StepResult{
 		State:                 &flowengine.State{ID: "flow_1"},
@@ -685,7 +683,7 @@ func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
 
 func TestFlowService_Submit_PropagatesSSOReturnAndBindingNonce(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att_1"})
+	repo := stubSubmitDB(t, def)
 	sm := &fakeStateMachine{processResult: flowengine.StepResult{
 		State:           &flowengine.State{ID: "flow_1"},
 		Step:            &flowengine.Step{Name: flowengine.StepNameSSORedirect},
@@ -710,46 +708,6 @@ func TestFlowService_Submit_PropagatesSSOReturnAndBindingNonce(t *testing.T) {
 	assert.Equal(t, &flowengine.SSOProviderRef{ID: "google"}, sm.gotSubmitInput.SSOProvider)
 	assert.Equal(t, ssoReturn, sm.gotSubmitInput.SSOReturn)
 	assert.Equal(t, "nonce-1", res.SSOBindingNonce)
-}
-
-func TestFlowService_Submit_DeadAttemptRestartsFlow(t *testing.T) {
-	tests := []struct {
-		name    string
-		attempt *domain.AuthAttempt
-	}{
-		{
-			name: "expired",
-			attempt: &domain.AuthAttempt{
-				ProjectID:  "proj",
-				ID:         "att_1",
-				CreatedAt:  time.Now().Add(-time.Hour),
-				TimeToLive: new(time.Minute),
-			},
-		},
-		{
-			name:    "handed off",
-			attempt: &domain.AuthAttempt{ProjectID: "proj", ID: "att_1", HandoffToken: &domain.HandoffToken{}},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-			sm := &fakeStateMachine{}
-			svc := service.NewFlowService(stubSubmitDB(t, def, tt.attempt), sm, domain.BuiltinSchemaBases{}, nil)
-
-			_, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
-				State: &flowengine.State{
-					ID:            "flow_1",
-					ProjectID:     def.ProjectID,
-					Progress:      flowengine.Progress{DefinitionID: def.ID},
-					AuthAttemptID: "att_1",
-				},
-				Action: "submit",
-			})
-			require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
-			assert.Nil(t, sm.gotProcessDef, "Process ran on a dead attempt")
-		})
-	}
 }
 
 func TestFlowService_GetStep_CallsRender(t *testing.T) {
@@ -893,7 +851,6 @@ func TestFlowService_Submit_GateReadsTheActiveDefinition(t *testing.T) {
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), ran.ProjectID, ran.ID).Return(ran, nil).Times(1)
-	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ran.ProjectID, "att_1").Return(&domain.AuthAttempt{ProjectID: ran.ProjectID, ID: "att_1"}, nil).Times(1)
 	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), active.ProjectID, active.ID).Return(active, nil).Times(1)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 
@@ -916,7 +873,7 @@ func TestFlowService_SignupIssuanceCannotDiscardTransition(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, started.Step.SignupRequired)
 	require.Nil(t, started.Step.SignupChallenge)
-	svc = service.NewFlowService(stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "attempt", CreatedAt: time.Now(), TimeToLive: new(time.Hour)}), sm, domain.BuiltinSchemaBases{}, protection)
+	svc = service.NewFlowService(stubSubmitDB(t, def), sm, domain.BuiltinSchemaBases{}, protection)
 	submitted, err := svc.Submit(t.Context(), service.SubmitFlowRequest{State: state, Action: "submit"})
 	require.NoError(t, err)
 	require.Same(t, state, submitted.State)

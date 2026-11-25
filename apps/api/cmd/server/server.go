@@ -438,7 +438,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		return err
 	}
 	signupProtection := service.NewSignupProtection(serviceDBPool, keyService, userCreatePolicy)
-	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore, signupProtection)
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, serviceDBPool, schemaStore, signupProtection)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
 		passwordPolicy,

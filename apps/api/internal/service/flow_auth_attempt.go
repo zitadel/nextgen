@@ -15,6 +15,8 @@ import (
 // cycle so the state machine never deals with challenge IDs.
 type FlowAuthAttemptAdapter struct {
 	attempts AuthAttemptService
+	// db backs the reads that only inspect the attempt.
+	db StatementPool
 	// schemaStore backs the create-user action a provisional passkey
 	// registration applies inside its verify transaction.
 	schemaStore domain.JSONSchemaStore
@@ -23,8 +25,8 @@ type FlowAuthAttemptAdapter struct {
 	protection SignupProtection
 }
 
-func NewFlowAuthAttemptAdapter(attempts AuthAttemptService, schemaStore domain.JSONSchemaStore, protection SignupProtection) *FlowAuthAttemptAdapter {
-	return &FlowAuthAttemptAdapter{attempts: attempts, schemaStore: schemaStore, protection: protection}
+func NewFlowAuthAttemptAdapter(attempts AuthAttemptService, db StatementPool, schemaStore domain.JSONSchemaStore, protection SignupProtection) *FlowAuthAttemptAdapter {
+	return &FlowAuthAttemptAdapter{attempts: attempts, db: db, schemaStore: schemaStore, protection: protection}
 }
 
 var _ flowengine.AuthAttemptService = (*FlowAuthAttemptAdapter)(nil)
@@ -40,6 +42,14 @@ func (a *FlowAuthAttemptAdapter) Start(ctx context.Context, in flowengine.Create
 		return "", err
 	}
 	return attempt.ID, nil
+}
+
+func (a *FlowAuthAttemptAdapter) Usable(ctx context.Context, projectID, attemptID string) (bool, error) {
+	attempt, err := a.db.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
+	if err != nil {
+		return false, fmt.Errorf("flow service: read auth attempt: %w", err)
+	}
+	return !attempt.IsExpired() && !attempt.IsHandedOff(), nil
 }
 
 func (a *FlowAuthAttemptAdapter) SubmitIdentifier(ctx context.Context, in flowengine.SubmitIdentifierInput) (string, error) {

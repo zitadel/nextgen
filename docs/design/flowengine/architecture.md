@@ -110,6 +110,7 @@ The state machine. Three entry points (`Start`, `Process`, `Render`) and one pri
 
 ```
 Process(in):
+  ├── restart the flow if its auth attempt expired or was handed off
   ├── find current step in definition
   ├── resolve fields via FlowFieldResolver
   ├── prefillFromCollected: hydrate resolved fields from state.CollectedData

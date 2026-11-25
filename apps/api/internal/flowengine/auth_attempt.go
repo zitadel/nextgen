@@ -21,6 +21,9 @@ import (
 // [State.PendingChallenge].
 type AuthAttemptService interface {
 	Start(ctx context.Context, in CreateAttemptInput) (attemptID string, err error)
+	// Usable reports whether the attempt still takes submissions: it has
+	// neither expired nor been handed off.
+	Usable(ctx context.Context, projectID, attemptID string) (bool, error)
 	SubmitIdentifier(ctx context.Context, in SubmitIdentifierInput) (userID string, err error)
 	SubmitPassword(ctx context.Context, in SubmitPasswordInput) error
 	// IssueChallenge mints a challenge of the params' check type on the

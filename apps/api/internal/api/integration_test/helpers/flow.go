@@ -51,7 +51,7 @@ func (h *Harness) EnsureFlowStateMachine(t testing.TB) *flowengine.Runtime {
 
 	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
-		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t), h.newSignupProtection(t))
+		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureServiceDB(t), h.EnsureSchemaStore(t), h.newSignupProtection(t))
 		h.flowStateMachine.value = flowengine.New(flowengine.Deps{
 			Schemas:       h.EnsureSchemaResolver(t),
 			SchemaStore:   h.EnsureSchemaStore(t),

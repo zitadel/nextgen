@@ -299,6 +299,45 @@ func (c *MockAuthAttemptServiceSubmitPasswordCall) DoAndReturn(f func(context.Co
 	return c
 }
 
+// Usable mocks base method.
+func (m *MockAuthAttemptService) Usable(ctx context.Context, projectID, attemptID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Usable", ctx, projectID, attemptID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Usable indicates an expected call of Usable.
+func (mr *MockAuthAttemptServiceMockRecorder) Usable(ctx, projectID, attemptID any) *MockAuthAttemptServiceUsableCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Usable", reflect.TypeOf((*MockAuthAttemptService)(nil).Usable), ctx, projectID, attemptID)
+	return &MockAuthAttemptServiceUsableCall{Call: call}
+}
+
+// MockAuthAttemptServiceUsableCall wrap *gomock.Call
+type MockAuthAttemptServiceUsableCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthAttemptServiceUsableCall) Return(arg0 bool, arg1 error) *MockAuthAttemptServiceUsableCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthAttemptServiceUsableCall) Do(f func(context.Context, string, string) (bool, error)) *MockAuthAttemptServiceUsableCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthAttemptServiceUsableCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockAuthAttemptServiceUsableCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // VerifyChallenge mocks base method.
 func (m *MockAuthAttemptService) VerifyChallenge(ctx context.Context, in flowengine.VerifyChallengeInput) (string, error) {
 	m.ctrl.T.Helper()

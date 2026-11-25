@@ -302,12 +302,12 @@ func TestFlowService_metrics(t *testing.T) {
 		}, metrics.FlowStart, metrics.FlowFailed},
 		{"submit completes", func(t *testing.T) error {
 			sm := &fakeStateMachine{processResult: flowengine.StepResult{State: state, Step: completeStep}}
-			_, err := service.NewFlowService(stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att-1"}), sm, domain.BuiltinSchemaBases{}, nil).Submit(t.Context(), service.SubmitFlowRequest{State: state})
+			_, err := service.NewFlowService(stubSubmitDB(t, def), sm, domain.BuiltinSchemaBases{}, nil).Submit(t.Context(), service.SubmitFlowRequest{State: state})
 			return err
 		}, metrics.FlowSubmit, metrics.FlowComplete},
 		{"submit fails", func(t *testing.T) error {
 			sm := &fakeStateMachine{processErr: domain.ErrFlowIntegrity()}
-			_, err := service.NewFlowService(stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att-1"}), sm, domain.BuiltinSchemaBases{}, nil).Submit(t.Context(), service.SubmitFlowRequest{State: state})
+			_, err := service.NewFlowService(stubSubmitDB(t, def), sm, domain.BuiltinSchemaBases{}, nil).Submit(t.Context(), service.SubmitFlowRequest{State: state})
 			return err
 		}, metrics.FlowSubmit, metrics.FlowFailed},
 		{"render a step", func(t *testing.T) error {
