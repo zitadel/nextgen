@@ -116,8 +116,6 @@ export async function publishedIds(
     if (isErrno(error, "ENOENT")) {
       return new Map();
     }
-    throw new SyncStateMalformedError(STATE_PATH, errorMessage(error), {
-      cause: error,
-    });
+    throw new SyncStateMalformedError(`Cannot read ${STATE_PATH}: ${errorMessage(error)}`, error);
   }
 }

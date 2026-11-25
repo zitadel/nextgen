@@ -169,9 +169,7 @@ describe("publishedIds", () => {
       expect(error).toBeInstanceOf(SyncStateMalformedError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        details: {
-          file: ".zitadel/state.json",
-        },
+        message: expect.stringContaining("Cannot read .zitadel/state.json: "),
       });
     },
   );

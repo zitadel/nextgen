@@ -1,3 +1,4 @@
+import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
@@ -9,38 +10,7 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
  * operating system refusing to read the file, is not one of these: it bubbles
  * as it was thrown.
  */
-export abstract class SyncError extends Error {
-  /** The kind of failure, which the boundary reports it as. */
-  abstract readonly category: ErrorCategory;
-
-  /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  abstract readonly retryable: boolean;
-
-  /** The stable product code the failure is reported with. */
-  abstract readonly code: ZitadelErrorCode;
-
-  /** What to do about it, for whoever reads the failure; none when there is nothing to add. */
-  readonly hint?: string | undefined;
-
-  /** Structured facts about the failure, for a `--json` reader. */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * Make a sync failure.
-   *
-   * @param message - What went wrong.
-   * @param options - The error that caused this one, if any.
-   */
-  constructor(
-    message: string,
-    options: {
-      readonly cause?: unknown;
-    } = {},
-  ) {
-    super(message, options);
-    this.name = new.target.name;
-  }
-}
+export abstract class SyncError extends ZitadelLibError {}
 
 /**
  * The state file is there but does not read as what it should be: it is not
@@ -50,48 +20,4 @@ export class SyncStateMalformedError extends SyncError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * What to do about it.
-   */
-  override readonly hint: string =
-    "The file records which platform resource each local file was synced as. " +
-    "Fix or remove it, then run this command again.";
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  override readonly details: Readonly<Record<string, unknown>>;
-
-  /**
-   * The state file's path, relative to the project.
-   */
-  readonly file: string;
-
-  /**
-   * What is wrong with it.
-   */
-  readonly problem: string;
-
-  /**
-   * Make the failure.
-   *
-   * @param file - The state file's path, relative to the project.
-   * @param problem - What is wrong with it.
-   * @param options - The cause.
-   */
-  constructor(
-    file: string,
-    problem: string,
-    options: {
-      readonly cause?: unknown;
-    } = {},
-  ) {
-    super(`Cannot read ${file}: ${problem}`, options);
-    this.details = {
-      file,
-    };
-    this.file = file;
-    this.problem = problem;
-  }
 }
