@@ -12,6 +12,8 @@ pnpm add @zitadel/sdk-solid@latest
 
 Peer dependencies: `solid-js >=1.6`.
 
+Solid 1 and Solid 2 both work from the one import. The package ships its components as uncompiled JSX under the `solid` export condition, which `vite-plugin-solid` (Solid 1) and `@solidjs/vite-plugin` (Solid 2) both set, so your own build compiles them for the Solid you installed. Bundlers that don't set the condition get a prebuilt Solid 1 build.
+
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
 ## Usage
