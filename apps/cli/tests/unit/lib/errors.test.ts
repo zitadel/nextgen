@@ -15,7 +15,6 @@ import {
   toZitadelError,
 } from "@/lib/errors";
 import {
-  ZitadelConfigFileReadFailedError,
   ZitadelConfigFileUnreadableError,
   ZitadelConfigError,
   ZitadelConfigResourceClashError,
@@ -133,11 +132,6 @@ describe("toZitadelError", () => {
       "a file the OS would not let it touch",
       new ZitadelConfigFileUnreadableError("x.json cannot be read (EPERM)"),
       "E_AUTH",
-    ],
-    [
-      "a file it could not read for any other errno",
-      new ZitadelConfigFileReadFailedError("x.json cannot be read (EIO)"),
-      "E_VALIDATION",
     ],
   ])("maps %s to %s", (_name, err, code) => {
     expect(toZitadelError(err).code).toBe(code);

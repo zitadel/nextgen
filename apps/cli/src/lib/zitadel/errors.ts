@@ -8,7 +8,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
 /**
  * What a configuration failure carries beyond its message.
  */
-export type ZitadelConfigErrorOptions = {
+export type ConfigErrorOptions = {
   /**
    * What to do about it.
    */
@@ -53,7 +53,7 @@ export class ZitadelConfigError extends Error {
    * @param message - What went wrong.
    * @param options - What to do about it, and the facts behind it.
    */
-  constructor(message: string, options: ZitadelConfigErrorOptions = {}) {
+  constructor(message: string, options: ConfigErrorOptions = {}) {
     super(message);
     this.name = new.target.name;
     this.hint = options.hint;
@@ -119,15 +119,6 @@ export class ZitadelConfigFileBrokenError extends ZitadelConfigError {
     );
     this.problems = problems;
   }
-}
-
-/**
- * An edit that cannot be made without discarding something written by hand.
- */
-export class ZitadelConfigEditRefusedError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /**
@@ -612,9 +603,18 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
     const issues = input.issues.map((item): JsonObject => {
       const issue = item.issue;
       if (issue.step === undefined) {
-        return { path: item.path, rule: issue.rule, message: issue.message };
+        return {
+          path: item.path,
+          rule: issue.rule,
+          message: issue.message,
+        };
       }
-      return { path: item.path, rule: issue.rule, message: issue.message, step: issue.step };
+      return {
+        path: item.path,
+        rule: issue.rule,
+        message: issue.message,
+        step: issue.step,
+      };
     });
     super([input.heading, ...listed].join("\n"), {
       hint: input.hint,
@@ -698,6 +698,15 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
 }
 
 /**
+ * A change that disables a sign-in method login flows still use.
+ */
+export class ZitadelConfigEditMethodInUseError extends ZitadelConfigEditBreaksFlowsError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
  * A login flow that already has errors, so it cannot be checked against a
  * changed schema.
  *
@@ -730,13 +739,25 @@ export class ZitadelConfigFlowsUncheckedError extends ZitadelConfigError {
     const issues = input.issues.map((item): JsonObject => {
       const issue = item.issue;
       if (issue.step === undefined) {
-        return { path: item.path, rule: issue.rule, message: issue.message };
+        return {
+          path: item.path,
+          rule: issue.rule,
+          message: issue.message,
+        };
       }
-      return { path: item.path, rule: issue.rule, message: issue.message, step: issue.step };
+      return {
+        path: item.path,
+        rule: issue.rule,
+        message: issue.message,
+        step: issue.step,
+      };
     });
     super([input.heading, ...listed].join("\n"), {
       hint: input.hint,
-      details: { file: input.file, issues },
+      details: {
+        file: input.file,
+        issues,
+      },
     });
   }
 }
@@ -751,22 +772,8 @@ export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
   override readonly code: ZitadelErrorCode = "E_AUTH";
 }
 
-/** A file or directory could not be read for a reason other than a refused permission. */
-export class ZitadelConfigFileReadFailedError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
 /** The bundle cannot be built because `.zitadel/` holds nothing to put in it. */
 export class ZitadelConfigDeployEmptyError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
-/** The bundle cannot be built because `.zitadel/` holds more than a release pins. */
-export class ZitadelConfigDeployTooLargeError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";

@@ -4,7 +4,6 @@ import {
   ZitadelConfigConnectionClientIdError,
   ZitadelConfigConnectionNotOidcError,
   ZitadelConfigConnectionUnusableError,
-  ZitadelConfigEditRefusedError,
   ZitadelConfigError,
   ZitadelConfigHandleInvalidError,
   ZitadelConfigResourceClashError,
@@ -13,9 +12,8 @@ import {
   ZitadelConfigSchemaMissingError,
   ZitadelConfigFileBrokenError,
   ZitadelConfigDeployEmptyError,
-  ZitadelConfigDeployTooLargeError,
-  ZitadelConfigFileReadFailedError,
   ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigEditMethodInUseError,
   ZitadelConfigFlowsUncheckedError,
   CONFIG_DIRECTORIES,
   ZitadelConfigConnectionExistsError,
@@ -423,27 +421,9 @@ describe("ZitadelConfigFileUnreadableError", () => {
   });
 });
 
-describe("ZitadelConfigFileReadFailedError", () => {
-  it("is a validation failure when a file cannot be read for another reason", () => {
-    expect(new ZitadelConfigFileReadFailedError("x cannot be read (ENOTDIR)")).toMatchObject({
-      category: "invalid",
-      code: "E_VALIDATION",
-    });
-  });
-});
-
 describe("ZitadelConfigDeployEmptyError", () => {
   it("is a validation failure when there is nothing to deploy", () => {
     expect(new ZitadelConfigDeployEmptyError("nothing here")).toMatchObject({
-      category: "invalid",
-      code: "E_VALIDATION",
-    });
-  });
-});
-
-describe("ZitadelConfigDeployTooLargeError", () => {
-  it("is a validation failure when there is too much to deploy", () => {
-    expect(new ZitadelConfigDeployTooLargeError("too many")).toMatchObject({
       category: "invalid",
       code: "E_VALIDATION",
     });
@@ -480,9 +460,19 @@ describe("ZitadelConfigError", () => {
   });
 });
 
-describe("ZitadelConfigEditRefusedError", () => {
-  it("is a validation failure", () => {
-    expect(new ZitadelConfigEditRefusedError("would discard a comment")).toMatchObject({
+describe("ZitadelConfigEditMethodInUseError", () => {
+  it("is a validation failure that is also an edit that breaks flows", () => {
+    const error = new ZitadelConfigEditMethodInUseError({
+      file: SCHEMA_PATH,
+      heading: "Disabling passkey would break a login flow that still uses it:",
+      hint: HINT,
+      issues: [],
+      kind: "method-in-use",
+      uses: [],
+    });
+
+    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toMatchObject({
       category: "invalid",
       code: "E_VALIDATION",
     });

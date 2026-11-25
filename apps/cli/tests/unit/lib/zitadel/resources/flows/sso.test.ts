@@ -7,7 +7,7 @@ import { serverCanonicalFlow } from "@zitadel/api-mock";
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import { ZitadelConfigEditRefusedError } from "@/lib/zitadel";
+import { ZitadelConfigError } from "@/lib/zitadel";
 import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
 import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 import {
@@ -1259,7 +1259,7 @@ describe("SsoGenerator.withProvider", () => {
         return new SsoGenerator(aFlow(flow)).withProvider(provider, BOTH_METHODS);
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditRefusedError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({ message });
     });
 

@@ -3,7 +3,6 @@ import { stringify } from "safe-stable-stringify";
 import {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
-  ZitadelConfigFileReadFailedError,
   ZitadelConfigFileUnreadableError,
 } from "@/lib/zitadel/errors";
 import {
@@ -268,22 +267,19 @@ export abstract class Store implements ConfigStore {
                 details: {
                   file: file.path,
                   ref,
-                  ...(code === undefined ? {} : { code }),
+                  code,
                 },
               },
             );
           }
-          throw new ZitadelConfigFileReadFailedError(
-            `$file ${JSON.stringify(ref)} cannot be read`,
-            {
-              hint: "Create the referenced file or fix the path.",
-              details: {
-                file: file.path,
-                ref,
-                ...(code === undefined ? {} : { code }),
-              },
+          throw new ZitadelConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
+            hint: "Create the referenced file or fix the path.",
+            details: {
+              file: file.path,
+              ref,
+              ...(code === undefined ? {} : { code }),
             },
-          );
+          });
         }
       },
       missing,
@@ -434,8 +430,8 @@ export abstract class Store implements ConfigStore {
    * The failure for a file or directory that cannot be read.
    *
    * @remarks
-   * The errno is kept in `details.code`, so the CLI can tell a permission
-   * failure from the rest.
+   * A refused permission is a ZitadelConfigFileUnreadableError; any other
+   * failure is a ZitadelConfigError.
    *
    * @param path - The project-relative path.
    * @param code - The errno of the failed operation, when it had one.
@@ -443,18 +439,15 @@ export abstract class Store implements ConfigStore {
    */
   private static unreadable(path: string, code: string | undefined): ZitadelConfigError {
     if (code === "EACCES" || code === "EPERM") {
-      return new ZitadelConfigFileUnreadableError(
-        `${path} cannot be read${code === undefined ? "" : ` (${code})`}`,
-        {
-          hint: "Check that the file is readable, then run the command again.",
-          details: {
-            file: path,
-            ...(code === undefined ? {} : { code }),
-          },
+      return new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`, {
+        hint: "Check that the file is readable, then run the command again.",
+        details: {
+          file: path,
+          code,
         },
-      );
+      });
     }
-    return new ZitadelConfigFileReadFailedError(
+    return new ZitadelConfigError(
       `${path} cannot be read${code === undefined ? "" : ` (${code})`}`,
       {
         hint: "Check that the file is readable, then run the command again.",

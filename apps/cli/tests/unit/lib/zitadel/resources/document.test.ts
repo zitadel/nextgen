@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ZitadelConfigFileBrokenError, ZitadelConfigEditRefusedError } from "@/lib/zitadel";
+import { ZitadelConfigFileBrokenError, ZitadelConfigError } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
@@ -145,7 +145,7 @@ class Sample extends ConfigDocument<SampleValue> {
    *
    * @param name - The new name.
    * @returns The edited sample.
-   * @throws {@link ZitadelConfigEditRefusedError} When `name` is not a string.
+   * @throws {@link ZitadelConfigError} When `name` is not a string.
    * @throws {@link ZitadelConfigFileBrokenError} When the contract refuses the new name.
    */
   withName(name: JsonObject[string]): Sample {
@@ -335,7 +335,7 @@ describe("ConfigDocument edits", () => {
       return sample.withName("b");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditRefusedError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: `${PATH}: name is not a string`,
       details: { file: PATH, region: "name is not a string" },

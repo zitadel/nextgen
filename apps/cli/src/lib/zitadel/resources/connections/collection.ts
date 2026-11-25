@@ -177,7 +177,7 @@ export class Connections extends Collection<Connection> {
    * @throws {@link ZitadelConfigResourceClashError} When the connection would step on another one.
    * @throws {@link ZitadelConfigConnectionClientIdError} When the existing connection holds
    *   another client id.
-   * @throws {@link ZitadelConfigEditRefusedError} When a region the edit writes is not the
+   * @throws {@link ZitadelConfigError} When a region the edit writes is not the
    *   shape it writes.
    * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow would stop validating.
    */
@@ -233,7 +233,7 @@ export class Connections extends Collection<Connection> {
    * @returns The change.
    * @throws {@link ZitadelConfigResourceMissingError} When nothing offers the provider and no
    *   connection or catalog entry has its name, such as a typo.
-   * @throws {@link ZitadelConfigEditRefusedError} When a region the edit writes is not the
+   * @throws {@link ZitadelConfigError} When a region the edit writes is not the
    *   shape it writes.
    * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow would stop validating.
    * @throws {@link ZitadelConfigEditLockoutError} When it is the last way to sign in and

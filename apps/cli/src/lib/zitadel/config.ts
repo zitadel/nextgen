@@ -15,7 +15,6 @@ import { Connections } from "@/lib/zitadel/resources/connections/collection";
 import {
   ZitadelConfigFileBrokenError,
   ZitadelConfigDeployEmptyError,
-  ZitadelConfigDeployTooLargeError,
   ZitadelConfigError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
@@ -462,7 +461,7 @@ export class ZitadelConfig {
       });
     }
     if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
-      throw new ZitadelConfigDeployTooLargeError(
+      throw new ZitadelConfigError(
         `A release pins at most ${ZitadelConfig.MAX_BUNDLE_RESOURCES} resources, but .zitadel/ holds ${fileCount}`,
       );
     }

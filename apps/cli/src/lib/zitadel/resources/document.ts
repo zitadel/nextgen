@@ -1,7 +1,7 @@
 import type { ReadonlyDeep } from "type-fest";
 import type { ZodType, z } from "zod";
 
-import { ZitadelConfigFileBrokenError, ZitadelConfigEditRefusedError } from "@/lib/zitadel/errors";
+import { ZitadelConfigFileBrokenError, ZitadelConfigError } from "@/lib/zitadel/errors";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { Issue, RuleId, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
@@ -208,7 +208,7 @@ export type Edit<Document> = {
  *   which tells one kind of document from another;
  * - an edit is a `with…` or `without…` method that returns an {@link Edit}
  *   holding a new document, or the same one when there is nothing to change,
- *   and throws {@link ZitadelConfigEditRefusedError} when it cannot be made, or
+ *   and throws {@link ZitadelConfigError} when it cannot be made, or
  *   {@link ZitadelConfigFileBrokenError} when the contract refuses the body it makes.
  *
  * Immutable. The body is never changed in place, so a document read once can
@@ -472,14 +472,14 @@ export abstract class ConfigDocument<Value = unknown> {
    * Such a region was written by hand, and rewriting it would discard it.
    *
    * @param region - What is wrong with the region, or `undefined` when nothing is.
-   * @throws {@link ZitadelConfigEditRefusedError} When a region is named, with the file and
+   * @throws {@link ZitadelConfigError} When a region is named, with the file and
    *   the region.
    */
   protected refuseUneditable(region: string | undefined): void {
     if (region === undefined) {
       return;
     }
-    throw new ZitadelConfigEditRefusedError(`${this.path}: ${region}`, {
+    throw new ZitadelConfigError(`${this.path}: ${region}`, {
       hint:
         "This command edits that region, and it is not the shape it edits. " +
         "Fix it against the dialect in .zitadel/meta/, then run the command again.",

@@ -18,6 +18,7 @@ import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/confi
 
 import {
   ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigEditMethodInUseError,
   ZitadelConfigFlowsUncheckedError,
 } from "@/lib/zitadel/errors";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
@@ -138,7 +139,7 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
  * @param edit - The edit that turns the method off.
  * @param method - The method.
  * @throws {@link ZitadelConfigFlowsUncheckedError} When a flow cannot be checked.
- * @throws {@link ZitadelConfigEditBreaksFlowsError} When a step still uses the method, naming every
+ * @throws {@link ZitadelConfigEditMethodInUseError} When a step still uses the method, naming every
  *   step that uses it.
  */
 export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): void {
@@ -168,7 +169,7 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
     });
     return { ...use, staying };
   });
-  throw new ZitadelConfigEditBreaksFlowsError({
+  throw new ZitadelConfigEditMethodInUseError({
     kind: "method-in-use",
     file: edit.edited.path,
     heading: `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
@@ -263,7 +264,6 @@ function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): 
   return [
     `Edit those steps first; login flows are not edited for you. From each step, remove its ${removed}.`,
     ...deletions,
-    "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
   ].join(" ");
 }
 

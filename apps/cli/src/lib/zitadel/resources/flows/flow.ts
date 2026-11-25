@@ -502,7 +502,7 @@ export class Flow extends ConfigDocument<FlowValue> {
    * {@link withProvider} checks this itself; a caller checks it first only to
    * refuse before it asks anything.
    *
-   * @throws {@link ZitadelConfigEditRefusedError} When a region the edit writes is not the
+   * @throws {@link ZitadelConfigError} When a region the edit writes is not the
    *   shape it writes, or no step marks where a completed sign-in ends.
    */
   assertProviderEditable(): void {
@@ -520,7 +520,7 @@ export class Flow extends ConfigDocument<FlowValue> {
    * @param methods - The methods the flow's schema enables.
    * @returns The edit: the edited flow, or this one when it already offers the
    *   provider, and the regions left alone.
-   * @throws {@link ZitadelConfigEditRefusedError} When a region the edit writes is not the
+   * @throws {@link ZitadelConfigError} When a region the edit writes is not the
    *   shape it writes.
    */
   withProvider(slug: ConnectionSlug, methods: EnabledMethods): Edit<Flow> {

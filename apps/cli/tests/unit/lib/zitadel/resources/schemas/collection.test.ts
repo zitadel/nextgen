@@ -4,7 +4,7 @@ import {
   ZitadelConfigSchemaAmbiguousError,
   ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditLockoutError,
-  ZitadelConfigEditRefusedError,
+  ZitadelConfigError,
   ZitadelConfigSchemaMissingError,
   ZitadelConfig,
 } from "@/lib/zitadel";
@@ -227,7 +227,7 @@ describe("Schemas.enable", () => {
       return config.schemas.enable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditRefusedError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: `${SCHEMA_PATH} has no x-identifier for password`,
       details: { file: SCHEMA_PATH, method: "password" },

@@ -14,6 +14,7 @@ import { WizardStep } from "@/lib/wizard";
 import {
   Connection,
   ZitadelConfigEditBreaksFlowsError,
+  ZitadelConfigEditMethodInUseError,
   ZitadelConfigFlowsUncheckedError,
 } from "@/lib/zitadel";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -25,6 +26,23 @@ const EDIT_BREAKS_FLOWS_REFUSAL = {
   message: "{message}",
   hint: "{hint}",
   details: "{details}",
+} as const satisfies Refusal;
+
+/**
+ * What a change that disables a method login flows still use is refused for.
+ */
+const EDIT_METHOD_IN_USE_REFUSAL = {
+  message: "{message}",
+  hint: "{hint} `zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+  details: "{details}",
+  next: [
+    {
+      id: "deploy",
+      flags: {
+        dryRun: true,
+      },
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -113,6 +131,13 @@ export class PlanChange extends WizardStep<
     if (error instanceof ZitadelConfigFlowsUncheckedError) {
       throw refusalError(FLOWS_UNCHECKED_REFUSAL, {
         message: error.message,
+        details: error.details ?? null,
+      });
+    }
+    if (error instanceof ZitadelConfigEditMethodInUseError) {
+      throw refusalError(EDIT_METHOD_IN_USE_REFUSAL, {
+        message: error.message,
+        hint: error.hint ?? "",
         details: error.details ?? null,
       });
     }

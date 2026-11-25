@@ -62,7 +62,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * @param schema - The schema.
    * @param method - The method.
    * @returns The change.
-   * @throws {@link ZitadelConfigEditRefusedError} When the schema's methods are not the
+   * @throws {@link ZitadelConfigError} When the schema's methods are not the
    *   shape the edit writes, or password is enabled without an identifier.
    * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow would stop validating.
    */
@@ -84,7 +84,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * @param method - The method.
    * @param options - Whether to leave the schema with no way to sign in.
    * @returns The change.
-   * @throws {@link ZitadelConfigEditRefusedError} When the schema's methods are not the
+   * @throws {@link ZitadelConfigError} When the schema's methods are not the
    *   shape the edit writes.
    * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow still uses the method.
    * @throws {@link ZitadelConfigEditLockoutError} When it is the last way to sign in and
