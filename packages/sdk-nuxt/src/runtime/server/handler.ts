@@ -2,6 +2,7 @@ import type { ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { useRuntimeConfig } from "#imports";
 
+import { refuseLegacyConfig } from "../lib/legacy";
 import { resolveUrl } from "../lib/settings";
 import { createZitadelMiddleware } from "./middleware";
 
@@ -87,9 +88,13 @@ export function middlewareOptions(
 }
 
 const config = useRuntimeConfig() as {
+  nextgen?: unknown;
   zitadel?: Record<string, unknown>;
   public?: Record<string, unknown>;
 };
+
+// Refuses to start on an old name that only the running server's environment carries.
+refuseLegacyConfig({ env: process.env, runtimeConfig: config, publicConfig: config.public });
 
 /**
  * The global Nitro event handler that the module registers as server middleware.

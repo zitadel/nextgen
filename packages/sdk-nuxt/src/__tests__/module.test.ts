@@ -42,6 +42,7 @@ async function install(
   app: {
     zitadel?: Record<string, unknown>;
     nextgen?: Record<string, unknown>;
+    privateRuntimeConfig?: Record<string, unknown>;
     publicRuntimeConfig?: Record<string, unknown>;
     envLocal?: string;
     dev?: boolean;
@@ -50,7 +51,7 @@ async function install(
   if (app.envLocal !== undefined) {
     writeFileSync(join(rootDir, ".env.local"), app.envLocal);
   }
-  const runtimeConfig = { public: { ...app.publicRuntimeConfig } };
+  const runtimeConfig = { ...app.privateRuntimeConfig, public: { ...app.publicRuntimeConfig } };
   const nuxt = {
     options: {
       rootDir,
@@ -86,6 +87,12 @@ describe("@zitadel/sdk-nuxt module", () => {
       await expect(install()).rejects.toThrow(
         "NUXT_PUBLIC_NEXTGEN_PROXY_PATH is now NUXT_PUBLIC_ZITADEL_PROXY_PATH",
       );
+    });
+
+    it("refuses the old private runtimeConfig.nextgen object", async () => {
+      await expect(
+        install({ privateRuntimeConfig: { nextgen: { protectedRoutes: ["/admin"] } } }),
+      ).rejects.toThrow("runtimeConfig.nextgen is now runtimeConfig.zitadel");
     });
 
     it("refuses the old public runtime settings", async () => {

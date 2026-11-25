@@ -10,8 +10,9 @@ import {
 import { existsSync, readFileSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 
-import type { Nuxt, NuxtModule } from "@nuxt/schema";
+import type { NuxtModule } from "@nuxt/schema";
 import type { ZitadelMiddlewareOptions } from "./runtime/types";
+import { refuseLegacyConfig } from "./runtime/lib/legacy";
 
 const DEFAULT_PROXY_PATH = "/__nextgen";
 
@@ -90,46 +91,6 @@ function settingsLookup(rootDir: string): (name: string) => string | undefined {
 }
 
 /**
- * Lists the settings of the old `nextgen` configuration that an app still carries, so the module
- * can refuse to start instead of ignoring them.
- *
- * The configuration key was renamed from `nextgen` to `zitadel`, together with the
- * `NUXT_NEXTGEN_*` and `NUXT_PUBLIC_NEXTGEN_*` environment variables and the public
- * `nextgenProxyPath` and `nextgenApiBase` runtime settings. Nuxt does not complain about a key no
- * module reads, so an app that kept the old name would lose every setting silently, including
- * `protectedRoutes`, and its protected pages would open to signed-out visitors. Naming the old
- * settings here turns that into a build error.
- *
- * Only the environment of the build or dev server is visible here. A `NUXT_NEXTGEN_*`
- * or `NUXT_PUBLIC_NEXTGEN_*` variable that is set only on the running server cannot be seen at
- * this point.
- *
- * @param nuxt - The Nuxt instance the module is installed into.
- * @returns One line per old setting found, or an empty list when the app uses the new names.
- */
-function legacyConfigProblems(nuxt: Nuxt): string[] {
-  const options = nuxt.options as unknown as Record<string, unknown>;
-  const publicConfig = nuxt.options.runtimeConfig.public as Record<string, unknown>;
-  const problems: string[] = [];
-  if (options.nextgen !== undefined) {
-    problems.push("the `nextgen` key in nuxt.config.ts is now `zitadel`");
-  }
-  for (const name of ["nextgenProxyPath", "nextgenApiBase"]) {
-    if (publicConfig[name] !== undefined) {
-      problems.push(
-        `runtimeConfig.public.${name} is now runtimeConfig.public.${name.replace("nextgen", "zitadel")}`,
-      );
-    }
-  }
-  for (const name of Object.keys(process.env)) {
-    if (name.startsWith("NUXT_NEXTGEN_") || name.startsWith("NUXT_PUBLIC_NEXTGEN_")) {
-      problems.push(`${name} is now ${name.replace("NEXTGEN_", "ZITADEL_")}`);
-    }
-  }
-  return problems;
-}
-
-/**
  * The Nuxt module that wires Zitadel sign-in into an app.
  *
  * Add `"@zitadel/sdk-nuxt/module"` to `modules` in `nuxt.config.ts` and configure it under the
@@ -204,14 +165,12 @@ const zitadelModule: NuxtModule<ZitadelMiddlewareOptions> =
       loginPath: "/login",
     },
     async setup(options, nuxt) {
-      const legacy = legacyConfigProblems(nuxt);
-      if (legacy.length > 0) {
-        throw new Error(
-          `[zitadel] The Nuxt module was renamed from "nextgen" to "zitadel", and these settings are ` +
-            `no longer read, so routes in \`protectedRoutes\` would not be protected: ` +
-            `${legacy.join("; ")}.`,
-        );
-      }
+      refuseLegacyConfig({
+        env: process.env,
+        nextgen: (nuxt.options as unknown as Record<string, unknown>).nextgen,
+        runtimeConfig: nuxt.options.runtimeConfig as unknown as Record<string, unknown>,
+        publicConfig: nuxt.options.runtimeConfig.public as Record<string, unknown>,
+      });
       const { resolve, resolvePath: resolveFile } = createResolver(import.meta.url);
       const setting = settingsLookup(nuxt.options.rootDir);
       const proxyPath = options.proxyPath ?? DEFAULT_PROXY_PATH;

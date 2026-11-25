@@ -112,8 +112,8 @@ may have nothing else to read. Rules for those comments:
 
 ### Reviewing a change to an SDK
 
-Every rule here comes from a defect that review found. Check it on every SDK, and
-write its test once for all of them (see "Write shared cases once" above).
+Check each rule on every SDK, and write its test once for all of them (see "Write
+shared cases once" above).
 
 - **A renamed string fails silently.** A renamed export breaks the build; an old
   config key, env var, header, cookie, state key or file name is just ignored.
@@ -125,9 +125,8 @@ write its test once for all of them (see "Write shared cases once" above).
   the shared function itself (`describeSharedConfigHelpers`, `describeClientEntry`).
 - **An exported `*Props` type must be what the component accepts,** in that
   framework's idiom (props, Vue listeners, Angular inputs, Qwik `$` props).
-- **Read a file's header comment and history before deleting it.** It may record
-  the constraint: Angular kept a local `configureZitadel` because ng-packagr could
-  not resolve `@zitadel/api`.
+- **Read a file's header comment and history before deleting it,** because it may
+  record a constraint (`git log -S'<name>'`).
 - **Deleting a test deletes its guard.** Name the invariant it held and keep the
   test if it still holds; drop it only when the behavior it pinned is gone.
 - **A test that reads other packages' files lists them in its turbo `inputs`,**

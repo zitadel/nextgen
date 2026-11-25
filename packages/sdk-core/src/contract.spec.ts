@@ -1021,12 +1021,17 @@ describe("SDK directories ↔ the guards in this file", () => {
 });
 
 describe("published SDK packages ↔ their contents", () => {
-  const sdkDirs = readdirSync(PACKAGES_ROOT).filter((dir) => dir.startsWith("sdk-"));
+  const sdkDirs = readdirSync(PACKAGES_ROOT).filter(
+    (dir) => dir.startsWith("sdk-") && existsSync(`${PACKAGES_ROOT}/${dir}/package.json`),
+  );
 
   it.each(sdkDirs)("%s keeps the generated API reference out of the tarball", (dir) => {
     const manifest = JSON.parse(readFileSync(`${PACKAGES_ROOT}/${dir}/package.json`, "utf8")) as {
       files?: string[];
     };
-    expect(manifest.files).toContain("!dist/api-docs");
+    // A negation only removes what an earlier pattern added, so it must come after `dist`.
+    expect(manifest.files?.indexOf("!dist/api-docs")).toBeGreaterThan(
+      manifest.files?.indexOf("dist") ?? Number.POSITIVE_INFINITY,
+    );
   });
 });

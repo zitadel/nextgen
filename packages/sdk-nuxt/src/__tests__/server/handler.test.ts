@@ -192,4 +192,12 @@ describe("middlewareOptions", () => {
     expect(options.protectedRoutes).toEqual(["/admin"]);
     expect(options.clockSkewMs).toBeUndefined();
   });
+
+  it("refuses to start when only the running server's environment has an old name", async () => {
+    vi.stubEnv("NUXT_NEXTGEN_PROTECTED_ROUTES", '["/admin*"]');
+
+    await expect(moduleHandler({})).rejects.toThrow(
+      "NUXT_NEXTGEN_PROTECTED_ROUTES is now NUXT_ZITADEL_PROTECTED_ROUTES",
+    );
+  });
 });

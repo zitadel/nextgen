@@ -15,9 +15,10 @@ The SDK rules: [`../AGENTS.md`](../AGENTS.md). The public API standard:
 
 ## The old `nextgen` names are refused
 
-- Keep `legacyConfigProblems` (`src/module.ts`) throwing for the `nextgen` config key,
-  `NUXT_NEXTGEN_*` and `NUXT_PUBLIC_NEXTGEN_*` variables, and
+- Keep `refuseLegacyConfig` (`src/runtime/lib/legacy.ts`) throwing for the `nextgen` config key,
+  `runtimeConfig.nextgen`, `NUXT_NEXTGEN_*` and `NUXT_PUBLIC_NEXTGEN_*` variables, and
   `runtimeConfig.public.nextgenProxyPath` and `nextgenApiBase`.
+- Call it from the module (the build's environment) and from `runtime/server/handler.ts`
+  (the running server's environment); a variable set only on the server needs the second.
 - Nuxt ignores a key no module reads, so a kept `nextgen: { protectedRoutes }` would
-  leave pages open; `src/__tests__/module.test.ts` pins each refusal.
-- It sees only the build or dev environment, not a variable set on the running server.
+  leave pages open; `src/__tests__/lib/legacy.test.ts` pins each name.

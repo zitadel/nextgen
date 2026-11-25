@@ -22,15 +22,20 @@ export type ConfigHelpersSdk = {
 export function describeSharedConfigHelpers(sdk: ConfigHelpersSdk): void {
   describe("the config helpers of the SDK entry", () => {
     const slots = globalThis as Record<symbol, unknown>;
-    const before: { slot?: unknown } = {};
+    const before: { had?: boolean; slot?: unknown } = {};
 
     beforeEach(() => {
+      before.had = PROJECT_SLOT in slots;
       before.slot = slots[PROJECT_SLOT];
       slots[PROJECT_SLOT] = null;
     });
 
     afterEach(() => {
-      slots[PROJECT_SLOT] = before.slot;
+      if (before.had) {
+        slots[PROJECT_SLOT] = before.slot;
+      } else {
+        delete slots[PROJECT_SLOT];
+      }
     });
 
     it("are the functions of the shared config module", () => {

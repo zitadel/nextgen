@@ -486,19 +486,21 @@ describe.sequential("task graph cache and ordering contracts", () => {
   // sdk-core's contract spec reads every SDK's public-api.json and the entry
   // sources it names, so they must be inputs of `@zitadel/sdk-core#test`.
   test.each(publicApiSdkDirs)(
-    "%s's public API and entry source invalidate the contract spec",
+    "%s's public API and every entry source invalidate the contract spec",
     (dir) => {
       const manifest = `packages/${dir}/public-api.json`;
       const manifestText = readFileSync(join(repo, manifest), "utf8");
-      const source = `packages/${dir}/${Object.values(JSON.parse(manifestText).entries)[0].source}`;
-      const sourceText = readFileSync(join(repo, source), "utf8");
       const before = baseline.get("@zitadel/sdk-core#test").hash;
       changed(manifest, `${manifestText}\n`, () => {
         expect(dry().get("@zitadel/sdk-core#test").hash).not.toBe(before);
       });
-      changed(source, `${sourceText}\n// changed entry source\n`, () => {
-        expect(dry().get("@zitadel/sdk-core#test").hash).not.toBe(before);
-      });
+      for (const { source } of Object.values(JSON.parse(manifestText).entries)) {
+        const path = `packages/${dir}/${source}`;
+        const sourceText = readFileSync(join(repo, path), "utf8");
+        changed(path, `${sourceText}\n// changed entry source\n`, () => {
+          expect(dry().get("@zitadel/sdk-core#test").hash).not.toBe(before);
+        });
+      }
     },
   );
 });
