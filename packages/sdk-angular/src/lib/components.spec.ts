@@ -45,7 +45,9 @@ type SubscribableOutput = { subscribe(next: (detail: unknown) => void): void };
 const outputOf = (instance: object, event: string): SubscribableOutput => {
   const name = outputName(event);
   const output = (instance as Record<string, SubscribableOutput | undefined>)[name];
-  if (!output) throw new Error(`component has no @Output() "${name}"`);
+  if (!output) {
+    throw new Error(`component has no @Output() "${name}"`);
+  }
   return output;
 };
 
@@ -267,14 +269,20 @@ async function serverRender(template: string, imports: Type<unknown>[] = []): Pr
     );
   } finally {
     for (const key of Reflect.ownKeys(globalThis)) {
-      if (!before.has(key)) Reflect.deleteProperty(globalThis, key);
+      if (!before.has(key)) {
+        Reflect.deleteProperty(globalThis, key);
+      }
     }
     for (const [key, value] of before) {
       const globals = globalThis as Record<PropertyKey, unknown>;
-      if (Object.is(globals[key], value)) continue;
+      if (Object.is(globals[key], value)) {
+        continue;
+      }
       const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
       // A read-only or getter-only global is not one a render can have replaced.
-      if (descriptor?.writable || descriptor?.set) globals[key] = value;
+      if (descriptor?.writable || descriptor?.set) {
+        globals[key] = value;
+      }
     }
   }
 }

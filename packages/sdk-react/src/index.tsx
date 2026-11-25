@@ -130,7 +130,9 @@ function isEventName<Name extends keyof EventDetails>(
 function eventName<Name extends keyof EventDetails>(
   name: Name,
 ): EventName<CustomEvent<EventDetails[Name]>> {
-  if (!isEventName(name)) throw new Error(`${name} is not a widget event`);
+  if (!isEventName(name)) {
+    throw new Error(`${name} is not a widget event`);
+  }
   return name;
 }
 
@@ -168,9 +170,12 @@ function asAttributes<Tag extends WidgetTag>(
     {},
     {
       has: (_target, key) => {
-        if (hidden.has(key)) return false;
-        if (typeof document !== "undefined")
+        if (hidden.has(key)) {
+          return false;
+        }
+        if (typeof document !== "undefined") {
           return key in (customElements.get(tag)?.prototype ?? {});
+        }
         return (
           typeof key === "string" &&
           !["children", "localName", "ref"].includes(key) &&
@@ -181,7 +186,9 @@ function asAttributes<Tag extends WidgetTag>(
     },
   );
   const elementClass = { name: tag, prototype };
-  if (!isElementClass<Tag>(elementClass)) throw new Error(`${tag} has no element class`);
+  if (!isElementClass<Tag>(elementClass)) {
+    throw new Error(`${tag} has no element class`);
+  }
   return elementClass;
 }
 
@@ -205,7 +212,9 @@ function projectAttributes(props: {
   readonly projectId?: string;
   readonly proxyPath?: string;
 }) {
-  if (props.project?.publishableKey) return {};
+  if (props.project?.publishableKey) {
+    return {};
+  }
   return {
     "project-id": props.project?.projectId ?? props.projectId,
     "proxy-path": props.project?.proxyPath ?? props.proxyPath,
@@ -380,7 +389,9 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginPr
     // A keyed handle cannot reach the element as attributes, and the element
     // starts its first flow when it first updates. Create it only once the
     // handle can be bound at the same time, never during server rendering.
-    if (keyed && !mounted) return null;
+    if (keyed && !mounted) {
+      return null;
+    }
     return (
       <ZitadelLoginElementReact
         {...attributes}

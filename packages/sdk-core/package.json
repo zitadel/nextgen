@@ -13,7 +13,8 @@
     "directory": "packages/sdk-core"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/api-docs"
   ],
   "type": "module",
   "scripts": {

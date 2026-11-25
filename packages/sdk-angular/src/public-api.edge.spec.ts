@@ -21,7 +21,9 @@ const render = async <Component>(
         environmentInjector: app.injector,
         hostElement: host,
       });
-      for (const [name, value] of Object.entries(inputs)) ref.setInput(name, value);
+      for (const [name, value] of Object.entries(inputs)) {
+        ref.setInput(name, value);
+      }
       app.attachView(ref.hostView);
       return app;
     },

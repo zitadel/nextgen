@@ -20,7 +20,9 @@ async function serve(request: Request, options: ZitadelMiddlewareOptions): Promi
       redirect: (status, location) => new Response(null, { status, headers: { location } }),
     });
   } catch (thrown) {
-    if (thrown instanceof Response) return thrown;
+    if (thrown instanceof Response) {
+      return thrown;
+    }
     throw thrown;
   }
   return sent ?? new Response("ok");

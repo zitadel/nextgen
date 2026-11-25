@@ -228,7 +228,9 @@ const stores = new Map<string, SessionStore>();
  */
 function publish(entry: Entry, snapshot: SessionSnapshot): void {
   entry.snapshot = snapshot;
-  for (const listener of entry.listeners) listener();
+  for (const listener of entry.listeners) {
+    listener();
+  }
 }
 
 /**
@@ -298,7 +300,9 @@ function createStore(key: string, projectId: string, proxyPath: string): Session
     }
     const answer = readOnce(entry.snapshot).then((snapshot) => {
       // A later read overtook this one: wait for that answer instead.
-      if (generation !== entry.generation) return entry.latest;
+      if (generation !== entry.generation) {
+        return entry.latest;
+      }
       publish(entry, snapshot);
       return snapshot;
     });
@@ -356,7 +360,9 @@ function createStore(key: string, projectId: string, proxyPath: string): Session
    */
   function dropWhenUnused(entry: Entry): void {
     queueMicrotask(() => {
-      if (entry.listeners.size === 0 && entries.get(key) === entry) entries.delete(key);
+      if (entry.listeners.size === 0 && entries.get(key) === entry) {
+        entries.delete(key);
+      }
     });
   }
 
@@ -368,7 +374,9 @@ function createStore(key: string, projectId: string, proxyPath: string): Session
       entry.listeners.add(listener);
       return () => {
         entry.listeners.delete(listener);
-        if (entry.listeners.size === 0) dropWhenUnused(entry);
+        if (entry.listeners.size === 0) {
+          dropWhenUnused(entry);
+        }
       };
     },
     refresh() {

@@ -23,7 +23,9 @@ async function serve(
   const jar = new Map<string, string>();
   for (const part of (init.headers?.cookie ?? "").split(";")) {
     const idx = part.indexOf("=");
-    if (idx !== -1) jar.set(part.slice(0, idx).trim(), part.slice(idx + 1).trim());
+    if (idx !== -1) {
+      jar.set(part.slice(0, idx).trim(), part.slice(idx + 1).trim());
+    }
   }
   // The `Set-Cookie` values SvelteKit adds to the response `resolve` produces.
   const written: string[] = [];
@@ -53,7 +55,9 @@ async function serve(
     },
     locals: {} as Record<string, unknown>,
     getClientAddress: () => {
-      if (!init.clientIp) throw new Error("Could not determine clientAddress");
+      if (!init.clientIp) {
+        throw new Error("Could not determine clientAddress");
+      }
       return init.clientIp;
     },
   } as unknown as RequestEvent;
@@ -88,10 +92,18 @@ interface CookieOptions {
 /** The `Set-Cookie` value SvelteKit writes for `event.cookies.set(name, value, opts)`. */
 function serializeCookie(name: string, value: string, opts: CookieOptions): string {
   const attributes = [`${name}=${(opts.encode ?? encodeURIComponent)(value)}`, `Path=${opts.path}`];
-  if (opts.maxAge !== undefined) attributes.push(`Max-Age=${opts.maxAge}`);
-  if (opts.httpOnly) attributes.push("HttpOnly");
-  if (opts.sameSite) attributes.push(`SameSite=${opts.sameSite}`);
-  if (opts.secure) attributes.push("Secure");
+  if (opts.maxAge !== undefined) {
+    attributes.push(`Max-Age=${opts.maxAge}`);
+  }
+  if (opts.httpOnly) {
+    attributes.push("HttpOnly");
+  }
+  if (opts.sameSite) {
+    attributes.push(`SameSite=${opts.sameSite}`);
+  }
+  if (opts.secure) {
+    attributes.push("Secure");
+  }
   return attributes.join("; ");
 }
 

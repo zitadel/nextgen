@@ -310,7 +310,9 @@ describe("opaque session tokens", () => {
 
   function backend(response: Response | Error) {
     const fetchMock = vi.fn(async () => {
-      if (response instanceof Error) throw response;
+      if (response instanceof Error) {
+        throw response;
+      }
       return response;
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -1261,6 +1263,27 @@ describe("proxySessionCookies", () => {
       );
     });
 
+    // ADR 083: the session of an old cookie is neither asked about nor ended,
+    // and the cookie is not touched.
+    it.each([
+      ["sign-out", SIGN_OUT, answer(204, null, [SERVER_CLEARED])],
+      ["sign-in", SIGN_IN, answer(200, {}, ["zitadel_session=new; Path=/; HttpOnly"])],
+    ])("leaves a session under an old name alone on %s", async (_label, request, response) => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...request, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      const { setCookies } = await cookies.toBrowser(response);
+
+      expect(setCookies.filter((setCookie) => setCookie.startsWith("__nextgen_session"))).toEqual(
+        [],
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("touches nothing when the sign-in fails", async () => {
       const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
       const cookies = proxySessionCookies(
@@ -1478,6 +1501,19 @@ describe("resolveSession", () => {
     );
 
     expect(resolved.auth).toMatchObject({ isAuthenticated: true, session: { token: "mine" } });
+  });
+
+  // ADR 083: an old session cookie is no credential and no source of one.
+  it("neither reads nor copies a session cookie from before ADR 083", async () => {
+    const fetchMock = backend(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+    const resolved = await resolveSession(
+      request({ __nextgen_session: "old", __nextgen_session_proj_app: "old" }),
+      OPTIONS,
+    );
+
+    expect(resolved).toEqual({ auth: SIGNED_OUT, undecided: false, cookies: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("clears with Secure where the app is served over https", async () => {

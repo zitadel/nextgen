@@ -32,7 +32,9 @@ async function serve(
   // SolidStart merges the response stub's headers into the page it sends.
   if (!response) {
     for (const [name, value] of event.response?.headers ?? []) {
-      if (name !== "set-cookie") headers.set(name, value);
+      if (name !== "set-cookie") {
+        headers.set(name, value);
+      }
     }
   }
   for (const cookie of event.response?.headers.getSetCookie() ?? []) {

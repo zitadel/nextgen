@@ -90,11 +90,15 @@ function typeOnlyExports(specifier: string, runtime: object): string[] {
   };
   const from = join(dirname(fileURLToPath(import.meta.url)), "..", "index.ts");
   const resolved = ts.resolveModuleName(specifier, from, options, ts.sys).resolvedModule;
-  if (!resolved) throw new Error(`cannot resolve ${specifier}`);
+  if (!resolved) {
+    throw new Error(`cannot resolve ${specifier}`);
+  }
   const program = ts.createProgram([resolved.resolvedFileName], options);
   const source = program.getSourceFile(resolved.resolvedFileName);
   const entry = source && program.getTypeChecker().getSymbolAtLocation(source);
-  if (!entry) throw new Error(`${specifier} has no module symbol`);
+  if (!entry) {
+    throw new Error(`${specifier} has no module symbol`);
+  }
   const values = new Set(Object.keys(runtime));
   return program
     .getTypeChecker()
@@ -177,8 +181,27 @@ describe("@zitadel/sdk-tanstack-start/components", () => {
     expect(Widget.displayName).toBe(name);
   });
 
-  it("re-exports @zitadel/sdk-react's business copy overlay", () => {
+  it("exports businessLocales as the very object @zitadel/sdk-react exports", () => {
+    expect(tanstackReact.businessLocales).toBeDefined();
     expect(tanstackReact.businessLocales).toBe(sdkReact.businessLocales);
+  });
+
+  it.each([
+    ["ZitadelLogin", tanstackReact.ZitadelLogin, sdkReact.ZitadelLogin],
+    ["ZitadelLogout", tanstackReact.ZitadelLogout, sdkReact.ZitadelLogout],
+    ["ZitadelSession", tanstackReact.ZitadelSession, sdkReact.ZitadelSession],
+  ])("defines %s itself, as a client-only wrapper of the @zitadel/sdk-react one", (_n, own, ui) => {
+    expect(own).toBeDefined();
+    expect(own).not.toBe(ui);
+  });
+
+  it("exports exactly the widget values the standard requires", () => {
+    expect(Object.keys(tanstackReact).sort()).toEqual([
+      "ZitadelLogin",
+      "ZitadelLogout",
+      "ZitadelSession",
+      "businessLocales",
+    ]);
   });
 
   it("exports only the standard types, all of them @zitadel/sdk-react's", () => {

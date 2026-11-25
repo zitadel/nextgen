@@ -280,13 +280,19 @@ async function proxyRequest(
  */
 function parseCookieHeader(header: string | null): Map<string, string> {
   const jar = new Map<string, string>();
-  if (!header) return jar;
+  if (!header) {
+    return jar;
+  }
   for (const part of header.split(";")) {
     const idx = part.indexOf("=");
-    if (idx === -1) continue;
+    if (idx === -1) {
+      continue;
+    }
     const name = part.slice(0, idx).trim();
     const value = part.slice(idx + 1).trim();
-    if (name) jar.set(name, value);
+    if (name) {
+      jar.set(name, value);
+    }
   }
   return jar;
 }

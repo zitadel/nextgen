@@ -36,7 +36,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/api-docs"
   ],
   "publishConfig": {
     "access": "public"

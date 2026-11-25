@@ -13,7 +13,8 @@
     "directory": "packages/sdk-next"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/api-docs"
   ],
   "type": "module",
   "sideEffects": [

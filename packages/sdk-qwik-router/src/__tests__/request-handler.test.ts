@@ -33,7 +33,9 @@ async function serve(
   const jar = new Map<string, string>();
   for (const part of (init.headers?.cookie ?? "").split(";")) {
     const idx = part.indexOf("=");
-    if (idx !== -1) jar.set(part.slice(0, idx).trim(), part.slice(idx + 1).trim());
+    if (idx !== -1) {
+      jar.set(part.slice(0, idx).trim(), part.slice(idx + 1).trim());
+    }
   }
   // The `Set-Cookie` values Qwik adds to whichever response goes out.
   const written: string[] = [];
@@ -70,10 +72,14 @@ async function serve(
   try {
     await createZitadelOnRequest(options)(ev);
   } catch (err) {
-    if (!(err instanceof RedirectMarker)) throw err;
+    if (!(err instanceof RedirectMarker)) {
+      throw err;
+    }
   }
   const headers = new Headers(sent?.headers ?? responseHeaders);
-  if (redirected) headers.set("location", redirected.url);
+  if (redirected) {
+    headers.set("location", redirected.url);
+  }
   for (const cookie of written) {
     headers.append("set-cookie", cookie);
   }
@@ -89,11 +95,21 @@ async function serve(
 /** The `Set-Cookie` value Qwik writes for `ev.cookie.set(name, value, opts)`. */
 function serializeCookie(name: string, value: string, opts: QwikCookieOptions): string {
   const attributes = [`${name}=${value}`];
-  if (opts.path) attributes.push(`Path=${opts.path}`);
-  if (opts.maxAge !== undefined) attributes.push(`Max-Age=${opts.maxAge}`);
-  if (opts.httpOnly) attributes.push("HttpOnly");
-  if (opts.sameSite) attributes.push(`SameSite=${opts.sameSite}`);
-  if (opts.secure) attributes.push("Secure");
+  if (opts.path) {
+    attributes.push(`Path=${opts.path}`);
+  }
+  if (opts.maxAge !== undefined) {
+    attributes.push(`Max-Age=${opts.maxAge}`);
+  }
+  if (opts.httpOnly) {
+    attributes.push("HttpOnly");
+  }
+  if (opts.sameSite) {
+    attributes.push(`SameSite=${opts.sameSite}`);
+  }
+  if (opts.secure) {
+    attributes.push("Secure");
+  }
   return attributes.join("; ");
 }
 

@@ -323,7 +323,9 @@ async function proxyRequest(
   // Write the response to the H3 event.
   setResponseStatus(event, response.status);
   for (const [key, value] of response.headers.entries()) {
-    if (key.toLowerCase() === "set-cookie") continue;
+    if (key.toLowerCase() === "set-cookie") {
+      continue;
+    }
     setResponseHeader(event, key, value);
   }
   // Use getSetCookie() so multiple Set-Cookie values aren't collapsed.

@@ -7,7 +7,9 @@ type ServerAuth = ReturnType<typeof getAuth>;
 
 /** Drops the raw token, exactly as a load function or loader does before serialising. */
 function stripToken(auth: ServerAuth): ClientAuthResult {
-  if (!auth.isAuthenticated) return auth;
+  if (!auth.isAuthenticated) {
+    return auth;
+  }
   const { token: _token, ...session } = auth.session;
   return { isAuthenticated: true, session };
 }

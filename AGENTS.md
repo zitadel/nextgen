@@ -87,6 +87,8 @@ consumer-agent contract is the CLI's
   widgets and types from `./components`; never remove or "deduplicate" them
   ([why](docs/adrs/090-sdk-public-api-standard.md#widgets-come-through-the-framework-sdk),
   [rule](packages/AGENTS.md)).
+- **SDK reviews**: check every finding on every SDK, with one shared test
+  ([checklist](packages/AGENTS.md#reviewing-a-change-to-an-sdk)).
 - **Wire casing**: fields, enum values and parameters are `snake_case`;
   the server's `lint` lints the spec ([openapi](apps/api/api/openapi/AGENTS.md)).
 - **CLI contract**: keep `--json` output one parseable envelope on stdout;

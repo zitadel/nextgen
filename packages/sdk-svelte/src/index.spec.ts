@@ -25,7 +25,7 @@ import {
 import type { Component } from "svelte";
 import { hydrate, unmount } from "svelte";
 import { createServer } from "vite";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
 import type { ZitadelLoginProps, ZitadelLogoutProps, ZitadelSessionProps } from "./lib/types";
@@ -39,14 +39,44 @@ import {
   cssProperties,
   describeStandardAttributes,
 } from "@zitadel/client-sdk-contract/standard-attributes";
+import type { ComponentProps } from "svelte";
+import { describeSharedConfigHelpers } from "@zitadel/client-sdk-contract/config-helpers";
+import * as sdk from "./lib/index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
 function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
-  if (!element) throw new Error(`no <${tag}> was rendered`);
+  if (!element) {
+    throw new Error(`no <${tag}> was rendered`);
+  }
   return element;
 }
+
+describeSharedConfigHelpers(sdk);
+
+describe("the exported props types describe what the components accept", () => {
+  it("ZitadelLoginProps is accepted by ZitadelLogin", () => {
+    type Accepted = ComponentProps<typeof ZitadelLogin>;
+
+    expectTypeOf<keyof ZitadelLoginProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLoginProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelLogoutProps is accepted by ZitadelLogout", () => {
+    type Accepted = ComponentProps<typeof ZitadelLogout>;
+
+    expectTypeOf<keyof ZitadelLogoutProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLogoutProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelSessionProps is accepted by ZitadelSession", () => {
+    type Accepted = ComponentProps<typeof ZitadelSession>;
+
+    expectTypeOf<keyof ZitadelSessionProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelSessionProps>().toExtend<Accepted>();
+  });
+});
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
@@ -312,8 +342,12 @@ describe("package manifest", () => {
   };
 
   function targets(value: unknown): string[] {
-    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
-    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    if (typeof value === "string") {
+      return value.startsWith("./") ? [value] : [];
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(targets);
+    }
     return [];
   }
 
@@ -440,7 +474,9 @@ async function loadServerMarkup(): Promise<(props: Record<string, unknown>) => s
       try {
         return renderOnServer(Login, { props }).body;
       } finally {
-        if (document) Object.defineProperty(globalThis, "document", document);
+        if (document) {
+          Object.defineProperty(globalThis, "document", document);
+        }
       }
     };
   } finally {

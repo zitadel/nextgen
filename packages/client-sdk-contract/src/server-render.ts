@@ -322,7 +322,9 @@ export function describeServerRenderCases(sdk: Sdk, renderAttributes: RenderAttr
       async (_title, { widget, props, present, absent }) => {
         const attributes = await renderAttributes(widget, props);
         expect(attributes).toMatchObject(present);
-        for (const name of absent) expect(attributes).not.toHaveProperty(name);
+        for (const name of absent) {
+          expect(attributes).not.toHaveProperty(name);
+        }
       },
     );
   });

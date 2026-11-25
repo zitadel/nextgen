@@ -101,7 +101,9 @@ describe("useAuth()", () => {
 
     act(() => {
       const setSession = getSetSession();
-      if (setSession) setSession(signedIn);
+      if (setSession) {
+        setSession(signedIn);
+      }
     });
 
     expect(result.current.isAuthenticated).toBe(true);

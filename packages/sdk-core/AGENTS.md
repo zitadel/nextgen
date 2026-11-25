@@ -22,3 +22,12 @@ project configuration from `@zitadel/sdk-core/config`.
   a default with `@defaultValue` on every `ZitadelMiddlewareOptions` property.
 - **Do not add a handler name here.** Each meta-framework SDK names its own
   server entry after its framework; see the SDK rules.
+
+## The contract spec and its cache
+
+- List every file `src/contract.spec.ts` reads in the `test` inputs of `turbo.json`;
+  a file it reads but turbo does not hash lets a cached pass hide drift.
+- `scripts/task-graph.test.mjs` fails when a change to an SDK's `public-api.json` or
+  entry source does not move the hash of `@zitadel/sdk-core#test`.
+- Locate packages from `import.meta.dirname`, never `process.cwd()`: a wrong
+  directory makes the tables empty and the guards silently vanish.

@@ -230,8 +230,12 @@ export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntim
  * @throws {@link ZitadelRuntimeError} When the name is not a known environment.
  */
 function parseEnvironment(value: string | undefined): ZitadelEnvironment {
-  if (!value || value === "development") return "development";
-  if (value === "preview" || value === "production") return value;
+  if (!value || value === "development") {
+    return "development";
+  }
+  if (value === "preview" || value === "production") {
+    return value;
+  }
   throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", `Unsupported ZITADEL_ENVIRONMENT "${value}".`);
 }
 

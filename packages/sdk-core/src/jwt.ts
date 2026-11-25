@@ -477,7 +477,9 @@ export function decodeJwt(token: string): DecodedJwt {
  */
 export function isJwtShaped(token: string): boolean {
   const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
+  if (parts.length < 3 || !parts[0]) {
+    return false;
+  }
   try {
     const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
     return typeof header?.alg === "string" && !("enc" in header);

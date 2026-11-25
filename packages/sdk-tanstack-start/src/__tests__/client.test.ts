@@ -1,21 +1,15 @@
-import { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
+import { describeClientEntry } from "@zitadel/server-sdk-contract/client";
 import { describe, expect, it } from "vitest";
 
-import * as client from "../client";
+import * as entry from "../client";
 
-// The widgets come from `/react`; `/client` only configures the SDK, like the
+describeClientEntry(entry);
+
+// The widgets come from `/components`; `/client` only configures the SDK, like the
 // other meta-framework SDKs' `/client`, so it never offers a Lit class under a
 // React component's name.
 describe("@zitadel/sdk-tanstack-start/client", () => {
   it("exports only the SDK configuration helpers", () => {
-    expect(Object.keys(client).sort()).toEqual(["configureZitadel", "getApi", "getZitadelConfig"]);
-  });
-
-  it.each([
-    ["configureZitadel", client.configureZitadel, configureZitadel],
-    ["getApi", client.getApi, getApi],
-    ["getZitadelConfig", client.getZitadelConfig, getZitadelConfig],
-  ])("re-exports @zitadel/sdk-core/config's %s", (_name, exported, original) => {
-    expect(exported).toBe(original);
+    expect(Object.keys(entry).sort()).toEqual(["configureZitadel", "getApi", "getZitadelConfig"]);
   });
 });

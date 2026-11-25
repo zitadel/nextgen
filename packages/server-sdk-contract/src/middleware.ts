@@ -511,6 +511,21 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       expect(calls).toHaveLength(0);
     });
 
+    // The name from before the rename is no credential and no source of one.
+    it("grants no session to the old x-nextgen-auth-token header", async () => {
+      const calls = captureFetch();
+
+      const served = await serve(
+        `${ORIGIN}/admin`,
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        OPTIONS,
+      );
+
+      expect(served.status).toBe(302);
+      expect(served.headers.get("location")).toContain("/login");
+      expect(calls).toHaveLength(0);
+    });
+
     it("forwards upstream Set-Cookie headers", async () => {
       const upstream = new Headers();
       upstream.append("set-cookie", `${SHARED}=abc; HttpOnly; SameSite=Lax`);

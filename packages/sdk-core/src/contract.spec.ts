@@ -21,6 +21,31 @@ import {
 } from "./types.js";
 
 /**
+ * The `packages/` directory, located from this file rather than from the process's working
+ * directory, so the guards below read the same folders whichever directory vitest starts in.
+ */
+const PACKAGES_ROOT = resolve(import.meta.dirname, "..", "..");
+
+/**
+ * The directories of the thirteen SDKs the guards below iterate over.
+ */
+const EXPECTED_SDK_DIRS = [
+  "sdk-angular",
+  "sdk-core",
+  "sdk-next",
+  "sdk-nuxt",
+  "sdk-qwik",
+  "sdk-qwik-router",
+  "sdk-react",
+  "sdk-solid",
+  "sdk-solid-start",
+  "sdk-svelte",
+  "sdk-sveltekit",
+  "sdk-tanstack-start",
+  "sdk-vue",
+];
+
+/**
  * The element↔contract drift guard.
  *
  * `@zitadel/components` publishes the widget events its elements dispatch
@@ -153,7 +178,9 @@ function publicProperties(ctor: ElementCtor, tag: string): string[] {
   document.createElement(tag);
   const names: string[] = [];
   for (const [prop, decl] of ctor.elementProperties) {
-    if (!decl.state) names.push(String(prop));
+    if (!decl.state) {
+      names.push(String(prop));
+    }
   }
   return names;
 }
@@ -222,7 +249,7 @@ describe("standard attributes ↔ widget props", () => {
  * every tarball that points at nothing.
  */
 describe("published packages ↔ declaration maps", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const published = readdirSync(packagesDir).filter((dir) => {
     const path = `${packagesDir}${dir}/package.json`;
     return (
@@ -255,8 +282,7 @@ describe("published packages ↔ declaration maps", () => {
  * a user to add it.
  */
 describe("widget loading ↔ SDK packages", () => {
-  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const sdkDirs = readdirSync(packagesDir).filter((dir) => dir.startsWith("sdk-"));
   const WIDGET_SDKS = [
     "sdk-angular",
@@ -284,7 +310,7 @@ describe("widget loading ↔ SDK packages", () => {
   // Apps go through their framework's SDK, which owns these packages as its own
   // dependencies, so no demo declares or imports them.
   const SDK_OWNED = ["@zitadel/components", "@zitadel/api", "@zitadel/design-tokens"];
-  const appsDir = `${resolve(process.cwd(), "../..")}/apps/`;
+  const appsDir = `${resolve(PACKAGES_ROOT, "..")}/apps/`;
   const demoDirs = readdirSync(appsDir).filter((dir) => dir.startsWith("demo-"));
   const SKIPPED_DIRS = /^(node_modules|dist|\.output|\.next.*|\.nuxt.*)$/;
   // Next's own file, which `next build` and `next dev` write: no test input.
@@ -387,8 +413,7 @@ describe("widget loading ↔ SDK packages", () => {
 });
 
 describe("SDK READMEs ↔ opening structure", () => {
-  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const readmeDirs = readdirSync(packagesDir).filter(
     (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
   );
@@ -398,9 +423,13 @@ describe("SDK READMEs ↔ opening structure", () => {
     const title: string[] = [];
     const sections: string[] = [];
     for (const line of readFileSync(`${packagesDir}${dir}/README.md`, "utf8").split("\n")) {
-      if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
-      else if (!fenced && line.startsWith("# ")) title.push(line.slice(2).trim());
-      else if (!fenced && line.startsWith("## ")) sections.push(line.slice(3).trim());
+      if (/^\s*(```|~~~)/.test(line)) {
+        fenced = !fenced;
+      } else if (!fenced && line.startsWith("# ")) {
+        title.push(line.slice(2).trim());
+      } else if (!fenced && line.startsWith("## ")) {
+        sections.push(line.slice(3).trim());
+      }
     }
     return { title, sections };
   };
@@ -509,7 +538,7 @@ const entryProblems = (source: string): string[] => {
 };
 
 describe("client SDK entries ↔ @zitadel/components", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const ENTRIES: [string, string][] = [
     ["sdk-react", "sdk-react/src/index.tsx"],
     ["sdk-vue", "sdk-vue/src/index.ts"],
@@ -619,7 +648,7 @@ const edgeConfigProblems = (source: string): string[] => {
 };
 
 describe("edge project declarations", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
 
   it("declares the edge project the same way in every config", () => {
@@ -671,7 +700,7 @@ describe("edge project declarations", () => {
  * its cached test results in place.
  */
 describe("SDK specs ↔ the contract packages", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
   type Task = { dependsOn?: string[]; inputs?: string[] };
   /** A package's turbo tasks: its turbo.json, read as JSON without its comment lines. */
@@ -794,7 +823,7 @@ describe("SDK specs ↔ the contract packages", () => {
  * declared extras, say so.
  */
 describe("SDK public API ↔ the standard", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const sdkDirs = readdirSync(packagesDir).filter(
     (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
   );
@@ -931,7 +960,7 @@ describe("SDK public API ↔ the standard", () => {
  * check reads the source of every `sdk-*` package, specs and tests excluded.
  */
 describe("SDK doc comments ↔ the documentation standard", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const sdkDirs = readdirSync(packagesDir).filter((dir) => dir.startsWith("sdk-"));
   const SINGLE_LINE_DOC = /\/\*\*[^\n*][^\n]*\*\//;
   const TEST_FILE = /\.(spec|test)\.[cm]?[jt]sx?$|__tests__|test-setup|\.d\.ts$/;
@@ -962,7 +991,7 @@ describe("SDK doc comments ↔ the documentation standard", () => {
  * generated one, would tie that SDK's public API to every API change.
  */
 describe("SDK sources ↔ the API package", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const sdkDirs = readdirSync(packagesDir).filter(
     (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
   );
@@ -981,5 +1010,23 @@ describe("SDK sources ↔ the API package", () => {
     expect(readFileSync(`${packagesDir}sdk-core/src/${file}`, "utf8")).not.toMatch(
       /@zitadel\/api\/generated/,
     );
+  });
+});
+
+describe("SDK directories ↔ the guards in this file", () => {
+  it("finds every SDK, so no guard silently iterates over nothing", () => {
+    const found = readdirSync(PACKAGES_ROOT).filter((dir) => dir.startsWith("sdk-"));
+    expect(found.sort()).toEqual(EXPECTED_SDK_DIRS);
+  });
+});
+
+describe("published SDK packages ↔ their contents", () => {
+  const sdkDirs = readdirSync(PACKAGES_ROOT).filter((dir) => dir.startsWith("sdk-"));
+
+  it.each(sdkDirs)("%s keeps the generated API reference out of the tarball", (dir) => {
+    const manifest = JSON.parse(readFileSync(`${PACKAGES_ROOT}/${dir}/package.json`, "utf8")) as {
+      files?: string[];
+    };
+    expect(manifest.files).toContain("!dist/api-docs");
   });
 });

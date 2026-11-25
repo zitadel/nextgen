@@ -15,6 +15,7 @@
   "type": "module",
   "files": [
     "dist",
+    "!dist/api-docs",
     "src/lib",
     "!src/lib/**/*.spec.ts"
   ],

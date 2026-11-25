@@ -110,6 +110,41 @@ may have nothing else to read. Rules for those comments:
 - **Describe a change to an SDK's exports** in its `public-api.json` and in
   [ADR 090](../docs/adrs/090-sdk-public-api-standard.md).
 
+### Reviewing a change to an SDK
+
+Every rule here comes from a defect that review found. Check it on every SDK, and
+write its test once for all of them (see "Write shared cases once" above).
+
+- **A renamed string fails silently.** A renamed export breaks the build; an old
+  config key, env var, header, cookie, state key or file name is just ignored.
+- **List every name an app can set,** not only exports: config keys, `NUXT_*` and
+  `NUXT_PUBLIC_*` variables, runtime-config keys, `locals` keys, `useState` keys.
+- **Refuse the old name or call it out under `**Breaking:**`.** `sdk-nuxt` throws in
+  `legacyConfigProblems` because an ignored `protectedRoutes` leaves pages open.
+- **A fork with a shared name passes name and type checks.** Assert the SDK exports
+  the shared function itself (`describeSharedConfigHelpers`, `describeClientEntry`).
+- **An exported `*Props` type must be what the component accepts,** in that
+  framework's idiom (props, Vue listeners, Angular inputs, Qwik `$` props).
+- **Read a file's header comment and history before deleting it.** It may record
+  the constraint: Angular kept a local `configureZitadel` because ng-packagr could
+  not resolve `@zitadel/api`.
+- **Deleting a test deletes its guard.** Name the invariant it held and keep the
+  test if it still holds; drop it only when the behavior it pinned is gone.
+- **A test that reads other packages' files lists them in its turbo `inputs`,**
+  or a cached pass hides drift; `scripts/task-graph.test.mjs` proves it per SDK.
+- **`files` is an allowlist:** anything generated inside `dist` ships. Keep
+  `dist/api-docs` out with `!dist/api-docs`; the contract spec checks every SDK.
+- **`{@link module!name}` names the module after its file.** Renaming an entry file
+  breaks the cover page; `docs:api` runs in CI and catches it.
+- **Say "wrapper" for a component an SDK defines and "re-export" for one it passes
+  through** (TanStack Start wraps; the others re-export).
+- **A task added to the root `ci` script adds `<NONEXISTENT>` tasks** to every
+  package without it; `scripts/task-graph.test.mjs` must ignore them.
+- **Raising a peer floor moves the CLI detector floor,** the docs, the skill and the
+  changeset's `**Breaking:**` paragraph with it.
+- **Brace every control statement.** `biome lint --only=style/useBlockStatements`
+  finds the rest.
+
 `sdk-core` has rules of its own: [`sdk-core/AGENTS.md`](sdk-core/AGENTS.md).
 
 ## `packages/api`
