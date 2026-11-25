@@ -334,6 +334,77 @@ describe("EnvironmentCommand.connect", () => {
     });
   });
 
+  it("points a development environment with no project at setup", async ({ dir }) => {
+    await expect(new ProjectProbe(["--cwd", dir], config).probe()).rejects.toMatchObject({
+      nextCommands: [
+        {
+          id: "setup",
+          flags: {
+            cwd: dir,
+          },
+        },
+      ],
+    });
+  });
+
+  it("points any other environment with no project at env add, run in the directory it addressed", async ({
+    dir,
+  }) => {
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env", "staging"], config).probe(),
+    ).rejects.toMatchObject({
+      nextCommands: [
+        {
+          id: "env:add",
+          args: {
+            name: "staging",
+          },
+          flags: {
+            cwd: dir,
+          },
+        },
+      ],
+    });
+  });
+
+  it("points an --env-file run at that file and never at setup", async ({ dir }) => {
+    await writeFile(join(dir, "ci.env"), "ZITADEL_URL=https://ci.example\n");
+
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env-file", join(dir, "ci.env")], config).probe(),
+    ).rejects.toMatchObject({
+      hint: expect.stringContaining("Set ZITADEL_PROJECT_ID in"),
+      nextCommands: undefined,
+    });
+  });
+
+  it("points an environment env add already bound at its own file", async ({ dir }) => {
+    await writeFile(
+      join(dir, ".env.production.local"),
+      "ZITADEL_URL=https://production.example\nZITADEL_PROJECT_ID=proj_production\n",
+    );
+
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env", "production"], config).probe(),
+    ).rejects.toMatchObject({
+      hint: expect.stringContaining("Set ZITADEL_PROJECT_SECRET in .env.production.local"),
+      nextCommands: undefined,
+    });
+  });
+
+  it("sends no one to env add when the process environment already names the project", async ({
+    dir,
+  }) => {
+    await writeFile(join(dir, ".env.production.local"), "ZITADEL_URL=https://production.example\n");
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_ci");
+
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env", "production"], config).probe(),
+    ).rejects.toMatchObject({
+      nextCommands: undefined,
+    });
+  });
+
   it("never asks for a missing value on a dry run, even on a terminal", async ({ dir }) => {
     const file = await envFile(dir, URL_AND_PROJECT);
 

@@ -87,7 +87,7 @@ describe("FlowService.get", () => {
     });
   });
 
-  it("refuses a name that matches no flow, saying how to see what the project has", async () => {
+  it("refuses a name that matches no flow", async () => {
     await expect(
       service({
         listFlowDefinitions: {
@@ -97,7 +97,6 @@ describe("FlowService.get", () => {
     ).rejects.toMatchObject({
       name: "BackendNotFoundError",
       message: 'No flow definition named "typo"',
-      hint: "Run `flow-definition list` to see the flows this project has.",
     });
   });
 });
