@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import { SyncError, SyncStateMalformedError } from "@/lib/sync";
 
 describe("the sync errors", () => {
@@ -11,10 +10,8 @@ describe("the sync errors", () => {
 
     expect(error).toBeInstanceOf(SyncError);
     expect(error.category).toBe("invalid");
-    expect(toZitadelError(error)).toMatchObject({
-      code: "E_VALIDATION",
-      message: "Cannot read .zitadel/state.json: it is not valid JSON",
-    });
+    expect(error.code).toBe("E_VALIDATION");
+    expect(error.message).toBe("Cannot read .zitadel/state.json: it is not valid JSON");
   });
 
   it("keeps the cause", () => {

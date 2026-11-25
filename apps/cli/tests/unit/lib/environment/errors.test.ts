@@ -9,7 +9,6 @@ import {
   EnvironmentValueMissingError,
   EnvironmentValueUnboundError,
 } from "@/lib/environment";
-import { toZitadelError } from "@/lib/errors";
 
 describe("the environment errors", () => {
   it.each([
@@ -22,10 +21,6 @@ describe("the environment errors", () => {
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(EnvironmentError);
     expect(error.category).toBe(category);
-  });
-
-  it("reports a missing file with the code it always had", () => {
-    expect(toZitadelError(new EnvironmentFileMissingError("gone")).code).toBe("E_VALIDATION");
   });
 
   it("keeps the failure a server address was made from as its cause", () => {

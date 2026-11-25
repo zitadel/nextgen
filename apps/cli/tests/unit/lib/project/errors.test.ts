@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import {
   ProjectConfigMissingError,
   ProjectEnvValueError,
@@ -29,15 +28,13 @@ describe("the project errors", () => {
     expect(error).toBeInstanceOf(ProjectError);
     expect(error.category).toBe(category);
     expect(error.retryable).toBe(false);
-    expect(toZitadelError(error).code).toBe(code);
+    expect(error.code).toBe(code);
   });
 
   it("reports the message it was given", () => {
-    expect(
-      toZitadelError(new ProjectConfigMissingError("zitadel.json was not found")),
-    ).toMatchObject({
-      message: "zitadel.json was not found",
-    });
+    expect(new ProjectConfigMissingError("zitadel.json was not found").message).toBe(
+      "zitadel.json was not found",
+    );
   });
 
   it("keeps the cause of a missing file", () => {

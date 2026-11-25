@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import {
   PmCommandFailedError,
   PmCommandNotPermittedError,
@@ -17,10 +16,7 @@ describe("the package manager errors", () => {
     expect(error.category).toBe("invalid");
     expect(error.retryable).toBe(false);
     expect(error.cause).toBe(cause);
-    expect(toZitadelError(error)).toMatchObject({
-      code: "E_VALIDATION",
-      message: "bad",
-    });
+    expect(error.code).toBe("E_VALIDATION");
   });
 
   it("reports a failed command as unknown, with its message and captured output", () => {
@@ -30,10 +26,7 @@ describe("the package manager errors", () => {
     expect(error.category).toBe("unknown");
     expect(error.retryable).toBe(false);
     expect(error.output).toBe("boom");
-    expect(toZitadelError(error)).toMatchObject({
-      code: "E_VALIDATION",
-      message: "npm install failed with exit 1",
-    });
+    expect(error.code).toBe("E_VALIDATION");
   });
 
   it("reports a command that printed nothing captured without output", () => {
@@ -46,9 +39,6 @@ describe("the package manager errors", () => {
     expect(error).toBeInstanceOf(PmError);
     expect(error.category).toBe("denied");
     expect(error.retryable).toBe(false);
-    expect(toZitadelError(error)).toMatchObject({
-      code: "E_AUTH",
-      message: "Permission denied: spawn npm EACCES",
-    });
+    expect(error.code).toBe("E_AUTH");
   });
 });

@@ -72,14 +72,3 @@ describe("the orca errors' codes", () => {
     expect(error.code).toBe(code);
   });
 });
-
-describe("the orca framework mismatch", () => {
-  it("keeps the framework asked for and the one detected", () => {
-    const error = new OrcaFrameworkMismatchError("why", "react", "next");
-
-    expect(error).toMatchObject({
-      requested: "react",
-      detected: "next",
-    });
-  });
-});

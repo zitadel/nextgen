@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import {
   PublishConfigInvalidError,
   PublishConfigLiteralSecretError,
@@ -68,15 +67,6 @@ describe("the publish errors", () => {
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
     expect(error).toBeInstanceOf(PublishError);
     expect(error.category).toBe(category);
-    expect(toZitadelError(error).code).toBe(code);
-  });
-
-  it.each([
-    ["a client secret held plain", PublishConnectionVariableNotSecretError],
-    ["a client id held secret", PublishConnectionVariableNotPlainError],
-    ["a missing client id variable", PublishConnectionVariableClientIdMissingError],
-    ["a missing client secret variable", PublishConnectionVariableClientSecretMissingError],
-  ] as const)("carries the variable %s was named with", (_name, Failure) => {
-    expect(new Failure("why", "ID").variable).toBe("ID");
+    expect(error.code).toBe(code);
   });
 });

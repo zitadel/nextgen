@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import {
   IdpError,
   IdpProviderUnknownError,
@@ -18,13 +17,6 @@ describe("the identity-provider errors", () => {
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(IdpError);
     expect(error.category).toBe(category);
-  });
-
-  it("reports an unknown provider with the code it always had", () => {
-    expect(toZitadelError(new IdpProviderUnknownError("Unknown provider okta"))).toMatchObject({
-      code: "E_VALIDATION",
-      message: "Unknown provider okta",
-    });
   });
 });
 

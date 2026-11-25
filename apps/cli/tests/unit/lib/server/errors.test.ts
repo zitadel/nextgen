@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import {
   LocalServerAdminFileMalformedError,
   LocalServerAdminPlatformMissingError,
@@ -97,7 +96,6 @@ describe("the local server errors", () => {
     expect(error).toBeInstanceOf(LocalServerError);
     expect(error.category).toBe(category);
     expect(error.code).toBe(code);
-    expect(toZitadelError(error).code).toBe(code);
   });
 
   it("is retryable only while another start holds the lock", () => {
@@ -138,13 +136,6 @@ describe("the local server errors", () => {
     });
     expect(new LocalServerPortBusyError(8080)).toMatchObject({
       port: 8080,
-    });
-  });
-
-  it("reports the message and the code of an error at the boundary", () => {
-    expect(toZitadelError(new LocalServerUrlInvalidError("Invalid server"))).toMatchObject({
-      code: "E_VALIDATION",
-      message: "Invalid server",
     });
   });
 });

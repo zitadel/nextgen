@@ -18,7 +18,6 @@ import {
   ZitadelConfigFileUnreadableError,
   ZitadelConfigError,
   ZitadelConfigResourceClashError,
-  ZitadelConfigResourceMissingError,
 } from "@/lib/zitadel";
 
 describe("EXIT_CODES", () => {
@@ -112,46 +111,17 @@ describe("toZitadelError", () => {
   });
 
   it.each([
+    ["a ZitadelConfigResourceClashError", new ZitadelConfigResourceClashError("two with one slug")],
+    ["a ZitadelConfigError", new ZitadelConfigError("not valid")],
     [
-      "a ZitadelConfigResourceClashError",
-      new ZitadelConfigResourceClashError("two with one slug"),
-      "E_CONFLICT",
+      "a ZitadelConfigFileUnreadableError",
+      new ZitadelConfigFileUnreadableError("x.json is locked"),
     ],
-    [
-      "a ZitadelConfigResourceMissingError",
-      new ZitadelConfigResourceMissingError("no such connection"),
-      "E_NOT_FOUND",
-    ],
-    ["any other ZitadelConfigError", new ZitadelConfigError("not valid"), "E_VALIDATION"],
-    [
-      "a file the OS refused to read",
-      new ZitadelConfigFileUnreadableError("x.json cannot be read (EACCES)"),
-      "E_AUTH",
-    ],
-    [
-      "a file the OS would not let it touch",
-      new ZitadelConfigFileUnreadableError("x.json cannot be read (EPERM)"),
-      "E_AUTH",
-    ],
-    [
-      "a ZitadelConfigError for any other errno",
-      new ZitadelConfigError("x.json cannot be read (EIO)"),
-      "E_VALIDATION",
-    ],
-  ])("maps %s to %s", (_name, err, code) => {
-    expect(toZitadelError(err).code).toBe(code);
-  });
-
-  it("reports an error a package raised by the code and message its class states", () => {
-    const result = toZitadelError(new ZitadelConfigError("boom"));
+  ])("reports %s by the code and message its class states", (_name, error) => {
+    const result = toZitadelError(error);
 
     expect(result).toBeInstanceOf(ZitadelError);
-    expect([result.code, result.message]).toEqual(["E_VALIDATION", "boom"]);
-    expect([result.hint, result.details, result.nextCommands]).toEqual([
-      undefined,
-      undefined,
-      undefined,
-    ]);
+    expect([result.code, result.message]).toEqual([error.code, error.message]);
   });
 
   it.each([

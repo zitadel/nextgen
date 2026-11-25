@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { toZitadelError } from "@/lib/errors";
 import { PM } from "@/lib/pm";
 import { UpgradeError, UpgradeInstallFailedError, UpgradeReleaseLookupError } from "@/lib/upgrade";
 
@@ -21,7 +20,7 @@ describe("UpgradeReleaseLookupError", () => {
 
     expect(error).toBeInstanceOf(UpgradeError);
     expect([error.category, error.retryable]).toEqual(["unknown", false]);
-    expect(toZitadelError(error).code).toBe("E_VALIDATION");
+    expect(error.code).toBe("E_VALIDATION");
   });
 });
 
@@ -43,6 +42,6 @@ describe("UpgradeInstallFailedError", () => {
     const error = new UpgradeInstallFailedError(INSTALL, new Error("exit 1"));
 
     expect([error.category, error.retryable]).toEqual(["unknown", false]);
-    expect(toZitadelError(error).code).toBe("E_VALIDATION");
+    expect(error.code).toBe("E_VALIDATION");
   });
 });

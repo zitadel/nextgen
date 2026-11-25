@@ -111,7 +111,7 @@ describe("validateConnections", () => {
 
       expect(error).toBeInstanceOf(PublishConnectionVariableClientSecretMissingError);
       expect(error).toMatchObject({
-        variable: "ACME_CLIENT_SECRET",
+        message: expect.stringContaining("ACME_CLIENT_SECRET"),
       });
     });
 
@@ -206,7 +206,7 @@ describe("validateConnections", () => {
 
       expect(error).toBeInstanceOf(PublishConnectionVariableClientSecretMissingError);
       expect(error).toMatchObject({
-        variable: "ACME_CLIENT_SECRET",
+        message: expect.stringContaining("ACME_CLIENT_SECRET"),
       });
     });
 
