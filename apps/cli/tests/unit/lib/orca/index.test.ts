@@ -124,19 +124,17 @@ describe("Orca detection", () => {
     });
   });
 
-  it("throws OrcaFrameworkNotDetectedError when nothing matches", async ({ dir }) => {
+  it("throws OrcaFrameworkMissingError when nothing matches", async ({ dir }) => {
     await expect(orca.detect(dir)).rejects.toMatchObject({
-      name: "OrcaFrameworkNotDetectedError",
+      name: "OrcaFrameworkMissingError",
       category: "missing",
       message: "Could not detect a supported app framework",
     });
   });
 
-  it("throws OrcaFrameworkNotDetectedError for an unsupported requested framework", async ({
-    dir,
-  }) => {
+  it("throws OrcaFrameworkMissingError for an unsupported requested framework", async ({ dir }) => {
     await expect(orca.detect(dir, "cobol")).rejects.toMatchObject({
-      name: "OrcaFrameworkNotDetectedError",
+      name: "OrcaFrameworkMissingError",
       details: { requested: "cobol" },
     });
   });
@@ -585,7 +583,7 @@ describe("Orca.scaffold", () => {
       );
 
       await expect(undetectableOrca.scaffoldUndoably(cwd, "fake")).rejects.toMatchObject({
-        name: "OrcaFrameworkNotDetectedError",
+        name: "OrcaFrameworkMissingError",
       });
       await expect(readdir(cwd)).resolves.toEqual([".gitignore"]);
     });

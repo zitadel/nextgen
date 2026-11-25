@@ -1,24 +1,4 @@
-import type { Categorized, ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
-
-/**
- * What an orca failure carries beyond its message.
- */
-export type OrcaErrorOptions = {
-  /**
-   * What to do about it, in words that name no command or flag.
-   */
-  readonly hint?: string | undefined;
-
-  /**
-   * Structured facts about the failure, for a `--json` reader.
-   */
-  readonly details?: Readonly<Record<string, unknown>> | undefined;
-
-  /**
-   * The error that caused this one.
-   */
-  readonly cause?: unknown;
-};
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
  * Anything orca fails with on purpose.
@@ -28,15 +8,15 @@ export type OrcaErrorOptions = {
  * own error in one place. A failure nothing here anticipated is not one of
  * these: it bubbles as it was thrown.
  */
-export class OrcaError extends Error implements Categorized {
+export abstract class OrcaError extends Error {
   /** The kind of failure; a subclass states its own. */
-  readonly category: ErrorCategory = "invalid";
+  abstract readonly category: ErrorCategory;
 
   /** Whether the same request may succeed on a later attempt, with nothing changed. */
-  readonly retryable: boolean = false;
+  abstract readonly retryable: boolean;
 
   /** The stable product code the failure is reported with; a subclass states its own. */
-  readonly code: ZitadelErrorCode = "E_VALIDATION";
+  abstract readonly code: ZitadelErrorCode;
 
   /**
    * What to do about it.
@@ -54,8 +34,22 @@ export class OrcaError extends Error implements Categorized {
    * @param message - What went wrong.
    * @param options - What to do about it, the facts behind it, and its cause.
    */
-  constructor(message: string, options: OrcaErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+  constructor(
+    message: string,
+    options: {
+      readonly hint?: string | undefined;
+      readonly details?: Readonly<Record<string, unknown>> | undefined;
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super(
+      message,
+      options.cause === undefined
+        ? undefined
+        : {
+            cause: options.cause,
+          },
+    );
     this.name = new.target.name;
     this.hint = options.hint;
     this.details = options.details;
@@ -67,7 +61,7 @@ export class OrcaError extends Error implements Categorized {
  * no detector for: there is nothing to integrate with, so a new app could be
  * scaffolded into the directory.
  */
-export class OrcaFrameworkNotDetectedError extends OrcaError {
+export class OrcaFrameworkMissingError extends OrcaError {
   override readonly category: ErrorCategory = "missing";
   override readonly code: ZitadelErrorCode = "E_FRAMEWORK_NOT_DETECTED";
   override readonly retryable: boolean = false;
@@ -107,6 +101,7 @@ export class OrcaScaffoldOccupiedError extends OrcaError {
  */
 export class OrcaScaffoldBlockedError extends OrcaError {
   override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
   override readonly retryable: boolean = false;
 }
 
@@ -154,6 +149,7 @@ export class OrcaPatchLayoutConflictError extends OrcaError {
  */
 export class OrcaPatchFileUnsupportedError extends OrcaError {
   override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
   override readonly retryable: boolean = false;
 }
 
@@ -162,6 +158,7 @@ export class OrcaPatchFileUnsupportedError extends OrcaError {
  */
 export class OrcaRendererUnknownError extends OrcaError {
   override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
   override readonly retryable: boolean = false;
 }
 
@@ -179,5 +176,6 @@ export class OrcaRendererPendingError extends OrcaError {
  */
 export class OrcaInternalError extends OrcaError {
   override readonly category: ErrorCategory = "fault";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
   override readonly retryable: boolean = false;
 }

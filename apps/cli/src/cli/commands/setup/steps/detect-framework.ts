@@ -1,6 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca, OrcaFrameworkMismatchError, OrcaFrameworkNotDetectedError } from "@/lib/orca";
+import { createOrca, OrcaFrameworkMismatchError, OrcaFrameworkMissingError } from "@/lib/orca";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
@@ -123,7 +123,7 @@ export class DetectFramework extends WizardStep<
         };
       })
       .catch((error: unknown) => {
-        if (!(error instanceof OrcaFrameworkNotDetectedError)) {
+        if (!(error instanceof OrcaFrameworkMissingError)) {
           detecting.fail();
         }
         throw error;
@@ -144,7 +144,7 @@ export class DetectFramework extends WizardStep<
         throw error;
       })
       .catch(async (error: unknown) => {
-        if (!(error instanceof OrcaFrameworkNotDetectedError)) {
+        if (!(error instanceof OrcaFrameworkMissingError)) {
           throw error;
         }
         const target = await orca.inspectScaffoldTarget(this.deps.cwd);

@@ -2,7 +2,6 @@ import { mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { isErrno } from "@/lib/errno";
-import { errorMessage } from "@/lib/errors";
 import { readDirIfExists } from "@/lib/fs";
 
 import { detectors } from "./detectors";
@@ -10,7 +9,7 @@ import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
 import {
   OrcaFrameworkMismatchError,
-  OrcaFrameworkNotDetectedError,
+  OrcaFrameworkMissingError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
   OrcaScaffoldOccupiedError,
@@ -28,7 +27,7 @@ export { issuerFromPort } from "./detectors/port";
 export {
   OrcaError,
   OrcaFrameworkMismatchError,
-  OrcaFrameworkNotDetectedError,
+  OrcaFrameworkMissingError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
   OrcaPatchFileConflictError,
@@ -41,7 +40,6 @@ export {
   OrcaScaffoldBlockedError,
   OrcaScaffoldOccupiedError,
 } from "./errors";
-export type { OrcaErrorOptions } from "./errors";
 export type { Detector, FrameworkFacts } from "./detectors/types";
 
 /** One framework the CLI can scaffold from scratch, surfaced to the picker. */
@@ -164,10 +162,11 @@ export class Orca {
   /**
    * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},
    * honouring an explicit `requested` framework. Throws
-   * {@link OrcaFrameworkNotDetectedError} when nothing matches or
+   * {@link OrcaFrameworkMissingError} when nothing matches or
    * `requested` has no detector, {@link OrcaFrameworkMismatchError} when
-   * `cwd` holds an app of a framework other than `requested`, and {@link OrcaFrameworkUnsupportedError} when a detector
-   * recognises an app it does not support.
+   * `cwd` holds an app of a framework other than `requested`, and
+   * {@link OrcaFrameworkUnsupportedError} when a detector recognises an app
+   * it does not support.
    */
   async detect(cwd: string, requested?: string): Promise<FrameworkFacts> {
     const candidates = requested
@@ -177,7 +176,7 @@ export class Orca {
       : this.detectors;
     if (requested && candidates.length === 0) {
       const supported = this.frameworkIds();
-      throw new OrcaFrameworkNotDetectedError(`Unsupported framework "${requested}"`, {
+      throw new OrcaFrameworkMissingError(`Unsupported framework "${requested}"`, {
         hint: `Supported frameworks: ${supported.join(", ")}.`,
         details: { requested, supported },
       });
@@ -202,7 +201,7 @@ export class Orca {
         }
       }
     }
-    throw new OrcaFrameworkNotDetectedError("Could not detect a supported app framework", {
+    throw new OrcaFrameworkMissingError("Could not detect a supported app framework", {
       hint: "Run it from your app project directory, or from an empty directory to scaffold a new app.",
     });
   }
@@ -213,19 +212,17 @@ export class Orca {
    * callers (e.g. `eject`) can probe and degrade gracefully.
    */
   async tryDetect(cwd: string): Promise<FrameworkFacts | undefined> {
-    return this.detect(cwd)
-      .catch((error: unknown) => {
-        if (error instanceof OrcaFrameworkNotDetectedError) {
-          return undefined;
-        }
-        throw error;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof OrcaFrameworkUnsupportedError) {
-          return undefined;
-        }
-        throw error;
-      });
+    try {
+      return await this.detect(cwd);
+    } catch (error) {
+      if (
+        error instanceof OrcaFrameworkMissingError ||
+        error instanceof OrcaFrameworkUnsupportedError
+      ) {
+        return undefined;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -258,9 +255,9 @@ export class Orca {
 
   /**
    * Creates a new `framework` project in `cwd`, then re-detects it to return
-   * the resulting {@link FrameworkFacts}. Throws OrcaScaffoldBlockedError when the directory
-   * already contains a project ("already scaffolded") and OrcaInternalError when no
-   * scaffolder supports the framework.
+   * the resulting {@link FrameworkFacts}. Throws OrcaScaffoldOccupiedError when the
+   * directory already contains a project ("already scaffolded") and OrcaInternalError
+   * when no scaffolder supports the framework.
    */
   async scaffold(cwd: string, framework: string, force = false): Promise<FrameworkFacts> {
     const scaffold = await this.scaffoldUndoably(cwd, framework, force);
@@ -278,7 +275,7 @@ export class Orca {
     const target = await this.inspectScaffoldTarget(cwd);
     if (!target.scaffoldable && !force) {
       throw new OrcaScaffoldOccupiedError(`Cannot scaffold: ${cwd} is not empty`, {
-        ...(target.reason === undefined ? {} : { hint: target.reason }),
+        hint: target.reason,
         details: { entries: target.entries },
       });
     }
@@ -306,14 +303,7 @@ export class Orca {
         return this.detect(cwd, framework);
       })
       .catch(async (error: unknown) => {
-        // The scaffold's own failure stays reachable as the cause of an undo
-        // that fails as well, so it is never hidden by it.
-        await undo().catch((undoError: unknown) => {
-          throw new Error(
-            `${errorMessage(error)}; and the directory could not be put back: ${errorMessage(undoError)}`,
-            { cause: error },
-          );
-        });
+        await undo();
         throw error;
       });
     return {

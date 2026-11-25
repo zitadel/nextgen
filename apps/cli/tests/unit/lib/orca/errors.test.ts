@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   OrcaError,
   OrcaFrameworkMismatchError,
-  OrcaFrameworkNotDetectedError,
+  OrcaFrameworkMissingError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
   OrcaPatchFileConflictError,
@@ -21,12 +21,24 @@ describe("OrcaError", () => {
   it("carries its message, name, hint, details and cause", () => {
     const cause = new Error("underneath");
 
-    expect(new OrcaError("why", { hint: "do", details: { a: 1 }, cause })).toMatchObject({
-      message: "why",
-      name: "OrcaError",
-      category: "invalid",
+    const error = new OrcaInternalError("why", {
       hint: "do",
-      details: { a: 1 },
+      details: {
+        a: 1,
+      },
+      cause,
+    });
+
+    expect(error).toBeInstanceOf(OrcaError);
+    expect(error).toMatchObject({
+      message: "why",
+      name: "OrcaInternalError",
+      code: "E_VALIDATION",
+      category: "fault",
+      hint: "do",
+      details: {
+        a: 1,
+      },
       cause,
     });
   });
@@ -34,7 +46,7 @@ describe("OrcaError", () => {
 
 describe("the orca errors", () => {
   it.each([
-    [new OrcaFrameworkNotDetectedError("why"), "OrcaFrameworkNotDetectedError", "missing"],
+    [new OrcaFrameworkMissingError("why"), "OrcaFrameworkMissingError", "missing"],
     [new OrcaFrameworkUnsupportedError("why"), "OrcaFrameworkUnsupportedError", "invalid"],
     [new OrcaFrameworkMismatchError("why"), "OrcaFrameworkMismatchError", "conflict"],
     [new OrcaScaffoldOccupiedError("why"), "OrcaScaffoldOccupiedError", "conflict"],
@@ -55,7 +67,7 @@ describe("the orca errors", () => {
 
 describe("the orca errors' codes", () => {
   it.each([
-    ["no app", new OrcaFrameworkNotDetectedError("why"), "E_FRAMEWORK_NOT_DETECTED"],
+    ["no app", new OrcaFrameworkMissingError("why"), "E_FRAMEWORK_NOT_DETECTED"],
     ["an unsupported app", new OrcaFrameworkUnsupportedError("why"), "E_UNSUPPORTED_PROJECT_SHAPE"],
     ["another framework", new OrcaFrameworkMismatchError("why"), "E_CONFLICT"],
     ["an occupied directory", new OrcaScaffoldOccupiedError("why"), "E_CONFLICT"],

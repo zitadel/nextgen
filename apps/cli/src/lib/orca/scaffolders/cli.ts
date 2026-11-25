@@ -2,7 +2,7 @@ import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { execaSync } from "execa";
 
-import { OrcaScaffoldBlockedError } from "../errors";
+import { OrcaScaffoldBlockedError } from "@/lib/orca/errors";
 import { warnings } from "@/lib/ui";
 
 import {
@@ -151,24 +151,14 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     }
     const status = result.exitCode ?? 1;
     if (status !== 0) {
-      const stdout = String(result.stdout);
-      const stderr = String(result.stderr);
-      const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
       throw new Error(
-        `Command "${command} ${args.join(" ")}" exited with status ${String(status)}${
-          output ? `\n${output}` : ""
-        }`,
+        `Command "${command} ${args.join(" ")}" exited with status ${String(status)}`,
+        {
+          cause: result,
+        },
       );
     }
   }
-}
-
-function truncateCommandOutput(output: string): string {
-  const limit = 4000;
-  if (output.length <= limit) {
-    return output;
-  }
-  return `${output.slice(0, limit)}\n... output truncated ...`;
 }
 
 export function npmPackageNameErrors(name: string): string[] {
