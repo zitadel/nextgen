@@ -128,7 +128,7 @@ describe("toZitadelError", () => {
     ["any other ZitadelConfigError", new ZitadelConfigError("not valid"), "E_VALIDATION"],
     [
       "a file the OS refused to read",
-      new ZitadelConfigFileUnreadableError("x.json cannot be read (EACCES)"),
+      new ZitadelConfigFileUnreadableError("denied", "x.json cannot be read (EACCES)"),
       "E_AUTH",
     ],
   ])("maps %s to %s", (_name, err, code) => {

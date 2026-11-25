@@ -640,15 +640,36 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
 }
 
 /**
- * A file or directory the operating system refused to let this process read.
+ * A file or directory that cannot be read: the operating system refused to let
+ * this process read it, or a file stands where a directory is expected.
  *
  * @remarks
- * Only a refused permission carries advice, so only that becomes this error;
- * any other failure of the file system reaches the caller as it came.
+ * Only these two carry advice, so only they become this error; any other
+ * failure of the file system reaches the caller as it came.
  */
 export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "denied";
+  override readonly category: ErrorCategory;
   override readonly retryable: boolean = false;
+
+  /** Why it cannot be read: the permission is refused, or it is the wrong kind of entry. */
+  readonly reason: "denied" | "wrong-kind";
+
+  /**
+   * Make the error.
+   *
+   * @param reason - Why it cannot be read.
+   * @param message - What went wrong.
+   * @param options - What to do about it, and the facts behind it.
+   */
+  constructor(
+    reason: "denied" | "wrong-kind",
+    message: string,
+    options: ZitadelConfigErrorOptions = {},
+  ) {
+    super(message, options);
+    this.reason = reason;
+    this.category = reason === "denied" ? "denied" : "conflict";
+  }
 }
 
 /** The bundle cannot be built from what `.zitadel/` holds. */

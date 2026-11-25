@@ -381,10 +381,17 @@ describe("ZitadelConfigFileExistsError", () => {
 });
 
 describe("ZitadelConfigFileUnreadableError", () => {
-  it("is an auth failure", () => {
-    expect(new ZitadelConfigFileUnreadableError("x.json cannot be read")).toMatchObject({
+  it("is an auth failure when the permission is refused", () => {
+    expect(new ZitadelConfigFileUnreadableError("denied", "x.json cannot be read")).toMatchObject({
       category: "denied",
+      reason: "denied",
     });
+  });
+
+  it("is a conflict when a file stands where a directory is expected", () => {
+    expect(
+      new ZitadelConfigFileUnreadableError("wrong-kind", "x cannot be read (ENOTDIR)"),
+    ).toMatchObject({ category: "conflict", reason: "wrong-kind" });
   });
 });
 

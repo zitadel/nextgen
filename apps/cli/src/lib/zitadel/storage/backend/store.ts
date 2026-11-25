@@ -37,6 +37,14 @@ const WRITE_FLAG = {
   replace: "w",
 } as const satisfies Record<WriteMode, string>;
 
+/** Why a read fails with advice, by the errno that says it. */
+const UNREADABLE_REASONS: Readonly<Record<string, "denied" | "wrong-kind">> = {
+  EACCES: "denied",
+  EPERM: "denied",
+  ENOTDIR: "wrong-kind",
+  EISDIR: "wrong-kind",
+};
+
 /**
  * The configuration as files under a project's `.zitadel/`, kept in whatever
  * {@link FileSystem} it is given.
@@ -263,6 +271,7 @@ export abstract class Store implements ConfigStore {
             throw error;
           }
           throw new ZitadelConfigFileUnreadableError(
+            "denied",
             `$file ${JSON.stringify(ref)} cannot be read`,
             {
               hint: "Check that the referenced file is readable, then run the command again.",
@@ -423,19 +432,20 @@ export abstract class Store implements ConfigStore {
    * The failure for a file or directory that cannot be read.
    *
    * @remarks
-   * Only a refused permission carries advice, so only that becomes an error of
-   * this package; any other failure is returned as it came, for the caller to
-   * throw.
+   * Only a refused permission and a file where a directory is expected carry
+   * advice, so only those become an error of this package; any other failure is
+   * returned as it came, for the caller to throw.
    *
    * @param path - The project-relative path.
    * @param code - The errno of the failed operation, when it had one.
    * @returns The error to throw.
    */
   private static unreadable(path: string, code: string | undefined, error: unknown): unknown {
-    if (code !== "EACCES" && code !== "EPERM") {
+    const reason = UNREADABLE_REASONS[code ?? ""];
+    if (reason === undefined) {
       return error;
     }
-    return new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`, {
+    return new ZitadelConfigFileUnreadableError(reason, `${path} cannot be read (${code})`, {
       hint: "Check that the file is readable, then run the command again.",
       details: {
         file: path,
