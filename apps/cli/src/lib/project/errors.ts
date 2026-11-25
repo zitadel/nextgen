@@ -13,38 +13,20 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 export abstract class ProjectError extends ZitadelLibError {}
 
 /**
- * `zitadel.json` is not there: the directory is not a project that was set up.
+ * A file the project needs is not there: `zitadel.json` or `.zitadel/secret`.
  */
-export class ProjectConfigMissingError extends ProjectError {
+export class ProjectFileMissingError extends ProjectError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /**
- * `.zitadel/secret` is not there.
+ * A project file or value cannot be used as it is: `.zitadel/secret` is not
+ * JSON, not an object or lacks what it must hold, or a value a `.env` file
+ * cannot hold has a line break or no quoting that reads it back unchanged.
  */
-export class ProjectSecretMissingError extends ProjectError {
-  override readonly category: ErrorCategory = "missing";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
-/**
- * `.zitadel/secret` cannot be read as what it should be: it is not JSON, not an
- * object, or lacks what it must hold.
- */
-export class ProjectMalformedError extends ProjectError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
-/**
- * A value that a `.env` file cannot hold as it is, so it is not written: it has
- * a line break, or no quoting reads it back unchanged.
- */
-export class ProjectEnvValueError extends ProjectError {
+export class ProjectInvalidError extends ProjectError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";

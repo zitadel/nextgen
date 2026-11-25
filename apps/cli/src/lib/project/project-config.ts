@@ -5,7 +5,7 @@ import { isErrno } from "@/lib/errno";
 import { pathExistsStrict } from "@/lib/fs";
 import { isObject, parseJsonObject } from "@/lib/json";
 
-import { ProjectConfigMissingError } from "./errors";
+import { ProjectFileMissingError } from "./errors";
 
 /**
  * A project's `zitadel.json`: the committed record of how setup configured it.
@@ -36,12 +36,12 @@ export class ProjectConfig {
 
   /**
    * Reads and parses `zitadel.json`. A missing file is a
-   * {@link ProjectConfigMissingError}; other errors (malformed JSON)
+   * {@link ProjectFileMissingError}; other errors (malformed JSON)
    * propagate unchanged.
    *
    * @param cwd - The project's directory.
    * @returns The project's configuration.
-   * @throws {@link ProjectConfigMissingError} When there is no `zitadel.json`.
+   * @throws {@link ProjectFileMissingError} When there is no `zitadel.json`.
    */
   static async read(cwd: string): Promise<ProjectConfig> {
     try {
@@ -50,7 +50,7 @@ export class ProjectConfig {
       );
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
-        throw new ProjectConfigMissingError("zitadel.json was not found", error);
+        throw new ProjectFileMissingError("zitadel.json was not found", error);
       }
       throw error;
     }

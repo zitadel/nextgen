@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { Project, ProjectConfigMissingError } from "@/lib/project";
+import { Project, ProjectFileMissingError } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
 
 async function makeTempDir(): Promise<string> {
@@ -34,7 +34,7 @@ describe("Project.config", () => {
       await Project.at(cwd).config();
       expect.unreachable("expected ProjectConfig.read to throw");
     } catch (error) {
-      expect(error).toBeInstanceOf(ProjectConfigMissingError);
+      expect(error).toBeInstanceOf(ProjectFileMissingError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
       });
@@ -50,7 +50,7 @@ describe("Project.config", () => {
     await writeFile(join(cwd, "zitadel.json"), "{ not valid json");
 
     await expect(Project.at(cwd).config()).rejects.toThrow();
-    await expect(Project.at(cwd).config()).rejects.not.toBeInstanceOf(ProjectConfigMissingError);
+    await expect(Project.at(cwd).config()).rejects.not.toBeInstanceOf(ProjectFileMissingError);
   });
 
   it("rejects a non-object JSON root via parseJsonObject", async () => {

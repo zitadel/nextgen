@@ -5,7 +5,7 @@ import { isErrno } from "@/lib/errno";
 import { pathExistsStrict } from "@/lib/fs";
 import { parseJsonObject, stableStringify } from "@/lib/json";
 
-import { ProjectMalformedError, ProjectSecretMissingError } from "./errors";
+import { ProjectFileMissingError, ProjectInvalidError } from "./errors";
 import { SecretFile } from "./secret-file";
 
 /**
@@ -69,13 +69,13 @@ export class ProjectSecret {
 
   /**
    * Reads, parses and structurally validates `.zitadel/secret`. A missing file
-   * is a {@link ProjectSecretMissingError}; a present-but-incomplete file is a
-   * {@link ProjectMalformedError}.
+   * is a {@link ProjectFileMissingError}; a present-but-incomplete file is a
+   * {@link ProjectInvalidError}.
    *
    * @param cwd - The project's directory.
    * @returns The secret.
-   * @throws {@link ProjectSecretMissingError} When there is no secret.
-   * @throws {@link ProjectMalformedError} When the file lacks a required field.
+   * @throws {@link ProjectFileMissingError} When there is no secret.
+   * @throws {@link ProjectInvalidError} When the file lacks a required field.
    */
   static async read(cwd: string): Promise<ProjectSecret> {
     try {
@@ -86,7 +86,7 @@ export class ProjectSecret {
         typeof secret.preview_secret !== "string" ||
         !Array.isArray(secret.preview_origins)
       ) {
-        throw new ProjectMalformedError(".zitadel/secret is missing required fields");
+        throw new ProjectInvalidError(".zitadel/secret is missing required fields");
       }
       // primary_origins was added with kinded origins; older secrets only have
       // preview_origins. A missing array reads as empty so doctor --fix can
@@ -95,12 +95,12 @@ export class ProjectSecret {
         secret.primary_origins = [];
       }
       if (!Array.isArray(secret.primary_origins)) {
-        throw new ProjectMalformedError(".zitadel/secret is missing required fields");
+        throw new ProjectInvalidError(".zitadel/secret is missing required fields");
       }
       return new ProjectSecret(cwd, secret as ProjectSecretData);
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
-        throw new ProjectSecretMissingError(".zitadel/secret was not found", error);
+        throw new ProjectFileMissingError(".zitadel/secret was not found", error);
       }
       throw error;
     }

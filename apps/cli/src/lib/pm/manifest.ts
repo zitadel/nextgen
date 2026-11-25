@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { PackageJson } from "type-fest";
 
+import { errorMessage } from "@/lib/errors";
 import { readIfExists } from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
 
@@ -59,10 +60,7 @@ export class Manifest {
     try {
       return new Manifest(parseJsonObject(text, path) as PackageJson);
     } catch (error) {
-      throw new PmManifestInvalidError(
-        error instanceof Error ? error.message : `Cannot read ${path} as a package.json`,
-        error,
-      );
+      throw new PmManifestInvalidError(errorMessage(error), error);
     }
   }
 
@@ -91,10 +89,7 @@ export class Manifest {
         ? undefined
         : new Manifest(parseJsonObject(text, path) as PackageJson);
     } catch (error) {
-      throw new PmManifestInvalidError(
-        error instanceof Error ? error.message : `Cannot read ${path} as a package.json`,
-        error,
-      );
+      throw new PmManifestInvalidError(errorMessage(error), error);
     }
   }
 }

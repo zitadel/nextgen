@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { Project, ProjectMalformedError, ProjectSecretMissingError } from "@/lib/project";
+import { Project, ProjectFileMissingError, ProjectInvalidError } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
 const VALID_SECRET = {
@@ -38,7 +38,7 @@ describe("Project.secret", () => {
       await Project.at(cwd).secret();
       expect.unreachable("expected ProjectSecret.read to throw");
     } catch (error) {
-      expect(error).toBeInstanceOf(ProjectSecretMissingError);
+      expect(error).toBeInstanceOf(ProjectFileMissingError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
       });
@@ -54,7 +54,7 @@ describe("Project.secret", () => {
     const { project_secret: _omit, ...partial } = VALID_SECRET;
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(partial));
 
-    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectMalformedError);
+    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectInvalidError);
     await expect(Project.at(cwd).secret()).rejects.toThrow(
       ".zitadel/secret is missing required fields",
     );
@@ -90,7 +90,7 @@ describe("Project.secret", () => {
     await writeFile(join(cwd, ".zitadel/secret"), "{ broken");
 
     await expect(Project.at(cwd).secret()).rejects.toThrow();
-    await expect(Project.at(cwd).secret()).rejects.not.toBeInstanceOf(ProjectSecretMissingError);
+    await expect(Project.at(cwd).secret()).rejects.not.toBeInstanceOf(ProjectFileMissingError);
   });
 });
 

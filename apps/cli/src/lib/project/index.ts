@@ -1,10 +1,8 @@
 export type { EnvFile } from "./env-file";
 export {
-  ProjectConfigMissingError,
-  ProjectEnvValueError,
   ProjectError,
-  ProjectMalformedError,
-  ProjectSecretMissingError,
+  ProjectFileMissingError,
+  ProjectInvalidError,
 } from "./errors";
 export type { Gitignore, GitignoreRule } from "./gitignore";
 export { Project } from "./project";

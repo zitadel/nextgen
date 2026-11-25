@@ -290,16 +290,15 @@ export function failureText(message: string): FailureText {
 }
 
 /**
- * Normalises any thrown value into a {@link ZitadelError}.
- *
- * @remarks
- * A {@link ZitadelError} is returned as it is, and an error a package raised
- * on purpose is reported with the `code` its class states. What is left is errno, Zod-like and plain errors, which are reported
- * as `E_VALIDATION` unless errno says more, with the original shape under
- * `details` for debugging without leaking it into the message.
- *
- * @param error - Whatever was caught.
- * @returns The error the CLI reports.
+ * Normalises any thrown value into a {@link ZitadelError}. Inspection is
+ * ordered most-specific-first (already-normalised, HTTP status, then
+ * errno/filesystem, no response, Zod-like, generic `Error`, then a
+ * catch-all) so the most actionable category and hint win. A cancelled
+ * request arrives already normalised, as the `E_CANCELLED` error that
+ * `./interrupt` aborts it with. This is the boundary that lets the rest
+ * of the CLI `throw` plain errors yet still produce consistent, categorised
+ * output. The original error shape is preserved under `details` for
+ * debugging without leaking it into the user-facing message.
  */
 export function toZitadelError(error: unknown): ZitadelError {
   if (error instanceof ZitadelError) {
@@ -354,7 +353,7 @@ export function toZitadelError(error: unknown): ZitadelError {
 /**
  * A {@link BackendError} as the CLI's error. One the server answered carries
  * its status, and is classified by it; one the backend raised itself carries
- * its class, and its message, hint and details as they were given.
+ * its class, and its message as it was given.
  */
 function fromBackendError(error: BackendError): ZitadelError {
   if (error instanceof BackendUnavailableError && error.reason !== undefined) {

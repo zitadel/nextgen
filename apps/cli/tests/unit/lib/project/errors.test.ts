@@ -1,29 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ProjectConfigMissingError,
-  ProjectEnvValueError,
-  ProjectError,
-  ProjectMalformedError,
-  ProjectSecretMissingError,
-} from "@/lib/project";
+import { ProjectError, ProjectFileMissingError, ProjectInvalidError } from "@/lib/project";
 
 describe("the project errors", () => {
   it.each([
     [
-      "missing config",
-      new ProjectConfigMissingError("zitadel.json was not found"),
+      "missing file",
+      new ProjectFileMissingError("zitadel.json was not found"),
       "missing",
       "E_VALIDATION",
     ],
-    [
-      "missing secret",
-      new ProjectSecretMissingError(".zitadel/secret was not found"),
-      "missing",
-      "E_VALIDATION",
-    ],
-    ["malformed file", new ProjectMalformedError("bad"), "invalid", "E_VALIDATION"],
-    ["value a .env cannot hold", new ProjectEnvValueError("bad"), "invalid", "E_VALIDATION"],
+    ["invalid file or value", new ProjectInvalidError("bad"), "invalid", "E_VALIDATION"],
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
     expect(error).toBeInstanceOf(ProjectError);
     expect(error.category).toBe(category);
@@ -32,7 +19,7 @@ describe("the project errors", () => {
   });
 
   it("reports the message it was given", () => {
-    expect(new ProjectConfigMissingError("zitadel.json was not found").message).toBe(
+    expect(new ProjectFileMissingError("zitadel.json was not found").message).toBe(
       "zitadel.json was not found",
     );
   });
@@ -40,6 +27,6 @@ describe("the project errors", () => {
   it("keeps the cause of a missing file", () => {
     const cause = new Error("ENOENT");
 
-    expect(new ProjectSecretMissingError(".zitadel/secret was not found", cause).cause).toBe(cause);
+    expect(new ProjectFileMissingError(".zitadel/secret was not found", cause).cause).toBe(cause);
   });
 });

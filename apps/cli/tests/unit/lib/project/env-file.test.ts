@@ -4,7 +4,7 @@ import { parseEnv } from "node:util";
 
 import { describe, expect } from "vitest";
 
-import { Project, ProjectEnvValueError } from "@/lib/project";
+import { Project, ProjectInvalidError } from "@/lib/project";
 import { it } from "@tests/fixtures";
 
 /** The name of the env file each test writes in its directory. */
@@ -59,7 +59,7 @@ describe("Project.envFile", () => {
     const path = join(dir, ENV_FILE);
 
     const appended = Project.envFile(path).append("ZITADEL_PROJECT_SECRET", "a\nb");
-    await expect(appended).rejects.toBeInstanceOf(ProjectEnvValueError);
+    await expect(appended).rejects.toBeInstanceOf(ProjectInvalidError);
     await expect(appended).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("ZITADEL_PROJECT_SECRET"),
@@ -68,6 +68,6 @@ describe("Project.envFile", () => {
 
     await expect(
       Project.envFile(path).write({ ZITADEL_PROJECT_SECRET: "line\rbreak" }),
-    ).rejects.toBeInstanceOf(ProjectEnvValueError);
+    ).rejects.toBeInstanceOf(ProjectInvalidError);
   });
 });

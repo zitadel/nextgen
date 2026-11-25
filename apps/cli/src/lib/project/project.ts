@@ -90,7 +90,7 @@ export class Project {
    * @param key - The variable.
    * @param value - Its value.
    * @returns The line, without its line break.
-   * @throws {@link ZitadelError} When the value has a line break, or no
+   * @throws {@link ProjectInvalidError} When the value has a line break, or no
    *   quoting reads it back unchanged.
    */
   static envLine(key: string, value: string): string {
@@ -145,7 +145,7 @@ export class Project {
    * Reads `zitadel.json`.
    *
    * @returns The project's configuration.
-   * @throws {@link ZitadelError} When there is no `zitadel.json`.
+   * @throws {@link ProjectFileMissingError} When there is no `zitadel.json`.
    */
   config(): Promise<ProjectConfig> {
     return ProjectConfig.read(this.cwd);
@@ -177,8 +177,8 @@ export class Project {
    * Reads and validates `.zitadel/secret`.
    *
    * @returns The secret.
-   * @throws {@link ZitadelError} When there is none.
-   * @throws {Error} When it lacks a required field.
+   * @throws {@link ProjectFileMissingError} When there is none.
+   * @throws {@link ProjectInvalidError} When it lacks a required field.
    */
   secret(): Promise<ProjectSecret> {
     return ProjectSecret.read(this.cwd);
