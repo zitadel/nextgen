@@ -31,7 +31,8 @@ export interface LegacySources {
  * `protectedRoutes`, and its protected pages would open to signed-out visitors. The module calls
  * this while it loads, which sees the environment of the build, and the server handler calls it
  * when the server starts, which sees the environment the server runs in. A variable set only
- * on the running server is caught by the second call only.
+ * on the running server is caught by the second call only. Both read `process.env`, so a
+ * variable that a runtime hands over only as a binding (Cloudflare Workers) is not seen.
  *
  * @param sources - Where to look for the old settings.
  * @returns One line per old setting found, or an empty list when the app uses the new names.

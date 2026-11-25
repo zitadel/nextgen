@@ -184,7 +184,8 @@ Rules that follow:
   build, but a renamed config key, environment variable, runtime-config key,
   header, cookie, state key or file name is ignored by whoever still uses the old
   one. An SDK that takes settings from such a name refuses the old one at setup:
-  `sdk-nuxt` throws in `legacyConfigProblems`, because an ignored
+  `sdk-nuxt` throws in `refuseLegacyConfig`, from the module at build time and from
+  the server handler at start, because an ignored
   `protectedRoutes` leaves pages open. The other SDKs take their settings in code,
   so an old name fails at build time there. Every renamed string is listed under
   Renames and in the changeset's `**Breaking:**` paragraph.
@@ -217,7 +218,7 @@ Rules that follow:
 | `NextgenMiddlewareOptions`, `NextgenProvider`, `NextgenHandle`, `NextgenRequestOptions`, `NextgenRequestDecision` | `ZitadelMiddlewareOptions`, `ZitadelProvider`, `ZitadelHandle`, `ZitadelRequestOptions`, `ZitadelRequestDecision` |
 | the `x-nextgen-auth-token` header, `nextgenAuth` on the request context, the Nuxt `nextgen` configuration key and `NUXT_NEXTGEN_*` variables, the `plugin@nextgen.ts` Qwik route | `x-zitadel-auth-token`, `zitadelAuth`, `zitadel`, `NUXT_ZITADEL_*`, `plugin@zitadel.ts` |
 | the legacy `__nextgen_session` cookie handling in `sdk-core` | removed; the server already refuses that name |
-| `runtimeConfig.public.nextgenProxyPath` and `nextgenApiBase` (Nuxt), and the `NUXT_PUBLIC_NEXTGEN_*` variables that set them | `zitadelProxyPath` and `zitadelApiBase`, and `NUXT_PUBLIC_ZITADEL_*`; the module refuses the old ones |
+| `runtimeConfig.public.nextgenProxyPath` and `nextgenApiBase` (Nuxt), and the `NUXT_PUBLIC_NEXTGEN_*` variables that set them | `zitadelProxyPath` and `zitadelApiBase`, and `NUXT_PUBLIC_ZITADEL_*`; the module and the server handler refuse the old ones |
 | `useState("nextgen-auth")` (Nuxt) and the `nextgenAuth` key of `event.locals`, `event.context` and Qwik's shared map | `"zitadel-auth"` and `zitadelAuth` |
 
 `sdk-angular` gains `getApi` and `getZitadelConfig`, and `sdk-next` gains

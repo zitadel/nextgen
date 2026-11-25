@@ -22,10 +22,11 @@ const UNSET_BY_NITRO = {
  */
 async function moduleHandler(
   zitadel: Record<string, unknown>,
+  rest: Record<string, unknown> = {},
 ): Promise<ReturnType<typeof toWebHandler>> {
   vi.resetModules();
   const { setRuntimeConfig } = await import("../stubs/nuxt-imports");
-  setRuntimeConfig({ zitadel });
+  setRuntimeConfig({ zitadel, ...rest });
   const { default: handler } = await import("../../runtime/server/handler");
   const app = createApp();
   app.use(handler);
@@ -199,5 +200,25 @@ describe("middlewareOptions", () => {
     await expect(moduleHandler({})).rejects.toThrow(
       "NUXT_NEXTGEN_PROTECTED_ROUTES is now NUXT_ZITADEL_PROTECTED_ROUTES",
     );
+  });
+
+  it.each([
+    [
+      "runtimeConfig.nextgen",
+      { nextgen: {} },
+      "runtimeConfig.nextgen is now runtimeConfig.zitadel",
+    ],
+    [
+      "runtimeConfig.public.nextgenProxyPath",
+      { public: { nextgenProxyPath: "/auth" } },
+      "runtimeConfig.public.nextgenProxyPath is now runtimeConfig.public.zitadelProxyPath",
+    ],
+    [
+      "runtimeConfig.public.nextgenApiBase",
+      { public: { nextgenApiBase: "/auth" } },
+      "runtimeConfig.public.nextgenApiBase is now runtimeConfig.public.zitadelApiBase",
+    ],
+  ])("refuses to start with %s in the runtime config", async (_label, rest, problem) => {
+    await expect(moduleHandler({}, rest)).rejects.toThrow(problem);
   });
 });

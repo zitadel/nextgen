@@ -1029,9 +1029,9 @@ describe("published SDK packages ↔ their contents", () => {
     const manifest = JSON.parse(readFileSync(`${PACKAGES_ROOT}/${dir}/package.json`, "utf8")) as {
       files?: string[];
     };
+    const files = manifest.files ?? [];
     // A negation only removes what an earlier pattern added, so it must come after `dist`.
-    expect(manifest.files?.indexOf("!dist/api-docs")).toBeGreaterThan(
-      manifest.files?.indexOf("dist") ?? Number.POSITIVE_INFINITY,
-    );
+    expect(files).toContain("dist");
+    expect(files.indexOf("!dist/api-docs")).toBeGreaterThan(files.indexOf("dist"));
   });
 });

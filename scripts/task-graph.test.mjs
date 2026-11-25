@@ -494,7 +494,8 @@ describe.sequential("task graph cache and ordering contracts", () => {
       changed(manifest, `${manifestText}\n`, () => {
         expect(dry().get("@zitadel/sdk-core#test").hash).not.toBe(before);
       });
-      for (const { source } of Object.values(JSON.parse(manifestText).entries)) {
+      const sources = new Set(Object.values(JSON.parse(manifestText).entries).map((e) => e.source));
+      for (const source of sources) {
         const path = `packages/${dir}/${source}`;
         const sourceText = readFileSync(join(repo, path), "utf8");
         changed(path, `${sourceText}\n// changed entry source\n`, () => {
