@@ -399,7 +399,9 @@ Each invocation prints one JSON object:
   the real command to run.
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
-  is structured context.
+  is structured context. `details` holds the facts of what failed, keyed in
+  snake_case (`path`, `lock_file`, `owner_pid`, `consulted`, `variable`), so a
+  script reads them there rather than parsing `message` or `hint`.
 - `next_commands`: the suggested follow-ups, inside `data` on success and at
   the top level on a no-op or failure. Prefer these over free-text hints. Each
   is runnable as written: it names flags by their long form (`--message`, not

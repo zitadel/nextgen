@@ -424,6 +424,7 @@ describe("api", () => {
           message: "No operation is called nopeOp",
           hint: `List them with ${expectedPublicCliCommand("api ls")}, or give a path such as /users/query.`,
           next_commands: [expectedPublicCliCommand(`api ls --json --cwd ${app.path}`)],
+          details: { near: [] },
         });
       });
 
@@ -451,6 +452,37 @@ describe("api", () => {
         });
       });
 
+      it.each([
+        ["a path that no operation has", ["api", "/no/such/path", "--json"]],
+        [
+          "a method that is not the operation's own",
+          ["api", "listVariables", "-X", "DELETE", "--json"],
+        ],
+      ])("points to the list on %s", async (_situation, argv) => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(argv);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          next_commands: [expectedPublicCliCommand(`api ls --json --cwd ${app.path}`)],
+        });
+      });
+
+      it("refuses an operation id with a near miss, naming it in the hint", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["api", "listVariable", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          message: "No operation is called listVariable",
+          hint: expect.stringMatching(/^Did you mean .*listVariables.*\? List them all with /),
+        });
+      });
+
       it("carries an operation name holding a control character raw", async () => {
         const app = await aSetUpApp();
 
@@ -465,6 +497,7 @@ describe("api", () => {
           message: "No operation is called a\u001b[2Jb",
           hint: `List them with ${expectedPublicCliCommand("api ls")}, or give a path such as /users/query.`,
           next_commands: [expectedPublicCliCommand(`api ls --json --cwd ${app.path}`)],
+          details: { near: [] },
         });
       });
 

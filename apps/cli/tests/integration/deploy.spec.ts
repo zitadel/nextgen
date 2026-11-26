@@ -350,6 +350,7 @@ describe("deploy", () => {
           message:
             "Configuration validation failed (1 issue):\n  - .zitadel/policies/auth.factor.password.set.json: config.min_length Too small: expected number to be >=1",
           hint: "Fix the files named above and rerun; no changes were made.",
+          details: { issues: expect.any(Array) },
         });
       });
 
@@ -407,6 +408,7 @@ describe("deploy", () => {
           message:
             "Configuration validation failed (1 issue):\n  - .zitadel/policies/password.json: holds the auth.factor.password.set policy, so it must be named auth.factor.password.set.json",
           hint: "Fix the files named above and rerun; no changes were made.",
+          details: { issues: expect.any(Array) },
         });
       });
 
@@ -1316,6 +1318,13 @@ describe("deploy", () => {
           next_commands: [
             expectedPublicCliCommand(app.againAsRun("variable set GOOGLE_CLIENT_SECRET --secret")),
           ],
+          details: {
+            variable: "GOOGLE_CLIENT_SECRET",
+            field: "client_secret",
+            file: ".zitadel/idps/google.json",
+            secret: true,
+            preview: false,
+          },
         });
       });
 
@@ -1871,6 +1880,7 @@ describe("deploy", () => {
             code: "E_VALIDATION",
             message: `Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: ${issue}`,
             hint: "Fix the files named above and rerun; no changes were made.",
+            details: { issues: expect.any(Array) },
           });
         });
 
@@ -1889,6 +1899,7 @@ describe("deploy", () => {
             code: "E_VALIDATION",
             message: `Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: ${issue}`,
             hint: "Fix the files named above and rerun; no changes were made.",
+            details: { issues: expect.any(Array) },
           });
         });
       });

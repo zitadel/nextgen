@@ -352,6 +352,7 @@ describe("branding eject", () => {
           next_commands: [
             expectedPublicCliCommand(`branding eject --design minimal --force --cwd ${app.path}`),
           ],
+          details: { file: ".zitadel/branding/branding.json" },
         });
       });
 

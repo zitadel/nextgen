@@ -321,6 +321,7 @@ describe("console", () => {
             expectedPublicCliCommand(`stop --cwd ${app.path}`),
             expectedPublicCliCommand(`start --cwd ${app.path}`),
           ],
+          details: { server_url: `http://localhost:${app.localPortOf(started)}` },
         });
       });
 

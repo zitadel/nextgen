@@ -1137,12 +1137,12 @@ describe("auth-method sso enable", () => {
             code: "E_CONFLICT",
             message: ".zitadel/idps/acme-sso.json and acme_sso both use ACME_SSO_CLIENT_ID",
             hint: "Point one of them at a variable of its own, then run the command again.",
-            details: {
+            details: expect.objectContaining({
               file: ".zitadel/idps/acme-sso.json",
               slug: "acme_sso",
               other_slug: "acme-sso",
               variable: "ACME_SSO_CLIENT_ID",
-            },
+            }),
           });
         });
       });
@@ -1165,12 +1165,12 @@ describe("auth-method sso enable", () => {
             message:
               ".zitadel/idps/acme-sso.json is already named acme-sso and connects to https://sso.acme.example, not https://sso.other.example",
             hint: "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another slug for this connection, then move the schemas and flows that name the old one to it.",
-            details: {
+            details: expect.objectContaining({
               file: ".zitadel/idps/acme-sso.json",
               slug: "acme-sso",
               issuer: "https://sso.other.example",
               existing_issuer: "https://sso.acme.example",
-            },
+            }),
           });
         });
       });
@@ -1190,9 +1190,9 @@ describe("auth-method sso enable", () => {
             message:
               '--slug: "google" is a built-in provider. Choose another name for this connection.',
             hint: "Fix --slug and run the command again.",
-            details: {
+            details: expect.objectContaining({
               flag: "--slug",
-            },
+            }),
           });
         });
       });
@@ -1258,11 +1258,11 @@ describe("auth-method sso enable", () => {
             code: "E_NOT_FOUND",
             message: "This project has no user schema named no\u001b[31mpe",
             hint: "Known schemas: default-human-user (human-user)",
-            details: {
+            details: expect.objectContaining({
               requested: "no\u001b[31mpe",
               known: [SCHEMA],
               schemas: [{ name: SCHEMA, object_type: "human-user" }],
-            },
+            }),
           });
         });
       });
