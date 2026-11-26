@@ -34,10 +34,9 @@ export class OrcaFrameworkUnsupportedError extends OrcaError {
 
 /**
  * A request orca cannot act on as given: a scaffold that cannot start until
- * something in the way is dealt with (a Node the framework's tool refuses, a
- * tool that is not installed), a file of the project a patch cannot edit
- * because its content is not in a shape the patch handles, or a renderer id
- * that names none.
+ * something in the way is dealt with (a Node the framework's tool refuses), a
+ * file of the project a patch cannot edit because its content is not in a
+ * shape the patch handles, or a renderer id that names none.
  */
 export class OrcaInvalidError extends OrcaError {
   override readonly category: ErrorCategory = "invalid";
