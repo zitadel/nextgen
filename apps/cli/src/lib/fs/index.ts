@@ -59,6 +59,7 @@ import {
   FsDeniedError,
   FsError,
   FsExistsError,
+  FsFailedError,
   FsIsDirectoryError,
   FsNotDirectoryError,
   FsNotFoundError,
@@ -75,7 +76,8 @@ export * from "./errors";
  * @param error - Whatever the Node call threw.
  * @param operation - What the call was doing, as a verb, for the message.
  * @param path - What it was doing it to.
- * @returns The typed error for a known code, otherwise `error` itself.
+ * @returns The typed error for a known code, {@link FsFailedError} for any other
+ *   errno code, otherwise `error` itself.
  */
 function fsFailure(error: unknown, operation: string, path: unknown): unknown {
   const message = `Cannot ${operation} ${String(path)}`;
@@ -93,6 +95,9 @@ function fsFailure(error: unknown, operation: string, path: unknown): unknown {
   }
   if (isErrno(error, "EEXIST")) {
     return new FsExistsError(message, error);
+  }
+  if (error instanceof Error && "code" in error && typeof error.code === "string") {
+    return new FsFailedError(`${message} (${error.code})`, error);
   }
   return error;
 }

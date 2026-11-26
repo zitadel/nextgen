@@ -6,12 +6,14 @@ import { describe, expect } from "vitest";
 import {
   entryExists,
   FsDeniedError,
+  FsFailedError,
   FsIsDirectoryError,
   FsNotDirectoryError,
   isFile,
   pathExists,
   pathExistsStrict,
   readDirIfExists,
+  readFile,
   readIfExists,
   readIfReadable,
 } from "@/lib/fs";
@@ -126,6 +128,25 @@ describe("isFile", () => {
   it("is false for a path that does not exist", async ({ dir }) => {
     expect(await isFile(join(dir, "missing"))).toBe(false);
   });
+
+  it.skipIf(process.platform === "win32")("is false for a symlink loop", async ({ dir }) => {
+    await symlink(join(dir, "b"), join(dir, "a"));
+    await symlink(join(dir, "a"), join(dir, "b"));
+
+    expect(await isFile(join(dir, "a"))).toBe(false);
+  });
+});
+
+describe("readFile", () => {
+  it.skipIf(process.platform === "win32")(
+    "throws an FsFailedError for a failure with no class of its own",
+    async ({ dir }) => {
+      await symlink(join(dir, "b"), join(dir, "a"));
+      await symlink(join(dir, "a"), join(dir, "b"));
+
+      await expect(readFile(join(dir, "a"), "utf8")).rejects.toBeInstanceOf(FsFailedError);
+    },
+  );
 });
 
 describe("entryExists", () => {

@@ -46,3 +46,13 @@ export class FsExistsError extends FsError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
+
+/**
+ * Any other failure Node reported with an errno code (`ELOOP`, `ENAMETOOLONG`,
+ * `EIO`, ...), so catching {@link FsError} catches every file-system failure.
+ */
+export class FsFailedError extends FsError {
+  override readonly category: ErrorCategory = "unknown";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
