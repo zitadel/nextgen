@@ -1130,6 +1130,6 @@ them requests, that also share a `flow_id`:
   of 200,000 chain rows took 6.8 to 8.6 s with it and 7.1 to 7.3 s without.
   The index costs nothing that shows beside the spread of the runs.
 
-Spanner was not measured, and its statements were not run: no local Spanner
-was at hand. There the index takes an entry for every event, as each index of
-the first amendment does.
+Spanner was not measured: no local Spanner shows a plan. Its statements and
+migrations pass the Spanner lane. There the index takes an entry for every
+event, as each index of the first amendment does.
