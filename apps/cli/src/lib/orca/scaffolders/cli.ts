@@ -1,4 +1,4 @@
-import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
+import { mkdir, readdir, rename, rmdir } from "@/lib/fs";
 import { basename, join } from "node:path";
 import { execaSync } from "execa";
 

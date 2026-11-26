@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile } from "@/lib/fs";
 import { text } from "node:stream/consumers";
 
 import { ZitadelError } from "@/lib/errors";

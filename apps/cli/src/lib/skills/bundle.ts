@@ -1,4 +1,4 @@
-import { cp, glob, mkdir, readFile, rm } from "node:fs/promises";
+import { cp, glob, mkdir, readFile, rm } from "@/lib/fs";
 import { basename, dirname, join } from "node:path";
 import { parse } from "yaml";
 

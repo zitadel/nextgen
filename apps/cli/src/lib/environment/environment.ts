@@ -1,5 +1,5 @@
 import { SERVER } from "@/constants";
-import { readdir } from "node:fs/promises";
+import { readdir } from "@/lib/fs";
 import { join, resolve } from "node:path";
 
 import { Project } from "@/lib/project";

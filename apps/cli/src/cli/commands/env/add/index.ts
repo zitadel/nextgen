@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { stat } from "@/lib/fs";
 import { basename, join } from "node:path";
 import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";

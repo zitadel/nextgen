@@ -1,4 +1,4 @@
-import { realpath } from "node:fs/promises";
+import { realpath } from "@/lib/fs";
 import { resolve } from "node:path";
 
 import type { Run, TcpListener } from "./local";

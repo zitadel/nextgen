@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile } from "@/lib/fs";
 
 import { isObject } from "@/lib/json";
 

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { realpath, rm } from "node:fs/promises";
+import { realpath, rm } from "@/lib/fs";
 import { join } from "node:path";
 
 import { entryExists } from "@/lib/fs";

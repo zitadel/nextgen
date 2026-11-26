@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "@/lib/fs";
 import { join } from "node:path";
 
 import { readIfExists } from "@/lib/fs";

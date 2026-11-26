@@ -15,7 +15,9 @@ import type { BufferView, NonSharedBuffer } from "node:buffer";
 import type {
   BigIntStats,
   BufferEncodingOption,
+  CopyOptions,
   Dirent,
+  GlobOptionsWithoutFileTypes,
   MakeDirectoryOptions,
   Mode,
   ObjectEncodingOptions,
@@ -24,22 +26,31 @@ import type {
   ReadFileOptionsWithBuffer,
   ReadFileOptionsWithBufferEncoding,
   ReadFileOptionsWithStringEncoding,
+  RmDirOptions,
   StatOptions,
   Stats,
+  TimeLike,
 } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
 import {
   access as nodeAccess,
+  chmod as nodeChmod,
+  copyFile as nodeCopyFile,
+  cp as nodeCp,
+  glob as nodeGlob,
   lstat as nodeLstat,
   mkdir as nodeMkdir,
+  mkdtemp as nodeMkdtemp,
   open as nodeOpen,
   readdir as nodeReaddir,
   readFile as nodeReadFile,
   realpath as nodeRealpath,
   rename as nodeRename,
   rm as nodeRm,
+  rmdir as nodeRmdir,
   stat as nodeStat,
   unlink as nodeUnlink,
+  utimes as nodeUtimes,
   writeFile as nodeWriteFile,
 } from "node:fs/promises";
 
@@ -310,6 +321,79 @@ export async function access(path: PathLike, mode?: number): Promise<void> {
     await nodeAccess(path, mode);
   } catch (error) {
     throw fsFailure(error, "access", path);
+  }
+}
+
+/** `chmod` of `node:fs/promises`, throwing typed errors. */
+export async function chmod(path: PathLike, mode: Mode): Promise<void> {
+  try {
+    await nodeChmod(path, mode);
+  } catch (error) {
+    throw fsFailure(error, "change the mode of", path);
+  }
+}
+
+/** `cp` of `node:fs/promises`, throwing typed errors. */
+export async function cp(
+  source: string | URL,
+  destination: string | URL,
+  options?: CopyOptions,
+): Promise<void> {
+  try {
+    await nodeCp(source, destination, options);
+  } catch (error) {
+    throw fsFailure(error, "copy", source);
+  }
+}
+
+/** `copyFile` of `node:fs/promises`, throwing typed errors. */
+export async function copyFile(src: PathLike, dest: PathLike, mode?: number): Promise<void> {
+  try {
+    await nodeCopyFile(src, dest, mode);
+  } catch (error) {
+    throw fsFailure(error, "copy", src);
+  }
+}
+
+/** `mkdtemp` of `node:fs/promises`, throwing typed errors. */
+export async function mkdtemp(
+  prefix: string,
+  options?: ObjectEncodingOptions | BufferEncoding | null,
+): Promise<string> {
+  try {
+    return await nodeMkdtemp(prefix, options);
+  } catch (error) {
+    throw fsFailure(error, "create a directory at", prefix);
+  }
+}
+
+/** `utimes` of `node:fs/promises`, throwing typed errors. */
+export async function utimes(path: PathLike, atime: TimeLike, mtime: TimeLike): Promise<void> {
+  try {
+    await nodeUtimes(path, atime, mtime);
+  } catch (error) {
+    throw fsFailure(error, "set the times of", path);
+  }
+}
+
+/** `rmdir` of `node:fs/promises`, throwing typed errors. */
+export async function rmdir(path: PathLike, options?: RmDirOptions): Promise<void> {
+  try {
+    await nodeRmdir(path, options);
+  } catch (error) {
+    throw fsFailure(error, "remove", path);
+  }
+}
+
+/** `glob` of `node:fs/promises` yielding path strings, throwing typed errors. */
+export async function* glob(
+  pattern: string | readonly string[],
+  options: GlobOptionsWithoutFileTypes = {},
+): AsyncGenerator<string> {
+  try {
+    yield* nodeGlob(pattern, options);
+  } catch (error) {
+    throw fsFailure(error, "search", options.cwd ?? pattern);
   }
 }
 

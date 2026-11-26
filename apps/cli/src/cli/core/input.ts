@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { open } from "node:fs/promises";
+import { FsError, open } from "@/lib/fs";
 import { text } from "node:stream/consumers";
 
 import { Errors, Flags, type Command, type Interfaces, Parser } from "@oclif/core";
@@ -535,6 +535,9 @@ export class Input {
         await handle.close();
       }
     } catch (error) {
+      if (error instanceof FsError) {
+        return unreadable(error);
+      }
       if (!(error instanceof ZitadelError)) {
         return unreadable(error);
       }

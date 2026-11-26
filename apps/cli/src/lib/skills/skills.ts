@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { cp, readdir, rm } from "node:fs/promises";
+import { cp, readdir, rm } from "@/lib/fs";
 import { dirname, join } from "node:path";
 import * as rosie from "rosie-skills";
 
