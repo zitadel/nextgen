@@ -624,6 +624,39 @@ describe("doctor", () => {
         expect((await before.changes()).added).toContain(".zitadel/secret");
       });
 
+      it.each([
+        ["is not JSON", (app: ScaffoldedApp) => app.corruptsItsLocalSecret()],
+        ["cannot be read", (app: ScaffoldedApp) => app.cannotReadItsLocalSecret()],
+      ])("skips the checks that read a project secret that %s", async (_how, breakIt) => {
+        const app = await aSetUpApp();
+        await breakIt(app);
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf(result).data.checks).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: "claim", status: "pass" }),
+            expect.objectContaining({ name: "issuer-origin", status: "pass" }),
+          ]),
+        );
+      });
+
+      it.each([
+        ["is not JSON", (app: ScaffoldedApp) => app.corruptsItsPackageJson()],
+        ["cannot be read", (app: ScaffoldedApp) => app.cannotReadItsPackageJson()],
+      ])("skips the dependency check of a package.json that %s", async (_how, breakIt) => {
+        const app = await aSetUpApp();
+        await breakIt(app);
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf(result).data.checks).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: "dependency-version", status: "pass" }),
+          ]),
+        );
+      });
+
       it("moves a Vite app's dev proxy that fixes the server's address onto ZITADEL_URL", async () => {
         const app = await aSetUpReactApp();
         await app.fixesItsServerAddress();

@@ -224,6 +224,22 @@ describe("Store.read", () => {
     });
 
     it.skipIf(AS_ROOT)(
+      "names the first file in path order when several cannot be read",
+      async ({ dir, other }) => {
+        const { store, project } = open(dir, other);
+        await project.write({ [IDP_B]: "{}", [IDP_A]: "{}" });
+        await project.restrict(IDP_B, 0o000);
+        await project.restrict(IDP_A, 0o000);
+
+        const error = await rejectionOf(() => {
+          return store.read("connections");
+        });
+
+        expect(error).toMatchObject({ message: `${IDP_A} cannot be read (EACCES)` });
+      },
+    );
+
+    it.skipIf(AS_ROOT)(
       "carries the errno of a directory it may not read",
       async ({ dir, other }) => {
         const { store, project } = open(dir, other);

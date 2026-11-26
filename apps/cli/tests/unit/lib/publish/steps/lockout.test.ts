@@ -1263,6 +1263,36 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining(UNFINISHED)]);
     });
 
+    it("keeps the other scans' warnings when one fails with an error that is not the backend's", async () => {
+      const context = aStepContext({
+        config: aConfig({
+          schemas: { "1.json": signingInWith("human-user", "username") },
+          flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
+        }),
+        client: {
+          ...aPlatform(),
+          queryUsers: {
+            pages: (query) => {
+              const scansUnserved = (query.filter ?? []).some((f) => {
+                return f.operation === "not_equals";
+              });
+              if (scansUnserved) {
+                throw new TypeError("users is not iterable");
+              }
+              return pagesOf(pageOf({}, [aUser("u1", "human-user")], query));
+            },
+          },
+        },
+      });
+
+      const said = await everythingSaid(context);
+
+      expect(said).toEqual([
+        expect.stringContaining('has no "username"'),
+        expect.stringContaining(UNFINISHED),
+      ]);
+    });
+
     it("keeps the identifier warning when a link read fails", async () => {
       const context = aStepContext({
         config: aConfig({

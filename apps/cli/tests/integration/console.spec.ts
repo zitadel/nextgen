@@ -111,6 +111,35 @@ describe("console", () => {
         });
       });
 
+      it("refuses when the server it started was stopped, and says to start it", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+        await app.run(["stop", "--json"]);
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          hint: expect.any(String),
+          next_commands: [expectedPublicCliCommand(`start --cwd ${app.path}`)],
+        });
+      });
+
+      it("refuses when the recorded server does not answer, and says to start it", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+        await app.run(["stop", "--json"]);
+        await app.writeStoppedServerRecord();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          hint: expect.any(String),
+          next_commands: [expectedPublicCliCommand(`start --cwd ${app.path}`)],
+        });
+      });
+
       it("opens the console of a project on the hosted cloud, not a local one", async () => {
         const app = await aSetUpApp();
 

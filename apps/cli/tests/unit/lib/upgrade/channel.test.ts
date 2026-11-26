@@ -266,6 +266,16 @@ describe("ReleaseChannel.latest", () => {
     await expect(channel().latest()).resolves.toBeUndefined();
   });
 
+  it("reads a registry answering null as no release", async ({ channel, server }) => {
+    server.use(
+      http.get(`${REGISTRY}/-/package/@acme%2fcli/dist-tags`, () => {
+        return HttpResponse.json(null);
+      }),
+    );
+
+    await expect(channel().latest()).resolves.toBeUndefined();
+  });
+
   it("does not take a cached value that is not a version, nor write it back", async ({
     channel,
     down,
