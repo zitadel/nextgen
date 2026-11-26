@@ -82,5 +82,6 @@ export { serverCanonicalFlow } from "./server-canonical-flow.js";
 export { PASSWORD_FIELD } from "./fixtures/login.js";
 
 export type { CapturedRequest, MockHandle };
+export type { PinRefusal } from "./handlers.js";
 export type { MockBranding } from "./branding.js";
 export type { FlowStepName } from "./flow-machine.js";

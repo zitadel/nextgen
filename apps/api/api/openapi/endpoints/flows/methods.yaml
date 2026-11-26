@@ -36,6 +36,14 @@ post:
       `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.
     - A revoked release answers `409` with `rel.revoked`.
 
+    An `X-Zitadel-Release` header pins the flow to a release deployed to the
+    target: the flow runs on the newest deployment of that release there
+    instead of the target's newest deployment, and the cookie seals it as it
+    seals any other. A pin to a release never deployed to the target answers
+    `409` with `rel.not_deployed`, a revoked one `409` with `rel.revoked`, an
+    unknown id `404` with `rel.not_found`, and a value that is not a release id
+    `400` with `rel.reference_invalid`. A pinned request needs an `Origin`.
+
     A request with no `Origin` passes the check, and so does the server's own
     origin, from which its console previews a project's login. Both are served
     the project's newest primary deployment unless the project lists that
@@ -68,6 +76,7 @@ post:
         type: string
         format: uri
         example: https://www.acme.com
+    - $ref: ../../components/parameters/release-pin.yaml
   requestBody:
     required: true
     content:
@@ -114,10 +123,10 @@ post:
                 message: 'no live preview for https://acme-k3x9v2-acmeinc.vercel.app; run zitadel preview on this branch'
     '409':
       description: |
-        Nothing is deployed to the resolved target (`rel.not_deployed`), the
-        request needs a primary deployment and the project has none
-        (`rel.no_default`), or the release of that deployment is revoked
-        (`rel.revoked`).
+        Nothing is deployed to the resolved target, or the pinned release was
+        never deployed there (`rel.not_deployed`), the request needs a primary
+        deployment and the project has none (`rel.no_default`), or the release
+        that would serve it is revoked (`rel.revoked`).
       content:
         application/json:
           schema:
@@ -128,6 +137,14 @@ post:
               value:
                 code: rel.not_deployed
                 message: 'nothing is deployed to https://www.acme.com'
+            pinned_not_deployed:
+              summary: The pinned release was never deployed to this origin
+              value:
+                code: rel.not_deployed
+                message: 'release rel_01KB3F7Y4Q2M8XVN is not deployed to https://www.acme.com; rebuild the app to pin the current release'
+                details:
+                  origin: https://www.acme.com
+                  release: rel_01KB3F7Y4Q2M8XVN
             no_default:
               summary: No primary deployment
               value:

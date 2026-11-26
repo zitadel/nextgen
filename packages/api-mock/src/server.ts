@@ -238,7 +238,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
       res.setHeader(
         "Access-Control-Allow-Headers",
-        "Content-Type, Idempotency-Key, X-Zitadel-CSRF",
+        "Content-Type, Idempotency-Key, X-Zitadel-CSRF, X-Zitadel-Release",
       );
       res.status(204).end();
       return;

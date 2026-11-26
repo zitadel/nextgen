@@ -141,6 +141,25 @@ func TestReleaseErrorResponseConflicts(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
 }
 
+// A pin that names no release id is the caller's malformed request.
+func TestReleaseErrorResponseReferenceInvalid(t *testing.T) {
+	assert.Equal(t, http.StatusBadRequest, releaseErrorResponse(domain.ErrReleaseReferenceInvalid(nil)).StatusCode)
+}
+
+// releasePin reads no pin from an absent header and refuses a malformed one.
+func TestReleasePin(t *testing.T) {
+	pin, err := releasePin(api.OptString{})
+	require.NoError(t, err)
+	assert.Empty(t, pin)
+
+	pin, err = releasePin(api.NewOptString("rel_01KB3F7Y4Q2M8XVN"))
+	require.NoError(t, err)
+	assert.Equal(t, "rel_01KB3F7Y4Q2M8XVN", pin)
+
+	_, err = releasePin(api.NewOptString("sha256:9f2c"))
+	assert.ErrorIs(t, err, domain.ErrReleaseReferenceInvalid(nil))
+}
+
 // The 409 names every origin still serving the release and its kind, so the
 // caller can deploy, roll back or remove the preview before revoking again.
 func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {

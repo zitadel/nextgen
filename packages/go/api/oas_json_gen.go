@@ -29318,6 +29318,22 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelReferenceInvalidCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.reference_invalid")
+		{
+			s := s.RelReferenceInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelRevokedCreateFlowErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.revoked")
@@ -29465,6 +29481,9 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 				case "rel.not_found":
 					s.Type = RelNotFoundCreateFlowErrorResponse
 					found = true
+				case "rel.reference_invalid":
+					s.Type = RelReferenceInvalidCreateFlowErrorResponse
+					found = true
 				case "rel.revoked":
 					s.Type = RelRevokedCreateFlowErrorResponse
 					found = true
@@ -29565,6 +29584,10 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case RelNotFoundCreateFlowErrorResponse:
 		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelReferenceInvalidCreateFlowErrorResponse:
+		if err := s.RelReferenceInvalid.Decode(d); err != nil {
 			return err
 		}
 	case RelRevokedCreateFlowErrorResponse:
@@ -111754,6 +111777,40 @@ func (s *OptRelProjectNotFoundDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes RelReferenceInvalidDetails as json.
+func (o OptRelReferenceInvalidDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes RelReferenceInvalidDetails from json.
+func (o *OptRelReferenceInvalidDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptRelReferenceInvalidDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(RelReferenceInvalidDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptRelReferenceInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptRelReferenceInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes RelRevisionNotFoundDetails as json.
 func (o OptRelRevisionNotFoundDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -138698,6 +138755,194 @@ func (s *RelProjectNotFoundDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *RelReferenceInvalid) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *RelReferenceInvalid) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("rel.reference_invalid")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfRelReferenceInvalid = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes RelReferenceInvalid from json.
+func (s *RelReferenceInvalid) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RelReferenceInvalid to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RelReferenceInvalid")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfRelReferenceInvalid) {
+					name = jsonFieldsNameOfRelReferenceInvalid[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RelReferenceInvalid) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RelReferenceInvalid) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s RelReferenceInvalidDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s RelReferenceInvalidDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes RelReferenceInvalidDetails from json.
+func (s *RelReferenceInvalidDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RelReferenceInvalidDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RelReferenceInvalidDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s RelReferenceInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RelReferenceInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *RelRevisionNotFound) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -154304,6 +154549,22 @@ func (s SetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelReferenceInvalidSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.reference_invalid")
+		{
+			s := s.RelReferenceInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelRevokedSetUserPasswordErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.revoked")
@@ -154536,6 +154797,9 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 				case "rel.not_found":
 					s.Type = RelNotFoundSetUserPasswordErrorResponse
 					found = true
+				case "rel.reference_invalid":
+					s.Type = RelReferenceInvalidSetUserPasswordErrorResponse
+					found = true
 				case "rel.revoked":
 					s.Type = RelRevokedSetUserPasswordErrorResponse
 					found = true
@@ -154621,6 +154885,10 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case RelNotFoundSetUserPasswordErrorResponse:
 		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelReferenceInvalidSetUserPasswordErrorResponse:
+		if err := s.RelReferenceInvalid.Decode(d); err != nil {
 			return err
 		}
 	case RelRevokedSetUserPasswordErrorResponse:

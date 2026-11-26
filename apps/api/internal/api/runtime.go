@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 
+	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -18,6 +19,16 @@ func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin string) 
 		return ctx, err
 	}
 	return service.WithRuntimeResolution(ctx, resolution), nil
+}
+
+// releasePin reads the X-Zitadel-Release header: the release id it pins, ""
+// when the request pins none.
+func releasePin(header api.OptString) (string, error) {
+	value, ok := header.Get()
+	if !ok {
+		return "", nil
+	}
+	return domain.ParseReleaseReference(value)
 }
 
 // resolvePrimaryRuntime puts the project's newest primary deployment on the

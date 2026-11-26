@@ -1115,7 +1115,7 @@
       "put": {
         "operationId": "setUserPassword",
         "summary": "Set a user's password",
-        "description": "Sets a user's password, hashed with the project's current password hashing\npolicy.\n\nThe new password replaces the current one, and setting it emits\n`auth.factor.password.set`. A password the project's password policy\nrefuses answers `user.password_policy_violation`; send one that meets the\npolicy.\n\nThe password policy is the one in the release that serves the caller's\n`Origin`, chosen as `createFlow` (`POST /flows`) chooses it. A frontend on a\npreview URL gets that preview's policy, and one on a primary origin the\nnewest primary deployment's. A request with no `Origin`, or from the\nconsole when the project does not list the console's origin, gets the\nproject's newest primary deployment.\n\nIf the request is refused:\n- `403 proj.origin_not_allowed`: the project admits no such origin. Add it\n  with `zitadel origin add`.\n- `403 proj.preview_not_live`: the origin matches a preview pattern but has\n  no live preview. Run `zitadel preview` on the branch.\n- `409 rel.not_deployed`: nothing is deployed to the origin. Run\n  `zitadel deploy`.\n- `409 rel.no_default`: the request names no origin and the project has no\n  primary deployment. Run `zitadel deploy`.\n- `409 rel.revoked`: the release that serves the origin is revoked.\n",
+        "description": "Sets a user's password, hashed with the project's current password hashing\npolicy.\n\nThe new password replaces the current one, and setting it emits\n`auth.factor.password.set`. A password the project's password policy\nrefuses answers `user.password_policy_violation`; send one that meets the\npolicy.\n\nThe password policy is the one in the release that serves the caller's\n`Origin`, chosen as `createFlow` (`POST /flows`) chooses it. A frontend on a\npreview URL gets that preview's policy, and one on a primary origin the\nnewest primary deployment's. A request with no `Origin`, or from the\nconsole when the project does not list the console's origin, gets the\nproject's newest primary deployment.\n\nIf the request is refused:\n- `403 proj.origin_not_allowed`: the project admits no such origin. Add it\n  with `zitadel origin add`.\n- `403 proj.preview_not_live`: the origin matches a preview pattern but has\n  no live preview. Run `zitadel preview` on the branch.\n- `409 rel.not_deployed`: nothing is deployed to the origin. Run\n  `zitadel deploy`.\n- `409 rel.no_default`: the request names no origin and the project has no\n  primary deployment. Run `zitadel deploy`.\n- `409 rel.revoked`: the release that serves the origin is revoked.\n\nAn `X-Zitadel-Release` header pins the policy to a release deployed to\nthat origin, as it pins a flow; see `createFlow` (`POST /flows`).\n",
         "tags": [
           "Users"
         ],
@@ -1133,6 +1133,9 @@
               "format": "uri",
               "example": "https://www.acme.com"
             }
+          },
+          {
+            "$ref": "#/components/parameters/release-pin"
           }
         ],
         "security": [
@@ -1941,7 +1944,7 @@
       "post": {
         "operationId": "createFlow",
         "summary": "Start a flow",
-        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flows/{flow_id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`, including when the project lists no origins.\n  Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to a listed origin or a live preview answers `409`\n  with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added\n  since the last deploy serves nothing until the next one.\n- A loopback origin the project does not list answers `409` with\n  `rel.not_deployed` too, as no deployment can name it. Add it with\n  `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check, and so does the server's own\norigin, from which its console previews a project's login. Both are served\nthe project's newest primary deployment unless the project lists that\norigin; with no primary deployment they answer `409` with\n`rel.no_default`. A loopback origin passes the check and is its own\ntarget. A step submitted from the server's own origin is still refused\nunless the project lists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flows/{flow_id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
+        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flows/{flow_id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`, including when the project lists no origins.\n  Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to a listed origin or a live preview answers `409`\n  with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added\n  since the last deploy serves nothing until the next one.\n- A loopback origin the project does not list answers `409` with\n  `rel.not_deployed` too, as no deployment can name it. Add it with\n  `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nAn `X-Zitadel-Release` header pins the flow to a release deployed to the\ntarget: the flow runs on the newest deployment of that release there\ninstead of the target's newest deployment, and the cookie seals it as it\nseals any other. A pin to a release never deployed to the target answers\n`409` with `rel.not_deployed`, a revoked one `409` with `rel.revoked`, an\nunknown id `404` with `rel.not_found`, and a value that is not a release id\n`400` with `rel.reference_invalid`. A pinned request needs an `Origin`.\n\nA request with no `Origin` passes the check, and so does the server's own\norigin, from which its console previews a project's login. Both are served\nthe project's newest primary deployment unless the project lists that\norigin; with no primary deployment they answer `409` with\n`rel.no_default`. A loopback origin passes the check and is its own\ntarget. A step submitted from the server's own origin is still refused\nunless the project lists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flows/{flow_id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
         "tags": [
           "Flows"
         ],
@@ -1957,6 +1960,9 @@
               "format": "uri",
               "example": "https://www.acme.com"
             }
+          },
+          {
+            "$ref": "#/components/parameters/release-pin"
           }
         ],
         "requestBody": {
@@ -2025,7 +2031,7 @@
             }
           },
           "409": {
-            "description": "Nothing is deployed to the resolved target (`rel.not_deployed`), the\nrequest needs a primary deployment and the project has none\n(`rel.no_default`), or the release of that deployment is revoked\n(`rel.revoked`).\n",
+            "description": "Nothing is deployed to the resolved target, or the pinned release was\nnever deployed there (`rel.not_deployed`), the request needs a primary\ndeployment and the project has none (`rel.no_default`), or the release\nthat would serve it is revoked (`rel.revoked`).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -2037,6 +2043,17 @@
                     "value": {
                       "code": "rel.not_deployed",
                       "message": "nothing is deployed to https://www.acme.com"
+                    }
+                  },
+                  "pinned_not_deployed": {
+                    "summary": "The pinned release was never deployed to this origin",
+                    "value": {
+                      "code": "rel.not_deployed",
+                      "message": "release rel_01KB3F7Y4Q2M8XVN is not deployed to https://www.acme.com; rebuild the app to pin the current release",
+                      "details": {
+                        "origin": "https://www.acme.com",
+                        "release": "rel_01KB3F7Y4Q2M8XVN"
+                      }
                     }
                   },
                   "no_default": {
@@ -14194,6 +14211,26 @@
               "code": {
                 "type": "string",
                 "const": "rel.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-reference_invalid": {
+        "description": "Release: the pinned release is not a release id\n\nError code: rel.reference_invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.reference_invalid"
               }
             },
             "required": [
@@ -27067,6 +27104,13 @@
           "message": "release: not found"
         }
       },
+      "rel-reference_invalid": {
+        "summary": "rel.reference_invalid",
+        "value": {
+          "code": "rel.reference_invalid",
+          "message": "release: the pinned release is not a release id"
+        }
+      },
       "rel-revoked": {
         "summary": "rel.revoked",
         "value": {
@@ -29002,6 +29046,9 @@
                   "$ref": "#/components/schemas/rel-not_found"
                 },
                 {
+                  "$ref": "#/components/schemas/rel-reference_invalid"
+                },
+                {
                   "$ref": "#/components/schemas/rel-revoked"
                 },
                 {
@@ -29048,6 +29095,7 @@
                   "rel.no_default": "#/components/schemas/rel-no_default",
                   "rel.not_deployed": "#/components/schemas/rel-not_deployed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
+                  "rel.reference_invalid": "#/components/schemas/rel-reference_invalid",
                   "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable",
@@ -29092,6 +29140,9 @@
               },
               "rel.not_found": {
                 "$ref": "#/components/examples/rel-not_found"
+              },
+              "rel.reference_invalid": {
+                "$ref": "#/components/examples/rel-reference_invalid"
               },
               "rel.revoked": {
                 "$ref": "#/components/examples/rel-revoked"
@@ -29825,6 +29876,9 @@
                   "$ref": "#/components/schemas/rel-not_found"
                 },
                 {
+                  "$ref": "#/components/schemas/rel-reference_invalid"
+                },
+                {
                   "$ref": "#/components/schemas/rel-revoked"
                 },
                 {
@@ -29859,6 +29913,7 @@
                   "rel.no_default": "#/components/schemas/rel-no_default",
                   "rel.not_deployed": "#/components/schemas/rel-not_deployed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
+                  "rel.reference_invalid": "#/components/schemas/rel-reference_invalid",
                   "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
@@ -29923,6 +29978,9 @@
               },
               "rel.not_found": {
                 "$ref": "#/components/examples/rel-not_found"
+              },
+              "rel.reference_invalid": {
+                "$ref": "#/components/examples/rel-reference_invalid"
               },
               "rel.revoked": {
                 "$ref": "#/components/examples/rel-revoked"
@@ -37961,6 +38019,16 @@
           "type": "string"
         },
         "example": "att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C"
+      },
+      "release-pin": {
+        "name": "X-Zitadel-Release",
+        "in": "header",
+        "required": false,
+        "description": "Pins the request to a release: the app sends the release id that\n`zitadel deploy` or `zitadel preview` printed when it was built, and is\nserved that release's configuration instead of the newest one deployed to\nits origin.\n\nThe `Origin` header picks the target first, as it does without a pin. The\npin then selects among the releases deployed to that target, and the\nrequest runs on the newest deployment of the pinned release there. A pin\nnever deploys a release and never admits an origin, and it needs no\ncredential of its own: a release stays pinnable until it is revoked.\n\nThe release id, `rel_` followed by letters, digits, `_` or `-`, is the one\nform accepted. Send the value as it was printed, without reading it.\n\n- `400 rel.reference_invalid`: the value is not a release id.\n- `404 rel.not_found`: the project has no release with that id.\n- `409 rel.not_deployed`: the release was never deployed to the target, or\n  the request has no `Origin` to pick one.\n- `409 rel.revoked`: the release is revoked.\n",
+        "schema": {
+          "type": "string",
+          "example": "rel_01KB3F7Y4Q2M8XVN"
+        }
       },
       "session-project-id": {
         "name": "project_id",
