@@ -127,3 +127,6 @@ Everything the package root reaches lands in every SDK app's main chunk.
   `createZitadelClient`, whose `Proxy` defeats tree-shaking.
 - Allow a tag or attribute in `sanitiser/allowlist.ts`, for both sanitisers; never list a
   `data-*` attribute or one twice: `setHTML()` rejects the whole configuration.
+- `sanitiser/browser-defaults.json` is the browser's `new Sanitizer().get()`; DOMPurify
+  (Safari) enforces it with the allowlist. `config.browser.spec.ts` fails when Chromium's
+  defaults change: export the new ones and commit them.

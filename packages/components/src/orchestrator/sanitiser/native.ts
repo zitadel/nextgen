@@ -1,20 +1,12 @@
-import { ATTRIBUTES, ELEMENTS, REMOVED_TAGS, UNWRAPPED_TAGS } from "./allowlist.js";
+import {
+  ATTRIBUTES,
+  ELEMENTS,
+  FOREIGN_NAMESPACES,
+  REMOVED_TAGS,
+  UNWRAPPED_TAGS,
+} from "./allowlist.js";
+import { dropUnsafeLinks } from "./links.js";
 import type { Sanitiser } from "./sanitiser.js";
-
-/**
- * The namespaces of the tags that are not HTML: the Sanitizer API matches a
- * tag by name and namespace, and `<svg>` and `<math>` are not in the HTML one.
- */
-const FOREIGN_NAMESPACES: Readonly<Record<string, string>> = {
-  svg: "http://www.w3.org/2000/svg",
-  math: "http://www.w3.org/1998/Math/MathML",
-};
-
-/** The attributes that hold a link or an image URL. */
-const LINK_ATTRIBUTES: ReadonlySet<string> = new Set(["href", "src", "srcset"]);
-
-/** The URL schemes an atom's link may not use. */
-const UNSAFE_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:", "data:"]);
 
 /**
  * Sanitises with the browser's own HTML Sanitizer API, `Element.setHTML()`.
@@ -24,12 +16,8 @@ const UNSAFE_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:",
  * `allowlist.ts`. The markup is parsed into an inert document, so nothing in
  * it loads or runs and no custom element upgrades while it is sanitised.
  *
- * The browser strips `javascript:` only from its own link attributes, such as
- * `href` on `<a>`. An atom that renders a link from its own attribute
- * (`<zl-pill href>`, `<zl-field forgot-password-href>`) would still follow it,
- * so afterwards a `javascript:`, `vbscript:` or `data:` URL is dropped from
- * every `href`, `src` and `srcset` attribute and every `*-href` one, as
- * DOMPurify does (which still allows a `data:` image).
+ * Unsafe links are then dropped by `dropUnsafeLinks` (`links.ts`), which
+ * `DomPurifySanitiser` runs too.
  */
 export class NativeSanitiser implements Sanitiser {
   /**
@@ -53,7 +41,7 @@ export class NativeSanitiser implements Sanitiser {
    *
    * @returns The configured sanitizer.
    */
-  private static configure(): Sanitizer {
+  static configure(): Sanitizer {
     const sanitizer = new Sanitizer();
     const defaults = new Set(
       sanitizer
@@ -79,26 +67,6 @@ export class NativeSanitiser implements Sanitiser {
   }
 
   /**
-   * Whether an attribute holds a link an atom may not follow, read the way a
-   * browser reads a link, so `" java\tscript:"` counts too.
-   *
-   * @param element - The element that carries it.
-   * @param attribute - The attribute.
-   * @returns `true` for a `javascript:`, `vbscript:` or `data:` URL in a link
-   *   attribute, other than a `data:` image.
-   */
-  private static isUnsafeUrl(element: Element, attribute: Attr): boolean {
-    const { name, value } = attribute;
-    if (!LINK_ATTRIBUTES.has(name) && !name.endsWith("-href")) {
-      return false;
-    }
-    if (element.localName === "img" && name === "src" && value.trimStart().startsWith("data:")) {
-      return false;
-    }
-    return UNSAFE_SCHEMES.has(URL.parse(value, document.baseURI)?.protocol ?? "");
-  }
-
-  /**
    * Sanitises markup with `setHTML()` and drops unsafe link URLs.
    *
    * @param html - The untrusted markup.
@@ -107,13 +75,7 @@ export class NativeSanitiser implements Sanitiser {
   sanitise(html: string): string {
     const host = document.implementation.createHTMLDocument("").createElement("div");
     host.setHTML(html, { sanitizer: this.sanitizer });
-    for (const element of host.querySelectorAll("*")) {
-      for (const attribute of [...element.attributes]) {
-        if (NativeSanitiser.isUnsafeUrl(element, attribute)) {
-          element.removeAttribute(attribute.name);
-        }
-      }
-    }
+    dropUnsafeLinks(host);
     return host.innerHTML;
   }
 }

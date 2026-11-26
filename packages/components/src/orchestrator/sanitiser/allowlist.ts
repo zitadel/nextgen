@@ -1,16 +1,16 @@
 /**
- * What a template may contain once sanitised, on top of the sanitiser's own
- * safe HTML: every `<zl-*>` atom, the attributes templates use, and the tags
- * that are dropped. Both sanitisers start from their library's standard set
- * (the browser's default Sanitizer configuration, DOMPurify's HTML profile)
- * and apply these lists, so plain HTML such as `<b>` or `<table>` keeps working.
+ * What a template may contain once sanitised, on top of the browser's built-in
+ * safe configuration: every `<zl-*>` atom, the attributes templates use, and
+ * the tags that are dropped or unwrapped. `NativeSanitiser` applies these to
+ * the browser's own configuration, and `config.ts` applies them the same way
+ * to a copy of it for `DomPurifySanitiser`, so both sanitise alike.
  */
 import { manifestRegistry } from "../../manifests.js";
 
 /**
  * Plain HTML tags templates use that the browser's safe list leaves out.
  * Everything else plain (`<div>`, `<p>`, `<h1>`, `<b>`, `<table>`) is in
- * both sanitisers' own lists already.
+ * that list already.
  */
 const STRUCTURAL_TAGS: readonly string[] = ["img", "label", "fieldset", "legend"];
 
@@ -122,54 +122,26 @@ export const ATTRIBUTES: readonly string[] = [
 ].filter((attribute) => !attribute.startsWith("data-"));
 
 /**
- * Tags dropped together with their content: scripts, styles and embedded
- * content, plus the tags DOMPurify's HTML profile keeps but the browser's safe
- * list leaves out (media, SVG, MathML, form widgets, obsolete tags), so a
- * template renders the same in Safari as in Chrome and Firefox.
+ * The HTML namespace, which every allowlisted tag is in.
  */
-export const REMOVED_TAGS: readonly string[] = [
-  "script",
-  "style",
-  "iframe",
-  "object",
-  "embed",
-  "noscript",
-  "template",
-  "svg",
-  "math",
-  "audio",
-  "video",
-  "source",
-  "track",
-  "picture",
-  "canvas",
-  "map",
-  "area",
-  "details",
-  "summary",
-  "dialog",
-  "select",
-  "option",
-  "optgroup",
-  "datalist",
-  "textarea",
-  "output",
-  "meter",
-  "progress",
-  "slot",
-  "acronym",
-  "big",
-  "blink",
-  "center",
-  "dir",
-  "font",
-  "marquee",
-  "menuitem",
-  "nobr",
-  "spacer",
-  "strike",
-  "tt",
-];
+export const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
+
+/**
+ * The namespaces of the removed tags that are not HTML: the Sanitizer API
+ * matches a tag by name and namespace.
+ */
+export const FOREIGN_NAMESPACES: Readonly<Record<string, string>> = {
+  svg: "http://www.w3.org/2000/svg",
+  math: "http://www.w3.org/1998/Math/MathML",
+};
+
+/**
+ * Tags the browser's safe configuration allows that templates may not use,
+ * dropped with their content: inline SVG and MathML (atoms such as
+ * `<zl-icon>` draw the icons). Everything else the configuration leaves out,
+ * such as `<script>`, `<iframe>` or `<video>`, is dropped already.
+ */
+export const REMOVED_TAGS: readonly string[] = ["svg", "math"];
 
 /**
  * Tags dropped while their content stays: templates use `<zl-*>` atoms for
