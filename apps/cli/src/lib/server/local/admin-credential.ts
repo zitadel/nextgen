@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
-import { FsNotFoundError, mkdir, readFile, rename, writeFile } from "@/lib/fs";
+import { FsExistsError, FsNotFoundError, mkdir, readFile, rename, writeFile } from "@/lib/fs";
 import { errorMessage } from "@/lib/errors";
 import { LocalServerInvalidError } from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
@@ -180,7 +180,9 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
   try {
     await writeFile(path, content, { mode: 0o600, flag: "wx" });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    if (error instanceof FsExistsError) {
+      return false;
+    }
     throw error;
   }
   await SecretFile.enforceMode(path, 0o600);
