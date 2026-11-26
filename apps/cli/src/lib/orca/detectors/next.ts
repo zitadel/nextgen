@@ -2,7 +2,7 @@ import { FsError, FsNotFoundError, stat } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
 import { join } from "node:path";
 
-import { OrcaFrameworkUnsupportedError } from "@/lib/orca/errors";
+import { OrcaPagesRouterError } from "@/lib/orca/errors";
 
 import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
@@ -44,9 +44,7 @@ export class NextDetector implements Detector {
           ? "src/app"
           : undefined;
       if (!appDir) {
-        throw new OrcaFrameworkUnsupportedError(
-          "Next.js Pages Router projects are not supported in v1; create an App Router project with an app/ or src/app/ directory",
-        );
+        throw new OrcaPagesRouterError("Next.js Pages Router projects are not supported in v1");
       }
 
       const devPort = await detectDevPort(cwd, pkg);

@@ -1,6 +1,12 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca, OrcaConflictError, OrcaFrameworkMissingError } from "@/lib/orca";
+import {
+  createOrca,
+  OrcaFrameworkMismatchError,
+  OrcaFrameworkMissingError,
+  OrcaPagesRouterError,
+  OrcaVersionBelowFloorError,
+} from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
@@ -25,7 +31,29 @@ const PREFERRED_FRAMEWORK = "next";
 const FRAMEWORK_MISMATCH_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
-  hint: "Rerun setup without --framework, or with the --framework this app is, to set up this app, or point --cwd at the app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
+  hint: "Rerun setup without --framework, or with --framework {detected}, to set up this app, or point --cwd at the {requestedName} app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
+  details: {
+    requested: "{requested}",
+    detected: "{detected}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How an app below the framework version the CLI integrates is refused.
+ */
+const VERSION_BELOW_FLOOR_REFUSAL = {
+  code: "E_UNSUPPORTED_PROJECT_SHAPE",
+  message: "{message}",
+  hint: "Upgrade the app to {displayName} {versionFloor} or later and rerun.{note}",
+} as const satisfies Refusal;
+
+/**
+ * How a Next.js app on the Pages Router is refused.
+ */
+const PAGES_ROUTER_REFUSAL = {
+  code: "E_UNSUPPORTED_PROJECT_SHAPE",
+  message: "{message}",
+  hint: "Create an App Router project with an app/ or src/app/ directory.",
 } as const satisfies Refusal;
 
 /**
@@ -129,9 +157,25 @@ export class DetectFramework extends WizardStep<
         scaffoldedFramework: found.detected === undefined,
       };
     } catch (error) {
-      if (error instanceof OrcaConflictError) {
+      if (error instanceof OrcaFrameworkMismatchError) {
         detecting.fail();
         throw refusalError(FRAMEWORK_MISMATCH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof OrcaVersionBelowFloorError) {
+        detecting.fail();
+        throw refusalError(VERSION_BELOW_FLOOR_REFUSAL, {
+          ...error,
+          message: error.message,
+          note: error.note === undefined ? "" : ` ${error.note}`,
+        });
+      }
+      if (error instanceof OrcaPagesRouterError) {
+        detecting.fail();
+        throw refusalError(PAGES_ROUTER_REFUSAL, {
+          ...error,
           message: error.message,
         });
       }

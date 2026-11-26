@@ -1523,7 +1523,8 @@ describe("setup", () => {
             source: MOCK_SERVER_URL,
             code: "E_UNSUPPORTED_PROJECT_SHAPE",
             message:
-              'Next.js "^14.2.0" is below the supported floor — the CLI integrates Next.js 15.2.3 and newer. Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).',
+              'Next.js "^14.2.0" is below the supported floor — the CLI integrates Next.js 15.2.3 and newer',
+            hint: "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
           });
         });
 

@@ -237,9 +237,8 @@ export function describeNodeEngines(c: NodeEnginesCase): void {
         npmPublishes(c.fallback);
 
         await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toMatchObject({
-          message: expect.stringContaining(
-            `switch to Node ${describeAcceptedNode(c.fallback)} and`,
-          ),
+          accepted: describeAcceptedNode(c.fallback),
+          required: c.fallback,
         });
       });
     } else {

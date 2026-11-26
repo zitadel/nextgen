@@ -44,7 +44,7 @@ import { ReadSsoFlags } from "@/cli/commands/setup/steps/read-sso-flags";
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { customExample, IdpSettingsInvalidError, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { customExample, IdpSettingsMissingError, SETUP_FLAG_NAMES } from "@/lib/idp";
 import { FsIsDirectoryError } from "@/lib/fs";
 import { Ui, warnings } from "@/lib/ui";
 import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
@@ -1088,6 +1088,20 @@ describe("setup", () => {
     });
   });
 
+  describe("when no local server was ever started", () => {
+    it("refuses, saying the local server is not running", async ({ dir }) => {
+      const res = await runCliForTest(setupIn(dir, "--framework", "next", ...LOCAL, ...SCRIPTED));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        code: "E_LOCAL_SERVER_NOT_RUNNING",
+        message: "Local Zitadel server is not running",
+        hint: expect.stringContaining(
+          `No local server has been started in this directory or a parent. Run \`${expectedPublicCliCommand("start")}\`, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup.`,
+        ),
+      });
+    });
+  });
+
   describe("when the local server is not running", () => {
     beforeEach(() => {
       passingThrough(DOWN_SERVER_URL);
@@ -1100,7 +1114,7 @@ describe("setup", () => {
 
       expect(res).toFailWith("E_LOCAL_SERVER_NOT_RUNNING");
       expect(parseJson(res.stdout)).toMatchObject({
-        hint: expect.stringContaining(`Run ${expectedPublicCliCommand("start")}`),
+        hint: expect.stringContaining("Start local Zitadel first"),
         next_commands: [
           expectedPublicCliCommand(`start --cwd ${dir}`),
           expectedPublicCliCommand(`setup --framework next --server local --cwd ${dir}`),
@@ -1431,6 +1445,51 @@ describe("setup", () => {
       expect(parseJson(res.stdout)).toMatchObject({
         message: "Setup detects Next.js here, not React (Vite)",
         hint: expect.stringContaining("--force or not"),
+      });
+    });
+
+    it("hints at the --framework the app is and the app that was asked for", async ({
+      dir,
+      serve,
+    }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+
+      const res = await runCliForTest(scriptedAgainst(dir, platform.url, "--framework", "react"));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        hint: "Rerun setup without --framework, or with --framework next, to set up this app, or point --cwd at the React (Vite) app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
+      });
+    });
+
+    it("names the requested and the detected framework", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+
+      const res = await runCliForTest(scriptedAgainst(dir, platform.url, "--framework", "react"));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        details: {
+          requested: "react",
+          detected: "next",
+        },
+      });
+    });
+  });
+
+  describe("in a Next.js app on the Pages Router", () => {
+    it("refuses, saying the Pages Router is not supported", async ({ dir }) => {
+      await write(dir, {
+        "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+        "pages/index.tsx": "export default function Page() {}\n",
+      });
+
+      const res = await runCliForTest(setupIn(dir, "--framework", "next", ...SCRIPTED));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        code: "E_UNSUPPORTED_PROJECT_SHAPE",
+        message: "Next.js Pages Router projects are not supported in v1",
+        hint: "Create an App Router project with an app/ or src/app/ directory.",
       });
     });
 
@@ -4130,10 +4189,10 @@ describe("ReadSsoFlags", () => {
           return readingFlags(true);
         });
 
-        expect(error).toBeInstanceOf(IdpSettingsInvalidError);
+        expect(error).toBeInstanceOf(IdpSettingsMissingError);
         expect(error).toMatchObject({
           code: "E_VALIDATION",
-          message: expect.stringContaining("describe it, e.g."),
+          example: expect.stringContaining("--provider custom"),
         });
       });
 

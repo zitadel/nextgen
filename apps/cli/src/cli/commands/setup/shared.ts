@@ -847,6 +847,9 @@ const PASSWORD_POLICY_EXISTS_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
   hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
+  details: {
+    file: "{path}",
+  },
 } as const satisfies Refusal;
 
 /** How setup refuses to replace a signup policy file that is already there. */
@@ -854,6 +857,9 @@ const SIGNUP_POLICY_EXISTS_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
   hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
+  details: {
+    file: "{path}",
+  },
 } as const satisfies Refusal;
 
 /** How setup refuses to replace any other file that is already there. */
@@ -861,6 +867,9 @@ const FILE_EXISTS_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
   hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+  details: {
+    file: "{path}",
+  },
 } as const satisfies Refusal;
 
 /**

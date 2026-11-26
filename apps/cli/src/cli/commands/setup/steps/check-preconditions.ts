@@ -23,8 +23,8 @@ import { Project } from "@/lib/project";
 /** How `--server local` with no server ever started is refused. */
 const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
-  message: "{message}",
-  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  message: "Local Zitadel server is not running",
+  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
@@ -32,7 +32,7 @@ const NO_LOCAL_SERVER_REFUSAL = {
 const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "Run `zitadel start` to bring it back. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "Run `zitadel start` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
@@ -40,7 +40,7 @@ const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
 const LOCAL_SERVER_ELSEWHERE_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "It was started in another directory: run `zitadel start` there, or with --cwd, to bring it back. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "It was started in another directory: run `zitadel start` there, or with --cwd, to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 

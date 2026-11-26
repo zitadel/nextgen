@@ -46,7 +46,9 @@ describe("NextScaffolder", () => {
       new NextScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "next"),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: expect.stringContaining("boom"),
+      output: expect.stringContaining("boom"),
+      stderr: "boom",
+      stdout: "hello",
     });
   });
 

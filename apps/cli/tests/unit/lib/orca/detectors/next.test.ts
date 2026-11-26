@@ -137,7 +137,7 @@ describe("NextDetector", () => {
     await writeNextPackageJson(dir, { dependencies: { next: "15.2.2" } });
 
     await expect(detector.detect(dir)).rejects.toMatchObject({
-      message: expect.stringContaining("CVE-2025-29927"),
+      note: expect.stringContaining("CVE-2025-29927"),
     });
   });
 
@@ -163,7 +163,7 @@ describe("NextDetector", () => {
 
       await expect(detector.detect(dir)).rejects.toThrow(
         new RegExp(
-          `^Next\\.js ${installed.replaceAll(".", "\\.")} is installed \\(.*node_modules/next/package\\.json\\), below the supported floor — the CLI integrates Next\\.js 15\\.2\\.3 and newer\\. Upgrade the app to Next\\.js 15\\.2\\.3 or later and rerun\\. Earlier releases let a request skip middleware \\(CVE-2025-29927\\)\\.$`,
+          `^Next\\.js ${installed.replaceAll(".", "\\.")} is installed \\(.*node_modules/next/package\\.json\\), below the supported floor — the CLI integrates Next\\.js 15\\.2\\.3 and newer$`,
         ),
       );
     },
@@ -178,7 +178,8 @@ describe("NextDetector", () => {
 
     await expect(detector.detect(dir)).rejects.toMatchObject({
       code: "E_UNSUPPORTED_PROJECT_SHAPE",
-      message: expect.stringContaining("Upgrade the app to Next.js 15.2.3 or later"),
+      displayName: "Next.js",
+      versionFloor: "15.2.3",
     });
   });
 

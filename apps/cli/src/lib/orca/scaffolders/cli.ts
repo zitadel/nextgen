@@ -2,7 +2,12 @@ import { mkdir, readdir, rename, rmdir } from "@/lib/fs";
 import { basename, join } from "node:path";
 import { execaSync } from "execa";
 
-import { OrcaInvalidError, OrcaInternalError } from "@/lib/orca/errors";
+import {
+  OrcaCommandFailedError,
+  OrcaCommandNotFoundError,
+  OrcaCommandSpawnFailedError,
+  OrcaNodeUnsupportedError,
+} from "@/lib/orca/errors";
 import { warnings } from "@/lib/ui";
 
 import {
@@ -119,8 +124,12 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
       );
     }
     if (support === "refused") {
-      throw new OrcaInvalidError(
-        `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}; switch to Node ${describeAcceptedNode(range)} and rerun`,
+      throw new OrcaNodeUnsupportedError(
+        `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}`,
+        this.nodeVersion,
+        range,
+        describeAcceptedNode(range),
+        this.displayName,
       );
     }
   }
@@ -135,20 +144,35 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
   protected runCommand(command: string, args: ReadonlyArray<string>, cwd: string): void {
     const result = execaSync(command, [...args], { cwd, reject: false });
     if (result.code !== undefined) {
-      const notFound = result.code === "ENOENT";
-      throw new OrcaInternalError(
-        notFound
-          ? `Command not found: ${command}`
-          : `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
+      if (result.code === "ENOENT") {
+        throw new OrcaCommandNotFoundError(
+          `Command not found: ${command}`,
+          command,
+          args,
+          result.code,
+        );
+      }
+      throw new OrcaCommandSpawnFailedError(
+        `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
+        command,
+        args,
+        result.code,
       );
     }
     const status = result.exitCode ?? 1;
     if (status !== 0) {
-      const output = truncateCommandOutput(
-        [String(result.stderr), String(result.stdout)].filter(Boolean).join("\n").trim(),
-      );
-      throw new OrcaInternalError(
-        `Command "${command} ${args.join(" ")}" exited with status ${String(status)}${output ? `:\n${output}` : ""}`,
+      const stdout = String(result.stdout);
+      const stderr = String(result.stderr);
+      throw new OrcaCommandFailedError(
+        `Command "${command} ${args.join(" ")}" exited with status ${String(status)}`,
+        {
+          command,
+          args: [...args],
+          cwd,
+          stdout,
+          stderr,
+          output: truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim()),
+        },
       );
     }
   }
