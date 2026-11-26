@@ -1,6 +1,5 @@
 import { isErrno } from "@/lib/errno";
 import { PmManifestInvalidError } from "@/lib/pm";
-import type { PackageJson } from "@/lib/pm";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -25,10 +24,16 @@ export class AngularDetector implements Detector {
   readonly versionFloor = "17";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    // biome-ignore lint/plugin: the checks after the read need `pkg` and must not sit inside the try that guards it
-    let pkg: PackageJson;
     try {
-      pkg = await readPackageJson(cwd);
+      const pkg = await readPackageJson(cwd);
+      if (!hasDependency(pkg, this.versionPackage)) {
+        return null;
+      }
+
+      await enforceVersionFloor(this, pkg, cwd);
+
+      const devPort = await detectDevPort(cwd, pkg);
+      return { id: "angular", appDir: "src/app", devPort, url: issuerFromPort(devPort) };
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         return null;
@@ -38,13 +43,5 @@ export class AngularDetector implements Detector {
       }
       throw error;
     }
-    if (!hasDependency(pkg, this.versionPackage)) {
-      return null;
-    }
-
-    await enforceVersionFloor(this, pkg, cwd);
-
-    const devPort = await detectDevPort(cwd, pkg);
-    return { id: "angular", appDir: "src/app", devPort, url: issuerFromPort(devPort) };
   }
 }

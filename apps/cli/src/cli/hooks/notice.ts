@@ -39,9 +39,9 @@ export async function updateNotice(input: {
   if (updateCheckDisabled(env)) {
     return undefined;
   }
-  let dependencies: Dependencies | undefined;
+  const read: (Dependencies | undefined)[] = [];
   try {
-    dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE);
+    read.push(await Dependencies.read(cwd, ZITADEL_SCOPE));
   } catch (error) {
     if (!(error instanceof PmManifestInvalidError)) {
       throw error;
@@ -56,7 +56,9 @@ export async function updateNotice(input: {
   if (release.isNewerThan(cliVersion)) {
     behind.push(`CLI ${cliVersion} → ${release.version}`);
   }
-  for (const dependency of dependencies?.exact() ?? []) {
+  for (const dependency of read.flatMap((dependencies) => {
+    return dependencies?.exact() ?? [];
+  })) {
     if (dependency.isBehind(release.version)) {
       const name = escapeControlCharacters(dependency.name);
       behind.push(`${name} ${dependency.specifier} → ${release.version}`);

@@ -1,6 +1,5 @@
 import { isErrno } from "@/lib/errno";
 import { PmManifestInvalidError } from "@/lib/pm";
-import type { PackageJson } from "@/lib/pm";
 import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -23,10 +22,28 @@ export class ReactDetector implements Detector {
   readonly versionFloor = "18";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    // biome-ignore lint/plugin: the checks after the read need `pkg` and must not sit inside the try that guards it
-    let pkg: PackageJson;
     try {
-      pkg = await readPackageJson(cwd);
+      const pkg = await readPackageJson(cwd);
+      if (
+        hasDependency(pkg, "next") ||
+        hasDependency(pkg, "@tanstack/react-start") ||
+        !hasDependency(pkg, this.versionPackage) ||
+        !hasDependency(pkg, "vite")
+      ) {
+        return null;
+      }
+
+      await enforceVersionFloor(this, pkg, cwd);
+
+      const devPort = await detectDevPort(cwd, pkg);
+      const versionMajor = dependencyVersionMajor(pkg, this.versionPackage);
+      return {
+        id: "react",
+        appDir: "src",
+        devPort,
+        url: issuerFromPort(devPort),
+        ...(versionMajor === undefined ? {} : { versionMajor }),
+      };
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         return null;
@@ -36,25 +53,5 @@ export class ReactDetector implements Detector {
       }
       throw error;
     }
-    if (
-      hasDependency(pkg, "next") ||
-      hasDependency(pkg, "@tanstack/react-start") ||
-      !hasDependency(pkg, this.versionPackage) ||
-      !hasDependency(pkg, "vite")
-    ) {
-      return null;
-    }
-
-    await enforceVersionFloor(this, pkg, cwd);
-
-    const devPort = await detectDevPort(cwd, pkg);
-    const versionMajor = dependencyVersionMajor(pkg, this.versionPackage);
-    return {
-      id: "react",
-      appDir: "src",
-      devPort,
-      url: issuerFromPort(devPort),
-      ...(versionMajor === undefined ? {} : { versionMajor }),
-    };
   }
 }

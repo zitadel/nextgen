@@ -119,9 +119,29 @@ export function Wrapped<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
       console.log = (...args: unknown[]): void => {
         written.push(format(...args));
       };
-      let returned: unknown;
       try {
-        returned = await real.run();
+        const returned = await real.run();
+        const text = written.join("\n");
+        const title = escapeControlCharacters(id);
+
+        const data = Array.isArray(returned) ? { result: returned } : returned;
+
+        return {
+          status: "ok",
+          data: data ?? { output: text },
+          verbatim: true,
+          pretty: prose(text),
+          summary: {
+            title,
+            sections: [],
+            lines:
+              text === ""
+                ? []
+                : text.split("\n").map((line) => {
+                    return escapeControlCharacters(line);
+                  }),
+          },
+        };
       } catch (error) {
         if (error instanceof ZitadelError) {
           throw error;
@@ -134,27 +154,6 @@ export function Wrapped<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
         process.stdout.write = write;
         console.log = consoleLog;
       }
-      const text = written.join("\n");
-      const title = escapeControlCharacters(id);
-
-      const data = Array.isArray(returned) ? { result: returned } : returned;
-
-      return {
-        status: "ok",
-        data: data ?? { output: text },
-        verbatim: true,
-        pretty: prose(text),
-        summary: {
-          title,
-          sections: [],
-          lines:
-            text === ""
-              ? []
-              : text.split("\n").map((line) => {
-                  return escapeControlCharacters(line);
-                }),
-        },
-      };
     }
   }
 

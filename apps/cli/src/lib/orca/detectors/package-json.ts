@@ -190,29 +190,26 @@ export async function installedPackage(
   cwd: string,
   name: string,
 ): Promise<InstalledPackage | undefined> {
-  // biome-ignore lint/plugin: the walk after the lookup needs `start` and must not sit inside the try that guards it
-  let start = resolve(cwd);
+  const resolved = resolve(cwd);
+  const real: string[] = [];
   try {
-    start = await realpath(start);
+    real.push(await realpath(resolved));
   } catch (error) {
     if (!isErrno(error, "ENOENT")) {
       throw error;
     }
   }
+  const [start = resolved] = real;
   for (const dir of ancestors(start)) {
     const path = join(dir, "node_modules", name, "package.json");
-    // biome-ignore lint/plugin: the code after the read needs `contents` and must not sit inside the try that guards it
-    let contents: string | undefined;
     try {
-      contents = await readFile(path, "utf8");
+      const contents = await readFile(path, "utf8");
+      const version = versionIn(contents);
+      return version === undefined ? undefined : { version, path };
     } catch (error) {
       if (!isErrno(error, "ENOENT")) {
         throw error;
       }
-    }
-    if (contents !== undefined) {
-      const version = versionIn(contents);
-      return version === undefined ? undefined : { version, path };
     }
     if (await isWorkspaceRoot(dir)) {
       return undefined;

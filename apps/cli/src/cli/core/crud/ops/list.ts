@@ -279,45 +279,43 @@ export abstract class ListOperation<Ctx> extends ResourceCommand {
 
       return page;
     });
-    let collected;
     try {
-      collected = await paging.collect(walk, { all });
+      const { items, next } = await paging.collect(walk, { all });
+      progress?.stop(
+        `Fetched ${items.length} ${new Intl.PluralRules("en").select(items.length) === "one" ? resource.singular : plural}`,
+      );
+
+      const rows = items;
+      const columns = resource.columns;
+      const footer: string[] = [];
+      const page = {
+        token: next,
+        cursorKey: wire.nextPageToken,
+      };
+      const extra = {};
+
+      return await this.listed(
+        {
+          plain: flags.plain === true,
+          fields: flags.fields,
+        },
+        {
+          columns,
+          shape,
+          rows,
+          items,
+          singular: resource.singular,
+          plural,
+          empty: next ? `No ${plural} on this page` : `No ${plural} found`,
+          footer,
+          page,
+          extra,
+        },
+      );
     } catch (error) {
       progress?.clear();
       throw error;
     }
-    const { items, next } = collected;
-    progress?.stop(
-      `Fetched ${items.length} ${new Intl.PluralRules("en").select(items.length) === "one" ? resource.singular : plural}`,
-    );
-
-    const rows = items;
-    const columns = resource.columns;
-    const footer: string[] = [];
-    const page = {
-      token: next,
-      cursorKey: wire.nextPageToken,
-    };
-    const extra = {};
-
-    return await this.listed(
-      {
-        plain: flags.plain === true,
-        fields: flags.fields,
-      },
-      {
-        columns,
-        shape,
-        rows,
-        items,
-        singular: resource.singular,
-        plural,
-        empty: next ? `No ${plural} on this page` : `No ${plural} found`,
-        footer,
-        page,
-        extra,
-      },
-    );
   }
 }
 

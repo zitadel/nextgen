@@ -1,6 +1,5 @@
 import { isErrno } from "@/lib/errno";
 import { PmManifestInvalidError } from "@/lib/pm";
-import type { PackageJson } from "@/lib/pm";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -25,10 +24,24 @@ export class SvelteKitDetector implements Detector {
   readonly versionFloor = "3";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    // biome-ignore lint/plugin: the checks after the read need `pkg` and must not sit inside the try that guards it
-    let pkg: PackageJson;
     try {
-      pkg = await readPackageJson(cwd);
+      const pkg = await readPackageJson(cwd);
+      if (!hasDependency(pkg, "@sveltejs/kit")) {
+        return null;
+      }
+
+      await enforceVersionFloor(this, pkg, cwd);
+
+      // The widgets come from @zitadel/sdk-svelte, which peers Svelte 5 and is
+      // written with runes; a Svelte 4 app cannot install or compile it.
+      await enforceVersionFloor(
+        { displayName: "Svelte", versionPackage: "svelte", versionFloor: "5" },
+        pkg,
+        cwd,
+      );
+
+      const devPort = await detectDevPort(cwd, pkg);
+      return { id: "sveltekit", appDir: "src", devPort, url: issuerFromPort(devPort) };
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         return null;
@@ -38,21 +51,5 @@ export class SvelteKitDetector implements Detector {
       }
       throw error;
     }
-    if (!hasDependency(pkg, "@sveltejs/kit")) {
-      return null;
-    }
-
-    await enforceVersionFloor(this, pkg, cwd);
-
-    // The widgets come from @zitadel/sdk-svelte, which peers Svelte 5 and is
-    // written with runes; a Svelte 4 app cannot install or compile it.
-    await enforceVersionFloor(
-      { displayName: "Svelte", versionPackage: "svelte", versionFloor: "5" },
-      pkg,
-      cwd,
-    );
-
-    const devPort = await detectDevPort(cwd, pkg);
-    return { id: "sveltekit", appDir: "src", devPort, url: issuerFromPort(devPort) };
   }
 }

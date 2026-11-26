@@ -1,6 +1,5 @@
 import { isErrno } from "@/lib/errno";
 import { PmManifestInvalidError } from "@/lib/pm";
-import type { PackageJson } from "@/lib/pm";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -19,10 +18,20 @@ export class SolidDetector implements Detector {
   readonly versionFloor = "1.6";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    // biome-ignore lint/plugin: the checks after the read need `pkg` and must not sit inside the try that guards it
-    let pkg: PackageJson;
     try {
-      pkg = await readPackageJson(cwd);
+      const pkg = await readPackageJson(cwd);
+      if (
+        hasDependency(pkg, "@solidjs/start") ||
+        !hasDependency(pkg, this.versionPackage) ||
+        !hasDependency(pkg, "vite")
+      ) {
+        return null;
+      }
+
+      await enforceVersionFloor(this, pkg, cwd);
+
+      const devPort = await detectDevPort(cwd, pkg);
+      return { id: "solid", appDir: "src", devPort, url: issuerFromPort(devPort) };
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         return null;
@@ -32,17 +41,5 @@ export class SolidDetector implements Detector {
       }
       throw error;
     }
-    if (
-      hasDependency(pkg, "@solidjs/start") ||
-      !hasDependency(pkg, this.versionPackage) ||
-      !hasDependency(pkg, "vite")
-    ) {
-      return null;
-    }
-
-    await enforceVersionFloor(this, pkg, cwd);
-
-    const devPort = await detectDevPort(cwd, pkg);
-    return { id: "solid", appDir: "src", devPort, url: issuerFromPort(devPort) };
   }
 }
