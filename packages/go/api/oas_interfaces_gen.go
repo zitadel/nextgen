@@ -301,10 +301,6 @@ type ListPolicyRevisionsRes interface {
 	listPolicyRevisionsRes()
 }
 
-type ListProjectAdminsRes interface {
-	listProjectAdminsRes()
-}
-
 type ListProjectMembersRes interface {
 	listProjectMembersRes()
 }

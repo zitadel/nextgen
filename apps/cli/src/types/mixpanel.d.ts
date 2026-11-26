@@ -9,8 +9,11 @@
  * declaration alongside the new usage rather than loosening it to `any`.
  */
 declare module "mixpanel" {
-  /** Properties bag for a tracked event. Mixpanel ingests a flat, single-level map. */
-  export type PropertyValue = string | number | boolean | null | undefined;
+  /**
+   * Properties bag for a tracked event. Mixpanel ingests a flat, single-level
+   * map; a list of strings is one value, which Mixpanel keeps as a list.
+   */
+  export type PropertyValue = string | number | boolean | readonly string[] | null | undefined;
   export type Properties = Record<string, PropertyValue>;
 
   /** Node-callback signature Mixpanel uses to report transport errors. */

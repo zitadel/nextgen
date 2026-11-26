@@ -25,6 +25,7 @@ import { Project } from "@/lib/project";
 import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { BaseCommand } from "@/cli/core";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -368,9 +369,11 @@ function ejected(
  * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
  * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
  */
-export default class Eject extends Destructive(
-  Previewable(BaseCommand),
-  "Remove the managed files and local state without the confirmation prompt. Required when non-interactive.",
+export default class Eject extends Telemetered(
+  Destructive(
+    Previewable(BaseCommand),
+    "Remove the managed files and local state without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localServer;

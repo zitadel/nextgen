@@ -21,6 +21,7 @@ import {
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { ProjectCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * Where a tested config came from: a policy file, a release's revision, or
@@ -121,7 +122,7 @@ const EVALUATE_CONCURRENCY = 8;
  * nothing is read from or written to the project's policies. A failing case
  * fails the command with `E_VALIDATION`, carrying the full results.
  */
-export default class PolicyTestCommand extends ProjectCommand {
+export default class PolicyTestCommand extends Telemetered(ProjectCommand) {
   static override description = `Run the test cases in .zitadel/policies/ against the policies.
 
 A policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.
@@ -229,7 +230,7 @@ The server evaluates every case, so the command needs a connection to it. By def
       return !testCase.passed;
     }).length;
     const source = flags.release === undefined ? "files" : "release";
-    this.recordTelemetry({
+    this.annotate({
       policy_source: source,
       case_count: cases.length,
       failed_count: failed,

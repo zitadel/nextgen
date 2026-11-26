@@ -121,7 +121,7 @@ export const Route = createFileRoute("${path}")({
 
 function ${componentName}() {
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelLogin project={project}${localesAttr} purpose="${purpose}" postSignInUrl="/profile" />
     </div>
   );
@@ -179,7 +179,7 @@ export const Route = createFileRoute("/profile")({
 
 function ProfilePage() {
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelSession project={project} postSignOutUrl="/login" />
     </div>
   );

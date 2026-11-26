@@ -53,6 +53,7 @@ var payloadByEventType = map[string]string{
 	"auth.check.failed":              "auth-check-payload.yaml",
 	"auth.check.succeeded":           "auth-check-payload.yaml",
 	"auth.request.created":           "auth-request-created-payload.yaml",
+	"auth.request.exchange.failed":   "auth-request-exchange-failed-payload.yaml",
 
 	"auth.sso.authorization.failed": "auth-check-payload.yaml",
 	"auth.sso.exchange.succeeded":   "auth-check-payload.yaml",
@@ -170,6 +171,9 @@ var webhookByEventType = map[string]webhookDoc{
 		"when a factor is recorded without a challenge, as on sign-up."},
 	"auth.request.created": {description: "An app started a sign-in at the OAuth authorization endpoint. " +
 		"`data` names the app by its `client_id`."},
+	"auth.request.exchange.failed": {description: "An app presented an authorization code at the OAuth token endpoint, " +
+		"and a check refused it. The code is used up all the same. `data` names the app by its `client_id` " +
+		"and says which check refused the code in `reason`."},
 
 	"auth.sso.authorization.failed": {description: "A sign-in through an identity provider (SSO) failed at the provider. " +
 		"It answered with an error, `access_denied` included, or the callback carried no code."},

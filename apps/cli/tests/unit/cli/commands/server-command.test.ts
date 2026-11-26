@@ -13,6 +13,7 @@ import { LocalRuntime, PsLocalServers, RealMachine, ZitadelRuntime } from "@/lib
 import { shellCommand } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { CommandGroups } from "@/cli/commands/groups";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 import { ZitadelError } from "@/lib/errors";
 import { it } from "@tests/fixtures";
 import { aConfigAt } from "@tests/helpers/suggestions";
@@ -277,7 +278,7 @@ describe("the server a failure names", () => {
 });
 
 /** A command that reads an environment, and so a server, with its failure captured. */
-class CapturingEnvironment extends ServerCommand(EnvironmentCommand) {
+class CapturingEnvironment extends Telemetered(ServerCommand(EnvironmentCommand)) {
   public static override readonly id: string = "capturing-environment-test";
   public readonly json: Record<string, unknown>[] = [];
   public readonly events: { event: string; properties: Properties }[] = [];

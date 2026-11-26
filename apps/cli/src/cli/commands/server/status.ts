@@ -19,6 +19,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { TestKit } from "@/lib/test-kit";
 import { ProjectCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 type ProjectStatus =
   | {
@@ -345,7 +346,7 @@ function nextCommandsFor(
  * local server, or orphaned config should be visible without making `status`
  * itself fail.
  */
-export default class Status extends ProjectCommand {
+export default class Status extends Telemetered(ProjectCommand) {
   static override description = "Summarize the local Zitadel server and project state.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 3;

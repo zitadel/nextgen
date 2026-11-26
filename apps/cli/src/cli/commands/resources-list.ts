@@ -7,6 +7,7 @@ import { RESOURCES } from "./resources";
 import { ServerCommand } from "@/cli/commands/server-command";
 import { Tabulatable } from "@/cli/core/tabulatable";
 import { BaseCommand } from "@/cli/core";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `resources` renders, in order. */
 const COLUMNS = ["topic", "verbs", "filters"] as const;
@@ -20,7 +21,7 @@ const COLUMNS = ["topic", "verbs", "filters"] as const;
  * of them from the registry at once, and `--json` makes it machine-readable.
  * The command talks to no server: it describes the CLI, not the project.
  */
-export default class ResourcesList extends Tabulatable(ServerCommand(BaseCommand)) {
+export default class ResourcesList extends Telemetered(Tabulatable(ServerCommand(BaseCommand))) {
   static override id = "resources";
   static override description =
     "List the resources this CLI manages.\n\nShows what can be done to each.";

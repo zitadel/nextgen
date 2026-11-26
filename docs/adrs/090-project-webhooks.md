@@ -210,6 +210,36 @@ What changes for a project's webhook:
 - **Isolation.** Webhooks ship concurrently, each within its own time budget,
   so a slow endpoint delays only itself.
 
+Whether a webhook keeps up is read from what it still owes, as a consumer's
+lag is:
+
+- `GET /webhooks/{webhook_id}` returns `oldest_pending_event_at`, the
+  `created_at` of the oldest event the webhook still owes, `null` when it
+  owes none, and `pending_events`, how many it owes, counted up to 10 000.
+- Both count only events the webhook's `event_types` match. They are worked
+  out when read and never stored. The list leaves them out, so it does not
+  scan every webhook's backlog.
+- Lag is now minus `oldest_pending_event_at`, not now minus the cursor: in a
+  quiet project the cursor ages while nothing is owed.
+- The count has a limit because the cursor is a position in time, not a
+  numbered offset, so counting reads the backlog.
+
+The server records these metrics:
+
+| Metric | Kind | Answers |
+|---|---|---|
+| `zitadel.webhook.deliveries` | counter, by outcome | how many are sent, and how they end |
+| `zitadel.webhook.delivery.duration` | histogram | how long an endpoint takes |
+| `zitadel.webhook.event.delay` | histogram | how old an event is when it arrives |
+| `zitadel.webhook.pending_events` | gauge | how large the backlog is |
+| `zitadel.webhook.oldest_pending.age` | gauge | the lag in time |
+
+- The gauges are recorded at the end of a delivery run, by the server that
+  holds the lease: the hosted cloud has no process that could sample them,
+  and replicas would count twice.
+- No metric is labelled with a webhook's id where the number of projects has
+  no bound, as on the hosted cloud. One webhook's lag is read from the API.
+
 ### 5. Events
 
 `webhook.created`, `webhook.updated`, `webhook.deleted`,
@@ -246,6 +276,7 @@ may be added, and a receiver ignores what it does not know.
   session cookie.
 - Create takes `url`, `event_types` and optionally `description`. `PATCH`
   takes those and `enabled`, and at least one of them.
+- Get also returns the webhook's lag (§4). List does not.
 - Delete removes the row. There is no deleted state.
 - The three permissions are the reserved scopes, added to the system catalog.
   A team-scoped credential holds none of them.
