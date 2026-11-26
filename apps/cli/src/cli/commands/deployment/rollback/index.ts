@@ -251,16 +251,16 @@ export default class DeploymentRollback extends Telemetered(
           ...(guard === undefined ? {} : { expected_deployment_id: guard }),
         });
         const releaseService = await this.service(ReleaseService);
-        const [release] = await Promise.allSettled([releaseService.get(deployment.release_id)]);
-        if (release.status === "rejected") {
-          if (!(release.reason instanceof BackendError)) {
-            throw release.reason;
+        const release = await releaseService.get(deployment.release_id).catch((error: unknown) => {
+          if (error instanceof BackendError) {
+            warnings.report(
+              `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
+            );
+            return undefined;
           }
-          warnings.report(
-            `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(release.reason).message}`,
-          );
-        }
-        const pointers = release.status === "fulfilled" ? release.value.pointers : undefined;
+          throw error;
+        });
+        const pointers = release?.pointers;
 
         const pointerTable =
           pointers === undefined

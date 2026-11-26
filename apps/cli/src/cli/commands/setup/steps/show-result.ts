@@ -339,17 +339,12 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
     }
     const manifest = this.deps.isJson
       ? undefined
-      : await PM.manifest(this.deps.cwd).then(
-          (read) => {
-            return read;
-          },
-          (error: unknown) => {
-            if (!(error instanceof PmManifestInvalidError) && !isErrno(error, "ENOENT")) {
-              throw error;
-            }
+      : await PM.manifest(this.deps.cwd).catch((error: unknown) => {
+          if (error instanceof PmManifestInvalidError || isErrno(error, "ENOENT")) {
             return undefined;
-          },
-        );
+          }
+          throw error;
+        });
     const projectFacts = this.deps.isJson
       ? undefined
       : await Promise.all([

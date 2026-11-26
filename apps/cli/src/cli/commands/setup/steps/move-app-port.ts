@@ -294,36 +294,26 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
               name: `remove ${previousIssuer} from the project's origins`,
               message: `Remove ${previousIssuer}, the app's previous origin, from project ${secret.data.project_id} on ${source.replace(/^https?:\/\//, "")}, now that ${issuer} replaces it?`,
             })
-            .then(
-              (granted) => {
-                return granted;
-              },
-              (error: unknown) => {
-                if (!Consent.isRefusal(error)) {
-                  throw error;
-                }
+            .catch((error: unknown) => {
+              if (Consent.isRefusal(error)) {
                 return "refused" as const;
-              },
-            )
+              }
+              throw error;
+            })
         : undefined;
       const granted = consent === undefined || consent === "refused" ? undefined : consent;
       const removal =
         replacing && granted !== undefined
           ? await new OriginService(granted.unlock(client), secret.data.project_id)
               .remove(previousIssuer)
-              .then(
-                () => {
-                  return undefined;
-                },
-                (error: unknown) => {
-                  if (isCancellation(error)) {
-                    throw error;
-                  }
-                  return previousIssuer;
-                },
-              )
+              .catch((error: unknown) => {
+                if (isCancellation(error)) {
+                  throw error;
+                }
+                return previousIssuer;
+              })
           : previousIssuer;
-      const staleOrigin = replacing ? removal : undefined;
+      const staleOrigin = replacing && typeof removal === "string" ? removal : undefined;
       if (!(await pathExists(join(this.deps.cwd, RECOVERY_ENV_FILE)))) {
         this.deps.recoverAt(source);
       }

@@ -110,7 +110,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
           },
         };
       }
-      const signupPolicy = await new PolicyService(
+      const evaluated = await new PolicyService(
         createZitadelClient({
           userAgent: Runtime.current().userAgent(),
           baseUrl: answers.server,
@@ -124,17 +124,13 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
           config: {},
           input: { solved_challenge: "zitadel_pow" },
         })
-        .then(
-          () => {
-            return true;
-          },
-          (error: unknown) => {
-            if (isCancellation(error) || this.deps.signal.aborted) {
-              throw error;
-            }
-            return !(error instanceof BackendRequestInvalidError);
-          },
-        );
+        .catch((error: unknown) => {
+          if (isCancellation(error) || this.deps.signal.aborted) {
+            throw error;
+          }
+          return !(error instanceof BackendRequestInvalidError);
+        });
+      const signupPolicy = evaluated !== false;
       const scaffold = await scaffoldOf(this.deps.cwd, this.deps.force, answers, signupPolicy);
       if (!signupPolicy) {
         warnings.report(
