@@ -1,4 +1,3 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -8,7 +7,7 @@ import {
   type SetupServices,
 } from "@/cli/commands/setup/shared";
 import { errorMessage } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
+import { FsNotFoundError, readFile, rm, writeFile } from "@/lib/fs";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
@@ -95,10 +94,10 @@ export class PatchApp extends WizardStep<
           try {
             return [file, await readFile(join(this.deps.cwd, file))];
           } catch (error) {
-            if (!isErrno(error, "ENOENT")) {
-              throw error;
+            if (error instanceof FsNotFoundError) {
+              return [file, undefined];
             }
-            return [file, undefined];
+            throw error;
           }
         }),
       ),
