@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { FsNotFoundError } from "@/lib/fs";
 import { PM, PmManifestInvalidError } from "@/lib/pm";
 import { it } from "@tests/fixtures";
 
@@ -16,7 +17,7 @@ describe("PM.manifest", () => {
   });
 
   it("throws when there is no package.json", async ({ dir }) => {
-    await expect(PM.manifest(dir)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(PM.manifest(dir)).rejects.toBeInstanceOf(FsNotFoundError);
   });
 
   it("throws on invalid JSON", async ({ dir }) => {

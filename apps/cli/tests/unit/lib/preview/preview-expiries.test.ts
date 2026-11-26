@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { BackendUnreachableError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { PreviewExpiries } from "@/lib/preview";
 import { warnings } from "@/lib/ui/warnings";
@@ -46,7 +47,7 @@ describe("PreviewExpiries.live", () => {
   it("answers no expiry when the previews cannot be read", async () => {
     const client = fakeClient({
       listProjectPreviews: {
-        pages: () => failingWith(new ZitadelError("E_NETWORK", "down")),
+        pages: () => failingWith(new BackendUnreachableError("down")),
       },
     });
 
@@ -58,7 +59,7 @@ describe("PreviewExpiries.live", () => {
   it("says why when the previews cannot be read", async () => {
     const client = fakeClient({
       listProjectPreviews: {
-        pages: () => failingWith(new ZitadelError("E_NETWORK", "down")),
+        pages: () => failingWith(new BackendUnreachableError("down")),
       },
     });
 

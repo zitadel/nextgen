@@ -5,7 +5,7 @@ import type {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Credential } from "@/lib/backend";
-import { BackendNotFoundError } from "@/lib/backend";
+import { BackendNotFoundError, BackendUnreachableError } from "@/lib/backend";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { warnings } from "@/lib/ui";
 import type { JsonObject, JsonValue } from "@/lib/zitadel";
@@ -202,7 +202,7 @@ function aPlatform(platform: Platform = {}): ClientStubs {
 function pageOf(platform: Platform, users: readonly AUser[], query: QueryUsersBody) {
   const filter = query.filter ?? [];
   if (platform.refuses?.(filter)) {
-    throw new Error("boom");
+    throw new BackendUnreachableError("boom");
   }
   const equals = filter.find((f) => {
     return f.field === "schema_object_type" && f.operation === "equals";
@@ -265,7 +265,7 @@ function liveOn(platform: Platform) {
  * @returns Never; it always throws.
  */
 function refused(): never {
-  throw new Error("forbidden");
+  throw new BackendUnreachableError("forbidden");
 }
 
 /**

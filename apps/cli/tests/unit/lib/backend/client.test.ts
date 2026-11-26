@@ -238,15 +238,16 @@ describe("responseFailure", () => {
 });
 
 describe("translateFailure", () => {
-  it.each(["unreachable", "timeout", "unreadable"] as const)(
-    "raises a request that got no response as unavailable, saying it was %s",
-    (reason) => {
+  it.each([
+    ["unreachable", "BackendUnreachableError"],
+    ["timeout", "BackendTimeoutError"],
+    ["unreadable", "BackendUnreadableError"],
+  ] as const)(
+    "raises a request that got no response, saying it was %s, as a %s",
+    (reason, name) => {
       expect(
         translateFailure(new NetworkError("http://localhost:8080", reason, "no answer")),
-      ).toMatchObject({
-        name: "BackendUnavailableError",
-        reason,
-      });
+      ).toMatchObject({ name });
     },
   );
 

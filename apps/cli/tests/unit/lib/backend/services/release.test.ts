@@ -1,7 +1,7 @@
 import { RevokeRelease409DetailsOriginsItemKind } from "@zitadel/api/generated/model";
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendConflictError, BackendReleaseInUseError } from "@/lib/backend";
+import { BackendReleaseInUseError } from "@/lib/backend";
 import { ReleaseService } from "@/lib/backend/services/release";
 import { fakeClient } from "@tests/helpers/fake-client";
 import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
@@ -145,14 +145,14 @@ describe("ReleaseService.revoke", () => {
       ["an origin that is empty", anInUseAnswer([{ ...PRIMARY, origin: "" }])],
       ["a deployment that is empty", anInUseAnswer([{ ...PRIMARY, deployment_id: "" }])],
       ["no details", { code: "rel.in_use", message: "release: still served by an origin" }],
-    ])("fails as the plain conflict it was when the answer has %s", async (_, body) => {
+    ])("fails as the in-use error it was when the answer has %s", async (_, body) => {
       const releaseService = refusedWith(body);
 
       const refusal = await rejectionOf(() => {
         return releaseService.revoke("rel_1");
       });
 
-      expect(refusal).toBeInstanceOf(BackendConflictError);
+      expect(refusal).toBeInstanceOf(BackendReleaseInUseError);
     });
   });
 });

@@ -15,11 +15,11 @@ describe("UpgradeReleaseLookupError", () => {
     ]);
   });
 
-  it("is a generic failure that is not worth retrying unchanged", () => {
+  it("is an unavailable failure that is not worth retrying unchanged", () => {
     const error = new UpgradeReleaseLookupError("Could not look up the latest release");
 
     expect(error).toBeInstanceOf(UpgradeError);
-    expect([error.category, error.retryable]).toEqual(["unknown", false]);
+    expect([error.category, error.retryable]).toEqual(["unavailable", false]);
     expect(error.code).toBe("E_VALIDATION");
   });
 });

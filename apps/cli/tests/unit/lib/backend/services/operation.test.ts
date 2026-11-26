@@ -173,7 +173,7 @@ describe("OperationService.call", () => {
     );
 
     expect(failure).toMatchObject({
-      name: "BackendUnavailableError",
+      name: "BackendUnreachableError",
     });
     expect(toZitadelError(failure).code).toBe("E_NETWORK");
   });

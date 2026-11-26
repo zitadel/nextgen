@@ -2,7 +2,7 @@ import type { RequestListener } from "node:http";
 
 import { describe, expect } from "vitest";
 
-import { BackendUnavailableError } from "@/lib/backend";
+import { BackendUnreachableError, BackendUnreadableError } from "@/lib/backend";
 import { request } from "@/lib/backend/transport";
 import { ZitadelError } from "@/lib/errors";
 import { it } from "@tests/fixtures";
@@ -28,13 +28,7 @@ describe("request", () => {
       request(CLOSED, {
         method: "POST",
       }),
-    ).rejects.toBeInstanceOf(BackendUnavailableError);
-  });
-
-  it("says why no response came, so the failure can be worded", async () => {
-    await expect(request(CLOSED, { method: "POST" })).rejects.toMatchObject({
-      reason: "unreachable",
-    });
+    ).rejects.toBeInstanceOf(BackendUnreachableError);
   });
 
   it("fails with the backend's own error when the body cannot be read", async ({ serve }) => {
@@ -44,21 +38,8 @@ describe("request", () => {
     };
 
     await expect(request(answeringUrl, { method: "GET" }, {}, read)).rejects.toBeInstanceOf(
-      BackendUnavailableError,
+      BackendUnreadableError,
     );
-  });
-
-  it("says the body was the part that failed, so it is not reported as an unreachable server", async ({
-    serve,
-  }) => {
-    const answeringUrl = await serve(answering, "127.0.0.1");
-    const read = async (): Promise<never> => {
-      throw new Error("the body broke off");
-    };
-
-    await expect(request(answeringUrl, { method: "GET" }, {}, read)).rejects.toMatchObject({
-      reason: "unreadable",
-    });
   });
 
   it("answers a cancellation as it came, so Ctrl-C still reads as cancelled", async () => {

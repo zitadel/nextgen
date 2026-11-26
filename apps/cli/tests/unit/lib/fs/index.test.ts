@@ -5,6 +5,9 @@ import { describe, expect } from "vitest";
 
 import {
   entryExists,
+  FsDeniedError,
+  FsIsDirectoryError,
+  FsNotDirectoryError,
   isFile,
   pathExists,
   pathExistsStrict,
@@ -44,7 +47,7 @@ describe("readIfExists", () => {
   it("throws for a path that exists but cannot be read as a file", async ({ dir }) => {
     await mkdir(join(dir, "folder"));
 
-    await expect(readIfExists(join(dir, "folder"))).rejects.toMatchObject({ code: "EISDIR" });
+    await expect(readIfExists(join(dir, "folder"))).rejects.toBeInstanceOf(FsIsDirectoryError);
   });
 
   it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
@@ -54,7 +57,7 @@ describe("readIfExists", () => {
       await writeFile(file, "x");
       await chmod(file, 0o000);
 
-      await expect(readIfExists(file)).rejects.toMatchObject({ code: "EACCES" });
+      await expect(readIfExists(file)).rejects.toBeInstanceOf(FsDeniedError);
     },
   );
 });
@@ -70,9 +73,9 @@ describe("pathExistsStrict", () => {
   it("throws when the parent is a file rather than a directory", async ({ dir }) => {
     await writeFile(join(dir, "a.txt"), "x");
 
-    await expect(pathExistsStrict(join(dir, "a.txt", "child"))).rejects.toMatchObject({
-      code: "ENOTDIR",
-    });
+    await expect(pathExistsStrict(join(dir, "a.txt", "child"))).rejects.toBeInstanceOf(
+      FsNotDirectoryError,
+    );
   });
 });
 
@@ -105,7 +108,7 @@ describe("readDirIfExists", () => {
   it("rethrows when the path is a file rather than a directory", async ({ dir }) => {
     await writeFile(join(dir, "a.txt"), "x");
 
-    await expect(readDirIfExists(join(dir, "a.txt"))).rejects.toMatchObject({ code: "ENOTDIR" });
+    await expect(readDirIfExists(join(dir, "a.txt"))).rejects.toBeInstanceOf(FsNotDirectoryError);
   });
 });
 
