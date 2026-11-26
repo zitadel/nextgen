@@ -24,27 +24,28 @@ export class SolidStartDetector implements Detector {
   readonly versionFloor = "2";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    try {
-      const pkg = await readPackageJson(cwd);
-      if (!hasDependency(pkg, "solid-js") || !hasDependency(pkg, "@solidjs/start")) {
-        return null;
-      }
-
-      // SolidStart 1 registers middleware in app.config.ts and has no
-      // vite.config, which the patch edits; refuse up front with a clear reason
-      // instead of failing later on a missing config file.
-      await enforceVersionFloor(this, pkg, cwd);
-
-      const devPort = await detectDevPort(cwd, pkg);
-      return { id: "solid-start", appDir: "src", devPort, url: issuerFromPort(devPort) };
-    } catch (error) {
+    const pkg = await readPackageJson(cwd).catch((error: unknown) => {
       if (error instanceof FsError) {
-        return null;
+        return undefined;
       }
       if (error instanceof PmManifestInvalidError) {
-        return null;
+        return undefined;
       }
       throw error;
+    });
+    if (pkg === undefined) {
+      return null;
     }
+    if (!hasDependency(pkg, "solid-js") || !hasDependency(pkg, "@solidjs/start")) {
+      return null;
+    }
+
+    // SolidStart 1 registers middleware in app.config.ts and has no
+    // vite.config, which the patch edits; refuse up front with a clear reason
+    // instead of failing later on a missing config file.
+    await enforceVersionFloor(this, pkg, cwd);
+
+    const devPort = await detectDevPort(cwd, pkg);
+    return { id: "solid-start", appDir: "src", devPort, url: issuerFromPort(devPort) };
   }
 }

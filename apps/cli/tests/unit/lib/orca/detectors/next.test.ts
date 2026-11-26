@@ -7,6 +7,7 @@ import { it } from "@tests/fixtures";
 
 import { NextDetector } from "@/lib/orca/detectors/next";
 import { OrcaError } from "@/lib/orca";
+import { FsNotDirectoryError } from "@/lib/fs";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const detector = new NextDetector();
@@ -105,6 +106,17 @@ describe("NextDetector", () => {
     expect(caught).toBeInstanceOf(OrcaError);
     expect((caught as OrcaError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
     expect((caught as OrcaError).message).toContain("Pages Router");
+  });
+
+  it("lets a file system failure while looking for the app router through", async ({ dir }) => {
+    await writeNextPackageJson(dir);
+    await writeFile(join(dir, "src"), "");
+
+    const caught = await rejectionOf(() => {
+      return detector.detect(dir);
+    });
+
+    expect(caught).toBeInstanceOf(FsNotDirectoryError);
   });
 
   it("throws the version floor for Next 14, before the app-router shape check", async ({ dir }) => {

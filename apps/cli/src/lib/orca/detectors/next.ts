@@ -30,41 +30,42 @@ export class NextDetector implements Detector {
    * an empty directory to scaffold.
    */
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    try {
-      const pkg = await readPackageJson(cwd);
-      if (!hasDependency(pkg, "next")) {
-        return null;
-      }
-
-      await enforceVersionFloor(this, pkg, cwd);
-
-      const appDir = (await dirExists(join(cwd, "app")))
-        ? "app"
-        : (await dirExists(join(cwd, "src/app")))
-          ? "src/app"
-          : undefined;
-      if (!appDir) {
-        throw new OrcaPagesRouterError("Next.js Pages Router projects are not supported in v1");
-      }
-
-      const devPort = await detectDevPort(cwd, pkg);
-      const versionMajor = dependencyVersionMajor(pkg, "next");
-      return {
-        id: "next",
-        appDir,
-        devPort,
-        url: issuerFromPort(devPort),
-        ...(versionMajor === undefined ? {} : { versionMajor }),
-      };
-    } catch (error) {
+    const pkg = await readPackageJson(cwd).catch((error: unknown) => {
       if (error instanceof FsError) {
-        return null;
+        return undefined;
       }
       if (error instanceof PmManifestInvalidError) {
-        return null;
+        return undefined;
       }
       throw error;
+    });
+    if (pkg === undefined) {
+      return null;
     }
+    if (!hasDependency(pkg, "next")) {
+      return null;
+    }
+
+    await enforceVersionFloor(this, pkg, cwd);
+
+    const appDir = (await dirExists(join(cwd, "app")))
+      ? "app"
+      : (await dirExists(join(cwd, "src/app")))
+        ? "src/app"
+        : undefined;
+    if (!appDir) {
+      throw new OrcaPagesRouterError("Next.js Pages Router projects are not supported in v1");
+    }
+
+    const devPort = await detectDevPort(cwd, pkg);
+    const versionMajor = dependencyVersionMajor(pkg, "next");
+    return {
+      id: "next",
+      appDir,
+      devPort,
+      url: issuerFromPort(devPort),
+      ...(versionMajor === undefined ? {} : { versionMajor }),
+    };
   }
 }
 
