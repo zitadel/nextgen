@@ -19,7 +19,7 @@ import {
   stat,
   writeFile,
 } from "@/lib/fs";
-import { parseJsonObject } from "@/lib/json";
+import { isObject, parseJsonOrUndefined } from "@/lib/json";
 import { ancestors } from "@/lib/paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
 import { isLoopbackHost } from "@/lib/server/host";
@@ -380,7 +380,10 @@ export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
     return undefined;
   }
 
-  const parsed = parseJsonObject(raw, LOCAL_RUNTIME_FILE);
+  const parsed = parseJsonOrUndefined(raw);
+  if (!isObject(parsed)) {
+    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
+  }
   return normalizeRuntimeMetadata(parsed);
 }
 
