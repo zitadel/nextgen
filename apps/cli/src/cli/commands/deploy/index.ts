@@ -5,7 +5,8 @@ import { z } from "zod";
 
 import { Origins } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
-import { confirmationHint, ZitadelError } from "@/lib/errors";
+import { ConsentRequiredError } from "@/lib/consent";
+import { ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, Connection, CommandResult } from "@/cli/core";
 import { reads, type Refused } from "@/cli/core/flags";
@@ -232,14 +233,10 @@ export default class Deploy extends Telemetered(
     const diff = this.said(prepared);
     const question = await this.lockoutQuestion(prepared.lockouts);
     if (question !== undefined && this.nonInteractive && !this.force) {
-      throw new ZitadelError(
-        "E_CONFIRMATION_REQUIRED",
+      throw new ConsentRequiredError(
         `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
-        {
-          hint: confirmationHint(question),
-          details: { question },
-          nextCommands: [await this.again("deploy", { with: { dryRun: true, force: true } })],
-        },
+        question,
+        await this.again("deploy", { with: { dryRun: true, force: true } }),
       );
     }
     const { resourceCount } = prepared;

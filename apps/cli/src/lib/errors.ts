@@ -104,15 +104,6 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
 };
 
 /**
- * The hint of an `E_CONFIRMATION_REQUIRED` refusal: the question the prompt
- * would have asked, for whoever runs the CLI to put to a person, and when
- * `--force` may follow.
- */
-export function confirmationHint(question: string): string {
-  return `Ask a person first: ${question} Pass --force only once they agree.`;
-}
-
-/**
  * Optional, user-facing extras attached to a {@link ZitadelError}. Kept
  * separate from the message so the renderer can present a hint, suggested
  * follow-up commands, and structured details independently (e.g. as JSON
@@ -299,7 +290,7 @@ export function toZitadelError(error: unknown): ZitadelError {
     }
     if (errno === "EEXIST") {
       return new ZitadelError("E_CONFLICT", error.message, {
-        hint: "A file already exists. Use --force to overwrite or remove it first.",
+        hint: "A file already exists. Remove it first.",
         details,
       });
     }
