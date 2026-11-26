@@ -1,3 +1,6 @@
+import { isErrno } from "@/lib/errno";
+import { PmManifestInvalidError } from "@/lib/pm";
+import type { PackageJson } from "@/lib/pm";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -26,10 +29,20 @@ export class QwikRouterDetector implements Detector {
   readonly versionFloor = "2.0.0-beta.45";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => {
-      return undefined;
-    });
-    if (!pkg || !hasDependency(pkg, "@qwik.dev/core") || !hasDependency(pkg, "@qwik.dev/router")) {
+    // biome-ignore lint/plugin: the checks after the read need `pkg` and must not sit inside the try that guards it
+    let pkg: PackageJson;
+    try {
+      pkg = await readPackageJson(cwd);
+    } catch (error) {
+      if (isErrno(error, "ENOENT")) {
+        return null;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return null;
+      }
+      throw error;
+    }
+    if (!hasDependency(pkg, "@qwik.dev/core") || !hasDependency(pkg, "@qwik.dev/router")) {
       return null;
     }
 

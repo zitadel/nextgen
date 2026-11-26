@@ -2,8 +2,9 @@ import { readFile, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import semver from "semver";
 
+import { isErrno } from "@/lib/errno";
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
-import { PM, type PackageJson } from "@/lib/pm";
+import { PM, PmManifestInvalidError, type PackageJson } from "@/lib/pm";
 import { ancestors } from "@/lib/paths";
 
 export type { PackageJson } from "@/lib/pm";
@@ -162,10 +163,18 @@ async function isWorkspaceRoot(dir: string): Promise<boolean> {
   ) {
     return true;
   }
-  const pkg = await readPackageJson(dir).catch(() => {
-    return undefined;
-  });
-  return pkg?.workspaces !== undefined && pkg.workspaces !== null;
+  try {
+    const pkg = await readPackageJson(dir);
+    return pkg.workspaces !== undefined && pkg.workspaces !== null;
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return false;
+    }
+    if (error instanceof PmManifestInvalidError) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -181,14 +190,26 @@ export async function installedPackage(
   cwd: string,
   name: string,
 ): Promise<InstalledPackage | undefined> {
-  const start = await realpath(resolve(cwd)).catch(() => {
-    return resolve(cwd);
-  });
+  // biome-ignore lint/plugin: the walk after the lookup needs `start` and must not sit inside the try that guards it
+  let start = resolve(cwd);
+  try {
+    start = await realpath(start);
+  } catch (error) {
+    if (!isErrno(error, "ENOENT")) {
+      throw error;
+    }
+  }
   for (const dir of ancestors(start)) {
     const path = join(dir, "node_modules", name, "package.json");
-    const contents = await readFile(path, "utf8").catch(() => {
-      return undefined;
-    });
+    // biome-ignore lint/plugin: the code after the read needs `contents` and must not sit inside the try that guards it
+    let contents: string | undefined;
+    try {
+      contents = await readFile(path, "utf8");
+    } catch (error) {
+      if (!isErrno(error, "ENOENT")) {
+        throw error;
+      }
+    }
     if (contents !== undefined) {
       const version = versionIn(contents);
       return version === undefined ? undefined : { version, path };

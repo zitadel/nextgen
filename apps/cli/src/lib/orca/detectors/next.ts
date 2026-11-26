@@ -1,3 +1,6 @@
+import { isErrno } from "@/lib/errno";
+import { PmManifestInvalidError } from "@/lib/pm";
+import type { PackageJson } from "@/lib/pm";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -29,10 +32,20 @@ export class NextDetector implements Detector {
    * an empty directory to scaffold.
    */
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => {
-      return undefined;
-    });
-    if (!pkg || !hasDependency(pkg, "next")) {
+    // biome-ignore lint/plugin: the checks after the read need `pkg` and must not sit inside the try that guards it
+    let pkg: PackageJson;
+    try {
+      pkg = await readPackageJson(cwd);
+    } catch (error) {
+      if (isErrno(error, "ENOENT")) {
+        return null;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return null;
+      }
+      throw error;
+    }
+    if (!hasDependency(pkg, "next")) {
       return null;
     }
 
@@ -65,12 +78,7 @@ async function dirExists(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: string }).code === "ENOENT"
-    ) {
+    if (isErrno(error, "ENOENT")) {
       return false;
     }
     throw error;

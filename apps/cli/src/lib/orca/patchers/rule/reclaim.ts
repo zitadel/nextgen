@@ -1,7 +1,8 @@
 import { join } from "node:path";
 
 import { pathExists } from "@/lib/fs";
-import { PM } from "@/lib/pm";
+import { isErrno } from "@/lib/errno";
+import { PM, PmManifestInvalidError } from "@/lib/pm";
 import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 
@@ -96,8 +97,16 @@ export async function withoutExistingTargets(
  * error handling reports the real problem.
  */
 async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
-  const pkg = await PM.manifest(cwd).catch(() => {
-    return undefined;
-  });
-  return pkg?.dependencies?.[name] !== undefined || pkg?.devDependencies?.[name] !== undefined;
+  try {
+    const pkg = await PM.manifest(cwd);
+    return pkg.dependencies?.[name] !== undefined || pkg.devDependencies?.[name] !== undefined;
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return false;
+    }
+    if (error instanceof PmManifestInvalidError) {
+      return false;
+    }
+    throw error;
+  }
 }

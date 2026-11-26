@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
 
+import { isErrno } from "@/lib/errno";
 import { isObject } from "@/lib/json";
 import { readState, updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldManifest, ScaffoldPosture } from "@/lib/sync/types";
@@ -112,12 +113,19 @@ export class ScaffoldManifestFile {
       });
     const read = await Promise.all(
       marked.map(async ({ path, key }) => {
+        // biome-ignore lint/plugin: the code after the read needs `contents` and must not sit inside the try that guards it
+        let contents: string | undefined;
+        try {
+          contents = await readFile(join(cwd, key), "utf8");
+        } catch (error) {
+          if (!isErrno(error, "ENOENT")) {
+            throw error;
+          }
+        }
         return {
           path,
           key,
-          contents: await readFile(join(cwd, key), "utf8").catch(() => {
-            return undefined;
-          }),
+          contents,
         };
       }),
     );

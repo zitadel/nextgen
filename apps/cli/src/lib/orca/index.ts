@@ -280,22 +280,18 @@ export class Orca {
         ? undoScaffold(cwd, before, workspace)
         : rm(created, { recursive: true, force: true });
     };
-    // Starting from a resolved promise puts the scaffolder lookup, which throws
-    // for an unknown framework, under the same undo as the scaffold itself.
-    const facts = await Promise.resolve()
-      .then(() => {
-        return this.scaffolderFor(framework).scaffold(workspace?.work ?? cwd, framework);
-      })
-      .then(() => {
-        return workspace?.moveInto(cwd);
-      })
-      .then(() => {
-        return this.detect(cwd, framework);
-      })
-      .catch(async (error: unknown) => {
-        await undo();
-        throw error;
-      });
+    // The scaffolder lookup throws for an unknown framework, so it sits under
+    // the same undo as the scaffold itself.
+    // biome-ignore lint/plugin: the return after the scaffold needs `facts` and must not sit inside the try that undoes it
+    let facts: FrameworkFacts;
+    try {
+      await this.scaffolderFor(framework).scaffold(workspace?.work ?? cwd, framework);
+      await workspace?.moveInto(cwd);
+      facts = await this.detect(cwd, framework);
+    } catch (error) {
+      await undo();
+      throw error;
+    }
     return {
       facts,
       undo,
