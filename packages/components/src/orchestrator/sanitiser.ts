@@ -61,9 +61,7 @@ const STRUCTURAL_TAGS: readonly string[] = [
 /**
  * Attributes templates may carry on structural tags. Per-atom attributes are
  * derived from the manifest registry below — manifests are the single source
- * of truth for "what attributes does `<zl-field>` accept?". `data-*` is
- * allowed as a whole, so none is listed: the Sanitizer API rejects a
- * configuration that lists one, or lists any attribute twice.
+ * of truth for "what attributes does `<zl-field>` accept?".
  */
 const COMMON_ATTRS: readonly string[] = [
   "id",
@@ -150,7 +148,8 @@ const ELEMENTS: readonly string[] = [
 
 /**
  * The attributes a template may use, each once: the common ones, every atom's,
- * and the ARIA ones.
+ * and the ARIA ones. `data-*` is allowed as a whole, so none is listed: the
+ * Sanitizer API rejects a configuration that lists one, or any attribute twice.
  */
 const ATTRIBUTES: readonly string[] = [
   ...new Set([
@@ -158,7 +157,7 @@ const ATTRIBUTES: readonly string[] = [
     ...manifestRegistry.flatMap((manifest) => manifest.attrs),
     ...ARIA_ATTRS,
   ]),
-];
+].filter((attribute) => !attribute.startsWith("data-"));
 
 /**
  * Turns untrusted template output into markup that is safe to render.

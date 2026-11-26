@@ -19,6 +19,14 @@ describe("createSanitiser with the browser's Sanitizer API", () => {
     );
   });
 
+  it("keeps the test id on an atom", () => {
+    const out = sanitiser.sanitise(
+      `<zl-button action="submit" data-testid="zitadel-action-submit"></zl-button>`,
+    );
+
+    expect(out).toBe(`<zl-button action="submit" data-testid="zitadel-action-submit"></zl-button>`);
+  });
+
   it("keeps data-* and aria-* attributes", () => {
     const out = sanitiser.sanitise(
       `<div data-theme="dark" data-testid="login" aria-label="Login">x</div>`,
