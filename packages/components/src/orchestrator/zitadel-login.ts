@@ -457,7 +457,7 @@ export class ZitadelLogin extends ZitadelSurface {
   private previewRepaint = false;
 
   /**
-   * Resolves the update paused while detached; `null` when none is.
+   * Old values of the properties that changed while detached, replayed on reattach.
    */
   private readonly heldChanges = new Map<PropertyKey, unknown>();
 
