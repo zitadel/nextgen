@@ -7,9 +7,8 @@ const native = new NativeSanitiser();
 const purify = await DomPurifySanitiser.load();
 
 /**
- * Template markup and what both sanitisers make of it: the native one exactly,
- * DOMPurify (which Safari loads, configured as before the native path existed)
- * with the same text and elements.
+ * Template markup and what both sanitisers make of it, exactly: the native one
+ * and DOMPurify, which Safari loads.
  */
 const cases: ReadonlyArray<[string, string, string]> = [
   [
@@ -31,6 +30,11 @@ const cases: ReadonlyArray<[string, string, string]> = [
     "keeps inline formatting and its text",
     `<p><b>Note:</b> use your <i>work</i> email, <code>name@example.com</code></p>`,
     `<p><b>Note:</b> use your <i>work</i> email, <code>name@example.com</code></p>`,
+  ],
+  [
+    "keeps the attributes a list and a link have by default",
+    `<ol start="3" reversed><li value="2">x</li></ol><a href="/f" hreflang="de">a</a>`,
+    `<ol start="3" reversed=""><li value="2">x</li></ol><a href="/f" hreflang="de">a</a>`,
   ],
   [
     "keeps a table",
@@ -75,15 +79,7 @@ describe("NativeSanitiser", () => {
     expect(native.sanitise(input)).toBe(expected);
   });
 
-  it.each(cases)("%s as DOMPurify does", (_name, input) => {
-    const parse = (html: string) => {
-      const template = document.createElement("template");
-      template.innerHTML = html;
-      return template.content;
-    };
-
-    expect(parse(native.sanitise(input)).textContent).toBe(
-      parse(purify.sanitise(input)).textContent,
-    );
+  it.each(cases)("%s with DOMPurify, as Safari does", (_name, input, expected) => {
+    expect(purify.sanitise(input)).toBe(expected);
   });
 });

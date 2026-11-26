@@ -7,8 +7,8 @@ import type { Sanitiser } from "./sanitiser.js";
  * Sanitises with DOMPurify, for browsers without the HTML Sanitizer API.
  *
  * Its HTML profile allows safe HTML such as `<b>` and `<table>`; the allowlist
- * adds the atoms and their attributes, and a dropped element keeps its text,
- * as {@link NativeSanitiser} does. DOM clobbering protection is off because
+ * adds the atoms and the attributes their manifests declare, and a dropped
+ * element keeps its text, as {@link NativeSanitiser} does. DOM clobbering protection is off because
  * the output renders inside the `<zitadel-login>` shadow root, which named
  * access on `document` and `window` cannot reach, and the guard would drop
  * field names such as `name` (#2532).
@@ -24,11 +24,6 @@ export class DomPurifySanitiser implements Sanitiser {
     ADD_TAGS: [...ELEMENTS],
     ADD_ATTR: [...ATTRIBUTES],
     FORBID_TAGS: [...REMOVED_TAGS, ...UNWRAPPED_TAGS],
-    CUSTOM_ELEMENT_HANDLING: {
-      tagNameCheck: /^zl-[a-z0-9-]+$/,
-      attributeNameCheck: /^(?!on)[a-z][a-z0-9-]*$/,
-      allowCustomizedBuiltInElements: false,
-    },
     KEEP_CONTENT: true,
     ALLOW_DATA_ATTR: true,
     ALLOW_ARIA_ATTR: true,

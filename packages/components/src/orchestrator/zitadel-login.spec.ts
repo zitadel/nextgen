@@ -938,14 +938,32 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
-  it("does not render while detached", async () => {
+  it("holds an update while detached", async () => {
     const element = await mount(host);
     element.remove();
     element.lang = "de";
-    await element.updateComplete;
+    await Promise.resolve();
 
+    expect(element.isUpdatePending).toBe(true);
     expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
       en["identifier.title"],
+    );
+  });
+
+  it("moves focus into a step that arrived while detached", async () => {
+    const element = await mount(host);
+    const stepped = new Promise((resolve) => {
+      element.addEventListener("zitadel-flow-step", resolve, { once: true });
+    });
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    element.remove();
+    await stepped;
+    host.appendChild(element);
+    await element.updateComplete;
+
+    await waitFor(() =>
+      element.shadowRoot?.activeElement?.matches(`zl-field[name="${PASSWORD_FIELD}"]`),
     );
   });
 

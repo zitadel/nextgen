@@ -22,13 +22,20 @@ export class NativeSanitiser implements Sanitiser {
   }
 
   /**
-   * The browser's default configuration with the allowlist applied.
+   * The browser's default configuration with the allowlist applied. A tag the
+   * default already allows is left as it is: allowing it again would replace
+   * its own attributes, such as `start` on `<ol>`.
    *
    * @returns The configured sanitizer.
    */
   private static configure(): Sanitizer {
     const sanitizer = new Sanitizer();
-    for (const element of ELEMENTS) {
+    const defaults = new Set(
+      sanitizer
+        .get()
+        .elements?.map((element) => (typeof element === "string" ? element : element.name)),
+    );
+    for (const element of ELEMENTS.filter((name) => !defaults.has(name))) {
       sanitizer.allowElement(element);
     }
     for (const attribute of ATTRIBUTES) {

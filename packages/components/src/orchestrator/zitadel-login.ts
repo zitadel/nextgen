@@ -457,6 +457,11 @@ export class ZitadelLogin extends ZitadelSurface {
   private previewRepaint = false;
 
   /**
+   * Resolves the update paused while detached; `null` when none is.
+   */
+  private resumeUpdate: (() => void) | null = null;
+
+  /**
    * What a step renders with: the dictionary for the page's language, the
    * LiquidJS engine and the sanitiser. Each loads on demand in its own chunk
    * (the translation the page shows, the engine, and DOMPurify where the
@@ -561,12 +566,12 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Renders again on every attach, as updates are skipped while detached
-   * ({@link shouldUpdate}).
+   * Resumes the update paused while detached ({@link scheduleUpdate}).
    */
   override connectedCallback(): void {
     super.connectedCallback();
-    this.requestUpdate();
+    this.resumeUpdate?.();
+    this.resumeUpdate = null;
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", this.handlePopState);
     }
@@ -642,15 +647,20 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Skips updates while detached: what the element loads on demand can finish
-   * after it left the page, and rendering then would replace the step it shows.
-   * The next attach renders again ({@link connectedCallback}).
+   * Pauses an update while the element is detached and runs it on the next
+   * attach, with every property that changed meanwhile: what the element loads
+   * on demand can finish after it left the page, and `updated` needs to see
+   * the step or value that changed then.
    *
-   * @param changed - The properties that changed.
-   * @returns Whether to update.
+   * @returns Once the update has run.
    */
-  protected override shouldUpdate(changed: PropertyValues<this>): boolean {
-    return this.isConnected && super.shouldUpdate(changed);
+  protected override async scheduleUpdate(): Promise<void> {
+    if (!this.isConnected) {
+      await new Promise<void>((resolve) => {
+        this.resumeUpdate = resolve;
+      });
+    }
+    super.scheduleUpdate();
   }
 
   override willUpdate(changed: PropertyValues<this>): void {

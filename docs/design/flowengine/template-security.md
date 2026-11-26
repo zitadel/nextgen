@@ -76,9 +76,9 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 │  Layer 2: Sanitization                              │
 │  Before innerHTML assignment, the rendered HTML     │
 │  string goes through the browser's Element.setHTML  │
-│  (DOMPurify where the browser lacks it) against one │
-│  allowlist, stripping dangerous tags and attributes │
-│  (onerror, onclick).                                │
+│  (DOMPurify where the browser lacks it): safe HTML  │
+│  plus the <zl-*> atoms, stripping dangerous tags    │
+│  and attributes (onerror, onclick).                 │
 ├─────────────────────────────────────────────────────┤
 │  Layer 3: Content Security Policy (CSP)             │
 │  The Hosted Login page sets:                        │
@@ -111,7 +111,7 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 └─────────────────────────────────────────────────────┘
 ```
 
-Layer 2 lives in `packages/components/src/orchestrator/sanitiser/`: `NativeSanitiser` uses the HTML Sanitizer API (`Element.setHTML()`, Chrome and Edge 146, Firefox 148), and `DomPurifySanitiser` loads DOMPurify only in a browser without it (Safari). Both enforce `allowlist.ts`. In the DOMPurify path, its DOM clobbering guard (`SANITIZE_DOM`) is disabled, because the sanitised HTML renders inside the `<zitadel-login>` shadow root, which `document` and `window` named access cannot reach, and the only form in that tree is the orchestrator's own. Named access on that form can only shadow the form's own methods, and the orchestrator reads none of its named properties. The atoms call `requestSubmit` and `reset` through `HTMLFormElement.prototype`, so a field named after a form method cannot shadow them.
+Layer 2 lives in `packages/components/src/orchestrator/sanitiser/`: `NativeSanitiser` uses the HTML Sanitizer API (`Element.setHTML()`, Chrome and Edge 146, Firefox 148), and `DomPurifySanitiser` loads DOMPurify only in a browser without it (Safari). Each starts from its library's safe HTML (the browser's default Sanitizer configuration, DOMPurify's HTML profile) and adds the atoms and attributes in `allowlist.ts`; `native.browser.spec.ts` holds both to the same output. In the DOMPurify path, its DOM clobbering guard (`SANITIZE_DOM`) is disabled, because the sanitised HTML renders inside the `<zitadel-login>` shadow root, which `document` and `window` named access cannot reach, and the only form in that tree is the orchestrator's own. Named access on that form can only shadow the form's own methods, and the orchestrator reads none of its named properties. The atoms call `requestSubmit` and `reset` through `HTMLFormElement.prototype`, so a field named after a form method cannot shadow them.
 
 ## Summary
 

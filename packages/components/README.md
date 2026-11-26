@@ -79,7 +79,7 @@ What `<zitadel-login>` handles for you:
   `branding.theme.mode`, else the variant default (`page` dark, `widget`
   follows `prefers-color-scheme`).
 - Mandatory gates (terms, captcha) enforced before submit.
-- Output sanitised against a per-atom allowlist before injection, with the browser's `Element.setHTML()`, or DOMPurify (loaded on demand) where the browser lacks it.
+- Output sanitised before injection with the browser's `Element.setHTML()`, or DOMPurify (loaded on demand) where the browser lacks it: safe HTML plus the `<zl-*>` atoms and the attributes their manifests declare.
 - Stateless server: the `_zflow` HttpOnly cookie is the source of truth
   between requests; every call runs with `credentials: "include"`.
 
