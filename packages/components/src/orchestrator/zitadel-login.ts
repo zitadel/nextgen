@@ -33,7 +33,14 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { createLiquidEngine, localiseFlowErrorKeys, stepNotice, stepTexts } from "./liquid.js";
+import { renderDefaultTemplate } from "./default-template.js";
+import {
+  createTemplateFilters,
+  localiseFlowErrorKeys,
+  stepNotice,
+  stepTexts,
+} from "./template-filters.js";
+import type { TemplateFilter } from "./template-runtime.js";
 import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
@@ -42,7 +49,6 @@ import { returnPathFromLocation } from "./return-path.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
-import { TEMPLATE_NAMES } from "./template-names.js";
 
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
 
@@ -455,7 +461,29 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private previewRepaint = false;
 
+  /**
+   * The dialect's filters for the active locale; the compiled default template
+   * and the engine share them.
+   */
+  private filters: Record<string, TemplateFilter> | null = null;
+
+  /**
+   * The engine for a tenant's `branding.liquid_template`. `null` until
+   * `liquid.ts` has loaded: the default template renders without it.
+   */
   private engine: Liquid | null = null;
+
+  /**
+   * `liquid.ts` once loaded. It is imported only when the branding carries a
+   * template, so a page on the default template never downloads LiquidJS.
+   */
+  private liquidModule: typeof import("./liquid.js") | null = null;
+
+  /**
+   * Where loading `liquid.ts` stands. A failed load renders the default
+   * template, as a template that fails to render does.
+   */
+  private liquidLoad: "idle" | "loading" | "failed" = "idle";
 
   /**
    * The theme the last commit rendered with. The template output carries the
@@ -593,8 +621,15 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
-    if (!this.engine || changed.has("locales") || changed.has("lang")) {
-      this.engine = createLiquidEngine({ locale: this.resolveLocale() });
+    if (!this.filters || changed.has("locales") || changed.has("lang")) {
+      this.filters = createTemplateFilters(this.resolveLocale());
+      this.engine = null;
+    }
+    if (this.tenantTemplateSource() !== null) {
+      this.loadLiquid();
+    }
+    if (this.liquidModule && !this.engine) {
+      this.engine = this.liquidModule.createLiquidEngine({ locale: this.resolveLocale() });
     }
     if (changed.has("previewState") && this.previewState && !this.preview) {
       console.warn(
@@ -761,10 +796,10 @@ export class ZitadelLogin extends ZitadelSurface {
     // `completing` holds the loader through the terminal step: painting a
     // success screen the host immediately navigates away from shows the user
     // two confirmations for one sign-in.
-    if (!this.response || !this.engine || this.completing) {
+    if (!this.response || !this.filters || this.completing || this.awaitingLiquid()) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
+    const rendered = this.injectAttribution(this.renderStep(this.response.step, this.filters));
     return html`<form
       class="zl-mount"
       part="form"
@@ -1229,11 +1264,57 @@ export class ZitadelLogin extends ZitadelSurface {
     return returnPathFromLocation() ?? this.postSignInUrl;
   }
 
-  private renderStep(step: CreateFlow201Step, engine: Liquid): string {
-    const tenantSource =
-      typeof this.branding?.liquid_template === "string" && this.branding.liquid_template.length > 0
-        ? this.branding.liquid_template
-        : null;
+  /**
+   * The tenant's template, when the branding carries a non-empty one.
+   *
+   * @returns The Liquid source, or `null` for the default template.
+   */
+  private tenantTemplateSource(): string | null {
+    return typeof this.branding?.liquid_template === "string" &&
+      this.branding.liquid_template.length > 0
+      ? this.branding.liquid_template
+      : null;
+  }
+
+  /**
+   * Whether the step waits for `liquid.ts` before it can render the tenant's
+   * template. The loader shows meanwhile, rather than the default template
+   * flashing before the tenant's.
+   *
+   * @returns `true` while the engine for a tenant template is loading.
+   */
+  private awaitingLiquid(): boolean {
+    return (
+      this.tenantTemplateSource() !== null && this.engine === null && this.liquidLoad !== "failed"
+    );
+  }
+
+  /**
+   * Starts loading `liquid.ts` once. Bundlers split the dynamic import into
+   * its own chunk, which only a branding with a template fetches.
+   */
+  private loadLiquid(): void {
+    if (this.liquidModule || this.liquidLoad !== "idle") {
+      return;
+    }
+    this.liquidLoad = "loading";
+    import("./liquid.js").then(
+      (module) => {
+        this.liquidModule = module;
+        this.liquidLoad = "idle";
+        this.requestUpdate();
+      },
+      (error: unknown) => {
+        console.error("[zitadel-login] Loading the Liquid engine failed:", error);
+        this.liquidLoad = "failed";
+        this.requestUpdate();
+      },
+    );
+  }
+
+  private renderStep(step: CreateFlow201Step, filters: Record<string, TemplateFilter>): string {
+    const tenantSource = this.tenantTemplateSource();
+    const engine = this.engine;
 
     // `error.*` keys — the server's validation dialect
     // (`error.<field>_<rule>`, one key per violation, "; "-joined) —
@@ -1302,7 +1383,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
     let raw: string;
     try {
-      if (tenantSource) {
+      if (tenantSource && engine) {
         const compiled =
           this.tenantTemplateCache?.source === tenantSource
             ? this.tenantTemplateCache.template
@@ -1310,12 +1391,12 @@ export class ZitadelLogin extends ZitadelSurface {
         this.tenantTemplateCache = { source: tenantSource, template: compiled };
         raw = engine.renderSync(compiled, context);
       } else {
-        raw = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+        raw = renderDefaultTemplate(context, filters);
       }
     } catch (error) {
       console.error("[zitadel-login] Liquid render failed:", error);
       try {
-        raw = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+        raw = renderDefaultTemplate(context, filters);
       } catch {
         return `<zl-alert severity="error">We couldn't render this step.</zl-alert>`;
       }

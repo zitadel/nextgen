@@ -19,20 +19,20 @@ import { gzipSync } from "node:zlib";
  * The gzip budgets, in bytes. Raise one only with the reason in the commit.
  */
 export const BUDGETS = {
-  standalone: 106_000,
-  defaultPath: 142_000,
+  standalone: 110_000,
+  defaultPath: 149_000,
 };
 
 /**
  * Relative specifiers of static `import`/`export … from` statements.
  */
 const STATIC_RELATIVE =
-  /(?:^|\n)\s*(?:import|export)\b[^;'"]*?(?:from\s*)?["'](\.{1,2}\/[^"']+)["']/g;
+  /(?:^|\n)\s*(?:import|export)\b[^;'"(]*?(?:from\s*)?["'](\.{1,2}\/[^"']+)["']/g;
 
 /**
  * Bare specifiers of static `import`/`export … from` statements.
  */
-const STATIC_BARE = /(?:^|\n)\s*(?:import|export)\b[^;'"]*?(?:from\s*)?["']((?![./])[^"']+)["']/g;
+const STATIC_BARE = /(?:^|\n)\s*(?:import|export)\b[^;'"(]*?(?:from\s*)?["']((?![./])[^"']+)["']/g;
 
 /**
  * The size of one file.

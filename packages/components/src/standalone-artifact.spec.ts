@@ -59,12 +59,6 @@ describe("bundle size", () => {
   });
 
   it("imports only these packages on the default path", () => {
-    expect(report.defaultPath.packages).toEqual([
-      "@zitadel/config",
-      "dompurify",
-      "liquidjs",
-      "lit",
-      "lucide",
-    ]);
+    expect(report.defaultPath.packages).toEqual(["@zitadel/config", "dompurify", "lit", "lucide"]);
   });
 });

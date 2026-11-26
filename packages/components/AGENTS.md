@@ -111,3 +111,8 @@ test; a warm `.vitest` cache brings that down to seconds.
 
 `tsdown.config.ts` keeps `lit`, `liquidjs`, `dompurify` and `lucide` external
 in the library build so consumers share one copy; never bundle them there.
+- The default template renders compiled (`templates/default.liquid?compiled`,
+  `vite-liquid-plugin.ts`); never import `liquid.ts`, `liquidjs` or
+  `@zitadel/config/template` statically from the orchestrator, only `import("./liquid.js")`.
+- `src/standalone-artifact.spec.ts` holds `dist/` to the gzip budgets in
+  `scripts/bundle-size.mjs`; lower a budget when a change shrinks the build.

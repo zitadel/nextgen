@@ -1,21 +1,15 @@
-import { readFileSync } from "node:fs";
-
 import { defineConfig, type TsdownPlugin } from "tsdown";
 
+import { liquidRaw as sharedLiquidRaw } from "./vite-liquid-plugin.ts";
+
 /**
- * Rolldown plugin that turns `.liquid` files into default-exported strings.
- * Mirrors what Vite does natively so `import tpl from "./file.liquid"` works
- * in both dev (Vite) and production (tsdown/rolldown) builds.
+ * The shared `.liquid` plugin (raw strings and `?compiled` render
+ * functions), the same one Vite uses in tests and Storybook.
+ *
+ * @returns The plugin, typed for Rolldown.
  */
 function liquidRaw(): TsdownPlugin {
-  return {
-    name: "liquid-raw",
-    load(id) {
-      if (!id.endsWith(".liquid")) return null;
-      const content = readFileSync(id, "utf-8");
-      return `export default ${JSON.stringify(content)};`;
-    },
-  };
+  return sharedLiquidRaw() as TsdownPlugin;
 }
 
 /**
@@ -126,6 +120,9 @@ export default defineConfig([
     sourcemap: false,
     // Nothing minifies this file after us: it is loaded as is from a CDN.
     minify: true,
+    // One file: the Liquid engine, which the library build loads with a
+    // dynamic import, is inlined here rather than left as a second chunk.
+    outputOptions: { codeSplitting: false },
     clean: false,
     target: "es2022",
     deps: {
