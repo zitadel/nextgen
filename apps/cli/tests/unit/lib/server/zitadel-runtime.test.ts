@@ -20,6 +20,7 @@ import {
   LocalServerNotRunningError,
   LocalServerPortBusyError,
   LocalServerStopError,
+  LocalServerUrlInvalidError,
 } from "@/lib/server";
 import {
   DestroyPermit,
@@ -963,6 +964,14 @@ describe("ZitadelRuntime.parse", () => {
       ok: false,
       problem: "The server URL cannot be empty",
     });
+  });
+});
+
+describe("ZitadelRuntime.origin", () => {
+  it("throws a LocalServerUrlInvalidError for an address that is not http(s)", () => {
+    expect(() => {
+      return ZitadelRuntime.origin("ftp://acme.example");
+    }).toThrow(LocalServerUrlInvalidError);
   });
 });
 

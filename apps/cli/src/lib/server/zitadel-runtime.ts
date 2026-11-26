@@ -13,6 +13,7 @@ import {
   LocalServerNotRunningError,
   LocalServerPortBusyError,
   LocalServerStopError,
+  LocalServerUrlInvalidError,
 } from "@/lib/server/errors";
 import { currentUser } from "@/lib/uidgid";
 
@@ -151,7 +152,7 @@ export abstract class ZitadelRuntime {
    *
    * @param input - The project directory and the `--server` flag, when given.
    * @returns The server and where it came from.
-   * @throws {LocalServerInvalidError} when the flag is not an http(s) URL,
+   * @throws {LocalServerUrlInvalidError} when the flag is not an http(s) URL,
    *   or the local server's own error when `local` is not running.
    */
   static async resolve(input: ResolveServerInput): Promise<ResolvedServer> {
@@ -198,15 +199,15 @@ export abstract class ZitadelRuntime {
    *
    * @param value - The server's address.
    * @returns The origin.
-   * @throws {LocalServerInvalidError} when it is not an http(s) URL.
+   * @throws {LocalServerUrlInvalidError} when it is not an http(s) URL.
    */
   static origin(value: string): string {
     if (!URL.canParse(value)) {
-      throw new LocalServerInvalidError(`Invalid server "${value}"`);
+      throw new LocalServerUrlInvalidError(`Invalid server "${value}"`);
     }
     const url = new URL(value);
     if (url.protocol !== "https:" && url.protocol !== "http:") {
-      throw new LocalServerInvalidError(`Server URL must use http(s): ${value}`);
+      throw new LocalServerUrlInvalidError(`Server URL must use http(s): ${value}`);
     }
     return url.origin;
   }
@@ -249,7 +250,7 @@ export abstract class ZitadelRuntime {
    * serves it apart from the API, and `/ui/console/` on any other server.
    *
    * @returns The console's address, with its trailing slash.
-   * @throws {LocalServerInvalidError} when the address is not an http(s) URL.
+   * @throws {LocalServerUrlInvalidError} when the address is not an http(s) URL.
    */
   consoleUrl(): string {
     if (this.isCloud()) {

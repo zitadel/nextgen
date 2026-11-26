@@ -5,6 +5,7 @@ export {
   LocalServerDockerMissingError,
   LocalServerError,
   LocalServerInvalidError,
+  LocalServerUrlInvalidError,
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,

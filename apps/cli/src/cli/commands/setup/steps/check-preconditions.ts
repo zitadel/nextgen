@@ -4,6 +4,7 @@ import {
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
+  LocalServerUrlInvalidError,
   ZitadelRuntime,
 } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
@@ -41,6 +42,12 @@ const LOCAL_SERVER_ELSEWHERE_REFUSAL = {
   message: "{message}",
   hint: "It was started in another directory: run `zitadel start` there, or with --cwd, to bring it back. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
+} as const satisfies Refusal;
+
+/** How a `--server` that is not an http(s) URL is refused. */
+const SERVER_URL_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Use a URL like {example}.",
 } as const satisfies Refusal;
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
@@ -308,6 +315,13 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
             },
           },
         );
+      }
+      if (error instanceof LocalServerUrlInvalidError) {
+        throw refusalError(SERVER_URL_INVALID_REFUSAL, {
+          ...error,
+          message: error.message,
+          example: ZitadelRuntime.DEFAULT,
+        });
       }
       throw error;
     }
