@@ -1,9 +1,8 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { PackageJson } from "type-fest";
 
 import { errorMessage } from "@/lib/errors";
-import { readIfExists } from "@/lib/fs";
+import { readFile, readIfExists } from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
 
 import { PmManifestInvalidError } from "./errors";

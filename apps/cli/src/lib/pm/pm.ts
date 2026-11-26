@@ -1,7 +1,6 @@
 import { dirname, join, resolve } from "node:path";
 
-import { isErrno } from "@/lib/errno";
-import { pathExists } from "@/lib/fs";
+import { FsNotFoundError, pathExists } from "@/lib/fs";
 import { Output } from "@/lib/ui/output";
 
 import { PmManifestInvalidError } from "./errors";
@@ -355,7 +354,10 @@ export class PM {
         ? name
         : undefined;
     } catch (error) {
-      if (isErrno(error, "ENOENT") || error instanceof PmManifestInvalidError) {
+      if (error instanceof FsNotFoundError) {
+        return undefined;
+      }
+      if (error instanceof PmManifestInvalidError) {
         return undefined;
       }
       throw error;

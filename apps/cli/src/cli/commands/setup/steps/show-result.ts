@@ -13,8 +13,7 @@ import {
   type SetupServices,
 } from "@/cli/commands/setup/shared";
 import { Claim } from "@/lib/claim";
-import { isErrno } from "@/lib/errno";
-import { pathExists } from "@/lib/fs";
+import { FsNotFoundError, pathExists } from "@/lib/fs";
 import { callbackUriFor, unpublished } from "@/lib/idp";
 import type { CommandResult } from "@/cli/core";
 import { asStepsShown } from "@/cli/core/next-steps";
@@ -340,7 +339,10 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
     const manifest = this.deps.isJson
       ? undefined
       : await PM.manifest(this.deps.cwd).catch((error: unknown) => {
-          if (error instanceof PmManifestInvalidError || isErrno(error, "ENOENT")) {
+          if (error instanceof PmManifestInvalidError) {
+            return undefined;
+          }
+          if (error instanceof FsNotFoundError) {
             return undefined;
           }
           throw error;

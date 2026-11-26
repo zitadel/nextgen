@@ -1,6 +1,5 @@
-import { isErrno } from "@/lib/errno";
+import { FsNotFoundError, stat } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
-import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { hasDependency, readPackageJson } from "./package-json";
@@ -38,7 +37,7 @@ export class NuxtDetector implements Detector {
       const devPort = await detectDevPort(cwd, pkg);
       return { id: "nuxt", appDir, devPort, url: issuerFromPort(devPort) };
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         return null;
       }
       if (error instanceof PmManifestInvalidError) {

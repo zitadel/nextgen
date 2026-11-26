@@ -1,4 +1,4 @@
-import { isErrno } from "@/lib/errno";
+import { FsNotFoundError } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
@@ -33,7 +33,7 @@ export class SvelteDetector implements Detector {
       const devPort = await detectDevPort(cwd, pkg);
       return { id: "svelte", appDir: "src", devPort, url: issuerFromPort(devPort) };
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         return null;
       }
       if (error instanceof PmManifestInvalidError) {

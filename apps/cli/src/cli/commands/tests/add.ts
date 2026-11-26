@@ -1,7 +1,7 @@
 import { join, relative, sep } from "node:path";
 import { Flags } from "@oclif/core";
 
-import { pathExists } from "@/lib/fs";
+import { FsNotFoundError, pathExists } from "@/lib/fs";
 import { isObject } from "@/lib/json";
 import { log } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -13,7 +13,6 @@ import { createOrca } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
-import { isErrno } from "@/lib/errno";
 import { type PackageCommand, type PackageJson, PM, PmManifestInvalidError } from "@/lib/pm";
 import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -362,7 +361,10 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
         planned,
       };
     } catch (error) {
-      if (isErrno(error, "ENOENT") || error instanceof PmManifestInvalidError) {
+      if (error instanceof FsNotFoundError) {
+        throw refusalError(MANIFEST_REFUSAL, {});
+      }
+      if (error instanceof PmManifestInvalidError) {
         throw refusalError(MANIFEST_REFUSAL, {});
       }
       throw error;
