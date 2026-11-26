@@ -149,7 +149,7 @@ describe("preview", () => {
       it("refuses content that builds back to a revoked release", async () => {
         const app = await anAppAdmittingPreviews();
         const first = app.envelopeOf<{ release_id: string; content_hash: string }>(
-          await app.run(["preview", "--origin", PREVIEW_URL, "--json"]),
+          await app.run(["release", "create", "--non-interactive", "--json"]),
         ).data;
         await app.run([
           "release",
