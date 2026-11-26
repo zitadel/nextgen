@@ -104,15 +104,16 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-    let contents = "";
-    try {
-      contents = await readFile(abs, "utf8");
-    } catch (error) {
-      if (!isErrno(error, "EACCES") && !isErrno(error, "EISDIR")) {
+    const contents = await (async () => {
+      try {
+        return await readFile(abs, "utf8");
+      } catch (error) {
+        if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
+          return "";
+        }
         throw error;
       }
-    }
+    })();
     if (!Orca.isManaged(contents)) {
       preserved.push(rel);
       continue;
@@ -168,15 +169,16 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-    let contents = "";
-    try {
-      contents = await readFile(abs, "utf8");
-    } catch (error) {
-      if (!isErrno(error, "EACCES") && !isErrno(error, "EISDIR")) {
+    const contents = await (async () => {
+      try {
+        return await readFile(abs, "utf8");
+      } catch (error) {
+        if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
+          return "";
+        }
         throw error;
       }
-    }
+    })();
     const stripped = removeGuidanceSection(contents);
     if (stripped === contents) {
       continue;

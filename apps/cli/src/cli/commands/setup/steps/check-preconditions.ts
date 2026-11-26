@@ -144,114 +144,114 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    // biome-ignore lint/plugin: the checks after the resolve need `server` and must not sit inside the try that translates its errors
-    let server: Awaited<ReturnType<typeof ZitadelRuntime.resolve>>;
-    try {
-      server = await ZitadelRuntime.resolve({
-        cwd: meta.cwd,
-        serverFlag: meta.serverFlag,
-      });
-    } catch (error) {
-      if (error instanceof LocalServerNotRunningError) {
-        const retry = retryOptionsFromFlags(flags);
-        const recovery = ssoRecovery(retry, suggest);
-        const scripting =
-          retry.sso && retry.sso.length > 0
-            ? "The rerun asks for the client id and secret, because a command carries neither. " +
-              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-            : "";
-        const recovered =
-          recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.join(" ")} `
-            : recovery.hint;
-        throw refusalError(
-          NO_LOCAL_SERVER_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-            scripting,
-            recovery: recovered,
-          },
-          {
-            start: {
-              id: "start",
-              flags: {},
+    const server = await (async () => {
+      try {
+        return await ZitadelRuntime.resolve({
+          cwd: meta.cwd,
+          serverFlag: meta.serverFlag,
+        });
+      } catch (error) {
+        if (error instanceof LocalServerNotRunningError) {
+          const retry = retryOptionsFromFlags(flags);
+          const recovery = ssoRecovery(retry, suggest);
+          const scripting =
+            retry.sso && retry.sso.length > 0
+              ? "The rerun asks for the client id and secret, because a command carries neither. " +
+                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+              : "";
+          const recovered =
+            recovery.commands.length > 0
+              ? `${recovery.hint}${recovery.commands.join(" ")} `
+              : recovery.hint;
+          throw refusalError(
+            NO_LOCAL_SERVER_REFUSAL,
+            {
+              ...error,
+              message: error.message,
+              scripting,
+              recovery: recovered,
             },
-            setup: {
-              id: "setup",
-              flags: setupRetryFlags(retry),
-            },
-          },
-        );
-      }
-      if (error instanceof LocalServerNotRespondingError) {
-        const retry = retryOptionsFromFlags(flags);
-        const recovery = ssoRecovery(retry, suggest);
-        const scripting =
-          retry.sso && retry.sso.length > 0
-            ? "The rerun asks for the client id and secret, because a command carries neither. " +
-              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-            : "";
-        const recovered =
-          recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.join(" ")} `
-            : recovery.hint;
-        throw refusalError(
-          LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-            scripting,
-            recovery: recovered,
-          },
-          {
-            start: {
-              id: "start",
-              flags: {},
-            },
-            setup: {
-              id: "setup",
-              flags: setupRetryFlags(retry),
-            },
-          },
-        );
-      }
-      if (error instanceof LocalServerNotRespondingElsewhereError) {
-        const retry = retryOptionsFromFlags(flags);
-        const recovery = ssoRecovery(retry, suggest);
-        const scripting =
-          retry.sso && retry.sso.length > 0
-            ? "The rerun asks for the client id and secret, because a command carries neither. " +
-              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-            : "";
-        const recovered =
-          recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.join(" ")} `
-            : recovery.hint;
-        throw refusalError(
-          LOCAL_SERVER_ELSEWHERE_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-            scripting,
-            recovery: recovered,
-          },
-          {
-            start: {
-              id: "start",
-              flags: {
-                cwd: error.directory,
+            {
+              start: {
+                id: "start",
+                flags: {},
+              },
+              setup: {
+                id: "setup",
+                flags: setupRetryFlags(retry),
               },
             },
-            setup: {
-              id: "setup",
-              flags: setupRetryFlags(retry),
+          );
+        }
+        if (error instanceof LocalServerNotRespondingError) {
+          const retry = retryOptionsFromFlags(flags);
+          const recovery = ssoRecovery(retry, suggest);
+          const scripting =
+            retry.sso && retry.sso.length > 0
+              ? "The rerun asks for the client id and secret, because a command carries neither. " +
+                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+              : "";
+          const recovered =
+            recovery.commands.length > 0
+              ? `${recovery.hint}${recovery.commands.join(" ")} `
+              : recovery.hint;
+          throw refusalError(
+            LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
+            {
+              ...error,
+              message: error.message,
+              scripting,
+              recovery: recovered,
             },
-          },
-        );
+            {
+              start: {
+                id: "start",
+                flags: {},
+              },
+              setup: {
+                id: "setup",
+                flags: setupRetryFlags(retry),
+              },
+            },
+          );
+        }
+        if (error instanceof LocalServerNotRespondingElsewhereError) {
+          const retry = retryOptionsFromFlags(flags);
+          const recovery = ssoRecovery(retry, suggest);
+          const scripting =
+            retry.sso && retry.sso.length > 0
+              ? "The rerun asks for the client id and secret, because a command carries neither. " +
+                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+              : "";
+          const recovered =
+            recovery.commands.length > 0
+              ? `${recovery.hint}${recovery.commands.join(" ")} `
+              : recovery.hint;
+          throw refusalError(
+            LOCAL_SERVER_ELSEWHERE_REFUSAL,
+            {
+              ...error,
+              message: error.message,
+              scripting,
+              recovery: recovered,
+            },
+            {
+              start: {
+                id: "start",
+                flags: {
+                  cwd: error.directory,
+                },
+              },
+              setup: {
+                id: "setup",
+                flags: setupRetryFlags(retry),
+              },
+            },
+          );
+        }
+        throw error;
       }
-      throw error;
-    }
+    })();
     if (!(await isDirectoryOrMissing(meta.cwd))) {
       throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
         cwd: meta.cwd,

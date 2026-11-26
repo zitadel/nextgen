@@ -150,49 +150,50 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
       };
     }
     const committing = this.deps.ui.begin("Committing the scaffolded project");
-    let outcome: InitialCommitOutcome;
-    try {
-      const existing = await Repository.open(this.deps.cwd);
-      const repository = existing ?? (await Repository.create(this.deps.cwd));
+    const outcome: InitialCommitOutcome = await (async () => {
       try {
-        const committed = await repository.commitAll(INITIAL_COMMIT_SUBJECT, {
-          except: (path) => {
-            return Project.isSecret(path);
-          },
-          authorIfGitHasNone: FALLBACK_AUTHOR,
-        });
-        outcome = committed.committed
-          ? {
-              kind: existing === null ? "created" : "committed",
-              sha: committed.sha,
-              guessedIdentity: committed.author !== "yours",
-              invented: committed.author === "fallback",
-            }
-          : {
-              kind: "unavailable",
-              reason: committed.reason,
-              createdRepository: existing === null,
-            };
+        const existing = await Repository.open(this.deps.cwd);
+        const repository = existing ?? (await Repository.create(this.deps.cwd));
+        try {
+          const committed = await repository.commitAll(INITIAL_COMMIT_SUBJECT, {
+            except: (path) => {
+              return Project.isSecret(path);
+            },
+            authorIfGitHasNone: FALLBACK_AUTHOR,
+          });
+          return committed.committed
+            ? {
+                kind: existing === null ? "created" : "committed",
+                sha: committed.sha,
+                guessedIdentity: committed.author !== "yours",
+                invented: committed.author === "fallback",
+              }
+            : {
+                kind: "unavailable",
+                reason: committed.reason,
+                createdRepository: existing === null,
+              };
+        } catch (error) {
+          if (!(error instanceof GitError)) {
+            throw error;
+          }
+          return {
+            kind: "unavailable",
+            reason: error.headline(),
+            createdRepository: existing === null,
+          };
+        }
       } catch (error) {
         if (!(error instanceof GitError)) {
           throw error;
         }
-        outcome = {
+        return {
           kind: "unavailable",
           reason: error.headline(),
-          createdRepository: existing === null,
+          createdRepository: false,
         };
       }
-    } catch (error) {
-      if (!(error instanceof GitError)) {
-        throw error;
-      }
-      outcome = {
-        kind: "unavailable",
-        reason: error.headline(),
-        createdRepository: false,
-      };
-    }
+    })();
     if (outcome.kind === "created" || outcome.kind === "committed") {
       committing.done(`Committed the project as ${outcome.sha.slice(0, 7)}`);
       if (outcome.invented) {

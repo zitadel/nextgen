@@ -186,20 +186,18 @@ export async function refusePrimaryOrigins(
   projectId: string,
 ): Promise<void> {
   const originService = new OriginService(client, projectId);
-  // biome-ignore lint/plugin: the check after the lookup needs `production` and must not sit inside the try that translates its errors
-  let production: readonly string[];
   try {
-    production = await originService.primaryAmong(urls);
+    const production = await originService.primaryAmong(urls);
+    if (production.length > 0) {
+      throw refusalError(PRIMARY_ORIGIN_REFUSAL, {
+        origins: production.join(", "),
+      });
+    }
   } catch (error) {
     if (error instanceof BackendForbiddenError) {
       return;
     }
     throw error;
-  }
-  if (production.length > 0) {
-    throw refusalError(PRIMARY_ORIGIN_REFUSAL, {
-      origins: production.join(", "),
-    });
   }
 }
 

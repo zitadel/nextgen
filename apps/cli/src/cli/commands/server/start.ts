@@ -270,83 +270,83 @@ export default class Start extends Telemetered(
   protected async apply({ flags }: Admitted<typeof Start>): Promise<CommandResult> {
     const { server, request } = await this.planned(flags);
     const retry = await this.again("start", {});
-    // biome-ignore lint/plugin: the code after the launch needs `started` and must not sit inside the try that translates the launch's errors
-    let started: Awaited<ReturnType<typeof server.launch>>;
-    try {
-      started = await server.launch(request);
-    } catch (error) {
-      if (error instanceof LocalServerDockerMissingError) {
-        throw refusalError(
-          DOCKER_UNAVAILABLE_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-          },
-          {
-            check: shellCommand("docker", "version"),
-            retry,
-          },
-        );
-      }
-      if (error instanceof LocalServerPortBusyError) {
-        const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
-          return port !== error.port;
-        });
+    const started = await (async () => {
+      try {
+        return await server.launch(request);
+      } catch (error) {
+        if (error instanceof LocalServerDockerMissingError) {
+          throw refusalError(
+            DOCKER_UNAVAILABLE_REFUSAL,
+            {
+              ...error,
+              message: error.message,
+            },
+            {
+              check: shellCommand("docker", "version"),
+              retry,
+            },
+          );
+        }
+        if (error instanceof LocalServerPortBusyError) {
+          const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
+            return port !== error.port;
+          });
 
-        throw refusalError(
-          PORT_IN_USE_REFUSAL,
-          {
+          throw refusalError(
+            PORT_IN_USE_REFUSAL,
+            {
+              ...error,
+              message: error.message,
+              url: LocalRuntime.urlOf(error.port),
+              listeners: await this.machine().listeners(error.port, {
+                timeoutMs: 5000,
+              }),
+            },
+            {
+              alternate: this.suggest({
+                id: "start",
+                flags: {
+                  port: alternatePort,
+                },
+              }),
+            },
+          );
+        }
+        if (error instanceof LocalServerPortFullError) {
+          throw refusalError(NO_FREE_PORT_REFUSAL, {
             ...error,
             message: error.message,
-            url: LocalRuntime.urlOf(error.port),
-            listeners: await this.machine().listeners(error.port, {
-              timeoutMs: 5000,
-            }),
-          },
-          {
-            alternate: this.suggest({
-              id: "start",
-              flags: {
-                port: alternatePort,
-              },
-            }),
-          },
-        );
+          });
+        }
+        if (error instanceof LocalServerStartCleanupFailedError) {
+          throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+            ...error,
+            message: error.message,
+          });
+        }
+        if (error instanceof LocalServerStartExitedError) {
+          throw refusalError(SERVER_NOT_READY_REFUSAL, {
+            ...error,
+            message: error.message,
+            hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
+          });
+        }
+        if (error instanceof LocalServerStartTimeoutError) {
+          throw refusalError(SERVER_NOT_READY_REFUSAL, {
+            ...error,
+            message: error.message,
+            hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
+          });
+        }
+        if (error instanceof LocalServerStopError) {
+          throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
+            ...error,
+            message: error.message,
+          });
+        }
+        throw error;
       }
-      if (error instanceof LocalServerPortFullError) {
-        throw refusalError(NO_FREE_PORT_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerStartCleanupFailedError) {
-        throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerStartExitedError) {
-        throw refusalError(SERVER_NOT_READY_REFUSAL, {
-          ...error,
-          message: error.message,
-          hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-        });
-      }
-      if (error instanceof LocalServerStartTimeoutError) {
-        throw refusalError(SERVER_NOT_READY_REFUSAL, {
-          ...error,
-          message: error.message,
-          hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
-        });
-      }
-      if (error instanceof LocalServerStopError) {
-        throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    })();
     const { runtime: record, alreadyRunning } = started;
     this.meta = { ...this.meta, source: record.server_url };
 

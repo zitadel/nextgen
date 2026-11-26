@@ -63,15 +63,18 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
-      // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-      let found: Inspection;
-      try {
-        found = await this.inspected(ctx);
-      } catch (error) {
-        if (error instanceof ZitadelConfigError) {
-          return await super.run(ctx);
+      const found = await (async () => {
+        try {
+          return await this.inspected(ctx);
+        } catch (error) {
+          if (error instanceof ZitadelConfigError) {
+            return undefined;
+          }
+          throw error;
         }
-        throw error;
+      })();
+      if (found === undefined) {
+        return await super.run(ctx);
       }
       const brokenSchemas = found.config.broken.filter((file) => {
         return file.kind === "schema";

@@ -1367,11 +1367,9 @@ export function retryOptionsFromFlags(
     ssoScopes?: string;
   }>,
 ): SetupRetryOptions {
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let selection: ReturnType<typeof selectionFromFlags> | undefined;
-  try {
-    selection =
-      flags.sso === undefined
+  const selection = (() => {
+    try {
+      return flags.sso === undefined
         ? undefined
         : selectionFromFlags(
             flags.sso,
@@ -1379,9 +1377,10 @@ export function retryOptionsFromFlags(
             SETUP_FLAG_NAMES,
             "",
           );
-  } catch {
-    selection = undefined;
-  }
+    } catch {
+      return undefined;
+    }
+  })();
   return {
     ssoTyped:
       selection === undefined &&
@@ -1593,33 +1592,32 @@ export async function outdatedLocalServer(
   cwd: string,
   machine: LocalMachine,
 ): Promise<OutdatedLocalServer | undefined> {
-  let nearest: Awaited<ReturnType<typeof LocalRuntime.readNearest>>;
   try {
-    nearest = await LocalRuntime.readNearest(cwd);
+    const nearest = await LocalRuntime.readNearest(cwd);
+    const runtime = nearest?.runtime;
+    const expected = machine.bundledVersion();
+    if (
+      !nearest ||
+      runtime?.backend !== "binary" ||
+      expected === undefined ||
+      !semver.valid(expected) ||
+      !semver.valid(runtime.server_version) ||
+      runtime.server_version === expected
+    ) {
+      return undefined;
+    }
+    return {
+      dir: nearest.dir,
+      serverUrl: runtime.server_url,
+      running: runtime.server_version,
+      expected,
+    };
   } catch (error) {
     if (!(error instanceof LocalServerError)) {
       throw error;
     }
     return undefined;
   }
-  const runtime = nearest?.runtime;
-  const expected = machine.bundledVersion();
-  if (
-    !nearest ||
-    runtime?.backend !== "binary" ||
-    expected === undefined ||
-    !semver.valid(expected) ||
-    !semver.valid(runtime.server_version) ||
-    runtime.server_version === expected
-  ) {
-    return undefined;
-  }
-  return {
-    dir: nearest.dir,
-    serverUrl: runtime.server_url,
-    running: runtime.server_version,
-    expected,
-  };
 }
 
 /**

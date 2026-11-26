@@ -142,26 +142,21 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
       },
       log,
       failed: (error, installCommand) => {
-        let original: {
-          name?: string;
-          message: string;
-          code?: string;
-        } = {
-          message: String(error),
-        };
-        if (error instanceof Error) {
-          original = {
-            name: error.name,
-            message: error.message,
-          };
-        }
-        if (error instanceof PmError) {
-          original = {
-            name: error.name,
-            message: error.message,
-            code: error.code,
-          };
-        }
+        const original =
+          error instanceof PmError
+            ? {
+                name: error.name,
+                message: error.message,
+                code: error.code,
+              }
+            : error instanceof Error
+              ? {
+                  name: error.name,
+                  message: error.message,
+                }
+              : {
+                  message: String(error),
+                };
         return new ZitadelError(
           "E_VALIDATION",
           `Dependency install failed: ${installCommand.display}`,
@@ -209,10 +204,7 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         if (this.deps.signal.aborted) {
           throw this.deps.signal.reason;
         }
-        let output: string | undefined;
-        if (error instanceof PmCommandFailedError) {
-          output = error.output;
-        }
+        const output = error instanceof PmCommandFailedError ? error.output : undefined;
         warnings.report(
           `${suggestedCommandOf(command.inDirectory(flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${errorMessage(error)}${
             output !== undefined && output.trim() !== ""

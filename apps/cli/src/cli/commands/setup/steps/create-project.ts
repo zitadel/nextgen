@@ -96,24 +96,24 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
     );
     try {
       const fromDirectory = basename(this.deps.cwd).trim();
-      let project: CreatedProject;
-      if (this.deps.dryRun) {
-        project = {
-          id: "dry-run-0000",
-          name: "dry-run",
-          project_secret: "sk_proj_dry_run_full",
-          preview_secret: "sk_proj_dry_run_preview",
-          origins: [
-            {
-              pattern: issuer,
-              kind: "primary",
-            },
-          ],
-          created_at: "2026-04-21T14:03:11.000Z",
-        };
-      } else {
+      const project: CreatedProject = await (async () => {
+        if (this.deps.dryRun) {
+          return {
+            id: "dry-run-0000",
+            name: "dry-run",
+            project_secret: "sk_proj_dry_run_full",
+            preview_secret: "sk_proj_dry_run_preview",
+            origins: [
+              {
+                pattern: issuer,
+                kind: "primary",
+              },
+            ],
+            created_at: "2026-04-21T14:03:11.000Z",
+          };
+        }
         try {
-          project = await new ProjectService(
+          return await new ProjectService(
             createZitadelClient({
               userAgent: Runtime.current().userAgent(),
               baseUrl: answers.server,
@@ -151,7 +151,7 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
           }
           throw error;
         }
-      }
+      })();
       creating.done(
         this.deps.dryRun
           ? "Would create a project (dry run)"
