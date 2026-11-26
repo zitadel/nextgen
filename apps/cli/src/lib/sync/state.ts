@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { errorMessage } from "@/lib/errors";
 import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
-import { isObject } from "@/lib/json";
+import { isObject, parseJsonOrUndefined } from "@/lib/json";
 
 import { SyncStateMalformedError } from "./errors";
 import type { ScaffoldManifest, StoredState } from "./types.js";
@@ -24,14 +24,14 @@ const STATE_PATH = ".zitadel/state.json";
  *
  * @param cwd - The project root.
  * @returns The file's sections, unchecked.
- * @throws {@link Error} When the file is missing, is not JSON, or does not
- *   hold an object.
+ * @throws {@link FsError} When the file is missing or cannot be read.
+ * @throws {@link SyncStateMalformedError} When it is not JSON or does not hold an object.
  */
 export async function readState(cwd: string): Promise<StoredState> {
   const raw = await readFile(join(cwd, STATE_PATH), "utf8");
-  const parsed: unknown = JSON.parse(raw);
+  const parsed = parseJsonOrUndefined(raw);
   if (!isObject(parsed)) {
-    throw new Error(`${STATE_PATH} does not hold an object`);
+    throw new SyncStateMalformedError(`Cannot read ${STATE_PATH}: it does not hold a JSON object`);
   }
   return parsed;
 }
@@ -48,7 +48,8 @@ export async function readState(cwd: string): Promise<StoredState> {
  * @param cwd - The project root.
  * @param scaffold - The manifest to record.
  * @returns Nothing, once the file is written.
- * @throws {@link Error} When the file cannot be read or written.
+ * @throws {@link FsError} When the file cannot be read or written.
+ * @throws {@link SyncStateMalformedError} When it is not JSON or does not hold an object.
  */
 export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): Promise<void> {
   const current = await readState(cwd);

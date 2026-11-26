@@ -37,6 +37,8 @@ describe("Orca.readManifest", () => {
     ["an entry without a hash", { scaffold: { files: { a: { class: "presentation" } } } }],
     ["an unknown class", { scaffold: { files: { a: { hash: "x", class: "other" } } } }],
     ["an unknown posture", { scaffold: { files: {}, posture: "frame" } }],
+    ["a state file that holds a list", []],
+    ["a state file that holds null", null],
   ] as const;
 
   for (const [what, state] of MALFORMED) {

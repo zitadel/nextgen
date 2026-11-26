@@ -60,15 +60,19 @@ describe("readState", () => {
     });
   });
 
-  describe("when the state file is not JSON", () => {
-    it("refuses with the parser's error", async ({ dir }) => {
-      await writeState(dir, "{ not json");
+  describe("when the state file does not hold a JSON object", () => {
+    it.for([
+      ["text that is not JSON", "{ not json"],
+      ["a list", "[]"],
+      ["null", "null"],
+    ] as const)("refuses %s as a malformed state file", async ([, text], { dir }) => {
+      await writeState(dir, text);
 
       const error = await rejectionOf(() => {
         return readState(dir);
       });
 
-      expect(error).toBeInstanceOf(SyntaxError);
+      expect(error).toBeInstanceOf(SyncStateMalformedError);
     });
   });
 });
