@@ -111,7 +111,6 @@ describe("the cli", () => {
             environment: "development",
             variable: "ZITADEL_PROJECT_ID",
             consulted: CONSULTED,
-            file: ".env.development.local",
           },
         });
       });
@@ -137,7 +136,6 @@ describe("the cli", () => {
             environment: "development",
             variable: "ZITADEL_PROJECT_ID",
             consulted: CONSULTED,
-            file: ".env.development.local",
           },
         });
       });
@@ -163,7 +161,6 @@ describe("the cli", () => {
             environment: "development",
             variable: "ZITADEL_PROJECT_ID",
             consulted: CONSULTED,
-            file: ".env.development.local",
           },
         });
       });
@@ -190,7 +187,6 @@ describe("the cli", () => {
             environment: "development",
             variable: "ZITADEL_PROJECT_ID",
             consulted: CONSULTED,
-            file: ".env.development.local",
           },
         });
       });

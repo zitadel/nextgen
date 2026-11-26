@@ -1322,8 +1322,6 @@ describe("deploy", () => {
             variable: "GOOGLE_CLIENT_SECRET",
             field: "client_secret",
             file: ".zitadel/idps/google.json",
-            secret: true,
-            preview: false,
           },
         });
       });

@@ -384,7 +384,6 @@ describe("api", () => {
               ".env",
               ".zitadel/secret",
             ],
-            file: ".env.development.local",
           },
         });
       });
@@ -424,7 +423,6 @@ describe("api", () => {
           message: "No operation is called nopeOp",
           hint: `List them with ${expectedPublicCliCommand("api ls")}, or give a path such as /users/query.`,
           next_commands: [expectedPublicCliCommand(`api ls --json --cwd ${app.path}`)],
-          details: { near: [] },
         });
       });
 
@@ -497,7 +495,6 @@ describe("api", () => {
           message: "No operation is called a\u001b[2Jb",
           hint: `List them with ${expectedPublicCliCommand("api ls")}, or give a path such as /users/query.`,
           next_commands: [expectedPublicCliCommand(`api ls --json --cwd ${app.path}`)],
-          details: { near: [] },
         });
       });
 

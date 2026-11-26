@@ -156,7 +156,6 @@ describe("origin list", () => {
             environment: "ci",
             variable: "ZITADEL_PROJECT_SECRET",
             consulted: ["--server", "process environment", ".env.ci.local", ".env.ci", ".env"],
-            file: ".env.ci.local",
           },
         });
       });

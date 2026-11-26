@@ -158,7 +158,6 @@ describe("preview list", () => {
               ".env.preview",
               ".env",
             ],
-            file: ".env.preview.local",
           },
         });
       });

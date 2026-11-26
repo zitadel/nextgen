@@ -146,7 +146,6 @@ describe("claim", () => {
               ".env",
               ".zitadel/secret",
             ],
-            file: ".env.development.local",
           },
           next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
         });

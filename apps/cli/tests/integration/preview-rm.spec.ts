@@ -144,7 +144,6 @@ describe("preview rm", () => {
               ".env.preview",
               ".env",
             ],
-            file: ".env.preview.local",
           },
         });
       });
