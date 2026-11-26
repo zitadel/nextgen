@@ -227,6 +227,9 @@ catalogs:
     '@fumadocs/story':
       specifier: ^1.5.3
       version: 1.5.3
+    '@lit/task':
+      specifier: ^1.0.3
+      version: 1.0.3
     '@modelcontextprotocol/server':
       specifier: ^2.4.0
       version: 2.4.0
@@ -2106,6 +2109,9 @@ importers:
 
   packages/components:
     dependencies:
+      '@lit/task':
+        specifier: 'catalog:'
+        version: 1.0.3
       '@zitadel/config':
         specifier: workspace:*
         version: link:../config
@@ -4989,6 +4995,9 @@ packages:
 
   '@lit/reactive-element@2.1.2':
     resolution: {integrity: sha512-pbCDiVMnne1lYUIaYNN5wrwQXDtHaYtg7YEFPeW+hws6U47WeFvISGUWekPGKWOP1ygrs0ef0o1VJMk1exos5A==}
+
+  '@lit/task@1.0.3':
+    resolution: {integrity: sha512-1gJGJl8WON+2j0y9xfcD+XsS1rvcy3XDgsIhcdUW++yTR8ESjZW6o7dn8M8a4SZM8NnJe6ynS2cKWwsbfLOurg==}
 
   '@lmdb/lmdb-darwin-arm64@3.5.6':
     resolution: {integrity: sha512-mY5FG4TjPAkY4P0w+OhHaUka5mDh2TX2WKYIwuKzJ1zeW3VvRgxdam/lGJTquI+bthTx5CSHDW+BAQCnNAzkEA==}
@@ -20203,6 +20212,10 @@ snapshots:
   '@lit/reactive-element@2.1.2':
     dependencies:
       '@lit-labs/ssr-dom-shim': 1.5.1
+
+  '@lit/task@1.0.3':
+    dependencies:
+      '@lit/reactive-element': 2.1.2
 
   '@lmdb/lmdb-darwin-arm64@3.5.6':
     optional: true

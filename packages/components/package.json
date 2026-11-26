@@ -94,6 +94,7 @@
     "prepack": "publint --strict"
   },
   "dependencies": {
+    "@lit/task": "catalog:",
     "@zitadel/config": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",

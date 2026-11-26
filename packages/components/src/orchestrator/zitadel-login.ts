@@ -11,6 +11,7 @@ import {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
+import { Task } from "@lit/task";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { property } from "../internal/property.js";
@@ -34,13 +35,7 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { localiseFlowErrorKeys, stepNotice, stepTexts } from "./step-texts.js";
-import {
-  isHidden,
-  loadBuiltinLocale,
-  localeFor,
-  primaryLanguage,
-  type Locale,
-} from "./locales/index.js";
+import { isHidden, loadBuiltinLocale, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
 import { resolveApi } from "./resolve-api.js";
@@ -461,31 +456,23 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private previewRepaint = false;
 
-  private engine: Liquid | null = null;
-
   /**
-   * The language whose built-in dictionary {@link builtinLocale} holds, or is
-   * loading; `null` before the first update.
+   * The dictionary and the LiquidJS engine for the page's language. Both load
+   * on demand: the translation the page shows, and the engine, each in its own
+   * chunk. The loader shows until they are there, and a change of `lang` or
+   * `locales` loads them again.
    */
-  private builtinLanguage: string | null = null;
-
-  /**
-   * The built-in dictionary for {@link builtinLanguage}, loaded on demand
-   * (`loadBuiltinLocale`); `undefined` while it loads or when the language
-   * has none.
-   */
-  private builtinLocale: Locale | undefined = undefined;
-
-  /**
-   * Whether {@link builtinLocale} has loaded for {@link builtinLanguage}.
-   */
-  private builtinLoaded = false;
-
-  /**
-   * The dictionary or engine load in flight, if any; {@link getUpdateComplete}
-   * waits for it.
-   */
-  private pendingLoad: Promise<void> | null = null;
+  private readonly rendering = new Task(this, {
+    args: () => [this.resolveLanguage(), this.locales] as const,
+    task: async ([language, locales]) => {
+      const [builtin, { createLiquidEngine }] = await Promise.all([
+        loadBuiltinLocale(language),
+        import("./liquid.js"),
+      ]);
+      const locale = localeFor(language, locales, builtin);
+      return { locale, engine: createLiquidEngine({ locale }) };
+    },
+  });
 
   /**
    * The theme the last commit rendered with. The template output carries the
@@ -606,7 +593,9 @@ export class ZitadelLogin extends ZitadelSurface {
    * the `locales` map merged over the built-in copy ({@link localeFor}).
    */
   private resolveLocale(): Locale {
-    return localeFor(this.resolveLanguage(), this.locales, this.builtinLocale);
+    return (
+      this.rendering.value?.locale ?? localeFor(this.resolveLanguage(), this.locales, undefined)
+    );
   }
 
   /**
@@ -623,53 +612,18 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Resolves once the element has rendered with what it loads on demand (the
-   * built-in dictionary and LiquidJS), so `await el.updateComplete` sees the
-   * step rather than the loader.
+   * Resolves once the element has rendered with what {@link rendering} loads,
+   * so `await el.updateComplete` sees the step rather than the loader.
    *
-   * @returns Whether the last update completed without another pending.
+   * @returns Whether the update completed without another pending.
    */
   protected override async getUpdateComplete(): Promise<boolean> {
-    let result = await super.getUpdateComplete();
-    while (this.pendingLoad !== null) {
-      const load = this.pendingLoad;
-      await load;
-      if (this.pendingLoad === load) {
-        this.pendingLoad = null;
-      }
-      result = await super.getUpdateComplete();
-    }
-    return result;
+    await super.getUpdateComplete();
+    await this.rendering.taskComplete;
+    return super.getUpdateComplete();
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
-    const language = primaryLanguage(this.resolveLanguage());
-    if (language !== this.builtinLanguage) {
-      // The language changed: drop the engine, whose filters hold the old
-      // dictionary, and load the new one. The loader shows meanwhile.
-      this.builtinLanguage = language;
-      this.builtinLocale = undefined;
-      this.builtinLoaded = false;
-      this.engine = null;
-      this.pendingLoad = loadBuiltinLocale(language).then((dictionary) => {
-        if (this.builtinLanguage === language) {
-          this.builtinLocale = dictionary;
-          this.builtinLoaded = true;
-          this.requestUpdate();
-        }
-      });
-    }
-    if (this.builtinLoaded && (!this.engine || changed.has("locales") || changed.has("lang"))) {
-      // LiquidJS loads on first render, in its own chunk; the loader shows
-      // until the engine is there.
-      const locale = this.resolveLocale();
-      this.pendingLoad = import("./liquid.js").then(({ createLiquidEngine }) => {
-        if (this.builtinLanguage === language) {
-          this.engine = createLiquidEngine({ locale });
-          this.requestUpdate();
-        }
-      });
-    }
     if (changed.has("previewState") && this.previewState && !this.preview) {
       console.warn(
         `[zitadel-login] preview-state="${this.previewState}" is not a preview state ` +
@@ -835,10 +789,11 @@ export class ZitadelLogin extends ZitadelSurface {
     // `completing` holds the loader through the terminal step: painting a
     // success screen the host immediately navigates away from shows the user
     // two confirmations for one sign-in.
-    if (!this.response || !this.engine || this.completing) {
+    const rendering = this.rendering.value;
+    if (!this.response || !rendering || this.completing) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
+    const rendered = this.injectAttribution(this.renderStep(this.response.step, rendering.engine));
     return html`<form
       class="zl-mount"
       part="form"

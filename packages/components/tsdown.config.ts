@@ -43,7 +43,15 @@ const INLINE_INTERNAL = [/^@zitadel\/api(\/|$)/, /^@zitadel\/design-tokens(\/|$)
 const INLINE_STANDALONE_ONLY = [/^@zitadel\/config(\/|$)/];
 
 /** Third-party runtime deps the components need in the browser. */
-const THIRD_PARTY = ["lit", /^lit\//, "liquidjs", "dompurify", "lucide", /^lucide\//] as const;
+const THIRD_PARTY = [
+  "lit",
+  /^lit\//,
+  "@lit/task",
+  "liquidjs",
+  "dompurify",
+  "lucide",
+  /^lucide\//,
+] as const;
 
 export default defineConfig([
   /**

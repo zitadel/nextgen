@@ -45,6 +45,7 @@ catalog:
   # check of its TypeScript sample, so keep it on fumadocs-openapi's range.
   "@fumadocs/json-schema": ^0.3.5
   "@fumadocs/story": ^1.5.3
+  "@lit/task": ^1.0.3
   "@modelcontextprotocol/server": ^2.4.0
   "@mswjs/http-middleware": ^0.10.3
   "@nuxt/kit": ^4.6.3

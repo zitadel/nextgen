@@ -7088,25 +7088,6 @@
             }
           ],
           "description": "The built-in dictionary for a language tag. English is bundled; the other\ntranslations load with a dynamic import, so a page downloads only the one it\nshows."
-        },
-        {
-          "kind": "function",
-          "name": "primaryLanguage",
-          "return": {
-            "type": {
-              "text": ""
-            }
-          },
-          "parameters": [
-            {
-              "name": "tag",
-              "type": {
-                "text": "string"
-              },
-              "description": "The BCP 47 language tag."
-            }
-          ],
-          "description": "The primary subtag of a language tag, lowercased."
         }
       ],
       "exports": [
@@ -7195,14 +7176,6 @@
           "name": "loadBuiltinLocale",
           "declaration": {
             "name": "loadBuiltinLocale",
-            "module": "src/orchestrator/locales/index.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "primaryLanguage",
-          "declaration": {
-            "name": "primaryLanguage",
             "module": "src/orchestrator/locales/index.ts"
           }
         }
@@ -8737,52 +8710,11 @@
             },
             {
               "kind": "field",
-              "name": "engine",
-              "type": {
-                "text": "Liquid | null"
-              },
+              "name": "rendering",
               "privacy": "private",
-              "default": "null"
-            },
-            {
-              "kind": "field",
-              "name": "builtinLanguage",
-              "type": {
-                "text": "string | null"
-              },
-              "privacy": "private",
-              "default": "null",
-              "description": "The language whose built-in dictionary builtinLocale holds, or is\nloading; `null` before the first update."
-            },
-            {
-              "kind": "field",
-              "name": "builtinLocale",
-              "type": {
-                "text": "Locale | undefined"
-              },
-              "privacy": "private",
-              "default": "undefined",
-              "description": "The built-in dictionary for builtinLanguage, loaded on demand\n(`loadBuiltinLocale`); `undefined` while it loads or when the language\nhas none."
-            },
-            {
-              "kind": "field",
-              "name": "builtinLoaded",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "default": "false",
-              "description": "Whether builtinLocale has loaded for builtinLanguage."
-            },
-            {
-              "kind": "field",
-              "name": "pendingLoad",
-              "type": {
-                "text": "Promise<void> | null"
-              },
-              "privacy": "private",
-              "default": "null",
-              "description": "The dictionary or engine load in flight, if any; getUpdateComplete\nwaits for it."
+              "readonly": true,
+              "default": "new Task(this, { args: () => [this.resolveLanguage(), this.locales] as const, task: async ([language, locales]) => { const [builtin, { createLiquidEngine }] = await Promise.all([ loadBuiltinLocale(language), import(\"./liquid.js\"), ]); const locale = localeFor(language, locales, builtin); return { locale, engine: createLiquidEngine({ locale }) }; }, })",
+              "description": "The dictionary and the LiquidJS engine for the page's language. Both load\non demand: the translation the page shows, and the engine, each in its own\nchunk. The loader shows until they are there, and a change of `lang` or\n`locales` loads them again."
             },
             {
               "kind": "field",
@@ -8868,7 +8800,7 @@
                   "text": ""
                 }
               },
-              "description": "Resolves once the element has rendered with what it loads on demand (the\nbuilt-in dictionary and LiquidJS), so `await el.updateComplete` sees the\nstep rather than the loader."
+              "description": "Resolves once the element has rendered with what rendering loads,\nso `await el.updateComplete` sees the step rather than the loader."
             },
             {
               "kind": "method",

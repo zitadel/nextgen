@@ -140,6 +140,6 @@ export async function loadBuiltinLocale(tag: string): Promise<Locale | undefined
  * @param tag - The BCP 47 language tag.
  * @returns The language, `de` for `de-CH`.
  */
-export function primaryLanguage(tag: string): string {
+function primaryLanguage(tag: string): string {
   return (tag.split("-")[0] ?? "").toLowerCase();
 }
