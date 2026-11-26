@@ -13,6 +13,7 @@
  *   escapes (Layer 1 of the security pipeline).
  * - Partials are loaded from an in-memory map; no filesystem access.
  */
+import { MANDATORY_GATES_TAG } from "@zitadel/config/template-tags";
 import type { Liquid } from "liquidjs";
 
 import type { CreateFlow201Step, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
@@ -69,11 +70,7 @@ const fieldErrorKeys: Record<string, string> = {
  * @returns The configured engine.
  */
 export async function createLiquidEngine(options: CreateLiquidOptions): Promise<Liquid> {
-  const [{ Liquid }, { MANDATORY_GATES_TAG }, locale] = await Promise.all([
-    import("liquidjs"),
-    import("@zitadel/config/template"),
-    options.locale,
-  ]);
+  const [{ Liquid }, locale] = await Promise.all([import("liquidjs"), options.locale]);
 
   const templates: Record<string, string> = {
     [TEMPLATE_NAMES.default]: defaultTemplate,

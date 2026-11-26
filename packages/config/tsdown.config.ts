@@ -14,6 +14,7 @@ export default defineConfig({
     schemas: "src/schemas.ts",
     server: "src/server.ts",
     template: "src/template.ts",
+    "template-tags": "src/template-tags.ts",
     validate: "src/validation/index.ts",
   },
   outDir: "dist",
