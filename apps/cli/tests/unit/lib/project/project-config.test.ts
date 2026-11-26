@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { Project, ProjectFileMissingError } from "@/lib/project";
+import { Project, ProjectFileMissingError, ProjectInvalidError } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
 
 async function makeTempDir(): Promise<string> {
@@ -58,6 +58,13 @@ describe("Project.config", () => {
     await writeFile(join(cwd, "zitadel.json"), JSON.stringify([1, 2, 3]));
 
     await expect(Project.at(cwd).config()).rejects.toThrow("must contain a JSON object");
+  });
+
+  it("refuses a non-object JSON root as an invalid project file", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "zitadel.json"), "[]");
+
+    await expect(Project.at(cwd).config()).rejects.toBeInstanceOf(ProjectInvalidError);
   });
 });
 

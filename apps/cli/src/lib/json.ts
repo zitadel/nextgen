@@ -82,11 +82,14 @@ function detectIndent(source: string): string | number {
  * array or scalar). The CLI's config and secret files are always objects, so
  * this guards callers from the `JSON.parse` return type of `any` and produces
  * a `path`-qualified error message pointing at the offending file.
+ *
+ * @throws {SyntaxError} When the text is not JSON, or its root is not an object,
+ *   so a caller handles both the same way.
  */
 export function parseJsonObject(contents: string, path: string): Record<string, unknown> {
   const value = JSON.parse(contents) as unknown;
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${path} must contain a JSON object`);
+    throw new SyntaxError(`${path} must contain a JSON object`);
   }
   return value as Record<string, unknown>;
 }

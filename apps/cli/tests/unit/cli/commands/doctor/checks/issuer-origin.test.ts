@@ -272,6 +272,15 @@ describe("IssuerOriginCheck.run", () => {
       expect(outcome.status).toBe("pass");
     });
 
+    it("skips, passing, when zitadel.json is not an object", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      await writeFile(join(dir, "zitadel.json"), "[]");
+
+      const outcome = await check.run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
     it("skips, passing, when .zitadel/secret is not JSON", async ({ dir }) => {
       await aProject(dir, AS_PREVIEW);
       await writeFile(join(dir, ".zitadel/secret"), "{not json");

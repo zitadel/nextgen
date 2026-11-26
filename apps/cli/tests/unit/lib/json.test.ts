@@ -141,6 +141,10 @@ describe("parseJsonObject", () => {
     );
   });
 
+  it.each(["[]", "42", "null"])("throws a SyntaxError for the non-object %s", (text) => {
+    expect(() => parseJsonObject(text, "config.json")).toThrow(SyntaxError);
+  });
+
   it("throws a path-qualified error for JSON null", () => {
     expect(() => parseJsonObject("null", "config.json")).toThrow(
       "config.json must contain a JSON object",
