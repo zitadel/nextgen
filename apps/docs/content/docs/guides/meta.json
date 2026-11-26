@@ -4,6 +4,7 @@
     "local-runtime",
     "edit-login-flow",
     "deploy",
+    "pin-a-release",
     "manage-project-access",
     "password-policy",
     "test-policies",
