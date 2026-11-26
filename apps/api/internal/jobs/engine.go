@@ -54,6 +54,7 @@ type registered struct {
 
 // Engine is the shared jobs runtime: RegisterWorker, Start/Close poll, and
 // RunDueOnce drain (ADR 065).
+// Review: zlog + lease_token debug tracing.
 type Engine struct {
 	db  Transactor
 	cfg Config
