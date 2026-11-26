@@ -441,7 +441,7 @@ Each invocation prints one JSON object:
   meta-schema does not declare is refused as
   `<schema>: <path> <key> is not an allowed key`, with
   `. Did you mean minLength?` when a keyword is close. `deploy` fails with
-  `E_VALIDATION` and lists these lines in `details.issues`; `doctor` fails
+  `E_VALIDATION` and lists these lines in its `message`; `doctor` fails
   its `schema` check with them in the check's `message`. Keys inside
   `items`, `$defs` or `oneOf`/`anyOf`/`allOf` are not checked.
 - `deploy` warns that a password step cannot tell which user to challenge only
@@ -602,15 +602,15 @@ Common error codes point at their own fix in `next_commands`:
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
   A file under `.zitadel/` that cannot be written because a directory it needs
-  is a file fails with `<path> cannot be written (ENOTDIR)`; `details.blocker`
-  is that file. Remove it, then run the command again. A directory where a
+  is a file fails with `<path> cannot be written (ENOTDIR): <file> is a file
+  where a directory is needed`; the message names that file. Remove it, then run the command again. A directory where a
   file is to be removed fails with `<path> cannot be removed (EISDIR)`; remove
   the directory, then run the command again.
 - `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
   see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
-  project variable that does not exist; `details.variable` is the name. Publish it
-  with `variable set NAME` (add `--secret` for the secret), then retry.
+  project variable that does not exist; the message names it, and
+  `next_commands` holds the `variable set` that publishes it, then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
@@ -1076,8 +1076,8 @@ contract or fails the per-file checks `deploy` makes (a literal `client_secret`,
 a branding template or `$file` that cannot be read or breaks the template
 rules, a connection field its contract does not know, a problem with its
 endpoints), even a file the command
-does not change (`E_VALIDATION`, with each file and finding in
-`details.problems`), changing nothing; fix the files named, then run the command
+does not change (`E_VALIDATION`, with each file and finding listed in the
+`message`), changing nothing; fix the files named, then run the command
 again. A schema whose `x-auth-methods` is not the shape the contract expects is
 such a file. They refuse to write or remove a file under `.zitadel/` whose path,
 through a symlink, resolves outside `.zitadel/`; reading still follows
@@ -1086,12 +1086,8 @@ to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
 and to edit a schema that points at an external URL. When they refuse to disable a
-method, `details.steps` lists each step that uses it with what it `keeps`
-without it (empty when it would have no field or sign-in method left), the
-purposes it is the entry step of (`entry_for`) and the transitions of other
-steps that lead to it (`targeted_by`, each `{step, transition}`, with
-`purpose` when it names only a purpose and so follows that purpose's entry
-step). Disabling the schema's last
+method, the message lists each step that uses it with what it still has
+without it, and what leads to it. Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that
@@ -1128,10 +1124,8 @@ the project's connections on the server, using `zitadel.json` and
 out rather than give it for connections already deployed.
 `deploy`, `preview` and `release create`, `--dry-run` included, check
 `.zitadel/` locally before anything is written, and refuse with one
-`E_VALIDATION`, `Configuration validation failed (N issues)`. `details.issues`
-lists every error as `{rule, path, steps?, message}`: the rule's id, the file,
-the flow steps when the rule names any, and what is wrong. There is no
-`handle` or `step` field. Every failure a file can have is an issue of that one
+`E_VALIDATION`, `Configuration validation failed (N issues)`, whose message
+lists every error on its own line as `<file>: <what is wrong>`. Every failure a file can have is an issue of that one
 error: a file that does not parse or fails its contract, a flow the server's
 flow rules refuse, a connection that disagrees with a schema or flow, and a
 variable the environment lacks (`environment/missing-variable`, one issue per
