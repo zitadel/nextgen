@@ -1031,11 +1031,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     element.locales = {};
     await element.updateComplete;
 
-    await waitFor(() =>
-      expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
-        en["identifier.title"],
-      ),
-    );
+    const title = await waitFor(() => element.shadowRoot!.querySelector(".zl-card-title"));
+
+    expect(title.textContent).toBe(en["identifier.title"]);
   });
 
   it("renders a tenant template in the new language after lang changes", async () => {
