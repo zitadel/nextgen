@@ -105,21 +105,16 @@ export class ReleaseChannel {
     }
 
     const path = `/-/package/${packageName.replaceAll("/", "%2f")}/dist-tags`;
-    const answered = await fetch(`${registry}${path}`, {
-      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          return {};
-        }
-        return (await response.json()) as Record<string, unknown>;
-      })
-      .then((tags) => {
-        return Release.from(tags[distTag]);
-      })
-      .catch(() => {
-        return undefined;
+    let answered: Release | undefined;
+    try {
+      const response = await fetch(`${registry}${path}`, {
+        signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
       });
+      const tags = response.ok ? ((await response.json()) as Record<string, unknown>) : {};
+      answered = Release.from(tags[distTag]);
+    } catch {
+      answered = undefined;
+    }
 
     if (fresh && answered === undefined) {
       return undefined;

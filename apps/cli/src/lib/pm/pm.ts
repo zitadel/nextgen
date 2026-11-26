@@ -1,8 +1,10 @@
 import { dirname, join, resolve } from "node:path";
 
+import { isErrno } from "@/lib/errno";
 import { pathExists } from "@/lib/fs";
 import { Output } from "@/lib/ui/output";
 
+import { PmManifestInvalidError } from "./errors";
 import { Manifest, type PackageJson } from "./manifest";
 import { PackageCommand, type Runner, type Verb } from "./package-command";
 
@@ -342,16 +344,21 @@ export class PM {
    *   manifest or it names none.
    */
   private static async declaredIn(dir: string): Promise<PMName | undefined> {
-    const manifest = await Manifest.read(dir).catch(() => {
-      return undefined;
-    });
-    const declared = manifest?.json.packageManager;
-    if (typeof declared !== "string") {
-      return undefined;
+    try {
+      const manifest = await Manifest.read(dir);
+      const declared = manifest.json.packageManager;
+      if (typeof declared !== "string") {
+        return undefined;
+      }
+      const name = declared.split("@")[0];
+      return name === "npm" || name === "pnpm" || name === "yarn" || name === "bun"
+        ? name
+        : undefined;
+    } catch (error) {
+      if (isErrno(error, "ENOENT") || error instanceof PmManifestInvalidError) {
+        return undefined;
+      }
+      throw error;
     }
-    const name = declared.split("@")[0];
-    return name === "npm" || name === "pnpm" || name === "yarn" || name === "bun"
-      ? name
-      : undefined;
   }
 }

@@ -3,7 +3,9 @@ import { dirname, join } from "node:path";
 
 import semver from "semver";
 
+import { isErrno } from "@/lib/errno";
 import { pathExists } from "@/lib/fs";
+import { PmManifestInvalidError } from "@/lib/pm";
 import { mapBounded } from "@/lib/map-bounded";
 import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 import { Dependencies } from "@/lib/upgrade/dependencies";
@@ -168,16 +170,21 @@ export class SchemaWriter {
     if (semver.valid(cliVersion) === null) {
       return undefined;
     }
-    const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE).catch(() => {
-      return undefined;
-    });
-    const pin = dependencies?.exact().find((dependency) => {
-      return dependency.isAhead(cliVersion);
-    });
-    if (pin === undefined) {
-      return undefined;
+    try {
+      const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE);
+      const pin = dependencies?.exact().find((dependency) => {
+        return dependency.isAhead(cliVersion);
+      });
+      if (pin === undefined) {
+        return undefined;
+      }
+      return { name: pin.name, version: pin.specifier };
+    } catch (error) {
+      if (error instanceof PmManifestInvalidError) {
+        return undefined;
+      }
+      throw error;
     }
-    return { name: pin.name, version: pin.specifier };
   }
 
   /**
@@ -204,8 +211,17 @@ export class SchemaWriter {
    * @returns The reason.
    */
   private readErrorReason(error: unknown): string {
-    if (error instanceof Error && "code" in error) {
-      return String(error.code);
+    if (isErrno(error, "EACCES")) {
+      return "EACCES";
+    }
+    if (isErrno(error, "EISDIR")) {
+      return "EISDIR";
+    }
+    if (isErrno(error, "ENOTDIR")) {
+      return "ENOTDIR";
+    }
+    if (isErrno(error, "EPERM")) {
+      return "EPERM";
     }
     return String(error);
   }

@@ -120,10 +120,12 @@ export async function entryExists(path: string): Promise<boolean> {
  * report on the state of files, where one that cannot be read is shown as
  * missing instead of aborting the rest.
  */
-export function readIfReadable(path: string): Promise<string | undefined> {
-  return readIfExists(path).catch(() => {
+export async function readIfReadable(path: string): Promise<string | undefined> {
+  try {
+    return await readIfExists(path);
+  } catch {
     return undefined;
-  });
+  }
 }
 
 /**

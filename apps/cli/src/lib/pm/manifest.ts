@@ -39,7 +39,7 @@ export class Manifest {
    * This is the strict reader: a project that has no `package.json`, or whose
    * `package.json` cannot be parsed, is an error the caller is expected to deal
    * with or let propagate. Nothing is swallowed here. Callers that can carry on
-   * without the file put `.catch(() => undefined)` on the call, or use
+   * without the file catch the error, or use
    * {@link Manifest.readIfExists} when only a missing file is acceptable.
    *
    * @param dir - The project directory that holds the `package.json`.

@@ -145,7 +145,11 @@ export class Cache {
       await writeFile(temporary, `${JSON.stringify(entries)}\n`);
       await rename(temporary, file);
     } catch {
-      await rm(temporary, { force: true }).catch(() => undefined);
+      try {
+        await rm(temporary, { force: true });
+      } catch {
+        return;
+      }
     }
   }
 
