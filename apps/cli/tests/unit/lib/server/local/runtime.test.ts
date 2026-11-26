@@ -110,7 +110,7 @@ describe("local server runtime metadata", () => {
 
     await expect(readRuntimeMetadata(cwd)).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: `${paths.runtimeFile} is malformed`,
+      message: `${LOCAL_RUNTIME_FILE} is malformed`,
     });
   });
 
@@ -176,17 +176,17 @@ describe("readNearestRuntimeMetadata", () => {
     const app = join(cwd, "my-app");
     await mkdir(app);
 
-    const rejection = expect(readNearestRuntimeMetadata(app)).rejects;
-    await rejection.toBeInstanceOf(LocalServerRecordMalformedError);
-    await rejection.toMatchObject({});
+    await expect(readNearestRuntimeMetadata(app)).rejects.toBeInstanceOf(
+      LocalServerRecordMalformedError,
+    );
   });
 
   it("names a malformed record in the working directory by kind", async ({ dir: cwd }) => {
     await malformedRecordAt(cwd);
 
-    const rejection = expect(readNearestRuntimeMetadata(cwd)).rejects;
-    await rejection.toBeInstanceOf(LocalServerRecordMalformedError);
-    await rejection.toMatchObject({});
+    await expect(readNearestRuntimeMetadata(cwd)).rejects.toBeInstanceOf(
+      LocalServerRecordMalformedError,
+    );
   });
 });
 

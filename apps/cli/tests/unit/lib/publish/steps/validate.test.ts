@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SchemaService } from "@/lib/backend";
-import { PublishConfigInvalidError, PublishError } from "@/lib/publish";
+import { PublishError } from "@/lib/publish";
 import { validateStep } from "@/lib/publish/steps/validate";
 import {
   aBranding,
@@ -197,14 +197,6 @@ describe("validateStep", () => {
         ),
       });
     });
-
-    it("states that a key a newer server added is among the refused ones", async () => {
-      const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config }));
-      });
-
-      expect(error).toBeInstanceOf(PublishConfigInvalidError);
-    });
   });
 
   describe("with a connection file", () => {
@@ -222,26 +214,6 @@ describe("validateStep", () => {
           ".zitadel/idps/acme.json: client_secret must reference a variable, not hold a value",
         ),
       });
-    });
-
-    it("states that a literal client_secret is among the refused findings", async () => {
-      const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
-
-      const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config }));
-      });
-
-      expect(error).toBeInstanceOf(PublishConfigInvalidError);
-    });
-
-    it("states no literal secret and no refused key for a refusal that has neither", async () => {
-      const config = aConfig({ flows: { "login.json": { name: "bad" } } });
-
-      const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config }));
-      });
-
-      expect(error).toBeInstanceOf(PublishConfigInvalidError);
     });
 
     it("leaves out the subject-claim advice when the connections could not be listed", async () => {

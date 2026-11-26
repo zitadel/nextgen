@@ -465,7 +465,7 @@ function normalizeRuntimeMetadata(
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
   ) {
-    throw malformedRuntime(directory);
+    throw malformedRuntime();
   }
 
   const backend = [input.backend, "docker"].find((value) => {
@@ -492,7 +492,7 @@ function normalizeRuntimeMetadata(
       typeof input.server_package !== "string" ||
       typeof input.server_version !== "string"
     ) {
-      throw malformedRuntime(directory);
+      throw malformedRuntime();
     }
     return {
       ...base,
@@ -511,7 +511,7 @@ function normalizeRuntimeMetadata(
     typeof input.container_id !== "string" ||
     typeof input.image !== "string"
   ) {
-    throw malformedRuntime(directory);
+    throw malformedRuntime();
   }
   return {
     ...base,
@@ -603,6 +603,6 @@ function explicitUrlPort(value: string): number | undefined {
   }
 }
 
-function malformedRuntime(directory: string): LocalServerRecordMalformedError {
-  return new LocalServerRecordMalformedError(`${join(directory, LOCAL_RUNTIME_FILE)} is malformed`);
+function malformedRuntime(): LocalServerRecordMalformedError {
+  return new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
 }

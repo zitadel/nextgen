@@ -29,7 +29,7 @@ export type {
   RuntimeMetadata,
 } from "./local/runtime";
 export { LogLines } from "./local/log-lines";
-export type { LocalMachine } from "./local-machine";
+export type { LocalMachine, PortHolder } from "./local-machine";
 export type { DockerResult, TcpListener, WritablePathProbe } from "./local";
 export { BinaryLauncher, DockerLauncher } from "./local/internal";
 export { assertLocalStateWritable, checkLocalServerHealth, listenersForPort } from "./local";

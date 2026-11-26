@@ -399,7 +399,11 @@ describe("LocalRuntime", () => {
 
   describe("logs", () => {
     it("refuses a directory that never started a server", async ({ dir }) => {
-      const rejection = expect(at(dir).logs({ tail: 10 })).rejects;
+      const rejection = expect(
+        at(dir).logs({
+          tail: 10,
+        }),
+      ).rejects;
       await rejection.toBeInstanceOf(LocalServerInvalidError);
       await rejection.toMatchObject({
         code: "E_VALIDATION",
@@ -746,7 +750,11 @@ describe("LocalRuntime launch", () => {
       available: async () => ({ status: 1, stdout: "", stderr: "daemon is down" }),
     });
 
-    const rejection = expect(at(dir, { docker }).launch(request({}))).rejects;
+    const rejection = expect(
+      at(dir, {
+        docker,
+      }).launch(request({})),
+    ).rejects;
     await rejection.toBeInstanceOf(LocalServerDockerMissingError);
     await rejection.toMatchObject({
       message: "Docker is not reachable: daemon is down",
@@ -858,7 +866,10 @@ describe("ZitadelRuntime.resolve", () => {
 
   it("rejects a non-http(s) URL with E_VALIDATION", async ({ dir }) => {
     const rejection = expect(
-      ZitadelRuntime.resolve({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
+      ZitadelRuntime.resolve({
+        cwd: dir,
+        serverFlag: "ftp://flag.example.com",
+      }),
     ).rejects;
     await rejection.toBeInstanceOf(LocalServerInvalidError);
     await rejection.toMatchObject({
@@ -867,7 +878,12 @@ describe("ZitadelRuntime.resolve", () => {
   });
 
   it("rejects an unparseable URL with E_VALIDATION", async ({ dir }) => {
-    const rejection = expect(ZitadelRuntime.resolve({ cwd: dir, serverFlag: "not a url" })).rejects;
+    const rejection = expect(
+      ZitadelRuntime.resolve({
+        cwd: dir,
+        serverFlag: "not a url",
+      }),
+    ).rejects;
     await rejection.toBeInstanceOf(LocalServerInvalidError);
     await rejection.toMatchObject({
       code: "E_VALIDATION",
@@ -888,7 +904,12 @@ describe("ZitadelRuntime.resolve", () => {
   }) => {
     await writeLocalRuntime(dir, "http://localhost:9");
 
-    const rejection = expect(ZitadelRuntime.resolve({ cwd: dir, serverFlag: "local" })).rejects;
+    const rejection = expect(
+      ZitadelRuntime.resolve({
+        cwd: dir,
+        serverFlag: "local",
+      }),
+    ).rejects;
     await rejection.toBeInstanceOf(LocalServerNotRespondingError);
     await rejection.toMatchObject({
       code: "E_LOCAL_SERVER_NOT_RUNNING",

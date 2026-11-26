@@ -202,6 +202,7 @@ describe("Store.read", () => {
         return store.read("connections");
       });
 
+      expect(error).not.toBeInstanceOf(ZitadelConfigFileUnreadableError);
       expect(error).toMatchObject({
         message: `${CONFIG_DIRECTORIES.connections} cannot be read (ENOTDIR)`,
       });
@@ -216,6 +217,7 @@ describe("Store.read", () => {
         return store.read("connections");
       });
 
+      expect(error).toBeInstanceOf(ZitadelConfigFileUnreadableError);
       expect(error).toMatchObject({
         message: `${IDP_A} cannot be read (EACCES)`,
       });
@@ -232,6 +234,7 @@ describe("Store.read", () => {
           return store.read("connections");
         });
 
+        expect(error).toBeInstanceOf(ZitadelConfigFileUnreadableError);
         expect(error).toMatchObject({
           message: `${CONFIG_DIRECTORIES.connections} cannot be read (EACCES)`,
         });

@@ -72,6 +72,24 @@ describe("ZitadelError", () => {
   });
 });
 
+describe("ZitadelLibError", () => {
+  it("names a failure by its class and keeps the failure it wraps", () => {
+    const cause = new Error("the file is locked");
+    const error = new ZitadelConfigError("not valid", cause);
+
+    expect(error.name).toBe("ZitadelConfigError");
+    expect(error.cause).toBe(cause);
+  });
+
+  it("is reported by toZitadelError with the code and message it states", () => {
+    const error = new ZitadelConfigError("not valid");
+    const result = toZitadelError(error);
+
+    expect(result).toBeInstanceOf(ZitadelError);
+    expect([result.code, result.message]).toEqual([error.code, error.message]);
+  });
+});
+
 describe("toZitadelError", () => {
   it("passes an existing ZitadelError through unchanged", () => {
     const original = new ZitadelError("E_AUTH", "already normalised");
