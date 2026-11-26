@@ -10,6 +10,9 @@ const FOREIGN_NAMESPACES: Readonly<Record<string, string>> = {
   math: "http://www.w3.org/1998/Math/MathML",
 };
 
+/** The attributes that hold a link or an image URL. */
+const LINK_ATTRIBUTES: ReadonlySet<string> = new Set(["href", "src", "srcset"]);
+
 /** The URL schemes an atom's link may not use. */
 const UNSAFE_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:", "data:"]);
 
@@ -25,7 +28,7 @@ const UNSAFE_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:",
  * `href` on `<a>`. An atom that renders a link from its own attribute
  * (`<zl-pill href>`, `<zl-field forgot-password-href>`) would still follow it,
  * so afterwards a `javascript:`, `vbscript:` or `data:` URL is dropped from
- * every `href` or `src` attribute and every `*-href` one, as DOMPurify does
+ * every `href`, `src` and `srcset` attribute and every `*-href` one, as DOMPurify does
  * (which still allows a `data:` image).
  */
 export class NativeSanitiser implements Sanitiser {
@@ -83,14 +86,21 @@ export class NativeSanitiser implements Sanitiser {
    */
   private static isUnsafeUrl(element: Element, attribute: Attr): boolean {
     const { name, value } = attribute;
-    if (name !== "href" && name !== "src" && !name.endsWith("-href")) {
+    if (!LINK_ATTRIBUTES.has(name) && !name.endsWith("-href")) {
       return false;
     }
-    const scheme = URL.parse(value, document.baseURI)?.protocol ?? "";
-    if (scheme === "data:" && element.localName === "img" && name === "src") {
+    if (element.localName === "img" && name === "src" && value.trimStart().startsWith("data:")) {
       return false;
     }
-    return UNSAFE_SCHEMES.has(scheme);
+    return NativeSanitiser.isUnsafeScheme(value);
+  }
+
+  /**
+   * @param url - A URL as written.
+   * @returns Whether it uses a scheme an atom's link may not use.
+   */
+  private static isUnsafeScheme(url: string): boolean {
+    return UNSAFE_SCHEMES.has(URL.parse(url, document.baseURI)?.protocol ?? "");
   }
 
   /**

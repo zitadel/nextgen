@@ -77,6 +77,11 @@ const cases: ReadonlyArray<[string, string, string]> = [
     `<zl-pill>x</zl-pill><img src="data:image/png;base64,AAAA" alt="">`,
   ],
   [
+    "strips a srcset with a script URL",
+    `<img src="a.png" srcset="javascript:alert(1) 1x, b.png 2x" alt="">`,
+    `<img src="a.png" alt="">`,
+  ],
+  [
     "keeps text that only looks like a script URL",
     `<p title="javascript:void" data-x="javascript:1">x</p>`,
     `<p title="javascript:void" data-x="javascript:1">x</p>`,
