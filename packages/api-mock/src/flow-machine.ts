@@ -27,7 +27,7 @@
  *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso)-----> sso-redirect
  *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
- *                                     --SUBMIT(submit, user_already_exists)--> password
+ *                                     --SUBMIT(submit | passkey_register, user_already_exists)--> password
  *                                     --SUBMIT(sign_in)--> identifier
  *                                     --SUBMIT(sso)-----> sso-redirect
  *                                     --SUBMIT(passkey_register)--> register, carrying
@@ -310,6 +310,19 @@ export const flowMachine = createMachine({
             actions: [captureFields, rotateToken],
           },
           {
+            // Before the ceremony: a taken email issues none, as on the server.
+            guard: ({ event }) =>
+              (event.action === "submit" || event.action === "passkey_register") &&
+              event.outcome === "user_already_exists",
+            target: "password",
+            actions: [
+              captureFields,
+              changePurpose("login"),
+              handOffToPassword("register"),
+              rotateToken,
+            ],
+          },
+          {
             // Asking for the ceremony stays on the step, which now carries it.
             guard: ({ event }) => event.action === "passkey_register",
             actions: [captureFields, assign({ passkeyRegistration: true }), rotateToken],
@@ -318,17 +331,6 @@ export const flowMachine = createMachine({
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
             actions: [captureFields, changePurpose("login"), rotateToken],
-          },
-          {
-            guard: ({ event }) =>
-              event.action === "submit" && event.outcome === "user_already_exists",
-            target: "password",
-            actions: [
-              captureFields,
-              changePurpose("login"),
-              handOffToPassword("register"),
-              rotateToken,
-            ],
           },
           {
             target: "register-password",

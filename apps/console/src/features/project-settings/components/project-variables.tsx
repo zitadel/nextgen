@@ -1,6 +1,11 @@
 import { CLI_VARIABLE_SET, CliCommand } from "@/components/cli-hint";
 import { DetailSection } from "@/components/detail-page";
-import { PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
+import {
+  MONO_VALUE,
+  PANEL_BODY_CELL,
+  PANEL_HEAD_CELL,
+  PANEL_TABLE_FIXED,
+} from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import {
   Table,
@@ -57,7 +62,7 @@ export function ProjectVariables({ variables }: { variables: Variables }) {
       ) : (
         // Fixed columns in the design's proportions, so a long value widens
         // nothing: it truncates in its cell.
-        <Table className="table-fixed text-sm">
+        <Table className={PANEL_TABLE_FIXED}>
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className={cn(HEAD, "w-[26%]")}>Name</TableHead>
@@ -132,14 +137,17 @@ function ValueCell({ name, kind, value }: { name: string; kind: string; value?: 
     return <span className="text-foreground">Configured</span>;
   }
   const text = String(value);
-  return <Copyable text={text} label={`Copy ${name} ${kind} value`} />;
+  return <Copyable text={text} label={`Copy ${name} ${kind} value`} mono />;
 }
 
-/** A cell's text with its copy beside it; the text truncates, the copy does not. */
-function Copyable({ text, label }: { text: string; label: string }) {
+/**
+ * A cell's text with its copy beside it; the text truncates, the copy does not.
+ * `mono` sets the text in the monospace face: a value takes it, a name does not.
+ */
+function Copyable({ text, label, mono }: { text: string; label: string; mono?: boolean }) {
   return (
     <span className="flex items-center gap-1.5 text-foreground">
-      <span className="truncate">{text}</span>
+      <span className={cn("truncate", mono && MONO_VALUE)}>{text}</span>
       <CopyButton value={text} label={label} size="inline" />
     </span>
   );

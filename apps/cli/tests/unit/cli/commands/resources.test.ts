@@ -44,8 +44,10 @@ import {
   update,
 } from "@/cli/commands/resources";
 import { COMMANDS, WORKFLOW_COMMANDS } from "@/index";
+import type { Facts } from "@/cli/core/base";
 import { idArg } from "@/cli/core/crud/shared";
 import { parseArg } from "@tests/helpers/inputs";
+import { aConfigAt } from "@tests/helpers/suggestions";
 import { tabulate } from "@tests/helpers/tabulate";
 import {
   definitionOf,
@@ -119,6 +121,33 @@ describe("resource registry", () => {
       const deleteVerb = resource.delete?.verb ?? "delete";
       expect(Boolean(COMMANDS[`${topic}:${deleteVerb}`])).toBe(Boolean(resource.delete));
     }
+  });
+
+  it.each([
+    ["user:create", { action: "create", resource_type: "user" }],
+    ["user:update", { action: "update", resource_type: "user" }],
+    ["user:delete", { action: "delete", resource_type: "user" }],
+    ["team:create", { action: "create", resource_type: "team" }],
+    ["team:update", { action: "update", resource_type: "team" }],
+    ["team:deactivate", { action: "deactivate", resource_type: "team" }],
+    ["grant:create", { action: "create", resource_type: "grant" }],
+    ["grant:delete", { action: "delete", resource_type: "grant" }],
+    ["user:list", {}],
+    ["user:get", {}],
+    ["session:revoke", {}],
+    ["project:update", {}],
+  ])("reports %s as the action and resource it changes, if any", (id, expected) => {
+    const Command = COMMANDS[id] as unknown as new (
+      argv: string[],
+      config: ReturnType<typeof aConfigAt>,
+    ) => { describe(): Facts };
+    const facts = new Command([], aConfigAt("0.0.0-test")).describe();
+
+    expect({ action: facts.action, resource_type: facts.resource_type }).toEqual({
+      action: undefined,
+      resource_type: undefined,
+      ...expected,
+    });
   });
 
   it("gives every generated command --env and --env-file, and no --environment flag", () => {

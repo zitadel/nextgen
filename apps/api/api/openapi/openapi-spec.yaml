@@ -226,8 +226,6 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
-  /projects/{project_id}/admins:
-    $ref: endpoints/projects/by_id/admins/methods.yaml
   /projects/{project_id}/members:
     $ref: endpoints/projects/by_id/members/methods.yaml
   /projects/{project_id}/claim/init:
@@ -372,6 +370,8 @@ webhooks:
     $ref: endpoints/events/webhooks/auth-factor-password-set.yaml
   auth.request.created:
     $ref: endpoints/events/webhooks/auth-request-created.yaml
+  auth.request.exchange.failed:
+    $ref: endpoints/events/webhooks/auth-request-exchange-failed.yaml
   auth.sso.authorization.failed:
     $ref: endpoints/events/webhooks/auth-sso-authorization-failed.yaml
   auth.sso.exchange.failed:

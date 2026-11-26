@@ -1350,37 +1350,6 @@ func (UnimplementedHandler) ListPolicyRevisions(ctx context.Context, params List
 	return r, ht.ErrNotImplemented
 }
 
-// ListProjectAdmins implements listProjectAdmins operation.
-//
-// Lists the people who can administer a project, and how each of them holds that access.
-//
-// A person appears once, with one entry in `sources` per way they hold it:
-//
-//   - `owning_team`: an active member of the team that owns the project, the team a claim attaches the
-//     project to. Removing a grant does not remove this access. It ends only when the person leaves the
-//     team or the project changes owner.
-//   - `grant`: an unexpired `admin` grant on the project, which is a role given to the person
-//     (`grant_id` only) or to a team they are an active member of (`grant_id` and `team`). Revoking
-//     that grant removes this source.
-//
-// The list follows the authorization check. A person who left a team, or whose team or user was
-// deactivated, is not listed through it. Grants that expired or carry a lower role are left out. A
-// person whose only access is a `viewer` or `editor` grant is not an admin and is not listed. Like the
-// check, a direct user grant requires an active user, so a suspended person's direct grant is not
-// listed.
-//
-// Every caller who passes the project read check sees every listed admin and every team name on
-// `sources`. Co-membership no longer filters the roster.
-//
-// The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
-// (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
-// project.
-//
-// GET /projects/{project_id}/admins
-func (UnimplementedHandler) ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (r ListProjectAdminsRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // ListProjectMembers implements listProjectMembers operation.
 //
 // Lists the people who have a role on a project, with each person's strongest role and how they hold

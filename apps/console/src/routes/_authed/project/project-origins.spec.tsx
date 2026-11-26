@@ -110,6 +110,22 @@ describe("project origins", () => {
     expect(section.getByRole("button", { name: `Copy ${PREVIEW.pattern}` })).toBeInTheDocument();
   });
 
+  it("draws the card's action outlined and a row's menu vertical", async () => {
+    stubProject([PRIMARY]);
+    await renderProject();
+
+    const section = await origins();
+    expect(section.getByRole("button", { name: "Add origin" })).toHaveAttribute(
+      "data-variant",
+      "outline",
+    );
+    expect(
+      section
+        .getByRole("button", { name: `Actions for ${PRIMARY.pattern}` })
+        .querySelector("svg.lucide-ellipsis-vertical"),
+    ).not.toBeNull();
+  });
+
   it("says that only a loopback origin is admitted while the list is empty", async () => {
     stubProject([]);
     await renderProject();

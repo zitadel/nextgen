@@ -33,7 +33,7 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys, stepNotice, stepTexts } from "./liquid.js";
 import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
@@ -794,6 +794,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const identifier = this.response?.step.identifier;
     if (!identifier?.value) return nothing;
     return html`<input
+      id="zl-paired-identifier"
       type="text"
       part="paired-identifier"
       readonly
@@ -1237,11 +1238,21 @@ export class ZitadelLogin extends ZitadelSurface {
 
     const fields = step.fields ?? [];
     const actions = step.actions ?? [];
+    // Why the flow moved between sign-in and sign-up without being asked, on
+    // the step right after the move. A host that sets the notice's text to ""
+    // in `locales` opts out of it ({@link isHidden}). The plain key counts as
+    // well as the variant shown: a built-in translation's variant would
+    // otherwise outlive an English "".
+    const language = this.resolveLanguage();
+    const notice =
+      step.notice && !isHidden(language, this.locales, step.notice)
+        ? stepNotice(step.notice, fields, this.resolveLocale())
+        : undefined;
     const context: LiquidContext = {
       step: {
         name: step.name,
         complete: step.complete,
-        texts: step.texts ?? {},
+        texts: stepTexts(step.texts ?? {}, fields, this.resolveLocale()),
       },
       fields,
       actions,
@@ -1253,12 +1264,9 @@ export class ZitadelLogin extends ZitadelSurface {
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
-      // Why the flow moved between sign-in and sign-up without being asked,
-      // on the step right after the move. A host that sets the notice's text
-      // to "" in `locales` opts out of it ({@link isHidden}).
       messages:
-        step.notice && !isHidden(this.resolveLanguage(), this.locales, step.notice)
-          ? [{ level: "info", text_key: step.notice }]
+        notice && !isHidden(language, this.locales, notice)
+          ? [{ level: "info", text_key: notice }]
           : [],
       identity: this.deriveIdentity(),
       errors,

@@ -24,6 +24,7 @@ import {
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { ChangeCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * A release id, as the platform mints it.
@@ -213,7 +214,7 @@ export function fileList(paths: readonly string[], dryRun: boolean): string[] {
  * resource by handle, so files are written by handle and the next `deploy`
  * rebuilds the same release.
  */
-export default class Pull extends ChangeCommand {
+export default class Pull extends Telemetered(ChangeCommand) {
   static override description =
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
   static override group = CommandGroups.releases;

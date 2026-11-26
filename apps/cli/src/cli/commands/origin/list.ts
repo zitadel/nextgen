@@ -3,6 +3,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["pattern", "kind"] as const;
@@ -14,7 +15,7 @@ const COLUMNS = ["pattern", "kind"] as const;
  * project state, so the server is the authority. An empty list means every
  * origin is admitted until the first pattern is added.
  */
-export default class OriginList extends ReadCommand {
+export default class OriginList extends Telemetered(ReadCommand) {
   static override description = "List the origin patterns on the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 3;

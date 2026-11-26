@@ -10,6 +10,7 @@ import { fieldsFlag } from "@/cli/core/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { ReadCommand } from "@/cli/commands/bases";
 import { invitationIdSchema } from "./id";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The invitation `invitation get` reads. The schema is the API spec's own, so
@@ -35,7 +36,7 @@ const INVITATION_ID: Refused<string> = {
  * shown again after `invitation create`. `--fields` cuts the data and the rows
  * to the dot-paths it names, judged by the invitation's shape.
  */
-export default class InvitationGet extends ReadCommand {
+export default class InvitationGet extends Telemetered(ReadCommand) {
   static override description = "Read one invitation by id.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 7;

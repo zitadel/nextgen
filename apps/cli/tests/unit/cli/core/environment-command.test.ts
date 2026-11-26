@@ -17,40 +17,8 @@ import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { asTerminal } from "@tests/fixtures/terminal";
 import { Previewable } from "@/cli/core/previewable";
 import { ServerCommand } from "@/cli/commands/server-command";
-import type { Telemetry } from "@/lib/telemetry";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-/** A telemetry client that keeps what it is sent. */
-class Recording {
-  /** The properties of each event sent, by event. */
-  readonly sent = new Map<string, Record<string, unknown>>();
-
-  /** Whether the client sends anything. */
-  readonly enabled = true;
-
-  /** Whether this is the first run. */
-  readonly isFirstRun = false;
-
-  /** The id the client says it is. */
-  readonly distinctId = "did-test";
-
-  /**
-   * Keeps an event.
-   *
-   * @param event - The event.
-   * @param properties - What it carries.
-   */
-  track(event: string, properties: Record<string, unknown> = {}): void {
-    this.sent.set(event, properties);
-  }
-
-  /** Sends nothing: a profile is not what these tests read. */
-  profile(): void {}
-
-  /** Flushes nothing: nothing is pending. */
-  async shutdown(): Promise<void> {}
-}
 
 /** Connects with the project secret, the default credential. */
 class ProjectProbe extends ServerCommand(EnvironmentCommand) {
@@ -58,21 +26,12 @@ class ProjectProbe extends ServerCommand(EnvironmentCommand) {
     throw new Error("unused");
   }
 
-  readonly recorder = new Recording();
-
-  protected override createTelemetry(): Telemetry {
-    return this.recorder as unknown as Telemetry;
-  }
-
   override log(): void {}
 
   async probe() {
     const { flags } = await this.parse(ProjectProbe);
     await this.toMeta(flags);
-    const connection = await this.connect();
-    this.emit({ status: "ok", data: {}, summary: { title: "Done", sections: [] } });
-
-    return { connection, telemetry: this.recorder.sent.get("cli_command_completed") };
+    return { connection: await this.connect(), telemetry: this.describe() };
   }
 }
 
@@ -176,21 +135,12 @@ class PreviewProbe extends ServerCommand(EnvironmentCommand) {
     throw new Error("unused");
   }
 
-  readonly recorder = new Recording();
-
-  protected override createTelemetry(): Telemetry {
-    return this.recorder as unknown as Telemetry;
-  }
-
   override log(): void {}
 
   async probe() {
     const { flags } = await this.parse(PreviewProbe);
     await this.toMeta(flags);
-    const connection = await this.connect();
-    this.emit({ status: "ok", data: {}, summary: { title: "Done", sections: [] } });
-
-    return { connection, telemetry: this.recorder.sent.get("cli_command_completed") };
+    return { connection: await this.connect(), telemetry: this.describe() };
   }
 }
 
@@ -441,7 +391,7 @@ describe("EnvironmentCommand.connect", () => {
       config,
     ).probe();
 
-    expect({ credential: telemetry?.credential, has_env_file: telemetry?.has_env_file }).toEqual({
+    expect(telemetry).toEqual({
       credential: "preview",
       has_env_file: true,
     });
@@ -455,7 +405,7 @@ describe("EnvironmentCommand.connect", () => {
 
     const { telemetry } = await new ProjectProbe(["--cwd", dir], config).probe();
 
-    expect({ credential: telemetry?.credential, has_env_file: telemetry?.has_env_file }).toEqual({
+    expect(telemetry).toEqual({
       credential: "project",
       has_env_file: false,
     });

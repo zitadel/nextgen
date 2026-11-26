@@ -12,10 +12,10 @@ import { describe, expect, it } from "vitest";
  */
 const setupCommand = join(import.meta.dirname, "../../../../src/cli/commands/setup/index.ts");
 
-/** The dimension names `setup` passes to `recordTelemetry`. */
+/** The dimension names `setup` passes to `annotate`. */
 async function recordedDimensions(): Promise<string[]> {
   const source = await readFile(setupCommand, "utf8");
-  const calls = [...source.matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
+  const calls = [...source.matchAll(/annotate\(\{([^}]*)\}/gs)];
   return [
     ...new Set(
       calls.flatMap((call) =>

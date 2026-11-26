@@ -42,7 +42,7 @@ class Early extends BaseCommand {
 
 /** The command, run as the CLI runs it, with `words` after the flags every run takes. */
 function command(...words: string[]): Early {
-  return new Early(["--no-telemetry", ...words], config);
+  return new Early(words, config);
 }
 
 describe("answeredEarly", () => {

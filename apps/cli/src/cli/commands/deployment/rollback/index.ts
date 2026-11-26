@@ -19,6 +19,7 @@ import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { RemoveCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 const NOTHING_DEPLOYED_REFUSAL = {
   message: "There is no deployment to roll back",
@@ -138,9 +139,11 @@ async function originChanges(
  * one. It reports the revisions that release pins, and that users keep theirs:
  * configuration rolls back, user data does not.
  */
-export default class DeploymentRollback extends Tabulatable(
-  RemoveCommand(
-    "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
+export default class DeploymentRollback extends Telemetered(
+  Tabulatable(
+    RemoveCommand(
+      "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
+    ),
   ),
 ) {
   static override description = "Roll back to an earlier deployment.";

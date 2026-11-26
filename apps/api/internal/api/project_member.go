@@ -36,43 +36,31 @@ func projectMemberResponse(member *service.ProjectMember) api.ProjectMember {
 	return api.ProjectMember{
 		User:     userRefToAPI(member.User),
 		Relation: api.ProjectMemberRelation(member.Relation),
-		Sources: mapProjectMemberSources(member.Sources,
-			func(team api.TeamRef) api.ProjectMemberSource {
-				return api.NewProjectMemberOwningTeamSourceProjectMemberSource(api.ProjectMemberOwningTeamSource{
-					Type: api.ProjectMemberOwningTeamSourceTypeOwningTeam,
-					Team: team,
-				})
-			},
-			func(grantID string, team api.OptTeamRef) api.ProjectMemberSource {
-				return api.NewProjectMemberGrantSourceProjectMemberSource(api.ProjectMemberGrantSource{
-					Type:    api.ProjectMemberGrantSourceTypeGrant,
-					GrantID: grantID,
-					Team:    team,
-				})
-			},
-		),
+		Sources:  projectMemberSources(member.Sources),
 	}
 }
 
-// mapProjectMemberSources walks domain sources once for both the members and
-// admins wire shapes: owning_team first, then grants, with an optional team
-// on a grant.
-func mapProjectMemberSources[S any](
-	sources []domain.ProjectMemberSourceRecord,
-	owningTeam func(api.TeamRef) S,
-	grant func(grantID string, team api.OptTeamRef) S,
-) []S {
-	out := make([]S, 0, len(sources))
+// projectMemberSources maps domain sources in order: owning_team first, then
+// grants, with an optional team on a grant.
+func projectMemberSources(sources []domain.ProjectMemberSourceRecord) []api.ProjectMemberSource {
+	out := make([]api.ProjectMemberSource, 0, len(sources))
 	for _, source := range sources {
 		if source.OwningTeam {
-			out = append(out, owningTeam(projectMemberTeamRef(source.TeamID, source.TeamName)))
+			out = append(out, api.NewProjectMemberOwningTeamSourceProjectMemberSource(api.ProjectMemberOwningTeamSource{
+				Type: api.ProjectMemberOwningTeamSourceTypeOwningTeam,
+				Team: projectMemberTeamRef(source.TeamID, source.TeamName),
+			}))
 			continue
 		}
 		var team api.OptTeamRef
 		if source.TeamID != "" {
 			team = api.NewOptTeamRef(projectMemberTeamRef(source.TeamID, source.TeamName))
 		}
-		out = append(out, grant(source.GrantID, team))
+		out = append(out, api.NewProjectMemberGrantSourceProjectMemberSource(api.ProjectMemberGrantSource{
+			Type:    api.ProjectMemberGrantSourceTypeGrant,
+			GrantID: source.GrantID,
+			Team:    team,
+		}))
 	}
 	return out
 }
