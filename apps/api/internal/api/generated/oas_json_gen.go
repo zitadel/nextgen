@@ -54204,112 +54204,6 @@ func (s *FinishUserPasskeyRegistrationResponse) UnmarshalJSON(data []byte) error
 }
 
 // Encode implements json.Marshaler.
-func (s *FlowAudience) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *FlowAudience) encodeFields(e *jx.Encoder) {
-	{
-		if s.TeamIds != nil {
-			e.FieldStart("team_ids")
-			e.ArrStart()
-			for _, elem := range s.TeamIds {
-				e.Str(elem)
-			}
-			e.ArrEnd()
-		}
-	}
-	{
-		if s.AppIds != nil {
-			e.FieldStart("app_ids")
-			e.ArrStart()
-			for _, elem := range s.AppIds {
-				e.Str(elem)
-			}
-			e.ArrEnd()
-		}
-	}
-}
-
-var jsonFieldsNameOfFlowAudience = [2]string{
-	0: "team_ids",
-	1: "app_ids",
-}
-
-// Decode decodes FlowAudience from json.
-func (s *FlowAudience) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowAudience to nil")
-	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "team_ids":
-			if err := func() error {
-				s.TeamIds = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.TeamIds = append(s.TeamIds, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"team_ids\"")
-			}
-		case "app_ids":
-			if err := func() error {
-				s.AppIds = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.AppIds = append(s.AppIds, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"app_ids\"")
-			}
-		default:
-			return errors.Errorf("unexpected field %q", k)
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode FlowAudience")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *FlowAudience) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowAudience) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
 func (s *FlowCompleted) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -54901,12 +54795,6 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 		s.Purposes.Encode(e)
 	}
 	{
-		if s.Audience.Set {
-			e.FieldStart("audience")
-			s.Audience.Encode(e)
-		}
-	}
-	{
 		e.FieldStart("steps")
 		e.ArrStart()
 		for _, elem := range s.Steps {
@@ -54916,13 +54804,12 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowDefinition = [6]string{
+var jsonFieldsNameOfFlowDefinition = [5]string{
 	0: "$schema",
 	1: "name",
 	2: "user_schema",
 	3: "purposes",
-	4: "audience",
-	5: "steps",
+	4: "steps",
 }
 
 // Decode decodes FlowDefinition from json.
@@ -54978,18 +54865,8 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"purposes\"")
 			}
-		case "audience":
-			if err := func() error {
-				s.Audience.Reset()
-				if err := s.Audience.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"audience\"")
-			}
 		case "steps":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				s.Steps = make([]FlowDefinitionStep, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -55016,7 +54893,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00101110,
+		0b00011110,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -56073,30 +55950,16 @@ func (s *FlowHint) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.TeamID.Set {
-			e.FieldStart("team_id")
-			s.TeamID.Encode(e)
-		}
-	}
-	{
 		if s.UserSchemaID.Set {
 			e.FieldStart("user_schema_id")
 			s.UserSchemaID.Encode(e)
 		}
 	}
-	{
-		if s.AppID.Set {
-			e.FieldStart("app_id")
-			s.AppID.Encode(e)
-		}
-	}
 }
 
-var jsonFieldsNameOfFlowHint = [4]string{
+var jsonFieldsNameOfFlowHint = [2]string{
 	0: "login_name",
-	1: "team_id",
-	2: "user_schema_id",
-	3: "app_id",
+	1: "user_schema_id",
 }
 
 // Decode decodes FlowHint from json.
@@ -56117,16 +55980,6 @@ func (s *FlowHint) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"login_name\"")
 			}
-		case "team_id":
-			if err := func() error {
-				s.TeamID.Reset()
-				if err := s.TeamID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"team_id\"")
-			}
 		case "user_schema_id":
 			if err := func() error {
 				s.UserSchemaID.Reset()
@@ -56136,16 +55989,6 @@ func (s *FlowHint) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"user_schema_id\"")
-			}
-		case "app_id":
-			if err := func() error {
-				s.AppID.Reset()
-				if err := s.AppID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"app_id\"")
 			}
 		default:
 			return d.Skip()
@@ -62703,19 +62546,12 @@ func (s *FlowdefPayload) encodeFields(e *jx.Encoder) {
 			s.Purposes.Encode(e)
 		}
 	}
-	{
-		if s.Audience.Set {
-			e.FieldStart("audience")
-			s.Audience.Encode(e)
-		}
-	}
 }
 
-var jsonFieldsNameOfFlowdefPayload = [4]string{
+var jsonFieldsNameOfFlowdefPayload = [3]string{
 	0: "name",
 	1: "user_schema",
 	2: "purposes",
-	3: "audience",
 }
 
 // Decode decodes FlowdefPayload from json.
@@ -62756,16 +62592,6 @@ func (s *FlowdefPayload) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"purposes\"")
 			}
-		case "audience":
-			if err := func() error {
-				s.Audience.Reset()
-				if err := s.Audience.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"audience\"")
-			}
 		default:
 			return d.Skip()
 		}
@@ -62786,112 +62612,6 @@ func (s *FlowdefPayload) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowdefPayload) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *FlowdefPayloadAudience) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *FlowdefPayloadAudience) encodeFields(e *jx.Encoder) {
-	{
-		if s.AppIds != nil {
-			e.FieldStart("app_ids")
-			e.ArrStart()
-			for _, elem := range s.AppIds {
-				e.Str(elem)
-			}
-			e.ArrEnd()
-		}
-	}
-	{
-		if s.TeamIds != nil {
-			e.FieldStart("team_ids")
-			e.ArrStart()
-			for _, elem := range s.TeamIds {
-				e.Str(elem)
-			}
-			e.ArrEnd()
-		}
-	}
-}
-
-var jsonFieldsNameOfFlowdefPayloadAudience = [2]string{
-	0: "app_ids",
-	1: "team_ids",
-}
-
-// Decode decodes FlowdefPayloadAudience from json.
-func (s *FlowdefPayloadAudience) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowdefPayloadAudience to nil")
-	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "app_ids":
-			if err := func() error {
-				s.AppIds = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.AppIds = append(s.AppIds, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"app_ids\"")
-			}
-		case "team_ids":
-			if err := func() error {
-				s.TeamIds = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.TeamIds = append(s.TeamIds, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"team_ids\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode FlowdefPayloadAudience")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *FlowdefPayloadAudience) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowdefPayloadAudience) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -103004,39 +102724,6 @@ func (s *OptFloat64) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes FlowAudience as json.
-func (o OptFlowAudience) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes FlowAudience from json.
-func (o *OptFlowAudience) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFlowAudience to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFlowAudience) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFlowAudience) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes FlowCompletedDetails as json.
 func (o OptFlowCompletedDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -104210,39 +103897,6 @@ func (s OptFlowdefNotFoundDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptFlowdefNotFoundDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FlowdefPayloadAudience as json.
-func (o OptFlowdefPayloadAudience) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes FlowdefPayloadAudience from json.
-func (o *OptFlowdefPayloadAudience) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFlowdefPayloadAudience to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFlowdefPayloadAudience) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFlowdefPayloadAudience) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

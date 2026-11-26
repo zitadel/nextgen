@@ -9,7 +9,7 @@
     "purposes",
     "steps"
   ],
-  "description": "A flow definition is the configuration of one flow: the sequence of screens\nthe login component (`<zitadel-login>`) walks a user through to sign in,\nregister, recover access or similar. Each screen is a step. A step collects\nfields (inputs taken from properties of the user schema), offers actions\n(what the user can do, such as submit the form or follow a link) and may\nrequire gates (security checks, such as a captcha, that must pass before the\nserver accepts the submission). Transitions say which step follows each\naction.\n\nThe definition is server-side configuration and is never sent to the\nfrontend. The server evaluates it and returns the current step, with its\nfields, actions and gates, to the client.\n\nAdministrators create flow definitions, either as `.zitadel/flows/` files\nthat `zitadel deploy` publishes or through the API, and they are stored in\nthe project/team configuration hierarchy. The server selects the matching\ndefinition from the purpose and audience when a flow starts with\n`createFlow` (`POST /flows`).\n",
+  "description": "A flow definition is the configuration of one flow: the sequence of screens\nthe login component (`<zitadel-login>`) walks a user through to sign in,\nregister, recover access or similar. Each screen is a step. A step collects\nfields (inputs taken from properties of the user schema), offers actions\n(what the user can do, such as submit the form or follow a link) and may\nrequire gates (security checks, such as a captcha, that must pass before the\nserver accepts the submission). Transitions say which step follows each\naction.\n\nThe definition is server-side configuration and is never sent to the\nfrontend. The server evaluates it and returns the current step, with its\nfields, actions and gates, to the client.\n\nAdministrators create flow definitions, either as `.zitadel/flows/` files\nthat `zitadel deploy` publishes or through the API, and they are stored in\nthe project/team configuration hierarchy. When a flow starts with\n`createFlow` (`POST /flows`), the server runs the definition the request\nnames, or else the newest pinned definition that serves the purpose.\n",
   "additionalProperties": false,
   "properties": {
     "$schema": {
@@ -54,16 +54,6 @@
       "examples": [
         {
           "login": "identify"
-        }
-      ]
-    },
-    "audience": {
-      "$ref": "#/$defs/FlowAudience",
-      "examples": [
-        {
-          "app_ids": [
-            "app_saas"
-          ]
         }
       ]
     },
@@ -121,39 +111,6 @@
     }
   },
   "$defs": {
-    "FlowAudience": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "Scopes which teams or apps this flow definition applies to. Empty or\nomitted fields mean \"no restriction\"; when both are empty the definition\nmatches every request in the project. The server picks the most specific\nmatching definition: app > team > project-wide.\n",
-      "properties": {
-        "team_ids": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Restrict to specific teams (organizations). Empty means no team restriction.",
-          "uniqueItems": true,
-          "examples": [
-            [
-              "team_acme"
-            ]
-          ]
-        },
-        "app_ids": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Restrict to specific applications. Empty means no app restriction.",
-          "uniqueItems": true,
-          "examples": [
-            [
-              "app_saas"
-            ]
-          ]
-        }
-      }
-    },
     "FlowDefinitionStep": {
       "type": "object",
       "required": [

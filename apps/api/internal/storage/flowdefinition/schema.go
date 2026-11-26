@@ -20,7 +20,7 @@ func ParsePurposeKey(s string) (domain.FlowDefinitionPurpose, error) {
 }
 
 // Schema binds flow definition list/filter/order fields for both dialects.
-// Nested payload (user schema, audience, steps) lives in the definition JSON
+// Nested payload (user schema, steps) lives in the definition JSON
 // column and is handled by Marshal/ToDomain — not as list Schema columns.
 var Schema = database.NewSchema(map[domain.FlowDefinitionField]database.FieldBinding[domain.FlowDefinition]{
 	domain.FlowDefinitionFieldProjectID: {

@@ -276,7 +276,7 @@ func TestAuthAttemptService_VerifyProof_user_metrics(t *testing.T) {
 }
 
 func TestFlowService_metrics(t *testing.T) {
-	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	def := newDef("login", "1.0.0", domain.FlowDefinitionPurposeLogin)
 	state := &domain.FlowState{ProjectID: def.ProjectID, AuthAttemptID: "att-1", FlowProgress: domain.FlowProgress{DefinitionID: def.ID}}
 	completeStep := &flowengine.FlowStep{Name: "done", Complete: new(domain.FlowStepCompleteRedirect)}
 

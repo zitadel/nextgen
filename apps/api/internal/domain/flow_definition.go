@@ -129,7 +129,6 @@ type FlowDefinition struct {
 	// Purposes maps each purpose this definition handles to the name of
 	// its entry-point step. Every value must match a step in [Steps].
 	Purposes map[FlowDefinitionPurpose]string
-	Audience FlowDefinitionAudience
 	Steps    []FlowDefinitionStep
 }
 
@@ -140,7 +139,6 @@ func NewFlowDefinition(
 	schemaVersion string,
 	userSchema string,
 	purposes map[FlowDefinitionPurpose]string,
-	audience FlowDefinitionAudience,
 	steps []FlowDefinitionStep,
 ) (_ *FlowDefinition, err error) {
 	return &FlowDefinition{
@@ -150,7 +148,6 @@ func NewFlowDefinition(
 		SchemaVersion: schemaVersion,
 		UserSchema:    userSchema,
 		Purposes:      purposes,
-		Audience:      audience,
 		Steps:         steps,
 	}, nil
 }
@@ -167,8 +164,6 @@ func (d *FlowDefinition) Equal(other *FlowDefinition) bool {
 	return d.Name == other.Name &&
 		d.UserSchema == other.UserSchema &&
 		maps.Equal(d.Purposes, other.Purposes) &&
-		slices.Equal(d.Audience.AppIDs, other.Audience.AppIDs) &&
-		slices.Equal(d.Audience.TeamIDs, other.Audience.TeamIDs) &&
 		flowDefinitionStepsEqual(d.Steps, other.Steps)
 }
 
@@ -230,14 +225,6 @@ func (d *FlowDefinition) TransitionTarget(t FlowStepTransition) string {
 		return d.Purposes[*t.Purpose]
 	}
 	return t.Target
-}
-
-// FlowDefinitionAudience describes which requests this definition should be selected for.
-// Empty slices (or nil) mean "no restriction". Specificity for resolution
-// is app > team > project-wide (both empty).
-type FlowDefinitionAudience struct {
-	AppIDs  []string
-	TeamIDs []string
 }
 
 // AuthMethodPrefix marks a step.fields entry as referring to an entry
@@ -400,6 +387,5 @@ const (
 	FlowDefinitionFieldUpdatedAt
 	FlowDefinitionFieldUserSchema
 	FlowDefinitionFieldPurposes
-	FlowDefinitionFieldAudience
 	FlowDefinitionFieldSteps
 )

@@ -20,8 +20,8 @@ properties:
   branding:
     $ref: branding.yaml
     description: |
-      Resolved branding inherited from the app → team → project hierarchy.
-      Determined at flow creation based on audience context. Does not change between steps.
+      The branding the project's deployed release pins.
+      Does not change between steps.
   redirect_uri:
     type: string
     format: uri

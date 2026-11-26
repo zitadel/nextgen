@@ -845,7 +845,6 @@ const FLOWS = {
     user_schema: "human_user",
     purposes: ["login"],
     initial_steps: { login: "login" },
-    audience: {},
     steps: [
       {
         name: "login",
@@ -877,7 +876,6 @@ const FLOWS = {
     user_schema: "human_user",
     purposes: ["register"],
     initial_steps: { register: "profile" },
-    audience: {},
     steps: [
       {
         name: "profile",
@@ -907,7 +905,6 @@ const FLOWS = {
     user_schema: "human_user",
     purposes: ["login"],
     initial_steps: { login: "login" },
-    audience: { team_ids: ["team_acme"], app_ids: ["app_dashboard"] },
     steps: [
       {
         name: "login",
@@ -953,7 +950,6 @@ const FLOWS = {
     user_schema: "human_user",
     purposes: ["login", "register"],
     initial_steps: { login: "identify", register: "identify" },
-    audience: {},
     steps: [
       {
         name: "identify",
@@ -994,7 +990,6 @@ const FLOWS = {
     user_schema: "saas_user",
     purposes: ["register"],
     initial_steps: { register: "profile" },
-    audience: { app_ids: ["app_saas"] },
     steps: [
       {
         name: "profile",
@@ -1040,7 +1035,6 @@ const FLOWS = {
     user_schema: "human_user",
     purposes: ["login"],
     initial_steps: { login: "passkey_prompt" },
-    audience: {},
     steps: [
       {
         name: "passkey_prompt",

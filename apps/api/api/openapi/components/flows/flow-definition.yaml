@@ -17,9 +17,9 @@ description: |
 
   Administrators create flow definitions, either as `.zitadel/flows/` files
   that `zitadel deploy` publishes or through the API, and they are stored in
-  the project/team configuration hierarchy. The server selects the matching
-  definition from the purpose and audience when a flow starts with
-  `createFlow` (`POST /flows`).
+  the project/team configuration hierarchy. When a flow starts with
+  `createFlow` (`POST /flows`), the server runs the definition the request
+  names, or else the newest pinned definition that serves the purpose.
 additionalProperties: false
 properties:
   "$schema":
@@ -81,11 +81,6 @@ properties:
       type: string
     example:
       login: identify
-
-  audience:
-    $ref: flow-audience.yaml
-    example:
-      app_ids: [ app_saas ]
 
   steps:
     type: array

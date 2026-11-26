@@ -809,12 +809,6 @@ func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
 		return service.ResolveFlowHint{}
 	}
 	out := service.ResolveFlowHint{}
-	if v, ok := h.AppID.Get(); ok {
-		out.AppID = &v
-	}
-	if v, ok := h.TeamID.Get(); ok {
-		out.TeamID = &v
-	}
 	if v, ok := h.UserSchemaID.Get(); ok {
 		out.UserSchemaID = &v
 	}

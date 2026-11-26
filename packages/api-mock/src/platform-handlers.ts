@@ -590,18 +590,14 @@ function bearerToken(request: Request): string {
  * Build a `flow-definition-response` envelope around a stored body, as
  * specified by `api/openapi/components/flows/flow-definition-response.yaml`.
  * Every read serves this — list included, which is the point of #939.
- * The Go server unconditionally echoes an `audience` (empty `{}` when the
- * stored flow has none — `internal/api/flow_definition.go`); mirror that so
- * consumers exercise the same wire shape the live server produces.
  */
 function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
     id: r.id,
     project_id: r.projectId,
-    flow_definition: {
-      audience: {},
-      ...serverCanonicalFlow(r.body as Record<string, unknown>),
-    } as unknown as GetFlowDefinition200["flow_definition"],
+    flow_definition: serverCanonicalFlow(
+      r.body as Record<string, unknown>,
+    ) as unknown as GetFlowDefinition200["flow_definition"],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;

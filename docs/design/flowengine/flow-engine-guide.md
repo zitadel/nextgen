@@ -393,43 +393,29 @@ A single flow definition can serve **multiple purposes** by declaring different 
 }
 ```
 
-Or you can have separate definitions for each purpose. The flow engine resolves which definition to use based on purpose + audience context.
+Or you can have separate definitions for each purpose. The flow engine resolves which definition to use from the purpose, or from the name the client passes.
 
 ---
 
-## Audience and Resolution
+## Resolution
 
-When a flow starts, the server resolves which definition to use:
+When a flow starts without `flow_definition_name`, the server resolves which definition to use:
 
 ```mermaid
 flowchart TD
-    req["Flow request:<br>purpose=login<br>team_id=acme<br>app_id=dashboard"]
+    req["Flow request:<br>purpose=login"]
     filter["Filter: pinned definitions<br>whose purposes has an entry for 'login'"]
     schema["If set, hard-filter by<br>user_schema_id"]
-    match["Score audience:<br>app match > team match > project-wide > other scoped"]
-    pick["Pick highest score<br>tie-break by created_at, then id"]
+    pick["Pick the newest created_at<br>tie-break by id"]
     missing["No candidate → flow_definition.not_found"]
 
-    req --> filter --> schema --> match --> pick
+    req --> filter --> schema --> pick
     pick -->|found| use["Use matched definition"]
     pick -->|none| missing
 ```
 
-A definition's **audience** scopes where it applies:
-
-```json
-{
-  "audience": {
-    "team_ids": ["team_acme"],
-    "app_ids": ["app_dashboard"]
-  }
-}
-```
-
-- A matching `app_id` is the most specific, followed by a matching `team_id`, then a project-wide definition.
-- An empty audience means "project default" — matches everything inside the project.
-- Equal scores prefer the newest `created_at`, then the highest ID; there is no `priority` field.
-- Audience hints are routing suggestions, not a security boundary. If no matching or project-wide definition exists, a definition scoped to another app or team can still be selected at the lowest score.
+- The newest pinned definition serving the purpose is the project default; there is no `priority` field.
+- A client that must keep a specific definition passes its name as `flow_definition_name`.
 - Project creation persists the shipped default definition normally; the resolver does not synthesize a fallback when no candidate exists.
 
 ---

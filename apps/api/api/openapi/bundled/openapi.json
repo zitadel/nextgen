@@ -1941,7 +1941,7 @@
       "post": {
         "operationId": "createFlow",
         "summary": "Start a flow",
-        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flows/{flow_id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`, including when the project lists no origins.\n  Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to a listed origin or a live preview answers `409`\n  with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added\n  since the last deploy serves nothing until the next one.\n- A loopback origin the project does not list answers `409` with\n  `rel.not_deployed` too, as no deployment can name it. Add it with\n  `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check, and so does the server's own\norigin, from which its console previews a project's login. Both are served\nthe project's newest primary deployment unless the project lists that\norigin; with no primary deployment they answer `409` with\n`rel.no_default`. A loopback origin passes the check and is its own\ntarget. A step submitted from the server's own origin is still refused\nunless the project lists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flows/{flow_id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
+        "description": "Starts a flow: resolves a flow definition from the request's purpose and\noptional name, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flows/{flow_id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`, including when the project lists no origins.\n  Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to a listed origin or a live preview answers `409`\n  with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added\n  since the last deploy serves nothing until the next one.\n- A loopback origin the project does not list answers `409` with\n  `rel.not_deployed` too, as no deployment can name it. Add it with\n  `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check, and so does the server's own\norigin, from which its console previews a project's login. Both are served\nthe project's newest primary deployment unless the project lists that\norigin; with no primary deployment they answer `409` with\n`rel.no_default`. A loopback origin passes the check and is its own\ntarget. A step submitted from the server's own origin is still refused\nunless the project lists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flows/{flow_id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
         "tags": [
           "Flows"
         ],
@@ -4510,7 +4510,7 @@
       "post": {
         "operationId": "publishFlowDefinition",
         "summary": "Publish a flow definition",
-        "description": "Publishes a new revision of a flow definition, creating the flow definition\non its first publish. It records a `flowdef.created` event.\n\nA [flow definition](/docs/concepts/flows-and-schemas) is a template that\ndefines the sequence of steps (capabilities) for one user journey, such as\nregistration, login or password reset. The body follows the flow\ndefinition schema, which includes the flow's purpose, audience and steps.\n\nEvery call allocates a new opaque ID. That `id` is the `revision_id` a\nrelease pins for `kind: flow_definition`.\n\nRevisions of one flow share its `name`. Posting a definition under an\nexisting `name` publishes a new revision of that flow, which is not a\nconflict. List with `name` to see a flow's revisions, newest by creation\ntime first.\n",
+        "description": "Publishes a new revision of a flow definition, creating the flow definition\non its first publish. It records a `flowdef.created` event.\n\nA [flow definition](/docs/concepts/flows-and-schemas) is a template that\ndefines the sequence of steps (capabilities) for one user journey, such as\nregistration, login or password reset. The body follows the flow\ndefinition schema, which includes the flow's purposes and steps.\n\nEvery call allocates a new opaque ID. That `id` is the `revision_id` a\nrelease pins for `kind: flow_definition`.\n\nRevisions of one flow share its `name`. Posting a definition under an\nexisting `name` publishes a new revision of that flow, which is not a\nconflict. List with `name` to see a flow's revisions, newest by creation\ntime first.\n",
         "tags": [
           "Flow Definitions"
         ],
@@ -14746,17 +14746,9 @@
             "type": "string",
             "description": "Submits the identifier step automatically. Maps to the OIDC `login_hint`."
           },
-          "team_id": {
-            "type": "string",
-            "description": "Scopes flow resolution to a team."
-          },
           "user_schema_id": {
             "type": "string",
             "description": "Scopes to a specific user type, the `objectType` of a user schema."
-          },
-          "app_id": {
-            "type": "string",
-            "description": "Scopes to a specific application."
           }
         }
       },
@@ -14787,7 +14779,7 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
             "x-zitadel-pattern-message": "must start with a lowercase letter and use only lowercase letters, digits and -",
-            "description": "Name of a specific flow definition to use.\nWhen omitted, the server selects the best-matching definition\nbased on purpose + audience context.\n",
+            "description": "Name of a specific flow definition to use.\nWhen omitted, the server runs the newest definition the release pins\nthat serves `purpose`.\n",
             "example": "custom-login"
           },
           "dry_run": {
@@ -15773,7 +15765,7 @@
           },
           "branding": {
             "$ref": "#/components/schemas/branding",
-            "description": "Resolved branding inherited from the app → team → project hierarchy.\nDetermined at flow creation based on audience context. Does not change between steps.\n"
+            "description": "The branding the project's deployed release pins.\nDoes not change between steps.\n"
           },
           "redirect_uri": {
             "type": "string",
@@ -18550,35 +18542,6 @@
           }
         ]
       },
-      "flow-audience": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Scopes which teams or apps this flow definition applies to. Empty or\nomitted fields mean \"no restriction\"; when both are empty the definition\nmatches every request in the project. The server picks the most specific\nmatching definition: app > team > project-wide.\n",
-        "properties": {
-          "team_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Restrict to specific teams (organizations). Empty means no team restriction.",
-            "uniqueItems": true,
-            "example": [
-              "team_acme"
-            ]
-          },
-          "app_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Restrict to specific applications. Empty means no app restriction.",
-            "uniqueItems": true,
-            "example": [
-              "app_saas"
-            ]
-          }
-        }
-      },
       "step-action": {
         "type": "object",
         "required": [
@@ -19036,7 +18999,7 @@
           "purposes",
           "steps"
         ],
-        "description": "A flow definition is the configuration of one flow: the sequence of screens\nthe login component (`<zitadel-login>`) walks a user through to sign in,\nregister, recover access or similar. Each screen is a step. A step collects\nfields (inputs taken from properties of the user schema), offers actions\n(what the user can do, such as submit the form or follow a link) and may\nrequire gates (security checks, such as a captcha, that must pass before the\nserver accepts the submission). Transitions say which step follows each\naction.\n\nThe definition is server-side configuration and is never sent to the\nfrontend. The server evaluates it and returns the current step, with its\nfields, actions and gates, to the client.\n\nAdministrators create flow definitions, either as `.zitadel/flows/` files\nthat `zitadel deploy` publishes or through the API, and they are stored in\nthe project/team configuration hierarchy. The server selects the matching\ndefinition from the purpose and audience when a flow starts with\n`createFlow` (`POST /flows`).\n",
+        "description": "A flow definition is the configuration of one flow: the sequence of screens\nthe login component (`<zitadel-login>`) walks a user through to sign in,\nregister, recover access or similar. Each screen is a step. A step collects\nfields (inputs taken from properties of the user schema), offers actions\n(what the user can do, such as submit the form or follow a link) and may\nrequire gates (security checks, such as a captcha, that must pass before the\nserver accepts the submission). Transitions say which step follows each\naction.\n\nThe definition is server-side configuration and is never sent to the\nfrontend. The server evaluates it and returns the current step, with its\nfields, actions and gates, to the client.\n\nAdministrators create flow definitions, either as `.zitadel/flows/` files\nthat `zitadel deploy` publishes or through the API, and they are stored in\nthe project/team configuration hierarchy. When a flow starts with\n`createFlow` (`POST /flows`), the server runs the definition the request\nnames, or else the newest pinned definition that serves the purpose.\n",
         "additionalProperties": false,
         "properties": {
           "$schema": {
@@ -19078,14 +19041,6 @@
             },
             "example": {
               "login": "identify"
-            }
-          },
-          "audience": {
-            "$ref": "#/components/schemas/flow-audience",
-            "example": {
-              "app_ids": [
-                "app_saas"
-              ]
             }
           },
           "steps": {
@@ -24211,23 +24166,6 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
-            }
-          },
-          "audience": {
-            "type": "object",
-            "properties": {
-              "app_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "team_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
             }
           }
         }

@@ -2,8 +2,8 @@
  * Canonical-form normalizers for the repo-config resource kinds.
  *
  * The sync engine compares `.zitadel/**` files against server responses;
- * the server echoes fields the author never wrote (an empty `audience`
- * on flows, a connection's `pkce_enabled`) and leaves out others it holds
+ * the server echoes fields the author never wrote (a connection's
+ * `pkce_enabled`) and leaves out others it holds
  * as defaults (an action's `primary: false`), and the meta-schemas declare
  * defaults an author may or may not spell out (`x-audit` on schema
  * properties). Normalizing both sides before hashing or diffing keeps a
@@ -76,24 +76,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * An `audience` counts as empty when it scopes nothing: no keys, or only
- * `team_ids`/`app_ids` that are null or empty arrays. Unknown keys keep
- * the audience — better a noisy diff than a silently dropped scope.
- */
-function isEmptyAudience(value: unknown): boolean {
-  if (!isPlainObject(value)) {
-    return false;
-  }
-  return Object.entries(value).every(
-    ([key, entry]) =>
-      (key === "team_ids" || key === "app_ids") &&
-      (entry === null || entry === undefined || (Array.isArray(entry) && entry.length === 0)),
-  );
-}
-
-/**
  * Return a deep copy of a bare flow-definition body with server-echoed
- * noise removed: an empty `audience` and any detail-envelope keys. A
+ * noise removed: any detail-envelope keys. A
  * top-level `$schema` is stripped too — it is a local editor affordance
  * (scaffolded flow files point it at `.zitadel/meta/flow-definition.json`),
  * never part of the resource: the server skips it on decode and omits it
@@ -108,9 +92,6 @@ export function normalizeFlowBody(body: object): object {
     delete result[key];
   }
   delete result.$schema;
-  if ("audience" in result && isEmptyAudience(result.audience)) {
-    delete result.audience;
-  }
   if (Array.isArray(result.steps)) {
     for (const step of result.steps.filter(isPlainObject)) {
       stripDefaults(step, FLOW_STEP_DEFAULTS);

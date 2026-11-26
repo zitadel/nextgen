@@ -19187,8 +19187,8 @@ type CreateFlowRequest struct {
 	ProjectID ProjectID `json:"project_id"`
 	// What the user is doing. It selects the entry step the flow definition lists for this purpose.
 	Purpose CreateFlowRequestPurpose `json:"purpose"`
-	// Name of a specific flow definition to use. When omitted, the server selects the best-matching
-	// definition based on purpose + audience context.
+	// Name of a specific flow definition to use. When omitted, the server runs the newest definition the
+	// release pins that serves `purpose`.
 	FlowDefinitionName OptString `json:"flow_definition_name"`
 	// Set to true to simulate the flow without actually creating any user or session. Useful for testing
 	// and validation of flow definitions. This requires setting the `flow_definition_name` property as
@@ -31456,37 +31456,6 @@ func (s *FinishUserPasskeyRegistrationResponse) SetCreatedAt(val time.Time) {
 
 func (*FinishUserPasskeyRegistrationResponse) completeUserPasskeyRegistrationRes() {}
 
-// Scopes which teams or apps this flow definition applies to. Empty or omitted fields mean "no
-// restriction"; when both are empty the definition matches every request in the project. The server
-// picks the most specific matching definition: app > team > project-wide.
-// Ref: #
-type FlowAudience struct {
-	// Restrict to specific teams (organizations). Empty means no team restriction.
-	TeamIds []string `json:"team_ids"`
-	// Restrict to specific applications. Empty means no app restriction.
-	AppIds []string `json:"app_ids"`
-}
-
-// GetTeamIds returns the value of TeamIds.
-func (s *FlowAudience) GetTeamIds() []string {
-	return s.TeamIds
-}
-
-// GetAppIds returns the value of AppIds.
-func (s *FlowAudience) GetAppIds() []string {
-	return s.AppIds
-}
-
-// SetTeamIds sets the value of TeamIds.
-func (s *FlowAudience) SetTeamIds(val []string) {
-	s.TeamIds = val
-}
-
-// SetAppIds sets the value of AppIds.
-func (s *FlowAudience) SetAppIds(val []string) {
-	s.AppIds = val
-}
-
 // Merged schema.
 // Ref: #
 type FlowCompleted struct {
@@ -31657,9 +31626,9 @@ func (s *FlowCookieInvalidDetails) init() FlowCookieInvalidDetails {
 // it and returns the current step, with its fields, actions and gates, to the client.
 //
 // Administrators create flow definitions, either as `.zitadel/flows/` files that `zitadel deploy`
-// publishes or through the API, and they are stored in the project/team configuration hierarchy. The
-// server selects the matching definition from the purpose and audience when a flow starts with
-// `createFlow` (`POST /flows`).
+// publishes or through the API, and they are stored in the project/team configuration hierarchy. When
+// a flow starts with `createFlow` (`POST /flows`), the server runs the definition the request names,
+// or else the newest pinned definition that serves the purpose.
 // Ref: #
 type FlowDefinition struct {
 	// Editor affordance: path or URL of this file's JSON meta-schema, so an editor validates and
@@ -31691,7 +31660,6 @@ type FlowDefinition struct {
 	//    the server does not run their journeys yet; `recovery` only asks a password field for a new
 	//    password.
 	Purposes FlowDefinitionPurposes `json:"purposes"`
-	Audience OptFlowAudience        `json:"audience"`
 	// The steps of this flow. The order is for human readability: transitions determine the actual step
 	// sequencing.
 	Steps []FlowDefinitionStep `json:"steps"`
@@ -31717,11 +31685,6 @@ func (s *FlowDefinition) GetPurposes() FlowDefinitionPurposes {
 	return s.Purposes
 }
 
-// GetAudience returns the value of Audience.
-func (s *FlowDefinition) GetAudience() OptFlowAudience {
-	return s.Audience
-}
-
 // GetSteps returns the value of Steps.
 func (s *FlowDefinition) GetSteps() []FlowDefinitionStep {
 	return s.Steps
@@ -31745,11 +31708,6 @@ func (s *FlowDefinition) SetUserSchema(val string) {
 // SetPurposes sets the value of Purposes.
 func (s *FlowDefinition) SetPurposes(val FlowDefinitionPurposes) {
 	s.Purposes = val
-}
-
-// SetAudience sets the value of Audience.
-func (s *FlowDefinition) SetAudience(val OptFlowAudience) {
-	s.Audience = val
 }
 
 // SetSteps sets the value of Steps.
@@ -32384,12 +32342,8 @@ func (s *FlowDefinitionStepTransitionsItemPurpose) UnmarshalText(data []byte) er
 type FlowHint struct {
 	// Submits the identifier step automatically. Maps to the OIDC `login_hint`.
 	LoginName OptString `json:"login_name"`
-	// Scopes flow resolution to a team.
-	TeamID OptString `json:"team_id"`
 	// Scopes to a specific user type, the `objectType` of a user schema.
 	UserSchemaID OptString `json:"user_schema_id"`
-	// Scopes to a specific application.
-	AppID OptString `json:"app_id"`
 }
 
 // GetLoginName returns the value of LoginName.
@@ -32397,19 +32351,9 @@ func (s *FlowHint) GetLoginName() OptString {
 	return s.LoginName
 }
 
-// GetTeamID returns the value of TeamID.
-func (s *FlowHint) GetTeamID() OptString {
-	return s.TeamID
-}
-
 // GetUserSchemaID returns the value of UserSchemaID.
 func (s *FlowHint) GetUserSchemaID() OptString {
 	return s.UserSchemaID
-}
-
-// GetAppID returns the value of AppID.
-func (s *FlowHint) GetAppID() OptString {
-	return s.AppID
 }
 
 // SetLoginName sets the value of LoginName.
@@ -32417,19 +32361,9 @@ func (s *FlowHint) SetLoginName(val OptString) {
 	s.LoginName = val
 }
 
-// SetTeamID sets the value of TeamID.
-func (s *FlowHint) SetTeamID(val OptString) {
-	s.TeamID = val
-}
-
 // SetUserSchemaID sets the value of UserSchemaID.
 func (s *FlowHint) SetUserSchemaID(val OptString) {
 	s.UserSchemaID = val
-}
-
-// SetAppID sets the value of AppID.
-func (s *FlowHint) SetAppID(val OptString) {
-	s.AppID = val
 }
 
 // Merged schema.
@@ -32761,8 +32695,7 @@ type FlowResponse struct {
 	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
 	SessionToken OptString `json:"session_token"`
 	Step         FlowStep  `json:"step"`
-	// Resolved branding inherited from the app → team → project hierarchy. Determined at flow creation
-	// based on audience context. Does not change between steps.
+	// The branding the project's deployed release pins. Does not change between steps.
 	Branding OptBranding `json:"branding"`
 	// Present when `step.complete` is `redirect`.
 	RedirectURI OptURI `json:"redirect_uri"`
@@ -35940,7 +35873,6 @@ type FlowdefPayload struct {
 	Name       OptString                 `json:"name"`
 	UserSchema OptString                 `json:"user_schema"`
 	Purposes   OptFlowdefPayloadPurposes `json:"purposes"`
-	Audience   OptFlowdefPayloadAudience `json:"audience"`
 }
 
 // GetName returns the value of Name.
@@ -35958,11 +35890,6 @@ func (s *FlowdefPayload) GetPurposes() OptFlowdefPayloadPurposes {
 	return s.Purposes
 }
 
-// GetAudience returns the value of Audience.
-func (s *FlowdefPayload) GetAudience() OptFlowdefPayloadAudience {
-	return s.Audience
-}
-
 // SetName sets the value of Name.
 func (s *FlowdefPayload) SetName(val OptString) {
 	s.Name = val
@@ -35976,36 +35903,6 @@ func (s *FlowdefPayload) SetUserSchema(val OptString) {
 // SetPurposes sets the value of Purposes.
 func (s *FlowdefPayload) SetPurposes(val OptFlowdefPayloadPurposes) {
 	s.Purposes = val
-}
-
-// SetAudience sets the value of Audience.
-func (s *FlowdefPayload) SetAudience(val OptFlowdefPayloadAudience) {
-	s.Audience = val
-}
-
-type FlowdefPayloadAudience struct {
-	AppIds  []string `json:"app_ids"`
-	TeamIds []string `json:"team_ids"`
-}
-
-// GetAppIds returns the value of AppIds.
-func (s *FlowdefPayloadAudience) GetAppIds() []string {
-	return s.AppIds
-}
-
-// GetTeamIds returns the value of TeamIds.
-func (s *FlowdefPayloadAudience) GetTeamIds() []string {
-	return s.TeamIds
-}
-
-// SetAppIds sets the value of AppIds.
-func (s *FlowdefPayloadAudience) SetAppIds(val []string) {
-	s.AppIds = val
-}
-
-// SetTeamIds sets the value of TeamIds.
-func (s *FlowdefPayloadAudience) SetTeamIds(val []string) {
-	s.TeamIds = val
 }
 
 type FlowdefPayloadPurposes map[string]string
@@ -65233,52 +65130,6 @@ func (o OptFloat64) Or(d float64) float64 {
 	return d
 }
 
-// NewOptFlowAudience returns new OptFlowAudience with value set to v.
-func NewOptFlowAudience(v FlowAudience) OptFlowAudience {
-	return OptFlowAudience{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowAudience is optional FlowAudience.
-type OptFlowAudience struct {
-	Value FlowAudience
-	Set   bool
-}
-
-// IsSet returns true if OptFlowAudience was set.
-func (o OptFlowAudience) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowAudience) Reset() {
-	var v FlowAudience
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowAudience) SetTo(v FlowAudience) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowAudience) Get() (v FlowAudience, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowAudience) Or(d FlowAudience) FlowAudience {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptFlowCompletedDetails returns new OptFlowCompletedDetails with value set to v.
 func NewOptFlowCompletedDetails(v FlowCompletedDetails) OptFlowCompletedDetails {
 	return OptFlowCompletedDetails{
@@ -66883,52 +66734,6 @@ func (o OptFlowdefNotFoundDetails) Get() (v FlowdefNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowdefNotFoundDetails) Or(d FlowdefNotFoundDetails) FlowdefNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowdefPayloadAudience returns new OptFlowdefPayloadAudience with value set to v.
-func NewOptFlowdefPayloadAudience(v FlowdefPayloadAudience) OptFlowdefPayloadAudience {
-	return OptFlowdefPayloadAudience{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowdefPayloadAudience is optional FlowdefPayloadAudience.
-type OptFlowdefPayloadAudience struct {
-	Value FlowdefPayloadAudience
-	Set   bool
-}
-
-// IsSet returns true if OptFlowdefPayloadAudience was set.
-func (o OptFlowdefPayloadAudience) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowdefPayloadAudience) Reset() {
-	var v FlowdefPayloadAudience
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowdefPayloadAudience) SetTo(v FlowdefPayloadAudience) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowdefPayloadAudience) Get() (v FlowdefPayloadAudience, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowdefPayloadAudience) Or(d FlowdefPayloadAudience) FlowdefPayloadAudience {
 	if v, ok := o.Get(); ok {
 		return v
 	}

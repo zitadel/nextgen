@@ -740,3 +740,8 @@ ADR 081 is amended separately. Its follow-up must change:
 ADR 037's introspection note, that introspection needs a stored token or
 token id, is amended by step 5 here: the server answers from the JWT and the
 consent and revocation state.
+
+## Amendment (2026-11-24): flow definitions carry no audience
+
+Flow definitions no longer carry an `audience`: of the two names for an
+application's slug above, only branding's remains.

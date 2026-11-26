@@ -78,7 +78,7 @@ change to `user_schema` and reaches sign-in with the next `deploy`; one that
 removes or renames a property a step collects needs that step's `fields`
 updated, and `deploy` checks each flow against the schema it names. A login
 pinned by `flow-name` serves the revision of that flow the release pins; an
-unpinned login serves the newest unscoped flow the release pins for its
+unpinned login serves the newest flow the release pins for its
 purpose, whatever its name. Removing a flow file leaves it out of the next
 release. Operation policies live in `.zitadel/policies/`: one `<operation>.json`
 per guarded operation, named after its `operation`, holding

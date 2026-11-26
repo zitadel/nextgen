@@ -22,10 +22,9 @@ to be a fast answer to "can I build flow X right now?"
 ### Resolution
 
 - Direct lookup by `name` (with optional `schema_version`). Multiple matches resolve via `pickLatestFlowVersion` — a lexicographic compare over `schema_version` strings (see [Missing → Resolution](#resolution-1)).
-- Audience-based resolution by `purpose` over the revisions the release pins:
-  `user_schema_id` is a hard filter, then candidates score app match > team
-  match > project-wide > a definition scoped elsewhere. Equal scores prefer
-  newer `created_at`, then the higher ID.
+- Resolution by `purpose` over the revisions the release pins:
+  `user_schema_id` is a hard filter, then the newest `created_at` wins, then
+  the higher ID.
 - Fails with `ErrFlowDefinitionPurposeMismatch` when a name-resolved definition doesn't serve the requested purpose.
 
 ### Definitions

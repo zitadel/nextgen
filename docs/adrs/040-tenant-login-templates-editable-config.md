@@ -265,3 +265,10 @@ meta-schema accepts either the string or the reference, and the CLI replaces
 any `$file` reference with the file's content before upload and writes the
 published value back to the file. The on-disk layout and the round-trip are
 unchanged; only the key is.
+
+## Amendment (2026-11-24): flow definitions carry no audience
+
+Flow definitions no longer carry an `audience`: a flow without a name runs
+the newest definition its release pins for the purpose, and resolution by
+name is unchanged. The app/team overrides named above stay future work for
+branding only.

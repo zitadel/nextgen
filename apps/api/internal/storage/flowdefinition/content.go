@@ -14,13 +14,7 @@ import (
 type Content struct {
 	UserSchema string            `json:"user_schema"`
 	Purposes   map[string]string `json:"purposes"`
-	Audience   AudienceJSON      `json:"audience"`
 	Steps      []StepJSON        `json:"steps"`
-}
-
-type AudienceJSON struct {
-	AppIDs  []string `json:"app_ids,omitempty"`
-	TeamIDs []string `json:"team_ids,omitempty"`
 }
 
 type StepJSON struct {
@@ -98,11 +92,7 @@ func Marshal(def *domain.FlowDefinition) ([]byte, error) {
 	return json.Marshal(Content{
 		UserSchema: def.UserSchema,
 		Purposes:   purposes,
-		Audience: AudienceJSON{
-			AppIDs:  def.Audience.AppIDs,
-			TeamIDs: def.Audience.TeamIDs,
-		},
-		Steps: steps,
+		Steps:      steps,
 	})
 }
 
@@ -223,11 +213,7 @@ func contentToDomain(
 		UpdatedAt:     updatedAt,
 		UserSchema:    content.UserSchema,
 		Purposes:      purposes,
-		Audience: domain.FlowDefinitionAudience{
-			AppIDs:  content.Audience.AppIDs,
-			TeamIDs: content.Audience.TeamIDs,
-		},
-		Steps: steps,
+		Steps:         steps,
 	}, nil
 }
 

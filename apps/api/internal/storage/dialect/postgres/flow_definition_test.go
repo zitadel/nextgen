@@ -30,9 +30,6 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		Purposes: map[domain.FlowDefinitionPurpose]string{
 			domain.FlowDefinitionPurposeLogin: "identifier",
 		},
-		Audience: domain.FlowDefinitionAudience{
-			AppIDs: []string{"app-1"},
-		},
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identifier",
@@ -66,7 +63,6 @@ func TestFlowDefinitionStatements_CreateAndGet(t *testing.T) {
 	assert.Equal(t, def.SchemaVersion, got.SchemaVersion)
 	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.Equal(t, def.Purposes, got.Purposes)
-	assert.Equal(t, def.Audience.AppIDs, got.Audience.AppIDs)
 	assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
 	assert.WithinDuration(t, time.Now(), got.UpdatedAt, 5*time.Second)
 }
