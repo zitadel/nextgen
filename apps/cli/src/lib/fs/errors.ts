@@ -55,4 +55,19 @@ export class FsFailedError extends FsError {
   override readonly category: ErrorCategory = "unknown";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The code Node reported, such as `ELOOP`, for a reason a report shows. */
+  readonly errno: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the path it is about.
+   * @param errno - The code Node reported.
+   * @param cause - Node's own error.
+   */
+  constructor(message: string, errno: string, cause?: unknown) {
+    super(message, cause);
+    this.errno = errno;
+  }
 }

@@ -96,8 +96,15 @@ function fsFailure(error: unknown, operation: string, path: unknown): unknown {
   if (isErrno(error, "EEXIST")) {
     return new FsExistsError(message, error);
   }
-  if (error instanceof Error && "code" in error && typeof error.code === "string") {
-    return new FsFailedError(`${message} (${error.code})`, error);
+  // Only a failure of the system call itself: Node's own argument errors
+  // (`ERR_*`) are bugs in the caller and stay as they are.
+  if (
+    error instanceof Error &&
+    "syscall" in error &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return new FsFailedError(`${message} (${error.code})`, error.code, error);
   }
   return error;
 }

@@ -4,6 +4,7 @@ import semver from "semver";
 
 import {
   FsDeniedError,
+  FsFailedError,
   FsError,
   FsIsDirectoryError,
   FsNotDirectoryError,
@@ -228,6 +229,9 @@ export class SchemaWriter {
     }
     if (error instanceof FsNotDirectoryError) {
       return "ENOTDIR";
+    }
+    if (error instanceof FsFailedError) {
+      return error.errno;
     }
     return String(error);
   }
