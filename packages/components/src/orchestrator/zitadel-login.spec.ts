@@ -1008,6 +1008,36 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(errors).toEqual(["Translations unavailable"]);
   });
 
+  it("clears a failed load's error once a later load succeeds", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    let reads = 0;
+    element.locales = new Proxy(
+      {},
+      {
+        get() {
+          reads += 1;
+          if (reads === 1) {
+            throw new Error("Translations unavailable");
+          }
+          return undefined;
+        },
+      },
+    );
+    host.appendChild(element);
+    await element.updateComplete;
+    expect(element.shadowRoot!.querySelector("zl-alert")).not.toBeNull();
+    element.locales = {};
+    await element.updateComplete;
+
+    await waitFor(() =>
+      expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
+        en["identifier.title"],
+      ),
+    );
+  });
+
   it("renders a tenant template in the new language after lang changes", async () => {
     applyBranding({
       liquid_template: '<p data-testid="tenant-title">{{ "identifier.title" | t }}</p>',

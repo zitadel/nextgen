@@ -11,7 +11,7 @@ import {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
-import { Task } from "@lit/task";
+import { Task, TaskStatus } from "@lit/task";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { property } from "../internal/property.js";
@@ -467,7 +467,8 @@ export class ZitadelLogin extends ZitadelSurface {
    * (the translation the page shows, the engine, and DOMPurify where the
    * browser has no `setHTML()`), all three at once. The loader shows until they
    * are there, a change of `lang` or `locales` loads them again, and a load that
-   * fails (a chunk gone after a deploy, say) shows the startup error.
+   * fails (a chunk gone after a deploy, say) shows its error until a later
+   * load succeeds ({@link loadError}).
    */
   private readonly rendering = new Task(this, {
     args: () => [this.resolveLanguage(), this.locales] as const,
@@ -480,8 +481,19 @@ export class ZitadelLogin extends ZitadelSurface {
       ]);
       return { translations: loaded, engine, sanitiser };
     },
-    onError: (error) => this.handleTransportError(error),
+    onError: (error) => this.reportError(error),
   });
+
+  /**
+   * Why the last load of what the page renders with failed, while that is the
+   * latest load: the task's own status, so switching back to a language that
+   * loads clears it without touching the flow's {@link startupError}.
+   *
+   * @returns The message, or `null` when the last load did not fail.
+   */
+  private get loadError(): string | null {
+    return this.rendering.status === TaskStatus.ERROR ? errorMessage(this.rendering.error) : null;
+  }
 
   /**
    * The theme the last commit rendered with. The template output carries the
@@ -818,7 +830,8 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   override render() {
-    if (this.startupError) {
+    const startupError = this.startupError ?? this.loadError;
+    if (startupError) {
       // Same chrome a step renders into (page shell + card), because this is
       // still the login surface — just one that could not start. Without the
       // shell the alert lands bare in the top-left corner of an otherwise
@@ -828,7 +841,7 @@ export class ZitadelLogin extends ZitadelSurface {
       return html`<form class="zl-mount" novalidate>
         <zl-page-shell>
           <zl-card>
-            <zl-alert severity="error">${this.startupError}</zl-alert>
+            <zl-alert severity="error">${startupError}</zl-alert>
           </zl-card>
         </zl-page-shell>
       </form>`;
@@ -2080,18 +2093,37 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private handleTransportError(error: unknown): void {
-    // For API rejections, prefer the server's error-envelope message (e.g.
-    // which origins a project allows) over the generic "POST … returned N".
-    const message =
-      error instanceof ApiError
-        ? apiErrorMessage(error)
-        : error instanceof Error
-          ? error.message
-          : "Unexpected error contacting the Flow API.";
-    this.startupError = message;
+    this.startupError = this.reportError(error);
+  }
+
+  /**
+   * Logs an error and announces it with `zitadel-flow-error`.
+   *
+   * @param error - What was thrown.
+   * @returns The message shown for it.
+   */
+  private reportError(error: unknown): string {
+    const message = errorMessage(error);
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
+    return message;
   }
+}
+
+/**
+ * The message shown for an error. For API rejections it prefers the server's
+ * error-envelope message (such as which origins a project allows) over the
+ * generic "POST … returned N".
+ *
+ * @param error - What was thrown.
+ * @returns The message.
+ */
+function errorMessage(error: unknown): string {
+  return error instanceof ApiError
+    ? apiErrorMessage(error)
+    : error instanceof Error
+      ? error.message
+      : "Unexpected error contacting the Flow API.";
 }
 
 /**
