@@ -90,6 +90,7 @@ export {
   ZitadelConfigFlowMethodInUseError,
   ZitadelConfigFlowUncheckedError,
   ZitadelConfigInternalError,
+  ZitadelConfigSchemaExternalError,
   ZitadelConfigNothingToDeployError,
   ZitadelConfigPathUnreadableError,
   ZitadelConfigProviderFileTakenError,

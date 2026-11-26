@@ -84,6 +84,9 @@ const NO_FREE_PORT_REFUSAL = {
       flags: { port: 9080 },
     },
   ],
+  details: {
+    first_port: "{firstPort}",
+  },
 } as const satisfies Refusal;
 
 /** How a start is refused when the server it launched did not become ready. */
@@ -98,6 +101,9 @@ const SERVER_NOT_READY_REFUSAL = {
       flags: { force: true },
     },
   ],
+  details: {
+    server_url: "{serverUrl}",
+  },
 } as const satisfies Refusal;
 
 /** How a start is refused when the server it had to replace would not stop. */

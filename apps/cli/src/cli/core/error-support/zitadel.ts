@@ -36,6 +36,7 @@ import {
   ZitadelConfigRegionUneditableError,
   ZitadelConfigRenameActionClashError,
   ZitadelConfigRenameRouteLossError,
+  ZitadelConfigSchemaExternalError,
   ZitadelConfigResourceClashError,
   ZitadelConfigResourceMissingError,
   ZitadelConfigSchemaAmbiguousError,
@@ -284,6 +285,9 @@ const SCHEMA_AMBIGUOUS_REFUSAL = {
 /** How {@link ZitadelConfigEditLockoutError} is refused. */
 const EDIT_LOCKOUT_REFUSAL = {
   message: "{message}",
+  details: {
+    file: "{path}",
+  },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigFileExistsError} is refused. */
@@ -298,6 +302,10 @@ const FILE_EXISTS_REFUSAL = {
 /** How {@link ZitadelConfigConnectionExistsError} is refused. */
 const CONNECTION_EXISTS_REFUSAL = {
   message: "{message}",
+  hint: "A connection file is yours to keep, so it is never replaced or removed. Remove it to scaffold a fresh one, or keep it and enable the provider to reuse it.",
+  details: {
+    file: "{path}",
+  },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigFileUnreadableError} is refused. */
@@ -435,6 +443,12 @@ const DIRECTORY_IN_THE_WAY_REFUSAL = {
   },
 } as const satisfies Refusal;
 
+/** How {@link ZitadelConfigSchemaExternalError} is refused. */
+const SCHEMA_EXTERNAL_REFUSAL = {
+  message: "{message}",
+  hint: "Its sign-in methods live in the schema at its url, which the server fetches. Edit x-auth-methods there instead.",
+} as const satisfies Refusal;
+
 /** How {@link ZitadelConfigError} is refused. */
 const CONFIG_REFUSAL = {
   message: "{message}",
@@ -497,5 +511,6 @@ export const ZITADEL_WORDINGS: readonly Wording[] = [
   [ZitadelConfigPathOutsideError, PATH_OUTSIDE_REFUSAL],
   [ZitadelConfigPathBlockedError, PATH_BLOCKED_REFUSAL],
   [ZitadelConfigDirectoryInTheWayError, DIRECTORY_IN_THE_WAY_REFUSAL],
+  [ZitadelConfigSchemaExternalError, SCHEMA_EXTERNAL_REFUSAL],
   [ZitadelConfigError, CONFIG_REFUSAL],
 ];

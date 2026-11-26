@@ -78,6 +78,9 @@ const FILE_EXISTS_REFUSAL = {
   message: "{message}",
   hint: "Rerun with --force to replace it, or edit the existing file directly.",
   next: ["{again}"],
+  details: {
+    file: "{path}",
+  },
 } as const satisfies Refusal;
 
 /** Whether `value` names a design the CLI ships. */

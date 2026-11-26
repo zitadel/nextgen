@@ -721,6 +721,26 @@ export class ZitadelConfigReferenceUnreadableError extends ZitadelConfigFileUnre
   }
 }
 
+/** A schema whose sign-in methods live at its `url`, which a command cannot edit. */
+export class ZitadelConfigSchemaExternalError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The pointer file of the external schema. */
+  readonly file: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param file - The pointer file of the external schema.
+   */
+  constructor(file: string) {
+    super(`${file} points at an external schema`);
+    this.file = file;
+  }
+}
+
 /** A bug in this package: something that cannot happen unless the code is wrong. */
 export class ZitadelConfigInternalError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "fault";
