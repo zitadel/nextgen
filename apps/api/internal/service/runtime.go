@@ -22,8 +22,9 @@ type RuntimeResolution struct {
 	// Target is the project origin pattern that admitted Origin, "" when the
 	// request is served the newest primary deployment.
 	Target string
-	// Source is "origin" when a deployment to the exact origin answered, or
-	// "default" when the newest primary deployment did.
+	// Source is "origin" when a deployment to the exact origin answered,
+	// "pin" when the release the request pinned did, or "default" when the
+	// newest primary deployment did.
 	Source     string
 	Deployment *domain.Deployment
 	Release    *domain.Release
@@ -81,11 +82,24 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...strin
 // with no origin, and one from a console host the project does not list, is
 // served the newest primary deployment.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
+	return r.ResolvePinned(ctx, projectID, origin, "")
+}
+
+// ResolvePinned is Resolve for a request that may pin a release. A pin
+// selects among the deployments to the target the origin found: the request
+// runs on the newest deployment of that release there. It never admits an
+// origin, never reaches a release deployed only to another target, and a
+// pinned request with no target is refused rather than served the default.
+// releaseID "" pins nothing.
+func (r *RuntimeResolver) ResolvePinned(ctx context.Context, projectID, origin, releaseID string) (*RuntimeResolution, error) {
 	logger := getLoggingContext(ctx, "runtime").With(
 		slog.String("project_id", projectID),
 		slog.String("origin", strings.TrimSpace(origin)),
 	)
-	resolution, err := r.resolve(ctx, projectID, origin)
+	if releaseID != "" {
+		logger = logger.With(slog.String("pinned_release_id", releaseID))
+	}
+	resolution, err := r.resolve(ctx, projectID, origin, releaseID)
 	if err != nil {
 		// The parent carries project and origin to the boundary line, which logs
 		// the refusal once. The Origin captured where the error was made stays.
@@ -111,7 +125,7 @@ func (r *RuntimeResolver) ResolvePrimary(ctx context.Context, projectID string) 
 	return r.Resolve(ctx, projectID, "")
 }
 
-func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
+func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin, releaseID string) (*RuntimeResolution, error) {
 	stmts := r.v2Pool.Statements()
 	project, err := stmts.GetProjectByID(ctx, projectID)
 	if err != nil {
@@ -122,6 +136,9 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	}
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
+		if releaseID != "" {
+			return nil, errPinWithoutTarget(releaseID)
+		}
 		return r.resolutionForDefault(ctx, project, "")
 	}
 
@@ -132,7 +149,13 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	// The console's own origin, where the project lists none, is served the
 	// default; every other admitted origin its own target.
 	if matched.pattern == "" && r.isOwnOrigin(matched.origin) {
+		if releaseID != "" {
+			return nil, errPinWithoutTarget(releaseID)
+		}
 		return r.resolutionForDefault(ctx, project, matched.origin)
+	}
+	if releaseID != "" {
+		return r.resolutionForPin(ctx, project, matched, releaseID)
 	}
 
 	dep, err := r.deploymentOf(ctx, projectID, matched)
@@ -151,6 +174,43 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	}
 	return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
 		WithMessage(message)
+}
+
+// resolutionForPin serves the newest deployment of the pinned release to the
+// admitted origin. The release is read first, so an id the project does not
+// hold is not found whatever the origin, and a revoked one is refused before
+// its history is read.
+func (r *RuntimeResolver) resolutionForPin(ctx context.Context, project *domain.Project, matched *matchedOrigin, releaseID string) (*RuntimeResolution, error) {
+	release, err := r.releases.Get(ctx, project.ID, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	if release.Revoked() {
+		return nil, domain.ErrReleaseRevoked()
+	}
+	dep, err := newestDeploymentOfRelease(ctx, r.v2Pool.Statements(), project.ID, matched.origin, releaseID)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's deployments")
+	}
+	if dep == nil {
+		return nil, domain.ErrReleaseNotDeployed(domain.ReleaseReferenceDetails{Origin: matched.origin, Release: releaseID}).
+			WithMessage("release " + releaseID + " is not deployed to " + matched.origin + "; rebuild the app to pin the current release")
+	}
+	return &RuntimeResolution{
+		Project:    project,
+		Origin:     matched.origin,
+		Target:     matched.pattern,
+		Source:     "pin",
+		Deployment: dep,
+		Release:    release,
+	}, nil
+}
+
+// errPinWithoutTarget refuses a pin on a request that has no target of its
+// own: without an origin there is no deployment history to choose from.
+func errPinWithoutTarget(releaseID string) error {
+	return domain.ErrReleaseNotDeployed(domain.ReleaseReferenceDetails{Release: releaseID}).
+		WithMessage("release " + releaseID + " is pinned, but the request has no origin of the project to serve it on")
 }
 
 // resolutionForDefault serves the project's newest primary deployment.

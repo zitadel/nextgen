@@ -17,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 )
 
 // ownOrigin is the deployment's own origin the mocked resolver is built with.
@@ -477,4 +478,113 @@ func TestRuntimeResolver_Gate(t *testing.T) {
 	_, err = resolver.Gate(t.Context(), &domain.Project{ID: "proj_1"}, "https://app.acme.com")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)))
+}
+
+// A pin chooses among the deployments to the origin the gate admitted, from
+// the history rather than the live view, and is refused wherever it cannot.
+func TestRuntimeResolver_ResolvePinned(t *testing.T) {
+	const projectID = "proj_1"
+	const origin = "https://app.acme.com"
+	const pinned = "rel_pinned"
+	primary := &domain.Project{ID: projectID, Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}}}
+	historyOf := func(origin string) any {
+		return gomock.Eq(deployment.ListOptions(projectID, &origin, new(pinned), 1))
+	}
+
+	t.Run("serves the newest deployment of the pinned release to the origin", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(primary, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, pinned).Return(&domain.Release{ID: pinned, ProjectID: projectID}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), historyOf(origin)).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+				ID: "dep_pinned", ProjectID: projectID, ReleaseID: pinned,
+			}}}, nil)
+
+		got, err := resolver.ResolvePinned(t.Context(), projectID, origin, pinned)
+		require.NoError(t, err)
+		assert.Equal(t, "pin", got.Source)
+		assert.Equal(t, origin, got.Origin)
+		assert.Equal(t, origin, got.Target)
+		assert.Equal(t, "dep_pinned", got.Deployment.ID)
+		assert.Equal(t, pinned, got.Release.ID)
+	})
+
+	t.Run("pins on a live preview URL", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		previewURL := "https://branch-acme.vercel.app"
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID:      projectID,
+			Origins: []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}},
+		}, nil)
+		statements.EXPECT().GetPreview(gomock.Any(), projectID, previewURL).Return(&domain.Preview{
+			ProjectID: projectID, Origin: previewURL, ExpiresAt: time.Now().Add(time.Hour),
+		}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, pinned).Return(&domain.Release{ID: pinned, ProjectID: projectID}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), historyOf(previewURL)).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+				ID: "dep_first_push", ProjectID: projectID, ReleaseID: pinned,
+			}}}, nil)
+
+		got, err := resolver.ResolvePinned(t.Context(), projectID, previewURL, pinned)
+		require.NoError(t, err)
+		assert.Equal(t, "dep_first_push", got.Deployment.ID)
+	})
+
+	t.Run("a release never deployed to the origin is not deployed", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(primary, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, pinned).Return(&domain.Release{ID: pinned, ProjectID: projectID}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), historyOf(origin)).
+			Return(&database.ListResult[*domain.Deployment]{}, nil)
+
+		_, err := resolver.ResolvePinned(t.Context(), projectID, origin, pinned)
+		require.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Equal(t, domain.ReleaseReferenceDetails{Origin: origin, Release: pinned}, de.Details)
+	})
+
+	t.Run("a revoked release is refused before its history is read", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(primary, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, pinned).Return(&domain.Release{
+			ID: pinned, ProjectID: projectID, RevokedAt: new(time.Now()),
+		}, nil)
+
+		_, err := resolver.ResolvePinned(t.Context(), projectID, origin, pinned)
+		require.ErrorIs(t, err, domain.ErrReleaseRevoked())
+	})
+
+	t.Run("a release the project does not hold is not found", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(primary, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, pinned).Return(nil, domain.ErrReleaseNotFound())
+
+		_, err := resolver.ResolvePinned(t.Context(), projectID, origin, pinned)
+		require.ErrorIs(t, err, domain.ErrReleaseNotFound())
+	})
+
+	t.Run("the gate still refuses an origin the project does not admit", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(primary, nil)
+
+		_, err := resolver.ResolvePinned(t.Context(), projectID, "https://evil.example", pinned)
+		require.ErrorIs(t, err, domain.ErrProjectOriginNotAllowed(nil))
+	})
+
+	for name, requestOrigin := range map[string]string{
+		"a pin without an origin is refused":                  "",
+		"a pin from the console's unlisted origin is refused": ownOrigin,
+	} {
+		t.Run(name, func(t *testing.T) {
+			resolver, statements, _ := newMockedRuntimeResolver(t)
+			statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(primary, nil)
+
+			_, err := resolver.ResolvePinned(t.Context(), projectID, requestOrigin, pinned)
+			require.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
+			de, ok := errors.AsType[domain.Error](err)
+			require.True(t, ok)
+			assert.Equal(t, domain.ReleaseReferenceDetails{Release: pinned}, de.Details)
+		})
+	}
 }
