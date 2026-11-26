@@ -757,5 +757,21 @@ describe("InstallDependencies", () => {
         nextCommands: ["npm install"],
       });
     });
+
+    it.for([
+      ["the errno of a package manager that could not start", "ENOENT"],
+      ["the exit code of an install that failed", 1],
+    ] as const)("reports %s as the original code", async ([, status], { dir }) => {
+      await aProject(dir);
+      const run: Runner = async () => {
+        throw new PmCommandFailedError("npm install failed", status);
+      };
+
+      const error = await rejectionOf(() => {
+        return installWith(anInstallInput({ cwd: dir, run }));
+      });
+
+      expect(error).toMatchObject({ details: { original: { code: status } } });
+    });
   });
 });
