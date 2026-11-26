@@ -1,30 +1,47 @@
-import { getZitadelConfig } from "@zitadel/api/config";
+/**
+ * The browser entry of `@zitadel/sdk-next` for reading the signed-in user from a Client Component.
+ *
+ * It exposes {@link getSession}, which asks the server who is signed in through the same-origin
+ * proxy path. It works on any page, including routes the middleware `matcher` does not cover,
+ * where the server-side {@link server!auth | auth} cannot see the session. The result
+ * carries no session token.
+ *
+ * @module
+ */
+import { getZitadelConfig } from "@zitadel/sdk-core/config";
+import { ZitadelRuntimeError } from "@zitadel/sdk-core";
+import type { ZitadelGetSessionOptions as CoreGetSessionOptions } from "@zitadel/sdk-core/session";
+
 import { getSession as readSession } from "@zitadel/sdk-core/session";
 
-import type { ClientAuthResult } from "./types.js";
-
-/** Options for {@link getSession}. */
-export type GetSessionOptions = {
-  /**
-   * Proxy path the scaffolded request boundary forwards to the Zitadel
-   * backend. Defaults to the path from `configureZitadel()` when it has run
-   * on this page, else `"/__nextgen"` (the scaffold default).
-   */
-  proxyPath?: string;
-
-  /**
-   * The project this app signs its users in to. A session of another project
-   * reads as signed out. Defaults to the project from `configureZitadel()`
-   * when it has run on this page, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`. With
-   * none, nobody reads as signed in, as on the server.
-   */
-  projectId?: string;
-};
+import type { ZitadelClientAuthResult } from "./types.js";
 
 /**
- * `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, which Next.js inlines into client bundles
- * at build time. Read defensively: where it was not inlined, `process` may not
- * exist in the browser.
+ * Options for {@link getSession}.
+ *
+ * It is the type of `@zitadel/sdk-core`, so the shape lives in one place: `proxyPath` and
+ * `projectId`. Both fall back to the configuration of the page, so an app that calls
+ * `configureZitadel()` before the read can pass nothing.
+ *
+ * Next.js adds one fallback of its own. With no `projectId` option and no project from
+ * `configureZitadel()`, {@link getSession} reads `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, which Next.js
+ * inlines into the bundle at build time. With no project id from any source, nobody reads as
+ * signed in, the same as on the server, and the first call logs a warning.
+ *
+ * @example
+ * ```ts
+ * const options: ZitadelGetSessionOptions = { projectId: "296547382910273", proxyPath: "/auth-proxy" };
+ * ```
+ */
+export type ZitadelGetSessionOptions = CoreGetSessionOptions;
+
+/**
+ * Reads `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, which Next.js inlines into client bundles at build time.
+ *
+ * The read is defensive: where the variable was not inlined, `process` may not exist in the
+ * browser, and the access would throw.
+ *
+ * @returns The project id, or `undefined` when it is unset or `process` is missing.
  */
 function publicProjectId(): string | undefined {
   try {
@@ -36,81 +53,100 @@ function publicProjectId(): string | undefined {
 
 let warnedMissingProject = false;
 
-/** Says once per page why `getSession()` signs no one in: no project is known. */
+/**
+ * Warns once per page that no project id is known, which is why {@link getSession} signs no one
+ * in.
+ */
 function warnMissingProject(): void {
   if (warnedMissingProject) {
     return;
   }
   warnedMissingProject = true;
   console.warn(
-    "[nextgen] getSession(): no project id is known, so no session counts as signed in. " +
+    "[zitadel] getSession(): no project id is known, so no session counts as signed in. " +
       "Pass `projectId` (e.g. process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID) or call " +
       "configureZitadel() first.",
   );
 }
 
 /**
- * Reads the current session state from the browser — the supported way for
- * an app's own UI (header navigation, account menus) to know whether a user
- * is signed in and who they are.
+ * Reads the current session state from the browser, so an app's own UI knows whether a user is
+ * signed in and who they are.
  *
- * Fetches the same-origin `{proxyPath}/api/v1/sessions/me?project_id=…` with
- * credentials and `cache: "no-store"` — the same read the `<zitadel-session>`
- * card performs — so the answer is the server's, not a client-side guess.
- * Works on any page: unlike server-side `auth()`, it does not require the
- * route to be covered by the middleware `matcher` (only the proxy path itself
- * must be matched, which the scaffolded request boundary always does).
+ * Use it for chrome such as header navigation and account menus, and for any page the middleware
+ * `matcher` does not cover. It fetches the same-origin
+ * `{proxyPath}/api/v1/sessions/me?project_id=...` with credentials and `cache: "no-store"`, the
+ * same read the `<zitadel-session>` card performs, so the answer is the server's and not a
+ * client-side guess. Unlike server-side {@link server!auth | auth}, it does not require the
+ * route to be covered by the middleware `matcher`. Only the proxy path itself must be matched,
+ * which the scaffolded request boundary always does. It throws on the server, because there is no
+ * browser to read from. In a Server Component or Route Handler use
+ * {@link server!auth | auth}.
  *
- * A session counts only in the app's own project: `options.projectId`, else
- * the project of `configureZitadel()`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`.
- * With none of them, it reads as signed out without asking the server.
+ * A session counts only in the app's own project: `options.projectId`, else the project of
+ * `configureZitadel()`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`. With none of them it reads as
+ * signed out without asking the server. The result is the client-safe shape: `userId`,
+ * `identifier`, `identifierProperty` and `display`, with no token.
  *
- * - `200` with an authenticated user → `{ isAuthenticated: true, session }`
- *   with the client-safe identity (`userId`, `identifier`,
- *   `identifierProperty`, `display` — no token).
- * - `200` for an anonymous session, `401` with `auth.unauthorized`, `403`
- *   with `sess.project_mismatch`, or `404` with `sess.not_found` → signed out.
- *   The `403` answers a session of another project on the same server, and a
- *   `200` naming another project (from a server that predates the parameter)
- *   reads as signed out too.
- * - Any other response throws — including a framework's HTML 404 page from
- *   a misrouted proxy: a failing proxy is a misconfiguration and must not
- *   silently render as "signed out". Treat a rejection as "unknown" —
- *   distinct from signed-out — as the example does.
+ * How the response maps to a result:
  *
+ * - `200` with an authenticated user resolves to `{ isAuthenticated: true, session }`.
+ * - `200` for an anonymous session, `401` with `auth.unauthorized`, `403` with
+ *   `sess.project_mismatch`, and `404` with `sess.not_found` all resolve to signed out. The `403`
+ *   answers a session of another project on the same server. A `200` that names another project,
+ *   from a server that predates the `project_id` parameter, reads as signed out too.
+ * - Any other response rejects, including a framework's HTML 404 page from a misrouted proxy and
+ *   a `404 req.not_found` from a server that does not serve the API under `/api/v1`. A failing
+ *   proxy is a misconfiguration and must not silently render as signed out.
+ *
+ * Treat a rejection as "unknown", which is distinct from signed out, and render neutral chrome
+ * instead of a sign-in link, as the example does.
+ *
+ * Sign-in and sign-out both navigate in the scaffolded setup, so chrome that calls this function
+ * re-reads on the next page load. To react in place instead, listen for the widgets'
+ * `zitadel-signout` and `zitadel-flow-complete` events and read again.
+ *
+ * @param options - The proxy path and project id; see {@link ZitadelGetSessionOptions}.
+ * @returns The current {@link ZitadelClientAuthResult}.
+ * @throws A `ZitadelRuntimeError` with the code `E_ZITADEL_SESSION_NO_BROWSER` when called outside
+ * a browser, and when the server answers with an unexpected response.
+ *
+ * @example
  * ```tsx
  * "use client";
- * import { getSession, type ClientAuthResult } from "@zitadel/sdk-next/session";
+ * import { useEffect, useState } from "react";
+ * import { getSession, type ZitadelClientAuthResult } from "@zitadel/sdk-next/session";
  *
  * export function HeaderNav() {
- *   // undefined = not yet known — render neutral chrome, not "Sign in".
- *   const [auth, setAuth] = useState<ClientAuthResult>();
+ *   // undefined means not yet known: render neutral chrome, not "Sign in".
+ *   const [auth, setAuth] = useState<ZitadelClientAuthResult>();
  *   const [failed, setFailed] = useState(false);
  *   useEffect(() => {
- *     getSession({ projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID }).then(
- *       setAuth,
- *       () => setFailed(true),
+ *     getSession({ projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID }).then(setAuth, () =>
+ *       setFailed(true),
  *     );
  *   }, []);
- *   if (failed) return <span role="alert">Session unavailable</span>;
- *   if (!auth) return null;
- *   return auth.isAuthenticated
- *     ? <a href="/profile">{auth.session.display ?? auth.session.identifier ?? "Account"}</a>
- *     : <a href="/login">Sign in</a>;
+ *   if (failed) {
+ *     return <span role="alert">Session unavailable</span>;
+ *   }
+ *   if (!auth) {
+ *     return null;
+ *   }
+ *   return auth.isAuthenticated ? (
+ *     <a href="/profile">{auth.session.display ?? auth.session.identifier ?? "Account"}</a>
+ *   ) : (
+ *     <a href="/login">Sign in</a>
+ *   );
  * }
  * ```
- *
- * The transitions need no extra wiring in the scaffolded posture: sign-in
- * (`post-sign-in-url`) and sign-out (`post-sign-out-url`) both navigate, so
- * chrome re-reads on the next page load. To react in place instead, listen
- * for the widgets' `zitadel-signout` / `zitadel-flow-complete` events.
- *
- * @returns The current {@link ClientAuthResult}.
  */
-export async function getSession(options: GetSessionOptions = {}): Promise<ClientAuthResult> {
+export async function getSession(
+  options: ZitadelGetSessionOptions = {},
+): Promise<ZitadelClientAuthResult> {
   if (typeof window === "undefined") {
-    throw new Error(
-      "[nextgen] getSession() reads the session from the browser. " +
+    throw new ZitadelRuntimeError(
+      "E_ZITADEL_SESSION_NO_BROWSER",
+      "getSession() reads the session from the browser. " +
         "In Server Components and Route Handlers use auth() from @zitadel/sdk-next/server " +
         "(requires the route to be covered by the middleware matcher).",
     );
@@ -124,4 +160,8 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   return readSession({ proxyPath: options.proxyPath, projectId });
 }
 
-export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types.js";
+export type {
+  ZitadelClientAuthResult,
+  ZitadelClientAuthState,
+  ZitadelClientSession,
+} from "./types.js";

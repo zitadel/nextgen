@@ -15,7 +15,7 @@ Give colleagues `viewer`, `editor`, or `admin` access to a claimed project. Use 
 
 ### In the console
 
-Open Project Settings → **Members** → **Invite member**. Enter a name (a reminder for other admins, not matched to an account), choose `viewer`, `editor`, or `admin`, and create the invitation. Copy the one-shot link and share it out of band. The Invitations tab lists open invitations so you can replace or cancel them.
+Open Project Settings → **Members** → **Invite member**. Enter a name (a reminder for other admins, not matched to an account), choose `viewer`, `editor`, or `admin`, and create the invitation. Copy the one-shot link and send it to the recipient yourself in a private channel, such as a direct message. Anyone with the link can accept the role. The Invitations tab lists open invitations so you can regenerate their links or cancel them.
 
 When the recipient opens the link, the console's `/invitations/accept` page asks them to sign in or sign up on the platform project, then accept or decline. Accept grants the role.
 
@@ -31,7 +31,7 @@ For scripts and agents, add `--non-interactive --json`. The envelope's `data` ca
 
 ## Check, replace, or cancel invitations
 
-In the console, use Project Settings → Members → **Invitations**.
+In the console, use Project Settings → Members → **Invitations**. A row's menu lets you **Regenerate link** or cancel the invitation.
 
 With the CLI, list open invitations. Accepted ones are hidden by default:
 
@@ -39,7 +39,7 @@ With the CLI, list open invitations. Accepted ones are hidden by default:
 npx @zitadel/cli@latest invitation list
 ```
 
-`--status` is repeatable. Pass `--status accepted` to include accepted rows, or combine statuses such as `--status pending --status expired`.
+`--status` is repeatable. Pass `--status accepted` to include accepted rows, or combine statuses such as `--status pending --status expired`. Declined invitations have the status `rejected`; list them with `--status rejected`.
 
 Read one invitation (never returns the link):
 
@@ -55,7 +55,7 @@ Replace a lost, expired, or declined invitation. The new row keeps `journey_id` 
 npx @zitadel/cli@latest invitation create --replaces <invitation_id> --relation editor
 ```
 
-Cancel a pending or declined invitation. Accepted and expired invitations cannot be cancelled:
+Cancel a pending, expired, or declined invitation. Only accepted invitations cannot be cancelled:
 
 ```sh
 npx @zitadel/cli@latest invitation cancel <invitation_id>
@@ -124,10 +124,11 @@ Useful types: `invitation.created`, `invitation.accepted`, `invitation.rejected`
 | Error | Fix |
 | --- | --- |
 | `inv.project_unclaimed` / `grant.project_unclaimed` | Run `npx @zitadel/cli@latest claim`, or confirm local `setup --server local` attached the project. |
-| `inv.platform_required` | Enable the platform project (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true`, the default). |
+| `inv.platform_required` | Run the server with a platform project: set `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true`. Hosted cloud and `zitadel start` set it; a server you run yourself leaves it off. |
 | `inv.pending_limit` | The project has 100 pending unexpired invitations. Run `invitation list --status pending` and cancel unused ones. |
 | `inv.self_accept` / `inv.self_reject` | The creator cannot redeem their own link. Test with a second platform account, or cancel with `invitation cancel`. |
 | `inv.inviter_not_admin` | The creator lost `admin` before acceptance. Create a fresh invitation as a current admin, or with a project secret. |
 | `grant.already_exists` | Run `grant list` (expired grants still bind). Revoke with `grant delete <grant_id>`, then create again. |
-| `404` on cancel, replace, or redeem | The invitation was already accepted, expired (on cancel), or unknown. |
+| `404` on cancel or replace | The invitation was accepted or does not exist. The CLI refuses an accepted one before calling the API. Create a new invitation instead. |
+| `404` on redeem | The link is unknown, expired, already accepted or declined, or was cancelled or replaced. Ask a project admin for a new link. |
 | `proj.last_owner` / `team.owns_project` | Add another active owning-team member before deleting the last one, or move ownership before deactivating the team. |

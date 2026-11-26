@@ -1,9 +1,9 @@
-export { createNextgenMiddleware, getAuth } from "./runtime/server/middleware";
+export { createZitadelMiddleware, getAuth } from "./runtime/server/middleware";
 export type {
-  NextgenMiddlewareOptions,
-  AuthResult,
-  NextgenSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelMiddlewareOptions,
+  ZitadelAuthResult,
+  ZitadelAuthSession,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./runtime/types.js";

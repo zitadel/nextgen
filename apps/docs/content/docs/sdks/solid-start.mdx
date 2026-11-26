@@ -8,7 +8,7 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The SolidStart SDK (`@zitadel/sdk-solid-start`) is request middleware that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. The login and logout components come from the [Solid SDK](/docs/sdks/solid).
+The SolidStart SDK (`@zitadel/sdk-solid-start`) is request middleware that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. Its `/components` entry also exports the login, logout and session components of the [Solid SDK](/docs/sdks/solid), so the app imports everything from this one package.
 
 <Callout title="Generated setup" type="info">
   The CLI targets SolidStart 2. It writes `src/middleware.ts`, registers it in `vite.config.ts`, and writes the backend URL, the project secret, and the project ID to `.env.local`.
@@ -21,9 +21,9 @@ The SolidStart SDK (`@zitadel/sdk-solid-start`) is request middleware that runs 
 - A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in), or [Add Zitadel to an existing app](/docs/get-started/existing-app).
 - The URL, project ID and project secret. Setup writes them to `.env.local` as `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, and the project ID again as `VITE_ZITADEL_PROJECT_ID`, the name a Vite app exposes to the browser.
 
-## Install the SDKs
+## Install the SDK
 
-Setup installs both packages. To add them yourself, run:
+Install `@zitadel/sdk-solid-start`. It re-exports the Solid widgets, so the app needs no other import. Setup also adds `@zitadel/sdk-solid` as a direct dependency, because the Solid Vite plugin looks for libraries to compile in the app's `package.json`. To add both yourself, run:
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -68,10 +68,10 @@ Setup installs both packages. To add them yourself, run:
 
     ```ts
     import { createMiddleware } from "@solidjs/start/middleware";
-    import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+    import { createZitadelMiddleware } from "@zitadel/sdk-solid-start/server";
 
     export default createMiddleware(
-      createNextgenMiddleware({
+      createZitadelMiddleware({
         protectedRoutes: ["/profile"],
         loginPath: "/login",
       }),
@@ -96,7 +96,7 @@ Setup installs both packages. To add them yourself, run:
     import { clientOnly } from "@solidjs/start";
 
     const ZitadelLogin = clientOnly(() =>
-      import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogin })),
+      import("@zitadel/sdk-solid-start/components").then((m) => ({ default: m.ZitadelLogin })),
     );
 
     export default function Login() {
@@ -117,7 +117,7 @@ Setup installs both packages. To add them yourself, run:
 
 <Steps>
   <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
-  <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(getRequestEvent()!)` in a server function.</Step>
+  <Step>It verifies the session token and puts the result on `event.locals.zitadelAuth`; read it with `getAuth(getRequestEvent()!)` in a server function.</Step>
   <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in.</Step>
 </Steps>
 

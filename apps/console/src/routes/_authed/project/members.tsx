@@ -2,7 +2,7 @@ import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router"
 import { Users } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { type InvitationsRead, readInvitations } from "@/features/invitations/api";
+import { readInvitationsForPage } from "@/features/invitations/api";
 import {
   InviteMemberButton,
   ProjectInvitations,
@@ -14,7 +14,6 @@ import {
   requireProjectScope,
   useRequiredProjectScope,
 } from "@/features/projects/project-scope";
-import { describeError } from "@/lib/api-error";
 
 /** The page's tabs; `members` is the one a bare URL opens. */
 type MembersTab = "members" | "invitations";
@@ -33,6 +32,10 @@ type MembersTab = "members" | "invitations";
  * The members and the grants are the same viewer check on the same project and
  * succeed or fail as one. A failed invitations read is shown in its tab rather
  * than thrown, so the members stay readable and the API's own message says why.
+ *
+ * Only the project's admins manage invitations. For anyone else the read is
+ * refused, and the page then has no Invite member and the tab says who can
+ * see invitations, instead of an error (#3331).
  */
 export const Route = createFileRoute("/_authed/project/members")({
   staticData: {
@@ -46,11 +49,7 @@ export const Route = createFileRoute("/_authed/project/members")({
     const projectId = requireProjectScope(deps.project);
     const [access, invitations] = await Promise.all([
       readProjectMembers(projectId),
-      readInvitations(projectId).catch(
-        (cause): InvitationsRead => ({
-          error: describeError(cause, "The invitations could not be read."),
-        }),
-      ),
+      readInvitationsForPage(projectId),
     ]);
     return { ...access, invitations };
   },
@@ -80,15 +79,17 @@ function ProjectMembersPage() {
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>
         </TabsList>
-        <InviteMemberButton
-          projectId={projectId}
-          projectName={project.name}
-          onInvited={() => {
-            // Closing the dialog lands on the table the new row is in.
-            open("invitations");
-            reload();
-          }}
-        />
+        {!("denied" in invitations) && (
+          <InviteMemberButton
+            projectId={projectId}
+            projectName={project.name}
+            onInvited={() => {
+              // Closing the dialog lands on the table the new row is in.
+              open("invitations");
+              reload();
+            }}
+          />
+        )}
       </div>
 
       <TabsContent value="members">

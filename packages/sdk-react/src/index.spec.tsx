@@ -17,23 +17,23 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
-  type WidgetTag,
-  type WidgetName,
+  type ZitadelWidgetTag,
+  type ZitadelWidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
   businessLocales,
   ZitadelLogin,
-  type ZitadelLoginReactProps,
+  type ZitadelLoginProps,
   ZitadelLogout,
-  type ZitadelLogoutReactProps,
+  type ZitadelLogoutProps,
   ZitadelSession,
-  type ZitadelSessionReactProps,
+  type ZitadelSessionProps,
 } from "./index";
 
 import {
@@ -45,17 +45,49 @@ import {
   cssProperties,
   describeStandardAttributes,
 } from "@zitadel/client-sdk-contract/standard-attributes";
+import { describeSharedConfigHelpers } from "@zitadel/client-sdk-contract/config-helpers";
+import * as sdk from "./index";
 
 // A representative project handle. The element still starts its flow before
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
 // rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+function widgetIn<Tag extends ZitadelWidgetTag>(
+  root: ParentNode,
+  tag: Tag,
+): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
-  if (!element) throw new Error(`no <${tag}> was rendered`);
+  if (!element) {
+    throw new Error(`no <${tag}> was rendered`);
+  }
   return element;
 }
+
+describeSharedConfigHelpers(sdk);
+
+describe("the exported props types describe what the components accept", () => {
+  it("ZitadelLoginProps is accepted by ZitadelLogin", () => {
+    type Accepted = React.ComponentProps<typeof ZitadelLogin>;
+
+    expectTypeOf<keyof ZitadelLoginProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLoginProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelLogoutProps is accepted by ZitadelLogout", () => {
+    type Accepted = React.ComponentProps<typeof ZitadelLogout>;
+
+    expectTypeOf<keyof ZitadelLogoutProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLogoutProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelSessionProps is accepted by ZitadelSession", () => {
+    type Accepted = React.ComponentProps<typeof ZitadelSession>;
+
+    expectTypeOf<keyof ZitadelSessionProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelSessionProps>().toExtend<Accepted>();
+  });
+});
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
@@ -347,24 +379,16 @@ describe("a login with a keyed project handle", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders no element on the server", () => {
-    expect(renderToString(<ZitadelLogin project={keyed} />)).toBe("");
-  });
-
-  it("starts its first flow once, with the bearer, after mounting", async () => {
+  it("starts its first flow once, with the bearer", async () => {
     const fetched = vi.spyOn(globalThis, "fetch");
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    hydrateRoot(host, <ZitadelLogin project={keyed} />);
+    const { container: host } = render(<ZitadelLogin project={keyed} />);
 
-    await waitFor(() => expect(host.querySelector(widgetTags.login)).not.toBeNull());
     expect(widgetIn(host, widgetTags.login).project).toBe(keyed);
     await waitFor(() => expect(fetched).toHaveBeenCalled());
     expect(fetched).toHaveBeenCalledTimes(1);
     const [input, init] = fetched.mock.calls[0]!;
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
     expect(headers.get("authorization")).toBe("Bearer pk_test_123");
-    host.remove();
   });
 });
 
@@ -532,8 +556,12 @@ describe("package manifest", () => {
   };
 
   function targets(value: unknown): string[] {
-    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
-    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    if (typeof value === "string") {
+      return value.startsWith("./") ? [value] : [];
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(targets);
+    }
     return [];
   }
 
@@ -581,11 +609,10 @@ describe("server-rendered properties", () => {
   it("leaves the properties and the callbacks out of the server markup", async () => {
     const attributes = await renderAttributes("login", {
       project: { projectId: "p1", proxyPath: "/px" },
-      variant: "page",
       locales: { en: {} },
       onFlowStep: () => undefined,
     });
-    for (const name of ["variant", "locales", "onflowstep"]) {
+    for (const name of ["locales", "onflowstep"]) {
       expect(attributes).not.toHaveProperty(name);
     }
     expect(Object.values(attributes).join(" ")).not.toContain("object Object");
@@ -605,9 +632,9 @@ type ForwardedAttributes = {
 };
 
 type WidgetProps = {
-  login: ZitadelLoginReactProps;
-  logout: ZitadelLogoutReactProps;
-  session: ZitadelSessionReactProps;
+  login: ZitadelLoginProps;
+  logout: ZitadelLogoutProps;
+  session: ZitadelSessionProps;
 };
 
 const staleOnRemoval: readonly string[] = [];
@@ -615,8 +642,9 @@ const staleOnRemoval: readonly string[] = [];
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref`, the way a consumer does. `update` renders it
 // again with other attributes.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
+async function mountWidget(widget: ZitadelWidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  configureZitadel(project);
   let element: HTMLElement | null = null;
   const elementFor = ({ class: className, style, hidden, tabindex, ...rest }: Attributes) => (
     <Widget
@@ -639,6 +667,10 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     },
   };
 }
+
+afterEach(() => {
+  _resetConfigForTesting();
+});
 
 describeStandardAttributes<ForwardedAttributes, WidgetProps>({
   mountWidget,

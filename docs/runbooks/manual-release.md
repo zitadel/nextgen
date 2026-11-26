@@ -170,7 +170,7 @@ owner of the `@zitadel` packages.
      { printf 'Published to npm and ghcr.io as `%s`.\n\n' "${old#v}"
        gh release view "$old" --repo zitadel/nextgen --json body -q .body; } > "$notes"
      gh release edit "$old" --repo zitadel/nextgen --tag "$new" \
-       --title "Zitadel NextGen $new" --notes-file "$notes"
+       --title "Zitadel $new" --notes-file "$notes"
      git push origin ":refs/tags/$old" && git tag -d "$old"
    done
    ```

@@ -1,6 +1,6 @@
 # demo-nuxt
 
-A minimal Nuxt application demonstrating [Nextgen Auth](../../packages/sdk-nuxt) end-to-end: login, protected routes, and sign-out.
+A minimal Nuxt application demonstrating [Zitadel Auth](../../packages/sdk-nuxt) end-to-end: login, protected routes, and sign-out.
 
 ## Running locally
 
@@ -91,18 +91,18 @@ The demo imports the package from `dist/`, not source.
 
 ## How it works
 
-**Server middleware** (`server/middleware/auth.ts`) uses `createNextgenMiddleware` from `@zitadel/sdk-nuxt` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
+**Server middleware** (`server/middleware/auth.ts`) uses `createZitadelMiddleware` from `@zitadel/sdk-nuxt` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
 
-**Plugin** (`plugins/auth.server.ts`) reads the verified auth context from the server event and writes it into Nuxt's shared `nextgen-auth` state so pages can access it without additional fetches.
+**Plugin** (`plugins/auth.server.ts`) reads the verified auth context from the server event and writes it into Nuxt's shared `zitadel-auth` state so pages can access it without additional fetches.
 
 **Login page** renders the `<zitadel-login>` web component inside `<ClientOnly>` to avoid SSR. The `@zitadel/sdk-nuxt` module registers the elements in the browser itself, so the app depends on `@zitadel/sdk-nuxt` alone.
 
-**Admin page** reads `useState('nextgen-auth')` to display the signed-in user's email, with the `<zitadel-logout>` component in the header.
+**Admin page** reads `useState('zitadel-auth')` to display the signed-in user's email, with the `<zitadel-logout>` component in the header.
 
 **Plugins** (the SDK's client plugin loads the widget elements; never import the widget package from page `<script setup>` — that runs during SSR and breaks hydration/fonts):
 
 | Plugin | Role |
 | ------ | ---- |
-| `plugins/auth.server.ts` | Seeds `useState('nextgen-auth')` from verified middleware context |
+| `plugins/auth.server.ts` | Seeds `useState('zitadel-auth')` from verified middleware context |
 
 **Fonts and branding** — same as demo-next: the mock server sets no font and `<zitadel-login>` loads none of its own, so the login renders in the token stack (Arimo where installed, else the system font) with no font-CDN request. `assets/css/demo-host.css` sets host `body` styles to match Next's `layout.tsx`. To render a face, load it in the app, or set branding `typography.font_url`, which a `variant="page"` login links in the document `<head>`.
