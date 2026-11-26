@@ -356,6 +356,33 @@ describe("a proxied redirect", () => {
   });
 });
 
+describe("a handoff exchange", () => {
+  it.each([
+    ["same-origin", "Bearer secret"],
+    ["cross-site", null],
+  ])("sent as %s reaches the server with the authorization %s", async (site, expected) => {
+    let authorization: string | null = null;
+    const backend = createServer((request, response) => {
+      authorization = request.headers.authorization ?? null;
+      response.end();
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    const { port } = backend.address() as AddressInfo;
+
+    try {
+      await serve(
+        "http://localhost:3000/__nextgen/sessions/exchange",
+        { method: "POST", headers: { "sec-fetch-site": site } },
+        { url: `http://127.0.0.1:${port}`, projectId: "project", projectSecret: "secret" },
+      );
+    } finally {
+      await new Promise((resolve) => backend.close(resolve));
+    }
+
+    expect(authorization).toBe(expected);
+  });
+});
+
 describe("a login redirect", () => {
   it("is an absolute URL on the origin of the request and carries the requested path", async () => {
     const served = await serve(

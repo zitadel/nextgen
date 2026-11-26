@@ -83,7 +83,7 @@ Setup installs the SDK. To add it yourself, run:
 
 ## Props and events
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the component's own default.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. This SDK adds a few React-only props and session helpers, which the sections [React-only props](#react-only-props) and [Session helpers](#session-helpers) list. An unset prop keeps the component's own default.
 
 | Prop | Type | Default | Components | Description |
 | --- | --- | --- | --- | --- |
@@ -129,6 +129,20 @@ Each component event reaches the callback in the last column. The callback recei
 ```tsx
 <ZitadelLogin project={project} className="login" data-testid="login" aria-label="Sign in" />
 ```
+
+## React-only props
+
+Only `ZitadelLogin` takes these, and no other SPA SDK has them.
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | unset | Content for the component's slots, such as `attribution-trailing`. It never changes what the component submits. |
+| `previewState` | `ZitadelLoginElement["previewState"]` | unset | The state to preview, for an admin tool that shows how a step looks. Never use it on a page where real users sign in. |
+| `previewSuccessStep` | `string` | unset | The terminal step that the `success` preview paints. Ignored for every other state. |
+
+## Session helpers
+
+Only this SDK exports `useSession`, `getSession` and `sessionStore`. The other framework SDKs read the session through `@zitadel/sdk-core/session`. The [package README](https://github.com/zitadel/nextgen/blob/main/packages/sdk-react/README.md) describes them.
 
 ## How requests reach Zitadel
 

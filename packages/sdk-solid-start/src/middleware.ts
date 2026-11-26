@@ -271,7 +271,7 @@ async function proxyRequest(
   // make this public boundary an open relay with project authority. A credential the caller
   // supplied is preserved.
   if (
-    requiresProjectSecret(method, suffix) &&
+    requiresProjectSecret(method, suffix, upstreamHeaders) &&
     !upstreamHeaders.has("authorization") &&
     projectSecret
   ) {

@@ -326,7 +326,10 @@ async function proxyRequest(
   // only for the handoff exchange. Never make the public proxy an
   // operator-capable relay, and preserve an explicit caller credential for
   // the future publishable-key exchange path.
-  if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
+  if (
+    requiresProjectSecret(method, suffix, upstreamHeaders) &&
+    !upstreamHeaders.has("authorization")
+  ) {
     const config = useRuntimeConfig();
     const projectSecret = resolveProjectSecret(config.zitadel, projectSecretOption);
     if (projectSecret) {

@@ -463,16 +463,31 @@ describe("refusedProxyResponse", () => {
 
 describe("requiresProjectSecret", () => {
   it("allows the secret on the handoff exchange", () => {
-    expect(requiresProjectSecret("POST", "/sessions/exchange")).toBe(true);
+    expect(requiresProjectSecret("POST", "/sessions/exchange", new Headers())).toBe(true);
   });
 
   it("allows the secret on the handoff exchange under the API prefix", () => {
-    expect(requiresProjectSecret("POST", "/api/v1/sessions/exchange")).toBe(true);
+    expect(requiresProjectSecret("POST", "/api/v1/sessions/exchange", new Headers())).toBe(true);
   });
 
   it("matches the method case-insensitively", () => {
-    expect(requiresProjectSecret("post", "/sessions/exchange")).toBe(true);
+    expect(requiresProjectSecret("post", "/sessions/exchange", new Headers())).toBe(true);
   });
+
+  it("allows the secret on a handoff exchange that the app makes itself", () => {
+    const headers = new Headers({ "sec-fetch-site": "same-origin" });
+
+    expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(true);
+  });
+
+  it.each(["cross-site", "same-site", "none"])(
+    "withholds the secret from a handoff exchange that the browser marks %s",
+    (site) => {
+      const headers = new Headers({ "sec-fetch-site": site });
+
+      expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(false);
+    },
+  );
 
   it.each([
     ["GET", "/sessions/exchange"],
@@ -490,7 +505,7 @@ describe("requiresProjectSecret", () => {
     ["POST", "/api/v1/api/v1/sessions/exchange"],
     ["POST", "/v1/sessions/exchange"],
   ])("withholds the secret from %s %s", (method, pathname) => {
-    expect(requiresProjectSecret(method, pathname)).toBe(false);
+    expect(requiresProjectSecret(method, pathname, new Headers())).toBe(false);
   });
 });
 

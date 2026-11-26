@@ -314,7 +314,10 @@ async function proxyRequest(
   // turns this public request boundary into an operator-capable open relay.
   // Preserve an explicit caller credential so the exchange can use the future
   // publishable-key plane without being overwritten.
-  if (requiresProjectSecret(req.method, suffix) && !upstreamHeaders.has("authorization")) {
+  if (
+    requiresProjectSecret(req.method, suffix, upstreamHeaders) &&
+    !upstreamHeaders.has("authorization")
+  ) {
     const secret = projectSecretOption || process.env.ZITADEL_PROJECT_SECRET;
     if (secret) {
       upstreamHeaders.set("authorization", `Bearer ${secret}`);

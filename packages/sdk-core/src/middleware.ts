@@ -210,20 +210,37 @@ function operationPath(path: string): string {
  * open relay that carries project-level authority for any anonymous caller, so a proxy asks this
  * function before it attaches the secret. The path matches with or without the API prefix.
  *
+ * The exchange also has to come from the app itself. A page on another site can make a browser
+ * post to the proxy, and the proxy would add the secret to a handoff that the attacker obtained, so
+ * that the visitor ends up signed in as the attacker. A browser states where a request comes from
+ * in `Sec-Fetch-Site`, which a page cannot set, so the secret goes only to a request that is
+ * `same-origin`. A request without that header comes from a client that is not a browser page, and
+ * passes.
+ *
  * @param method - The HTTP method of the proxied request, in any case.
  * @param pathname - The path after the proxy prefix, for example `/sessions/exchange` or
  * `/api/v1/sessions/exchange`.
- * @returns `true` only for the handoff exchange.
+ * @param headers - The headers of the proxied request.
+ * @returns `true` only for the handoff exchange that the app itself makes.
  *
  * @example
  * ```ts
- * if (requiresProjectSecret(request.method, pathAfterProxyPrefix)) {
+ * if (requiresProjectSecret(request.method, pathAfterProxyPrefix, request.headers)) {
  *   headers.set("authorization", `Bearer ${projectSecret}`);
  * }
  * ```
  */
-export function requiresProjectSecret(method: string, pathname: string): boolean {
-  return method.toUpperCase() === "POST" && operationPath(pathname) === "/sessions/exchange";
+export function requiresProjectSecret(
+  method: string,
+  pathname: string,
+  headers: Pick<Headers, "get">,
+): boolean {
+  const site = headers.get("sec-fetch-site");
+  return (
+    method.toUpperCase() === "POST" &&
+    operationPath(pathname) === "/sessions/exchange" &&
+    (site === null || site === "same-origin")
+  );
 }
 
 // ─── Proxy routing ───────────────────────────────────────────────────────────
@@ -1061,6 +1078,10 @@ export interface ZitadelProxiedSessionCookies {
  *   another project, such as the Console's on `localhost`, is left alone.
  * - Each of these calls is known by its path with or without the API prefix `/api/v1`, which the
  *   server answers both ways until version 1.0.0.
+ * - Every cookie that is not a session cookie goes upstream as the browser sent it, by design. The
+ *   proxy is same-origin so that the server sees the cookies of the app's own domain. The server
+ *   is part of the deployment and is trusted with them; point the proxy only at a server you
+ *   operate or trust.
  * - Without a project the cookies pass as they are, because nothing says which session is the
  *   session of the app.
  *
