@@ -3,7 +3,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { BackendGoneError, BackendNotFoundError } from "@/lib/backend/errors";
+import { BackendNotFoundError } from "@/lib/backend/errors";
 
 /** What narrows a query of the project's users: its filters, sorts and page size. */
 export type UserQuery = Readonly<QueryUsersBody>;
@@ -81,9 +81,6 @@ export class UserService extends ApiService {
       if (error instanceof BackendNotFoundError) {
         return false;
       }
-      if (error instanceof BackendGoneError) {
-        return false;
-      }
       throw error;
     }
   }
@@ -122,9 +119,6 @@ export class UserService extends ApiService {
       } catch (error) {
         // Gone mid-read: what was read before belonged to a user who no longer exists.
         if (error instanceof BackendNotFoundError) {
-          return new Set();
-        }
-        if (error instanceof BackendGoneError) {
           return new Set();
         }
         throw error;

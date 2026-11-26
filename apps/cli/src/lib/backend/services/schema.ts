@@ -9,7 +9,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { BackendNotFoundError } from "@/lib/backend/errors";
+import { BackendGoneError, BackendNotFoundError } from "@/lib/backend/errors";
 
 /** What narrows and pages a list of schemas. */
 export type SchemaQuery = Readonly<Omit<ListSchemasParams, "project_id">>;
@@ -112,6 +112,9 @@ export class SchemaService extends ApiService {
       // A 404 exactly, because this reads the failure as a statement about the
       // reference rather than about the schema: nothing holds that id, so the
       // reference must have been an object type.
+      if (error instanceof BackendGoneError) {
+        throw error;
+      }
       if (!(error instanceof BackendNotFoundError)) {
         throw error;
       }

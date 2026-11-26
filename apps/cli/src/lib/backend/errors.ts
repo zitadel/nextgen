@@ -70,22 +70,37 @@ export class BackendConflictError extends BackendError {
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
-/** The server answered that what was asked for is gone: a `410`. */
-export class BackendGoneError extends BackendError {
+/**
+ * The server answered that what was asked for is gone: a `410`.
+ *
+ * @remarks
+ * A {@link BackendNotFoundError}, so a caller that catches that kind catches this one too.
+ */
+export class BackendGoneError extends BackendNotFoundError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
 }
 
-/** The claim window of a project closed: a `410` naming `proj.claim_window_expired`. */
-export class BackendClaimWindowExpiredError extends BackendError {
+/**
+ * The claim window of a project closed: a `410` naming `proj.claim_window_expired`.
+ *
+ * @remarks
+ * A {@link BackendGoneError}, so a caller that catches that kind catches this one too.
+ */
+export class BackendClaimWindowExpiredError extends BackendGoneError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
 }
 
-/** The claim link is not known to the server: a `404` naming `claim_challenge.not_found`. */
-export class BackendClaimChallengeNotFoundError extends BackendError {
+/**
+ * The claim link is not known to the server: a `404` naming `claim_challenge.not_found`.
+ *
+ * @remarks
+ * A {@link BackendNotFoundError}, so a caller that catches that kind catches this one too.
+ */
+export class BackendClaimChallengeNotFoundError extends BackendNotFoundError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
@@ -117,22 +132,37 @@ export class BackendReleaseContentRevokedError extends BackendConflictError {
   }
 }
 
-/** The release was revoked and can never be served: a `409` naming `rel.revoked`. */
-export class BackendReleaseRevokedError extends BackendError {
+/**
+ * The release was revoked and can never be served: a `409` naming `rel.revoked`.
+ *
+ * @remarks
+ * A {@link BackendConflictError}, so a caller that catches that kind catches this one too.
+ */
+export class BackendReleaseRevokedError extends BackendConflictError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
-/** The release is still served by an origin: a `409` naming `rel.in_use`. */
-export class BackendReleaseInUseError extends BackendError {
+/**
+ * The release is still served by an origin: a `409` naming `rel.in_use`.
+ *
+ * @remarks
+ * A {@link BackendConflictError}, so a caller that catches that kind catches this one too.
+ */
+export class BackendReleaseInUseError extends BackendConflictError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
-/** The proof of an authentication attempt was wrong: a `409` naming `att.proof_rejected`. */
-export class BackendProofRejectedError extends BackendError {
+/**
+ * The proof of an authentication attempt was wrong: a `409` naming `att.proof_rejected`.
+ *
+ * @remarks
+ * A {@link BackendConflictError}, so a caller that catches that kind catches this one too.
+ */
+export class BackendProofRejectedError extends BackendConflictError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";

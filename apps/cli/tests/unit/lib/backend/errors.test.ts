@@ -50,6 +50,23 @@ describe("the backend errors", () => {
   });
 });
 
+describe("the backend errors' families", () => {
+  it.each([
+    ["gone", new BackendGoneError("why"), BackendNotFoundError],
+    ["claim window expired", new BackendClaimWindowExpiredError("why"), BackendGoneError],
+    [
+      "claim challenge not found",
+      new BackendClaimChallengeNotFoundError("why"),
+      BackendNotFoundError,
+    ],
+    ["release revoked", new BackendReleaseRevokedError("why"), BackendConflictError],
+    ["release in use", new BackendReleaseInUseError("why"), BackendConflictError],
+    ["proof rejected", new BackendProofRejectedError("why"), BackendConflictError],
+  ] as const)("catches a %s failure as its general kind", (_name, error, general) => {
+    expect(error).toBeInstanceOf(general);
+  });
+});
+
 describe("the backend errors' codes", () => {
   it.each([
     [new BackendNotFoundError("why"), "E_NOT_FOUND"],

@@ -6,6 +6,7 @@ import { it } from "@tests/fixtures";
 
 import {
   BackendConflictError,
+  BackendReleaseInUseError,
   BackendForbiddenError,
   BackendReleaseRevokedError,
 } from "@/lib/backend";
@@ -737,6 +738,21 @@ describe("DeploymentService.deployToPrimary", () => {
     await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toMatchObject({
       outcome: "raced",
       current: { id: "dep_9" },
+    });
+  });
+
+  it("reports a release the server says is in use as a race, as every other conflict", async () => {
+    const deploymentService = deployWith([], async () => {
+      throw new BackendReleaseInUseError("in use", {
+        status: 409,
+        body: {
+          code: "rel.in_use",
+        },
+      });
+    });
+
+    await expect(deploymentService.deployToPrimary({ releaseId: "rel_1" })).resolves.toMatchObject({
+      outcome: "raced",
     });
   });
 
