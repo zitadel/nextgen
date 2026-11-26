@@ -1,4 +1,5 @@
 import { errorMessage } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 import {
   BinaryLauncher,
   DockerLauncher,
@@ -94,9 +95,16 @@ export class LocalRuntimeChecks {
         "docker-cli",
         "Docker is reachable",
         async () => {
-          const result = await this.docker().catch((error: unknown) => {
-            throw new Error(unreachable(errorMessage(error)), { cause: error });
-          });
+          // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
+          let result: DockerResult;
+          try {
+            result = await this.docker();
+          } catch (error) {
+            if (isErrno(error, "ENOENT") || isErrno(error, "EACCES")) {
+              throw new Error(unreachable(errorMessage(error)), { cause: error });
+            }
+            throw error;
+          }
           if (result.status !== 0) {
             throw new Error(unreachable(result.stderr || "docker version failed"));
           }

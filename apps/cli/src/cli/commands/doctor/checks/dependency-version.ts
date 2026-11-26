@@ -53,6 +53,7 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
+    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
     let dependencies: Dependencies | undefined;
     try {
       dependencies = await Dependencies.read(ctx.cwd, ZITADEL_SCOPE);

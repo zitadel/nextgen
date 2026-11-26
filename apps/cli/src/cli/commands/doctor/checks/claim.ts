@@ -1,8 +1,8 @@
-import { Claim } from "@/lib/claim";
+import { Claim, type ClaimState } from "@/lib/claim";
 import { ZitadelRuntime } from "@/lib/server";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { Project } from "@/lib/project";
+import { Project, ProjectError } from "@/lib/project";
 
 /**
  * What a project on a local or self-hosted server is told: it has no team to
@@ -49,26 +49,26 @@ export class ClaimCheck implements SanityCheck {
    * @returns The outcome of the check.
    */
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const state = await Project.at(ctx.cwd)
-      .secret()
-      .then(async (secret) => {
-        return Claim.state({
-          secret: secret.data,
-          cloud: ZitadelRuntime.fromUrl(
-            (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT,
-          ).isCloud(),
-        });
-      })
-      .catch(() => {
-        return undefined;
+    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
+    let state: ClaimState;
+    try {
+      const secret = await Project.at(ctx.cwd).secret();
+      state = Claim.state({
+        secret: secret.data,
+        cloud: ZitadelRuntime.fromUrl(
+          (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT,
+        ).isCloud(),
       });
-    if (state === undefined) {
-      return {
-        name: this.name,
-        status: "pass",
-        message: "Skipped: could not read the project files that record the owning team",
-        path: this.path,
-      };
+    } catch (error) {
+      if (error instanceof ProjectError) {
+        return {
+          name: this.name,
+          status: "pass",
+          message: "Skipped: could not read the project files that record the owning team",
+          path: this.path,
+        };
+      }
+      throw error;
     }
 
     if (state.kind === "detached") {

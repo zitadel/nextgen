@@ -63,6 +63,7 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
+      // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
       let found: Inspection;
       try {
         found = await this.inspected(ctx);

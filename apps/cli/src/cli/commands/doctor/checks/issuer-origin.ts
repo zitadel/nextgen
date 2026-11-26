@@ -112,6 +112,7 @@ export class IssuerOriginCheck implements SanityCheck {
         }),
       })
       .write();
+    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
     let deployed = false;
     try {
       const extended = await new DeploymentService(client, held.project_id).extendPrimary(
@@ -146,7 +147,9 @@ export class IssuerOriginCheck implements SanityCheck {
  * @throws The cancellation, when the person stopped the run.
  */
 async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
+  // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
   let secret: ProjectSecret;
+  // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
   let server: string;
   try {
     secret = await Project.at(cwd).secret();
@@ -195,6 +198,7 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
     signal,
   });
   const originService = new OriginService(client, secret.data.project_id);
+  // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
   let origins: Origins;
   try {
     origins = await originService.list();

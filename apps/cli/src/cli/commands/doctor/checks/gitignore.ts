@@ -25,14 +25,19 @@ export class GitignoreCheck implements SanityCheck {
   readonly path = ".gitignore";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    return this.evaluate(ctx).catch((error: unknown) => {
-      return {
-        name: this.name,
-        path: this.path,
-        status: "fail",
-        message: errorMessage(error),
-      };
-    });
+    try {
+      return await this.evaluate(ctx);
+    } catch (error) {
+      if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
+        return {
+          name: this.name,
+          path: this.path,
+          status: "fail",
+          message: errorMessage(error),
+        };
+      }
+      throw error;
+    }
   }
 
   /**
@@ -135,10 +140,12 @@ async function holdsNamesOnly(cwd: string, rules: ReadonlyArray<GitignoreRule>):
 }
 
 async function readText(path: string): Promise<string | undefined> {
-  return readFile(path, "utf8").catch((error: unknown) => {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return undefined;
     }
     throw error;
-  });
+  }
 }

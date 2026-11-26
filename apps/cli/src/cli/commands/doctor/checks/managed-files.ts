@@ -8,8 +8,8 @@ import { updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { Project } from "@/lib/project";
-import { Orca } from "@/lib/orca";
+import { Project, ProjectError } from "@/lib/project";
+import { Orca, OrcaError } from "@/lib/orca";
 
 /**
  * Per-file classification reported in the check's `details`:
@@ -355,8 +355,11 @@ async function probeConfigWiring(ctx: CheckContext): Promise<ReadonlyArray<Confi
   try {
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
     return await ctx.orca.patcherFor(patchCtx.framework.id).verify(patchCtx, { cwd: ctx.cwd });
-  } catch {
-    return [];
+  } catch (error) {
+    if (error instanceof ProjectError || error instanceof OrcaError) {
+      return [];
+    }
+    throw error;
   }
 }
 
@@ -411,8 +414,11 @@ async function materializeManifest(
       actions,
       written: marked,
     });
-  } catch {
-    return;
+  } catch (error) {
+    if (error instanceof ProjectError || error instanceof OrcaError) {
+      return;
+    }
+    throw error;
   }
 }
 
@@ -485,8 +491,11 @@ export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions 
       framework,
       rendererId: config.rendererId,
     });
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof ProjectError || error instanceof OrcaError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 

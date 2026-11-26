@@ -1,6 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { isErrno } from "@/lib/errno";
+
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /** The keys `.env.example` must document for a Zitadel-managed project. */
@@ -23,9 +25,15 @@ export class EnvExampleCheck extends AbstractSanityCheck {
 
   override async fix(ctx: CheckContext): Promise<void> {
     const path = join(ctx.cwd, ".env.example");
-    const existing = await readFile(path, "utf8").catch(() => {
-      return "";
-    });
+    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
+    let existing = "";
+    try {
+      existing = await readFile(path, "utf8");
+    } catch (error) {
+      if (!isErrno(error, "ENOENT")) {
+        throw error;
+      }
+    }
     const missing = REQUIRED_KEYS.filter((key) => {
       return !existing.includes(`${key}=`);
     });
