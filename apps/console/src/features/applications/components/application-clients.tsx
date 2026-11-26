@@ -71,12 +71,19 @@ function ClientRows({ client }: { client: ApplicationClient }) {
       <DetailRow label="First-party">
         <span className={DETAIL_VALUE}>{client.first_party ? "Yes" : "No"}</span>
       </DetailRow>
-      {/* Every client is confidential and has a secret: the API generates a
-          registered client's on create, and a declared one names the variable
-          that holds it (a deploy checks the variable has a secret value). */}
-      <DetailRow label="Client secret">
-        <span className={DETAIL_VALUE}>Configured</span>
-      </DetailRow>
+      {/* A confidential client has a secret. The API generates a registered
+          client's on create; a declared one names the variable that holds it,
+          which may have no value until a deploy checks it, so the row names
+          the variable rather than claim it is set. */}
+      {client.type === "confidential" && (
+        <DetailRow label="Client secret">
+          {client.secret ? (
+            <span className={cn(DETAIL_VALUE, MONO_VALUE)}>{client.secret}</span>
+          ) : (
+            <span className={DETAIL_VALUE}>Configured</span>
+          )}
+        </DetailRow>
+      )}
       <DetailRow align="center" label="Grant types">
         <span className="flex min-w-0 flex-wrap gap-2">
           {client.grant_types.map((grantType) => (

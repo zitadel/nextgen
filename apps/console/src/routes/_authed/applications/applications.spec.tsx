@@ -121,7 +121,7 @@ describe("application detail", () => {
     expect(within(worker).queryByText("Authorization code")).toBeNull();
   });
 
-  it("marks a registered application's source", async () => {
+  it("marks a registered application's source and gives no deploy hint", async () => {
     server.use(http.get(APPLICATION_URL, () => HttpResponse.json(application())));
     await renderAt("/applications/app_1");
 
@@ -132,6 +132,9 @@ describe("application detail", () => {
     expect(within(overview).getByText("Registered")).toBeInTheDocument();
     // No issuer: the API returns no one value for it (D41).
     expect(within(overview).queryByText("Issuer URL")).toBeNull();
+    // A deploy never revises a registered application.
+    const web = await screen.findByRole("region", { name: "web" });
+    expect(within(web).queryByText(/Edit the client locally/)).toBeNull();
   });
 
   it("marks a declared application's source and says how to change a client", async () => {
@@ -156,6 +159,9 @@ describe("application detail", () => {
     expect(within(overview).getByText("Code")).toBeInTheDocument();
 
     const web = await screen.findByRole("region", { name: "web" });
+    // The secret row names the variable: its value is unknown until a deploy.
+    expect(within(web).getByText("${{ WEB_CLIENT_SECRET }}")).toBeInTheDocument();
+    expect(within(web).queryByText("Configured")).toBeNull();
     expect(
       within(web).getByText(/Edit the client locally, then deploy your changes/),
     ).toBeInTheDocument();
