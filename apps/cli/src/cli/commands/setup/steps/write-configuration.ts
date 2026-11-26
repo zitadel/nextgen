@@ -34,6 +34,7 @@ import {
   ZitadelConfigFileExistsError,
   SignupPolicy,
 } from "@/lib/zitadel";
+import { wordedError } from "@/cli/core/error-support";
 
 /**
  * What the step reads from what is known.
@@ -213,7 +214,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
         error instanceof ZitadelError
           ? error
           : error instanceof ZitadelLibError
-            ? toZitadelError(error)
+            ? toZitadelError(wordedError(error, this.deps.cwd))
             : undefined;
       if (cause === undefined) {
         throw error;
