@@ -549,9 +549,10 @@ This refines §4's `project_member` adapter for a user who already has access
   borrowed through a team (tuple-to-userset), or operating the deployment
   (ADR 075). An expired grant gives none, so accept still renews it.
 - **The check belongs to the type's adapter**, like the grant. For
-  `project_member` it asks the resolver for the user's strongest project role:
-  the check accept already runs on the inviter (§10), now one injected check
-  for both. `team_member` will ask about team membership. Accept and decline
+  `project_member` it asks the resolver for the user's strongest project role,
+  the same question accept asks about the inviter (§10). The service reaches
+  the resolver through an injected check until #3362 lets it call the
+  resolver directly. `team_member` will ask about team membership. Accept and decline
   run it after the project lock, so it sees a grant that a racing accept or
   administrator wrote.
 - **Lookup returns the same answer** as `membership: { relation }` on the

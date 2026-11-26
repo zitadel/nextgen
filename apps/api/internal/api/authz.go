@@ -504,40 +504,17 @@ func ProjectRoleCheck(platformProjectID string) service.ProjectRoleCheck {
 		if home.ResourceKind != domain.ResourceKindUser {
 			return "", nil
 		}
-		r := resolver.New()
-		holds := func(relation string) (bool, error) {
-			req := resolver.Request{
-				PrincipalType: domain.AuthzPrincipalTypeUser,
-				PrincipalID:   userID,
-				ProjectID:     projectID,
-				HomeProjectID: home.ProjectID,
-				ObjectType:    "project",
-				Relation:      relation,
-			}
-			// Set only for a user homed in the platform project (ADR 075).
-			if platformProjectID != "" && home.ProjectID == platformProjectID {
-				req.PlatformProjectID = platformProjectID
-			}
-			dec, err := r.Check(ctx, stmts, req)
-			if err != nil {
-				return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
-			}
-			return dec == resolver.DecisionAllow, nil
+		role, err := resolver.New().StrongestProjectRole(ctx, stmts, resolver.Request{
+			PrincipalType:     domain.AuthzPrincipalTypeUser,
+			PrincipalID:       userID,
+			ProjectID:         projectID,
+			HomeProjectID:     home.ProjectID,
+			PlatformProjectID: platformProjectID,
+		})
+		if err != nil {
+			return "", domain.ErrInternal(err).WithMessage("authz permission check failed")
 		}
-		// Roles are additive, so walk them weakest first and stop at the first
-		// miss: most redeemers hold none, which costs one check.
-		held := ""
-		for _, role := range domain.ProjectRoles {
-			ok, err := holds(role)
-			if err != nil {
-				return "", err
-			}
-			if !ok {
-				break
-			}
-			held = role
-		}
-		return held, nil
+		return role, nil
 	}
 }
 
