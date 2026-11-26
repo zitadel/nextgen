@@ -56,12 +56,12 @@ const SIGNUP_POLICY_INVALID_ADVICE = {
 
 /** How {@link ZitadelConfigActionClashError} is refused. */
 const ACTION_CLASH_ADVICE = {
-  hint: 'Rename the action "{action}" on step "{step}" (and its transition), then run auth-method sso enable again.',
+  hint: 'Rename the action "{action}" on step "{step}" (and its transition), then run `zitadel auth-method sso enable` again.',
 } as const satisfies Advice;
 
 /** How {@link ZitadelConfigRenameRouteLossError} is refused. */
 const RENAME_ROUTE_LOSS_ADVICE = {
-  hint: 'Remove purpose and action from the transition "{transition}" on step "{step}", then run auth-method sso enable again.',
+  hint: 'Remove purpose and action from the transition "{transition}" on step "{step}", then run `zitadel auth-method sso enable` again.',
 } as const satisfies Advice;
 
 /**

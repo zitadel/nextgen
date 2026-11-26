@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
-import { cliVersion, pressCtrlC } from "@tests/helpers/run-cli";
+import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
@@ -390,7 +390,7 @@ describe("variable get", () => {
         expect(JSON.parse(result.stdout)).toMatchObject({
           code: "E_NOT_FOUND",
           message: "Variable API_URL has no primary value.",
-          hint: "Set one with variable set.",
+          hint: `Set one with ${expectedPublicCliCommand("variable set")}.`,
         });
       });
 

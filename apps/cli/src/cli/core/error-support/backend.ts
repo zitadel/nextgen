@@ -23,7 +23,7 @@ const VARIABLE_PREVIEW_MISSING_ADVICE = {
 
 /** How a variable with no primary value is refused. */
 const VARIABLE_PRIMARY_MISSING_ADVICE = {
-  hint: "Set one with `variable set`.",
+  hint: "Set one with `zitadel variable set`.",
 } as const satisfies Advice;
 
 /** How a path that matches no operation's template is refused. */
@@ -90,8 +90,8 @@ const NAME_UNKNOWN_ADVICE = {
 
 /** The command that lists each kind of named record, as the hint names it. */
 const LISTED_BY = {
-  flow: "Run `flow-definition list` to see the flows this project has.",
-  schema: "Run `schema list` to see the object types this project has.",
+  flow: "Run `zitadel flow-definition list` to see the flows this project has.",
+  schema: "Run `zitadel schema list` to see the object types this project has.",
 } as const;
 
 /**

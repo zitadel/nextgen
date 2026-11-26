@@ -2,7 +2,6 @@ import type { Interfaces } from "@oclif/core";
 import { isVariableReference } from "@zitadel/config/idp";
 
 import {
-  BackendNameUnknownError,
   BrandingService,
   FlowService,
   PolicyService,
@@ -86,21 +85,6 @@ import { CommandGroups } from "@/cli/commands/groups";
 import type { Tabulate } from "@/cli/core/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
-
-/** How a schema named by an object type no schema carries is refused. */
-const SCHEMA_UNNAMED_REFUSAL = {
-  code: "E_NOT_FOUND",
-  message: "{message}",
-  hint: "Run `schema list` to see the object types this project has.",
-} as const satisfies Refusal;
-
-/** How a flow definition named by a name no flow carries is refused. */
-const FLOW_UNNAMED_REFUSAL = {
-  code: "E_NOT_FOUND",
-  message: "{message}",
-  hint: "Run `flow-definition list` to see the flows this project has.",
-} as const satisfies Refusal;
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
 const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
@@ -1001,15 +985,7 @@ export const RESOURCES = {
       response: GetSchemaResponse,
       call: ({ client, projectId }, reference) => {
         const schemaService = new SchemaService(client, projectId);
-        return schemaService.get(reference).catch((error: unknown) => {
-          if (error instanceof BackendNameUnknownError) {
-            throw refusalError(SCHEMA_UNNAMED_REFUSAL, {
-              ...error,
-              message: error.message,
-            });
-          }
-          throw error;
-        });
+        return schemaService.get(reference);
       },
     }),
   }),
@@ -1098,15 +1074,7 @@ export const RESOURCES = {
       response: GetFlowDefinitionResponse,
       call: ({ client, projectId }, reference) => {
         const flowService = new FlowService(client, projectId);
-        return flowService.get(reference).catch((error: unknown) => {
-          if (error instanceof BackendNameUnknownError) {
-            throw refusalError(FLOW_UNNAMED_REFUSAL, {
-              ...error,
-              message: error.message,
-            });
-          }
-          throw error;
-        });
+        return flowService.get(reference);
       },
     }),
   }),
