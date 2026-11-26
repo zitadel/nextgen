@@ -60,7 +60,8 @@ The private `resolveLocale()` method determines the effective dictionary:
 loads every other built-in translation with a dynamic import when the page
 shows that language (`Translations.load`), so a page downloads only the translation
 it renders. New languages are added by creating a `<code>.ts` file in the
-`locales/` directory and registering its loader in `BUILTIN`. The
+`locales/` directory, registering its loader in `BUILTIN` and adding it to
+`builtinLocales` in `src/locales.ts`; a spec fails when the two disagree. The
 dictionaries as values, and the `builtinLocales` map, are exported from
 `@zitadel/components/locales` for an app that extends one.
 

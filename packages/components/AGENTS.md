@@ -120,8 +120,9 @@ Everything the package root reaches lands in every SDK app's main chunk.
   `import()` (`liquid.ts`, `sanitiser/dompurify.ts`, `locales/translations.ts`).
 - Never re-export `de`, `it` or `builtinLocales` from the root: a static export keeps
   them in every bundle; their home is `@zitadel/components/locales`.
-- Add a language as `locales/<code>.ts` plus one loader in `BUILTIN`
-  (`locales/translations.ts`); resolve texts only through `Translations`.
+- Add a language as `locales/<code>.ts`, one loader in `BUILTIN`
+  (`locales/translations.ts`) and one entry in `builtinLocales` (`src/locales.ts`);
+  `translations.spec.ts` fails when the two disagree. Resolve texts only through `Translations`.
 - Import an API endpoint by name in `api-client.ts`; never through
   `createZitadelClient`, whose `Proxy` defeats tree-shaking.
 - Allow a tag or attribute in `sanitiser/allowlist.ts`, for both sanitisers; never list a

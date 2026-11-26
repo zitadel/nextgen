@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { de } from "./de.js";
 import { en } from "./en.js";
 import { it as italian } from "./it.js";
+import { builtinLocales } from "../../locales.js";
 import { mergeLocale, Translations } from "./translations.js";
 
 describe("mergeLocale", () => {
@@ -185,6 +186,13 @@ describe("Translations.load", () => {
   ])("loads the built-in dictionary for %s", async (tag, expected) => {
     expect((await Translations.load(tag)).texts).toEqual(expected);
   });
+
+  it.each(Object.entries(builtinLocales))(
+    "loads every language the public map lists: %s",
+    async (language, expected) => {
+      expect((await Translations.load(language)).texts).toEqual(expected);
+    },
+  );
 
   it("merges the integrator's text over the loaded translation", async () => {
     const locale = (await Translations.load("de", { de: { "identifier.title": "Willkommen" } }))
