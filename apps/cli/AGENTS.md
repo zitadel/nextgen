@@ -347,6 +347,9 @@
   throws `refusalError(X_REFUSAL, ...)`, then `throw error;`.
 - Recognise an error only by `instanceof`, never by `reason`, `code`, `hint`,
   `message`, `status` or `name`.
+- Where a call yields a value that falls back to a default, use one
+  `.catch((error: unknown) => { if (error instanceof X) { return fallback; } throw error; })`;
+  never chain or nest `.catch`, and never use `let`, an IIFE, `Promise.allSettled` or `.then(ok, err)` as a catch.
 - Make a class for a server code where an `ApiError` becomes a backend error, in
   `src/lib/backend/client.ts`.
 - Write every hint and next command in the catching command's `*_REFUSAL`.
