@@ -66,14 +66,15 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
     const current = scaffolding
       ? this.deps.ui.begin(`Scaffolding a new ${app.framework} project`)
       : undefined;
-    const newApp = scaffolding
-      ? await orca
-          .scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force)
-          .catch((error) => {
-            current?.fail();
-            throw error;
-          })
-      : undefined;
+    let newApp: Awaited<ReturnType<typeof orca.scaffoldUndoably>> | undefined;
+    if (scaffolding) {
+      try {
+        newApp = await orca.scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force);
+      } catch (error) {
+        current?.fail();
+        throw error;
+      }
+    }
     if (newApp !== undefined) {
       current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
     }

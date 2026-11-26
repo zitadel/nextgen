@@ -1,7 +1,14 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { log, warnings, type BoxAction } from "@/lib/ui";
-import { ZitadelError } from "@/lib/errors";
-import { type DependencyInstall, type InstallContext, PM, type Runner } from "@/lib/pm";
+import { errorMessage, ZitadelError } from "@/lib/errors";
+import {
+  type DependencyInstall,
+  type InstallContext,
+  PM,
+  PmCommandFailedError,
+  PmError,
+  type Runner,
+} from "@/lib/pm";
 import { Guidance, suggestedCommandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { WizardStep } from "@/lib/wizard";
 
@@ -135,6 +142,26 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
       },
       log,
       failed: (error, installCommand) => {
+        let original: {
+          name?: string;
+          message: string;
+          code?: string;
+        } = {
+          message: String(error),
+        };
+        if (error instanceof Error) {
+          original = {
+            name: error.name,
+            message: error.message,
+          };
+        }
+        if (error instanceof PmError) {
+          original = {
+            name: error.name,
+            message: error.message,
+            code: error.code,
+          };
+        }
         return new ZitadelError(
           "E_VALIDATION",
           `Dependency install failed: ${installCommand.display}`,
@@ -144,16 +171,7 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
             details: {
               command: installCommand.display,
               cwd: this.deps.cwd,
-              original:
-                error instanceof Error
-                  ? {
-                      name: error.name,
-                      message: error.message,
-                      code: "code" in error ? error.code : undefined,
-                    }
-                  : {
-                      message: String(error),
-                    },
+              original,
             },
           },
         );
@@ -191,13 +209,13 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         if (this.deps.signal.aborted) {
           throw this.deps.signal.reason;
         }
-        const output =
-          typeof error === "object" && error !== null && "output" in error
-            ? error.output
-            : undefined;
+        let output: string | undefined;
+        if (error instanceof PmCommandFailedError) {
+          output = error.output;
+        }
         warnings.report(
-          `${suggestedCommandOf(command.inDirectory(flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${
-            typeof output === "string" && output.trim() !== ""
+          `${suggestedCommandOf(command.inDirectory(flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${errorMessage(error)}${
+            output !== undefined && output.trim() !== ""
               ? `\n${output.trimEnd().split("\n").slice(-QUOTED_OUTPUT_LINES).join("\n")}`
               : ""
           }`,

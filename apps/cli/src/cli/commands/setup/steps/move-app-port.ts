@@ -287,20 +287,21 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
         );
       }
       const replacing = !this.deps.dryRun && moved && portFromIssuer(previousIssuer) !== undefined;
-      const consent = replacing
-        ? await this.deps
-            .consent({
-              verb: "replace",
-              name: `remove ${previousIssuer} from the project's origins`,
-              message: `Remove ${previousIssuer}, the app's previous origin, from project ${secret.data.project_id} on ${source.replace(/^https?:\/\//, "")}, now that ${issuer} replaces it?`,
-            })
-            .catch((error: unknown) => {
-              if (Consent.isRefusal(error)) {
-                return "refused" as const;
-              }
-              throw error;
-            })
-        : undefined;
+      let consent: Awaited<ReturnType<Deps["consent"]>> | "refused" | undefined;
+      if (replacing) {
+        try {
+          consent = await this.deps.consent({
+            verb: "replace",
+            name: `remove ${previousIssuer} from the project's origins`,
+            message: `Remove ${previousIssuer}, the app's previous origin, from project ${secret.data.project_id} on ${source.replace(/^https?:\/\//, "")}, now that ${issuer} replaces it?`,
+          });
+        } catch (error) {
+          if (!Consent.isRefusal(error)) {
+            throw error;
+          }
+          consent = "refused";
+        }
+      }
       const granted = consent === undefined || consent === "refused" ? undefined : consent;
       const removal =
         replacing && granted !== undefined

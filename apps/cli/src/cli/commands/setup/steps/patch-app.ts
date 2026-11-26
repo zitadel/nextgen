@@ -122,17 +122,18 @@ export class PatchApp extends WizardStep<
     const patching = this.deps.ui.begin(
       `Patching project files${this.deps.dryRun ? " (dry run)" : ""}`,
     );
-    const patched = await patcher
-      .patch(patchContext(framework, project), {
+    let patched: Awaited<ReturnType<typeof patcher.patch>>;
+    try {
+      patched = await patcher.patch(patchContext(framework, project), {
         cwd: this.deps.cwd,
         dryRun: this.deps.dryRun,
         force: this.deps.force,
-      })
-      .catch(async (error: unknown) => {
-        await this.rollBack(envFilesBefore);
-        patching.fail();
-        throw error;
       });
+    } catch (error) {
+      await this.rollBack(envFilesBefore);
+      patching.fail();
+      throw error;
+    }
     for (const file of patched.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.deps.cwd, file), this.deps.dryRun);
       if (sentence) {

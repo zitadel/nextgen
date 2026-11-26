@@ -13,13 +13,14 @@ import {
   type SetupServices,
 } from "@/cli/commands/setup/shared";
 import { Claim } from "@/lib/claim";
+import { isErrno } from "@/lib/errno";
 import { pathExists } from "@/lib/fs";
 import { callbackUriFor, unpublished } from "@/lib/idp";
 import type { CommandResult } from "@/cli/core";
 import { asStepsShown } from "@/cli/core/next-steps";
 import { painted } from "@/lib/oclif/rendering";
 import { detectors } from "@/lib/orca/detectors";
-import { PM } from "@/lib/pm";
+import { PM, PmManifestInvalidError } from "@/lib/pm";
 import { type Fact as SummaryFact, section, type Summary, style } from "@/lib/ui";
 import { Guidance, Spelling, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -336,19 +337,26 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
     if (!this.deps.dryRun) {
       this.deps.ui.ranAgainst(project.id, answers.server);
     }
+    let manifest: Awaited<ReturnType<typeof PM.manifest>> | undefined;
+    if (!this.deps.isJson) {
+      try {
+        manifest = await PM.manifest(this.deps.cwd);
+      } catch (error) {
+        if (!(error instanceof PmManifestInvalidError) && !isErrno(error, "ENOENT")) {
+          throw error;
+        }
+      }
+    }
     const projectFacts = this.deps.isJson
       ? undefined
       : await Promise.all([
           pathExists(join(this.deps.cwd, "tsconfig.json")),
           PM.detect(this.deps.cwd),
-          PM.manifest(this.deps.cwd).catch(() => {
-            return undefined;
-          }),
-        ]).then(([typescript, packageManager, packageJson]) => {
+        ]).then(([typescript, packageManager]) => {
           return {
             typescript,
             packageManager,
-            packageJson,
+            packageJson: manifest,
           };
         });
     const detector = detectors.find((candidate) => {

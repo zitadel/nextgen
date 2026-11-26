@@ -49,7 +49,13 @@ import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import type { Facts } from "@/cli/core/base";
-import { LocalRuntime, type LocalMachine, type ResolvedServer, ZitadelRuntime } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerError,
+  type LocalMachine,
+  type ResolvedServer,
+  ZitadelRuntime,
+} from "@/lib/server";
 
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
@@ -1587,9 +1593,15 @@ export async function outdatedLocalServer(
   cwd: string,
   machine: LocalMachine,
 ): Promise<OutdatedLocalServer | undefined> {
-  const nearest = await LocalRuntime.readNearest(cwd).catch(() => {
+  let nearest: Awaited<ReturnType<typeof LocalRuntime.readNearest>>;
+  try {
+    nearest = await LocalRuntime.readNearest(cwd);
+  } catch (error) {
+    if (!(error instanceof LocalServerError)) {
+      throw error;
+    }
     return undefined;
-  });
+  }
   const runtime = nearest?.runtime;
   const expected = machine.bundledVersion();
   if (
