@@ -103,15 +103,29 @@ export abstract class Store implements ConfigStore {
           return name.endsWith(".json");
         })
         .sort();
-      // One file at a time in path order, so the first failure in path order
-      // is the one raised and which bad file is named never depends on which
-      // read finished first.
-      const stored: StoredFile[] = [];
-      for (const name of files) {
-        stored.push(await this.readFileAt(`${directory}/${name}`));
+      // Every read settles before any failure is raised, and the first failure
+      // in path order is the one raised, so which bad file is named never
+      // depends on which read finished first.
+      const readings = await Promise.all(
+        files.map((name) => {
+          return this.readFileAt(`${directory}/${name}`).catch((error: unknown) => {
+            if (error instanceof ZitadelConfigError) {
+              return error;
+            }
+            throw error;
+          });
+        }),
+      );
+      const failure = readings.find((reading) => {
+        return reading instanceof ZitadelConfigError;
+      });
+      if (failure !== undefined) {
+        throw failure;
       }
 
-      return stored;
+      return readings.filter((reading): reading is StoredFile => {
+        return !(reading instanceof ZitadelConfigError);
+      });
     } catch (error) {
       // Only an absent directory means the project has none: a permission
       // failure, or a file where the directory should be, reported as "no
