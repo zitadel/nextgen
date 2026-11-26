@@ -204,8 +204,15 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_NETWORK");
     expect(result.exitCode).toBe(4);
     expect(result.message).toBe("GET http://localhost:8080/idps got no response (ECONNREFUSED)");
-    expect(result.hint).toBe("Check your connection and the server URL (ZITADEL_URL or --server).");
     expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreachable" });
+  });
+
+  it("leaves the hint of a request that got no response to the CLI, which names --server", () => {
+    const err = new BackendUnreachableError("GET http://localhost:8080/idps got no response", {
+      url: "http://localhost:8080/idps",
+    });
+
+    expect(toZitadelError(err).hint).toBeUndefined();
   });
 
   it("maps a request that timed out to E_NETWORK with a hint about the server", () => {

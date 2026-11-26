@@ -131,7 +131,7 @@ export class Path {
         return fs.lstatSync(path.value).isSymbolicLink();
       } catch (error) {
         // Nothing there, or a file where a directory would be: no link either way.
-        const failure = fsFailure(error, "inspect", path.value);
+        const failure = fsFailure(error);
         if (failure instanceof FsNotFoundError) {
           return false;
         }

@@ -1,4 +1,6 @@
-import { errorMessage, ZitadelLibError } from "@/lib/errors";
+import { SERVER } from "@/constants";
+import { Cmd } from "@/lib/cmd";
+import { errorMessage, originalOf, ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 import type { StopBinaryRuntimeResult } from "@/lib/server/local/internal/binary-launcher";
 import type { ManagedRuntimeProcess } from "@/lib/server/local/processes";
@@ -183,10 +185,25 @@ export class LocalServerEnvUnreadableError extends LocalServerError {
    * @param path - The env file, which the refusal names.
    * @param cause - The failure that reading it raised.
    */
+  override readonly hint: string;
+
   constructor(message: string, path: string, cause: unknown) {
     super(message, cause);
     this.path = path;
     this.failure = errorMessage(cause);
+    this.hint = `The file ${Cmd.quote(path)} exists but could not be read; fix its permissions or remove it.`;
+  }
+
+  /**
+   * The file, and what reading it failed with.
+   *
+   * @returns The path, and the failure as `message`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      path: this.path,
+      message: this.failure,
+    };
   }
 }
 
@@ -252,6 +269,8 @@ export class LocalServerPermitMismatchError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "A reset acts on one folder only. Run it from the folder whose server you mean to reset.";
 }
 
 /**
@@ -317,6 +336,7 @@ export class LocalServerUrlInvalidError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = `Use a URL like ${SERVER}.`;
 }
 
 /** The local server does not host the platform project, so the local admin cannot sign in. */
@@ -359,10 +379,13 @@ export class LocalServerBusyError extends LocalServerError {
    * @param lockFile - The lock file the other start holds.
    * @param ownerPid - The process the lock names as its owner, when it names one.
    */
+  override readonly hint: string;
+
   constructor(message: string, lockFile: string, ownerPid: number | undefined) {
     super(message);
     this.lockFile = lockFile;
     this.ownerPid = ownerPid;
+    this.hint = `Wait for it to finish, or delete ${Cmd.quote(lockFile)} if no start is running.`;
   }
 }
 
@@ -414,6 +437,18 @@ export class LocalServerProcessDeniedError extends LocalServerError {
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";
+  override readonly hint: string = "Check file permissions or run with the right user.";
+
+  /**
+   * The error the operating system refused the signal with.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
 }
 
 /** The server does not know the local admin, or refused its session. */
@@ -501,6 +536,8 @@ export class LocalServerStopError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Inspect the local runtime process and stop it manually, then rerun the command.";
 
   /** The record of the server that did not stop, when one server was stopped. */
   readonly runtime: object | undefined;
@@ -551,10 +588,25 @@ export class LocalServerRecordUnreadableError extends LocalServerError {
    * @param path - The record, which the refusal names.
    * @param cause - The failure that reading it raised.
    */
+  override readonly hint: string;
+
   constructor(message: string, path: string, cause: unknown) {
     super(message, cause);
     this.path = path;
     this.failure = errorMessage(cause);
+    this.hint = `Check that ${Cmd.quote(path)} and its directory are readable by you.`;
+  }
+
+  /**
+   * The record, and what reading it failed with.
+   *
+   * @returns The path, and the failure as `cause`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      path: this.path,
+      cause: this.failure,
+    };
   }
 }
 

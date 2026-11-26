@@ -176,7 +176,7 @@ export abstract class Store implements ConfigStore {
       await this.fs.promises.access(this.root.resolve(path).toString());
       return true;
     } catch (error) {
-      const failure = fsFailure(error, "access", path);
+      const failure = fsFailure(error);
       if (failure instanceof FsNotFoundError) {
         return false;
       }
@@ -239,7 +239,7 @@ export abstract class Store implements ConfigStore {
     } catch (error) {
       // A file that is not there, or a directory on the way that is a file,
       // is already removed.
-      const failure = fsFailure(error, "remove", path);
+      const failure = fsFailure(error);
       if (failure instanceof FsNotFoundError) {
         return;
       }
@@ -297,7 +297,7 @@ export abstract class Store implements ConfigStore {
         } catch (error) {
           // Only a file that is not there may be omitted; one that is there
           // but unreadable is refused, so a deploy never drops it silently.
-          const failure = fsFailure(error, "read", target.toString());
+          const failure = fsFailure(error);
           if (failure instanceof FsNotFoundError) {
             return undefined;
           }
@@ -453,7 +453,7 @@ export abstract class Store implements ConfigStore {
     } catch (error) {
       // A directory named like a file cannot be parsed, but it hides nothing
       // else: it is reported as the broken entry it is.
-      if (fsFailure(error, "read", path) instanceof FsIsDirectoryError) {
+      if (fsFailure(error) instanceof FsIsDirectoryError) {
         return UnparsedFile.directory(path);
       }
       if (isErrno(error, "EACCES")) {

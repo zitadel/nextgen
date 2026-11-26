@@ -1,40 +1,33 @@
 import {
-  BackendInternalError,
   BackendMethodMismatchError,
   BackendNameUnknownError,
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
-  BackendPageMalformedError,
   BackendPathUnknownError,
-  BackendReleaseContentRevokedError,
+  BackendUnreachableError,
   BackendVariablePreviewMissingError,
   BackendVariablePrimaryMissingError,
 } from "@/lib/backend";
 
-import type { Refusal } from "@/cli/core/refusal";
-import { derived, type Wording } from "./wording";
+import { type Advice, derived, type Wording } from "./wording";
+
+/** How a server that cannot be reached is refused. */
+const UNREACHABLE_ADVICE = {
+  hint: "Check your connection and the server URL (ZITADEL_URL or --server).",
+} as const satisfies Advice;
 
 /** How a variable with no preview value is refused. */
-const VARIABLE_PREVIEW_MISSING_REFUSAL = {
-  message: "{message}",
+const VARIABLE_PREVIEW_MISSING_ADVICE = {
   hint: "A name has a preview value only once one is set with `--preview`.",
-} as const satisfies Refusal;
+} as const satisfies Advice;
 
 /** How a variable with no primary value is refused. */
-const VARIABLE_PRIMARY_MISSING_REFUSAL = {
-  message: "{message}",
+const VARIABLE_PRIMARY_MISSING_ADVICE = {
   hint: "Set one with `variable set`.",
-} as const satisfies Refusal;
-
-/** How content that was released already, as a release since revoked, is refused. */
-const RELEASE_CONTENT_REVOKED_REFUSAL = {
-  message: "{message}",
-  hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
-} as const satisfies Refusal;
+} as const satisfies Advice;
 
 /** How a path that matches no operation's template is refused. */
-const PATH_UNKNOWN_REFUSAL = {
-  message: "{message}",
+const PATH_UNKNOWN_ADVICE = {
   hint: "List the paths with `zitadel api ls`.",
   details: {},
   next: [
@@ -45,11 +38,10 @@ const PATH_UNKNOWN_REFUSAL = {
       },
     },
   ],
-} as const satisfies Refusal;
+} as const satisfies Advice;
 
 /** How an operation id that names nothing the API has is refused. */
-const OPERATION_UNKNOWN_REFUSAL = {
-  message: "{message}",
+const OPERATION_UNKNOWN_ADVICE = {
   hint: "{fix}",
   details: {},
   next: [
@@ -60,11 +52,10 @@ const OPERATION_UNKNOWN_REFUSAL = {
       },
     },
   ],
-} as const satisfies Refusal;
+} as const satisfies Advice;
 
 /** How an operation id given a method that is not its own is refused. */
-const METHOD_MISMATCH_REFUSAL = {
-  message: "{message}",
+const METHOD_MISMATCH_ADVICE = {
   hint: "Leave out -X, or pass -X {method}.",
   details: {},
   next: [
@@ -75,11 +66,10 @@ const METHOD_MISMATCH_REFUSAL = {
       },
     },
   ],
-} as const satisfies Refusal;
+} as const satisfies Advice;
 
 /** How a path whose method does not pick one operation is refused. */
-const OPERATION_AMBIGUOUS_REFUSAL = {
-  message: "{message}",
+const OPERATION_AMBIGUOUS_ADVICE = {
   hint: "Pass -X with one of {offered}.",
   details: {},
   next: [
@@ -90,22 +80,13 @@ const OPERATION_AMBIGUOUS_REFUSAL = {
       },
     },
   ],
-} as const satisfies Refusal;
+} as const satisfies Advice;
 
 /** How a name no flow or schema carries is refused, with where to list them. */
-const NAME_UNKNOWN_REFUSAL = {
-  message: "{message}",
+const NAME_UNKNOWN_ADVICE = {
   hint: "{fix}",
   details: {},
-} as const satisfies Refusal;
-
-/** How a bug in the backend's own code is reported, with the failure it is. */
-const INTERNAL_REFUSAL = {
-  message: "{message}",
-  details: {
-    original: "{original}",
-  },
-} as const satisfies Refusal;
+} as const satisfies Advice;
 
 /** The command that lists each kind of named record, as the hint names it. */
 const LISTED_BY = {
@@ -113,24 +94,19 @@ const LISTED_BY = {
   schema: "Run `schema list` to see the object types this project has.",
 } as const;
 
-/** How a page that does not hold the list its operation pages through is refused. */
-const PAGE_MALFORMED_REFUSAL = {
-  message: "{message}",
-} as const satisfies Refusal;
-
 /**
- * How the errors of `@/lib/backend` are worded, most specific class first.
+ * How the errors of `@/lib/backend` are advised on, each for exactly its class.
  *
- * Only the classes the CLI raises with facts of its own are worded here. Every
- * other backend error is the server's answer, which `toZitadelError` words
- * from the status and the body the server sent.
+ * Only the classes whose advice names a command or a flag are here. A backend
+ * error the server answered is worded by `toZitadelError` from its status and
+ * the body the server sent; any other states itself.
  */
 export const BACKEND_WORDINGS: readonly Wording[] = [
-  [BackendVariablePreviewMissingError, VARIABLE_PREVIEW_MISSING_REFUSAL],
-  [BackendVariablePrimaryMissingError, VARIABLE_PRIMARY_MISSING_REFUSAL],
-  [BackendReleaseContentRevokedError, RELEASE_CONTENT_REVOKED_REFUSAL],
-  [BackendPathUnknownError, PATH_UNKNOWN_REFUSAL],
-  derived(BackendOperationUnknownError, OPERATION_UNKNOWN_REFUSAL, (error) => {
+  [BackendUnreachableError, UNREACHABLE_ADVICE],
+  [BackendVariablePreviewMissingError, VARIABLE_PREVIEW_MISSING_ADVICE],
+  [BackendVariablePrimaryMissingError, VARIABLE_PRIMARY_MISSING_ADVICE],
+  [BackendPathUnknownError, PATH_UNKNOWN_ADVICE],
+  derived(BackendOperationUnknownError, OPERATION_UNKNOWN_ADVICE, (error) => {
     return {
       values: {
         fix:
@@ -140,21 +116,19 @@ export const BACKEND_WORDINGS: readonly Wording[] = [
       },
     };
   }),
-  [BackendMethodMismatchError, METHOD_MISMATCH_REFUSAL],
-  derived(BackendOperationAmbiguousError, OPERATION_AMBIGUOUS_REFUSAL, (error) => {
+  [BackendMethodMismatchError, METHOD_MISMATCH_ADVICE],
+  derived(BackendOperationAmbiguousError, OPERATION_AMBIGUOUS_ADVICE, (error) => {
     return {
       values: {
         offered: error.methods.join(", "),
       },
     };
   }),
-  [BackendPageMalformedError, PAGE_MALFORMED_REFUSAL],
-  derived(BackendNameUnknownError, NAME_UNKNOWN_REFUSAL, (error) => {
+  derived(BackendNameUnknownError, NAME_UNKNOWN_ADVICE, (error) => {
     return {
       values: {
         fix: LISTED_BY[error.kind],
       },
     };
   }),
-  [BackendInternalError, INTERNAL_REFUSAL],
 ];

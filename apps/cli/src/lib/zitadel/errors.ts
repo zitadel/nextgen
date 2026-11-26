@@ -22,6 +22,19 @@ export class ZitadelConfigError extends ZitadelLibError {
 
   /** The stable product code the failure is reported with; a subclass states its own. */
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The failure's facts, keyed as the package reports them: a project file as `file` and an operating system's error code as `code`.
+   *
+   * @returns The facts, by name.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return Object.fromEntries(
+      Object.entries(super.details).map(([key, value]) => {
+        return [key === "path" ? "file" : key === "errno" ? "code" : key, value];
+      }),
+    );
+  }
 }
 
 /**
@@ -73,6 +86,19 @@ export class ZitadelConfigFlowMethodInUseError extends ZitadelConfigError {
     this.issues = facts.issues;
     this.uses = facts.uses;
   }
+
+  /**
+   * The flow, its issues, and the steps that still use the method, as `--json` reports them.
+   *
+   * @returns The file, the issues and the steps.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.file,
+      issues: issueDetailsOf(this.issues),
+      steps: stepDetailsOf(this.uses),
+    };
+  }
 }
 
 /**
@@ -82,6 +108,7 @@ export class ZitadelConfigFlowBrokenError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = "Fix the steps named above, then run the command again.";
 
   /**
    * The project-relative path of the schema whose edit was checked.
@@ -109,6 +136,18 @@ export class ZitadelConfigFlowBrokenError extends ZitadelConfigError {
     super(message);
     this.file = facts.file;
     this.issues = facts.issues;
+  }
+
+  /**
+   * The flow, and its issues as `--json` reports them.
+   *
+   * @returns The file, and the issues.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.file,
+      issues: issueDetailsOf(this.issues),
+    };
   }
 }
 
@@ -147,6 +186,18 @@ export class ZitadelConfigFlowUncheckedError extends ZitadelConfigError {
     this.file = facts.file;
     this.issues = facts.issues;
   }
+
+  /**
+   * The flow, and its issues as `--json` reports them.
+   *
+   * @returns The file, and the issues.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.file,
+      issues: issueDetailsOf(this.issues),
+    };
+  }
 }
 
 /**
@@ -172,6 +223,8 @@ export class ZitadelConfigFilesBrokenError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Fix the files named above, then run the command again; nothing was changed.";
 
   /**
    * Each file refused, and why.
@@ -224,6 +277,8 @@ export class ZitadelConfigClientIdMismatchError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Edit the connection file to change its client id, or run the command without one to reuse it.";
 
   /**
    * The project-relative path of the connection.
@@ -253,6 +308,19 @@ export class ZitadelConfigClientIdMismatchError extends ZitadelConfigError {
     this.stored = stored;
     this.supplied = supplied;
   }
+
+  /**
+   * The connection file, and the client ids it holds and was given.
+   *
+   * @returns The file, and both client ids.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.path,
+      stored_client_id: this.stored,
+      supplied_client_id: this.supplied,
+    };
+  }
 }
 
 /**
@@ -262,6 +330,7 @@ export class ZitadelConfigSettingUnusableError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = "Fix it in that file, or choose another slug.";
 
   /**
    * The project-relative path of the connection.
@@ -297,6 +366,7 @@ export class ZitadelConfigPathUnreadableError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = "Check that the file is readable, then run the command again.";
 
   /**
    * The project-relative path that cannot be read.
@@ -340,6 +410,8 @@ export class ZitadelConfigConnectionNotOidcError extends ZitadelConfigResourceCl
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "Fix the file, or choose another slug, then run the command again.";
 
   /**
    * The project-relative path of the connection.
@@ -371,6 +443,8 @@ export class ZitadelConfigConnectionIssuerClashError extends ZitadelConfigResour
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another slug for this connection, then move the schemas and flows that name the old one to it.";
 
   /**
    * The project-relative path of the connection.
@@ -419,16 +493,12 @@ export class ZitadelConfigProviderFileTakenError extends ZitadelConfigResourceCl
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string = "Rename or remove that file, then run the command again.";
 
   /**
    * The project-relative path that is taken.
    */
   readonly path: string;
-
-  /**
-   * The slug the file was wanted for.
-   */
-  readonly wanted: string;
 
   /**
    * The slug of the connection the file holds.
@@ -445,7 +515,6 @@ export class ZitadelConfigProviderFileTakenError extends ZitadelConfigResourceCl
   constructor(path: string, wanted: string, slug: string) {
     super(`${path} already exists and is not the ${wanted} connection`);
     this.path = path;
-    this.wanted = wanted;
     this.slug = slug;
   }
 }
@@ -457,16 +526,13 @@ export class ZitadelConfigConnectionFileTakenError extends ZitadelConfigResource
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "Rename or remove that file, or choose another slug, then run the command again.";
 
   /**
    * The project-relative path that is taken.
    */
   readonly path: string;
-
-  /**
-   * The slug the file was wanted for.
-   */
-  readonly wanted: string;
 
   /**
    * The slug of the connection the file holds.
@@ -483,7 +549,6 @@ export class ZitadelConfigConnectionFileTakenError extends ZitadelConfigResource
   constructor(path: string, wanted: string, slug: string) {
     super(`${path} already exists and is not the ${wanted} connection`);
     this.path = path;
-    this.wanted = wanted;
     this.slug = slug;
   }
 }
@@ -531,6 +596,20 @@ export class ZitadelConfigSchemaMissingError extends ZitadelConfigResourceMissin
     this.requested = requested ?? null;
     this.known = known;
   }
+
+  /**
+   * The schema asked for, and the names of those there are.
+   *
+   * @returns The request, and the known names.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      requested: this.requested,
+      known: this.known.map((schema) => {
+        return schema.name;
+      }),
+    };
+  }
 }
 
 /**
@@ -571,6 +650,20 @@ export class ZitadelConfigSchemaAmbiguousError extends ZitadelConfigError {
     super(message);
     this.requested = requested ?? null;
     this.candidates = candidates;
+  }
+
+  /**
+   * The schema asked for, and the names of those that answer to it.
+   *
+   * @returns The request, and the candidates' names.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      requested: this.requested,
+      candidates: this.candidates.map((schema) => {
+        return schema.name;
+      }),
+    };
   }
 }
 
@@ -656,6 +749,19 @@ export class ZitadelConfigEditLockoutError extends ZitadelConfigError implements
     this.usable = input.usable;
     this.alternatives = input.alternatives;
   }
+
+  /**
+   * The schema file, and the methods left to sign in with.
+   *
+   * @returns The file, the methods still usable and the alternatives.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.path,
+      usable: this.usable,
+      alternatives: this.alternatives,
+    };
+  }
 }
 
 /**
@@ -669,6 +775,8 @@ export class ZitadelConfigFileExistsError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "Move or rename the file that is already there, then run the command again.";
 
   /**
    * The project-relative path that is already taken.
@@ -700,6 +808,8 @@ export class ZitadelConfigConnectionExistsError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "A connection file is yours to keep, so it is never replaced or removed. Remove it to scaffold a fresh one, or keep it and enable the provider to reuse it.";
 
   /**
    * The project-relative path of the connection already there.
@@ -722,6 +832,17 @@ export class ZitadelConfigConnectionExistsError extends ZitadelConfigError {
     this.path = path;
     this.selection = selection;
   }
+
+  /**
+   * The connection file that is already there.
+   *
+   * @returns Its path, as `file`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.path,
+    };
+  }
 }
 
 /**
@@ -732,6 +853,7 @@ export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";
+  override readonly hint: string = "Check that the file is readable, then run the command again.";
 
   /**
    * The project-relative path that cannot be read.
@@ -770,6 +892,7 @@ export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
  * caller that refuses one refuses the other the same way.
  */
 export class ZitadelConfigReferenceUnreadableError extends ZitadelConfigFileUnreadableError {
+  override readonly hint: string = "Create the referenced file or fix the path.";
   /**
    * The reference, as the file holding it wrote it.
    */
@@ -794,6 +917,8 @@ export class ZitadelConfigSchemaExternalError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Its sign-in methods live in the schema at its url, which the server fetches. Edit x-auth-methods there instead.";
 
   /** The pointer file of the external schema. */
   readonly file: string;
@@ -823,11 +948,8 @@ export class ZitadelConfigBrandingDuplicatedError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * How many branding descriptors `.zitadel/branding/` holds.
-   */
-  readonly count: number;
+  override readonly hint: string =
+    "A project has a single branding; keep one descriptor under .zitadel/branding/.";
 
   /**
    * Make the failure for this many descriptors.
@@ -836,7 +958,6 @@ export class ZitadelConfigBrandingDuplicatedError extends ZitadelConfigError {
    */
   constructor(count: number) {
     super(`A release carries at most one branding, but .zitadel/branding/ holds ${count}`);
-    this.count = count;
   }
 }
 
@@ -898,6 +1019,8 @@ export class ZitadelConfigHandleInvalidError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "A handle must be a single name, without slashes or dots that climb out of its directory.";
 
   /**
    * The handle, as the server gave it.
@@ -922,6 +1045,7 @@ export class ZitadelConfigHandleClashError extends ZitadelConfigResourceClashErr
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string = "Remove or fix all but one of them, then run the command again.";
 
   /**
    * The handle they hold.
@@ -955,6 +1079,8 @@ export class ZitadelConfigConnectionDuplicatedError extends ZitadelConfigResourc
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "Keep the one this project should use and remove the others, then run the command again.";
 
   /**
    * The provider's slug.
@@ -978,6 +1104,18 @@ export class ZitadelConfigConnectionDuplicatedError extends ZitadelConfigResourc
     this.provider = provider;
     this.paths = paths;
   }
+
+  /**
+   * The provider, and the files that each hold a connection to it.
+   *
+   * @returns The provider, and the files.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      provider: this.provider,
+      files: this.paths,
+    };
+  }
 }
 
 /**
@@ -987,6 +1125,8 @@ export class ZitadelConfigSlugDuplicatedError extends ZitadelConfigResourceClash
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "A slug names one connection. Remove or rename all but one, then run the command again.";
 
   /**
    * The slug.
@@ -1009,6 +1149,18 @@ export class ZitadelConfigSlugDuplicatedError extends ZitadelConfigResourceClash
     this.slug = slug;
     this.paths = paths;
   }
+
+  /**
+   * The slug, and the files that each hold a connection by it.
+   *
+   * @returns The slug, and the files.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      slug: this.slug,
+      files: this.paths,
+    };
+  }
 }
 
 /**
@@ -1019,11 +1171,7 @@ export class ZitadelConfigProviderUnknownError extends ZitadelConfigResourceMiss
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
-
-  /**
-   * The schema's name.
-   */
-  readonly schema: string;
+  override readonly hint: string;
 
   /**
    * The provider, as it was asked for.
@@ -1055,10 +1203,10 @@ export class ZitadelConfigProviderUnknownError extends ZitadelConfigResourceMiss
     connections: readonly string[],
   ) {
     super(`${schema} has no provider named ${requested}`);
-    this.schema = schema;
     this.requested = requested;
     this.offered = offered;
     this.connections = connections;
+    this.hint = `${schema} offers: ${offered.join(", ") || "none"}. Connections under .zitadel/idps/: ${connections.join(", ") || "none"}.`;
   }
 }
 
@@ -1070,6 +1218,8 @@ export class ZitadelConfigConnectionProviderMismatchError extends ZitadelConfigR
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "Point it at the provider if it is that connection. Otherwise change its slug, in the file and in the schemas and flows that name it, then run the command again.";
 
   /**
    * The project-relative path of the connection.
@@ -1105,6 +1255,8 @@ export class ZitadelConfigCredentialsDoubledError extends ZitadelConfigResourceC
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "Give client_id and client_secret separate ${{ NAME }} references, then run the command again.";
 
   /**
    * The connection's slug.
@@ -1136,6 +1288,8 @@ export class ZitadelConfigVariableSharedError extends ZitadelConfigResourceClash
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly hint: string =
+    "Point one of them at a variable of its own, then run the command again.";
 
   /**
    * The project-relative path of the other connection.
@@ -1182,6 +1336,8 @@ export class ZitadelConfigRegionUneditableError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "This command edits that region, and it is not the shape it edits. Fix it against the dialect in .zitadel/meta/, then run the command again.";
 
   /**
    * The project-relative path of the file.
@@ -1213,6 +1369,8 @@ export class ZitadelConfigFlowMissingError extends ZitadelConfigResourceMissingE
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+  override readonly hint: string =
+    "The provider is offered by a flow, and none of the files under .zitadel/flows/ names this schema. Check that the flow's user_schema names the schema's objectType.";
 
   /**
    * The project-relative path of the schema.
@@ -1228,6 +1386,17 @@ export class ZitadelConfigFlowMissingError extends ZitadelConfigResourceMissingE
   constructor(name: string, path: string) {
     super(`No login flow runs against ${name}`);
     this.path = path;
+  }
+
+  /**
+   * The schema no flow names.
+   *
+   * @returns Its path, as `schema`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      schema: this.path,
+    };
   }
 }
 
@@ -1343,6 +1512,8 @@ export class ZitadelConfigIdentifierMissingError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    'A password is checked against the user found by the schema\'s identifier. Set "x-identifier" to the property users sign in with, e.g. "email", then run the command again.';
 
   /**
    * The project-relative path of the schema.
@@ -1358,6 +1529,18 @@ export class ZitadelConfigIdentifierMissingError extends ZitadelConfigError {
     super(`${path} has no x-identifier for password`);
     this.path = path;
   }
+
+  /**
+   * The schema, and the method that needs its identifier.
+   *
+   * @returns Its path, and `password` as the method.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.path,
+      method: "password",
+    };
+  }
 }
 
 /**
@@ -1368,6 +1551,7 @@ export class ZitadelConfigReferenceMissingError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = "Create the referenced file or fix the path.";
 
   /**
    * The reference, as it was written.
@@ -1384,6 +1568,15 @@ export class ZitadelConfigReferenceMissingError extends ZitadelConfigError {
     super(`$file ${JSON.stringify(ref)} cannot be read`, cause);
     this.ref = ref;
   }
+
+  /**
+   * Nothing beyond the message, which names the reference.
+   *
+   * @returns No facts.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {};
+  }
 }
 
 /**
@@ -1391,6 +1584,7 @@ export class ZitadelConfigReferenceMissingError extends ZitadelConfigError {
  * other than permissions.
  */
 export class ZitadelConfigReferenceBrokenError extends ZitadelConfigReferenceMissingError {
+  override readonly hint: string = "Create the referenced file or fix the path.";
   /**
    * The project-relative path of the file holding the reference.
    */
@@ -1414,6 +1608,19 @@ export class ZitadelConfigReferenceBrokenError extends ZitadelConfigReferenceMis
     this.path = path;
     this.errno = errno;
   }
+
+  /**
+   * The file holding the reference, the reference, and the operating system's error code.
+   *
+   * @returns The file, the reference and, when the system gave one, the code.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.path,
+      ref: this.ref,
+      ...(this.errno === undefined ? {} : { code: this.errno }),
+    };
+  }
 }
 
 /**
@@ -1423,11 +1630,8 @@ export class ZitadelConfigReferenceOutsideError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * The reference, as it was written.
-   */
-  readonly ref: string;
+  override readonly hint: string =
+    "Keep referenced files inside the project, next to the file that references them; a symlink on the way must resolve inside the project too.";
 
   /**
    * Make the failure for this reference.
@@ -1436,7 +1640,6 @@ export class ZitadelConfigReferenceOutsideError extends ZitadelConfigError {
    */
   constructor(ref: string) {
     super(`$file ${JSON.stringify(ref)} points outside the project`);
-    this.ref = ref;
   }
 }
 
@@ -1447,6 +1650,7 @@ export class ZitadelConfigPathOutsideError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = "Files are only written and removed inside .zitadel/.";
 
   /**
    * The project-relative path, as it was given.
@@ -1471,6 +1675,7 @@ export class ZitadelConfigPathBlockedError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
 
   /**
    * The project-relative path being written.
@@ -1493,6 +1698,20 @@ export class ZitadelConfigPathBlockedError extends ZitadelConfigError {
     super(`${path} cannot be written (ENOTDIR)`);
     this.path = path;
     this.blocker = blocker;
+    this.hint = `Remove ${blocker}, which is a file where a directory is needed, then run the command again.`;
+  }
+
+  /**
+   * The path, and the file standing where a directory is needed.
+   *
+   * @returns The path, `ENOTDIR` as the code, and the blocker.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.path,
+      code: "ENOTDIR",
+      blocker: this.blocker,
+    };
   }
 }
 
@@ -1503,6 +1722,7 @@ export class ZitadelConfigDirectoryInTheWayError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
 
   /**
    * The project-relative path.
@@ -1517,5 +1737,77 @@ export class ZitadelConfigDirectoryInTheWayError extends ZitadelConfigError {
   constructor(path: string) {
     super(`${path} cannot be removed (EISDIR)`);
     this.path = path;
+    this.hint = `Remove ${path}, which is a directory where a file is expected, then run the command again.`;
   }
+
+  /**
+   * The path a directory stands at.
+   *
+   * @returns The path, and `EISDIR` as the code.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: this.path,
+      code: "EISDIR",
+    };
+  }
+}
+
+/**
+ * Flow issues in the shape `--json` reports them.
+ *
+ * @param issues - The issues.
+ * @returns Each issue's path, rule, message and, when it has one, step.
+ */
+function issueDetailsOf(
+  issues: readonly FlowIssue[],
+): readonly Readonly<Record<string, unknown>>[] {
+  return issues.map((item) => {
+    if (item.issue.step === undefined) {
+      return {
+        path: item.path,
+        rule: item.issue.rule,
+        message: item.issue.message,
+      };
+    }
+    return {
+      path: item.path,
+      rule: item.issue.rule,
+      message: item.issue.message,
+      step: item.issue.step,
+    };
+  });
+}
+
+/**
+ * The steps that still use a method, in the shape `--json` reports them.
+ *
+ * @param uses - The steps.
+ * @returns Each step with what it keeps, what it is the entry step of and
+ *   what leads to it.
+ */
+function stepDetailsOf(
+  uses: readonly FlowMethodUse[],
+): readonly Readonly<Record<string, unknown>>[] {
+  return uses.map((use) => {
+    return {
+      path: use.path,
+      step: use.step,
+      keeps: use.keeps,
+      entry_for: use.entryFor,
+      targeted_by: use.targetedBy.map((item) => {
+        if (item.purpose === undefined) {
+          return {
+            step: item.step,
+            transition: item.transition,
+          };
+        }
+        return {
+          step: item.step,
+          transition: item.transition,
+          purpose: item.purpose,
+        };
+      }),
+    };
+  });
 }

@@ -1,4 +1,4 @@
-import { ZitadelLibError } from "@/lib/errors";
+import { originalOf, ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 import type { PackageCommand } from "@/lib/pm";
 
@@ -9,7 +9,18 @@ import type { PackageCommand } from "@/lib/pm";
  * A caller catches this, or one of its subclasses, and words the failure for
  * its own person. A failure nothing here anticipated bubbles as it was thrown.
  */
-export abstract class UpgradeError extends ZitadelLibError {}
+export abstract class UpgradeError extends ZitadelLibError {
+  /**
+   * The failure the upgrade stands for.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
+}
 
 /**
  * The newest release could not be looked up. Its message is generic on purpose:

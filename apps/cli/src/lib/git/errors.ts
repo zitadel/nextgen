@@ -1,4 +1,4 @@
-import { ZitadelLibError } from "@/lib/errors";
+import { originalOf, ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
@@ -35,6 +35,17 @@ export abstract class GitError extends ZitadelLibError {
       return reason;
     }
     return lines[0] ?? "git gave no reason";
+  }
+
+  /**
+   * The failure as git, or the package, raised it.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
   }
 }
 

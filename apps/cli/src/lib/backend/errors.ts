@@ -1,6 +1,7 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
 import { ZitadelLibError } from "@/lib/lib-error";
+import { originalOf } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /** What a failure carries beyond its message. */
@@ -136,6 +137,9 @@ export class BackendVariablePreviewMissingError extends BackendNotFoundError {
  * served. A {@link BackendConflictError} like any other conflict.
  */
 export class BackendReleaseContentRevokedError extends BackendConflictError {
+  override readonly hint: string =
+    "A revoked release can never be served again. Change the configuration so it builds a new release.";
+
   /** The revoked release the content built back to. */
   readonly releaseId: string;
 
@@ -331,6 +335,17 @@ export class BackendInternalError extends BackendError {
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The bug as the failure it is.
+   *
+   * @returns The error itself, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
 }
 
 /**
@@ -360,6 +375,18 @@ export class BackendUnreachableError extends BackendError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
+
+  /**
+   * The URL it requested, and how the request failed.
+   *
+   * @returns The URL, and `unreachable` as the reason.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      url: this.url,
+      reason: "unreachable",
+    };
+  }
 }
 
 /** The server accepted the connection but did not answer in time. */
@@ -367,6 +394,20 @@ export class BackendTimeoutError extends BackendError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
+  override readonly hint: string =
+    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.";
+
+  /**
+   * The URL it requested, and how the request failed.
+   *
+   * @returns The URL, and `timeout` as the reason.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      url: this.url,
+      reason: "timeout",
+    };
+  }
 }
 
 /** The server answered, but its response could not be read. */
@@ -374,6 +415,20 @@ export class BackendUnreadableError extends BackendError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
+  override readonly hint: string =
+    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.";
+
+  /**
+   * The URL it requested, and how the request failed.
+   *
+   * @returns The URL, and `unreadable` as the reason.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      url: this.url,
+      reason: "unreadable",
+    };
+  }
 }
 
 /** The server could not be used: it failed with a `5xx`. */

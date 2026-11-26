@@ -456,13 +456,15 @@ export default class Start extends Telemetered(
         }
         if (error instanceof LocalServerStartExitedError) {
           throw refusalError(SERVER_NOT_READY_REFUSAL, {
-            ...NOT_READY_REASONS.exited,
+            message: NOT_READY_REASONS.exited.message,
+            hint: NOT_READY_REASONS.exited.hint,
             details,
           });
         }
         if (error instanceof LocalServerStartTimeoutError) {
           throw refusalError(SERVER_NOT_READY_REFUSAL, {
-            ...NOT_READY_REASONS.timeout,
+            message: NOT_READY_REASONS.timeout.message,
+            hint: NOT_READY_REASONS.timeout.hint,
             details,
           });
         }

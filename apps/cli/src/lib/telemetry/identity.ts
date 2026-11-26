@@ -12,6 +12,8 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { errorMessage } from "@/lib/errors";
+
 import { TelemetryHomeUnknownError } from "./errors";
 
 /**
@@ -87,7 +89,7 @@ export function telemetryConfigDir(env: NodeJS.ProcessEnv): string | undefined {
       return join(homedir(), ".config", "zitadel", "cli");
     } catch (error) {
       // The boundary: `homedir` throws Node's untyped system error.
-      throw new TelemetryHomeUnknownError("Cannot find the home directory", error);
+      throw new TelemetryHomeUnknownError(errorMessage(error), error);
     }
   } catch (error) {
     if (error instanceof TelemetryHomeUnknownError) {

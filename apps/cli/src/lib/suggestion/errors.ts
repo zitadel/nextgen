@@ -1,4 +1,4 @@
-import { ZitadelLibError } from "@/lib/errors";
+import { originalOf, ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
@@ -15,4 +15,15 @@ export class SuggestionInvalidError extends SuggestionError {
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The bug as the failure it is.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
 }

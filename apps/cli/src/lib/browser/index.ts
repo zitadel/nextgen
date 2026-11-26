@@ -1,7 +1,9 @@
 import isWsl from "is-wsl";
 import open from "open";
 
-import { BrowserLaunchError } from "./errors";
+import { errorMessage } from "@/lib/errors";
+
+import { BrowserError } from "./errors";
 
 export * from "./errors";
 
@@ -31,7 +33,7 @@ export type BrowserDeps = {
   platform: NodeJS.Platform;
   env: NodeJS.ProcessEnv;
   wsl: boolean;
-  /** Hands `url` to the desktop's opener, or to the program named by `app` when given; rejects with a `BrowserLaunchError` when it cannot. */
+  /** Hands `url` to the desktop's opener, or to the program named by `app` when given; rejects with a `BrowserError` when it cannot. */
   open: (url: string, app?: string) => Promise<void>;
 };
 
@@ -103,12 +105,12 @@ function hasGraphicalSession(env: NodeJS.ProcessEnv): boolean {
  * @param url - What to open.
  * @param app - The program to open it with, instead of the desktop's opener.
  * @returns Once the opener has started.
- * @throws {@link BrowserLaunchError} When the opener cannot be started.
+ * @throws {@link BrowserError} When the opener cannot be started.
  */
 async function launch(url: string, app?: string): Promise<void> {
   const child = await open(url, app ? { app: { name: app } } : {}).catch((error: unknown) => {
     // The boundary: `open` rejects with untyped errors.
-    throw new BrowserLaunchError("Cannot start the browser opener", error);
+    throw new BrowserError(errorMessage(error), error);
   });
   // A spawn error surfaces asynchronously; swallow it so an opener that
   // vanishes cannot crash the CLI with an unhandled 'error' event.

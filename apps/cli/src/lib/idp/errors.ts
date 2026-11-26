@@ -106,11 +106,7 @@ export class IdpProviderUnknownError extends IdpError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * Every provider the command takes.
-   */
-  readonly known: readonly string[];
+  override readonly hint: string;
 
   /**
    * Make the failure for this name.
@@ -120,6 +116,6 @@ export class IdpProviderUnknownError extends IdpError {
    */
   constructor(provider: string, known: readonly string[]) {
     super(`Unknown provider ${provider}`);
-    this.known = known;
+    this.hint = `Use one of ${known.join(", ")}.`;
   }
 }

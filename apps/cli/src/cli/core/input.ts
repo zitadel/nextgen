@@ -3,7 +3,7 @@ import { text } from "node:stream/consumers";
 
 import { Errors, Flags, type Command, type Interfaces, Parser } from "@oclif/core";
 
-import { ZitadelError } from "@/lib/errors";
+import { errorMessage, ZitadelError } from "@/lib/errors";
 import {
   isObject,
   JsonNotAnObjectError,
@@ -541,7 +541,7 @@ export class Input {
       if (error instanceof FsError) {
         throw refusalError(UNREADABLE_REFUSAL, {
           path,
-          problem: error.reason,
+          problem: errorMessage(error.cause),
         });
       }
       throw error;

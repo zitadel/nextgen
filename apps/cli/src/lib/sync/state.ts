@@ -4,15 +4,10 @@ import { errorMessage } from "@/lib/errors";
 import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
 import { isObject } from "@/lib/json";
 
-import { SyncStateMalformedError, SyncStateUnreadableError } from "./errors";
+import { STATE_PATH, SyncStateMalformedError, SyncStateUnreadableError } from "./errors";
 import type { ScaffoldManifest, StoredState } from "./types.js";
 
 export type { StoredState, ZitadelState } from "./types.js";
-
-/**
- * Where the state file lives, relative to the project root.
- */
-const STATE_PATH = ".zitadel/state.json";
 
 /**
  * The state file's text as JSON.

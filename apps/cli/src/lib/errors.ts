@@ -1,11 +1,6 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import {
-  BackendError,
-  BackendTimeoutError,
-  BackendUnreachableError,
-  BackendUnreadableError,
-} from "./backend";
+import { BackendError } from "./backend";
 import { errnoOf } from "./errno";
 import { isObject } from "./json";
 import { ZitadelLibError } from "./lib-error";
@@ -267,12 +262,18 @@ export function toZitadelError(error: unknown): ZitadelError {
     return error;
   }
 
-  if (error instanceof BackendError) {
-    return fromBackendError(error);
+  if (error instanceof BackendError && error.status !== undefined && error.url !== undefined) {
+    return fromBackendError(error, error.status, error.url);
   }
 
+  // A lib error is reported as it states itself: its code, message, hint and
+  // facts. A backend error the server did not answer is one of them too.
   if (error instanceof ZitadelLibError) {
-    return new ZitadelError(error.code, error.message);
+    const { details } = error;
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: Object.keys(details).length === 0 ? undefined : details,
+    });
   }
 
   if (isZodLikeError(error)) {
@@ -317,47 +318,20 @@ export function toZitadelError(error: unknown): ZitadelError {
 }
 
 /**
- * A {@link BackendError} as the CLI's error. One the server answered carries
- * its status, and is classified by it; one the backend raised itself carries
- * its class, and its message as it was given.
+ * A {@link BackendError} the server answered, as the CLI's error: classified
+ * by its status and the body the server sent.
+ *
+ * @param error - The error.
+ * @param status - The status the server answered with.
+ * @param url - The URL it answered.
+ * @returns The CLI's error.
  */
-function fromBackendError(error: BackendError): ZitadelError {
-  if (error instanceof BackendUnreachableError) {
-    return new ZitadelError("E_NETWORK", error.message, {
-      hint: "Check your connection and the server URL (ZITADEL_URL or --server).",
-      details: {
-        url: error.url,
-        reason: "unreachable",
-      },
-    });
-  }
-  if (error instanceof BackendTimeoutError) {
-    return new ZitadelError("E_NETWORK", error.message, {
-      hint: "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
-      details: {
-        url: error.url,
-        reason: "timeout",
-      },
-    });
-  }
-  if (error instanceof BackendUnreadableError) {
-    return new ZitadelError("E_NETWORK", error.message, {
-      hint: "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
-      details: {
-        url: error.url,
-        reason: "unreadable",
-      },
-    });
-  }
-  if (error.status === undefined || error.url === undefined) {
-    return new ZitadelError(error.code, error.message);
-  }
+function fromBackendError(error: BackendError, status: number, url: string): ZitadelError {
   // `401`/`403` → bad or missing project secret; `404` → something is
   // missing (see below); `5xx` → transport or server fault; everything
   // else 4xx → the body the CLI sent was rejected (validation, conflict, …).
-  const { status, url } = error;
   const details = { status, url, body: error.body };
-  if (error.status === 404) {
+  if (status === 404) {
     // A 404 carrying the platform's error envelope (a `code` field) is a
     // domain-level miss from a real Zitadel API — an unknown schema or
     // project id — except `req.not_found`, which the server answers for a
@@ -365,18 +339,14 @@ function fromBackendError(error: BackendError): ZitadelError {
     // the endpoint itself is missing: the CLI is pointed at a server that
     // isn't a Zitadel platform API.
     if (error.serverCode === "req.not_found") {
-      return new ZitadelError(
-        "E_NOT_FOUND",
-        `${error.url} has no such endpoint on this Zitadel server`,
-        {
-          hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
-          details,
-        },
-      );
+      return new ZitadelError("E_NOT_FOUND", `${url} has no such endpoint on this Zitadel server`, {
+        hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
+        details,
+      });
     }
     const wrongServer = error.serverCode === undefined;
     const message = wrongServer
-      ? `${error.message} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
+      ? `${error.message} — ${url} has no such endpoint; is this a Zitadel platform API?`
       : error.message;
 
     return new ZitadelError("E_NOT_FOUND", message, { details });
@@ -391,16 +361,16 @@ function fromBackendError(error: BackendError): ZitadelError {
   // correct. A 429 is the server asking for less traffic, so it joins the
   // failures worth retrying rather than the ones to fix, which is what
   // `E_NETWORK` says and what its exit code means to a script.
-  const originRefused = error.status === 403 && error.serverCode === "proj.origin_not_allowed";
+  const originRefused = status === 403 && error.serverCode === "proj.origin_not_allowed";
   const code: ZitadelErrorCode = originRefused
     ? "E_VALIDATION"
-    : error.status === 401 || error.status === 403
+    : status === 401 || status === 403
       ? "E_AUTH"
-      : error.status === 409
+      : status === 409
         ? "E_CONFLICT"
-        : error.status === 410
+        : status === 410
           ? "E_NOT_FOUND"
-          : error.status === 429 || error.status >= 500
+          : status === 429 || status >= 500
             ? "E_NETWORK"
             : "E_VALIDATION";
   // The platform names the fields it rejected, and the message does not

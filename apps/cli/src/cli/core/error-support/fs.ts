@@ -1,72 +1,11 @@
-import {
-  FsDeniedError,
-  FsExistsError,
-  FsFailedError,
-  FsIsDirectoryError,
-  FsNotDirectoryError,
-  FsNotFoundError,
-} from "@/lib/fs";
+import { FsExistsError } from "@/lib/fs";
 
-import type { Refusal } from "@/cli/core/refusal";
-import type { Wording } from "./wording";
-
-/** How a file or folder the run needs and does not find is refused. */
-const NOT_FOUND_REFUSAL = {
-  message: "{reason}",
-  hint: "A required file or directory is missing.",
-  details: {
-    original: "{original}",
-  },
-} as const satisfies Refusal;
-
-/** How a file the operating system will not let the run read or write is refused. */
-const DENIED_REFUSAL = {
-  message: "Permission denied: {reason}",
-  hint: "Check file permissions or run with the right user.",
-  details: {
-    original: "{original}",
-  },
-} as const satisfies Refusal;
+import type { Advice, Wording } from "./wording";
 
 /** How a file that stands where the run would write one is refused. */
-const EXISTS_REFUSAL = {
-  message: "{reason}",
+const EXISTS_ADVICE = {
   hint: "A file already exists. Use --force to overwrite or remove it first.",
-  details: {
-    original: "{original}",
-  },
-} as const satisfies Refusal;
+} as const satisfies Advice;
 
-/** How a file that stands where a folder is needed is refused. */
-const NOT_DIRECTORY_REFUSAL = {
-  message: "{reason}",
-  details: {
-    original: "{original}",
-  },
-} as const satisfies Refusal;
-
-/** How a folder that stands where a file is needed is refused. */
-const IS_DIRECTORY_REFUSAL = {
-  message: "{reason}",
-  details: {
-    original: "{original}",
-  },
-} as const satisfies Refusal;
-
-/** How any other failure of a file-system call is refused. */
-const FAILED_REFUSAL = {
-  message: "{reason}",
-  details: {
-    original: "{original}",
-  },
-} as const satisfies Refusal;
-
-/** How the errors of `@/lib/fs` are worded, most specific class first. */
-export const FS_WORDINGS: readonly Wording[] = [
-  [FsNotFoundError, NOT_FOUND_REFUSAL],
-  [FsDeniedError, DENIED_REFUSAL],
-  [FsExistsError, EXISTS_REFUSAL],
-  [FsNotDirectoryError, NOT_DIRECTORY_REFUSAL],
-  [FsIsDirectoryError, IS_DIRECTORY_REFUSAL],
-  [FsFailedError, FAILED_REFUSAL],
-];
+/** How the errors of `@/lib/fs` are advised on, each for exactly its class. */
+export const FS_WORDINGS: readonly Wording[] = [[FsExistsError, EXISTS_ADVICE]];

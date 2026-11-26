@@ -22,6 +22,9 @@ const root = fileURLToPath(new URL("../../../../src", import.meta.url));
 /** What `read` fills for every flag and argument (`src/cli/core/flags.ts`). */
 const ALWAYS = ["value", "input", "problem"];
 
+/** What `ErrorSupport` fills every wording's advice with, beside the fields of its class. */
+const WORDED = ["message", "original"];
+
 /** The name inside each `{…}` of a refusal's wording, as `interpolate` reads one. */
 const PLACEHOLDER = /\{([\w-]+)\}/g;
 
@@ -228,8 +231,8 @@ function thrownWith(
 
 /**
  * The keys each wording of `name` in `source` gives values for, one list per
- * wording. `ErrorSupport` raises a wording's refusal with the fields of its
- * class and the error's message (`src/cli/core/error-support/`), and a
+ * wording. `ErrorSupport` fills a wording's advice with the fields of its
+ * class, the error's message and `original` (`src/cli/core/error-support.ts`), and a
  * `derived` wording with the `values` and `next` its function returns as well.
  *
  * @param source - The parsed module.
@@ -249,7 +252,7 @@ function wordedWith(
       ts.isIdentifier(named) &&
       ts.isIdentifier(refusal) &&
       refusal.text === name
-      ? [[...fieldsOf(classes, named.text), "message"]]
+      ? [[...fieldsOf(classes, named.text), ...WORDED]]
       : [];
   });
   const derived = callsOf(source, ["derived"]).flatMap((call) => {
@@ -272,7 +275,7 @@ function wordedWith(
               ? keysOf(property.initializer)
               : [];
           });
-    return [[...fieldsOf(classes, named.text), "message", ...values]];
+    return [[...fieldsOf(classes, named.text), ...WORDED, ...values]];
   });
   return [...plain, ...derived];
 }
@@ -344,6 +347,7 @@ async function weighed(): Promise<Weighed[]> {
     }
     for (const { name, literal } of [
       ...declaredAs(source, "Refusal"),
+      ...declaredAs(source, "Advice"),
       ...declaredAs(source, "ParseRefusal"),
     ]) {
       found.push({

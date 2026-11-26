@@ -1,3 +1,4 @@
+import { SERVER } from "@/constants";
 import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
@@ -110,6 +111,8 @@ export class EnvironmentValueInvalidError extends EnvironmentError {
   /** Why the address is not a server, which the refusal reports. */
   readonly reason: string;
 
+  override readonly hint: string;
+
   /**
    * Creates the error.
    *
@@ -121,6 +124,18 @@ export class EnvironmentValueInvalidError extends EnvironmentError {
     super(message, cause);
     this.source = source;
     this.reason = cause.message;
+    this.hint = `Fix or remove ZITADEL_URL in ${source}; it must be a URL such as ${SERVER}.`;
+  }
+
+  /**
+   * Why the address is not a server.
+   *
+   * @returns The reason, as `cause`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      cause: this.reason,
+    };
   }
 }
 

@@ -14,6 +14,7 @@ import {
   setupRetryFlags,
   ssoRecovery,
 } from "@/cli/commands/setup/shared";
+import { wordedError } from "@/cli/core/error-support";
 
 /**
  * What the step reads from what is known.
@@ -134,7 +135,7 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
         };
       } catch (error) {
         if (error instanceof BackendError) {
-          const normalized = toZitadelError(error);
+          const normalized = toZitadelError(wordedError(error, this.deps.cwd));
           const sso = ssoRecovery(retry, this.deps.suggest);
           throw new ZitadelError(normalized.code, normalized.message, {
             hint: `${normalized.hint ? `${normalized.hint} ` : ""}If you meant to use a local Zitadel server, start it first and retry setup with the commands below. ${sso.hint}`.trimEnd(),

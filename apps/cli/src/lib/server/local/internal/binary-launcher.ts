@@ -16,6 +16,7 @@ import {
   LocalServerProcessGoneError,
 } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
+import { errorMessage } from "@/lib/errors";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
@@ -617,10 +618,7 @@ function signalProcess(pid: number, signal: NodeJS.Signals | 0): void {
       throw new LocalServerProcessGoneError(`No process ${String(pid)}`, error);
     }
     if (isErrno(error, "EPERM")) {
-      throw new LocalServerProcessDeniedError(
-        `Process ${String(pid)} is not ours to signal`,
-        error,
-      );
+      throw new LocalServerProcessDeniedError(`Permission denied: ${errorMessage(error)}`, error);
     }
     throw error;
   }

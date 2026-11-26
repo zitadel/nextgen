@@ -9,7 +9,16 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
  * the failure itself. A failure nothing here anticipated is not one of these:
  * it bubbles as it was thrown.
  */
-export abstract class OrcaError extends ZitadelLibError {}
+export abstract class OrcaError extends ZitadelLibError {
+  /**
+   * Nothing beyond the message: orca reports the facts of a failure only where its class says.
+   *
+   * @returns No facts.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {};
+  }
+}
 
 /**
  * A directory with no app of a framework orca knows, or a framework orca has
@@ -122,6 +131,18 @@ export class OrcaFrameworkMismatchError extends OrcaConflictError {
     this.detected = detected;
     this.requestedName = requestedName;
   }
+
+  /**
+   * The framework asked for, and the one detected.
+   *
+   * @returns Both frameworks.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      requested: this.requested,
+      detected: this.detected,
+    };
+  }
 }
 
 /**
@@ -154,6 +175,17 @@ export class OrcaDirectoryNotEmptyError extends OrcaConflictError {
     this.reason = reason;
     this.entries = entries;
   }
+
+  /**
+   * What the directory holds.
+   *
+   * @returns Its entries.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      entries: this.entries,
+    };
+  }
 }
 
 /**
@@ -162,6 +194,7 @@ export class OrcaDirectoryNotEmptyError extends OrcaConflictError {
 export class OrcaVersionBelowFloorError extends OrcaFrameworkUnsupportedError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_UNSUPPORTED_PROJECT_SHAPE";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -197,6 +230,7 @@ export class OrcaVersionBelowFloorError extends OrcaFrameworkUnsupportedError {
     this.displayName = displayName;
     this.versionFloor = versionFloor;
     this.note = note;
+    this.hint = `Upgrade the app to ${this.displayName} ${this.versionFloor} or later and rerun.${this.note === undefined ? "" : ` ${this.note}`}`;
   }
 }
 
@@ -206,6 +240,8 @@ export class OrcaVersionBelowFloorError extends OrcaFrameworkUnsupportedError {
 export class OrcaPagesRouterError extends OrcaFrameworkUnsupportedError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_UNSUPPORTED_PROJECT_SHAPE";
+  override readonly hint: string =
+    "Create an App Router project with an app/ or src/app/ directory.";
   override readonly retryable: boolean = false;
 }
 
@@ -259,6 +295,18 @@ export class OrcaNodeUnsupportedError extends OrcaInvalidError {
     this.accepted = accepted;
     this.displayName = displayName;
   }
+
+  /**
+   * The Node that runs, and the Node the framework needs.
+   *
+   * @returns Both versions.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      node: this.node,
+      required: this.required,
+    };
+  }
 }
 
 /**
@@ -298,6 +346,19 @@ export class OrcaCommandSpawnFailedError extends OrcaInternalError {
     this.args = args;
     this.spawnCode = spawnCode;
   }
+
+  /**
+   * The command, its arguments, and the code it could not start with.
+   *
+   * @returns The command, the arguments and the code.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      command: this.command,
+      args: this.args,
+      code: this.spawnCode,
+    };
+  }
 }
 
 /**
@@ -306,6 +367,7 @@ export class OrcaCommandSpawnFailedError extends OrcaInternalError {
 export class OrcaCommandNotFoundError extends OrcaCommandSpawnFailedError {
   override readonly category: ErrorCategory = "fault";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = `Ensure '${this.command}' is installed and on PATH.`;
   override readonly retryable: boolean = false;
 }
 
@@ -315,6 +377,7 @@ export class OrcaCommandNotFoundError extends OrcaCommandSpawnFailedError {
 export class OrcaCommandFailedError extends OrcaInternalError {
   override readonly category: ErrorCategory = "fault";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -377,6 +440,25 @@ export class OrcaCommandFailedError extends OrcaInternalError {
     this.stdout = run.stdout;
     this.stderr = run.stderr;
     this.output = run.output;
+    this.hint =
+      this.output === ""
+        ? "Run the command directly for more detail."
+        : `Command output:\n${this.output}`;
+  }
+
+  /**
+   * The command, its arguments, where it ran and what it printed.
+   *
+   * @returns The command, the arguments, the folder and its output.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      command: this.command,
+      args: this.args,
+      cwd: this.cwd,
+      stdout: this.stdout,
+      stderr: this.stderr,
+    };
   }
 }
 
@@ -386,6 +468,7 @@ export class OrcaCommandFailedError extends OrcaInternalError {
 export class OrcaFrameworkUnknownError extends OrcaFrameworkMissingError {
   override readonly category: ErrorCategory = "missing";
   override readonly code: ZitadelErrorCode = "E_FRAMEWORK_NOT_DETECTED";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -402,6 +485,7 @@ export class OrcaFrameworkUnknownError extends OrcaFrameworkMissingError {
   constructor(message: string, supported: string) {
     super(message);
     this.supported = supported;
+    this.hint = `Supported frameworks: ${this.supported}.`;
   }
 }
 
@@ -411,6 +495,7 @@ export class OrcaFrameworkUnknownError extends OrcaFrameworkMissingError {
 export class OrcaPatcherMissingError extends OrcaInternalError {
   override readonly category: ErrorCategory = "fault";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = "Zitadel integration currently supports Next.js.";
   override readonly retryable: boolean = false;
 }
 
@@ -420,6 +505,8 @@ export class OrcaPatcherMissingError extends OrcaInternalError {
 export class OrcaPatchOpEmptyError extends OrcaInternalError {
   override readonly category: ErrorCategory = "fault";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "This is an internal patcher error — please report it if you hit it.";
   override readonly retryable: boolean = false;
 }
 
@@ -438,6 +525,7 @@ export class OrcaAngularJsonMissingError extends OrcaPatchFileMissingError {
 export class OrcaAngularProjectAmbiguousError extends OrcaInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -454,6 +542,7 @@ export class OrcaAngularProjectAmbiguousError extends OrcaInvalidError {
   constructor(message: string, projects: string) {
     super(message);
     this.projects = projects;
+    this.hint = `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: ${this.projects}.`;
   }
 }
 
@@ -463,6 +552,7 @@ export class OrcaAngularProjectAmbiguousError extends OrcaInvalidError {
 export class OrcaAngularRoutesNotInlineError extends OrcaInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -479,6 +569,7 @@ export class OrcaAngularRoutesNotInlineError extends OrcaInvalidError {
   constructor(message: string, label: string) {
     super(message);
     this.label = label;
+    this.hint = `Set "routes" in ${this.label} to an inline Routes array, or add /login, /register, and /profile manually.`;
   }
 }
 
@@ -523,6 +614,17 @@ export class OrcaFileOverwriteError extends OrcaConflictError {
     super(message);
     this.path = path;
   }
+
+  /**
+   * The file setup would overwrite.
+   *
+   * @returns Its path.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      path: this.path,
+    };
+  }
 }
 
 /**
@@ -551,6 +653,18 @@ export abstract class OrcaBoundaryConflictError extends OrcaConflictError {
     super(message);
     this.existing = existing;
     this.target = target;
+  }
+
+  /**
+   * The boundary file in the way, and the one setup writes.
+   *
+   * @returns The file, as `path`, and what setup writes.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      path: this.existing,
+      writes: this.target,
+    };
   }
 }
 
@@ -589,6 +703,7 @@ export class OrcaBoundaryVersionUnknownError extends OrcaBoundaryConflictError {
 export class OrcaRendererUnknownError extends OrcaInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -605,6 +720,7 @@ export class OrcaRendererUnknownError extends OrcaInvalidError {
   constructor(message: string, renderers: string) {
     super(message);
     this.renderers = renderers;
+    this.hint = `Available renderers: ${this.renderers}.`;
   }
 }
 
@@ -615,6 +731,7 @@ export class OrcaRendererUnknownError extends OrcaInvalidError {
 export class OrcaProxyCredentialLeakError extends OrcaInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -631,6 +748,7 @@ export class OrcaProxyCredentialLeakError extends OrcaInvalidError {
   constructor(message: string, exchangePath: string) {
     super(message);
     this.exchangePath = exchangePath;
+    this.hint = `Review the proxy manually: restrict the bearer to the exact POST /sessions/exchange or ${this.exchangePath} pathname and preserve caller-provided authorization.`;
   }
 }
 
@@ -687,6 +805,19 @@ export class OrcaRootComponentMountError extends OrcaConflictError {
     this.root = mount.root;
     this.statement = mount.statement;
   }
+
+  /**
+   * The root the entry mounts, the entry, and the root setup writes.
+   *
+   * @returns The mounted root, as `path`, the entry and what setup writes.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      path: this.mountedRoot,
+      entry: this.entry,
+      writes: this.root,
+    };
+  }
 }
 
 /**
@@ -704,6 +835,8 @@ export class OrcaSolidStartConfigMissingError extends OrcaPatchFileMissingError 
 export class OrcaSolidStartPluginMissingError extends OrcaInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config.";
   override readonly retryable: boolean = false;
 }
 
@@ -793,6 +926,7 @@ export abstract class OrcaConfigShapeError extends OrcaInvalidError {
 export class OrcaConfigUnparseableError extends OrcaConfigShapeError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -811,6 +945,18 @@ export class OrcaConfigUnparseableError extends OrcaConfigShapeError {
   constructor(message: string, filename: string, parseError: string, cause: unknown) {
     super(message, filename, cause);
     this.parseError = parseError;
+    this.hint = `Ensure ${this.filename} is valid, or apply the Zitadel changes manually.`;
+  }
+
+  /**
+   * Why the config does not parse.
+   *
+   * @returns The parse error, as `cause`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      cause: this.parseError,
+    };
   }
 }
 
@@ -820,6 +966,8 @@ export class OrcaConfigUnparseableError extends OrcaConfigShapeError {
 export class OrcaConfigCommonJsError extends OrcaConfigShapeError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    'The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.';
   override readonly retryable: boolean = false;
 }
 
@@ -829,6 +977,8 @@ export class OrcaConfigCommonJsError extends OrcaConfigShapeError {
 export class OrcaConfigObjectMissingError extends OrcaConfigShapeError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    `Add the Zitadel configuration to ${this.filename} manually (see the SDK README).`;
   override readonly retryable: boolean = false;
 }
 
@@ -838,6 +988,7 @@ export class OrcaConfigObjectMissingError extends OrcaConfigShapeError {
 export class OrcaConfigUnwritableError extends OrcaConfigShapeError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -856,6 +1007,18 @@ export class OrcaConfigUnwritableError extends OrcaConfigShapeError {
   constructor(message: string, filename: string, parseError: string, cause: unknown) {
     super(message, filename, cause);
     this.parseError = parseError;
+    this.hint = `The edit left ${this.filename} unparseable, so apply the Zitadel changes manually.`;
+  }
+
+  /**
+   * Why the config does not parse.
+   *
+   * @returns The parse error, as `cause`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      cause: this.parseError,
+    };
   }
 }
 
@@ -887,6 +1050,8 @@ export abstract class OrcaConfigKeyError extends OrcaInvalidError {
 export class OrcaConfigObjectExpectedError extends OrcaConfigKeyError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    `Set "${this.key}" to an inline object literal, or add the Zitadel settings manually.`;
   override readonly retryable: boolean = false;
 }
 
@@ -896,6 +1061,8 @@ export class OrcaConfigObjectExpectedError extends OrcaConfigKeyError {
 export class OrcaConfigArrayExpectedError extends OrcaConfigKeyError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    `Set "${this.key}" to an inline array literal, or add the Zitadel settings manually.`;
   override readonly retryable: boolean = false;
 }
 
@@ -905,6 +1072,7 @@ export class OrcaConfigArrayExpectedError extends OrcaConfigKeyError {
 export class OrcaScaffolderMissingError extends OrcaInternalError {
   override readonly category: ErrorCategory = "fault";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
   override readonly retryable: boolean = false;
 
   /**
@@ -921,6 +1089,7 @@ export class OrcaScaffolderMissingError extends OrcaInternalError {
   constructor(message: string, frameworks: string) {
     super(message);
     this.frameworks = frameworks;
+    this.hint = `Available frameworks: ${this.frameworks}.`;
   }
 }
 
@@ -930,6 +1099,7 @@ export class OrcaScaffolderMissingError extends OrcaInternalError {
 export class OrcaAngularProjectMissingError extends OrcaInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = 'Add "proxyConfig" to your serve target manually.';
   override readonly retryable: boolean = false;
 }
 
@@ -940,6 +1110,7 @@ export class OrcaAngularProjectMissingError extends OrcaInvalidError {
 export class OrcaAngularServeTargetMissingError extends OrcaInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = 'Add "proxyConfig" to your serve options manually.';
   override readonly retryable: boolean = false;
 }
 
@@ -950,5 +1121,7 @@ export class OrcaAngularServeTargetMissingError extends OrcaInvalidError {
 export class OrcaSolidStartOptionsError extends OrcaInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    'Pass an options object to solidStart(), e.g. solidStart({ middleware: "./src/middleware.ts" }).';
   override readonly retryable: boolean = false;
 }

@@ -1,4 +1,4 @@
-import { ZitadelLibError } from "@/lib/errors";
+import { originalOf, ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
@@ -19,6 +19,7 @@ export class PublishConfigInvalidError extends PublishError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string;
 
   /** Each finding the refusal is about, as `--json` lists it: its rule, file and message. */
   readonly issues: readonly unknown[];
@@ -37,6 +38,18 @@ export class PublishConfigInvalidError extends PublishError {
     super(message);
     this.issues = issues;
     this.refusedKey = refusedKey;
+    this.hint = `Fix the files named above and rerun; no changes were made.${refusedKey ? " A key a newer Zitadel server added needs a CLI as new as the server." : ""}`;
+  }
+
+  /**
+   * The findings, as `--json` lists them.
+   *
+   * @returns The issues.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      issues: this.issues,
+    };
   }
 }
 
@@ -98,6 +111,8 @@ export class PublishConnectionVariableSharedError extends PublishError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Give each its own variable: a plain one for the client id, a secret one for the client secret.";
 
   /** The variable both name. */
   readonly variable: string;
@@ -218,6 +233,17 @@ export class PublishAssetTargetUnsafeError extends PublishError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The failure the probe refused the target with.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
 }
 
 /**
@@ -227,4 +253,15 @@ export class PublishAssetLookupFailedError extends PublishError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
+
+  /**
+   * The failure the host name could not be resolved with.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
 }

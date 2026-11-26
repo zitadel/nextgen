@@ -1,4 +1,4 @@
-import { ZitadelLibError } from "@/lib/errors";
+import { originalOf, ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /**
@@ -22,6 +22,7 @@ export class ProjectConfigMissingError extends ProjectFileMissingError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = "Set the project up first.";
 }
 
 /** The project has no `.zitadel/secret`. */
@@ -40,6 +41,17 @@ export class ProjectInvalidError extends ProjectError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The failure the file could not be used with.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
 }
 
 /** A value a `.env` file cannot hold, because it has a line break. */
@@ -47,6 +59,17 @@ export class ProjectEnvValueMultilineError extends ProjectInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "A .env value is a single line; remove the newline or store the value another way.";
+
+  /**
+   * Nothing beyond the message, which names the variable.
+   *
+   * @returns No facts.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {};
+  }
 }
 
 /** A value a `.env` file cannot hold, because no quoting reads it back unchanged. */
@@ -54,4 +77,14 @@ export class ProjectEnvValueUnquotableError extends ProjectInvalidError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string = "Set it in the process environment instead of a .env file.";
+
+  /**
+   * Nothing beyond the message, which names the variable.
+   *
+   * @returns No facts.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {};
+  }
 }

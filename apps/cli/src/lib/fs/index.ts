@@ -4,8 +4,8 @@
  * @remarks
  * Every function here has the name of its `node:fs/promises` namesake and the
  * part of its signature the CLI uses. It calls Node and turns a failure of the
- * system call into the matching class of `./errors`, naming the operation and
- * the path and keeping Node's error as `cause`. Node's own argument errors
+ * system call into the matching class of `./errors`, which says what Node said
+ * and keeps Node's error as `cause`. Node's own argument errors
  * (`ERR_*`) are bugs in the caller and are rethrown as Node raised them.
  *
  * This is the one place that reads the `code` of a Node error. Everything else
@@ -57,6 +57,7 @@ import {
 } from "node:fs/promises";
 
 import { isErrno } from "../errno";
+import { errorMessage } from "../errors";
 import {
   FsDeniedError,
   FsError,
@@ -75,24 +76,23 @@ export * from "./errors";
  * @remarks
  * Every wrapper in this module uses it, and it is the only reader of a Node
  * error's `code` in the CLI. The config store uses it too, for the failures of
- * the file system it is given, so it recognises them by class.
+ * the file system it is given, so it recognises them by class. The typed error
+ * says what Node said, which names the call and the path.
  *
  * @param error - Whatever the Node call threw.
- * @param operation - What the call was doing, as a verb, for the message.
- * @param path - What it was doing it to.
  * @returns The typed error for a known code, {@link FsFailedError} for any other
  *   failure of the system call, otherwise `error` itself.
  */
-export function fsFailure(error: unknown, operation: string, path: PathLike): unknown {
-  const message = `Cannot ${operation} ${String(path)}`;
+export function fsFailure(error: unknown): unknown {
+  const message = errorMessage(error);
   if (isErrno(error, "ENOENT")) {
     return new FsNotFoundError(message, error, "ENOENT");
   }
   if (isErrno(error, "EACCES")) {
-    return new FsDeniedError(message, error, "EACCES");
+    return new FsDeniedError(`Permission denied: ${message}`, error, "EACCES");
   }
   if (isErrno(error, "EPERM")) {
-    return new FsDeniedError(message, error, "EPERM");
+    return new FsDeniedError(`Permission denied: ${message}`, error, "EPERM");
   }
   if (isErrno(error, "ENOTDIR")) {
     return new FsNotDirectoryError(message, error, "ENOTDIR");
@@ -112,7 +112,7 @@ export function fsFailure(error: unknown, operation: string, path: PathLike): un
     "code" in error &&
     typeof error.code === "string"
   ) {
-    return new FsFailedError(`${message} (${error.code})`, error.code, error);
+    return new FsFailedError(message, error.code, error);
   }
   return error;
 }
@@ -149,7 +149,7 @@ export async function readFile(
   try {
     return encoding === undefined ? await nodeReadFile(path) : await nodeReadFile(path, encoding);
   } catch (error) {
-    throw fsFailure(error, "read", path);
+    throw fsFailure(error);
   }
 }
 
@@ -169,7 +169,7 @@ export async function writeFile(
   try {
     await nodeWriteFile(path, data, options);
   } catch (error) {
-    throw fsFailure(error, "write", path);
+    throw fsFailure(error);
   }
 }
 
@@ -184,7 +184,7 @@ export async function rm(path: PathLike, options?: RmOptions): Promise<void> {
   try {
     await nodeRm(path, options);
   } catch (error) {
-    throw fsFailure(error, "remove", path);
+    throw fsFailure(error);
   }
 }
 
@@ -204,7 +204,7 @@ export async function mkdir(
   try {
     return await nodeMkdir(path, options);
   } catch (error) {
-    throw fsFailure(error, "create directory", path);
+    throw fsFailure(error);
   }
 }
 
@@ -219,7 +219,7 @@ export async function stat(path: PathLike): Promise<Stats> {
   try {
     return await nodeStat(path);
   } catch (error) {
-    throw fsFailure(error, "inspect", path);
+    throw fsFailure(error);
   }
 }
 
@@ -234,7 +234,7 @@ export async function lstat(path: PathLike): Promise<Stats> {
   try {
     return await nodeLstat(path);
   } catch (error) {
-    throw fsFailure(error, "inspect", path);
+    throw fsFailure(error);
   }
 }
 
@@ -281,7 +281,7 @@ export async function readdir(
           withFileTypes: true,
         });
   } catch (error) {
-    throw fsFailure(error, "list", path);
+    throw fsFailure(error);
   }
 }
 
@@ -296,7 +296,7 @@ export async function rename(oldPath: PathLike, newPath: PathLike): Promise<void
   try {
     await nodeRename(oldPath, newPath);
   } catch (error) {
-    throw fsFailure(error, "rename", oldPath);
+    throw fsFailure(error);
   }
 }
 
@@ -311,7 +311,7 @@ export async function realpath(path: PathLike): Promise<string> {
   try {
     return await nodeRealpath(path);
   } catch (error) {
-    throw fsFailure(error, "resolve", path);
+    throw fsFailure(error);
   }
 }
 
@@ -332,7 +332,7 @@ export async function open(
   try {
     return await nodeOpen(path, flags, mode);
   } catch (error) {
-    throw fsFailure(error, "open", path);
+    throw fsFailure(error);
   }
 }
 
@@ -346,7 +346,7 @@ export async function unlink(path: PathLike): Promise<void> {
   try {
     await nodeUnlink(path);
   } catch (error) {
-    throw fsFailure(error, "remove", path);
+    throw fsFailure(error);
   }
 }
 
@@ -360,7 +360,7 @@ export function unlinkSync(path: PathLike): void {
   try {
     nodeUnlinkSync(path);
   } catch (error) {
-    throw fsFailure(error, "remove", path);
+    throw fsFailure(error);
   }
 }
 
@@ -375,7 +375,7 @@ export async function access(path: PathLike, mode?: number): Promise<void> {
   try {
     await nodeAccess(path, mode);
   } catch (error) {
-    throw fsFailure(error, "access", path);
+    throw fsFailure(error);
   }
 }
 
@@ -390,7 +390,7 @@ export async function chmod(path: PathLike, mode: Mode): Promise<void> {
   try {
     await nodeChmod(path, mode);
   } catch (error) {
-    throw fsFailure(error, "change the mode of", path);
+    throw fsFailure(error);
   }
 }
 
@@ -410,7 +410,7 @@ export async function cp(
   try {
     await nodeCp(source, destination, options);
   } catch (error) {
-    throw fsFailure(error, "copy", source);
+    throw fsFailure(error);
   }
 }
 
@@ -430,7 +430,7 @@ export async function copyFile(
   try {
     await nodeCopyFile(source, destination, mode);
   } catch (error) {
-    throw fsFailure(error, "copy", source);
+    throw fsFailure(error);
   }
 }
 
@@ -445,7 +445,7 @@ export async function mkdtemp(prefix: string): Promise<string> {
   try {
     return await nodeMkdtemp(prefix);
   } catch (error) {
-    throw fsFailure(error, "create a directory at", prefix);
+    throw fsFailure(error);
   }
 }
 
@@ -461,7 +461,7 @@ export async function utimes(path: PathLike, atime: TimeLike, mtime: TimeLike): 
   try {
     await nodeUtimes(path, atime, mtime);
   } catch (error) {
-    throw fsFailure(error, "set the times of", path);
+    throw fsFailure(error);
   }
 }
 
@@ -476,7 +476,7 @@ export async function rmdir(path: PathLike, options?: RmDirOptions): Promise<voi
   try {
     await nodeRmdir(path, options);
   } catch (error) {
-    throw fsFailure(error, "remove", path);
+    throw fsFailure(error);
   }
 }
 
@@ -495,7 +495,7 @@ export async function* glob(
   try {
     yield* nodeGlob(pattern, options);
   } catch (error) {
-    throw fsFailure(error, "search", options.cwd ?? String(pattern));
+    throw fsFailure(error);
   }
 }
 
@@ -682,7 +682,7 @@ export function readFileSync(path: PathLike, encoding: BufferEncoding): string {
   try {
     return nodeReadFileSync(path, encoding);
   } catch (error) {
-    throw fsFailure(error, "read", path);
+    throw fsFailure(error);
   }
 }
 
@@ -704,7 +704,7 @@ export function writeFileSync(
   try {
     nodeWriteFileSync(path, data, options);
   } catch (error) {
-    throw fsFailure(error, "write", path);
+    throw fsFailure(error);
   }
 }
 
@@ -721,7 +721,7 @@ export function mkdirSync(path: PathLike, options?: MakeDirectoryOptions): strin
   try {
     return nodeMkdirSync(path, options);
   } catch (error) {
-    throw fsFailure(error, "create directory", path);
+    throw fsFailure(error);
   }
 }
 
@@ -736,7 +736,7 @@ export function renameSync(oldPath: PathLike, newPath: PathLike): void {
   try {
     nodeRenameSync(oldPath, newPath);
   } catch (error) {
-    throw fsFailure(error, "rename", oldPath);
+    throw fsFailure(error);
   }
 }
 
@@ -752,6 +752,6 @@ export function rmSync(path: PathLike, options?: RmOptions): void {
   try {
     nodeRmSync(path, options);
   } catch (error) {
-    throw fsFailure(error, "remove", path);
+    throw fsFailure(error);
   }
 }

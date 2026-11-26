@@ -1,5 +1,10 @@
-import { ZitadelLibError } from "@/lib/errors";
+import { originalOf, ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+
+/**
+ * Where the state file lives, relative to the project root.
+ */
+export const STATE_PATH = ".zitadel/state.json";
 
 /**
  * Anything reading the record of what was synced fails with on purpose.
@@ -20,6 +25,19 @@ export class SyncStateMalformedError extends SyncError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined =
+    "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.";
+
+  /**
+   * The state file.
+   *
+   * @returns Its path, as `file`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      file: STATE_PATH,
+    };
+  }
 }
 
 /**
@@ -31,4 +49,16 @@ export class SyncStateUnreadableError extends SyncStateMalformedError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string | undefined = undefined;
+
+  /**
+   * The failure the state file could not be read with.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
 }
