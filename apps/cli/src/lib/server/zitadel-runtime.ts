@@ -4,7 +4,7 @@ import { SERVER } from "@/constants";
 import type { Parsed } from "@zitadel/config/idp";
 
 import { errorMessage } from "@/lib/errors";
-import { FsNotFoundError, readFile, realpath } from "@/lib/fs";
+import { FsDeniedError, FsIsDirectoryError, FsNotFoundError, readFile, realpath } from "@/lib/fs";
 import {
   LocalServerDockerMissingError,
   LocalServerInvalidError,
@@ -1299,7 +1299,11 @@ export class LocalRuntime extends ZitadelRuntime {
             "The local runtime record cannot be read and the machine's processes cannot be listed",
           );
         } catch (error) {
-          if (!(error instanceof FsNotFoundError)) {
+          if (
+            !(error instanceof FsNotFoundError) &&
+            !(error instanceof FsDeniedError) &&
+            !(error instanceof FsIsDirectoryError)
+          ) {
             throw error;
           }
         }
