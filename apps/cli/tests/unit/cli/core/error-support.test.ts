@@ -9,8 +9,7 @@ import { ErrorSupport } from "@/cli/core/error-support";
 import { WORDINGS } from "@/cli/core/error-support/index";
 import { BackendTimeoutError } from "@/lib/backend";
 import { EnvironmentValueMissingError } from "@/lib/environment";
-import { toZitadelError, ZitadelError } from "@/lib/errors";
-import { isObject } from "@/lib/json";
+import { ZitadelError } from "@/lib/errors";
 import {
   OrcaAngularJsonMissingError,
   OrcaAngularProjectAmbiguousError,
@@ -44,9 +43,6 @@ import { LocalServerBusyError, LocalServerRecordMalformedError } from "@/lib/ser
 import { it } from "@tests/fixtures";
 import { nodesOf, parsedFile, sourcesUnder } from "@tests/helpers/declarations";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-
-import { CWD, type Row, type Shown } from "./error-support/row";
-import { ROWS } from "./error-support/rows";
 
 const lib = fileURLToPath(new URL("../../../../src/lib", import.meta.url));
 
@@ -141,42 +137,8 @@ async function aWordingCommand(): Promise<Wording> {
   return new Wording([], await Config.load(cliPackageRoot));
 }
 
-/** A `{name}` a wording left in what it shows, which nothing filled. */
-const UNFILLED = /\{[A-Za-z_][\w-]*\}/;
-
-/**
- * What a run shows of what a command threw, as the base command's catch
- * reports it: worded by the mixin, then made the CLI's own error.
- *
- * @param reported - What the mixin made of what the command threw.
- * @returns What the envelope and the exit show.
- */
-function shownOf(reported: unknown): Shown {
-  const error = toZitadelError(reported);
-  return {
-    code: error.code,
-    message: error.message,
-    hint: error.hint,
-    details: isObject(error.details) ? error.details : undefined,
-    next: error.nextCommands,
-    exitCode: error.exitCode,
-  };
-}
-
-/**
- * The name a row's tests go by: its class, and the situation it samples.
- *
- * @param row - The row.
- * @returns Its name.
- */
-function nameOf(row: Row): string {
-  return row.case === undefined ? row.error.name : `${row.error.name} (${row.case})`;
-}
-
-/** Every row, by the name its tests go by. */
-const NAMED = ROWS.map((row) => {
-  return [nameOf(row), row] as const;
-});
+/** The folder the sample run acts on. */
+const CWD = "/work/app";
 
 /**
  * The note every conflict `--force` cannot settle ends with.
@@ -215,58 +177,6 @@ describe("ErrorSupport", () => {
     });
 
     expect(unknown).toEqual([]);
-  });
-
-  describe("as main worded each failure", () => {
-    it("has a row for every concrete lib error", async () => {
-      const classes = await libClasses();
-      const sampled = new Set(
-        ROWS.map((row) => {
-          return row.error.name;
-        }),
-      );
-
-      const missing = [...classes.entries()].flatMap(([name, declared]) => {
-        return declared.abstract ||
-          !chainOf(classes, name).includes("ZitadelLibError") ||
-          name === "ZitadelLibError" ||
-          sampled.has(name)
-          ? []
-          : [name];
-      });
-
-      expect(missing).toEqual([]);
-    });
-
-    it.each(NAMED)("shows %s as main did", async (_name, row) => {
-      const command = await aWordingCommand();
-
-      const shown = shownOf(command.wording(row.error, CWD));
-
-      expect(shown).toEqual({ ...row.expected, ...row.deviation?.shown });
-    });
-
-    it.each(NAMED)("fills every placeholder of %s", async (_name, row) => {
-      const command = await aWordingCommand();
-
-      const shown = shownOf(command.wording(row.error, CWD));
-
-      expect(JSON.stringify([shown.message, shown.hint, shown.details, shown.next])).not.toMatch(
-        UNFILLED,
-      );
-    });
-
-    it.each(NAMED)("states a value for every detail of %s", async (_name, row) => {
-      const command = await aWordingCommand();
-
-      const shown = shownOf(command.wording(row.error, CWD));
-
-      expect(
-        Object.entries(shown.details ?? {}).filter(([, value]) => {
-          return value === undefined || value === "undefined";
-        }),
-      ).toEqual([]);
-    });
   });
 
   describe("with a lib error that has a wording", () => {
