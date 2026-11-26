@@ -1,0 +1,51 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.ts",
+      "kind": "other",
+      "extras": [
+        "ZitadelAuthResult",
+        "ZitadelAuthState",
+        "ZitadelClientAuthResult",
+        "ZitadelUnauthState",
+        "ZitadelAuthSession",
+        "ZitadelConfig",
+        "ZitadelMiddlewareOptions",
+        "ZitadelProject",
+        "configureZitadel",
+        "createZitadelHandle",
+        "getApi",
+        "getAuth",
+        "getZitadelConfig"
+      ]
+    },
+    "./server": {
+      "source": "src/server.ts",
+      "kind": "server",
+      "handler": {
+        "name": "createZitadelHandle",
+        "why": "SvelteKit calls this hook handle: it is the handle export of hooks.server.ts and is composed with sequence(), so the name ends in Handle and the call reads export const handle = createZitadelHandle(...). It is a factory, called once to return the hook, so it starts with create."
+      },
+      "authReader": {
+        "name": "getAuth",
+        "why": "Takes the framework's own request event or context and returns the verified result that the handler stored on it. It reads and never creates, so it is called getAuth, and it is synchronous because the framework has already handed over the event."
+      },
+      "extras": [
+        "ZitadelHandle"
+      ]
+    },
+    "./client": {
+      "source": "src/client.ts",
+      "kind": "client",
+      "extras": []
+    },
+    "./components": {
+      "source": "src/components.ts",
+      "kind": "widgets",
+      "extras": [
+        "businessLocales",
+        "configureZitadel"
+      ]
+    }
+  }
+}

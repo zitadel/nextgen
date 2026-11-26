@@ -1,33 +1,42 @@
 /**
- * Client-safe React bindings for `@zitadel/sdk-next`.
+ * The client-safe React bindings of `@zitadel/sdk-next`, for Client Components.
  *
- * This is the entry point for `"use client"` components. It pulls in no
- * server-only modules (`next/headers`, `auth()`, `NextgenProvider`), so it is
- * safe to import anywhere.
+ * This is the entry point for modules that start with `"use client"`. It pulls in no server-only
+ * module (`next/headers`, {@link server!auth | auth}), so it is safe to import anywhere. It
+ * exposes {@link useAuth} to read the signed-in state and {@link AuthContextProvider} to seed it
+ * from client-side data.
  *
+ * {@link server!ZitadelProvider | ZitadelProvider} is deliberately not exported here. It accepts
+ * the token-bearing result of {@link server!auth | auth}, so it must run in a Server
+ * Component: wrapping it in a `"use client"` file would serialize the raw session token across the
+ * server-to-client boundary before the provider strips it, and any script on the page could read it
+ * from the flight payload. Import it from `@zitadel/sdk-next/server` instead, where the
+ * `server-only` guard turns a client-side import into a build error. To seed the context from
+ * client-side state, such as a {@link session!getSession | getSession} read, render
+ * {@link AuthContextProvider}, which is typed as the token-less {@link ZitadelClientAuthResult} and
+ * strips nothing.
+ *
+ * @example
  * ```tsx
  * "use client";
  * import { useAuth } from "@zitadel/sdk-next/react";
+ *
+ * export function Greeting() {
+ *   const auth = useAuth();
+ *   return auth.isAuthenticated ? <p>Hello {auth.session.userId}</p> : <p>Signed out</p>;
+ * }
  * ```
  *
- * `NextgenProvider` is deliberately **not** exported here: it accepts the
- * token-bearing `auth()` result, so it must execute in a Server Component —
- * wrapping it in a `"use client"` file would serialise the raw token across
- * the boundary before the provider strips it. Import it from
- * `@zitadel/sdk-next/server` (or the package root) instead; the `server-only`
- * guard turns a client-side import into a build error. To seed the context
- * from client-side state (e.g. a `getSession()` read), render
- * {@link AuthContextProvider}, which only accepts the token-less
- * `ClientAuthResult`.
+ * @module
  */
 export { AuthContextProvider, useAuthContext } from "./context.js";
 export { useAuth } from "./useAuth.js";
 export type {
-  AuthResult,
-  AuthState,
-  ClientAuthResult,
-  ClientAuthState,
-  ClientSession,
-  NextgenSession,
-  UnauthState,
+  ZitadelAuthResult,
+  ZitadelAuthState,
+  ZitadelClientAuthResult,
+  ZitadelClientAuthState,
+  ZitadelClientSession,
+  ZitadelAuthSession,
+  ZitadelUnauthState,
 } from "./types.js";

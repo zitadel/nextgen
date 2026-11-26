@@ -1,7 +1,7 @@
 /**
  * Unit tests for auth().
  *
- * auth() reads the `x-nextgen-auth-token` request header and must treat it as
+ * auth() reads the `x-zitadel-auth-token` request header and must treat it as
  * **untrusted input**: on routes outside the middleware `matcher` the header
  * arrives straight from the client, so every value is re-verified — JWTs
  * cryptographically (signature via a real RSA key pair and a mocked JWKS
@@ -127,14 +127,14 @@ afterEach(() => {
 });
 
 describe("auth()", () => {
-  it("returns unauthenticated when the x-nextgen-auth-token header is absent", async () => {
+  it("returns unauthenticated when the x-zitadel-auth-token header is absent", async () => {
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("returns unauthenticated for the middleware's empty-string tunnel value", async () => {
-    mockHeadersMap.set("x-nextgen-auth-token", "");
+    mockHeadersMap.set("x-zitadel-auth-token", "");
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -146,7 +146,7 @@ describe("auth()", () => {
     const kid = nextKid();
     routeFetch(kid, () => jsonResponse({}, 500));
     mockHeadersMap.set(
-      "x-nextgen-auth-token",
+      "x-zitadel-auth-token",
       makeForgedJwt({ sub: "attacker", iss: ISSUER, exp: ts(3600) }, kid),
     );
 
@@ -171,7 +171,7 @@ describe("auth()", () => {
       },
       kid,
     );
-    mockHeadersMap.set("x-nextgen-auth-token", token);
+    mockHeadersMap.set("x-zitadel-auth-token", token);
 
     const auth = await importAuth();
     const result = await auth(OPTIONS);
@@ -192,7 +192,7 @@ describe("auth()", () => {
     const kid = nextKid();
     routeFetch(kid, () => jsonResponse({}, 500));
     mockHeadersMap.set(
-      "x-nextgen-auth-token",
+      "x-zitadel-auth-token",
       makeSignedJwt({ sub: "user-xyz", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid),
     );
 
@@ -210,7 +210,7 @@ describe("auth()", () => {
     const kid = nextKid();
     routeFetch(kid, () => jsonResponse({}, 500));
     mockHeadersMap.set(
-      "x-nextgen-auth-token",
+      "x-zitadel-auth-token",
       makeSignedJwt({ email: "nosub@example.com", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid),
     );
 
@@ -223,7 +223,7 @@ describe("auth()", () => {
     const kid = nextKid();
     routeFetch(kid, () => jsonResponse({}, 500));
     mockHeadersMap.set(
-      "x-nextgen-auth-token",
+      "x-zitadel-auth-token",
       makeSignedJwt({ sub: "user-late", iss: ISSUER, aud: PROJECT, exp: ts(-3600) }, kid),
     );
 
@@ -235,7 +235,7 @@ describe("auth()", () => {
 
   it("rejects a random opaque header value the backend does not know", async () => {
     routeFetch(nextKid(), () => jsonResponse({ error: "unauthenticated" }, 401));
-    mockHeadersMap.set("x-nextgen-auth-token", "attacker-supplied-junk");
+    mockHeadersMap.set("x-zitadel-auth-token", "attacker-supplied-junk");
 
     const auth = await importAuth();
     const result = await auth(OPTIONS);
@@ -267,7 +267,7 @@ describe("auth()", () => {
       }),
     );
     const token = makeJweShapedToken();
-    mockHeadersMap.set("x-nextgen-auth-token", token);
+    mockHeadersMap.set("x-zitadel-auth-token", token);
 
     const auth = await importAuth();
     const result = await auth(OPTIONS);
@@ -289,7 +289,7 @@ describe("auth()", () => {
     routeFetch(nextKid(), () =>
       jsonResponse({ session_id: "sess-2", project_id: "proj-1", state: "active" }),
     );
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
@@ -297,7 +297,7 @@ describe("auth()", () => {
 
   it("fails closed and warns on unexpected backend statuses", async () => {
     routeFetch(nextKid(), () => jsonResponse({ error: "boom" }, 500));
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
@@ -306,7 +306,7 @@ describe("auth()", () => {
 
   it("fails closed and warns when the backend is unreachable", async () => {
     fetchMock.mockRejectedValue(new TypeError("fetch failed"));
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
@@ -326,7 +326,7 @@ describe("auth()", () => {
           );
         }),
     );
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     const result = await auth({ ...OPTIONS, opaqueTokenTimeoutMs: 5 });
@@ -348,7 +348,7 @@ describe("auth()", () => {
         user_id: "user-3",
       }),
     );
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     const result = await auth();
@@ -364,7 +364,7 @@ describe("auth()", () => {
     const kid = nextKid();
     routeFetch(kid, () => jsonResponse({}, 500));
     const token = makeSignedJwt({ sub: "user-abc", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid);
-    mockHeadersMap.set("x-nextgen-auth-token", token);
+    mockHeadersMap.set("x-zitadel-auth-token", token);
 
     const auth = await importAuth();
     const result = await auth({ ...OPTIONS, url: `${ISSUER}/` });
@@ -376,7 +376,7 @@ describe("auth()", () => {
     routeFetch(nextKid(), () =>
       jsonResponse({ session_id: "sess-3", project_id: PROJECT, state: "active", user_id: "u3" }),
     );
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     const result = await auth({ ...OPTIONS, url: `${ISSUER}/` });
@@ -394,7 +394,7 @@ describe("auth()", () => {
     const kid = nextKid();
     routeFetch(kid, () => jsonResponse({}, 500));
     mockHeadersMap.set(
-      "x-nextgen-auth-token",
+      "x-zitadel-auth-token",
       makeSignedJwt({ sub: "user-abc", iss: ISSUER, aud: OTHER_PROJECT, exp: ts(3600) }, kid),
     );
 
@@ -413,7 +413,7 @@ describe("auth()", () => {
         user_id: "user-4",
       }),
     );
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
@@ -423,7 +423,7 @@ describe("auth()", () => {
     routeFetch(nextKid(), () =>
       jsonResponse({ code: "sess.project_mismatch", message: "different project" }, 403),
     );
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
@@ -434,7 +434,7 @@ describe("auth()", () => {
   // any other 403 (a proxy, a firewall) is a failure worth a log line.
   it("warns on a 403 that is not a project mismatch", async () => {
     routeFetch(nextKid(), () => jsonResponse({ code: "auth.csrf_invalid" }, 403));
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
@@ -450,7 +450,7 @@ describe("auth()", () => {
     routeFetch(nextKid(), () =>
       jsonResponse({ session_id: "sess-6", project_id: PROJECT, state: "active", user_id: "u6" }),
     );
-    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+    mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
     expect((await auth({ url: ISSUER })).isAuthenticated).toBe(true);
@@ -462,7 +462,7 @@ describe("auth()", () => {
     const kid = nextKid();
     routeFetch(kid, () => jsonResponse({}, 500));
     mockHeadersMap.set(
-      "x-nextgen-auth-token",
+      "x-zitadel-auth-token",
       makeSignedJwt({ sub: "user-abc", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid),
     );
 
@@ -479,7 +479,7 @@ describe("auth()", () => {
       routeFetch(nextKid(), () =>
         jsonResponse({ session_id: "sess-5", project_id: PROJECT, state: "active", user_id: "u5" }),
       );
-      mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+      mockHeadersMap.set("x-zitadel-auth-token", makeJweShapedToken());
 
       const auth = await importAuth();
       expect((await auth({ url: ISSUER })).isAuthenticated).toBe(true);

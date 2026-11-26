@@ -1,0 +1,57 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.ts",
+      "kind": "other",
+      "extras": [
+        "ZitadelAuthResult",
+        "ZitadelAuthState",
+        "ZitadelClientAuthResult",
+        "ZitadelRequestMiddlewareContext",
+        "ZitadelUnauthState",
+        "ZitadelAuthSession",
+        "ZitadelConfig",
+        "ZitadelMiddlewareOptions",
+        "ZitadelProject",
+        "ZitadelRequestResult",
+        "ZitadelRequestOptions",
+        "configureZitadel",
+        "createZitadelRequestMiddleware",
+        "getApi",
+        "getAuth",
+        "getZitadelConfig",
+        "handleZitadelRequest"
+      ]
+    },
+    "./server": {
+      "source": "src/server.ts",
+      "kind": "server",
+      "handler": {
+        "name": "createZitadelRequestMiddleware",
+        "why": "TanStack Start has request middleware and function middleware, both registered in start.ts, so the name says RequestMiddleware to tell the two apart. It is a factory, called once to return the middleware, so it starts with create."
+      },
+      "authReader": {
+        "name": "getAuth",
+        "why": "Takes the framework's own request event or context and returns the verified result that the handler stored on it. It reads and never creates, so it is called getAuth, and it is synchronous because the framework has already handed over the event."
+      },
+      "extras": [
+        "ZitadelRequestMiddlewareContext",
+        "ZitadelRequestResult",
+        "ZitadelRequestOptions",
+        "handleZitadelRequest"
+      ]
+    },
+    "./client": {
+      "source": "src/client.ts",
+      "kind": "client",
+      "extras": []
+    },
+    "./components": {
+      "source": "src/components.tsx",
+      "kind": "widgets",
+      "extras": [
+        "businessLocales"
+      ]
+    }
+  }
+}

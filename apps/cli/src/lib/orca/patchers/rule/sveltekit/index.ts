@@ -16,10 +16,10 @@ import {
 
 const SDK_DEPENDENCY = "@zitadel/sdk-sveltekit";
 /**
- * The idiomatic Svelte component library that ships the `<ZitadelLogin>` /
- * `<ZitadelSession>` Svelte components the routes render. The server SDK above is
- * plumbing only; the widget comes from here, so a SvelteKit app gets the native
- * Svelte component (typed props, callback events) rather than the bare element.
+ * The Svelte UI SDK behind the widgets. The routes import the widgets from
+ * `@zitadel/sdk-sveltekit/components`, which re-exports this package, yet the
+ * app still declares it as a direct dependency: Vite's Svelte plugin finds the
+ * Svelte libraries to compile in the app's own `package.json`.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-svelte";
 
@@ -29,9 +29,9 @@ const COMPONENT_DEPENDENCY = "@zitadel/sdk-svelte";
  * here the `@zitadel/sdk-sveltekit` `handle` hook in `src/hooks.server.ts`.
  * Contributes the layout + landing/login/register/profile file-based routes (the
  * idiomatic `<ZitadelLogin>`/`<ZitadelSession>` Svelte components from
- * `@zitadel/sdk-svelte`), the public project-id env var, and both deps. No config
- * edit is needed — the hook is a plain file, so (like Next) every managed file
- * carries the marker.
+ * `@zitadel/sdk-sveltekit/components`), the public project-id env var, and
+ * both deps. No config edit is needed — the hook is a plain file, so (like
+ * Next) every managed file carries the marker.
  */
 export class SvelteKitPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
@@ -153,7 +153,7 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     return {
       title: "SvelteKit integration",
       detail:
-        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle), declared its settings in src/env.ts, plus layout and landing/login/register/profile routes using @zitadel/sdk-svelte.",
+        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle), declared its settings in src/env.ts, plus layout and landing/login/register/profile routes that import the widgets from @zitadel/sdk-sveltekit/components.",
     };
   }
 }

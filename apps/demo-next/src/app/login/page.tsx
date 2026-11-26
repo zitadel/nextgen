@@ -5,7 +5,9 @@ import { LoginWidget } from "./widget";
 
 export default async function LoginPage() {
   const session = await auth({ projectId: DEMO_PROJECT_ID });
-  if (session.isAuthenticated) redirect("/admin");
+  if (session.isAuthenticated) {
+    redirect("/admin");
+  }
   return (
     <main
       style={{

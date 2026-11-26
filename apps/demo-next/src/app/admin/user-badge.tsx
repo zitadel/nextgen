@@ -3,7 +3,7 @@
 import { useAuth } from "@zitadel/sdk-next/react";
 
 /**
- * Client component reading the auth state seeded by NextgenProvider in the
+ * Client component reading the auth state seeded by ZitadelProvider in the
  * root layout. The hook returns the client-safe identity only — the raw
  * session token never reaches client code.
  */

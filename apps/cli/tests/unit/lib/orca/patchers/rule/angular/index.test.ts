@@ -525,15 +525,15 @@ function managedAppFiles(c: PatchContext): Record<string, string | undefined> {
 const LITERAL_APP_COMPONENT = `// zitadel-cli: managed-file v1
 import { Component, OnInit } from "@angular/core";
 import {
-  ZitadelLoginComponent,
-  ZitadelSessionComponent,
+  ZitadelLogin,
+  ZitadelSession,
   configureZitadel,
 } from "@zitadel/sdk-angular";
 
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [ZitadelLoginComponent, ZitadelSessionComponent],
+  imports: [ZitadelLogin, ZitadelSession],
   templateUrl: "./app.html",
 })
 export class App implements OnInit {

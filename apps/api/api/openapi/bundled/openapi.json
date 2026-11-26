@@ -9115,7 +9115,7 @@
         "operationId": "createInvitation",
         "x-zitadel-cli": "invitation create",
         "summary": "Create an invitation",
-        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` (1–200 characters) labels who the link is\nfor. Optional `replaces_invitation_id` replaces that invitation: the new\nrow keeps the original's `journey_id`, and the original is deleted in the\nsame transaction unless it was accepted.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project already has 100 pending unexpired invitations.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` (1–200 characters) labels who the link is\nfor. Optional `replaces_invitation_id` replaces that invitation: the new\nrow keeps the original's `journey_id`, and the original is deleted in the\nsame transaction. An accepted original cannot be replaced: the request\nanswers `404`.\n\nThe `link` appears only in this response. Send it to the recipient\nyourself; whoever opens it and is signed in can redeem the role. It\nexpires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project already has 100 pending unexpired invitations.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9460,7 +9460,7 @@
       "post": {
         "operationId": "acceptInvitation",
         "summary": "Accept an invitation",
-        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is claimed, and the\ncreator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9531,7 +9531,7 @@
             }
           },
           "409": {
-            "description": "The project is unclaimed or inactive, so acceptance cannot complete.",
+            "description": "The project is unclaimed, or the server has no platform project.",
             "content": {
               "application/json": {
                 "schema": {
