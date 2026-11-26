@@ -1,10 +1,7 @@
 /**
- * Locale resolution for the login widgets.
- *
- * English is bundled and is the fallback for every language. The other
- * built-in translations load on demand ({@link loadLocale}), so a page
- * downloads only the one it shows. An app that wants a translation as a
- * value, to extend it, imports it from `@zitadel/components/locales`.
+ * Locale resolution for the login widgets. English is bundled and is the
+ * fallback for every language; the other built-in translations load on demand
+ * (`load.ts`).
  */
 export { en, type Locale } from "./en.js";
 export { businessLocales } from "./business.js";
@@ -70,7 +67,7 @@ export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
  * @param tag - The BCP 47 language tag.
  * @param locales - The integrator's dictionaries, by primary subtag.
  * @param builtin - The built-in dictionary for the tag's language, which the
- *   caller loads ({@link loadLocale}); `undefined` for English or a language with none.
+ *   caller loads (`loadLocale`); `undefined` for English or a language with none.
  * @returns The merged dictionary.
  */
 export function localeFor(
@@ -108,35 +105,11 @@ export function isHidden(
 }
 
 /**
- * The built-in translations besides English, by primary language subtag.
- */
-const TRANSLATIONS: Readonly<Record<string, () => Promise<Locale>>> = {
-  de: async () => (await import("./de.js")).de,
-  it: async () => (await import("./it.js")).it,
-};
-
-/**
- * Loads the dictionary for a BCP 47 language tag: its built-in translation,
- * if there is one, with the integrator's `locales` merged over it
- * ({@link localeFor}).
- *
- * @param tag - The BCP 47 language tag.
- * @param locales - The integrator's dictionaries, by primary subtag.
- * @returns The merged dictionary.
- */
-export async function loadLocale(
-  tag: string,
-  locales: Readonly<Record<string, Partial<Locale>>> | undefined,
-): Promise<Locale> {
-  return localeFor(tag, locales, await TRANSLATIONS[primaryLanguage(tag)]?.());
-}
-
-/**
  * The primary subtag of a language tag, lowercased.
  *
  * @param tag - The BCP 47 language tag.
  * @returns The language, `de` for `de-CH`.
  */
-function primaryLanguage(tag: string): string {
+export function primaryLanguage(tag: string): string {
   return (tag.split("-")[0] ?? "").toLowerCase();
 }

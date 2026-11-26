@@ -180,7 +180,7 @@ Every template should render:
 
 Of these, the authoring validator enforces the last one only. At render time `{% mandatory_gates %}` appends any required field and the primary action a template left out; nothing else on the list is checked or repaired. No atom renders `gates` (`captcha`) or `sso_providers` yet, so a template has nothing to place for them. See [`validator.md`](validator.md) for what ships and for the structural validation design, and [`../flowengine/template-security.md`](../flowengine/template-security.md) for the security rules.
 
-A template renders no identifier control for a password-only step. A step that collects a password without the identifier carries one in `step.identifier` for the surrounding form to hold, so a manager can save the pair — but that is the widget's to place, not the template's: the template context exposes `step` as `name`, `complete` and `texts` only, and the sanitiser drops a raw `<input>` or `<form>` regardless (`FORBID_TAGS` in `packages/components/src/orchestrator/sanitiser.ts`). An ejected template keeps the behaviour by leaving it alone.
+A template renders no identifier control for a password-only step. A step that collects a password without the identifier carries one in `step.identifier` for the surrounding form to hold, so a manager can save the pair — but that is the widget's to place, not the template's: the template context exposes `step` as `name`, `complete` and `texts` only, and the sanitiser drops a raw `<input>` or `<form>` regardless (they are not in its allowlist, `packages/components/src/orchestrator/sanitiser/allowlist.ts`). An ejected template keeps the behaviour by leaving it alone.
 
 ## Grouping (decided: one global template)
 

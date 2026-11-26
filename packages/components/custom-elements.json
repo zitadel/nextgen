@@ -6651,7 +6651,7 @@
           "name": "createSanitiser",
           "declaration": {
             "name": "createSanitiser",
-            "module": "./sanitiser.js"
+            "module": "./sanitiser/index.js"
           }
         },
         {
@@ -7156,7 +7156,7 @@
               "type": {
                 "text": "Locale"
               },
-              "description": "The built-in dictionary for the tag's language, which the\n *   caller loads ({@link loadLocale}); `undefined` for English or a language with none.\n * "
+              "description": "The built-in dictionary for the tag's language, which the\ncaller loads (`loadLocale`); `undefined` for English or a language with none."
             }
           ],
           "description": "The dictionary for a BCP 47 language tag. Its layers, strongest first: the\nintegrator's `locales` entries for the tag's primary subtag, the built-in\ndictionary for it, their `en` entries, and the built-in English.\n\nThe integrator's English is thus the fallback for every language: a key a\nlanguage has no text for, such as one for a step they added, shows their\nEnglish rather than the raw key, while a built-in translation still beats it."
@@ -7193,7 +7193,7 @@
         },
         {
           "kind": "function",
-          "name": "loadLocale",
+          "name": "primaryLanguage",
           "return": {
             "type": {
               "text": ""
@@ -7206,16 +7206,9 @@
                 "text": "string"
               },
               "description": "The BCP 47 language tag."
-            },
-            {
-              "name": "locales",
-              "type": {
-                "text": "Readonly<Record<string, Partial<Locale>>> | undefined"
-              },
-              "description": "The integrator's dictionaries, by primary subtag."
             }
           ],
-          "description": "Loads the dictionary for a BCP 47 language tag: its built-in translation,\nif there is one, with the integrator's `locales` merged over it\n(localeFor)."
+          "description": "The primary subtag of a language tag, lowercased."
         }
       ],
       "exports": [
@@ -7277,9 +7270,9 @@
         },
         {
           "kind": "js",
-          "name": "loadLocale",
+          "name": "primaryLanguage",
           "declaration": {
-            "name": "loadLocale",
+            "name": "primaryLanguage",
             "module": "src/orchestrator/locales/index.ts"
           }
         }
@@ -7305,6 +7298,48 @@
           "declaration": {
             "name": "it",
             "module": "src/orchestrator/locales/it.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/locales/load.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "loadLocale",
+          "return": {
+            "type": {
+              "text": ""
+            }
+          },
+          "parameters": [
+            {
+              "name": "tag",
+              "type": {
+                "text": "string"
+              },
+              "description": "The BCP 47 language tag."
+            },
+            {
+              "name": "locales",
+              "type": {
+                "text": "Readonly<Record<string, Partial<Locale>>> | undefined"
+              },
+              "description": "The integrator's dictionaries, by primary subtag."
+            }
+          ],
+          "description": "Loads the dictionary for a BCP 47 language tag: its built-in translation,\nif there is one, with the integrator's `locales` merged over it\n(localeFor)."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "loadLocale",
+          "declaration": {
+            "name": "loadLocale",
+            "module": "src/orchestrator/locales/load.ts"
           }
         }
       ]
@@ -7492,7 +7527,197 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/orchestrator/sanitiser.ts",
+      "path": "src/orchestrator/sanitiser/allowlist.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "ELEMENTS",
+          "type": {
+            "text": "readonly string[]"
+          },
+          "default": "[ ...new Set([...STRUCTURAL_TAGS, ...manifestRegistry.map((manifest) => manifest.tag)]), ]",
+          "description": "The elements a template may use: the structural tags and every atom."
+        },
+        {
+          "kind": "variable",
+          "name": "ATTRIBUTES",
+          "type": {
+            "text": "readonly string[]"
+          },
+          "description": "The attributes a template may use, each once: the common ones, every atom's,\nand the ARIA ones. `data-*` is allowed as a whole, so none is listed: the\nSanitizer API rejects a configuration that lists one, or any attribute twice."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ELEMENTS",
+          "declaration": {
+            "name": "ELEMENTS",
+            "module": "src/orchestrator/sanitiser/allowlist.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ATTRIBUTES",
+          "declaration": {
+            "name": "ATTRIBUTES",
+            "module": "src/orchestrator/sanitiser/allowlist.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/dompurify.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Sanitises with DOMPurify, for browsers without the HTML Sanitizer API.\n\nIts configuration matches NativeSanitiser: only the listed elements\nand attributes plus `data-*`, and a removed element's content removed with\nit. DOM clobbering protection is off because the output renders inside the\n`<zitadel-login>` shadow root, which named access on `document` and `window`\ncannot reach, and the guard would drop field names such as `name` (#2532).\n\nEach call makes an instance for the current `window`: DOMPurify keeps the\nDOM classes it finds when an instance is made, and a server render (such as\nAngular's) swaps those globals while it runs.",
+          "name": "DomPurifySanitiser",
+          "members": [
+            {
+              "kind": "field",
+              "name": "config",
+              "type": {
+                "text": "Config"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "default": "{ ALLOWED_TAGS: [...ELEMENTS, \"#text\"], ALLOWED_ATTR: [...ATTRIBUTES], ALLOW_DATA_ATTR: true, ALLOW_ARIA_ATTR: false, KEEP_CONTENT: false, RETURN_TRUSTED_TYPE: false, SANITIZE_DOM: false, }"
+            },
+            {
+              "kind": "field",
+              "name": "purify",
+              "type": {
+                "text": "DOMPurify"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "default": "purify"
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "description": "Loads DOMPurify, in its own chunk, and creates the sanitiser."
+            },
+            {
+              "kind": "method",
+              "name": "sanitise",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "html",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The untrusted markup."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "DomPurifySanitiser",
+          "declaration": {
+            "name": "DomPurifySanitiser",
+            "module": "src/orchestrator/sanitiser/dompurify.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Sanitiser",
+          "declaration": {
+            "name": "Sanitiser",
+            "module": "src/orchestrator/sanitiser/index.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/native.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Sanitises with the browser's own HTML Sanitizer API, `Element.setHTML()`.\n\nThe markup is parsed into an inert document, so nothing in it loads or runs\nand no custom element upgrades while it is sanitised.",
+          "name": "NativeSanitiser",
+          "members": [
+            {
+              "kind": "field",
+              "name": "sanitizer",
+              "type": {
+                "text": "SanitizerConfig"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "default": "{ elements: [...ELEMENTS], attributes: [...ATTRIBUTES], dataAttributes: true, comments: false, }"
+            },
+            {
+              "kind": "method",
+              "name": "isSupported",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "description": "Whether this browser has the HTML Sanitizer API."
+            },
+            {
+              "kind": "method",
+              "name": "sanitise",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "html",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The untrusted markup."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "NativeSanitiser",
+          "declaration": {
+            "name": "NativeSanitiser",
+            "module": "src/orchestrator/sanitiser/native.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/sanitiser.ts",
       "declarations": [],
       "exports": []
     },

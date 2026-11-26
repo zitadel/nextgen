@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { createSanitiser } from "./sanitiser.js";
+import { NativeSanitiser } from "./native.js";
 
-const sanitiser = await createSanitiser();
+const sanitiser = new NativeSanitiser();
 
-describe("createSanitiser with the browser's Sanitizer API", () => {
-  it("runs on a browser that has setHTML()", () => {
-    expect("setHTML" in Element.prototype).toBe(true);
+describe("NativeSanitiser", () => {
+  it("is supported on a browser that has setHTML()", () => {
+    expect(NativeSanitiser.isSupported()).toBe(true);
   });
 
   it("keeps <zl-*> elements with their attributes and text", () => {

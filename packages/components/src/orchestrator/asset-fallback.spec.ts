@@ -15,7 +15,7 @@ import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import { armAssetFallbacks } from "./asset-fallback.js";
 import { createLiquidEngine } from "./liquid.js";
-import { createSanitiser } from "./sanitiser.js";
+import { createSanitiser } from "./sanitiser/index.js";
 
 const sanitiser = await createSanitiser();
 

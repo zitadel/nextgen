@@ -21,7 +21,7 @@ import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en } from "./locales/en.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
-import { createSanitiser } from "./sanitiser.js";
+import { createSanitiser } from "./sanitiser/index.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 
 const sanitiser = await createSanitiser();
