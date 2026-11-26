@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 
-import { chmod, FsNotFoundError, rm, stat, writeFile } from "@/lib/fs";
+import { chmod, FsDeniedError, FsNotFoundError, rm, stat, writeFile } from "@/lib/fs";
 
 import { warnings } from "@/lib/ui/warnings";
 
@@ -43,7 +43,7 @@ export class SecretFile {
       await chmod(path, mode);
     } catch (error) {
       warnings.report(
-        `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${error instanceof FsNotFoundError ? "ENOENT" : error instanceof Error ? error.message : "unknown"}); its permissions may be broader than intended.`,
+        `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${error instanceof FsNotFoundError ? "ENOENT" : error instanceof FsDeniedError ? "EACCES" : "unknown"}); its permissions may be broader than intended.`,
       );
     }
   }
