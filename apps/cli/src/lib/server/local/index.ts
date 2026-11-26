@@ -9,8 +9,8 @@ export type { LocalAdmin } from "./admin-credential";
 export { EMPTY_SUMMARY, loadProjectEnv } from "./env-vars";
 export type { ResolvedEnv } from "./env-vars";
 export type { DestroyPermit } from "./destroy-permit";
-export { listenersForPort } from "./ports";
-export type { TcpListener } from "./ports";
+export { listenersForPort, systemRun, workingDirectories } from "./ports";
+export type { Run, TcpListener } from "./ports";
 export type { LocalServers, ManagedRuntimeProcess } from "./processes";
 export {
   CONTAINER_DATA_DIR,

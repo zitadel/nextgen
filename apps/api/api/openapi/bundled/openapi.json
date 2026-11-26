@@ -2845,97 +2845,6 @@
         }
       }
     },
-    "/projects/{project_id}/admins": {
-      "get": {
-        "operationId": "listProjectAdmins",
-        "summary": "List the admins of a project",
-        "description": "Lists the people who can administer a project, and how each of them\nholds that access.\n\nA person appears once, with one entry in `sources` per way they hold it:\n\n- `owning_team`: an active member of the team that owns the project, the\n  team a claim attaches the project to. Removing a grant does not remove\n  this access. It ends only when the person leaves the team or the\n  project changes owner.\n- `grant`: an unexpired `admin` grant on the project, which is a role\n  given to the person (`grant_id` only) or to a team they are an active\n  member of (`grant_id` and `team`). Revoking that grant removes this\n  source.\n\nThe list follows the authorization check. A person who left a team, or\nwhose team or user was deactivated, is not listed through it. Grants that\nexpired or carry a lower role are left out. A person whose only access is a\n`viewer` or `editor` grant is not an admin and is not listed. Like the\ncheck, a direct user grant requires an active user, so a suspended\nperson's direct grant is not listed.\n\nEvery caller who passes the project read check sees every listed admin\nand every team name on `sources`. Co-membership no longer filters the\nroster.\n\nThe list is ordered by `user_id` and paginated with `page_token`.\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can read the project.\n",
-        "tags": [
-          "Projects"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/limit"
-          },
-          {
-            "$ref": "#/components/parameters/page-token"
-          },
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/project-id"
-            }
-          }
-        ],
-        "security": [
-          {
-            "oauth2": [
-              "project.write"
-            ]
-          },
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of the project's admins.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/list-project-admins-response"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The page token is not valid. Send the `next_page_token` from the previous response unchanged.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-details"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid credentials.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-details"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller cannot read the project's admins.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-details"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-details"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/listProjectAdmins-error-response"
-          }
-        }
-      }
-    },
     "/projects/{project_id}/members": {
       "get": {
         "operationId": "listProjectMembers",
@@ -11576,6 +11485,35 @@
         }
       }
     },
+    "auth.request.exchange.failed": {
+      "post": {
+        "operationId": "authRequestExchangeFailed",
+        "summary": "auth.request.exchange.failed",
+        "description": "An app presented an authorization code at the OAuth token endpoint, and\na check refused it. The code is used up all the same. The payload names\nthe app by its `client_id` and says which check refused the code in\n`reason`.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth-request-exchange-failed-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "auth.sso.authorization.failed": {
       "post": {
         "operationId": "authSsoAuthorizationFailed",
@@ -17139,7 +17077,7 @@
             ],
             "properties": {
               "owning_team_id": {
-                "description": "The team that owns the project, which is how its members administer\nit. Null when no team owns the project, for example before it is\nclaimed.\n\nThe team lives in the platform project, so treat this ID as opaque.\n`GET /projects/{project_id}/admins` lists the people who administer\nthe project through it.\n",
+                "description": "The team that owns the project, which is how its members administer\nit. Null when no team owns the project, for example before it is\nclaimed.\n\nThe team lives in the platform project, so treat this ID as opaque.\n`GET /projects/{project_id}/members?relation=admin` lists the people\nwho administer the project, through it or through a grant.\n",
                 "oneOf": [
                   {
                     "$ref": "#/components/schemas/team-id"
@@ -17246,120 +17184,6 @@
             "type": "string",
             "description": "The team's name. Absent when the team can no longer be loaded, or where\nthe referencing endpoint leaves it out for a team the caller may not see.\n",
             "example": "Platform admins"
-          }
-        }
-      },
-      "project-admin-owning-team-source": {
-        "title": "ProjectAdminOwningTeamSource",
-        "description": "Admin access as an active member of the team that owns the project.",
-        "type": "object",
-        "required": [
-          "type",
-          "team"
-        ],
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "owning_team"
-            ]
-          },
-          "team": {
-            "description": "The owning team.",
-            "$ref": "#/components/schemas/team-ref"
-          }
-        }
-      },
-      "project-admin-grant-source": {
-        "title": "ProjectAdminGrantSource",
-        "description": "Admin access through an `admin` grant on the project, to the person or to a\nteam they are an active member of.\n",
-        "type": "object",
-        "required": [
-          "type",
-          "grant_id"
-        ],
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "grant"
-            ]
-          },
-          "grant_id": {
-            "type": "string",
-            "description": "The grant (`asgn_<opaque>`), as served by `GET /grants/{grant_id}`."
-          },
-          "team": {
-            "description": "The team the grant is to, absent for a grant to the person directly.",
-            "$ref": "#/components/schemas/team-ref"
-          }
-        }
-      },
-      "project-admin-source": {
-        "title": "ProjectAdminSource",
-        "description": "One way a person holds admin access to the project. Discriminate on `type`.\n\n- `owning_team`: the person is an active member of the owning team named by\n  `team`. There is no `grant_id`: this access is not a grant, so the grants\n  API cannot revoke it.\n- `grant`: an `admin` grant on the project, named by `grant_id`. `team` is\n  present when the grant is to a team the person is an active member of.\n  It is absent when the grant is to the person directly.\n",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/project-admin-owning-team-source"
-          },
-          {
-            "$ref": "#/components/schemas/project-admin-grant-source"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type",
-          "mapping": {
-            "owning_team": "#/components/schemas/project-admin-owning-team-source",
-            "grant": "#/components/schemas/project-admin-grant-source"
-          }
-        }
-      },
-      "project-admin": {
-        "title": "ProjectAdmin",
-        "description": "One person who can administer the project, with every way they hold that\naccess.\n",
-        "type": "object",
-        "required": [
-          "user",
-          "sources"
-        ],
-        "properties": {
-          "user": {
-            "description": "The person. A user-ref: render `display`, falling back to `identifier`,\nthen `user_id`.\n",
-            "$ref": "#/components/schemas/user-ref"
-          },
-          "sources": {
-            "type": "array",
-            "minItems": 1,
-            "description": "How the person holds admin access: owning-team access first, then\ngrants to teams, then grants to the person.\n",
-            "items": {
-              "$ref": "#/components/schemas/project-admin-source"
-            }
-          }
-        }
-      },
-      "list-project-admins-response": {
-        "type": "object",
-        "description": "A page of the people who administer a project.",
-        "required": [
-          "admins"
-        ],
-        "properties": {
-          "admins": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/project-admin"
-            }
-          },
-          "next_page_token": {
-            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/page-token"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         }
       },
@@ -23964,6 +23788,61 @@
           }
         ]
       },
+      "auth-request-exchange-failed-payload": {
+        "title": "AuthRequestExchangeFailedPayload",
+        "type": "object",
+        "description": "Payload for `auth.request.exchange.failed` events. The code, the\n`code_verifier` and the `redirect_uri` the client sent stay out.\n",
+        "required": [
+          "client_id",
+          "reason"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The client that presented the code."
+          },
+          "reason": {
+            "type": "string",
+            "description": "The check that refused the code.",
+            "enum": [
+              "client_mismatch",
+              "code_expired",
+              "redirect_uri_mismatch",
+              "code_verifier_missing",
+              "code_verifier_invalid",
+              "code_verifier_unexpected",
+              "release_revoked",
+              "session_not_active",
+              "user_not_active"
+            ]
+          }
+        }
+      },
+      "auth-request-exchange-failed-event": {
+        "title": "AuthRequestExchangeFailedEvent",
+        "description": "An event of type auth.request.exchange.failed, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "auth.request.exchange.failed"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/auth-request-exchange-failed-payload"
+              }
+            }
+          }
+        ]
+      },
       "auth-sso-authorization-failed-event": {
         "title": "AuthSsoAuthorizationFailedEvent",
         "description": "An event of type auth.sso.authorization.failed, with the shared event fields and its own payload.\n",
@@ -24049,6 +23928,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client that redeemed the authorization code. Only a token issued for a code has it."
           }
         }
       },
@@ -25843,6 +25726,9 @@
             "$ref": "#/components/schemas/auth-request-created-event"
           },
           {
+            "$ref": "#/components/schemas/auth-request-exchange-failed-event"
+          },
+          {
             "$ref": "#/components/schemas/auth-sso-authorization-failed-event"
           },
           {
@@ -25990,6 +25876,7 @@
             "auth.factor.passkey.enrolled": "#/components/schemas/auth-factor-passkey-enrolled-event",
             "auth.factor.password.set": "#/components/schemas/auth-factor-password-set-event",
             "auth.request.created": "#/components/schemas/auth-request-created-event",
+            "auth.request.exchange.failed": "#/components/schemas/auth-request-exchange-failed-event",
             "auth.sso.authorization.failed": "#/components/schemas/auth-sso-authorization-failed-event",
             "auth.sso.exchange.failed": "#/components/schemas/auth-sso-exchange-failed-event",
             "auth.sso.exchange.succeeded": "#/components/schemas/auth-sso-exchange-succeeded-event",
@@ -31574,80 +31461,6 @@
               },
               "proj.password_hash_invalid": {
                 "$ref": "#/components/examples/proj-password_hash_invalid"
-              },
-              "proj.permission_denied": {
-                "$ref": "#/components/examples/proj-permission_denied"
-              },
-              "req.invalid": {
-                "$ref": "#/components/examples/req-invalid"
-              },
-              "unavailable": {
-                "$ref": "#/components/examples/unavailable"
-              }
-            }
-          }
-        }
-      },
-      "listProjectAdmins-error-response": {
-        "description": "Error response",
-        "content": {
-          "application/json": {
-            "schema": {
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/auth-unauthorized"
-                },
-                {
-                  "$ref": "#/components/schemas/internal"
-                },
-                {
-                  "$ref": "#/components/schemas/not_implemented"
-                },
-                {
-                  "$ref": "#/components/schemas/proj-missing_id"
-                },
-                {
-                  "$ref": "#/components/schemas/proj-not_found"
-                },
-                {
-                  "$ref": "#/components/schemas/proj-permission_denied"
-                },
-                {
-                  "$ref": "#/components/schemas/req-invalid"
-                },
-                {
-                  "$ref": "#/components/schemas/unavailable"
-                }
-              ],
-              "discriminator": {
-                "propertyName": "code",
-                "mapping": {
-                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
-                  "internal": "#/components/schemas/internal",
-                  "not_implemented": "#/components/schemas/not_implemented",
-                  "proj.missing_id": "#/components/schemas/proj-missing_id",
-                  "proj.not_found": "#/components/schemas/proj-not_found",
-                  "proj.permission_denied": "#/components/schemas/proj-permission_denied",
-                  "req.invalid": "#/components/schemas/req-invalid",
-                  "unavailable": "#/components/schemas/unavailable"
-                }
-              }
-            },
-            "examples": {
-              "auth.unauthorized": {
-                "$ref": "#/components/examples/auth-unauthorized"
-              },
-              "internal": {
-                "$ref": "#/components/examples/internal"
-              },
-              "not_implemented": {
-                "$ref": "#/components/examples/not_implemented"
-              },
-              "proj.missing_id": {
-                "$ref": "#/components/examples/proj-missing_id"
-              },
-              "proj.not_found": {
-                "$ref": "#/components/examples/proj-not_found"
               },
               "proj.permission_denied": {
                 "$ref": "#/components/examples/proj-permission_denied"

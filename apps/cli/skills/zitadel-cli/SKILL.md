@@ -976,9 +976,22 @@ holds the warnings and errors, and `--tail` counts only those lines. `logs
 errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
 running, name it in `data.next_actions`.
 
-To move a set-up app to another dev port (setup's `warnings` say the port is
-already in use, the dev server exits with `EADDRINUSE`, or another app needs
-the port), run `setup --dev-port <port>` in the app; never change the port in
+Setup pins the app's dev script to its dev port and registers
+`http://localhost:<port>` as the origin and issuer. A process running in the
+app's folder that holds the port is the app's own dev server: setup keeps the
+port and says nothing, so leave a running dev server up while setup runs. When
+something else holds it, a run that asks nothing warns in `warnings`. A warning
+that names the holder (`node (pid 4242)`) found it running outside the app's
+folder: stop it, or run the `setup --dev-port` it gives. A warning that names
+none could not see the holder (no `lsof`, or another user's process). Either
+way, if the holder is this app's dev server after all (in a container it shows
+as Docker's process), ignore the warning and keep the port: moved off the port
+its own dev server serves, the app's origin and issuer no longer match the
+running app.
+
+To move a set-up app to another dev port (a setup warning names another process
+on it, the dev server exits with `EADDRINUSE`, or another app needs the port),
+run `setup --dev-port <port>` in the app; never change the port in
 one file by hand. In a directory with a
 `zitadel.json`, `setup` returns `status: "skipped"` with `reason:
 "already-initialized"`, unless `--dev-port` is given: then it moves the app.
