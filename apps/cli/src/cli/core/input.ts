@@ -296,11 +296,15 @@ export class Input {
         const value = word.includes("=") ? word.slice(word.indexOf("=") + 1) : argv[index + 1];
         if (value !== undefined) {
           try {
-            const text = await Input.textOf(value);
-            const asksForJson = parseJsonObject(text, "--input").json === true;
+            const parsed = parseJsonOrUndefined(await Input.textOf(value));
+            const asksForJson = isObject(parsed) && parsed.json === true;
 
             return asksForJson && !argv.includes("--json") ? [...argv, "--json"] : argv;
-          } catch {}
+          } catch (error) {
+            if (!(error instanceof ZitadelError)) {
+              throw error;
+            }
+          }
         }
 
         return argv;
