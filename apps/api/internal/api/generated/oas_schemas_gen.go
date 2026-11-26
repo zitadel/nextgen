@@ -1783,7 +1783,18 @@ type ApplicationCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString       `json:"target"`
 	Metadata OptEventMetadata   `json:"metadata"`
 	Payload  ApplicationPayload `json:"payload"`
 }
@@ -1891,6 +1902,21 @@ func (s *ApplicationCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ApplicationCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *ApplicationCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *ApplicationCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *ApplicationCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -2006,6 +2032,21 @@ func (s *ApplicationCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ApplicationCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *ApplicationCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *ApplicationCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *ApplicationCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -2397,7 +2438,18 @@ type ApplicationUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString       `json:"target"`
 	Metadata OptEventMetadata   `json:"metadata"`
 	Payload  ApplicationPayload `json:"payload"`
 }
@@ -2505,6 +2557,21 @@ func (s *ApplicationUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ApplicationUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *ApplicationUpdatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *ApplicationUpdatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *ApplicationUpdatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -2620,6 +2687,21 @@ func (s *ApplicationUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ApplicationUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *ApplicationUpdatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *ApplicationUpdatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *ApplicationUpdatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -3283,7 +3365,18 @@ type AuthAttemptCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -3391,6 +3484,21 @@ func (s *AuthAttemptCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthAttemptCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthAttemptCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthAttemptCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthAttemptCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -3506,6 +3614,21 @@ func (s *AuthAttemptCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthAttemptCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthAttemptCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthAttemptCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthAttemptCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -3743,7 +3866,18 @@ type AuthAttemptHandedOffEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -3851,6 +3985,21 @@ func (s *AuthAttemptHandedOffEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthAttemptHandedOffEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthAttemptHandedOffEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthAttemptHandedOffEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthAttemptHandedOffEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -3966,6 +4115,21 @@ func (s *AuthAttemptHandedOffEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthAttemptHandedOffEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthAttemptHandedOffEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthAttemptHandedOffEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthAttemptHandedOffEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -4417,7 +4581,18 @@ type AuthCheckFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
 }
@@ -4525,6 +4700,21 @@ func (s *AuthCheckFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthCheckFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthCheckFailedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthCheckFailedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthCheckFailedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -4640,6 +4830,21 @@ func (s *AuthCheckFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthCheckFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthCheckFailedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthCheckFailedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthCheckFailedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -4917,7 +5122,18 @@ type AuthCheckSucceededEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
 }
@@ -5025,6 +5241,21 @@ func (s *AuthCheckSucceededEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthCheckSucceededEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthCheckSucceededEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthCheckSucceededEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthCheckSucceededEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -5140,6 +5371,21 @@ func (s *AuthCheckSucceededEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthCheckSucceededEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthCheckSucceededEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthCheckSucceededEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthCheckSucceededEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -5430,7 +5676,18 @@ type AuthFactorPasskeyEnrolledEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  AuthFactorPayload `json:"payload"`
 }
@@ -5538,6 +5795,21 @@ func (s *AuthFactorPasskeyEnrolledEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthFactorPasskeyEnrolledEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthFactorPasskeyEnrolledEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthFactorPasskeyEnrolledEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthFactorPasskeyEnrolledEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -5653,6 +5925,21 @@ func (s *AuthFactorPasskeyEnrolledEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthFactorPasskeyEnrolledEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthFactorPasskeyEnrolledEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthFactorPasskeyEnrolledEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthFactorPasskeyEnrolledEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -5890,7 +6177,18 @@ type AuthFactorPasswordSetEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  AuthFactorPayload `json:"payload"`
 }
@@ -5998,6 +6296,21 @@ func (s *AuthFactorPasswordSetEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthFactorPasswordSetEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthFactorPasswordSetEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthFactorPasswordSetEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthFactorPasswordSetEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -6113,6 +6426,21 @@ func (s *AuthFactorPasswordSetEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthFactorPasswordSetEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthFactorPasswordSetEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthFactorPasswordSetEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthFactorPasswordSetEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -6454,7 +6782,18 @@ type AuthRequestCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString              `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString              `json:"target"`
 	Metadata OptEventMetadata          `json:"metadata"`
 	Payload  AuthRequestCreatedPayload `json:"payload"`
 }
@@ -6562,6 +6901,21 @@ func (s *AuthRequestCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthRequestCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthRequestCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthRequestCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthRequestCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -6677,6 +7031,21 @@ func (s *AuthRequestCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthRequestCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthRequestCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthRequestCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthRequestCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -7511,7 +7880,18 @@ type AuthSSOAuthorizationFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
 }
@@ -7619,6 +7999,21 @@ func (s *AuthSSOAuthorizationFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthSSOAuthorizationFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthSSOAuthorizationFailedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthSSOAuthorizationFailedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthSSOAuthorizationFailedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -7734,6 +8129,21 @@ func (s *AuthSSOAuthorizationFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthSSOAuthorizationFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthSSOAuthorizationFailedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthSSOAuthorizationFailedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthSSOAuthorizationFailedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -7971,7 +8381,18 @@ type AuthSSOExchangeFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
 }
@@ -8079,6 +8500,21 @@ func (s *AuthSSOExchangeFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthSSOExchangeFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthSSOExchangeFailedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthSSOExchangeFailedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthSSOExchangeFailedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -8194,6 +8630,21 @@ func (s *AuthSSOExchangeFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthSSOExchangeFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthSSOExchangeFailedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthSSOExchangeFailedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthSSOExchangeFailedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -8431,7 +8882,18 @@ type AuthSSOExchangeSucceededEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
 }
@@ -8539,6 +9001,21 @@ func (s *AuthSSOExchangeSucceededEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthSSOExchangeSucceededEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthSSOExchangeSucceededEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthSSOExchangeSucceededEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthSSOExchangeSucceededEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -8654,6 +9131,21 @@ func (s *AuthSSOExchangeSucceededEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthSSOExchangeSucceededEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthSSOExchangeSucceededEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthSSOExchangeSucceededEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthSSOExchangeSucceededEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -8891,7 +9383,18 @@ type AuthTokenIssuedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString           `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString           `json:"target"`
 	Metadata OptEventMetadata       `json:"metadata"`
 	Payload  AuthTokenIssuedPayload `json:"payload"`
 }
@@ -8999,6 +9502,21 @@ func (s *AuthTokenIssuedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthTokenIssuedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthTokenIssuedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthTokenIssuedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthTokenIssuedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -9114,6 +9632,21 @@ func (s *AuthTokenIssuedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthTokenIssuedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthTokenIssuedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthTokenIssuedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthTokenIssuedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -9379,7 +9912,18 @@ type AuthTokenRevokedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -9487,6 +10031,21 @@ func (s *AuthTokenRevokedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthTokenRevokedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthTokenRevokedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthTokenRevokedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthTokenRevokedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -9602,6 +10161,21 @@ func (s *AuthTokenRevokedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthTokenRevokedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthTokenRevokedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthTokenRevokedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthTokenRevokedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -9930,7 +10504,18 @@ type AuthzGrantedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString        `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString        `json:"target"`
 	Metadata OptEventMetadata    `json:"metadata"`
 	Payload  AuthzGrantedPayload `json:"payload"`
 }
@@ -10038,6 +10623,21 @@ func (s *AuthzGrantedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthzGrantedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthzGrantedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthzGrantedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthzGrantedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -10153,6 +10753,21 @@ func (s *AuthzGrantedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthzGrantedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthzGrantedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthzGrantedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthzGrantedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -10428,7 +11043,18 @@ type AuthzRevokedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString        `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString        `json:"target"`
 	Metadata OptEventMetadata    `json:"metadata"`
 	Payload  AuthzGrantedPayload `json:"payload"`
 }
@@ -10536,6 +11162,21 @@ func (s *AuthzRevokedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthzRevokedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *AuthzRevokedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *AuthzRevokedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *AuthzRevokedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -10651,6 +11292,21 @@ func (s *AuthzRevokedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthzRevokedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *AuthzRevokedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *AuthzRevokedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *AuthzRevokedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -11108,7 +11764,18 @@ type BrandingCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString           `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString           `json:"target"`
 	Metadata OptEventMetadata       `json:"metadata"`
 	Payload  BrandingCreatedPayload `json:"payload"`
 }
@@ -11216,6 +11883,21 @@ func (s *BrandingCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *BrandingCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *BrandingCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *BrandingCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *BrandingCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -11331,6 +12013,21 @@ func (s *BrandingCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *BrandingCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *BrandingCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *BrandingCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *BrandingCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -26434,7 +27131,18 @@ type DeploymentCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString             `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString             `json:"target"`
 	Metadata OptEventMetadata         `json:"metadata"`
 	Payload  DeploymentCreatedPayload `json:"payload"`
 }
@@ -26542,6 +27250,21 @@ func (s *DeploymentCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *DeploymentCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *DeploymentCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *DeploymentCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *DeploymentCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -26657,6 +27380,21 @@ func (s *DeploymentCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *DeploymentCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *DeploymentCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *DeploymentCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *DeploymentCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -33072,7 +33810,18 @@ type FlowSignupChallengeConsumedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -33180,6 +33929,21 @@ func (s *FlowSignupChallengeConsumedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowSignupChallengeConsumedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *FlowSignupChallengeConsumedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *FlowSignupChallengeConsumedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *FlowSignupChallengeConsumedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -33295,6 +34059,21 @@ func (s *FlowSignupChallengeConsumedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowSignupChallengeConsumedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *FlowSignupChallengeConsumedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *FlowSignupChallengeConsumedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *FlowSignupChallengeConsumedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -33532,7 +34311,18 @@ type FlowSignupChallengeIssuedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -33640,6 +34430,21 @@ func (s *FlowSignupChallengeIssuedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowSignupChallengeIssuedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *FlowSignupChallengeIssuedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *FlowSignupChallengeIssuedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *FlowSignupChallengeIssuedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -33755,6 +34560,21 @@ func (s *FlowSignupChallengeIssuedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowSignupChallengeIssuedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *FlowSignupChallengeIssuedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *FlowSignupChallengeIssuedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *FlowSignupChallengeIssuedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -34873,7 +35693,18 @@ type FlowdefCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  FlowdefPayload   `json:"payload"`
 }
@@ -34981,6 +35812,21 @@ func (s *FlowdefCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowdefCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *FlowdefCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *FlowdefCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *FlowdefCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -35096,6 +35942,21 @@ func (s *FlowdefCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowdefCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *FlowdefCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *FlowdefCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *FlowdefCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -35333,7 +36194,18 @@ type FlowdefDeletedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -35441,6 +36313,21 @@ func (s *FlowdefDeletedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowdefDeletedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *FlowdefDeletedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *FlowdefDeletedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *FlowdefDeletedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -35556,6 +36443,21 @@ func (s *FlowdefDeletedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowdefDeletedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *FlowdefDeletedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *FlowdefDeletedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *FlowdefDeletedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -36303,7 +37205,18 @@ type FlowdefUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  FlowdefPayload   `json:"payload"`
 }
@@ -36411,6 +37324,21 @@ func (s *FlowdefUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowdefUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *FlowdefUpdatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *FlowdefUpdatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *FlowdefUpdatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -36526,6 +37454,21 @@ func (s *FlowdefUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowdefUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *FlowdefUpdatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *FlowdefUpdatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *FlowdefUpdatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -46942,7 +47885,18 @@ type IdpCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  IdpPayload       `json:"payload"`
 }
@@ -47050,6 +48004,21 @@ func (s *IdpCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *IdpCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *IdpCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *IdpCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *IdpCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -47165,6 +48134,21 @@ func (s *IdpCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *IdpCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *IdpCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *IdpCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *IdpCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -47608,7 +48592,18 @@ type IdpIdentityLinkCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString                  `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString                  `json:"target"`
 	Metadata OptEventMetadata              `json:"metadata"`
 	Payload  IdpIdentityLinkCreatedPayload `json:"payload"`
 }
@@ -47716,6 +48711,21 @@ func (s *IdpIdentityLinkCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *IdpIdentityLinkCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *IdpIdentityLinkCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *IdpIdentityLinkCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *IdpIdentityLinkCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -47831,6 +48841,21 @@ func (s *IdpIdentityLinkCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *IdpIdentityLinkCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *IdpIdentityLinkCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *IdpIdentityLinkCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *IdpIdentityLinkCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -48551,7 +49576,18 @@ type IdpUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  IdpPayload       `json:"payload"`
 }
@@ -48659,6 +49695,21 @@ func (s *IdpUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *IdpUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *IdpUpdatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *IdpUpdatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *IdpUpdatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -48774,6 +49825,21 @@ func (s *IdpUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *IdpUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *IdpUpdatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *IdpUpdatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *IdpUpdatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -49658,7 +50724,18 @@ type InvitationAcceptedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString              `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString              `json:"target"`
 	Metadata OptEventMetadata          `json:"metadata"`
 	Payload  InvitationAcceptedPayload `json:"payload"`
 }
@@ -49766,6 +50843,21 @@ func (s *InvitationAcceptedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *InvitationAcceptedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *InvitationAcceptedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *InvitationAcceptedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *InvitationAcceptedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -49881,6 +50973,21 @@ func (s *InvitationAcceptedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *InvitationAcceptedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *InvitationAcceptedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *InvitationAcceptedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *InvitationAcceptedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -50496,7 +51603,18 @@ type InvitationCancelledEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString               `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString               `json:"target"`
 	Metadata OptEventMetadata           `json:"metadata"`
 	Payload  InvitationCancelledPayload `json:"payload"`
 }
@@ -50604,6 +51722,21 @@ func (s *InvitationCancelledEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *InvitationCancelledEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *InvitationCancelledEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *InvitationCancelledEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *InvitationCancelledEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -50719,6 +51852,21 @@ func (s *InvitationCancelledEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *InvitationCancelledEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *InvitationCancelledEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *InvitationCancelledEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *InvitationCancelledEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -51029,7 +52177,18 @@ type InvitationCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString             `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString             `json:"target"`
 	Metadata OptEventMetadata         `json:"metadata"`
 	Payload  InvitationCreatedPayload `json:"payload"`
 }
@@ -51137,6 +52296,21 @@ func (s *InvitationCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *InvitationCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *InvitationCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *InvitationCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *InvitationCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -51252,6 +52426,21 @@ func (s *InvitationCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *InvitationCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *InvitationCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *InvitationCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *InvitationCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -52615,7 +53804,18 @@ type InvitationRejectedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString              `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString              `json:"target"`
 	Metadata OptEventMetadata          `json:"metadata"`
 	Payload  InvitationRejectedPayload `json:"payload"`
 }
@@ -52723,6 +53923,21 @@ func (s *InvitationRejectedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *InvitationRejectedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *InvitationRejectedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *InvitationRejectedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *InvitationRejectedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -52838,6 +54053,21 @@ func (s *InvitationRejectedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *InvitationRejectedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *InvitationRejectedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *InvitationRejectedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *InvitationRejectedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -60492,7 +61722,18 @@ type OAuthSettingsCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString                `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString                `json:"target"`
 	Metadata OptEventMetadata            `json:"metadata"`
 	Payload  OAuthSettingsCreatedPayload `json:"payload"`
 }
@@ -60600,6 +61841,21 @@ func (s *OAuthSettingsCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *OAuthSettingsCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *OAuthSettingsCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *OAuthSettingsCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *OAuthSettingsCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -60715,6 +61971,21 @@ func (s *OAuthSettingsCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *OAuthSettingsCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *OAuthSettingsCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *OAuthSettingsCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *OAuthSettingsCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -82179,7 +83450,18 @@ type OriginAddedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  OriginPayload    `json:"payload"`
 }
@@ -82287,6 +83569,21 @@ func (s *OriginAddedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *OriginAddedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *OriginAddedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *OriginAddedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *OriginAddedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -82402,6 +83699,21 @@ func (s *OriginAddedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *OriginAddedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *OriginAddedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *OriginAddedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *OriginAddedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -82972,7 +84284,18 @@ type OriginRemovedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  OriginPayload    `json:"payload"`
 }
@@ -83080,6 +84403,21 @@ func (s *OriginRemovedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *OriginRemovedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *OriginRemovedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *OriginRemovedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *OriginRemovedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -83195,6 +84533,21 @@ func (s *OriginRemovedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *OriginRemovedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *OriginRemovedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *OriginRemovedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *OriginRemovedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -84943,7 +86296,18 @@ type PolicyCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  PolicyPayload    `json:"payload"`
 }
@@ -85051,6 +86415,21 @@ func (s *PolicyCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *PolicyCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *PolicyCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *PolicyCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *PolicyCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -85166,6 +86545,21 @@ func (s *PolicyCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *PolicyCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *PolicyCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *PolicyCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *PolicyCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -85505,7 +86899,18 @@ type PolicyUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  PolicyPayload    `json:"payload"`
 }
@@ -85613,6 +87018,21 @@ func (s *PolicyUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *PolicyUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *PolicyUpdatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *PolicyUpdatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *PolicyUpdatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -85728,6 +87148,21 @@ func (s *PolicyUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *PolicyUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *PolicyUpdatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *PolicyUpdatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *PolicyUpdatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -86099,7 +87534,18 @@ type PreviewRemovedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -86207,6 +87653,21 @@ func (s *PreviewRemovedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *PreviewRemovedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *PreviewRemovedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *PreviewRemovedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *PreviewRemovedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -86322,6 +87783,21 @@ func (s *PreviewRemovedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *PreviewRemovedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *PreviewRemovedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *PreviewRemovedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *PreviewRemovedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -87203,7 +88679,18 @@ type ProjectCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  ProjectPayload   `json:"payload"`
 }
@@ -87311,6 +88798,21 @@ func (s *ProjectCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ProjectCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *ProjectCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *ProjectCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *ProjectCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -87426,6 +88928,21 @@ func (s *ProjectCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ProjectCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *ProjectCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *ProjectCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *ProjectCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -87663,7 +89180,18 @@ type ProjectDeletedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -87771,6 +89299,21 @@ func (s *ProjectDeletedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ProjectDeletedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *ProjectDeletedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *ProjectDeletedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *ProjectDeletedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -87886,6 +89429,21 @@ func (s *ProjectDeletedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ProjectDeletedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *ProjectDeletedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *ProjectDeletedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *ProjectDeletedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -88727,7 +90285,18 @@ type ProjectUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  ProjectPayload   `json:"payload"`
 }
@@ -88835,6 +90404,21 @@ func (s *ProjectUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ProjectUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *ProjectUpdatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *ProjectUpdatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *ProjectUpdatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -88950,6 +90534,21 @@ func (s *ProjectUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ProjectUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *ProjectUpdatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *ProjectUpdatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *ProjectUpdatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -95354,7 +96953,18 @@ type ReleaseCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString          `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString          `json:"target"`
 	Metadata OptEventMetadata      `json:"metadata"`
 	Payload  ReleaseCreatedPayload `json:"payload"`
 }
@@ -95462,6 +97072,21 @@ func (s *ReleaseCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ReleaseCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *ReleaseCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *ReleaseCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *ReleaseCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -95577,6 +97202,21 @@ func (s *ReleaseCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ReleaseCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *ReleaseCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *ReleaseCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *ReleaseCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -96227,7 +97867,18 @@ type ReleaseRevokedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString          `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString          `json:"target"`
 	Metadata OptEventMetadata      `json:"metadata"`
 	Payload  ReleaseRevokedPayload `json:"payload"`
 }
@@ -96335,6 +97986,21 @@ func (s *ReleaseRevokedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ReleaseRevokedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *ReleaseRevokedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *ReleaseRevokedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *ReleaseRevokedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -96450,6 +98116,21 @@ func (s *ReleaseRevokedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ReleaseRevokedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *ReleaseRevokedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *ReleaseRevokedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *ReleaseRevokedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -97513,7 +99194,18 @@ type RequestAPIEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  RequestAPIPayload `json:"payload"`
 }
@@ -97621,6 +99313,21 @@ func (s *RequestAPIEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *RequestAPIEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *RequestAPIEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *RequestAPIEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *RequestAPIEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -97736,6 +99443,21 @@ func (s *RequestAPIEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *RequestAPIEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *RequestAPIEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *RequestAPIEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *RequestAPIEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -100509,7 +102231,18 @@ type SchemaCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString         `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString         `json:"target"`
 	Metadata OptEventMetadata     `json:"metadata"`
 	Payload  SchemaCreatedPayload `json:"payload"`
 }
@@ -100617,6 +102350,21 @@ func (s *SchemaCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *SchemaCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *SchemaCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *SchemaCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *SchemaCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -100732,6 +102480,21 @@ func (s *SchemaCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *SchemaCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *SchemaCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *SchemaCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *SchemaCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -102397,7 +104160,18 @@ type SessionDeletedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString          `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString          `json:"target"`
 	Metadata OptEventMetadata      `json:"metadata"`
 	Payload  SessionDeletedPayload `json:"payload"`
 }
@@ -102505,6 +104279,21 @@ func (s *SessionDeletedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *SessionDeletedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *SessionDeletedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *SessionDeletedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *SessionDeletedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -102620,6 +104409,21 @@ func (s *SessionDeletedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *SessionDeletedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *SessionDeletedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *SessionDeletedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *SessionDeletedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -102873,7 +104677,18 @@ type SessionEstablishedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString              `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString              `json:"target"`
 	Metadata OptEventMetadata          `json:"metadata"`
 	Payload  SessionEstablishedPayload `json:"payload"`
 }
@@ -102981,6 +104796,21 @@ func (s *SessionEstablishedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *SessionEstablishedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *SessionEstablishedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *SessionEstablishedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *SessionEstablishedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -103096,6 +104926,21 @@ func (s *SessionEstablishedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *SessionEstablishedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *SessionEstablishedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *SessionEstablishedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *SessionEstablishedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -106700,7 +108545,18 @@ type TeamCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  TeamPayload      `json:"payload"`
 }
@@ -106808,6 +108664,21 @@ func (s *TeamCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *TeamCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *TeamCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *TeamCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *TeamCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -106923,6 +108794,21 @@ func (s *TeamCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *TeamCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *TeamCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *TeamCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *TeamCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -107160,7 +109046,18 @@ type TeamDeactivatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -107268,6 +109165,21 @@ func (s *TeamDeactivatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *TeamDeactivatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *TeamDeactivatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *TeamDeactivatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *TeamDeactivatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -107383,6 +109295,21 @@ func (s *TeamDeactivatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *TeamDeactivatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *TeamDeactivatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *TeamDeactivatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *TeamDeactivatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -108135,7 +110062,18 @@ type TeamUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString     `json:"target"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  TeamPayload      `json:"payload"`
 }
@@ -108243,6 +110181,21 @@ func (s *TeamUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *TeamUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *TeamUpdatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *TeamUpdatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *TeamUpdatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -108358,6 +110311,21 @@ func (s *TeamUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *TeamUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *TeamUpdatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *TeamUpdatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *TeamUpdatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -110890,7 +112858,18 @@ type UserCreateFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString            `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString            `json:"target"`
 	Metadata OptEventMetadata        `json:"metadata"`
 	Payload  UserCreateFailedPayload `json:"payload"`
 }
@@ -110998,6 +112977,21 @@ func (s *UserCreateFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *UserCreateFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *UserCreateFailedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *UserCreateFailedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *UserCreateFailedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -111113,6 +113107,21 @@ func (s *UserCreateFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *UserCreateFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *UserCreateFailedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *UserCreateFailedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *UserCreateFailedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -111552,7 +113561,18 @@ type UserCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString       `json:"target"`
 	Metadata OptEventMetadata   `json:"metadata"`
 	Payload  UserCreatedPayload `json:"payload"`
 }
@@ -111660,6 +113680,21 @@ func (s *UserCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *UserCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *UserCreatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *UserCreatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *UserCreatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -111775,6 +113810,21 @@ func (s *UserCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *UserCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *UserCreatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *UserCreatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *UserCreatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -112062,7 +114112,18 @@ type UserDeletedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString      `json:"target"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
 }
@@ -112170,6 +114231,21 @@ func (s *UserDeletedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *UserDeletedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *UserDeletedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *UserDeletedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *UserDeletedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -112285,6 +114361,21 @@ func (s *UserDeletedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *UserDeletedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *UserDeletedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *UserDeletedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *UserDeletedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -113886,7 +115977,18 @@ type UserUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString       `json:"target"`
 	Metadata OptEventMetadata   `json:"metadata"`
 	Payload  UserUpdatedPayload `json:"payload"`
 }
@@ -113994,6 +116096,21 @@ func (s *UserUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *UserUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *UserUpdatedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *UserUpdatedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *UserUpdatedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -114109,6 +116226,21 @@ func (s *UserUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *UserUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *UserUpdatedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *UserUpdatedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *UserUpdatedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -115066,7 +117198,18 @@ type VariableRemovedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString           `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString           `json:"target"`
 	Metadata OptEventMetadata       `json:"metadata"`
 	Payload  VariableRemovedPayload `json:"payload"`
 }
@@ -115174,6 +117317,21 @@ func (s *VariableRemovedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *VariableRemovedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *VariableRemovedEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *VariableRemovedEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *VariableRemovedEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -115289,6 +117447,21 @@ func (s *VariableRemovedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *VariableRemovedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *VariableRemovedEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *VariableRemovedEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *VariableRemovedEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -115681,7 +117854,18 @@ type VariableSetEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
+	FlowID OptNilString `json:"flow_id"`
+	// The deployment whose configuration served the request that caused the event: the one the request's
+	// origin resolved, the one a pinned build selected, or the one sealed into the flow the request
+	// continued. Null for an event no deployment served, such as a resource or project change.
+	DeploymentID OptNilString `json:"deployment_id"`
+	// The release of `deployment_id`: the configuration the request ran on. Null exactly when
+	// `deployment_id` is.
+	ReleaseID OptNilString `json:"release_id"`
+	// The request's origin, when the server checked it against the project's origins before a deployment
+	// served the request. Null when no deployment served it, when the request named no origin, and on a
+	// call that continues an authentication attempt directly, which checks none.
+	Target   OptNilString       `json:"target"`
 	Metadata OptEventMetadata   `json:"metadata"`
 	Payload  VariableSetPayload `json:"payload"`
 }
@@ -115789,6 +117973,21 @@ func (s *VariableSetEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *VariableSetEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *VariableSetEvent) GetDeploymentID() OptNilString {
+	return s.DeploymentID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *VariableSetEvent) GetReleaseID() OptNilString {
+	return s.ReleaseID
+}
+
+// GetTarget returns the value of Target.
+func (s *VariableSetEvent) GetTarget() OptNilString {
+	return s.Target
 }
 
 // GetMetadata returns the value of Metadata.
@@ -115904,6 +118103,21 @@ func (s *VariableSetEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *VariableSetEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *VariableSetEvent) SetDeploymentID(val OptNilString) {
+	s.DeploymentID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *VariableSetEvent) SetReleaseID(val OptNilString) {
+	s.ReleaseID = val
+}
+
+// SetTarget sets the value of Target.
+func (s *VariableSetEvent) SetTarget(val OptNilString) {
+	s.Target = val
 }
 
 // SetMetadata sets the value of Metadata.

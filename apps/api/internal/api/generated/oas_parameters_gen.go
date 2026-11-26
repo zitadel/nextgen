@@ -6886,6 +6886,10 @@ type ListEventsParams struct {
 	FlowID OptString `json:",omitempty,omitzero"`
 	// Only events of this HTTP request ID.
 	RequestID OptString `json:",omitempty,omitzero"`
+	// Only events of requests served by this release, a pinned release included.
+	ReleaseID OptString `json:",omitempty,omitzero"`
+	// Only events of requests served by this deployment.
+	DeploymentID OptString `json:",omitempty,omitzero"`
 	// Only events with this device fingerprint ID.
 	Fingerprint OptString `json:",omitempty,omitzero"`
 	// Only events that affected this type of resource, such as `user`.
@@ -6997,6 +7001,24 @@ func unpackListEventsParams(packed middleware.Parameters) (params ListEventsPara
 		}
 		if v, ok := packed[key]; ok {
 			params.RequestID = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "release_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ReleaseID = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "deployment_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.DeploymentID = v.(OptString)
 		}
 	}
 	{
@@ -7506,6 +7528,88 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "request_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: release_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "release_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotReleaseIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotReleaseIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ReleaseID.SetTo(paramsDotReleaseIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "release_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: deployment_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "deployment_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotDeploymentIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotDeploymentIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.DeploymentID.SetTo(paramsDotDeploymentIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "deployment_id",
 			In:   "query",
 			Err:  err,
 		}

@@ -9888,6 +9888,22 @@
             }
           },
           {
+            "name": "release_id",
+            "in": "query",
+            "description": "Only events of requests served by this release, a pinned release\nincluded.\n",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deployment_id",
+            "in": "query",
+            "description": "Only events of requests served by this deployment.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "fingerprint",
             "in": "query",
             "description": "Only events with this device fingerprint ID.",
@@ -23505,6 +23521,39 @@
           },
           "flow_id": {
             "description": "An ID that correlates the events of one login flow.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deployment_id": {
+            "description": "The deployment whose configuration served the request that caused the\nevent: the one the request's origin resolved, the one a pinned build\nselected, or the one sealed into the flow the request continued. Null\nfor an event no deployment served, such as a resource or project change.\n",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "release_id": {
+            "description": "The release of `deployment_id`: the configuration the request ran on.\nNull exactly when `deployment_id` is.\n",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target": {
+            "description": "The request's origin, when the server checked it against the project's\norigins before a deployment served the request. Null when no deployment\nserved it, when the request named no origin, and on a call that\ncontinues an authentication attempt directly, which checks none.\n",
             "oneOf": [
               {
                 "type": "string"

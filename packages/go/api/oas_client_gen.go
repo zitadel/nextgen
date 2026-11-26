@@ -11965,6 +11965,40 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 		}
 	}
 	{
+		// Encode "release_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "release_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ReleaseID.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "deployment_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "deployment_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.DeploymentID.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
 		// Encode "fingerprint" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
 			Name:    "fingerprint",

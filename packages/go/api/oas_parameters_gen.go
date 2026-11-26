@@ -621,6 +621,10 @@ type ListEventsParams struct {
 	FlowID OptString `json:",omitempty,omitzero"`
 	// Only events of this HTTP request ID.
 	RequestID OptString `json:",omitempty,omitzero"`
+	// Only events of requests served by this release, a pinned release included.
+	ReleaseID OptString `json:",omitempty,omitzero"`
+	// Only events of requests served by this deployment.
+	DeploymentID OptString `json:",omitempty,omitzero"`
 	// Only events with this device fingerprint ID.
 	Fingerprint OptString `json:",omitempty,omitzero"`
 	// Only events that affected this type of resource, such as `user`.
