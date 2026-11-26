@@ -111,6 +111,10 @@ const (
 	EventTypeAuthAttemptHandedOff    EventType = "auth.attempt.handed_off"
 	EventTypeAuthCheckFailed         EventType = "auth.check.failed"
 	EventTypeAuthCheckSucceeded      EventType = "auth.check.succeeded"
+	EventTypeAuthRequestCreated      EventType = "auth.request.created"
+	// A check refused a code that was redeemed, which consumed it. An unknown
+	// code consumes nothing and writes no event.
+	EventTypeAuthRequestExchangeFailed EventType = "auth.request.exchange.failed"
 
 	// The SSO callback's outcome, separate from auth.check.*: a succeeded
 	// exchange is not a sign-in, since the identity may still match no account.
@@ -132,6 +136,8 @@ const (
 	EventTypeSchemaCreated EventType = "schema.created"
 
 	EventTypeBrandingCreated EventType = "branding.created"
+
+	EventTypeOAuthSettingsCreated EventType = "oauth_settings.created"
 
 	EventTypePolicyCreated EventType = "policy.created"
 	EventTypePolicyUpdated EventType = "policy.updated"

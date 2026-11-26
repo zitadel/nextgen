@@ -10,6 +10,7 @@ import { nullOnForbidden } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { Members, fetchMembers } from "@/features/teams/components/team-members";
+import { teamStatusLabel } from "@/features/teams/status";
 
 /**
  * Team detail: a resource inside Teams, not a scope of its own. The sidebar
@@ -50,7 +51,7 @@ function TeamDetail() {
       <DetailHeader
         icon={Box}
         title={team.name}
-        status={<StatusBadge status={team.status} />}
+        status={<StatusBadge status={team.status} label={teamStatusLabel(team.status)} />}
         meta={[
           { label: "Team ID", value: team.id, copyable: true },
           { label: "Created", value: formatDate(team.created_at) },
@@ -67,6 +68,7 @@ function TeamDetail() {
           {/* The team's own `name`, the only field `PATCH /teams/{team_id}` accepts. */}
           <RenameCard
             id="team-detail-name"
+            title="Team details"
             label="Team name"
             value={team.name}
             onSave={async (name) => {

@@ -44,8 +44,10 @@ import {
   update,
 } from "@/cli/commands/resources";
 import { COMMANDS, WORKFLOW_COMMANDS } from "@/index";
-import { idArg } from "@/lib/oclif/crud/shared";
+import type { Facts } from "@/cli/core/base";
+import { idArg } from "@/cli/core/crud/shared";
 import { parseArg } from "@tests/helpers/inputs";
+import { aConfigAt } from "@tests/helpers/suggestions";
 import { tabulate } from "@tests/helpers/tabulate";
 import {
   definitionOf,
@@ -54,7 +56,7 @@ import {
   parseFilter,
   parseSort,
   type ResourceDescriptor,
-} from "@/lib/oclif/crud";
+} from "@/cli/core/crud";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://preview.zitadel.com";
@@ -119,6 +121,33 @@ describe("resource registry", () => {
       const deleteVerb = resource.delete?.verb ?? "delete";
       expect(Boolean(COMMANDS[`${topic}:${deleteVerb}`])).toBe(Boolean(resource.delete));
     }
+  });
+
+  it.each([
+    ["user:create", { action: "create", resource_type: "user" }],
+    ["user:update", { action: "update", resource_type: "user" }],
+    ["user:delete", { action: "delete", resource_type: "user" }],
+    ["team:create", { action: "create", resource_type: "team" }],
+    ["team:update", { action: "update", resource_type: "team" }],
+    ["team:deactivate", { action: "deactivate", resource_type: "team" }],
+    ["grant:create", { action: "create", resource_type: "grant" }],
+    ["grant:delete", { action: "delete", resource_type: "grant" }],
+    ["user:list", {}],
+    ["user:get", {}],
+    ["session:revoke", {}],
+    ["project:update", {}],
+  ])("reports %s as the action and resource it changes, if any", (id, expected) => {
+    const Command = COMMANDS[id] as unknown as new (
+      argv: string[],
+      config: ReturnType<typeof aConfigAt>,
+    ) => { describe(): Facts };
+    const facts = new Command([], aConfigAt("0.0.0-test")).describe();
+
+    expect({ action: facts.action, resource_type: facts.resource_type }).toEqual({
+      action: undefined,
+      resource_type: undefined,
+      ...expected,
+    });
   });
 
   it("gives every generated command --env and --env-file, and no --environment flag", () => {
@@ -502,7 +531,10 @@ describe("get rendering", () => {
     expect(res.stdout).not.toContain('"metadata": {');
   });
 
-  it("still prints the whole object when piped", async ({ server, dir: cwd }) => {
+  it("prints the whole object as plain text when piped, and JSON only with --json", async ({
+    server,
+    dir: cwd,
+  }) => {
     await makeProject(cwd);
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
@@ -518,7 +550,11 @@ describe("get rendering", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(JSON.parse(res.stdout)).toMatchObject({ id: "user_1", schema: "sch_default" });
+    expect(res.stdout).toMatch(/id\s+user_1/);
+    expect(res.stdout).toMatch(/schema\s+sch_default/);
+    expect(() => {
+      JSON.parse(res.stdout);
+    }).toThrow();
   });
 
   it("takes --fields on a terminal too", async ({ server, dir: cwd, terminal }) => {
@@ -1214,9 +1250,8 @@ describe("chosen columns", () => {
 
     const res = await run(cwd, ["user", "list", "--fields", "id,attributes.email"]);
     expect(res.exitCode).toBe(0);
-    // --json is unaffected by --fields; the rows are the human rendering.
-    const json = parseJson(res.stdout) as { data: { items: Array<{ schema: string }> } };
-    expect(json.data.items[0]?.schema).toBe("sch_default");
+    const json = parseJson(res.stdout) as { data: { items: Array<Record<string, unknown>> } };
+    expect(Object.keys(json.data.items[0] ?? {}).sort()).toEqual(["attributes", "id"]);
 
     const rows = await runCliForTest([
       "user",
@@ -2912,5 +2947,175 @@ describe("the id of a resource whose id has a format", () => {
         hint: "List them to find one.",
       });
     }
+  });
+});
+
+describe("an id no verb that takes one accepts", () => {
+  const VERBS = Object.entries(COMMANDS).flatMap(([id, command]) => {
+    const arg = command.args?.id;
+    return /:(get|update|delete)$/.test(id) && arg !== undefined ? [[id, arg] as const] : [];
+  });
+
+  it("is found on get, update and delete commands", () => {
+    const verbs = new Set(
+      VERBS.map(([id]) => {
+        return id.split(":").pop();
+      }),
+    );
+
+    expect([...verbs].sort()).toEqual(["delete", "get", "update"]);
+  });
+
+  it.each([
+    ["blank", ""],
+    ["a dot", "."],
+    ["two dots", ".."],
+    ["a control character", "user_1\u001b[2J"],
+    ["a line break", "user_1\nx"],
+  ])("is refused when it is %s", async (_, value) => {
+    for (const [id, arg] of VERBS) {
+      await expect(parseArg(arg, value, "id"), id).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
+    }
+  });
+});
+
+describe("an id the CLI refuses", () => {
+  it("keeps the details its refusal carries in the failure envelope", async ({ dir: cwd }) => {
+    await makeProject(cwd);
+
+    const res = await run(cwd, ["user", "get", "..", "--json"]);
+
+    expect(res).toFailWith("E_VALIDATION");
+    expect(parseJson(res.stdout)).toMatchObject({ details: { argument: "id" } });
+  });
+});
+
+describe("a record read with --fields", () => {
+  it("is cut to the fields named under --json", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
+
+    const res = await run(cwd, ["user", "get", "user_1", "--fields", "id", "--json"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({ data: { id: "user_1" } });
+    expect(res.stdout).not.toContain('"attributes"');
+  });
+});
+
+describe("an update that removes fields", () => {
+  const removing = ["user", "update", "user_1", "--set", "attributes.nickname:=null"];
+
+  it("is refused without --force when nothing can be asked, and sends nothing", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+
+    const res = await run(cwd, removing);
+
+    expect(res).toFailWith("E_CONFIRMATION_REQUIRED");
+    expect(bodies).toEqual([]);
+  });
+
+  it("is sent with --force", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+
+    const res = await run(cwd, [...removing, "--force"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(bodies).toEqual([{ attributes: { nickname: null } }]);
+  });
+
+  it("is previewed by --dry-run without asking", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+
+    const res = await run(cwd, [...removing, "--dry-run", "--json"]);
+
+    expect(res).toSucceed();
+    expect(parseJson(res.stdout)).toMatchObject({ data: { dry_run: true } });
+    expect(bodies).toEqual([{ attributes: { nickname: null }, dry_run: true }]);
+  });
+
+  it("is warned about by --dry-run, which suggests the real run with --force", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))),
+    );
+
+    const res = await run(cwd, [...removing, "--dry-run", "--json"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      status: "ok",
+      warnings: [expect.stringContaining("nickname")],
+      data: { next_commands: [expect.stringContaining("--force")] },
+    });
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { next_commands: [expect.not.stringContaining("--dry-run")] },
+    });
+  });
+
+  it("is not warned about by --dry-run when the update removes nothing", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))),
+    );
+
+    const res = await run(cwd, [
+      "user",
+      "update",
+      "user_1",
+      "--set",
+      "attributes.givenName=Ada",
+      "--dry-run",
+      "--json",
+    ]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { next_commands: [expect.not.stringContaining("--force")] },
+    });
+    expect(parseJson(res.stdout)).not.toHaveProperty(
+      "warnings",
+      expect.arrayContaining([expect.anything()]),
+    );
+  });
+
+  it("is not asked about when the update removes nothing", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))),
+    );
+
+    const res = await run(cwd, ["user", "update", "user_1", "--set", "attributes.givenName=Ada"]);
+
+    expect(res.exitCode).toBe(0);
   });
 });

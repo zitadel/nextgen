@@ -242,7 +242,7 @@ function reportPublished(
 ): void {
   switch (state) {
     case "stored": {
-      log.done(`Published ${escapeControlCharacters(name)} to the project`);
+      log.debug(`Published ${escapeControlCharacters(name)} to the project`);
       return;
     }
     case "deferred": {

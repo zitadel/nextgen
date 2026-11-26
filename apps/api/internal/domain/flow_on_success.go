@@ -4,25 +4,45 @@ import (
 	"context"
 )
 
-// FlowOnSuccessHandler is the contract every on_success mutation
-// satisfies. The state machine calls Handle after a step's fields
-// validate and before its transition fires.
-//
-// Each [FlowOnSuccess] value maps to one handler. Implementations live
-// in their own file (e.g. flow_on_success_create_user.go).
+// FlowOnSuccessHandler applies the create_user mutation. The state machine
+// calls Handle after a step's fields validate and before its transition
+// fires; create_user_with_sso writes through [FlowSSOIdentityService].
 type FlowOnSuccessHandler interface {
 	Handle(ctx context.Context, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
 }
 
-// ManifestForOnSuccess returns the credential kinds a mutation establishes.
-// Dispatch (verify-vs-skip) and the validator (upstream-collects check)
-// both read this table.
-func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
-	switch o {
-	case FlowOnSuccessCreateUser:
-		return []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword}
+// FlowOnSuccessSpec declares what a [FlowOnSuccess] mutation needs and how
+// the step that runs it behaves. The validator and the flow engine both read it.
+type FlowOnSuccessSpec struct {
+	// Manifest lists the credential kinds the mutation establishes; each must
+	// be collected on the step or upstream.
+	Manifest []FlowFieldChallenge
+	// SpendsSignupProof marks a mutation that creates a user from the submitted
+	// values: the step announces the sign-up gate and its submission carries the proof.
+	SpendsSignupProof bool
+	// ProviderIdentity marks a step whose values describe the identity an
+	// external provider returned, not a sign-in.
+	ProviderIdentity bool
+}
+
+// flowOnSuccessSpecs holds one declaration per [FlowOnSuccess] value.
+var flowOnSuccessSpecs = map[FlowOnSuccess]FlowOnSuccessSpec{
+	FlowOnSuccessCreateUser: {
+		Manifest:          []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword},
+		SpendsSignupProof: true,
+	},
+	FlowOnSuccessCreateUserWithSso: {
+		ProviderIdentity: true,
+	},
+}
+
+// OnSuccessSpec returns the declaration of the step's on_success mutation,
+// or the zero spec when the step runs none.
+func (s *FlowDefinitionStep) OnSuccessSpec() FlowOnSuccessSpec {
+	if s.OnSuccess == nil {
+		return FlowOnSuccessSpec{}
 	}
-	return nil
+	return flowOnSuccessSpecs[*s.OnSuccess]
 }
 
 // FlowOnSuccessInput is the per-call context the state machine threads

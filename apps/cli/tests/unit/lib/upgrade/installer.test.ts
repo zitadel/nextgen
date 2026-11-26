@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
 import { PM } from "@/lib/pm";
 import { Dependencies } from "@/lib/upgrade/dependencies";
@@ -9,6 +9,7 @@ import { InstallError } from "@/lib/upgrade/errors";
 import { PackageInstaller, type PlannedInstall } from "@/lib/upgrade/installer";
 import { UpgradePlan } from "@/lib/upgrade/plan";
 import { Release } from "@/lib/upgrade/release";
+import { Output } from "@/lib/ui";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -86,5 +87,51 @@ describe("PackageInstaller.install", () => {
 
     expect(error).toBeInstanceOf(InstallError);
     expect(error).toMatchObject({ cause: { code: 3 } });
+  });
+});
+
+describe("PackageInstaller.install with the output option left out", () => {
+  afterEach(() => {
+    Output.settle({ json: false, color: false });
+  });
+
+  /**
+   * An install of a project script that prints a line to stdout.
+   *
+   * @param dir - The project directory.
+   * @returns The install.
+   */
+  async function talkingInstall(dir: string): Promise<PlannedInstall> {
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({ scripts: { talk: `node -e "console.log('to stdout')"` } }),
+    );
+    const run = PM.named("npm").script("talk");
+
+    return { run, shown: run };
+  }
+
+  it("moves the package manager's stdout to stderr when the run answers in JSON", async ({
+    dir,
+    terminal,
+  }) => {
+    Output.settle({ json: true, color: false });
+    const install = await talkingInstall(dir);
+
+    await new PackageInstaller({ cwd: dir, typedCwd: undefined }).install(install);
+
+    expect(terminal.errors()).toContain("to stdout");
+  });
+
+  it("leaves the package manager's stdout alone when the run does not answer in JSON", async ({
+    dir,
+    terminal,
+  }) => {
+    Output.settle({ json: false, color: false });
+    const install = await talkingInstall(dir);
+
+    await new PackageInstaller({ cwd: dir, typedCwd: undefined }).install(install);
+
+    expect(terminal.errors()).not.toContain("to stdout");
   });
 });

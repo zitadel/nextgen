@@ -25,12 +25,25 @@ export function describeError(cause: unknown, fallback: string): string {
     const body = errorBody(cause);
     const message = body?.message;
     if (body && typeof message === "string" && message.trim() !== "") {
+      const sentence = asSentenceStart(message);
       const fields = namedFields(body);
-      return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
+      return fields.length > 0 ? `${sentence} (${fields.join(", ")})` : sentence;
     }
     return fallback;
   }
   return cause instanceof Error ? cause.message : fallback;
+}
+
+/**
+ * An API message as the start of a sentence. The server words its errors the
+ * way Go does, in lower case (`the inviter cannot accept their own
+ * invitation`), and the console shows them as a line of their own, so the
+ * first letter is raised here, once, for every screen. Nothing else changes:
+ * the rest is the server's wording.
+ */
+function asSentenceStart(message: string): string {
+  const text = message.trimStart();
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** The fields a failed request names, as {@link describeError} lists them. */

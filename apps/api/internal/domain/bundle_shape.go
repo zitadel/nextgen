@@ -25,6 +25,12 @@ type BundleShapeIDP struct {
 	Document []byte
 }
 
+// BundleShapeApplication is one applications[] entry for shape validation.
+type BundleShapeApplication struct {
+	Index    int
+	Document []byte
+}
+
 // BundleShapePolicy is one policies[] entry for shape validation.
 type BundleShapePolicy struct {
 	Index     int
@@ -33,11 +39,13 @@ type BundleShapePolicy struct {
 
 // BundleShapeInput is the author-facing bundle shape ValidateBundleShape checks.
 type BundleShapeInput struct {
-	Schemas     []BundleShapeSchema
-	Flows       []BundleShapeFlow
-	IDPs        []BundleShapeIDP
-	Policies    []BundleShapePolicy
-	HasBranding bool
+	Schemas      []BundleShapeSchema
+	Flows        []BundleShapeFlow
+	IDPs         []BundleShapeIDP
+	Applications []BundleShapeApplication
+	Policies     []BundleShapePolicy
+	HasBranding  bool
+	HasOAuth     bool
 }
 
 // BundleShapeFailure is one shape rule that a bundle entry broke.
@@ -53,8 +61,11 @@ type BundleShapeFailure struct {
 // failure is returned so Build can report them together. An empty bundle is
 // not a resource failure — callers refuse it with ErrReleaseInvalid.
 func ValidateBundleShape(input BundleShapeInput) []BundleShapeFailure {
-	total := len(input.Schemas) + len(input.Flows) + len(input.IDPs) + len(input.Policies)
+	total := len(input.Schemas) + len(input.Flows) + len(input.IDPs) + len(input.Applications) + len(input.Policies)
 	if input.HasBranding {
+		total++
+	}
+	if input.HasOAuth {
 		total++
 	}
 	if total == 0 {
@@ -158,6 +169,30 @@ func ValidateBundleShape(input BundleShapeInput) []BundleShapeFailure {
 		seenIDP[slug] = idp.Index
 	}
 
+	// The decoder already holds each application to its schema, which
+	// requires a slug.
+	seenApplication := map[string]int{}
+	for _, application := range input.Applications {
+		doc, err := ParseApplicationDocument(application.Document)
+		if err != nil {
+			failures = append(failures, BundleShapeFailure{
+				Kind:  ReleasePointerKindApplication,
+				Index: application.Index,
+				Err:   ErrReleaseInvalid(err.Error(), err),
+			})
+			continue
+		}
+		if prev, ok := seenApplication[doc.Slug]; ok {
+			msg := fmt.Sprintf("application %q appears twice (indices %d and %d)", doc.Slug, prev, application.Index)
+			failures = append(failures,
+				BundleShapeFailure{Kind: ReleasePointerKindApplication, Index: prev, Handle: doc.Slug, Err: ErrReleaseInvalid(msg, nil)},
+				BundleShapeFailure{Kind: ReleasePointerKindApplication, Index: application.Index, Handle: doc.Slug, Err: ErrReleaseInvalid(msg, nil)},
+			)
+			continue
+		}
+		seenApplication[doc.Slug] = application.Index
+	}
+
 	// The operation is the policy's handle: a project has one policy per
 	// operation, so a release cannot pin two. The decoder already holds it to
 	// a catalogued operation.
@@ -211,5 +246,5 @@ func IDPDocumentSlug(document []byte) (string, error) {
 
 // BundleEmpty reports whether the bundle carries no resources.
 func BundleEmpty(input BundleShapeInput) bool {
-	return len(input.Schemas)+len(input.Flows)+len(input.IDPs)+len(input.Policies) == 0 && !input.HasBranding
+	return len(input.Schemas)+len(input.Flows)+len(input.IDPs)+len(input.Applications)+len(input.Policies) == 0 && !input.HasBranding && !input.HasOAuth
 }

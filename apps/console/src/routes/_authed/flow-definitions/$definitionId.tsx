@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { api } from "@/api/zitadel";
-import { DETAIL_BODY, DetailHeader, DetailSection } from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_STACK, DetailHeader, DetailSection } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
@@ -14,6 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
+import { fetchLatestBranding } from "@/features/branding/api";
+import { FlowCanvas } from "@/features/flow-definitions/components/flow-canvas";
 import {
   type FlowDefinition,
   type FlowStep,
@@ -32,12 +34,14 @@ export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")(
     const entry = await api.getFlowDefinition(params.definitionId);
     // Structurally the list's `flow_definition`; orval renames per operation.
     const definition: FlowDefinition = entry.flow_definition;
-    return {
-      definition,
-      createdAt: entry.created_at,
+    const projectId = requireProjectScope(deps.project);
+    const [schema, branding] = await Promise.all([
       // No `expand` on this endpoint, so the badge costs a second call.
-      ...(await resolveSchema(definition.user_schema, requireProjectScope(deps.project))),
-    };
+      resolveSchema(definition.user_schema, projectId),
+      // The canvas paints the maintained defaults without it.
+      fetchLatestBranding(projectId).catch(() => undefined),
+    ]);
+    return { definition, createdAt: entry.created_at, branding, ...schema };
   },
   component: FlowDefinitionDetail,
 });
@@ -64,7 +68,7 @@ async function resolveSchema(
 }
 
 function FlowDefinitionDetail() {
-  const { definition, createdAt, schemaName, schemaId } = Route.useLoaderData();
+  const { definition, createdAt, branding, schemaName, schemaId } = Route.useLoaderData();
   const { definitionId } = Route.useParams();
   const name = flowDisplayName(definition);
   const steps = definition.steps ?? [];
@@ -80,54 +84,57 @@ function FlowDefinitionDetail() {
         ]}
       />
 
-      <DetailSection
-        title="User schema"
-        className={DETAIL_BODY}
-        aside={
-          schemaName && schemaId ? (
-            // The name opens the schema; the box beside it opens the revision
-            // the flow signs into, its newest.
-            <span className="flex min-w-0 flex-wrap items-center gap-3">
-              <Link
-                to="/schemas/$schemaId"
-                params={{ schemaId }}
-                className="text-sm leading-5 text-foreground underline-offset-2 hover:underline"
-              >
-                {schemaName}
-              </Link>
-              <RevisionLink schemaId={schemaId} name={schemaName} />
-            </span>
-          ) : (
-            definition.user_schema && (
-              <span className="text-sm leading-5 text-foreground">{definition.user_schema}</span>
-            )
-          )
-        }
-      >
-        {/* `table-fixed`: equal thirds, not redistributed by content. */}
-        <Table className="table-fixed" aria-label="Steps">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className={`${HEAD_CELL} pl-2`}>Step</TableHead>
-              <TableHead className={HEAD_CELL}>Field</TableHead>
-              <TableHead className={`${HEAD_CELL} pr-2`}>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="[&_tr:last-child]:border-b">
-            {steps.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={3} className="h-16 px-2 text-center text-muted-foreground">
-                  This flow defines no steps.
-                </TableCell>
-              </TableRow>
+      <div className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
+        <DetailSection
+          title="User schema"
+          aside={
+            schemaName && schemaId ? (
+              // The name opens the schema; the box beside it opens the revision
+              // the flow signs into, its newest.
+              <span className="flex min-w-0 flex-wrap items-center gap-3">
+                <Link
+                  to="/schemas/$schemaId"
+                  params={{ schemaId }}
+                  className="text-sm leading-5 text-foreground underline-offset-2 hover:underline"
+                >
+                  {schemaName}
+                </Link>
+                <RevisionLink schemaId={schemaId} name={schemaName} />
+              </span>
             ) : (
-              steps.map((step) => <StepRow key={step.name} step={step} />)
-            )}
-          </TableBody>
-        </Table>
+              definition.user_schema && (
+                <span className="text-sm leading-5 text-foreground">{definition.user_schema}</span>
+              )
+            )
+          }
+        >
+          {/* `table-fixed`: equal thirds, not redistributed by content. */}
+          <Table className="table-fixed" aria-label="Steps">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className={`${HEAD_CELL} pl-2`}>Step</TableHead>
+                <TableHead className={HEAD_CELL}>Field</TableHead>
+                <TableHead className={`${HEAD_CELL} pr-2`}>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="[&_tr:last-child]:border-b">
+              {steps.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={3} className="h-16 px-2 text-center text-muted-foreground">
+                    This flow defines no steps.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                steps.map((step) => <StepRow key={step.name} step={step} />)
+              )}
+            </TableBody>
+          </Table>
 
-        <DocumentViewer document={definition} noun="definition" />
-      </DetailSection>
+          <DocumentViewer document={definition} noun="definition" />
+        </DetailSection>
+
+        <FlowCanvas definition={definition} name={name} branding={branding} />
+      </div>
     </Page>
   );
 }

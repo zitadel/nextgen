@@ -16,6 +16,7 @@ import (
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -256,7 +257,7 @@ func TestFlowSSOIdentityResolver_LoadParked_NothingToResolveIsNil(t *testing.T) 
 		// disabled or a parked error leaves it parked) is skipped before the
 		// revision and link reads.
 		"already resolved row":       {attempt: parkedAttempt(parkedResult()), resolvedID: "ch-1"},
-		"already resolved error row": {attempt: parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed}), resolvedID: "ch-1"},
+		"already resolved error row": {attempt: parkedAttempt(&domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOFailed}), resolvedID: "ch-1"},
 		// An earlier bind lost its handoff, then a second ceremony parked a row
 		// the engine already resolved: the row still wins, so the earlier user
 		// is not signed in.
@@ -340,12 +341,12 @@ func TestFlowSSOIdentityResolver_LoadParked_DeadAttemptRestarts(t *testing.T) {
 func TestFlowSSOIdentityResolver_LoadParked_ErrorResultReportsKey(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
-	f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}))
+	f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled}))
 	f.expectNoRevisionOrLinkRead()
 
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
-	assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ErrorKey: domain.FlowStepErrorSSOCancelled}, got)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ErrorKey: flowengine.FlowStepErrorSSOCancelled}, got)
 }
 
 func TestFlowSSOIdentityResolver_LoadParked_LinkFound(t *testing.T) {
@@ -581,7 +582,7 @@ func TestFlowSSOIdentityResolver_LoadCollected_CannotCreateRestarts(t *testing.T
 	for name, expect := range map[string]func(*ssoResolverFixture){
 		// A failed ceremony left nothing to create from.
 		"error row": func(f *ssoResolverFixture) {
-			f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}))
+			f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{ErrorKey: flowengine.FlowStepErrorSSOCancelled}))
 			f.expectNoRevisionOrLinkRead()
 		},
 		// A render with an older cookie resolved a row of a connection that

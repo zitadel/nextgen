@@ -1455,6 +1455,63 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       expect(served.status).toBe(200);
     });
 
+    it("tells the server the proxy path and the login page, whatever the client sent", async () => {
+      const calls = captureFetch();
+
+      await serve(
+        `${ORIGIN}/__nextgen/oauth/${PROJECT}/authorize?client_id=app`,
+        { headers: { "x-forwarded-prefix": "/forged", "x-zitadel-login-path": "/forged" } },
+        { ...APP_PROXY, loginPath: "/signin?from=app" },
+      );
+
+      expect(calls[0]?.url).toBe(`http://localhost:4000/oauth/${PROJECT}/authorize?client_id=app`);
+      expect(calls[0]?.headers.get("x-forwarded-prefix")).toBe("/__nextgen");
+      expect(calls[0]?.headers.get("x-zitadel-login-path")).toBe("/signin");
+    });
+
+    it("proxies the metadata of this project's OAuth issuer from its well-known path", async () => {
+      const calls = captureFetch();
+
+      const served = await serve(
+        `${ORIGIN}/.well-known/oauth-authorization-server/__nextgen/oauth/${PROJECT}`,
+        {},
+        APP_PROXY,
+      );
+
+      expect(served.status).toBe(200);
+      expect(calls[0]?.url).toBe(
+        `http://localhost:4000/.well-known/oauth-authorization-server/oauth/${PROJECT}`,
+      );
+      expect(calls[0]?.headers.get("x-forwarded-prefix")).toBe("/__nextgen");
+    });
+
+    it("answers 404 for another project's OAuth issuer without asking the server", async () => {
+      const calls = captureFetch();
+
+      const metadata = await serve(
+        `${ORIGIN}/.well-known/oauth-authorization-server/__nextgen/oauth/${OTHER_PROJECT}`,
+        {},
+        APP_PROXY,
+      );
+      const endpoint = await serve(
+        `${ORIGIN}/__nextgen/oauth/${OTHER_PROJECT}/authorize`,
+        {},
+        APP_PROXY,
+      );
+
+      // The server's own answer for an issuer it does not serve.
+      const refusal = {
+        error: "invalid_request",
+        error_description: "no authorization server at this issuer",
+      };
+      expect(metadata.status).toBe(404);
+      expect(JSON.parse(metadata.body)).toEqual(refusal);
+      expect(metadata.headers.get("content-type")).toContain("application/json");
+      expect(endpoint.status).toBe(404);
+      expect(JSON.parse(endpoint.body)).toEqual(refusal);
+      expect(calls).toHaveLength(0);
+    });
+
     it("refuses a request that carries the auth header", async () => {
       const served = await serve(
         `${ORIGIN}/`,

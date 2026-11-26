@@ -50,6 +50,27 @@ describe("invitation cancel", () => {
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });
 
+    it.each([
+      ["asking to confirm", []],
+      ["with --force", ["--force"]],
+    ])("holds its invariants for a hostile name %s", async (_, extra) => {
+      const app = await aSetUpApp();
+      platform.servesAHostileInvitation();
+      const args = ["invitation", "cancel", "inv_hostile", ...extra];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
+    it("spells out a hostile name in the question it refuses to ask", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileInvitation();
+
+      const result = await app.run(["invitation", "cancel", "inv_hostile"]);
+
+      expect(result.stderr).not.toContain("\u001b[2J");
+      expect(result.stderr).toContain("Ada\\x1b[2Jwiped");
+    });
+
     describe("--json", () => {
       it("cancels a pending invitation", async () => {
         const app = await aSetUpApp();
@@ -69,6 +90,26 @@ describe("invitation cancel", () => {
         expect(await app.invitationIds()).toEqual([]);
       });
 
+      it("removes a declined invitation", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+        platform.declinesInvitation(invitation);
+
+        await app.run(["invitation", "cancel", invitation, "--force", "--json"]);
+
+        expect(await app.invitationIds()).toEqual([]);
+      });
+
+      it("removes an expired invitation", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+        platform.expiresInvitation(invitation);
+
+        await app.run(["invitation", "cancel", invitation, "--force", "--json"]);
+
+        expect(await app.invitationIds()).toEqual([]);
+      });
+
       it("refuses an accepted invitation", async () => {
         const app = await aSetUpApp();
         const invitation = await app.invite();
@@ -76,7 +117,7 @@ describe("invitation cancel", () => {
 
         const result = await app.run(["invitation", "cancel", invitation, "--force", "--json"]);
 
-        expect(result).toFailWith("E_NOT_FOUND");
+        expect(result).toFailWith("E_VALIDATION");
       });
 
       it("refuses an invitation the project does not hold", async () => {

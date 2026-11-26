@@ -30,6 +30,7 @@ func TestPublishApplication(t *testing.T) {
 		assert.True(t, domain.PrefixApplicationClient.Matches(web.ClientID), "a client without client_id gets a generated one: %s", web.ClientID)
 		assert.True(t, strings.HasPrefix(web.Secret, "sk_client_"), web.Secret)
 		assert.Equal(t, web.ClientID, created.Definition.Clients[0].ClientID.Value)
+		assert.Equal(t, api.NewOptBool(false), created.Definition.Clients[0].FirstParty, "a registered client is third-party by default")
 	})
 
 	t.Run("only the hash of the secret is stored", func(t *testing.T) {
@@ -126,6 +127,25 @@ func TestApplicationAccess(t *testing.T) {
 		denied := viewer.put(t, shopApplication(webClient("web", "")))
 		require.IsType(t, &api.PublishApplicationForbidden{}, denied, helpers.MustMarshal(t, denied))
 		assert.Equal(t, api.ErrorCode(domain.ErrApplicationPermissionDenied().Code), denied.(*api.PublishApplicationForbidden).Code)
+	})
+
+	// The Console holds only its session cookie: the grant on the project is
+	// what admits it, and a session without one learns nothing.
+	t.Run("a signed-in project admin reads with their session", func(t *testing.T) {
+		adminID, _ := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+		harness.SeedProjectAdmin(t, owner.project.ID, adminID)
+		admin := applicationFixture{project: owner.project, client: sessionClientForUser(t, adminID)}
+
+		resp := admin.get(t, app.ID)
+		require.IsType(t, &api.ApplicationResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, app.ID, resp.(*api.ApplicationResponse).ID)
+	})
+
+	t.Run("a session without access to the project gets 404", func(t *testing.T) {
+		strangerID, _ := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+		stranger := applicationFixture{project: owner.project, client: sessionClientForUser(t, strangerID)}
+
+		assertAuthzError(t, stranger.get(t, app.ID), domain.ErrApplicationNotFound().Code)
 	})
 
 	t.Run("unauthenticated calls are rejected", func(t *testing.T) {

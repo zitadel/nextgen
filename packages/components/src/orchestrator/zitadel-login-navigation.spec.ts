@@ -269,7 +269,7 @@ describe("<zitadel-login> purpose navigation", () => {
     const notice = root().querySelector<ZlAlert>("zl-alert[data-zl-step-message]");
     expect(notice?.severity).toBe("info");
     expect(notice?.textContent).toContain(
-      "That email already has an account. Sign in to continue.",
+      "An account with these details already exists. Sign in to continue.",
     );
     expect(root().querySelector("zl-alert[data-zl-step-error]")).toBeNull();
     expect(root().querySelector("zl-field")?.getAttribute("autocomplete")).toBe("current-password");

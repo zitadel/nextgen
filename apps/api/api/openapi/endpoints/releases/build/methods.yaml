@@ -33,8 +33,9 @@ post:
 
     Building writes revisions, so besides `release.write` it needs the write
     scope of every kind the bundle carries a resource of: `schema.write`,
-    `flow_definition.write`, `branding.write`, `idp.write`, `policy.write`
-    and `oauth_settings.write`, as the per-kind create endpoints do. A missing scope answers `403` with
+    `flow_definition.write`, `branding.write`, `idp.write`,
+    `application.write`, `policy.write` and `oauth_settings.write`, as the
+    per-kind create endpoints do. A missing scope answers `403` with
     `rel.permission_denied`, naming the kind. Request a token with that scope.
     An empty kind needs no scope.
 
@@ -58,7 +59,7 @@ post:
           bundle:
             summary: Built from the files on disk
             description: |
-              The CLI's form: the schemas, flow definitions, branding and
+              A whole bundle: the schemas, flow definitions, branding and
               OAuth settings as authored, the flow naming its schema by
               `objectType`. The
               schema's `metaSchema` is the one the server publishes at
@@ -121,6 +122,18 @@ post:
                       scopes:
                         - openid
                         - email
+                applications:
+                  - slug: shop
+                    name: Shop
+                    clients:
+                      - slug: web
+                        client_id: shop-web
+                        type: confidential
+                        grant_types:
+                          - authorization_code
+                        redirect_uris:
+                          - https://shop.example.com/callback
+                        secret: '${{ SHOP_WEB_CLIENT_SECRET }}'
                 policies:
                   - operation: auth.factor.password.set
                     config:
@@ -186,7 +199,7 @@ post:
                 resource, and the revision it reused or allocated for it. The
                 handle is `objectType` for a schema, `name` for a flow
                 definition, `default` for branding and for OAuth settings,
-                and `slug` for an IdP connection.
+                and `slug` for an IdP connection and an application.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -212,6 +225,9 @@ post:
                   - kind: idp
                     handle: google
                     revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                  - kind: application
+                    handle: shop
+                    revision_id: apprev_01KWHF3A9QZ27F0N9WD3P2E4YM
                   - kind: oauth
                     handle: default
                     revision_id: oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM

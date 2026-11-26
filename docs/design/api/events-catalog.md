@@ -68,10 +68,12 @@ same TX (shared `request_id`).
 | **Team** | `name` | — |
 | **Flow definition** | `name`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
+| **OAuth settings** | `enabled` | — |
 | **Policy** | `operation`, `revision_id`, `config` (the instance's settings) | — |
 | **Schema** | `kind`, `object_type` | Schema document body |
 | **IdP connection** | `slug`, `protocol`, `template`, `display_name`, `revision_id` | Connection document body, `client_secret` |
 | **Application** | `slug`, `name`, `client_ids[]` (the clients the write created), `revision_id` | Application document body, client secrets and their hashes |
+| **Auth request** | `client_id` | `redirect_uri`, `state`, the code challenge (request input); `scopes`, the issuer, the deployment and the release (on the stored request) |
 | **IdP identity link** | `connection_id`, `user_id` | Provider subject, claims, tokens |
 | **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
 | **Token** | `scopes[]` | Token string / JWE |
@@ -119,7 +121,8 @@ are not inputs to the live risk evaluator
 
 - The user as a record: `user.created`, `user.updated`, `user.deleted`.
 - A session or a token that belongs to a user: `session.established`,
-  `session.deleted`, `auth.token.issued`, `auth.token.revoked`.
+  `session.deleted`, `auth.token.issued`, `auth.token.revoked`, and a code
+  refused at redemption: `auth.request.exchange.failed`.
 - A sign-in, once its attempt has resolved a user: `auth.attempt.created`,
   `auth.attempt.handed_off`, `auth.check.succeeded`, `auth.check.failed`,
   `auth.sso.authorization.failed`, `auth.sso.exchange.failed`,
@@ -183,7 +186,7 @@ tracked below.
 | `CreateTeam` | `team.created` | `admin` | `team` | `name` |
 | `UpdateTeam` | `team.updated` | `admin` | `team` | delta: `name` |
 | `DeactivateTeam` (when status changed) | `team.deactivated` | `admin` | `team` | _(empty)_ |
-| `CreateToken` / session mint / `GenerateJWE` | `auth.token.issued` | `auth` | `token` | `scopes[]` |
+| `CreateToken` / session mint / `GenerateJWE` / authorization code redemption (`RedeemCode`) | `auth.token.issued` | `auth` | `token` | `scopes[]`, `client_id` (code redemption only) |
 | `DeleteTokenByID` / `RevokeToken` | `auth.token.revoked` | `auth` | `token` | _(empty)_ |
 | Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
 | `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` (secondary) |
@@ -191,6 +194,8 @@ tracked below.
 | Signup challenge issued | `flow.signup_challenge.issued` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | Signup proof consumed | `flow.signup_challenge.consumed` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
+| `CreateAuthRequest` (OAuth authorization endpoint) | `auth.request.created` | `auth` | `auth_request` | `client_id` |
+| `RedeemCode` refused a code it consumed (an unknown code consumes nothing and writes no event) | `auth.request.exchange.failed` | `auth` | `auth_request` | `client_id` (the client that presented the code), `reason` (`client_mismatch`, `code_expired`, `redirect_uri_mismatch`, `code_verifier_missing`, `code_verifier_invalid`, `code_verifier_unexpected`, `release_revoked`, `session_not_active`, `user_not_active`); `user_id` and `session_id` columns set |
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
 | Challenge failed (not a sign-up's identifier that matches no account: that lookup asks whether the identifier is free, and counts only toward the challenge's failures) | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
@@ -201,14 +206,15 @@ tracked below.
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `user_schema`, `purposes`, `audience` |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
+| ReleaseService build (new OAuth settings revision) | `oauth_settings.created` | `admin` | `oauth_settings` | `enabled` |
 | PolicyService publish (first revision of an operation's policy) | `policy.created` | `admin` | `policy` | `operation`, `revision_id`, `config` |
 | PolicyService publish (later revision) | `policy.updated` | `admin` | `policy` | `operation`, `revision_id`, `config` |
 | ReleaseService create | `release.created` | `admin` | `release` | `content_hash`, `message`, `git_sha`, `git_dirty`, `pointers` |
 | ReleaseService revoke | `release.revoked` | `admin` | `release` | `content_hash` |
 | IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
-| ApplicationService create (new slug) | `application.created` | `admin` | `application` | `slug`, `name`, `client_ids[]`, `revision_id` |
-| ApplicationService revise (existing slug) | `application.updated` | `admin` | `application` | `revision_id`; delta: `name` (when changed), `client_ids[]` (the clients the revision added) |
+| ApplicationService create (new slug; a release build for a declared one) | `application.created` | `admin` | `application` | `slug`, `name`, `client_ids[]`, `revision_id` |
+| ApplicationService revise (existing slug; a release build for a declared one) | `application.updated` | `admin` | `application` | `revision_id`; delta: `name` (when changed), `client_ids[]` (the clients the revision added) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
 | VariableService set (one event per row written; entering and replacing are the same event, since the value is the only difference and it never appears; a value written for both kinds is two rows) | `variable.set` | `entity` | `variable` | `kind` (with `entity_id`, the row key), `secret` |
@@ -229,7 +235,8 @@ tracked below.
 internals without a product mutate API; signal category deferred until ADR 019
 writers exist; issuing a challenge or an sso state record (`IssueChallenge`,
 `IssueSSOState`), which mints the `check_id` the outcome event then carries;
-storing the rehash of an outdated password hash on sign-in, which rewrites the
+issuing an authorization code (`IssueCode`), whose redemption writes
+`auth.token.issued`; storing the rehash of an outdated password hash on sign-in, which rewrites the
 existing password row in place.
 
 ## Retired

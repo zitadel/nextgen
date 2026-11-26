@@ -1,7 +1,13 @@
 import type { DiffedFile } from "@/lib/git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "@/lib/publish/git";
-import type { Learned, Step, StepContext, StepResult } from "@/lib/publish/pipeline";
-import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import type {
+  ConfigurationType,
+  Learned,
+  Step,
+  StepContext,
+  StepResult,
+} from "@/lib/publish/pipeline";
+import { CONFIG_DIRECTORIES, POLICY_TEST_SUFFIX } from "@/lib/zitadel";
 
 /**
  * The directories whose changes can lock existing users out, which decide
@@ -11,6 +17,17 @@ import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
  * Branding, policies and connections cannot lock anyone out.
  */
 const LOCKOUT_DIRECTORIES = [CONFIG_DIRECTORIES.schemas, CONFIG_DIRECTORIES.flows] as const;
+
+/**
+ * The kind of configuration each directory holds, as the event catalog names it.
+ */
+const CONFIGURATION_TYPES: readonly (readonly [string, ConfigurationType])[] = [
+  [CONFIG_DIRECTORIES.schemas, "user_schema"],
+  [CONFIG_DIRECTORIES.flows, "login_flow"],
+  [CONFIG_DIRECTORIES.connections, "identity_provider"],
+  [CONFIG_DIRECTORIES.policies, "policy"],
+  [CONFIG_DIRECTORIES.branding, "branding"],
+];
 
 /**
  * How many characters of a commit sha a message shows.
@@ -93,20 +110,16 @@ export const diffStep: Step = {
     const note = noteOnReleases(releases.size, short);
     const unknown = `No diff available: ${short} is not in this repository's history.`;
 
-    const touched = await diffConfigFilesAgainst(ctx.cwd, sha, []);
+    const referenced = ctx.referenced;
+    const touched = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
     // Origins serving different releases each move from their own baseline, so
     // a diff against the newest says nothing about the others.
-    const learned = learnedFrom(touched, releases.size);
-
-    const referenced = ctx.config.branding.all.flatMap((branding) => {
-      return branding.listReferencedPaths(ctx.store);
-    });
+    const learned = learnedFrom(touched, releases.size, referenced);
     if (ctx.json) {
-      const files = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
-      if (files === null) {
+      if (touched === null) {
         return { ...noDiff(ctx, sha, unknown), learned };
       }
-      const diff: ConfigDiff = { against: sha, files, note };
+      const diff: ConfigDiff = { against: sha, files: touched, note };
       return { data: { diff }, learned };
     }
 
@@ -141,7 +154,11 @@ function noteOnReleases(releases: number, short: string): string | undefined {
  * @returns Whether a schema or flow changed, or nothing when the diff cannot
  *   say: there was none, or the origins serve different releases.
  */
-function learnedFrom(touched: readonly DiffedFile[] | null, releases: number): Learned {
+function learnedFrom(
+  touched: readonly DiffedFile[] | null,
+  releases: number,
+  referenced: readonly string[],
+): Learned {
   if (touched === null || releases !== 1) {
     return {};
   }
@@ -153,7 +170,21 @@ function learnedFrom(touched: readonly DiffedFile[] | null, releases: number): L
       });
     });
   });
-  return { schemasOrFlowsChanged: changed };
+  // What a release carries: not a README, not a policy's test file, and an
+  // asset a branding file references counts as branding wherever it lives.
+  const carried = touched.flatMap((file) => {
+    return [file.path, file.previous_path ?? ""].filter((path) => {
+      return path !== "" && !path.endsWith("README.md") && !path.endsWith(POLICY_TEST_SUFFIX);
+    });
+  });
+  const changedConfiguration = CONFIGURATION_TYPES.filter(([directory, type]) => {
+    return carried.some((path) => {
+      return path.startsWith(`${directory}/`) || (type === "branding" && referenced.includes(path));
+    });
+  }).map(([, type]) => {
+    return type;
+  });
+  return { schemasOrFlowsChanged: changed, changedConfiguration };
 }
 
 /**

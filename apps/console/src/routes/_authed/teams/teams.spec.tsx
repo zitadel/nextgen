@@ -73,7 +73,7 @@ describe("teams screen", () => {
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
   });
 
-  it("shows the status the API returns rather than the mock's wording", async () => {
+  it("calls a deactivated team inactive", async () => {
     server.use(
       http.post(TEAMS_URL, () =>
         HttpResponse.json({
@@ -83,13 +83,9 @@ describe("teams screen", () => {
     );
     await renderTeams();
 
-    // The design writes this state as `Inactive`; `team-status` calls it
-    // `deactivated`, and the console does not invent a second vocabulary for one
-    // state. The pill is title-cased by CSS, so the accessible text is the
-    // API's own value.
     const table = within(await screen.findByRole("table"));
-    expect(table.getByText("Deactivated")).toBeInTheDocument();
-    expect(table.queryByText("Inactive")).not.toBeInTheDocument();
+    expect(table.getByText("Inactive")).toBeInTheDocument();
+    expect(table.queryByText("Deactivated")).not.toBeInTheDocument();
   });
 
   it("says so when there are no teams", async () => {
@@ -176,7 +172,7 @@ describe("teams screen", () => {
     expect(bodies[1]).toMatchObject({ page_token: "page-2", filter: [ACTIVE_FILTER] });
   });
 
-  it("asks for active teams, and for deactivated ones when the tab changes", async () => {
+  it("asks for active teams, and for deactivated ones under the Inactive tab", async () => {
     const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
     await renderTeams();
 
@@ -185,7 +181,7 @@ describe("teams screen", () => {
     // fetched page — `status` is a `team-filter-field`.
     expect(bodies.at(-1)).toMatchObject({ filter: [ACTIVE_FILTER] });
 
-    await userEvent.click(screen.getByRole("tab", { name: "Deactivated" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Inactive" }));
 
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
@@ -202,9 +198,6 @@ describe("teams screen", () => {
     expect(bodies.at(-1)).toMatchObject({
       filter: [{ field: "status", operation: "equals", value: "deactivated" }],
     });
-    expect(screen.getByRole("tab", { name: "Deactivated" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.getByRole("tab", { name: "Inactive" })).toHaveAttribute("aria-selected", "true");
   });
 });

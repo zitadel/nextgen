@@ -13,6 +13,7 @@ get:
   security:
     - oauth2:
         - application.read
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/application-id.yaml
@@ -30,6 +31,7 @@ get:
                 id: app_01KWH3B72K7M7F0N9WD3P2E4YM
                 revision_id: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
                 slug: shop
+                declared: false
                 created_at: '2026-11-06T09:11:00Z'
                 updated_at: '2026-11-06T09:11:00Z'
                 definition:

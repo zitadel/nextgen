@@ -1,4 +1,4 @@
-import type { LocalMachine, TcpListener } from "@/lib/server";
+import type { LocalMachine, PortHolder, TcpListener } from "@/lib/server";
 
 /**
  * What a {@link FakeMachine} answers. Every field has the answer of a
@@ -9,6 +9,8 @@ export type MachineScript = Readonly<{
   detected?: string;
   /** The ports something holds. */
   taken?: readonly number[];
+  /** The folder the process holding a taken port runs in; a port missing here is held from elsewhere. */
+  runningIn?: Readonly<Record<number, string>>;
   /** The port to suggest in place of a taken one. */
   nextFree?: (port: number) => number | undefined;
   /** The server release the CLI ships. */
@@ -67,6 +69,21 @@ export class FakeMachine implements LocalMachine {
       }
     }
     return undefined;
+  }
+
+  /**
+   * @param port - The port asked about.
+   * @param directory - The app's folder.
+   * @returns `none` for a port the script does not hold, `app` for one it holds from `directory`,
+   *   and `other`, with what the script has listening there, for any other.
+   */
+  async portHolder(port: number, directory: string): Promise<PortHolder> {
+    if (await this.isPortFree(port)) {
+      return { kind: "none" };
+    }
+    return this.script.runningIn?.[port] === directory
+      ? { kind: "app" }
+      : { kind: "other", listeners: await this.listeners(port) };
   }
 
   /**

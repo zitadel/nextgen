@@ -31,7 +31,7 @@ import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
  *   The shipped flow has none, so it is off by default.
  *
  * Interactive fixture emails (typed live in the rendered form):
- * - `wrong@example.com` -> inline "Wrong email or password." on the password
+ * - `wrong@example.com` -> inline "Wrong password." on the password
  *   step (credential failures surface there, not on the identifier)
  * - `server@example.com` -> form alert on the password step
  * - `exists@example.com` -> inline "account already exists" on Sign up
@@ -39,7 +39,8 @@ import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
  *
  * Excluded from the Storybook test run (`no-test`): the orchestrator drives
  * real network + the MSW worker; its behaviour is covered by the
- * `@zitadel/components` orchestrator specs.
+ * `@zitadel/components` orchestrator specs. The one exception is
+ * `PasskeyLogin` (`!no-test`), which gates its pending step.
  */
 export interface OrchestratorArgs {
   purpose: "login" | "register";
@@ -308,6 +309,40 @@ export function freezePasskeyCeremony(): () => void {
     } else {
       delete (window as unknown as Record<string, unknown>).PublicKeyCredential;
     }
+  };
+}
+
+/**
+ * Hold the WebAuthn ceremony open so a passkey step can be shown, with a real
+ * authenticator wherever one can be had.
+ *
+ * Under Vitest, Playwright drives Chromium and the DevTools protocol is
+ * reachable, so a virtual authenticator that never answers the touch keeps the
+ * ceremony genuinely in flight: `<zl-passkey>` talks to the browser's own
+ * WebAuthn and shows its real pending UI, with nothing stubbed. In the gallery
+ * a person's own Chrome has no protocol client, so it falls back to
+ * `freezePasskeyCeremony`. Returns the teardown for Storybook `beforeEach`.
+ */
+export async function holdPasskeyCeremony(): Promise<() => void | Promise<void>> {
+  const mode = (import.meta as ImportMeta & { env?: { MODE?: string } }).env?.MODE;
+  if (mode !== "test") {
+    return freezePasskeyCeremony();
+  }
+  const { cdp } = await import("vitest/browser");
+  await cdp().send("WebAuthn.enable");
+  const { authenticatorId } = await cdp().send("WebAuthn.addVirtualAuthenticator", {
+    options: {
+      protocol: "ctap2",
+      transport: "internal",
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      automaticPresenceSimulation: false,
+    },
+  });
+  return async () => {
+    await cdp().send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+    await cdp().send("WebAuthn.disable");
   };
 }
 

@@ -4,7 +4,7 @@ import type { Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel
 
 import { resolveTelemetryToken, type TelemetryEndpoint } from "./config";
 import { resolveConsent } from "./consent";
-import { type Identity, loadOrCreateIdentity } from "./identity";
+import { type Identity, loadOrCreateIdentity, type StoredIdentity } from "./identity";
 import { MixpanelSink } from "./mixpanel-sink";
 import { type TelemetrySink, trace } from "./sink";
 import { compact } from "./util";
@@ -64,17 +64,21 @@ export type TelemetryDeps = {
 export class Telemetry {
   readonly distinctId: string;
   readonly isFirstRun: boolean;
+  /** The install's record as it was read, for the profile's due-check. */
+  readonly record: StoredIdentity | undefined;
   private readonly sinks: readonly TelemetrySink[];
   private readonly newId: () => string;
 
   private constructor(settings: {
     readonly distinctId: string;
     readonly isFirstRun: boolean;
+    readonly record?: StoredIdentity;
     readonly sinks: readonly TelemetrySink[];
     readonly newId: () => string;
   }) {
     this.distinctId = settings.distinctId;
     this.isFirstRun = settings.isFirstRun;
+    this.record = settings.record;
     this.sinks = settings.sinks;
     this.newId = settings.newId;
   }
@@ -139,28 +143,50 @@ export class Telemetry {
     return new Telemetry({
       distinctId: identity.distinctId,
       isFirstRun: identity.isFirstRun,
+      record: identity.record,
       sinks,
       newId,
     });
   }
 
-  /** Send an event with the given properties; `distinct_id`/`$insert_id` are stamped here. */
-  track(event: string, properties: TelemetryProperties): void {
+  /**
+   * Send an event with the given properties; `distinct_id`/`$insert_id` are
+   * stamped here.
+   *
+   * @param event - The event's name.
+   * @param properties - The event's properties.
+   * @param only - The destinations the event goes to; every one when left out.
+   */
+  track(
+    event: string,
+    properties: TelemetryProperties,
+    only?: readonly TelemetrySink["destination"][],
+  ): void {
     const payload = compact({
       ...properties,
       distinct_id: this.distinctId,
       $insert_id: this.newId(),
     });
     for (const sink of this.sinks) {
-      sink.track(event, payload);
+      if (only === undefined || only.includes(sink.destination)) {
+        sink.track(event, payload);
+      }
     }
   }
 
-  /** Write a user profile where the destination has one. `modifiers` carries `$ip` etc. */
-  profile(properties: TelemetryProperties, modifiers: Modifiers = {}): void {
+  /**
+   * Write a user profile where the destination has one. `modifiers` carries
+   * `$ip` etc.; `once` is written only where the profile does not have it yet.
+   */
+  profile(
+    properties: TelemetryProperties,
+    modifiers: Modifiers = {},
+    once: TelemetryProperties = {},
+  ): void {
     const payload = compact(properties);
+    const first = compact(once);
     for (const sink of this.sinks) {
-      sink.profile(payload, modifiers);
+      sink.profile(payload, modifiers, first);
     }
   }
 

@@ -11,10 +11,10 @@ import {
   CLI_COMMAND_STARTED,
   commandEventProperties,
   deviceProfileProperties,
-  VERCEL_COMMAND_DIMENSIONS,
+  firstSeenProperties,
   vercelEventKeys,
-} from "@/lib/oclif/command-telemetry";
-import type { GlobalOptions } from "@/lib/oclif/types";
+} from "@/cli/telemetry/properties";
+import type { GlobalOptions } from "@/cli/core/types";
 import { VERCEL_MAX_PROPERTIES } from "@/lib/telemetry/vercel";
 import { keysOf } from "@tests/helpers/declarations";
 
@@ -31,7 +31,7 @@ const catalogPath = join(
 );
 const srcDir = join(import.meta.dirname, "../../../../src");
 const commandsDir = join(srcDir, "cli", "commands");
-const baseCommand = join(srcDir, "lib/oclif/base.ts");
+const telemetered = join(srcDir, "cli/telemetry/telemetered.ts");
 
 type PropertyDef = {
   type: string;
@@ -137,15 +137,15 @@ function commandId(file: string): string {
   return segments.join(":");
 }
 
-/** The dimensions each command passes to `recordTelemetry`, by command id. */
+/** The dimensions each command passes to `annotate`, by command id. */
 async function recordedDimensions(): Promise<Map<string, Set<string>>> {
   const files = (await readdir(commandsDir, { recursive: true })).filter((file) =>
     file.endsWith(".ts"),
   );
   const recorded = new Map<string, Set<string>>();
   for (const file of files) {
-    const keys = (await callsIn(join(commandsDir, file), calls("recordTelemetry"))).flatMap(
-      (call) => keysOf(call.arguments[0]),
+    const keys = (await callsIn(join(commandsDir, file), calls("annotate"))).flatMap((call) =>
+      keysOf(call.arguments[0]),
     );
     if (keys.length > 0) {
       const id = commandId(file);
@@ -155,37 +155,98 @@ async function recordedDimensions(): Promise<Map<string, Set<string>>> {
   return recorded;
 }
 
-/** Each lifecycle event, by the constant `BaseCommand` tracks it with. */
+/**
+ * The one fact each command keeps in its Vercel copy, by command id: the
+ * `static override readonly headline` the command declares.
+ */
+async function headlines(): Promise<Map<string, string>> {
+  const files = (await readdir(commandsDir, { recursive: true })).filter((file) =>
+    file.endsWith(".ts"),
+  );
+  const found = new Map<string, string>();
+  for (const file of files) {
+    const headline = (await readFile(join(commandsDir, file), "utf8")).match(
+      /static override readonly headline = "(\w+)"/,
+    );
+    if (headline?.[1] !== undefined) {
+      found.set(commandId(file), headline[1]);
+    }
+  }
+  return found;
+}
+
+/** A product event a command sends with `trackEvent`, and the keys it names. */
+type TrackedEvent = Readonly<{ command: string; event: string; keys: string[] }>;
+
+/**
+ * The event a `trackEvent` call names: a string literal, or a `const` in the
+ * same file that holds one.
+ */
+function eventName(node: ts.Expression | undefined, source: ts.SourceFile): string | undefined {
+  if (node && ts.isStringLiteral(node)) {
+    return node.text;
+  }
+  if (!node || !ts.isIdentifier(node)) {
+    return undefined;
+  }
+  const find = (child: ts.Node): string | undefined => {
+    if (
+      ts.isVariableDeclaration(child) &&
+      ts.isIdentifier(child.name) &&
+      child.name.text === node.text &&
+      child.initializer &&
+      ts.isStringLiteral(child.initializer)
+    ) {
+      return child.initializer.text;
+    }
+    return ts.forEachChild(child, find);
+  };
+  return find(source);
+}
+
+/** Every product event the commands send, by the command that sends it. */
+async function trackedEvents(): Promise<TrackedEvent[]> {
+  const files = (await readdir(commandsDir, { recursive: true })).filter((file) =>
+    file.endsWith(".ts"),
+  );
+  const tracked: TrackedEvent[] = [];
+  for (const file of files) {
+    for (const call of await callsIn(join(commandsDir, file), calls("trackEvent"))) {
+      const event = eventName(call.arguments[0], call.getSourceFile());
+      if (event === undefined) {
+        throw new Error(`${file}: trackEvent names its event with neither a literal nor a const`);
+      }
+      tracked.push({ command: commandId(file), event, keys: keysOf(call.arguments[1]) });
+    }
+  }
+  return tracked;
+}
+
+/** Each lifecycle event, by the constant `Telemetered` tracks it with. */
 const LIFECYCLE_EVENTS = [
   ["CLI_COMMAND_STARTED", CLI_COMMAND_STARTED],
   ["CLI_COMMAND_COMPLETED", CLI_COMMAND_COMPLETED],
   ["CLI_COMMAND_FAILED", CLI_COMMAND_FAILED],
 ] as const;
 
-/** The properties `BaseCommand` adds to `commandEventProperties` where it tracks `constant`. */
+/** The properties `Telemetered` adds to `commandEventProperties` where it tracks `constant`. */
 async function lifecycleExtras(constant: string): Promise<string[]> {
   const tracks = await callsIn(
-    baseCommand,
+    telemetered,
     (call) =>
-      calls("track")(call) &&
+      calls("reportTrack")(call) &&
       call.arguments[0] !== undefined &&
       ts.isIdentifier(call.arguments[0]) &&
       call.arguments[0].text === constant,
   );
   return tracks.flatMap((track) => {
-    const bag = track.arguments[1];
-    if (bag && ts.isCallExpression(bag)) {
-      return keysOf(bag.arguments[3]);
-    }
-    return [];
+    return keysOf(track.arguments[1]);
   });
 }
 
 function meta(): GlobalOptions {
   return {
     cwd: "/work/app",
-    colored: false,
-    json: false,
     nonInteractive: true,
     dryRun: false,
     force: false,
@@ -327,6 +388,27 @@ describe("product analytics catalog", () => {
 });
 
 describe("CLI telemetry against the catalog", () => {
+  it("sends exactly the properties the catalog lists on each product event", async () => {
+    const catalog = await loadCatalog();
+    const { events } = cliOf(catalog);
+    const base = [
+      ...Object.keys(commandEventProperties(meta(), "cloud", "invocation-1")),
+      ...STAMPED,
+    ];
+    for (const { command, event, keys } of await trackedEvents()) {
+      const definition = events[event];
+      expect(definition?.status, `${command} sends ${event}, not in the catalog as emitted`).toBe(
+        "emitted",
+      );
+      if (!definition) {
+        continue;
+      }
+      expect(new Set(eventProperties(catalog, "cli", definition)), event).toEqual(
+        new Set([...base, ...keys]),
+      );
+    }
+  });
+
   it("emits only lifecycle events the catalog lists as emitted", async () => {
     const { events } = cliOf(await loadCatalog());
     for (const [, event] of LIFECYCLE_EVENTS) {
@@ -363,13 +445,14 @@ describe("CLI telemetry against the catalog", () => {
     for (const [, event] of LIFECYCLE_EVENTS) {
       expect(events[event]?.destinations, event).toContain("vercel");
     }
-    expect(Object.fromEntries(VERCEL_COMMAND_DIMENSIONS)).toEqual(vercel?.dimensions ?? {});
-    for (const command of [...VERCEL_COMMAND_DIMENSIONS.keys(), "variable:list"]) {
-      const dimension = VERCEL_COMMAND_DIMENSIONS.get(command);
+    const declared = await headlines();
+    expect(Object.fromEntries(declared)).toEqual(vercel?.dimensions ?? {});
+    for (const command of [...declared.keys(), "variable:list"]) {
+      const dimension = declared.get(command);
       const listed = (vercel?.properties ?? []).flatMap((key) =>
         key !== DIMENSION ? [key] : dimension === undefined ? [] : [dimension],
       );
-      expect(vercelEventKeys(command), command).toEqual(listed);
+      expect(vercelEventKeys(dimension), command).toEqual(listed);
     }
   });
 
@@ -415,7 +498,10 @@ describe("CLI telemetry against the catalog", () => {
 
   it("sends exactly the properties the catalog lists on the install profile", async () => {
     const { profile } = cliOf(await loadCatalog());
-    const sent = Object.keys(deviceProfileProperties(meta(), "09233195-cd34-468c"));
+    const sent = [
+      ...Object.keys(deviceProfileProperties(meta(), "09233195-cd34-468c")),
+      ...Object.keys(firstSeenProperties("0.1.0-alpha.11")),
+    ];
     expect(new Set(profile?.properties)).toEqual(new Set(sent));
   });
 });

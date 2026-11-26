@@ -1,3 +1,4 @@
+import { Output } from "@/lib/ui/output";
 import { type PackageCommand, PM } from "@/lib/pm";
 
 import { InstallError } from "./errors";
@@ -36,7 +37,7 @@ export type InstallerOptions = Readonly<{
    * Whether a package manager's progress must stay off stdout, which a command
    * that prints one machine-readable result needs.
    */
-  redirectStdoutToStderr: boolean;
+  redirectStdoutToStderr?: boolean;
 }>;
 
 /**
@@ -88,7 +89,7 @@ export class PackageInstaller {
     try {
       await install.run.run({
         cwd: this.options.cwd,
-        redirectStdoutToStderr: this.options.redirectStdoutToStderr,
+        redirectStdoutToStderr: this.options.redirectStdoutToStderr ?? Output.json,
       });
     } catch (error) {
       throw new InstallError(install.shown, error);

@@ -72,7 +72,7 @@ Transition values:
 - `user_schema` names a schema of the project.
 - **The automatic switch is optional.** A definition that serves both `login` and `register` may leave `user_not_found` (login entry) or `user_already_exists` (register entry) unwired; the outcome then shows its step error. `zitadel deploy --dry-run` warns about it. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 - **A purpose switch names a served purpose.** A transition with `purpose` targets that purpose's entry step: either `target` is that step or `target` is left out.
-- **`on_success` manifest cross-check.** Every credential kind a mutation establishes (per `ManifestForOnSuccess`) must be collected on the step itself or on some upstream step in the graph. `create_user` establishes `{identifier, password}` — both must appear in `fields` somewhere reachable.
+- **`on_success` manifest cross-check.** Every credential kind a mutation establishes (per its `FlowOnSuccessSpec`) must be collected on the step itself or on some upstream step in the graph. `create_user` establishes `{identifier, password}` — both must appear in `fields` somewhere reachable.
 
 ### Step
 

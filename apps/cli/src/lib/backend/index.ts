@@ -77,11 +77,13 @@ export {
   type Invitation,
   type InvitationInput,
   type InvitationPageQuery,
+  invitationGrant,
   type InvitationRelation,
   invitationRole,
   InvitationService,
   type InvitationStatus,
   type InvitationType,
+  UNACCEPTED_INVITATION_STATUSES,
 } from "./services/invitation";
 export {
   type ApiOperation,

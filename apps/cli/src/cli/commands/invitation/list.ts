@@ -6,14 +6,17 @@ import {
   invitationRole,
   type InvitationStatus,
   type InvitationType,
+  UNACCEPTED_INVITATION_STATUSES,
 } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { reads, type Refused, whole } from "@/lib/oclif/flags";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { reads, type Refused, whole } from "@/cli/core/flags";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { ListInvitationsQueryParams } from "@/lib/backend/schemas";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ListInvitationsQueryParams, ListInvitationsResponse } from "@/lib/backend/schemas";
+import { fieldPaths } from "@/cli/core/crud";
+import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "name", "role", "status", "expires_at"] as const;
@@ -46,20 +49,24 @@ const LIMIT = {
  * with their status and expiry. `--status` and `--type` narrow the page; like
  * every list verb it fetches one page and reports `next_page_token`.
  */
-export default class InvitationList extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class InvitationList extends Telemetered(ReadCommand) {
   static override description = "List the project's invitations, newest first.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 6;
+
   static override examples = [
     "<%= config.bin %> invitation list",
     "<%= config.bin %> invitation list --status pending",
+    "<%= config.bin %> invitation list --status accepted --status pending",
     "<%= config.bin %> invitation list --all --json",
   ];
   static override flags = relatedFlags(
     {
       status: Flags.custom<InvitationStatus>({})({
         options: [...STATUSES],
-        description: "Only invitations with this status.",
+        multiple: true,
+        description:
+          "Only invitations with this status; repeat it for several. Without it, every status but accepted.",
       }),
       type: Flags.custom<InvitationType>({})({
         options: [...TYPES],
@@ -79,18 +86,27 @@ export default class InvitationList extends Tabulatable(ServerCommand(Environmen
         char: "a",
         description: "Fetch every page instead of one.",
       }),
+      fields: fieldsFlag({
+        shape: fieldPaths(ListInvitationsResponse.shape.invitations.element),
+      }),
       plain: plainFlag,
     },
     { all: { exclusive: ["page-token"] } },
   );
 
-  protected async execute({ flags }: Admitted<typeof InvitationList>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-
-    const invitationService = new InvitationService(client, projectId);
+  /**
+   * Lists the project's invitations, the unaccepted ones unless a status is
+   * given. A list that found nothing drops the footer, so the default says here
+   * that accepted invitations are left out.
+   *
+   * @param input.flags - The filters and paging of the list.
+   * @returns The envelope of the run.
+   */
+  protected async execute({ flags }: Admitted<typeof InvitationList>): Promise<CommandResult> {
+    const invitationService = await this.service(InvitationService);
     const listed = await invitationService.page(
       {
-        status: flags.status === undefined ? undefined : [flags.status],
+        status: [...(flags.status ?? UNACCEPTED_INVITATION_STATUSES)],
         type: flags.type,
         limit: flags.limit,
         page_token: flags.pageToken,
@@ -111,14 +127,20 @@ export default class InvitationList extends Tabulatable(ServerCommand(Environmen
       };
     });
     const columns = COLUMNS;
-    const empty = "No invitations yet.";
-    const footer: string[] = [];
+    const empty =
+      flags.status === undefined
+        ? "No invitations found; accepted ones are left out, pass --status accepted to list them"
+        : "No invitations found";
+    const footer =
+      flags.status === undefined
+        ? ["Accepted invitations are left out; pass --status accepted to list them"]
+        : [];
     const page = {
       token: listed.next,
     };
     const extra = {};
 
-    return this.emitList(flags, {
+    return this.listed(flags, {
       columns,
       rows,
       items,

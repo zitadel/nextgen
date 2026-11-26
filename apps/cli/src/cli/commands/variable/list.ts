@@ -2,10 +2,11 @@ import { Flags } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { VariableView } from "@/lib/variable";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `list` renders, in order; `--preview` leaves out the preview column. */
 const COLUMNS = ["name", "value", "preview"] as const;
@@ -20,7 +21,7 @@ const PREVIEW_COLUMNS = ["name", "value"] as const;
  * `--preview` it lists the preview values alone, which are never merged with the
  * primary ones — only the names that hold one.
  */
-export default class VariableList extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class VariableList extends Telemetered(ReadCommand) {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;
@@ -35,16 +36,28 @@ export default class VariableList extends Tabulatable(ServerCommand(EnvironmentC
       default: false,
       description: "List the preview values instead of the primary ones.",
     }),
+    fields: fieldsFlag({
+      fallback: ["name"],
+      shape: {
+        known: new Set(["name", "secret", "value", "preview", "preview.secret", "preview.value"]),
+        open: [],
+      },
+    }),
     plain: plainFlag,
   };
 
-  protected async execute({ flags }: Admitted<typeof VariableList>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const variableService = new VariableService(client, projectId);
+  /**
+   * Lists the variables entered on the project.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The variables, as a list.
+   */
+  protected async execute({ flags }: Admitted<typeof VariableList>): Promise<CommandResult> {
+    const variableService = await this.service(VariableService);
 
     if (flags.preview) {
       const items = await variableService.previews();
-      this.recordTelemetry({
+      this.annotate({
         variable_count: items.length,
       });
       const rows = items.map((item) => {
@@ -56,7 +69,7 @@ export default class VariableList extends Tabulatable(ServerCommand(EnvironmentC
       const page = null;
       const extra = {};
 
-      return this.emitList(flags, {
+      return this.listed(flags, {
         columns,
         rows,
         items,
@@ -69,7 +82,7 @@ export default class VariableList extends Tabulatable(ServerCommand(EnvironmentC
     }
 
     const items = await variableService.inventory();
-    this.recordTelemetry({
+    this.annotate({
       variable_count: items.length,
     });
     const rows = items.map((item) => {
@@ -81,7 +94,7 @@ export default class VariableList extends Tabulatable(ServerCommand(EnvironmentC
     const page = null;
     const extra = {};
 
-    return this.emitList(flags, {
+    return this.listed(flags, {
       columns,
       rows,
       items,
