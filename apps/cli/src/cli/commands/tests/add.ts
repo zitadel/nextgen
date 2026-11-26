@@ -333,15 +333,20 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
         throw refusalError(PLAYWRIGHT_CONFIG_REFUSAL, { config });
       }
     }
-    const packageJson: PackageJson = await PM.manifest(this.cwd).catch((error: unknown) => {
-      if (error instanceof FsError) {
-        throw refusalError(MANIFEST_REFUSAL, {});
-      }
-      if (error instanceof PmManifestInvalidError) {
-        throw refusalError(MANIFEST_REFUSAL, {});
-      }
-      throw error;
-    });
+    const packageJson: PackageJson | undefined = await PM.manifest(this.cwd).catch(
+      (error: unknown) => {
+        if (error instanceof FsError) {
+          return undefined;
+        }
+        if (error instanceof PmManifestInvalidError) {
+          return undefined;
+        }
+        throw error;
+      },
+    );
+    if (packageJson === undefined) {
+      throw refusalError(MANIFEST_REFUSAL, {});
+    }
     const manifest: Manifest = {
       dependencies: new Set(
         [packageJson.dependencies, packageJson.devDependencies].flatMap((section) => {
