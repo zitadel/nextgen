@@ -103,6 +103,7 @@ export const sessions: Session[] = [
     label: "Add a field",
     description:
       "Add a property to the user schema, ask for it on the registration step, commit, do a dry run, deploy. The form shows it.",
+    ask: "Ask for the company at sign-up.",
     artifact: {
       files: [
         {
@@ -149,6 +150,7 @@ export const sessions: Session[] = [
     label: "Change the flow",
     description:
       "Change what a step asks for and where it goes next, commit, do a dry run, deploy. The login follows.",
+    ask: "Ask for email and password on one screen.",
     artifact: {
       // After the change the identifier step asks for the password too: its
       // pill shows it, or the flow would look like it lost the password.
@@ -196,4 +198,5 @@ export const brandStep = {
   label: "Match your brand",
   description:
     "Set the login's design tokens in your own stylesheet. The look follows your app. Try it here.",
+  ask: "Make the login match our brand.",
 };

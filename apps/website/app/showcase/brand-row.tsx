@@ -177,6 +177,7 @@ export function BrandRow({ index, count }: { index: number; count: number }) {
       count={count}
       label={brandStep.label}
       description={brandStep.description}
+      ask={brandStep.ask}
       artifact={
         <FileCard
           artifact={{ files: [{ path: "app/globals.css", lines: brandLines(choice) }] }}

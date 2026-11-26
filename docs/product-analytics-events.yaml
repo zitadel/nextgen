@@ -77,14 +77,17 @@ properties:
     description: The selected tab, on pages with tracked tabs.
   placement:
     type: string
-    values: [hero, showcase, try_it, footer]
+    values: [header, hero, showcase, try_it, footer]
     description: >-
-      Where on its page a copy button or a call to action sits: `try_it` is
-      the Try it section of a website phase page, which `page` names.
+      Where on its page a copy button or a call to action sits: `header` is
+      the bar over every website page, `try_it` the Try it section of a
+      website phase page, which `page` names.
   target:
     type: string
-    values: [quickstart, github]
-    description: Where a link leads, as a stable name, never a URL.
+    values: [quickstart, github, get_started]
+    description: >-
+      Where a link leads, as a stable name, never a URL: `get_started` is the
+      website's /get-started page.
 
   # Attribution
   utm_source:
@@ -782,7 +785,9 @@ components:
         properties: [page, snippet, placement]
       clicked_link:
         status: emitted
-        trigger: A call to action, to the quickstart or to GitHub, is clicked.
+        trigger: >-
+          A call to action, to the quickstart or to GitHub, or the header's
+          Get started button is clicked.
         destinations: [vercel]
         properties: [page, target, placement]
 

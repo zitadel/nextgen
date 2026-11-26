@@ -50,18 +50,19 @@ export function Sentences({ text }: { text: string }) {
 
 /**
  * One step of the showcase (zitadel/new-website's TerminalSessionRow), the
- * same way round every time: its number and heading, the line under it, then
- * the terminal, the files or the diff beside the page they produce, at one
- * height. Its dot sits on the spine, in the rail beside it from a tablet up
- * and in the gutter on a phone, lit in the step's color once the visitor
- * reaches it (spine.tsx sets data-reached on the step; .step-dot in
- * globals.css).
+ * same way round every time: its number and heading, the line under it and
+ * the ask that gets the same change from an agent, then the terminal, the
+ * files or the diff beside the page they produce, at one height. Its dot
+ * sits on the spine, in the rail beside it from a tablet up and in the
+ * gutter on a phone, lit in the step's color once the visitor reaches it
+ * (spine.tsx sets data-reached on the step; .step-dot in globals.css).
  */
 export function Step({
   index,
   count,
   label,
   description,
+  ask,
   artifact,
   result,
 }: {
@@ -69,6 +70,7 @@ export function Step({
   count: number;
   label: string;
   description: string;
+  ask?: string;
   artifact: ReactNode;
   result?: ReactNode;
 }) {
@@ -101,6 +103,18 @@ export function Step({
           <p className="text-text-secondary leading-6">
             <Sentences text={description} />
           </p>
+          {/* The ask at its prompt, as a person types it to their agent. */}
+          {ask && (
+            <p className="flex gap-2 font-mono text-[0.8125rem] text-text-primary leading-6">
+              <span aria-hidden="true" className="select-none text-text-accent">
+                &gt;
+              </span>
+              <span>
+                <span className="sr-only">Or ask your agent: </span>
+                {ask}
+              </span>
+            </p>
+          )}
         </header>
 
         <div className={`grid grid-cols-1 gap-5 ${result ? "lg:grid-cols-2" : ""}`}>

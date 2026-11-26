@@ -1,7 +1,7 @@
 import { ChangeHistory, CodeFile, NumberedCommands } from "../blocks";
 import { appPath, devCommand, setupCommand, startCommand } from "../commands";
+import { CallToAction } from "../cta";
 import { PhasePage, phaseMetadata } from "../phase-page";
-import { Showcase } from "../showcase/showcase";
 
 export const metadata = phaseMetadata("get-started");
 
@@ -77,11 +77,10 @@ export default function GetStartedPage() {
           ),
         },
         tryIt: {
-          line: "Run these in an empty folder. Below them, each step as it runs: what it writes into your app, and the login it serves.",
-          wide: true,
+          line: "Run these in an empty folder. The quickstart walks you through each step.",
           content: (
-            <div className="flex flex-col gap-20 md:gap-28">
-              <div className="max-w-3xl">
+            <div className="flex max-w-3xl flex-col items-start gap-7">
+              <div className="w-full">
                 <NumberedCommands
                   title={appPath}
                   note="Node 24+"
@@ -90,7 +89,7 @@ export default function GetStartedPage() {
                   copyAll
                 />
               </div>
-              <Showcase />
+              <CallToAction placement="try_it" />
             </div>
           ),
         },

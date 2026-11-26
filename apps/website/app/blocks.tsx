@@ -7,7 +7,8 @@ import { WINDOW_FOOTER, WINDOW_INSET, Window } from "./window";
 // What the front page and the phase pages (phase-page.tsx) show in their
 // windows: a person asking their agent, the changes and events that name who
 // acted, a file, commands to copy as numbered steps, and the questions with
-// their FAQPage data. Each marks itself in the page's color, --step.
+// their FAQPage data. All in the page's neutral inks: a brand color never
+// marks who acted or what is current (AGENTS.md).
 
 export type Exchange = { ask: string; reply: string };
 
@@ -39,7 +40,7 @@ export function Transcript({
             </p>
             <span
               aria-hidden="true"
-              className="mt-2.5 size-1.5 justify-self-center rounded-full bg-(--step)"
+              className="mt-2.5 size-1.5 justify-self-center rounded-full bg-text-muted"
             />
             <p className="text-pretty text-sm text-text-secondary leading-6 md:text-base md:leading-7">
               <span className="sr-only">Your agent: </span>
@@ -65,11 +66,7 @@ export function ChangeHistory({ changes }: { changes: readonly Change[] }) {
             className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3.5 ${WINDOW_INSET}`}
           >
             <span className="text-sm text-text-primary leading-6">{change}</span>
-            <span
-              className={`rounded-full px-2.5 font-mono text-xs leading-6 ${
-                agent ? "bg-text-accent/10 text-text-accent" : "bg-tint/[0.07] text-text-secondary"
-              }`}
-            >
+            <span className="rounded-full bg-tint/[0.07] px-2.5 font-mono text-text-secondary text-xs leading-6">
               <span className="sr-only">Made by </span>
               {agent ? "Your agent, for you" : "You"}
             </span>
@@ -121,8 +118,8 @@ export type Step = { label: string; command: string };
 
 /**
  * Commands as numbered steps, each with what it does and a copy button that
- * always shows; without `numbered`, commands to pick from, each marked in the
- * page's color. `copyAll` adds one button in the title bar for a sequence
+ * always shows; without `numbered`, commands to pick from, each marked with
+ * a dot. `copyAll` adds one button in the title bar for a sequence
  * run in order; `note` is the one prerequisite, `footer` a line under the
  * steps, and `placement` where the block sits (analytics.ts).
  */
@@ -176,7 +173,7 @@ export function NumberedCommands({
             ) : (
               <span
                 aria-hidden="true"
-                className="size-1.5 self-center justify-self-center rounded-full bg-(--step)"
+                className="size-1.5 self-center justify-self-center rounded-full bg-text-muted"
               />
             )}
             <p className="self-center text-sm text-text-primary leading-6">{label}</p>

@@ -1,6 +1,6 @@
 // The four phases of running identity with an agent, in order: a page each
-// (phase-page.tsx), the header's links, the front page's strip and the
-// sitemap read them from here.
+// (phase-page.tsx), with the phases' stepper on it; the header's Product menu
+// (nav.ts) and the sitemap read them from here.
 
 export type PhaseSlug = "get-started" | "operate" | "investigate" | "govern";
 
@@ -8,7 +8,7 @@ export type Phase = {
   slug: PhaseSlug;
   /** The page's name in the header. */
   name: string;
-  /** Its step on the front page's strip. */
+  /** Its step in the Product menu and on the phases' stepper. */
   short: string;
   /** The page's H1. */
   title: string;

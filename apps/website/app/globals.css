@@ -101,20 +101,13 @@
 /* The page's own pieces: the hero (page.tsx), the logo (logo.tsx) and the
    steps' dots. */
 @layer components {
-  /* The hero takes the first screen under the header (h-16, and below a
-     laptop's width the phases' row of 2.5rem under it; site-header.tsx), its
-     content just above the middle and the cue to what follows at its foot
-     (page.tsx). Never shorter than its content needs, and on a very tall
-     screen no taller than 60rem, so the content does not float in a void and
-     what follows begins in view. */
+  /* The hero takes the first screen under the header (h-16), its content
+     just above the middle and the cue to the steps at its foot (page.tsx).
+     Never shorter than its content needs, and on a very tall screen no
+     taller than 60rem, so the content does not float in a void and the
+     steps begin in view. */
   .hero {
-    min-height: clamp(36rem, 100svh - 6.5rem, 60rem);
-  }
-
-  @media (min-width: 64rem) {
-    .hero {
-      min-height: clamp(36rem, 100svh - 4rem, 60rem);
-    }
+    min-height: clamp(36rem, 100svh - 4rem, 60rem);
   }
 
   /* The cue nods down now and then, once the hero has settled. */
@@ -124,12 +117,12 @@
     }
   }
 
-  /* The text of the display titles, the hero's and the closing band's
-     (page.tsx), in one look: white at the top, and toward the foot of each
-     line the process's colors, --title-from on its left to --title-to on its
-     right (the hero: Zitadel's orange to the stepper's green; the closing
-     band, like the showcase's finish: its own green). Cloned per line, so a
-     title that wraps lights every line alike. */
+  /* The text of the display titles, the hero's and the phase pages'
+     (.hero-title) and the finish's (showcase/finish.tsx), in one look: white
+     at the top, and toward the foot of each line the process's colors,
+     --title-from on its left to --title-to on its right (the hero's:
+     Zitadel's orange to the finish's green; the finish: its own green).
+     Cloned per line, so a title that wraps lights every line alike. */
   .display-title {
     font-family: var(--font-heading);
     letter-spacing: -0.025em;
@@ -149,8 +142,9 @@
     color: transparent;
   }
 
-  /* The hero's title: a line per sentence (page.tsx breaks it after the
-     first), the first wrapping on a phone. */
+  /* The hero's title, and a phase page's (phase-page.tsx): the front page's
+     a line per sentence (page.tsx breaks it after the first), a long one
+     wrapping on a phone. */
   .hero-title {
     --title-from: var(--color-step-start);
     --title-to: var(--color-step-end);

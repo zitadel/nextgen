@@ -1,29 +1,25 @@
 "use client";
 
 import { type Placement, trackEvent } from "./analytics";
-import { links } from "./links";
 import { GitHubMark } from "./github-mark";
+import { links } from "./links";
+import { phasePath } from "./phases";
 
 const BUTTON =
   "group inline-flex h-11 items-center gap-2 rounded-lg px-5 font-semibold text-sm transition-colors";
-const FILLED = "bg-text-primary text-background hover:opacity-85";
-const OUTLINED =
-  "border border-window-border bg-tint/[0.03] text-text-primary hover:bg-tint/[0.07]";
 
 /**
- * The page's ways on beside its commands: the quickstart and the code. Under
- * the hero's commands, `quiet` keeps to the quickstart, outlined, so the
- * commands stay the first thing to do. A click reports `clicked_link` with
- * `placement` (analytics.ts): page views cannot say which page sent a visitor
- * to the quickstart, and GitHub is another site.
+ * The page's two ways on, under the hero, at the end of the steps and in a
+ * phase page's Try it: the quickstart, the one thing to do next, and the
+ * code. A click reports `clicked_link` with `placement` (analytics.ts): page
+ * views cannot say which page sent a visitor to the quickstart, and GitHub is
+ * another site.
  */
 export function CallToAction({
   placement,
-  quiet = false,
   className = "",
 }: {
   placement: Placement;
-  quiet?: boolean;
   className?: string;
 }) {
   return (
@@ -31,7 +27,7 @@ export function CallToAction({
       <a
         href={links.quickstart}
         onClick={() => trackEvent("clicked_link", { target: "quickstart", placement })}
-        className={`${BUTTON} ${quiet ? OUTLINED : FILLED}`}
+        className={`${BUTTON} bg-text-primary text-background hover:opacity-85`}
       >
         Read the quickstart
         <svg
@@ -49,16 +45,32 @@ export function CallToAction({
           />
         </svg>
       </a>
-      {!quiet && (
-        <a
-          href={links.github}
-          onClick={() => trackEvent("clicked_link", { target: "github", placement })}
-          className={`${BUTTON} ${OUTLINED}`}
-        >
-          <GitHubMark className="size-4" />
-          View on GitHub
-        </a>
-      )}
+      <a
+        href={links.github}
+        onClick={() => trackEvent("clicked_link", { target: "github", placement })}
+        className={`${BUTTON} border border-window-border bg-tint/[0.03] text-text-primary hover:bg-tint/[0.07]`}
+      >
+        <GitHubMark className="size-4" />
+        View on GitHub
+      </a>
     </div>
+  );
+}
+
+/**
+ * The header's one primary button, to the first phase's page, in the filled
+ * style of the quickstart's button at the bar's height. A click reports
+ * `clicked_link`: the page views of /get-started cannot say that the header
+ * sent the visitor.
+ */
+export function GetStartedButton() {
+  return (
+    <a
+      href={phasePath("get-started")}
+      onClick={() => trackEvent("clicked_link", { target: "get_started", placement: "header" })}
+      className="ml-1 inline-flex h-9 shrink-0 items-center rounded-xl bg-text-primary px-3 font-semibold text-background text-sm transition-opacity hover:opacity-85 sm:px-3.5"
+    >
+      Get started
+    </a>
   );
 }

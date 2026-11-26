@@ -26,10 +26,11 @@ import {
 // both and the ratios between them hold.
 
 /**
- * Where on its page a copy button or a call to action sits: `try_it` is a
- * phase page's Try it (phase-page.tsx), whose page the event's `page` names.
+ * Where on its page a copy button or a call to action sits: `header` is the
+ * bar over every page, `try_it` a phase page's Try it (phase-page.tsx), whose
+ * page the event's `page` names.
  */
-export type Placement = "hero" | "showcase" | "try_it" | "footer";
+export type Placement = "header" | "hero" | "showcase" | "try_it" | "footer";
 
 /**
  * What a copy button copied, never its text: `all` is a whole block of
@@ -74,7 +75,7 @@ export function snippetOf(command: string): Snippet | undefined {
 
 type Events = {
   copied_command: { snippet: Snippet; placement: Placement };
-  clicked_link: { target: "quickstart" | "github"; placement: Placement };
+  clicked_link: { target: "quickstart" | "github" | "get_started"; placement: Placement };
 };
 
 /** A page's stable name: `home` for `/`, else its first path segment. */
