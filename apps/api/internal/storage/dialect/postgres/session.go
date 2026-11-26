@@ -104,6 +104,70 @@ func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, se
 	})
 }
 
+// DeleteSessions implements [service.SessionStatements].
+func (ss sessionStatements) DeleteSessions(ctx context.Context, opts *database.ListOptions[domain.SessionField]) ([]*domain.Session, error) {
+	if opts == nil || opts.Filter == nil {
+		return nil, fmt.Errorf("session filter is required")
+	}
+	opts = sessionDeleteOpts(opts)
+	var deleted []*domain.Session
+	err := withTransaction(ctx, ss.client, func(ctx context.Context, tx queryExecutor) error {
+		var pick statementCompiler
+		if err := compileRead(&pick, `SELECT s.project_id, s.id FROM zitadel_nextgen.sessions s`, opts, sessionSchema); err != nil {
+			return err
+		}
+		var del statementCompiler
+		del.WriteString(`DELETE FROM zitadel_nextgen.sessions WHERE (project_id, id) IN (`)
+		del.WriteString(pick.String())
+		del.args = append(del.args, pick.args...)
+		del.WriteString(`) RETURNING project_id, id, user_id, expires_at`)
+		rows, err := tx.Query(ctx, del.String(), del.args...)
+		if err != nil {
+			return wrapError(err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var s domain.Session
+			if err := rows.Scan(&s.ProjectID, &s.ID, &s.UserID, &s.ExpiresAt); err != nil {
+				return wrapError(err)
+			}
+			deleted = append(deleted, &s)
+		}
+		if err := rows.Err(); err != nil {
+			return wrapError(err)
+		}
+		tokens := newTokenStatements(tx)
+		rsi := newResourceScopeStatements(tx)
+		for _, s := range deleted {
+			if err := tokens.DeleteTokensBySessionID(ctx, s.ProjectID, s.ID); err != nil {
+				return err
+			}
+			if err := rsi.DeleteResourceScope(ctx, domain.ResourceKindSession, s.ProjectID, s.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if deleted == nil {
+		deleted = []*domain.Session{}
+	}
+	return deleted, nil
+}
+
+func sessionDeleteOpts(opts *database.ListOptions[domain.SessionField]) *database.ListOptions[domain.SessionField] {
+	out := *opts
+	if out.Pagination.OrderBy.Columns == nil {
+		out.Pagination.OrderBy.Columns = []database.Column[domain.SessionField]{
+			database.Col(domain.SessionFieldExpiresAt),
+			database.Col(domain.SessionFieldID),
+		}
+	}
+	return &out
+}
+
 func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
 	var refreshed *domain.Session
 	err := withTransaction(ctx, ss.client, func(ctx context.Context, tx queryExecutor) error {

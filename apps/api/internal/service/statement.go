@@ -497,6 +497,11 @@ type SessionStatements interface {
 	GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
 	ListSessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) (*database.ListResult[*domain.Session], error)
 	DeleteSessionByID(ctx context.Context, projectID, sessionID string) error
+	// DeleteSessions deletes sessions matching opts.Filter (required). Limit and
+	// order follow opts.Pagination like ListSessions. Returns the deleted rows
+	// (project_id, id, user_id, expires_at) for Path B emitters. Also deletes
+	// tokens and resource_scope for those sessions; checks cascade from sessions.
+	DeleteSessions(ctx context.Context, opts *database.ListOptions[domain.SessionField]) ([]*domain.Session, error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -53,8 +54,8 @@ func (c SessionsGCConfig) Validate() error {
 	return nil
 }
 
-// SessionsGC is the sessions.gc Perform handler: emit session.expired
-// (system actor) then hard-delete, bounded per run.
+// SessionsGC is the sessions.gc Perform handler: filter-delete expired
+// sessions, emit session.expired (system actor), bounded per run.
 //
 // It does not import internal/jobs (jobs already imports service); the server
 // wraps Perform as a jobs.Handler at RegisterWorker.
@@ -63,68 +64,49 @@ type SessionsGC struct {
 	batchSize int
 }
 
-// NewSessionsGC builds a reaper that lists at most cfg.BatchSize expired
+// NewSessionsGC builds a reaper that deletes at most cfg.BatchSize expired
 // sessions per Perform.
 func NewSessionsGC(pool StatementPool, cfg SessionsGCConfig) *SessionsGC {
 	cfg = ApplySessionsGCDefaults(cfg)
 	return &SessionsGC{pool: pool, batchSize: cfg.BatchSize}
 }
 
-// Perform reaps up to batchSize sessions with expires_at < now.
-// Idempotent under at-least-once: a missing session is a no-op.
+// Perform deletes up to batchSize sessions with expires_at < now via
+// DeleteSessions, emits Path B session.expired for each returned row, and
+// logs the deleted count. Idempotent under at-least-once.
 func (g *SessionsGC) Perform(ctx context.Context) error {
 	now := time.Now().UTC()
-	listed, err := g.pool.Statements().ListSessions(ctx, &database.ListOptions[domain.SessionField]{
-		Filter: database.LessThan(database.Col(domain.SessionFieldExpiresAt), now),
-		Pagination: database.Page[domain.SessionField]{
-			Limit: uint32(g.batchSize),
-			OrderBy: database.OrderBy[domain.SessionField]{
-				Columns: []database.Column[domain.SessionField]{
-					database.Col(domain.SessionFieldExpiresAt),
-					database.Col(domain.SessionFieldID),
+	var deleted []*domain.Session
+	err := g.pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		var err error
+		deleted, err = stmts.DeleteSessions(ctx, &database.ListOptions[domain.SessionField]{
+			Filter: database.LessThan(database.Col(domain.SessionFieldExpiresAt), now),
+			Pagination: database.Page[domain.SessionField]{
+				Limit: uint32(g.batchSize),
+				OrderBy: database.OrderBy[domain.SessionField]{
+					Columns: []database.Column[domain.SessionField]{
+						database.Col(domain.SessionFieldExpiresAt),
+						database.Col(domain.SessionFieldID),
+					},
 				},
 			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("sessions.gc list expired: %w", err)
-	}
-	for _, session := range listed.Items {
-		if err := g.reapOne(ctx, session); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (g *SessionsGC) reapOne(ctx context.Context, session *domain.Session) error {
-	return g.pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		stmts := tx.Statements()
-		current, err := stmts.GetSessionByID(ctx, session.ProjectID, session.ID)
+		})
 		if err != nil {
-			if errors.Is(err, domain.ErrSessionNotFound()) {
-				return nil
+			return fmt.Errorf("sessions.gc delete expired: %w", err)
+		}
+		for _, session := range deleted {
+			if err := emitSessionExpired(ctx, stmts, session); err != nil {
+				return err
 			}
-			return fmt.Errorf("sessions.gc get %s: %w", session.ID, err)
-		}
-		// Still live: another write extended TTL between list and take.
-		if !current.ExpiresAt.Before(time.Now().UTC()) {
-			return nil
-		}
-		if err := emitSessionExpired(ctx, stmts, current); err != nil {
-			return err
-		}
-		if err := stmts.DeleteTokensBySessionID(ctx, current.ProjectID, current.ID); err != nil {
-			return fmt.Errorf("sessions.gc delete tokens %s: %w", current.ID, err)
-		}
-		if err := stmts.DeleteSessionByID(ctx, current.ProjectID, current.ID); err != nil {
-			if errors.Is(err, domain.ErrSessionNotFound()) {
-				return nil
-			}
-			return fmt.Errorf("sessions.gc delete %s: %w", current.ID, err)
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	zlog.Info(ctx, "sessions.gc: deleted sessions", slog.Int("deleted", len(deleted)))
+	return nil
 }
 
 func emitSessionExpired(ctx context.Context, stmts EventStatements, session *domain.Session) error {
