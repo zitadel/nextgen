@@ -160,7 +160,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         ...(error instanceof ZitadelError
           ? {
               code: error.code,
-              ...(error.hint === undefined ? {} : { hint: error.hint }),
+              hint: error.hint,
             }
           : {}),
         ...(error instanceof ZitadelLibError

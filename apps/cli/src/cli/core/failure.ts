@@ -57,8 +57,9 @@ export class Failure {
       source: meta.source,
       code: error.code,
       message: error.message,
-      hint:
-        error.hint === undefined ? undefined : Spelling.at(meta.cliVersion).spellOut(error.hint),
+      hint: error.hint?.replace(/^[\s\S]*$/, (hint) => {
+        return Spelling.at(meta.cliVersion).spellOut(hint);
+      }),
       next_commands: error.nextCommands === undefined ? undefined : this.commands(),
       details: error.details,
     };
