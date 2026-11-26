@@ -407,12 +407,16 @@ type AuthzMembershipEdge struct {
 	CreatedAt  time.Time
 }
 
-// ProjectRoleAdmin is the strongest of ProjectRoles.
-const ProjectRoleAdmin = "admin"
+// The roles a grant gives on a project.
+const (
+	ProjectRoleViewer = "viewer"
+	ProjectRoleEditor = "editor"
+	ProjectRoleAdmin  = "admin"
+)
 
 // ProjectRoles are the roles a grant gives on a project, weakest first. A
 // stronger role includes the weaker ones.
-var ProjectRoles = []string{"viewer", "editor", ProjectRoleAdmin}
+var ProjectRoles = []string{ProjectRoleViewer, ProjectRoleEditor, ProjectRoleAdmin}
 
 // ProjectRolesAtLeast returns the roles at least as strong as minRole, all of
 // them for "", and none for a role that is not a project role.
