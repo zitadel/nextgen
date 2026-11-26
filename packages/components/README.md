@@ -38,7 +38,7 @@ for the form-association / accessibility decisions baked into every input atom.
 corepack pnpm add @zitadel/components@latest
 ```
 
-`lit`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally
+`lit`, `@lit/task`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally
 externalised so npm consumers dedupe with their own copies.
 
 ## Quickstart — drop on a page
@@ -427,7 +427,7 @@ packages/components/
 │   ├── manifests.ts       per-atom attribute / part / event manifests
 │   ├── server.ts          Lit-free subset the root resolves to on edge
 │   └── index.ts           barrel
-├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
+├── tsdown.config.ts       library build (externalises its runtime deps)
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects
 ```
 

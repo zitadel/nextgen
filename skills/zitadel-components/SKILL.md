@@ -31,7 +31,7 @@ is the component itself: attributes, tokens, parts, events, shadow-DOM hooks.
 corepack pnpm add @zitadel/components@latest
 ```
 
-`lit`, `liquidjs`, `dompurify` are externalised peer/runtime deps (consumers
+`lit`, `@lit/task`, `liquidjs`, `dompurify` and `lucide` are externalised runtime deps (consumers
 dedupe their own copies). A CDN `standalone` build is published (`unpkg` /
 `jsdelivr` → `./dist/standalone.mjs`). Subpath exports exist for `./atoms`,
 `./orchestrator`, `./tokens`, `./manifests`, and JSX types at `./jsx`. Importing

@@ -109,7 +109,7 @@ test; a warm `.vitest` cache brings that down to seconds.
 
 ## Build
 
-`tsdown.config.ts` keeps `lit`, `liquidjs`, `dompurify` and `lucide` external
+`tsdown.config.ts` keeps `lit`, `@lit/task`, `liquidjs`, `dompurify` and `lucide` external
 in the library build so consumers share one copy; never bundle them there.
 
 ## Bundle size

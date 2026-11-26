@@ -56,7 +56,7 @@ const THIRD_PARTY = [
 
 export default defineConfig([
   /**
-   * Library build — the npm entrypoints. `lit`/`liquidjs`/`dompurify`/`lucide`
+   * Library build — the npm entrypoints. The THIRD_PARTY runtime deps
    * stay EXTERNAL so a consuming app's bundler resolves a single shared copy
    * (no duplicate-Lit). This is what `import "@zitadel/components"` resolves to.
    */
