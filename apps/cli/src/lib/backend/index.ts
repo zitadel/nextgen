@@ -22,6 +22,7 @@ export {
   BackendClaimChallengeNotFoundError,
   BackendClaimWindowExpiredError,
   BackendConflictError,
+  BackendReleaseContentRevokedError,
   BackendError,
   BackendForbiddenError,
   BackendGoneError,

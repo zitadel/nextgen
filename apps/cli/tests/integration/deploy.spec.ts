@@ -1429,7 +1429,12 @@ describe("deploy", () => {
           command: "deploy",
           source: MOCK_SERVER_URL,
           code: "E_CONFLICT",
-          message: `This content was already released as ${first.release_id}, which is revoked and can never be served again; change the configuration so it builds a new release`,
+          message: `This content was already released as ${first.release_id}, which is revoked`,
+          hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
+          details: {
+            release_id: first.release_id,
+            content_hash: first.content_hash,
+          },
         });
       });
 

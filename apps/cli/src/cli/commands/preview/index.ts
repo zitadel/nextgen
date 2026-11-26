@@ -1,7 +1,12 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { BackendForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
+import {
+  BackendForbiddenError,
+  BackendReleaseContentRevokedError,
+  OriginService,
+  type ZitadelClient,
+} from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, CREDENTIALS, PREVIEW_CREDENTIAL } from "@/cli/core";
@@ -43,6 +48,17 @@ const NO_URLS_REFUSAL = {
 const PRIMARY_ORIGIN_REFUSAL = {
   message: "{origins} is a primary origin",
   hint: "Pass the preview URLs with --origin; production is deployed after merge.",
+} as const satisfies Refusal;
+
+/** How a preview is refused when its content builds back to a revoked release. */
+const RELEASE_REVOKED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
+  details: {
+    release_id: "{release_id}",
+    content_hash: "{content_hash}",
+  },
 } as const satisfies Refusal;
 
 /** How a configuration with errors is refused. */
@@ -408,67 +424,79 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
     this.narrate(prepared.notices);
 
     const message = await deployMessage(flags.message, this.cwd, this.env);
-    const { release, deployment } = await publisher.preview({
-      prepared,
-      message,
-      urls,
-      ...(flags.ttl === undefined
-        ? {}
-        : {
-            ttl: flags.ttl.iso,
-          }),
-    });
+    try {
+      const { release, deployment } = await publisher.preview({
+        prepared,
+        message,
+        urls,
+        ...(flags.ttl === undefined
+          ? {}
+          : {
+              ttl: flags.ttl.iso,
+            }),
+      });
 
-    const expiries = await PreviewExpiries.of(client, projectId).live(
-      deployment.targets.map((target) => {
-        return target.origin;
-      }),
-    );
-    const previews = deployment.targets.map((target) => {
+      const expiries = await PreviewExpiries.of(client, projectId).live(
+        deployment.targets.map((target) => {
+          return target.origin;
+        }),
+      );
+      const previews = deployment.targets.map((target) => {
+        return {
+          url: target.origin,
+          expires_at: expiries.get(target.origin) ?? null,
+        };
+      });
+
+      const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
+
+      const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
+
       return {
-        url: target.origin,
-        expires_at: expiries.get(target.origin) ?? null,
+        status: "ok",
+        data: {
+          title,
+          release_id: release.id,
+          content_hash: release.content_hash,
+          deployment_id: deployment.id,
+          previews,
+          release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+        },
+        pretty: prose(
+          [
+            `Previewed ${release.content_hash} on ${previewUrls}`,
+            ...previews.map((preview) => {
+              return preview.expires_at === null
+                ? `  - ${preview.url}`
+                : `  - ${preview.url} (until ${preview.expires_at})`;
+            }),
+            `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+          ].join("\n"),
+        ),
+        summary: {
+          title,
+          sections: [],
+          lines: [
+            ...previews.map((preview) => {
+              return preview.expires_at === null
+                ? `  - ${escapeControlCharacters(preview.url)}`
+                : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
+            }),
+            `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
+          ],
+        },
       };
-    });
-
-    const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
-
-    const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
-
-    return {
-      status: "ok",
-      data: {
-        title,
-        release_id: release.id,
-        content_hash: release.content_hash,
-        deployment_id: deployment.id,
-        previews,
-        release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
-      },
-      pretty: prose(
-        [
-          `Previewed ${release.content_hash} on ${previewUrls}`,
-          ...previews.map((preview) => {
-            return preview.expires_at === null
-              ? `  - ${preview.url}`
-              : `  - ${preview.url} (until ${preview.expires_at})`;
-          }),
-          `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
-        ].join("\n"),
-      ),
-      summary: {
-        title,
-        sections: [],
-        lines: [
-          ...previews.map((preview) => {
-            return preview.expires_at === null
-              ? `  - ${escapeControlCharacters(preview.url)}`
-              : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
-          }),
-          `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
-        ],
-      },
-    };
+    } catch (error) {
+      if (error instanceof BackendReleaseContentRevokedError) {
+        throw refusalError(RELEASE_REVOKED_REFUSAL, {
+          ...error,
+          message: error.message,
+          release_id: error.releaseId,
+          content_hash: error.contentHash,
+        });
+      }
+      throw error;
+    }
   }
 
   /**

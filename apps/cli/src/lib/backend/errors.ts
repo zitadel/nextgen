@@ -91,6 +91,32 @@ export class BackendClaimChallengeNotFoundError extends BackendError {
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
 }
 
+/**
+ * The content built back to a release that was revoked: the server dedupes on
+ * content, so the same tree always builds to that release, which can never be
+ * served. A {@link BackendConflictError} like any other conflict.
+ */
+export class BackendReleaseContentRevokedError extends BackendConflictError {
+  /** The revoked release the content built back to. */
+  readonly releaseId: string;
+
+  /** The hash of the content. */
+  readonly contentHash: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, naming the release.
+   * @param releaseId - The revoked release.
+   * @param contentHash - The hash of the content.
+   */
+  constructor(message: string, releaseId: string, contentHash: string) {
+    super(message);
+    this.releaseId = releaseId;
+    this.contentHash = contentHash;
+  }
+}
+
 /** The release was revoked and can never be served: a `409` naming `rel.revoked`. */
 export class BackendReleaseRevokedError extends BackendError {
   override readonly category: ErrorCategory = "conflict";

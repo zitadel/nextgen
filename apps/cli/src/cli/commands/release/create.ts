@@ -5,6 +5,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { type Refused, reads } from "@/cli/core/flags";
+import { BackendReleaseContentRevokedError } from "@/lib/backend";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import {
   MESSAGE_MAX_LENGTH,
@@ -25,6 +26,17 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 const CONFIG_INVALID_REFUSAL = {
   message: "{message}",
   hint: "Fix the files named above and rerun; no changes were made.",
+} as const satisfies Refusal;
+
+/** How a release is refused when its content builds back to a revoked release. */
+const RELEASE_REVOKED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
+  details: {
+    release_id: "{release_id}",
+    content_hash: "{content_hash}",
+  },
 } as const satisfies Refusal;
 
 /** How a connection that holds its secret itself is refused. */
@@ -145,35 +157,47 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
   protected async apply({ flags }: Admitted<typeof ReleaseCreate>): Promise<CommandResult> {
     const { publisher, prepared, diff } = await this.prepared(false);
 
-    const release = await publisher.createRelease({
-      prepared,
-      message: flags.message,
-    });
+    try {
+      const release = await publisher.createRelease({
+        prepared,
+        message: flags.message,
+      });
 
-    const title = `Created ${escapeControlCharacters(release.id)}`;
+      const title = `Created ${escapeControlCharacters(release.id)}`;
 
-    return {
-      status: "ok",
-      data: {
-        title,
-        release_id: release.id,
-        content_hash: release.content_hash,
-        resources: prepared.resourceCount,
-      },
-      summary: {
-        title,
-        sections: [],
-        lines: diff,
-      },
-      next: {
-        commands: [
-          this.suggest({
-            id: "deployment:create",
-            flags: { release: release.id },
-          }),
-        ],
-      },
-    };
+      return {
+        status: "ok",
+        data: {
+          title,
+          release_id: release.id,
+          content_hash: release.content_hash,
+          resources: prepared.resourceCount,
+        },
+        summary: {
+          title,
+          sections: [],
+          lines: diff,
+        },
+        next: {
+          commands: [
+            this.suggest({
+              id: "deployment:create",
+              flags: { release: release.id },
+            }),
+          ],
+        },
+      };
+    } catch (error) {
+      if (error instanceof BackendReleaseContentRevokedError) {
+        throw refusalError(RELEASE_REVOKED_REFUSAL, {
+          ...error,
+          message: error.message,
+          release_id: error.releaseId,
+          content_hash: error.contentHash,
+        });
+      }
+      throw error;
+    }
   }
 
   /**

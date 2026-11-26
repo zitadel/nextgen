@@ -146,6 +146,33 @@ describe("preview", () => {
         });
       });
 
+      it("refuses content that builds back to a revoked release", async () => {
+        const app = await anAppAdmittingPreviews();
+        const first = app.envelopeOf<{ release_id: string; content_hash: string }>(
+          await app.run(["preview", "--origin", PREVIEW_URL, "--json"]),
+        ).data;
+        await app.run([
+          "release",
+          "revoke",
+          first.release_id,
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_CONFLICT",
+          hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
+          details: {
+            release_id: first.release_id,
+            content_hash: first.content_hash,
+          },
+        });
+      });
+
       it("still pins the release when it cannot read when the previews expire", async () => {
         const app = await anAppAdmittingPreviews();
         platform.cannotListPreviews();

@@ -13,7 +13,7 @@ import { z } from "zod";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
-import { BackendConflictError, BackendReleaseInUseError } from "@/lib/backend/errors";
+import { BackendReleaseContentRevokedError, BackendReleaseInUseError } from "@/lib/backend/errors";
 
 /**
  * One origin that serves a release.
@@ -130,7 +130,7 @@ export class ReleaseService extends ApiService {
    *
    * @param input - The bundle, a message and the commit it was built from.
    * @returns The release, new or the one that already carried the bundle.
-   * @throws BackendConflictError when the content matches a release that was
+   * @throws BackendReleaseContentRevokedError when the content matches a release that was
    * revoked. The server dedupes on content, so the same tree always builds back
    * to that release, and a revoked release can never be served.
    */
@@ -139,8 +139,10 @@ export class ReleaseService extends ApiService {
       project_id: this.projectId,
     });
     if (release.revoked_at) {
-      throw new BackendConflictError(
-        `This content was already released as ${release.id}, which is revoked and can never be served again; change the configuration so it builds a new release`,
+      throw new BackendReleaseContentRevokedError(
+        `This content was already released as ${release.id}, which is revoked`,
+        release.id,
+        release.content_hash,
       );
     }
     return release;

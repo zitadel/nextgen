@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { Origins } from "@/lib/backend";
+import { BackendReleaseContentRevokedError, Origins } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
 import { confirmationHint, ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -41,6 +41,17 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 const CONFIG_INVALID_REFUSAL = {
   message: "{message}",
   hint: "Fix the files named above and rerun; no changes were made.",
+} as const satisfies Refusal;
+
+/** How a deploy is refused when its content builds back to a revoked release. */
+const RELEASE_REVOKED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
+  details: {
+    release_id: "{release_id}",
+    content_hash: "{content_hash}",
+  },
 } as const satisfies Refusal;
 
 /** How a connection that holds its secret itself is refused. */
@@ -384,100 +395,112 @@ export default class Deploy extends Telemetered(
       );
     }
 
-    const { release, publication } = await publisher.deploy(
-      {
-        prepared,
-        message,
-      },
-      (stage) => {
-        this.annotate({ stage });
-      },
-    );
-    switch (publication.outcome) {
-      case "revoked": {
-        throw new ZitadelError(
-          "E_CONFLICT",
-          `This content was already released as ${release.id}, which is revoked`,
-          {
-            hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-            details: {
-              release_id: release.id,
-              content_hash: release.content_hash,
+    try {
+      const { release, publication } = await publisher.deploy(
+        {
+          prepared,
+          message,
+        },
+        (stage) => {
+          this.annotate({ stage });
+        },
+      );
+      switch (publication.outcome) {
+        case "revoked": {
+          throw new ZitadelError(
+            "E_CONFLICT",
+            `This content was already released as ${release.id}, which is revoked`,
+            {
+              hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
+              details: {
+                release_id: release.id,
+                content_hash: release.content_hash,
+              },
             },
-          },
-        );
-      }
-      case "raced": {
-        const again = await this.again("deploy", {
-          without: ["dryRun"],
-          with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
-        });
+          );
+        }
+        case "raced": {
+          const again = await this.again("deploy", {
+            without: ["dryRun"],
+            with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
+          });
 
-        throw new ZitadelError(
-          "E_CONFLICT",
-          "Another deploy changed the targets since this one was prepared",
-          {
-            hint: `Rerun ${again}; it will build and deploy against the current state.`,
-            details:
-              publication.current === undefined
-                ? undefined
-                : { current_deployment: publication.current },
-            nextCommands: [
-              this.suggest({
-                id: "deployment:list",
-                flags: { live: true },
+          throw new ZitadelError(
+            "E_CONFLICT",
+            "Another deploy changed the targets since this one was prepared",
+            {
+              hint: `Rerun ${again}; it will build and deploy against the current state.`,
+              details:
+                publication.current === undefined
+                  ? undefined
+                  : { current_deployment: publication.current },
+              nextCommands: [
+                this.suggest({
+                  id: "deployment:list",
+                  flags: { live: true },
+                }),
+              ],
+            },
+          );
+        }
+        case "deployed": {
+          break;
+        }
+      }
+      const { deployment } = publication;
+      this.annotate({
+        stage: undefined,
+        changed_configuration_types: prepared.changedConfiguration,
+      });
+
+      const servedOrigins = deployment.origins;
+      this.annotate({ origin_count: servedOrigins.length });
+
+      const title = `Deployed ${resources}`;
+      const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
+      const live =
+        servedOrigins.length > 0
+          ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
+              servedOrigins.map((origin) => {
+                return escapeControlCharacters(origin);
               }),
-            ],
-          },
-        );
+            )}.`
+          : `${released}.`;
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          release_id: release.id,
+          content_hash: release.content_hash,
+          deployment_id: deployment.id,
+          resources: resourceCount,
+          origins: servedOrigins,
+          ...prepared.report,
+        },
+        summary: {
+          title,
+          sections: [],
+          lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
+        },
+        next: {
+          commands: [
+            this.suggest({ id: "deployment:list" }),
+            ...(prepared.gitDirty ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
+          ],
+        },
+      };
+    } catch (error) {
+      if (error instanceof BackendReleaseContentRevokedError) {
+        throw refusalError(RELEASE_REVOKED_REFUSAL, {
+          ...error,
+          message: error.message,
+          release_id: error.releaseId,
+          content_hash: error.contentHash,
+        });
       }
-      case "deployed": {
-        break;
-      }
+      throw error;
     }
-    const { deployment } = publication;
-    this.annotate({
-      stage: undefined,
-      changed_configuration_types: prepared.changedConfiguration,
-    });
-
-    const servedOrigins = deployment.origins;
-    this.annotate({ origin_count: servedOrigins.length });
-
-    const title = `Deployed ${resources}`;
-    const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
-    const live =
-      servedOrigins.length > 0
-        ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
-            servedOrigins.map((origin) => {
-              return escapeControlCharacters(origin);
-            }),
-          )}.`
-        : `${released}.`;
-
-    return {
-      status: "ok",
-      data: {
-        title,
-        release_id: release.id,
-        content_hash: release.content_hash,
-        deployment_id: deployment.id,
-        resources: resourceCount,
-        origins: servedOrigins,
-        ...prepared.report,
-      },
-      summary: {
-        title,
-        sections: [],
-        lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
-      },
-      next: {
-        commands: [
-          this.suggest({ id: "deployment:list" }),
-          ...(prepared.gitDirty ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
-        ],
-      },
-    };
   }
 
   /**

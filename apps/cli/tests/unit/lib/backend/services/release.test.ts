@@ -49,8 +49,9 @@ describe("ReleaseService.create", () => {
     const releaseService = new ReleaseService(fakeClient({ buildRelease }), "proj_1");
 
     await expect(releaseService.create(INPUT)).rejects.toMatchObject({
-      name: "BackendConflictError",
-      message: expect.stringContaining("rel_1"),
+      name: "BackendReleaseContentRevokedError",
+      releaseId: "rel_1",
+      contentHash: "sha256:abc",
     });
   });
 });
