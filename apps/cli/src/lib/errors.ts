@@ -354,19 +354,28 @@ function fromBackendError(error: BackendError): ZitadelError {
   if (error instanceof BackendUnreachableError) {
     return new ZitadelError("E_NETWORK", error.message, {
       hint: "Check your connection and the server URL (ZITADEL_URL or --server).",
-      details: { url: error.url, reason: "unreachable" },
+      details: {
+        url: error.url,
+        reason: "unreachable",
+      },
     });
   }
   if (error instanceof BackendTimeoutError) {
     return new ZitadelError("E_NETWORK", error.message, {
       hint: "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
-      details: { url: error.url, reason: "timeout" },
+      details: {
+        url: error.url,
+        reason: "timeout",
+      },
     });
   }
   if (error instanceof BackendUnreadableError) {
     return new ZitadelError("E_NETWORK", error.message, {
       hint: "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
-      details: { url: error.url, reason: "unreadable" },
+      details: {
+        url: error.url,
+        reason: "unreadable",
+      },
     });
   }
   if (error.status === undefined || error.url === undefined) {
