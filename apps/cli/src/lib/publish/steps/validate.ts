@@ -1,5 +1,8 @@
 import { mapBounded } from "@/lib/map-bounded";
-import { PublishConfigInvalidError } from "@/lib/publish/errors";
+import {
+  PublishConfigInvalidError,
+  PublishConnectionSecretLiteralError,
+} from "@/lib/publish/errors";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue, type RuleId } from "@/lib/zitadel";
 
@@ -66,7 +69,8 @@ type ServerFinding = {
  * sent.
  *
  * @param findings - Every finding.
- * @throws {@link PublishConfigInvalidError} when any finding is an error.
+ * @throws {@link PublishConnectionSecretLiteralError} when a connection holds its secret itself.
+ * @throws {@link PublishConfigInvalidError} when any other finding is an error.
  */
 function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const errors = findings.filter((finding) => {
@@ -78,9 +82,14 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const lines = errors.map((finding) => {
     return `  - ${finding.file}: ${finding.message}`;
   });
-  throw new PublishConfigInvalidError(
-    `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
-  );
+  const message = `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`;
+  const literalSecret = errors.some((finding) => {
+    return finding.rule === "connection/literal-secret";
+  });
+  if (literalSecret) {
+    throw new PublishConnectionSecretLiteralError(message);
+  }
+  throw new PublishConfigInvalidError(message);
 }
 
 /**

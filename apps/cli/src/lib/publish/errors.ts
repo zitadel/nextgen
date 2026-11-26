@@ -22,12 +22,85 @@ export class PublishConfigInvalidError extends PublishError {
 }
 
 /**
+ * A connection's secret is written into its file instead of naming a variable.
+ */
+export class PublishConnectionSecretLiteralError extends PublishError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
+ * A connection's client id and client secret name one variable.
+ */
+export class PublishConnectionVariableSharedError extends PublishError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
  * A connection names a variable the project does not have.
  */
 export class PublishConnectionVariableMissingError extends PublishError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CREDENTIAL_MISSING";
+
+  /**
+   * The variable the connection names.
+   */
+  readonly variable: string;
+
+  /**
+   * Whether the connection needs it to be a secret.
+   */
+  readonly secret: boolean;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param variable - The variable the connection names.
+   * @param secret - Whether the connection needs it to be a secret.
+   */
+  constructor(message: string, variable: string, secret: boolean) {
+    super(message);
+    this.variable = variable;
+    this.secret = secret;
+  }
+}
+
+/**
+ * A connection names a variable that is a secret where it needs a plain one, or the reverse.
+ */
+export class PublishConnectionVariableKindError extends PublishError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The variable the connection names.
+   */
+  readonly variable: string;
+
+  /**
+   * Whether the connection needs it to be a secret.
+   */
+  readonly secret: boolean;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param variable - The variable the connection names.
+   * @param secret - Whether the connection needs it to be a secret.
+   */
+  constructor(message: string, variable: string, secret: boolean) {
+    super(message);
+    this.variable = variable;
+    this.secret = secret;
+  }
 }
 
 /**

@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { CommandGroups } from "@/cli/commands/groups";
+import { prepareOrRefuse } from "@/cli/commands/publish-refusals";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { type Refused, reads } from "@/cli/core/flags";
@@ -134,7 +135,7 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
    */
   private async prepared(dryRun: boolean) {
     const publisher = await this.service(Publisher);
-    const prepared = await publisher.prepare({
+    const prepared = await prepareOrRefuse(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "deploy",

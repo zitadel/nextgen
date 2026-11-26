@@ -4,6 +4,7 @@ import { z } from "zod";
 import { BackendForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
+import { prepareOrRefuse } from "@/cli/commands/publish-refusals";
 import { type Admitted, type CommandResult, CREDENTIALS, PREVIEW_CREDENTIAL } from "@/cli/core";
 import { filled, reads, type Refused } from "@/cli/core/flags";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -275,7 +276,7 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, publisher } = await this.connected(flags);
-    const prepared = await publisher.prepare({
+    const prepared = await prepareOrRefuse(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "preview",
@@ -341,7 +342,7 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, client, projectId, publisher } = await this.connected(flags);
-    const prepared = await publisher.prepare({
+    const prepared = await prepareOrRefuse(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "preview",

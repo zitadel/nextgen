@@ -15,6 +15,9 @@ export {
 export {
   PublishAssetTargetUnsafeError,
   PublishConfigInvalidError,
+  PublishConnectionSecretLiteralError,
+  PublishConnectionVariableKindError,
   PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
   PublishError,
 } from "./errors";

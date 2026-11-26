@@ -7,6 +7,7 @@ import { Origins } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
 import { confirmationHint, ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
+import { prepareOrRefuse } from "@/cli/commands/publish-refusals";
 import type { Admitted, Connection, CommandResult } from "@/cli/core";
 import { reads, type Refused } from "@/cli/core/flags";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -220,7 +221,7 @@ export default class Deploy extends Telemetered(
   protected async preview({ flags }: Admitted<typeof Deploy>): Promise<CommandResult> {
     const publisher = await this.service(Publisher);
     this.annotate({ stage: "validation" });
-    const prepared = await publisher.prepare({
+    const prepared = await prepareOrRefuse(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "deploy",
@@ -305,7 +306,7 @@ export default class Deploy extends Telemetered(
     const publisher = new Publisher(client, projectId);
     await this.requirePrimaryOrigin(publisher, projectId, environment);
     this.annotate({ stage: "validation" });
-    const prepared = await publisher.prepare({
+    const prepared = await prepareOrRefuse(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "deploy",

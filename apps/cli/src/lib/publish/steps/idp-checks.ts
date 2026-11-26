@@ -1,7 +1,8 @@
 import { BackendForbiddenError, type VariableService } from "@/lib/backend";
 import {
-  PublishConfigInvalidError,
+  PublishConnectionVariableKindError,
   PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
 } from "@/lib/publish/errors";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
 import type { Connection } from "@/lib/zitadel";
@@ -33,9 +34,10 @@ const VARIABLE_KIND = {
  *
  * @param ctx - The step's context: the connections and the variables.
  * @returns Nothing when every connection's variables are held as it needs.
- * @throws {@link PublishConfigInvalidError} When a connection's client id and secret
- *   name one variable, the client secret names a plain variable, or the client id
- *   names a secret one.
+ * @throws {@link PublishConnectionVariableSharedError} When a connection's client id and
+ *   secret name one variable.
+ * @throws {@link PublishConnectionVariableKindError} When the client secret names a
+ *   plain variable, or the client id names a secret one.
  * @throws {@link PublishConnectionVariableMissingError} When the project does not
  *   hold a variable a connection names.
  * @throws {@link BackendForbiddenError} When a deploy's token may not read the
@@ -86,9 +88,10 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  *
  * @param connection - The connection.
  * @param held - The project's variables, and whether each is a secret.
- * @throws {@link PublishConfigInvalidError} When the client id and secret name one
- *   variable, the client secret names a plain variable, or the client id names a
- *   secret one.
+ * @throws {@link PublishConnectionVariableSharedError} When the client id and secret name
+ *   one variable.
+ * @throws {@link PublishConnectionVariableKindError} When the client secret names a
+ *   plain variable, or the client id names a secret one.
  * @throws {@link PublishConnectionVariableMissingError} When a variable a connection
  *   names is not held.
  */
@@ -117,7 +120,7 @@ function checkCredentialVariables(
   const idVariable: string | undefined = id?.variable;
   const secretVariable: string | undefined = secret?.variable;
   if (idVariable !== undefined && idVariable === secretVariable) {
-    throw new PublishConfigInvalidError(
+    throw new PublishConnectionVariableSharedError(
       `${file}: client_id and client_secret both name the variable ${idVariable}`,
     );
   }
@@ -129,12 +132,16 @@ function checkCredentialVariables(
     if (isSecret === undefined) {
       throw new PublishConnectionVariableMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
+        variable,
+        wantsSecret,
       );
     }
     if (isSecret !== wantsSecret) {
       const kind = isSecret ? "a secret" : "not a secret";
-      throw new PublishConfigInvalidError(
+      throw new PublishConnectionVariableKindError(
         `${file}: ${field} names the variable ${variable}, which is ${kind}`,
+        variable,
+        wantsSecret,
       );
     }
   }
