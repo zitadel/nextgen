@@ -279,10 +279,13 @@ export abstract class ListOperation<Ctx> extends ResourceCommand {
 
       return page;
     });
-    const collected = await paging.collect(walk, { all }).catch((error: unknown) => {
+    let collected;
+    try {
+      collected = await paging.collect(walk, { all });
+    } catch (error) {
       progress?.clear();
       throw error;
-    });
+    }
     const { items, next } = collected;
     progress?.stop(
       `Fetched ${items.length} ${new Intl.PluralRules("en").select(items.length) === "one" ? resource.singular : plural}`,

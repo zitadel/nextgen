@@ -309,12 +309,13 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
    * the command is here: only {@link execute} is handed the names and types
    * its own command declared, which is why {@link admit} asserts them.
    */
-  protected parseOnce(): ReturnType<BaseCommand["parse"]> {
-    this.reading ??= this.parse(this.command).catch((error: unknown) => {
+  protected async parseOnce(): ReturnType<BaseCommand["parse"]> {
+    this.reading ??= this.parse(this.command);
+    try {
+      return await this.reading;
+    } catch (error) {
       throw asRaised(error);
-    });
-
-    return this.reading;
+    }
   }
 
   /**

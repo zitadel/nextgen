@@ -288,7 +288,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * connection is forgotten rather than kept: a credential given after the
    * first attempt was refused would otherwise never be tried.
    */
-  protected connect(options: ConnectOptions = {}): Promise<Connection> {
+  protected async connect(options: ConnectOptions = {}): Promise<Connection> {
     const key = JSON.stringify(
       Object.fromEntries(
         Object.entries(options).sort(([one], [other]) => {
@@ -300,11 +300,14 @@ export abstract class EnvironmentCommand extends BaseCommand {
     if (already !== undefined) {
       return already;
     }
-    const open = this.openConnection(options).catch((error: unknown) => {
+    const open = this.openConnection(options);
+    this.connections.set(key, open);
+    try {
+      await open;
+    } catch (error) {
       this.connections.delete(key);
       throw error;
-    });
-    this.connections.set(key, open);
+    }
 
     return open;
   }

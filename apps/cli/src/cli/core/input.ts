@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
-import { Flags, type Command, type Interfaces, Parser } from "@oclif/core";
+import { Errors, Flags, type Command, type Interfaces, Parser } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
 import { parseJsonObject, wordOf } from "@/lib/json";
@@ -294,15 +294,13 @@ export class Input {
           continue;
         }
         const value = word.includes("=") ? word.slice(word.indexOf("=") + 1) : argv[index + 1];
-        const asksForJson =
-          value !== undefined &&
-          (await Input.textOf(value)
-            .then((text) => {
-              return parseJsonObject(text, "--input").json === true;
-            })
-            .catch(() => {
-              return false;
-            }));
+        let asksForJson = false;
+        if (value !== undefined) {
+          try {
+            const text = await Input.textOf(value);
+            asksForJson = parseJsonObject(text, "--input").json === true;
+          } catch {}
+        }
 
         return asksForJson && !argv.includes("--json") ? [...argv, "--json"] : argv;
       }
@@ -312,19 +310,21 @@ export class Input {
     if (line.sources.length > 1) {
       return argv;
     }
-    const body = await Input.textOf(source).catch(() => {
-      return undefined;
-    });
+    let body: string | undefined;
+    try {
+      body = await Input.textOf(source);
+    } catch (error) {
+      if (!(error instanceof ZitadelError)) {
+        throw error;
+      }
+    }
     if (body === undefined) {
       return argv;
     }
-    const asksForJson = await Promise.resolve(body)
-      .then((text) => {
-        return parseJsonObject(text, "--input").json === true;
-      })
-      .catch(() => {
-        return false;
-      });
+    let asksForJson = false;
+    try {
+      asksForJson = parseJsonObject(body, "--input").json === true;
+    } catch {}
     const fallback = [
       ...line.kept,
       ...(asksForJson && !line.given.includes("json") ? ["--json"] : []),
@@ -521,13 +521,28 @@ export class Input {
         problem: error instanceof Error ? error.message : String(error),
       });
     };
-    const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK).catch(unreadable);
+    let handle;
     try {
-      const found = await handle.stat().catch(unreadable);
+      handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
+    } catch (error) {
+      return unreadable(error);
+    }
+    try {
+      let found;
+      try {
+        found = await handle.stat();
+      } catch (error) {
+        return unreadable(error);
+      }
       if (!found.isFile() || found.size > 8_000_000) {
         throw refusalError(NOT_A_SMALL_FILE_REFUSAL, { path });
       }
-      const content = await handle.readFile("utf8").catch(unreadable);
+      let content;
+      try {
+        content = await handle.readFile("utf8");
+      } catch (error) {
+        return unreadable(error);
+      }
 
       return content.replace(/^\uFEFF/u, "");
     } finally {
@@ -546,13 +561,18 @@ export class Input {
    * @returns What the line holds.
    */
   private async scan(argv: readonly string[]): Promise<Line> {
-    const parsed = await Parser.parse([...argv], {
-      flags: this.tokenizing,
-      args: {},
-      strict: false,
-    }).catch(() => {
-      return undefined;
-    });
+    let parsed: Interfaces.ParserOutput | undefined;
+    try {
+      parsed = await Parser.parse([...argv], {
+        flags: this.tokenizing,
+        args: {},
+        strict: false,
+      });
+    } catch (error) {
+      if (!(error instanceof Errors.CLIError)) {
+        throw error;
+      }
+    }
     if (parsed === undefined) {
       return {
         kept: [],

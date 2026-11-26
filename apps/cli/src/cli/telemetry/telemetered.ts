@@ -279,7 +279,9 @@ export function Telemetered<
      */
     protected override async finally(error: Error | undefined): Promise<void> {
       await super.finally(error);
-      await this.reportClient?.shutdown(1000).catch(() => undefined);
+      try {
+        await this.reportClient?.shutdown(1000);
+      } catch {}
       if (this.reportClient?.enabled) {
         this.armExitWatchdog();
       }

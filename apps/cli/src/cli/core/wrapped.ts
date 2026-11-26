@@ -119,21 +119,21 @@ export function Wrapped<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
       console.log = (...args: unknown[]): void => {
         written.push(format(...args));
       };
-      const returned: unknown = await real
-        .run()
-        .catch((error: unknown) => {
-          if (error instanceof ZitadelError) {
-            throw error;
-          }
+      let returned: unknown;
+      try {
+        returned = await real.run();
+      } catch (error) {
+        if (error instanceof ZitadelError) {
+          throw error;
+        }
 
-          throw refusalError(PLUGIN_REFUSED_REFUSAL, {
-            problem: error instanceof Error ? error.message : String(error),
-          });
-        })
-        .finally(() => {
-          process.stdout.write = write;
-          console.log = consoleLog;
+        throw refusalError(PLUGIN_REFUSED_REFUSAL, {
+          problem: error instanceof Error ? error.message : String(error),
         });
+      } finally {
+        process.stdout.write = write;
+        console.log = consoleLog;
+      }
       const text = written.join("\n");
       const title = escapeControlCharacters(id);
 

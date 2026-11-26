@@ -1,3 +1,4 @@
+import { PmManifestInvalidError } from "@/lib/pm";
 import { Dependencies } from "@/lib/upgrade/dependencies";
 
 import { Ui, style } from "@/lib/ui";
@@ -38,12 +39,15 @@ export async function updateNotice(input: {
   if (updateCheckDisabled(env)) {
     return undefined;
   }
-  const [release, dependencies] = await Promise.all([
-    releaseChannel(cliVersion, env).latest(),
-    Dependencies.read(cwd, ZITADEL_SCOPE).catch(() => {
-      return undefined;
-    }),
-  ]);
+  let dependencies: Dependencies | undefined;
+  try {
+    dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE);
+  } catch (error) {
+    if (!(error instanceof PmManifestInvalidError)) {
+      throw error;
+    }
+  }
+  const release = await releaseChannel(cliVersion, env).latest();
   if (release === undefined) {
     return undefined;
   }
