@@ -77,7 +77,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
    *
    * @param file - The file.
    * @returns The descriptor, marked as read.
-   * @throws {@link ZitadelConfigFileBrokenError} When the branding contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the branding contract refuses the body.
    */
   static of(file: DocumentFile): Branding {
     return Branding.build(file, "read");
@@ -89,7 +89,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The descriptor, marked as created.
-   * @throws {@link ZitadelConfigFileBrokenError} When the branding contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the branding contract refuses the body.
    */
   static create(file: DocumentFile): Branding {
     return Branding.build(file, "created");
@@ -102,7 +102,7 @@ export class Branding extends ConfigDocument<BrandingValue> {
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The descriptor.
-   * @throws {@link ZitadelConfigFileBrokenError} When the branding contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the branding contract refuses the body.
    */
   private static build(file: DocumentFile, status: DocumentStatus): Branding {
     return new Branding(file, Branding.parseFile(Branding.CONTRACT, file), status);

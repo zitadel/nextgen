@@ -44,7 +44,7 @@ export class SignupPolicy extends Policy {
    *
    * @param file - The file.
    * @returns The policy, marked as read.
-   * @throws {@link ZitadelConfigFileBrokenError} When the policy contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the policy contract refuses the body.
    */
   static override of(file: DocumentFile): SignupPolicy {
     return new SignupPolicy(file, SignupPolicy.parseFile(Policy.CONTRACT, file), "read");
@@ -56,7 +56,7 @@ export class SignupPolicy extends Policy {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The policy, marked as created.
-   * @throws {@link ZitadelConfigFileBrokenError} When the policy contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the policy contract refuses the body.
    */
   static override create(file: DocumentFile): SignupPolicy {
     return new SignupPolicy(file, SignupPolicy.parseFile(Policy.CONTRACT, file), "created");

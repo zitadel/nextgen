@@ -141,7 +141,7 @@ export class Flow extends ConfigDocument<FlowValue> {
    *
    * @param file - The file.
    * @returns The flow, marked as read.
-   * @throws {@link ZitadelConfigFileBrokenError} When the flow contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the flow contract refuses the body.
    */
   static of(file: DocumentFile): Flow {
     return Flow.build(file, "read");
@@ -152,7 +152,7 @@ export class Flow extends ConfigDocument<FlowValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The flow, marked as created.
-   * @throws {@link ZitadelConfigFileBrokenError} When the flow contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the flow contract refuses the body.
    */
   static create(file: DocumentFile): Flow {
     return Flow.build(file, "created");
@@ -165,7 +165,7 @@ export class Flow extends ConfigDocument<FlowValue> {
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The flow.
-   * @throws {@link ZitadelConfigFileBrokenError} When the flow contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the flow contract refuses the body.
    */
   private static build(file: DocumentFile, status: DocumentStatus): Flow {
     return new Flow(file, Flow.parseFile(Flow.CONTRACT, file), status);

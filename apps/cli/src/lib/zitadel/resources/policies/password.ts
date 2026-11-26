@@ -65,7 +65,7 @@ export class PasswordPolicy extends Policy {
    *
    * @param file - The file.
    * @returns The policy, marked as read.
-   * @throws {@link ZitadelConfigFileBrokenError} When the policy contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the policy contract refuses the body.
    */
   static override of(file: DocumentFile): PasswordPolicy {
     return PasswordPolicy.build(file, "read");
@@ -77,7 +77,7 @@ export class PasswordPolicy extends Policy {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The policy, marked as created.
-   * @throws {@link ZitadelConfigFileBrokenError} When the policy contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the policy contract refuses the body.
    */
   static override create(file: DocumentFile): PasswordPolicy {
     return PasswordPolicy.build(file, "created");
@@ -90,7 +90,7 @@ export class PasswordPolicy extends Policy {
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The policy.
-   * @throws {@link ZitadelConfigFileBrokenError} When the policy contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the policy contract refuses the body.
    */
   private static build(file: DocumentFile, status: DocumentStatus): PasswordPolicy {
     return new PasswordPolicy(file, PasswordPolicy.parseFile(Policy.CONTRACT, file), status);
@@ -191,7 +191,7 @@ export class PasswordPolicy extends Policy {
    * @returns The edit: the same policy when none was given or the minimum is
    *   already that one; otherwise the policy without `min_length` for "none",
    *   or with the new length.
-   * @throws {@link ZitadelConfigFileBrokenError} When the policy contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the policy contract refuses the body.
    */
   withMinLength(minLength: PasswordMinLength | undefined): Edit<PasswordPolicy> {
     const unchanged: Edit<PasswordPolicy> = { document: this, changed: false, skipped: [] };

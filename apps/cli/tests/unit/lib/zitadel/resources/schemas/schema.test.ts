@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 
-import { ZitadelConfigFileBrokenError, ZitadelConfigError, UserSchema } from "@/lib/zitadel";
+import { ZitadelConfigError, UserSchema } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
@@ -165,7 +165,7 @@ describe("UserSchema.of", () => {
       return UserSchema.of(aFile("schemas", SCHEMA_FILE, REFUSED));
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining(`${PATH}:`),
     });

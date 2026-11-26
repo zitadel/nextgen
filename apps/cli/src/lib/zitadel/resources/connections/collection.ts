@@ -169,7 +169,7 @@ export class Connections extends Collection<Connection> {
    * @throws {@link ZitadelConfigResourceClashError} When the connection would step on another one.
    * @throws {@link ZitadelConfigError} When the existing connection holds another
    *   client id, or a region the edit writes is not the shape it writes.
-   * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow would stop validating.
+   * @throws {@link ZitadelConfigError} When a flow would stop validating.
    */
   enable(
     schema: UserSchema,
@@ -225,7 +225,7 @@ export class Connections extends Collection<Connection> {
    *   connection or catalog entry has its name, such as a typo.
    * @throws {@link ZitadelConfigError} When a region the edit writes is not the
    *   shape it writes.
-   * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow would stop validating.
+   * @throws {@link ZitadelConfigError} When a flow would stop validating.
    * @throws {@link ZitadelConfigEditLockoutError} When it is the last way to sign in and
    *   `force` is not set.
    */

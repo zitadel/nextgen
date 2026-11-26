@@ -16,7 +16,7 @@
 
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
 
-import { ZitadelConfigEditBreaksFlowsError } from "@/lib/zitadel/errors";
+import { ZitadelConfigError } from "@/lib/zitadel/errors";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
@@ -97,16 +97,20 @@ export const FLOW_RULES: readonly Rule[] = [
  * An edit that changes nothing breaks nothing.
  *
  * @param edit - The edit.
- * @throws {@link ZitadelConfigEditBreaksFlowsError} When the edit breaks a flow, naming every issue.
+ * @throws {@link ZitadelConfigError} When the edit breaks a flow, naming every issue.
  */
 export function assertFlowsIntact(edit: SchemaEdit): void {
   const introduced = checkedIssues(edit);
   if (introduced.length === 0) {
     return;
   }
-  throw new ZitadelConfigEditBreaksFlowsError(
-    "A login flow would stop validating after this change:",
-    introduced,
+  throw new ZitadelConfigError(
+    [
+      "A login flow would stop validating after this change:",
+      ...introduced.map((item) => {
+        return `  - ${item.path}: ${item.issue.message}`;
+      }),
+    ].join("\n"),
   );
 }
 
@@ -121,7 +125,7 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
  *
  * @param edit - The edit that turns the method off.
  * @param method - The method.
- * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow cannot be checked, or a step still
+ * @throws {@link ZitadelConfigError} When a flow cannot be checked, or a step still
  *   uses the method, naming every step that uses it.
  */
 export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): void {
@@ -151,10 +155,48 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
     });
     return { ...use, staying };
   });
-  throw new ZitadelConfigEditBreaksFlowsError(
-    `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
-    introduced,
-    uses,
+  throw new ZitadelConfigError(
+    [
+      `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
+      ...uses.map((use) => {
+        return `  - ${use.path}: step ${JSON.stringify(use.step)} ${use.uses}\n    ${
+          use.keeps.length > 0
+            ? `Still has ${use.keeps.join(", ")}.`
+            : [
+                "Left with no field or sign-in method.",
+                ...(use.entryFor.length > 0
+                  ? [
+                      `Entry step of ${use.entryFor
+                        .map((purpose) => {
+                          return `purposes.${purpose}`;
+                        })
+                        .join(", ")}.`,
+                    ]
+                  : []),
+                ...(use.staying.length > 0
+                  ? [
+                      `Targeted by ${use.staying
+                        .map((item) => {
+                          return item.purpose === undefined
+                            ? `${item.step}.${item.transition}`
+                            : `${item.step}.${item.transition} (via purposes.${item.purpose})`;
+                        })
+                        .join(", ")}.`,
+                    ]
+                  : []),
+              ].join(" ")
+        }`;
+      }),
+      ...introduced
+        .filter((item) => {
+          return !uses.some((use) => {
+            return use.path === item.path && use.step === item.issue.step;
+          });
+        })
+        .map((item) => {
+          return `  - ${item.path}: ${item.issue.message}`;
+        }),
+    ].join("\n"),
   );
 }
 
@@ -166,7 +208,7 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
  *
  * @param edit - The edit.
  * @returns The errors it brings; none when it changes nothing.
- * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow cannot be checked.
+ * @throws {@link ZitadelConfigError} When a flow cannot be checked.
  */
 function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
   if (edit.after.changedDocuments.length === 0) {
@@ -188,9 +230,13 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
     return check.issues;
   });
   if (unchecked.length > 0) {
-    throw new ZitadelConfigEditBreaksFlowsError(
-      "A login flow has errors, so it cannot be checked against the changed schema:",
-      unchecked,
+    throw new ZitadelConfigError(
+      [
+        "A login flow has errors, so it cannot be checked against the changed schema:",
+        ...unchecked.map((item) => {
+          return `  - ${item.path}: ${item.issue.message}`;
+        }),
+      ].join("\n"),
     );
   }
   return checks.flatMap((check) => {

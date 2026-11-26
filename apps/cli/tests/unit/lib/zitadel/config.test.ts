@@ -3,10 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   BrokenFile,
-  ZitadelConfigFileBrokenError,
+  ZitadelConfigError,
   Branding,
   CONFIG_DIRECTORIES,
-  ZitadelConfigError,
   ZitadelConfigResourceClashError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
@@ -262,7 +261,7 @@ describe("ZitadelConfig.load", () => {
       return ZitadelConfig.load(store);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
   });
 
   it("names the broken file", async () => {

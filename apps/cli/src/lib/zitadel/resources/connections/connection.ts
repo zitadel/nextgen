@@ -113,7 +113,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    *
    * @param file - The file.
    * @returns The connection, marked as read.
-   * @throws {@link ZitadelConfigFileBrokenError} When the connection contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the connection contract refuses the body.
    */
   static of(file: DocumentFile): Connection {
     return Connection.build(file, "read");
@@ -125,7 +125,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The connection, marked as created.
-   * @throws {@link ZitadelConfigFileBrokenError} When the connection contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the connection contract refuses the body.
    */
   static create(file: DocumentFile): Connection {
     return Connection.build(file, "created");
@@ -138,7 +138,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The connection.
-   * @throws {@link ZitadelConfigFileBrokenError} When the connection contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the connection contract refuses the body.
    */
   private static build(file: DocumentFile, status: DocumentStatus): Connection {
     return new Connection(file, Connection.parseFile(Connection.CONTRACT, file), status);
@@ -157,7 +157,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * @param endpoints - Where the provider answers, when not at its own issuer.
    * @returns The connection, marked as created.
    * @throws {@link ZitadelConfigError} When the provider's document is not JSON.
-   * @throws {@link ZitadelConfigFileBrokenError} When the connection contract refuses the
+   * @throws {@link ZitadelConfigError} When the connection contract refuses the
    *   provider's document.
    */
   static forProvider(

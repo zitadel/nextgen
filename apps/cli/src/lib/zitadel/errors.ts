@@ -2,7 +2,6 @@ import type { ProviderSelection } from "@zitadel/config/idp";
 
 import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
-import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
@@ -37,41 +36,6 @@ export type FileProblem = {
    */
   readonly problem: string;
 };
-
-/**
- * Files that are not what their kind of file must be, such as a connection
- * missing its `protocol`.
- *
- * @remarks
- * Every broken file is named at once, so one run lists everything to fix.
- */
-export class ZitadelConfigFileBrokenError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * Make the failure for these files.
-   *
-   * @param problems - Every broken file, and what is wrong with each.
-   */
-  constructor(problems: readonly FileProblem[]) {
-    const paths = new Set(
-      problems.map((entry) => {
-        return entry.path;
-      }),
-    );
-    const lines = problems.map((entry) => {
-      return `  - ${entry.path}: ${entry.problem}`;
-    });
-    super(
-      [
-        `${paths.size} configuration ${new Intl.PluralRules("en").select(paths.size) === "one" ? "file is" : "files are"} not valid:`,
-        ...lines,
-      ].join("\n"),
-    );
-  }
-}
 
 /**
  * Two things the configuration cannot hold at once, such as two connections
@@ -304,71 +268,6 @@ export class ZitadelConfigConnectionExistsError extends ZitadelConfigError {
     super(`${path} already exists`);
     this.path = path;
     this.selection = selection;
-  }
-}
-
-/**
- * A change a login flow would no longer validate after, or that disables a
- * sign-in method login flows still use.
- */
-export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * Make the failure for these issues.
-   *
-   * @param heading - The line the listed issues follow.
-   * @param issues - Every issue, as the server's flow rules word it.
-   * @param uses - The steps that use the method being disabled, if one is.
-   */
-  constructor(heading: string, issues: readonly FlowIssue[], uses: readonly FlowMethodUse[] = []) {
-    const unexplained = issues.filter((item) => {
-      return !uses.some((use) => {
-        return use.path === item.path && use.step === item.issue.step;
-      });
-    });
-    const unexplainedLines = unexplained.map((item) => {
-      return `${item.path}: ${item.issue.message}`;
-    });
-    const lines = [...uses.map(ZitadelConfigEditBreaksFlowsError.useLine), ...unexplainedLines];
-    const listed = lines.map((line) => {
-      return `  - ${line}`;
-    });
-    super([heading, ...listed].join("\n"));
-  }
-
-  /**
-   * How a step that uses a method being disabled is listed.
-   *
-   * @remarks
-   * Only a step left with nothing says what starts on it and leads to it, since
-   * it is the one to go.
-   *
-   * @param use - The step.
-   * @returns Its line.
-   */
-  private static useLine(use: FlowMethodUse): string {
-    const at = `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}`;
-    if (use.keeps.length > 0) {
-      return `${at}\n    Still has ${use.keeps.join(", ")}.`;
-    }
-    const purposes = use.entryFor.map((purpose) => {
-      return `purposes.${purpose}`;
-    });
-    const transitions = use.staying.map((item) => {
-      if (item.purpose === undefined) {
-        return `${item.step}.${item.transition}`;
-      }
-      return `${item.step}.${item.transition} (via purposes.${item.purpose})`;
-    });
-    const entry = `Entry step of ${purposes.join(", ")}.`;
-    const targeted = `Targeted by ${transitions.join(", ")}.`;
-    const entryNotes = purposes.length > 0 ? [entry] : [];
-    const targetedNotes = transitions.length > 0 ? [targeted] : [];
-    const notes = ["Left with no field or sign-in method.", ...entryNotes, ...targetedNotes];
-    return [at, notes.join(" ")].join("\n    ");
   }
 }
 

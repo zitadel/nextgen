@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ZitadelConfigFileBrokenError, ZitadelConfigError } from "@/lib/zitadel";
+import { ZitadelConfigError } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
@@ -113,7 +113,7 @@ class Sample extends ConfigDocument<SampleValue> {
    *
    * @param file - The file.
    * @returns The sample, marked as read.
-   * @throws {@link ZitadelConfigFileBrokenError} When the contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the contract refuses the body.
    */
   static of(file: DocumentFile): Sample {
     return new Sample(file, Sample.parseFile(Sample.CONTRACT, file), "read");
@@ -124,7 +124,7 @@ class Sample extends ConfigDocument<SampleValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The sample, marked as created.
-   * @throws {@link ZitadelConfigFileBrokenError} When the contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the contract refuses the body.
    */
   static create(file: DocumentFile): Sample {
     return new Sample(file, Sample.parseFile(Sample.CONTRACT, file), "created");
@@ -146,7 +146,7 @@ class Sample extends ConfigDocument<SampleValue> {
    * @param name - The new name.
    * @returns The edited sample.
    * @throws {@link ZitadelConfigError} When `name` is not a string.
-   * @throws {@link ZitadelConfigFileBrokenError} When the contract refuses the new name.
+   * @throws {@link ZitadelConfigError} When the contract refuses the new name.
    */
   withName(name: JsonObject[string]): Sample {
     this.refuseUneditable(typeof this.value.name === "string" ? undefined : "name is not a string");
@@ -302,7 +302,7 @@ describe("ConfigDocument.parseFile", () => {
       return Sample.of(file);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining(`${PATH}:`),
     });
@@ -350,7 +350,7 @@ describe("ConfigDocument edits", () => {
       return sample.withName(true);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
   });
 
   it("hold what the contract parsed the new body to", () => {

@@ -132,7 +132,7 @@ export class Flows extends PinnedCollection<Flow> {
    *   provider no flow offers is no sign-in button at all.
    * @throws {@link ZitadelConfigError} When a region the edit writes is not the
    *   shape it writes.
-   * @throws {@link ZitadelConfigEditBreaksFlowsError} When offering the slug would leave a flow
+   * @throws {@link ZitadelConfigError} When offering the slug would leave a flow
    *   failing the server's rules, or one already fails them.
    */
   resolveForSso(schema: UserSchema, slug?: ConnectionSlug): readonly Flow[] {

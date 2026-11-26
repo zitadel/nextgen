@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelConfigEditBreaksFlowsError, type JsonObject } from "@/lib/zitadel";
+import { ZitadelConfigError, type JsonObject } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
 import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
 import {
@@ -185,7 +185,7 @@ describe("assertFlowsIntact", () => {
       assertFlowsIntact(edit);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining(`${FLOW_PATH}:`),
     });
@@ -202,7 +202,7 @@ describe("assertFlowsIntact", () => {
       assertFlowsIntact(edit);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining("A login flow would stop validating after this change:"),
     });
@@ -219,7 +219,7 @@ describe("assertFlowsIntact", () => {
       assertFlowsIntact(edit);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining(`${FLOW_PATH}:`),
     });
@@ -279,7 +279,7 @@ describe("assertFlowsIntact", () => {
       assertFlowsIntact(edit);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining(`${FLOW_PATH}:`),
     });
@@ -296,7 +296,7 @@ describe("assertFlowsIntact", () => {
       assertFlowsIntact(edit);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining(
         "A login flow has errors, so it cannot be checked against the changed schema:",
@@ -320,7 +320,7 @@ describe("assertFlowsIntact", () => {
       assertFlowsIntact(edit);
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining(`${FLOW_PATH}:`),
     });
@@ -354,7 +354,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "passkey");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           `Disabling passkey in ${SCHEMA_PATH} would break a login flow that still uses it:`,
@@ -373,7 +373,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "passkey");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.stringContaining(`${FLOW_PATH}: step "identifier"`),
       });
@@ -392,7 +392,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.not.stringContaining("Targeted by first.submit"),
       });
@@ -425,7 +425,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.stringMatching(
           /b\.json: step "second"[^\n]*\n\s+Left with no field or sign-in method\. Targeted by first\.submit\./,
@@ -440,7 +440,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.stringMatching(
           /a\.json: step "second"[^\n]*\n\s+Left with no field or sign-in method\.(\n|$)/,
@@ -474,7 +474,7 @@ describe("assertMethodUnused", () => {
       assertMethodUnused(edit, "password");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: expect.stringContaining(
         "A login flow has errors, so it cannot be checked against the changed schema:",

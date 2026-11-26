@@ -54,10 +54,8 @@ export type {
 } from "@/lib/zitadel/resources/document";
 export {
   ZitadelConfigConnectionExistsError,
-  ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigError,
-  ZitadelConfigFileBrokenError,
   ZitadelConfigFileExistsError,
   ZitadelConfigFileUnreadableError,
   ZitadelConfigInternalError,

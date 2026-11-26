@@ -1,7 +1,7 @@
 import type { ReadonlyDeep } from "type-fest";
 import type { ZodType, z } from "zod";
 
-import { ZitadelConfigFileBrokenError, ZitadelConfigError } from "@/lib/zitadel/errors";
+import { ZitadelConfigError } from "@/lib/zitadel/errors";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { Issue, RuleId, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
@@ -209,7 +209,7 @@ export type Edit<Document> = {
  * - an edit is a `with…` or `without…` method that returns an {@link Edit}
  *   holding a new document, or the same one when there is nothing to change,
  *   and throws {@link ZitadelConfigError} when it cannot be made, or
- *   {@link ZitadelConfigFileBrokenError} when the contract refuses the body it makes.
+ *   {@link ZitadelConfigError} when the contract refuses the body it makes.
  *
  * Immutable. The body is never changed in place, so a document read once can
  * be compared with what an edit made of it. The body is kept whole, including
@@ -335,7 +335,7 @@ export abstract class ConfigDocument<Value = unknown> {
    * @param contract - The kind's contract.
    * @param file - The file.
    * @returns What the contract parsed the body to.
-   * @throws {@link ZitadelConfigFileBrokenError} When the contract refuses the body,
+   * @throws {@link ZitadelConfigError} When the contract refuses the body,
    *   naming every finding its kind reports about it.
    */
   protected static parseFile<Schema extends ZodType>(
@@ -346,7 +346,30 @@ export abstract class ConfigDocument<Value = unknown> {
       return { value };
     });
     if (reading instanceof BrokenFile) {
-      throw new ZitadelConfigFileBrokenError(reading.problems);
+      throw new ZitadelConfigError(
+        [
+          `${
+            new Set(
+              reading.problems.map((entry) => {
+                return entry.path;
+              }),
+            ).size
+          } configuration ${
+            new Intl.PluralRules("en").select(
+              new Set(
+                reading.problems.map((entry) => {
+                  return entry.path;
+                }),
+              ).size,
+            ) === "one"
+              ? "file is"
+              : "files are"
+          } not valid:`,
+          ...reading.problems.map((entry) => {
+            return `  - ${entry.path}: ${entry.problem}`;
+          }),
+        ].join("\n"),
+      );
     }
     return reading.value;
   }

@@ -13,7 +13,6 @@ import { Brandings } from "@/lib/zitadel/resources/branding/collection";
 import { Connection } from "@/lib/zitadel/resources/connections/connection";
 import { Connections } from "@/lib/zitadel/resources/connections/collection";
 import {
-  ZitadelConfigFileBrokenError,
   ZitadelConfigError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
@@ -196,7 +195,7 @@ export class ZitadelConfig {
    * @param options - What is known beyond the files.
    * @returns The configuration, holding no broken file of a kind a release
    *   carries.
-   * @throws {@link ZitadelConfigFileBrokenError} Naming every file the contract rules refuse.
+   * @throws {@link ZitadelConfigError} Naming every file the contract rules refuse.
    */
   static async load(store: ConfigStore, options: ConfigOptions = {}): Promise<ZitadelConfig> {
     const config = await ZitadelConfig.loadUnchecked(store, options);
@@ -613,7 +612,7 @@ export class ZitadelConfig {
    * @param store - Where the configuration is kept, for the rules that read
    *   beside the files.
    * @returns This configuration.
-   * @throws {@link ZitadelConfigFileBrokenError} Naming every file the contract rules refuse.
+   * @throws {@link ZitadelConfigError} Naming every file the contract rules refuse.
    */
   refuseBroken(store: ConfigStore): ZitadelConfig {
     const problems = CONTRACT_RULES.flatMap((rule) => {
@@ -626,7 +625,30 @@ export class ZitadelConfig {
         return { path: issue.file, problem: issue.message };
       });
     if (problems.length > 0) {
-      throw new ZitadelConfigFileBrokenError(problems);
+      throw new ZitadelConfigError(
+        [
+          `${
+            new Set(
+              problems.map((entry) => {
+                return entry.path;
+              }),
+            ).size
+          } configuration ${
+            new Intl.PluralRules("en").select(
+              new Set(
+                problems.map((entry) => {
+                  return entry.path;
+                }),
+              ).size,
+            ) === "one"
+              ? "file is"
+              : "files are"
+          } not valid:`,
+          ...problems.map((entry) => {
+            return `  - ${entry.path}: ${entry.problem}`;
+          }),
+        ].join("\n"),
+      );
     }
     return this;
   }
