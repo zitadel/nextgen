@@ -9,7 +9,7 @@ import {
   fieldExample,
   flagsAloneMayBeIncomplete,
 } from "@/cli/core/crud/fields";
-import type { Admitted, BaseCommand } from "@/cli/core/base";
+import type { Admitted, BaseCommand, Facts } from "@/cli/core/base";
 import { Destructive } from "@/cli/core/destructive";
 import { Previewable } from "@/cli/core/previewable";
 import { resourceBody } from "@/cli/core/crud/resource-body";
@@ -204,6 +204,34 @@ abstract class WriteOperation extends Previewable(ResourceCommand) {
   protected abstract verb: "create" | "update";
 
   /**
+   * A write is the verb it is.
+   *
+   * @returns `create` or `update`.
+   */
+  protected override get action(): string {
+    return this.verb;
+  }
+
+  /**
+   * The body this run sent, once it has.
+   */
+  private written: Json | undefined;
+
+  /**
+   * What the write knows about its run from the body it sent.
+   *
+   * @returns The facts the resource's write declares, with the layers below.
+   */
+  protected override describe(): Facts {
+    return {
+      ...super.describe(),
+      ...(this.written === undefined
+        ? {}
+        : this.defined<unknown, WrittenSpec>().spec.facts?.(this.written)),
+    };
+  }
+
+  /**
    * Reads what the write would do from the command line, which a dry run and
    * the real run both start from: the body it would send, the id it names and
    * the fields it would remove.
@@ -311,6 +339,7 @@ abstract class WriteOperation extends Previewable(ResourceCommand) {
    */
   protected async commit({ body, id }: Intent): Promise<CommandResult> {
     const { topic, resource } = this.defined<unknown, WrittenSpec>();
+    this.written = body;
     const result = await this.send(await this.context<unknown>(), body, id);
     const summary: Summary =
       result === undefined

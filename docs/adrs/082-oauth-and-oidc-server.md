@@ -38,6 +38,16 @@
 > **Amendment (2026-11-13), [identity model](../design/api/identity-model.md#one-call):**
 > the web preset fills the authorization code grant only, and refresh tokens
 > are opt-in (§3), as step 2 of the recommended sequence already says.
+>
+> **Amended 2026-11-23** (§2, §7): the token endpoint refuses a
+> `code_verifier` for a request that sent no `code_challenge`, and its
+> response has no `scope` while the server grants none. §7 lists what it
+> checks before a code becomes an access token. A replayed code revokes
+> nothing, and an access token never outlives its session. A client that
+> fails to authenticate gets `401 invalid_client`, with the Basic challenge
+> only when it sent Basic credentials. The code names the deployment that
+> served its request, so a declared client authenticates against that
+> deployment's variable (zitadel/nextgen#2796).
 
 ## TL;DR
 
@@ -121,7 +131,11 @@ writes. Each path has one writer: a declared resource is read-only outside
   and the SDK and `setup --sign-in-with` always send it. OAuth 2.1 requires
   PKCE for every client; this profile does not require it for confidential
   clients, so that an existing confidential client on the OAuth 2.0 code flow
-  connects without a change. Redirect URIs match exactly; a native
+  connects without a change. A token request that sends a `code_verifier` for
+  an authorization request without a `code_challenge` is refused, so an
+  attacker cannot strip PKCE from a request
+  ([RFC 9700 §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1)).
+  Redirect URIs match exactly; a native
   application's loopback redirect may use any port (RFC 8252). Responses carry
   `iss` ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207), ADR 081 §9).
 - **Refresh tokens** rotate on every use (ADR 037). A third-party client gets
@@ -145,7 +159,9 @@ only:
   ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)) answers from step 2.
 - `openid` is not in `scopes_supported`. A standard scope the server does not
   serve yet is ignored. The token response returns the granted `scope`
-  ([RFC 6749 §3.3](https://www.rfc-editor.org/rfc/rfc6749#section-3.3)). An
+  ([RFC 6749 §3.3](https://www.rfc-editor.org/rfc/rfc6749#section-3.3)) once
+  the server grants one. Until then it grants none, and the response has no
+  `scope` member, because RFC 6749 cannot express an empty scope. An
   API's unknown scope still ends the flow with `invalid_scope` (§5, once
   protected APIs ship in step 5).
 - Step 2 signs with EdDSA only. This deviates from
@@ -340,6 +356,57 @@ ID tokens ship, since OpenID Connect Discovery requires it, and a client or
 an API may choose ES256. `sub` is
 the user's ID, and ID tokens carry `sid` so that back-channel logout can
 follow.
+
+An authorization code lives one minute and is redeemed once: a redemption
+that finds the code uses it up, whether it succeeds or is refused. The token
+endpoint issues an access token only when all of these hold, checked in this
+order:
+
+- the client that authenticated is the client the code was issued to;
+- the code has not expired;
+- `redirect_uri` is the authorization request's, as the same string;
+- the `code_verifier` matches the request's `code_challenge`, is present when
+  the request sent one, and is absent when it did not (§2);
+- the release the request was served from is not revoked;
+- the session the code was issued for is still active and belongs to the
+  code's user;
+- that user is active.
+
+The access token expires after five minutes or when the session expires,
+whichever is earlier, and `expires_in` says when. An authorization request
+that has expired gets no code.
+
+An authorization code is `<deployment_id>.<random>`: the ID of the
+deployment that served its authorization request, then 32 random bytes. The
+server stores the hash of the whole code, so a code with a changed prefix
+finds nothing. The prefix only names a deployment and is not a credential.
+It tells the token endpoint which deployment serves the client, because a
+token request comes from the client's backend and names no deployment
+otherwise. A registered client is checked against its stored secrets and
+ignores the prefix. A declared client is checked against the variable its
+`secret` names, as the deployment the code names froze it. A code that names
+no deployment, a deployment the project does not have, one whose release was
+revoked, or one that does not serve the client, is refused like an unknown
+client (zitadel/nextgen#2796).
+
+A client that fails to authenticate gets `401` with `invalid_client`, and
+an unknown client gets the same body as a wrong secret. The answer carries
+`WWW-Authenticate: Basic realm="oauth"` only when the request sent HTTP
+Basic credentials, as
+[RFC 6749 §5.2](https://www.rfc-editor.org/rfc/rfc6749#section-5.2) asks: a
+browser may open its own login dialog for the challenge.
+
+An unknown code, or a code sent to another project's token endpoint, is
+refused without being used up or recorded. The token endpoint does not read
+the project's OAuth settings: a code issued before OAuth was turned off stays
+redeemable for its minute, and revoking the release stops it.
+
+A refused redemption is recorded as `auth.request.exchange.failed` with the
+reason. A replayed code is refused and revokes nothing.
+[RFC 6749 §4.1.2](https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2) asks
+to revoke the tokens issued for a code that is used twice, when possible.
+ADR 037 stores nothing for access tokens, so there is nothing to revoke until
+refresh tokens ship.
 
 ### 8. Consent
 

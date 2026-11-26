@@ -307,7 +307,6 @@ func TestHandleSessionCookie(t *testing.T) {
 			api.ListMyProjectsOperation,
 			api.GetProjectOperation,
 			api.UpdateProjectOperation,
-			api.ListProjectAdminsOperation,
 			api.ListProjectMembersOperation,
 			// #2320: the project settings page's origin writes and variable
 			// reads, and the policy reads, which a session without a user

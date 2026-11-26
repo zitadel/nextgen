@@ -1,188 +1,217 @@
 /**
- * @file lib/jwt.ts
- *
- * # JWT Verification
- *
- * Stateless JWT verification via JWKS, with in-process key caching.
+ * Stateless JWT verification through a JWKS, with in-process key caching.
  *
  * ## Anatomy of a JWT
  *
- * A compact JWT (JWS compact serialisation) is three Base64URL-encoded parts
- * joined by dots:
+ * A compact JWT, in the JWS compact serialization, is three Base64URL-encoded parts joined by
+ * dots:
  *
  * ```
  * <header>.<payload>.<signature>
  * ```
  *
- * - **Header** — metadata about the token: signing algorithm, key ID, token type.
- * - **Payload** — the claims: user identity, expiry, issuer, audience, etc.
- * - **Signature** — `SIGN(privateKey, "<header>.<payload>")`. Any party with the
- *   matching public key can verify it without contacting the auth server.
+ * - The header holds metadata: the signing algorithm, the key id and the token type.
+ * - The payload holds the claims: the user identity, the expiry, the issuer, the audience and so
+ *   on.
+ * - The signature is `SIGN(privateKey, "<header>.<payload>")`. Any party with the matching public
+ *   key can verify it without contacting the auth server.
  *
- * A valid signature proves two things:
+ * A valid signature proves authenticity, because the holder of the private key produced the token,
+ * and integrity, because neither the header nor the payload has changed since signing. A signature
+ * alone is not enough: the claims must be checked too, for expiry, issuer and audience.
+ * {@link verifyJwt} performs both steps.
  *
- * 1. **Authenticity** — the token was produced by the holder of the private key.
- * 2. **Integrity** — neither the header nor the payload has been altered since signing.
- *
- * Signature verification alone is not sufficient. The claims inside the payload
- * must also be checked (expiry, issuer, audience, …). Both steps are performed
- * by {@link verifyJwt}.
- *
- * ---
- *
- * ## JWT Header fields
- *
- * The header is a JSON object Base64URL-encoded into the first segment.
+ * ## Header fields
  *
  * | Field | Purpose | Verified |
- * |-------|---------|---------|
- * | `alg` | Signing algorithm (`RS256`, `ES256`, …) | Checked against {@link VerifyJwtOptions.allowedAlgorithms} before JWKS is fetched |
- * | `kid` | Key ID — selects the matching public key from the JWKS | Used for key lookup; falls back to the first JWKS key when absent |
- * | `typ` | Token type (`JWT`, `at+JWT`, …) | Checked against {@link VerifyJwtOptions.allowedTokenTypes} (case-insensitive) |
- * | ~~`enc`~~ | ~~Encryption algorithm — present in JWE (encrypted) tokens only~~ | ~~Not applicable — we verify JWS (signed) tokens, not JWE (encrypted)~~ |
- * | ~~`cty`~~ | ~~Content type — describes the secured content media type~~ | ~~Not applicable — not set by standard OIDC/OAuth auth servers~~ |
+ * |-------|---------|----------|
+ * | `alg` | Signing algorithm (`RS256`, `ES256`, and so on) | Checked against {@link ZitadelVerifyJwtOptions.allowedAlgorithms} before the JWKS is fetched; `none` is always rejected |
+ * | `kid` | Key id, which selects the public key from the JWKS | Used for the key lookup; the first key of the JWKS is used when absent |
+ * | `typ` | Token type (`JWT`, `at+JWT`) | Checked against {@link ZitadelVerifyJwtOptions.allowedTokenTypes}, case-insensitively |
+ * | `enc` | Encryption algorithm, present in encrypted (JWE) tokens only | Not applicable: only signed (JWS) tokens are verified |
+ * | `cty` | Content type of the secured content | Not applicable: standard OIDC and OAuth servers do not set it |
  *
- * ---
+ * ## Payload claims
  *
- * ## JWT Payload claims
- *
- * The payload is a JSON object Base64URL-encoded into the second segment.
- *
- * ### Validated claims
+ * The claims that are validated:
  *
  * | Claim | Purpose | How |
  * |-------|---------|-----|
- * | `iss` | Issuer — the URL of the auth server that issued the token | Must be present and must equal {@link VerifyJwtOptions.issuerUrl} |
- * | `exp` | Expiration time — Unix timestamp after which the token is invalid | Must be present and in the future, allowing {@link VerifyJwtOptions.clockSkewMs} tolerance |
- * | `nbf` | Not before — Unix timestamp before which the token must not be accepted | Must be in the past, allowing {@link VerifyJwtOptions.clockSkewMs} tolerance |
- * | `iat` | Issued at — Unix timestamp when the token was created | Must not be in the future beyond {@link VerifyJwtOptions.clockSkewMs} |
- * | `aud` | Audience — the intended recipient(s) of the token | Checked against {@link VerifyJwtOptions.audience} when that option is provided |
+ * | `iss` | Issuer, the URL of the auth server that issued the token | Must be present and equal {@link ZitadelVerifyJwtOptions.issuerUrl} |
+ * | `exp` | Expiration time, a Unix timestamp | Must be present and in the future, with {@link ZitadelVerifyJwtOptions.clockSkewMs} tolerance |
+ * | `nbf` | Not before, a Unix timestamp | Must be in the past, with {@link ZitadelVerifyJwtOptions.clockSkewMs} tolerance |
+ * | `iat` | Issued at, a Unix timestamp | Must not be in the future beyond {@link ZitadelVerifyJwtOptions.clockSkewMs} |
+ * | `aud` | Audience, the intended recipients | Checked against {@link ZitadelVerifyJwtOptions.audience} when that option is set |
  *
- * ### Read-only claims (extracted into the session, not further validated)
+ * The claims that are read and not validated: `sub` (the user id), `email` and `name`.
  *
- * | Claim | Purpose |
- * |-------|---------|
- * | `sub` | Subject — the user's unique identifier |
- * | `email` | User's email address |
- * | `name` | User's display name |
- *
- * ### Not validated
- *
- * | Claim | Purpose | Why skipped |
- * |-------|---------|-------------|
- * | ~~`jti`~~ | ~~JWT ID — a unique identifier for this specific token instance~~ | ~~Revocation requires a server-side blocklist; not feasible in stateless edge middleware~~ |
- * | ~~`azp`~~ | ~~Authorized party — the OAuth 2.0 client that requested the token~~ | ~~The proxy architecture means the browser never contacts the auth server directly, making cross-origin token replay a non-threat~~ |
- * | ~~`nonce`~~ | ~~OIDC nonce — binds a token to a specific authorisation request~~ | ~~Not applicable in our password/cookie flow (no OIDC redirect round-trip)~~ |
- * | ~~`acr`~~ | ~~Authentication class reference — describes the strength of the authentication~~ | ~~Not validated (future: require MFA for sensitive routes)~~ |
- * | ~~`amr`~~ | ~~Authentication methods reference — list of methods used to authenticate~~ | ~~Not validated~~ |
- * | ~~`scope`~~ | ~~OAuth 2.0 scopes granted to the token~~ | ~~Not validated (future: per-route scope enforcement)~~ |
- *
- * ---
+ * The claims that are not validated at all: `jti`, because revocation needs a server-side
+ * blocklist that stateless edge middleware cannot hold; `azp`, because the proxy architecture means
+ * the browser never contacts the auth server directly; `nonce`, because the cookie flow has no
+ * OIDC redirect round trip; and `acr`, `amr` and `scope`, which no route enforces yet.
  *
  * ## JWKS caching
  *
- * Each issuer's whole JWKS document is cached in-process, keyed by its JWKS URI,
- * for {@link JWKS_TTL_MS} milliseconds (default 5 minutes); keys are imported
- * once and reused. Keying by the URI keeps two issuers that publish the same
- * `kid` apart.
+ * The whole JWKS document of each issuer is cached in-process, keyed by its JWKS URI, for
+ * {@link JWKS_TTL_MS} milliseconds. The keys are imported once and reused. Keying by the URI keeps
+ * two issuers that publish the same `kid` apart.
  *
- * The document is fetched from `{issuerUrl}/auth/keys` on first use and after
- * the TTL. A token naming a `kid` the cached document lacks refreshes it — how
- * a rotated key is picked up — but no sooner than {@link JWKS_MIN_REFRESH_MS}
- * after the last fetch. The `kid` header is attacker-controlled, so a per-`kid`
- * cache would let any request with a made-up `kid` cost a JWKS fetch.
+ * The document is fetched from `{issuerUrl}/auth/keys` on first use and after the time to live
+ * ends. A token that names a `kid` the cached document lacks refreshes it, which is how a rotated
+ * key is picked up, but no sooner than {@link JWKS_MIN_REFRESH_MS} after the last fetch. The `kid`
+ * header is attacker-controlled, so a cache per `kid` would let any request with a made-up `kid`
+ * cost a JWKS fetch.
  *
- * > **Note (serverless):** the cache is module-level. In serverless environments
- * > each cold start gets a fresh cache; warm instances share it across requests.
+ * The cache is module-level. In serverless environments each cold start gets a fresh cache, and
+ * warm instances share it across requests.
  *
- * ---
+ * ## Runtimes
  *
- * ## Runtime note
+ * This module is the shared implementation for the edge runtime and for Node.js. It uses the Web
+ * Crypto API, `fetch` and `atob`, so it needs no Node-only dependency.
  *
- * This file is the **shared implementation** used by both `sdk-next` (Edge
- * runtime) and `sdk-nuxt` (Node.js/Nitro). `base64UrlDecode` uses `atob`,
- * which is available in both environments (Edge natively; Node.js since v16).
- * The previous per-SDK copies (one using `atob`, one using `Buffer`) have
- * been consolidated here.
+ * @packageDocumentation
  */
 
 import { joinURL, withoutTrailingSlash } from "ufo";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-/** How long a cached JWKS document is considered fresh before re-fetching. */
+/**
+ * The number of milliseconds a cached JWKS document is considered fresh before it is fetched again.
+ *
+ * The value is five minutes. It bounds how long a key that the issuer removed or that was
+ * compromised keeps verifying, even when the JWKS endpoint is down: an expired document is never
+ * used. Call {@link clearJwksCache} to drop a key sooner.
+ *
+ * @defaultValue 300000
+ */
 export const JWKS_TTL_MS = 5 * 60 * 1_000;
 
 /**
- * The least time between two JWKS fetches for one issuer. A token naming a
- * `kid` the cached document lacks triggers a refresh — that is how a rotated
- * key is picked up — but at most this often, so a stream of tokens with random
- * `kid` values cannot turn every request into a JWKS fetch.
+ * The least number of milliseconds between two JWKS fetches for one issuer.
+ *
+ * A token that names a `kid` the cached document lacks triggers a refresh, which is how a rotated
+ * key is picked up. The refresh happens at most this often, so a stream of tokens with random
+ * `kid` values cannot turn every request into a JWKS fetch. A failed fetch counts too, so a
+ * failing endpoint is not retried on every request.
+ *
+ * @defaultValue 30000
  */
 export const JWKS_MIN_REFRESH_MS = 30 * 1_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /**
- * The subset of standard JWT payload claims this module reads or validates.
+ * The subset of standard JWT payload claims that this module reads or validates.
  *
- * All fields are `readonly`. Additional custom claims are preserved under
- * the index signature and accessible via `payload["my-claim"]`.
+ * Every field is `readonly`. Custom claims are preserved under the index signature and reachable
+ * as `payload["my-claim"]`, with the type `unknown`. The module documentation lists which claims
+ * are validated.
  *
- * Refer to the module-level documentation for the full verification matrix.
+ * @example
+ * ```ts
+ * const payload = await verifyJwt(token, options);
+ * const userId = payload?.sub;
+ * ```
  */
-export interface JwtPayload {
-  /** Issuer (`iss`) — identifies the auth server that created the token. */
+export interface ZitadelJwtPayload {
+  /**
+   * The issuer (`iss`), which identifies the auth server that created the token.
+   *
+   * Verification requires it to equal the configured issuer URL.
+   */
   readonly iss?: string;
-  /** Subject (`sub`) — the user's unique identifier. */
+  /**
+   * The subject (`sub`), which is the unique identifier of the user.
+   */
   readonly sub?: string;
   /**
-   * Audience (`aud`) — the intended recipient(s).
-   * A single string or an array of strings per RFC 7519 §4.1.3.
+   * The audience (`aud`), which names the intended recipients.
+   *
+   * It is a single string or an array of strings, as RFC 7519 allows. For a Zitadel token it
+   * carries the project ids that the token was issued for.
    */
   readonly aud?: string | readonly string[];
-  /** Expiration time (`exp`) — seconds since Unix epoch. */
+  /**
+   * The expiration time (`exp`), in seconds since the Unix epoch.
+   *
+   * Verification rejects a token without it.
+   */
   readonly exp?: number;
-  /** Not before (`nbf`) — seconds since Unix epoch. */
+  /**
+   * The not-before time (`nbf`), in seconds since the Unix epoch.
+   */
   readonly nbf?: number;
-  /** Issued at (`iat`) — seconds since Unix epoch. */
+  /**
+   * The issued-at time (`iat`), in seconds since the Unix epoch.
+   */
   readonly iat?: number;
-  /** User's email address (custom claim). */
+  /**
+   * The email address of the user, a custom claim.
+   *
+   * The session uses it as the login identifier of a JWT-based sign-in.
+   */
   readonly email?: string;
-  /** User's display name (custom claim). */
+  /**
+   * The display name of the user, a custom claim.
+   */
   readonly name?: string;
+  /**
+   * Any other claim, with the type `unknown`.
+   */
   readonly [key: string]: unknown;
 }
 
 /**
  * The typed representation of a JWT header.
  *
- * The three fields below are the only ones this library reads. Additional
- * header parameters are preserved under the index signature.
+ * The three fields below are the only ones that this module reads. Other header parameters are
+ * preserved under the index signature.
  */
-export interface JwtHeader {
-  /** Signing algorithm (`alg`) — e.g. `"RS256"`, `"ES256"`. */
+export interface ZitadelJwtHeader {
+  /**
+   * The signing algorithm (`alg`), for example `"RS256"` or `"ES256"`.
+   *
+   * Verification rejects a token without it, and always rejects `none`.
+   */
   readonly alg?: string;
-  /** Token type (`typ`) — e.g. `"JWT"`, `"at+JWT"`. */
+  /**
+   * The token type (`typ`), for example `"JWT"` or `"at+JWT"`.
+   */
   readonly typ?: string;
-  /** Key ID (`kid`) — selects the matching public key from the JWKS. */
+  /**
+   * The key id (`kid`), which selects the matching public key from the JWKS.
+   *
+   * When it is absent, verification uses the first key of the JWKS.
+   */
   readonly kid?: string;
+  /**
+   * Any other header parameter, with the type `unknown`.
+   */
   readonly [key: string]: unknown;
 }
 
 /**
- * The decoded, unverified parts of a compact-serialised JWT.
+ * The decoded and unverified parts of a compact JWT.
  *
- * **Do not act on these values before signature verification.**
- * This type is returned by {@link decodeJwt} purely to carry the
- * raw data into the next step.
+ * Do not act on these values before signature verification: anyone can craft a token with any
+ * claims. {@link decodeJwt} returns this type only to carry the raw data into the next step.
  */
-export interface DecodedJwt {
-  readonly header: JwtHeader;
-  readonly payload: JwtPayload;
+export interface ZitadelDecodedJwt {
+  /**
+   * The protected header: the algorithm, the key id and the token type that the token claims.
+   */
+  readonly header: ZitadelJwtHeader;
+  /**
+   * The claims.
+   *
+   * They are unverified, so never trust them until {@link verifyJwt} accepts the token.
+   */
+  readonly payload: ZitadelJwtPayload;
 }
 
-/** A public key as published in a JWKS document. */
+/**
+ * A public key as published in a JWKS document.
+ */
 type Jwk = JsonWebKey & { readonly kid?: string; readonly alg?: string };
 
 /**
@@ -191,97 +220,152 @@ type Jwk = JsonWebKey & { readonly kid?: string; readonly alg?: string };
  * the cache instead of costing a JWKS fetch.
  */
 interface JwksCacheEntry {
+  /**
+   * The keys of the document.
+   */
   readonly keys: readonly Jwk[];
+  /**
+   * The time of the fetch, in milliseconds since the Unix epoch.
+   */
   readonly fetchedAt: number;
-  /** Imported keys, by `kid` and algorithm, so each is imported once. */
+  /**
+   * The imported keys, by `kid` and algorithm, so that each is imported once.
+   */
   readonly imported: Map<string, CryptoKey>;
 }
 
 /**
- * Options for {@link verifyJwt}.
+ * The options of {@link verifyJwt}.
  *
- * All fields are `readonly` — this object is never mutated after construction.
+ * Every field is `readonly`: the object is never changed after construction. The middleware layer
+ * fills the defaults of the optional fields before it passes the options here, so a direct caller
+ * decides each field itself.
+ *
+ * @example
+ * ```ts
+ * const options: ZitadelVerifyJwtOptions = {
+ *   issuerUrl: "https://auth.example.com",
+ *   allowedAlgorithms: ["RS256", "ES256"],
+ *   clockSkewMs: 5000,
+ *   allowedTokenTypes: ["JWT", "at+JWT"],
+ * };
+ * ```
  */
-export interface VerifyJwtOptions {
+export interface ZitadelVerifyJwtOptions {
   /**
-   * Base URL of the auth backend.
+   * The base URL of the auth backend.
    *
-   * Serves two purposes:
-   * 1. Determines the JWKS endpoint: `{issuerUrl}/auth/keys`
-   * 2. Is compared against the `iss` claim when present in the token.
+   * It serves two purposes. It determines the JWKS endpoint, `{issuerUrl}/auth/keys`, and it is
+   * compared with the `iss` claim of the token. The comparison is strict: a trailing slash on the
+   * configured address is ignored, but a difference in case or whitespace rejects the token,
+   * because it is either a misconfiguration or a token from another server.
+   *
+   * @example "https://auth.example.com"
    */
   readonly issuerUrl: string;
 
   /**
-   * Restrict accepted `alg` header values. Tokens whose algorithm is not in
-   * this list are rejected before the JWKS is fetched.
-   * When `undefined`, all algorithms are accepted (the middleware layer
-   * defaults to `["RS256", "ES256"]` before passing options here).
+   * The accepted values of the `alg` header.
+   *
+   * A token whose algorithm is not in the list is rejected before the JWKS is fetched. When it is
+   * unset or empty, every supported algorithm is accepted, but the `none` algorithm is rejected in
+   * all cases. The supported algorithms are `RS256`, `RS384`, `RS512`, `ES256`, `ES384` and
+   * `ES512`. The middleware layer defaults to `["RS256", "ES256"]` before it passes the options
+   * here.
+   *
+   * @example ["RS256", "ES256"]
    */
   readonly allowedAlgorithms?: readonly string[];
 
   /**
-   * Clock-skew tolerance in milliseconds, applied symmetrically to `exp`,
-   * `nbf`, and `iat` checks to accommodate minor differences between clocks.
+   * The clock-skew tolerance in milliseconds.
+   *
+   * It applies to the `exp`, `nbf` and `iat` checks, so a small difference between the clock of the
+   * issuer and the clock of the verifier does not reject a valid token. A larger value accepts an
+   * expired token for longer.
+   *
+   * @example 5000
    */
   readonly clockSkewMs: number;
 
   /**
-   * Expected `aud` claim value(s). When `undefined`, audience is not
-   * validated. Provide a string or array when the auth server sets `aud`
-   * and you want to ensure the token was issued specifically for your app.
+   * The expected value or values of the `aud` claim.
+   *
+   * The token passes when its audience contains at least one of them. When it is unset, the
+   * audience is not validated here. Set it to make sure that the token was issued for your app and
+   * not for another one on the same issuer.
+   *
+   * @example "296547382910273"
    */
   readonly audience?: string | readonly string[];
 
   /**
-   * Accepted `typ` header values (case-insensitive).
+   * The accepted values of the `typ` header, compared case-insensitively.
    *
-   * Guards against using a refresh token or ID token where an access token
-   * is expected. Set to an empty array (`[]`) to disable this check.
+   * It guards against the use of another kind of token where an access token is expected. Set it to
+   * an empty array to disable the check. A token without a `typ` header counts as an empty string,
+   * so it passes only when the check is disabled.
    *
-   * @default ["JWT", "at+JWT"]
+   * @defaultValue ["JWT", "at+JWT"]
    */
   readonly allowedTokenTypes: readonly string[];
 
   /**
-   * Timeout in milliseconds for JWKS endpoint requests.
-   * Requests that do not complete within this window are aborted and the
-   * token is rejected (function returns `null`).
-   * @default 5000
+   * The timeout of a JWKS request, in milliseconds.
+   *
+   * A request that does not complete within the window is aborted, and the token is rejected: the
+   * verification returns `null`, so the request counts as signed out.
+   *
+   * @defaultValue 5000
    */
   readonly jwksTimeoutMs?: number;
 }
 
-// ─── JWKS cache ───────────────────────────────────────────────────────────────
-
 /**
- * In-memory JWKS cache: one document per JWKS URI. Keying by the full URI keeps
- * two issuers that publish the same `kid` apart. It holds one entry per issuer
- * the process verifies against, each with the keys that issuer published, so it
- * cannot be grown by the `kid` values tokens claim.
+ * The in-memory JWKS cache, with one document per JWKS URI.
+ *
+ * Keying by the full URI keeps two issuers that publish the same `kid` apart. It holds one entry
+ * per issuer that the process verifies against, each with the keys that the issuer published, so
+ * the `kid` values that tokens claim cannot grow it.
  */
 const jwksCache = new Map<string, JwksCacheEntry>();
 
-/** In-flight JWKS fetches by URI, so concurrent misses share one request. */
+/**
+ * The JWKS fetches in flight, by URI, so that concurrent misses share one request.
+ */
 const jwksInFlight = new Map<string, Promise<JwksCacheEntry | null>>();
 
 /**
- * When each URI was last fetched, successfully or not. The refresh throttle
- * counts from here, not from the last document, so a failing endpoint is not
- * retried on every request.
+ * The time each URI was last fetched, successfully or not.
+ *
+ * The refresh throttle counts from here and not from the last document, so a failing endpoint is
+ * not retried on every request.
  */
 const jwksAttemptedAt = new Map<string, number>();
 
 /**
- * Bumped by {@link clearJwksCache}. A fetch that started before a clear must not
- * write its answer into the cache or the in-flight table afterwards.
+ * The counter that {@link clearJwksCache} bumps.
+ *
+ * A fetch that started before a clear must not write its answer into the cache or the in-flight
+ * table afterwards.
  */
 let jwksGeneration = 0;
 
 /**
- * Forgets every cached JWKS document, so the next verification fetches the key
- * set anew. Use it to drop a compromised key at once instead of waiting out
- * {@link JWKS_TTL_MS}, and in tests that publish different keys per case.
+ * Forgets every cached JWKS document, so that the next verification fetches the key set anew.
+ *
+ * Use it to drop a compromised key at once instead of waiting out {@link JWKS_TTL_MS}, and in
+ * tests that publish different keys per case. A fetch that was already running when it is called
+ * does not write its answer into the cache.
+ *
+ * @example
+ * ```ts
+ * import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+ *
+ * afterEach(() => {
+ *   clearJwksCache();
+ * });
+ * ```
  */
 export function clearJwksCache(): void {
   jwksGeneration++;
@@ -293,16 +377,20 @@ export function clearJwksCache(): void {
 const DECODER = new TextDecoder();
 const ENCODER = new TextEncoder();
 
-// ─── Base64URL ────────────────────────────────────────────────────────────────
-
 /**
- * Decodes a Base64URL-encoded string into a `Uint8Array`.
+ * Decodes a Base64URL-encoded string into bytes.
  *
- * The Edge runtime has no `Buffer`, so this uses `atob` after translating the
- * Base64URL alphabet (`-` → `+`, `_` → `/`) and padding to a multiple of four.
+ * The edge runtime has no `Buffer`, so the function uses `atob` after it translates the Base64URL
+ * alphabet, `-` to `+` and `_` to `/`, and pads the input to a multiple of four.
  *
- * @param input - A Base64URL-encoded string (padding is optional).
+ * @param input - A Base64URL-encoded string. The padding is optional.
  * @returns The decoded bytes.
+ * @throws {DOMException} When the input is not valid Base64.
+ *
+ * @example
+ * ```ts
+ * new TextDecoder().decode(base64UrlDecode("aGVsbG8")); // "hello"
+ * ```
  */
 export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
   const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -311,15 +399,12 @@ export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
 
-// ─── JWT splitting ────────────────────────────────────────────────────────────
-
 /**
- * Splits a compact JWT string into its three raw Base64URL segments without
- * decoding or verifying any of them.
+ * Splits a compact JWT string into its three raw Base64URL segments without decoding or verifying
+ * any of them.
  *
- * Tokens with more than three segments (e.g. nested JWTs) are accepted; only
- * the first three parts are returned. Tokens with fewer than three segments are
- * structurally invalid compact JWTs and cannot be verified.
+ * A token with more than three segments is accepted, and only the first three parts are returned.
+ * A token with fewer than three segments is not a valid compact JWT and cannot be verified.
  *
  * @param token - The compact JWT string.
  * @returns A `[header, payload, signature]` tuple, or `null` when the token
@@ -333,21 +418,27 @@ function splitToken(token: string): readonly [string, string, string] | null {
   return [h, p, s] as const;
 }
 
-// ─── JWT decode ───────────────────────────────────────────────────────────────
-
 /**
- * Decodes a compact-serialised JWT into its header and payload **without**
- * verifying the signature.
+ * Decodes a compact JWT into its header and payload without verifying the signature.
  *
- * **Do not trust the result of this function alone.** Use it only as the first
- * step of a full verification pipeline — the signature check in {@link verifyJwt}
- * must follow before any claim can be trusted.
+ * Do not trust the result alone. Use it only as the first step of a full verification pipeline,
+ * and use {@link verifyJwt} before any claim is trusted. A legitimate use of the unverified result
+ * is to read the `kid` or the `alg` to route the token.
  *
- * @param token - A compact JWT string (`header.payload.signature`).
- * @returns The decoded {@link DecodedJwt}.
- * @throws {TypeError} When `token` has fewer than three dot-separated segments.
+ * @param token - A compact JWT string, `header.payload.signature`.
+ * @returns The decoded header and payload.
+ * @throws {TypeError} When the token has fewer than three dot-separated segments.
+ * @throws {SyntaxError} When the header or the payload is not valid JSON.
+ *
+ * @example
+ * ```ts
+ * import { decodeJwt } from "@zitadel/sdk-core/jwt";
+ *
+ * const { header } = decodeJwt(token);
+ * console.log(header.kid);
+ * ```
  */
-export function decodeJwt(token: string): DecodedJwt {
+export function decodeJwt(token: string): ZitadelDecodedJwt {
   const segments = splitToken(token);
   if (!segments) {
     throw new TypeError(
@@ -356,33 +447,39 @@ export function decodeJwt(token: string): DecodedJwt {
   }
   const [h, p] = segments;
   return {
-    header: JSON.parse(DECODER.decode(base64UrlDecode(h))) as JwtHeader,
-    payload: JSON.parse(DECODER.decode(base64UrlDecode(p))) as JwtPayload,
+    header: JSON.parse(DECODER.decode(base64UrlDecode(h))) as ZitadelJwtHeader,
+    payload: JSON.parse(DECODER.decode(base64UrlDecode(p))) as ZitadelJwtPayload,
   };
 }
 
-// ─── JWT shape detection ──────────────────────────────────────────────────────
-
 /**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
- * NOT an encrypted token (JWE).
+ * Returns whether a token looks structurally like a signed JWT, and not like an encrypted token.
  *
- * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
- * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
+ * A signed (JWS) compact token has three dot-separated segments, and its header has `alg` but not
+ * `enc`. An encrypted (JWE) compact token has five segments, and its header has both. The Zitadel
+ * backend issues encrypted tokens, whose compact form is `header.encrypted_key.iv.ciphertext.tag`
+ * and whose header names `A256GCMKW` and `A256GCM`. Checking for the absence of `enc` identifies
+ * signed JWTs without a false positive on those tokens.
  *
- * The Zitadel backend issues JWE tokens (AES-256-GCM via go-jose
- * `A256GCMKW/A256GCM`), whose compact form is
- * `header.encrypted_key.iv.ciphertext.tag`. The header decodes to JSON with
- * `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the absence of `enc`
- * correctly identifies signed JWTs without false-positives on JWE tokens.
+ * The check is structural and not a security check. Use it to route a token to the right
+ * validation path, {@link verifyJwt} for a signed token and a lookup at the backend for everything
+ * else. Never use it to trust a token. Any failure to parse the header gives `false`.
  *
- * This is a structural check only — not a security check. Use it to route a
- * token to the correct validation path ({@link verifyJwt} for JWS, a backend
- * session lookup for everything else), never to trust one.
+ * @param token - The token to inspect.
+ * @returns `true` when the token has at least three segments and a header with `alg` and no `enc`.
+ *
+ * @example
+ * ```ts
+ * import { isJwtShaped, verifyJwt } from "@zitadel/sdk-core/jwt";
+ *
+ * const payload = isJwtShaped(token) ? await verifyJwt(token, options) : null;
+ * ```
  */
 export function isJwtShaped(token: string): boolean {
   const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
+  if (parts.length < 3 || !parts[0]) {
+    return false;
+  }
   try {
     const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
     return typeof header?.alg === "string" && !("enc" in header);
@@ -391,12 +488,11 @@ export function isJwtShaped(token: string): boolean {
   }
 }
 
-// ─── Algorithm helpers ────────────────────────────────────────────────────────
-
 /**
- * Web Crypto parameters for importing a public key from JWKS, keyed by JWT
- * `alg` header value. The keys of this object are the only supported algorithms;
- * anything not present throws {@link TypeError}.
+ * The Web Crypto parameters for importing a public key from a JWKS, keyed by the `alg` header
+ * value.
+ *
+ * The keys of this object are the only supported algorithms. Anything else is not accepted.
  */
 const IMPORT_PARAMS = {
   RS256: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
@@ -408,8 +504,7 @@ const IMPORT_PARAMS = {
 } satisfies Record<string, RsaHashedImportParams | EcKeyImportParams>;
 
 /**
- * Web Crypto parameters for verifying a JWT signature, keyed by JWT `alg`
- * header value.
+ * The Web Crypto parameters for verifying a JWT signature, keyed by the `alg` header value.
  */
 const VERIFY_PARAMS = {
   RS256: { name: "RSASSA-PKCS1-v1_5" },
@@ -420,6 +515,12 @@ const VERIFY_PARAMS = {
   ES512: { name: "ECDSA", hash: "SHA-512" },
 } satisfies Record<string, EcdsaParams | Algorithm>;
 
+/**
+ * Asserts that an algorithm is supported.
+ *
+ * @param alg - The `alg` header value.
+ * @throws {TypeError} When the algorithm is not supported.
+ */
 function assertSupportedAlgorithm(alg: string): asserts alg is keyof typeof IMPORT_PARAMS {
   if (!Object.hasOwn(IMPORT_PARAMS, alg)) {
     throw new TypeError(
@@ -428,7 +529,9 @@ function assertSupportedAlgorithm(alg: string): asserts alg is keyof typeof IMPO
   }
 }
 
-/** The JWT `alg` an EC key's curve signs with (RFC 7518 §3.4). */
+/**
+ * The JWT `alg` that the curve of an elliptic-curve key signs with, as RFC 7518 defines.
+ */
 const CURVE_ALGORITHMS: Readonly<Record<string, string>> = {
   "P-256": "ES256",
   "P-384": "ES384",
@@ -458,14 +561,25 @@ function importParams(jwk: Jwk, alg: string): RsaHashedImportParams | EcKeyImpor
   return fits ? IMPORT_PARAMS[alg as keyof typeof IMPORT_PARAMS] : null;
 }
 
+/**
+ * Returns the Web Crypto verification parameters for an algorithm.
+ *
+ * @param alg - The `alg` header value.
+ * @returns The parameters.
+ * @throws {TypeError} When the algorithm is not supported.
+ */
 function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
   assertSupportedAlgorithm(alg);
   return VERIFY_PARAMS[alg];
 }
 
-// ─── JWKS fetch ───────────────────────────────────────────────────────────────
-
-/** Resolves to `null` if `promise` has not settled within `timeoutMs`. */
+/**
+ * Resolves to `null` when a promise has not settled within the timeout.
+ *
+ * @param promise - The promise to wait for.
+ * @param timeoutMs - The timeout in milliseconds.
+ * @returns The value of the promise, or `null` after the timeout.
+ */
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<null>((resolve) => {
@@ -528,7 +642,13 @@ function refreshJwks(jwksUri: string, timeoutMs: number): Promise<JwksCacheEntry
   return request;
 }
 
-/** The key a token names: the one with its `kid`, or the first without one. */
+/**
+ * Returns the key that a token names: the one with its `kid`, or the first key when it has none.
+ *
+ * @param entry - The cached document.
+ * @param kid - The `kid` header value, or `undefined`.
+ * @returns The key, or `undefined` when none fits.
+ */
 function findKey(entry: JwksCacheEntry, kid: string | undefined): Jwk | undefined {
   return kid === undefined ? entry.keys[0] : entry.keys.find((key) => key.kid === kid);
 }
@@ -544,9 +664,11 @@ function findKey(entry: JwksCacheEntry, kid: string | undefined): Jwk | undefine
  * when its refresh fails. Returns `null` when no key fits: the endpoint failed,
  * no key has that `kid`, or the key cannot verify `alg`.
  *
- * @param jwksUri - Full URL of the JWKS endpoint.
- * @param kid     - The `kid` header value from the JWT, or `undefined`.
- * @param alg     - The token's (already allowlisted) `alg` header value.
+ * @param jwksUri - The full URL of the JWKS endpoint.
+ * @param kid - The `kid` header value from the JWT, or `undefined`.
+ * @param alg - The `alg` header value of the token, already checked against the allow list.
+ * @param timeoutMs - The timeout of a JWKS request, in milliseconds.
+ * @returns The imported key, or `null` when no key fits.
  */
 async function resolveJwk(
   jwksUri: string,
@@ -592,33 +714,54 @@ async function resolveJwk(
   return cryptoKey;
 }
 
-// ─── Verification ─────────────────────────────────────────────────────────────
-
 /**
- * Verifies a compact-serialised JWT and returns its validated payload.
+ * Verifies a compact JWT and returns its validated payload.
  *
- * ## Verification steps (in order)
+ * The steps run in this order:
  *
- * 1. Split the token — returns `null` immediately when fewer than three
- *    dot-separated segments are present.
- * 2. Reject if `alg` is not in {@link VerifyJwtOptions.allowedAlgorithms} (when set).
- * 3. Reject if `typ` is not in {@link VerifyJwtOptions.allowedTokenTypes} (when non-empty).
- * 4. Fetch (or retrieve from cache) the matching public key from the JWKS endpoint.
- * 5. Verify the cryptographic signature over `header.payload`.
- * 6. Reject if `iss` is absent or does not equal {@link VerifyJwtOptions.issuerUrl}.
- * 7. Reject if {@link VerifyJwtOptions.audience} is set and `aud` does not contain it.
- * 8. Reject if `exp` is absent or is in the past (minus clock-skew tolerance).
- * 9. Reject if `nbf` is in the future (plus clock-skew tolerance).
- * 10. Reject if `iat` is in the future (plus clock-skew tolerance).
+ * 1. Split the token. It returns `null` at once when fewer than three dot-separated segments are
+ *    present.
+ * 2. Reject the token when `alg` is missing, is `none` in any casing, or is not in
+ *    {@link ZitadelVerifyJwtOptions.allowedAlgorithms} when that list is set.
+ * 3. Reject the token when `typ` is not in {@link ZitadelVerifyJwtOptions.allowedTokenTypes} when that
+ *    list is not empty.
+ * 4. Fetch the matching public key from the JWKS endpoint, or take it from the cache.
+ * 5. Verify the signature over `header.payload`.
+ * 6. Reject the token when `iss` is absent or does not equal {@link ZitadelVerifyJwtOptions.issuerUrl}.
+ * 7. Reject the token when {@link ZitadelVerifyJwtOptions.audience} is set and `aud` contains none of
+ *    its values.
+ * 8. Reject the token when `exp` is absent or in the past, allowing the clock skew.
+ * 9. Reject the token when `nbf` is in the future, allowing the clock skew.
+ * 10. Reject the token when `iat` is in the future, allowing the clock skew.
  *
- * Returns `null` on any failure rather than throwing, so callers can treat a
- * bad token identically to a missing one without try/catch at the call site.
+ * The function returns `null` on any failure instead of throwing, so a caller treats a bad token
+ * the same as a missing one without a try block. A token that is not JSON, such as an opaque
+ * session token, returns `null` without a log. An unexpected failure, such as a network error, a
+ * malformed JWKS or a Web Crypto error, also returns `null` but is logged to the console, so an
+ * operator can tell an infrastructure problem from a bad token.
  *
- * @param token - The raw compact-serialised JWT string.
- * @param opts  - Verification options; see {@link VerifyJwtOptions}.
- * @returns The verified {@link JwtPayload}, or `null` if verification fails.
+ * @param token - The raw compact JWT string.
+ * @param opts - The verification options.
+ * @returns The verified payload, or `null` when verification fails.
+ *
+ * @example
+ * ```ts
+ * import { verifyJwt } from "@zitadel/sdk-core/jwt";
+ *
+ * const payload = await verifyJwt(token, {
+ *   issuerUrl: "https://auth.example.com",
+ *   clockSkewMs: 5000,
+ *   allowedTokenTypes: ["JWT", "at+JWT"],
+ * });
+ * if (payload) {
+ *   console.log(payload.sub);
+ * }
+ * ```
  */
-export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<JwtPayload | null> {
+export async function verifyJwt(
+  token: string,
+  opts: ZitadelVerifyJwtOptions,
+): Promise<ZitadelJwtPayload | null> {
   try {
     const {
       issuerUrl,
@@ -635,8 +778,8 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     }
     const [rawHeader, rawPayload, rawSig] = segments;
 
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(rawHeader))) as JwtHeader;
-    const payload = JSON.parse(DECODER.decode(base64UrlDecode(rawPayload))) as JwtPayload;
+    const header = JSON.parse(DECODER.decode(base64UrlDecode(rawHeader))) as ZitadelJwtHeader;
+    const payload = JSON.parse(DECODER.decode(base64UrlDecode(rawPayload))) as ZitadelJwtPayload;
 
     // RFC 7515 §4.1.1 requires 'alg' in the JWT header. A token that omits it
     // is structurally invalid — we reject it rather than guessing an algorithm.
@@ -717,7 +860,7 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     // Any other unexpected error (network failure, malformed JWKS, Web Crypto
     // exception) is worth logging so operators can distinguish infrastructure
     // failures from genuine bad tokens.
-    console.error("[nextgen] verifyJwt unexpected error:", err);
+    console.error("[zitadel] verifyJwt unexpected error:", err);
     return null;
   }
 }

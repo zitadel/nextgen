@@ -1,0 +1,16 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": [
+    "../../typedoc.base.json"
+  ],
+  "name": "@zitadel/sdk-tanstack-start",
+  "entryPoints": [
+    "src/index.ts",
+    "src/server.ts",
+    "src/client.ts",
+    "src/components.tsx"
+  ],
+  "tsconfig": "tsconfig.lib.json",
+  "readme": "docs/cover.md",
+  "out": "dist/api-docs"
+}

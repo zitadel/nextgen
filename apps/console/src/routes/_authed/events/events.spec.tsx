@@ -963,6 +963,7 @@ describe("events filters", () => {
     await waitFor(() =>
       expect(queries.at(-1)?.getAll("event_type")).toEqual([
         "auth.check.failed",
+        "auth.request.exchange.failed",
         "auth.sso.authorization.failed",
         "auth.sso.exchange.failed",
         "user.create.failed",

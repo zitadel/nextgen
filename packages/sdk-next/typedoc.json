@@ -1,0 +1,19 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": [
+    "../../typedoc.base.json"
+  ],
+  "name": "@zitadel/sdk-next",
+  "entryPoints": [
+    "src/index.ts",
+    "src/server.ts",
+    "src/client.ts",
+    "src/components.ts",
+    "src/react.ts",
+    "src/middleware.ts",
+    "src/session.ts"
+  ],
+  "tsconfig": "tsconfig.lib.json",
+  "readme": "docs/cover.md",
+  "out": "dist/api-docs"
+}

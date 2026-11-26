@@ -247,10 +247,10 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * so they carry the properties the seeded users already validate against.
  * `Employees` adds an optional boolean and integer, and one employee is seeded
  * with both set, so the user page shows a switch and a number field. The
- * client id and secret are `${{ VAR }}` references: no variable backs them, so
- * the connection renders but cannot complete a sign-in — which nothing here
- * asks of it. Best-effort, like the grant: a failure costs the screen its
- * data, not the instance.
+ * client id and secret are `${{ VAR }}` references to placeholder variables
+ * (`seedVariables`), so the connection renders but cannot complete a sign-in,
+ * which nothing here asks of it. Best-effort, like the grant: a failure costs
+ * the screen its data, not the instance.
  */
 const EMPLOYEE_EMAIL = "employee@zitadel.local";
 /** The revision the seeded connection was created as; a release pins it. */
@@ -510,6 +510,43 @@ if (!claimMode && !(await seedNestedSchema())) {
 }
 
 /**
+ * Two variables, so a project's Settings draw the Variables and Secrets table:
+ * a plain value that differs per kind and a secret, under the names the seeded
+ * connection references. Set before the releases are deployed: a deployment is
+ * refused when its release names a variable its kind has no value for.
+ * Best-effort, like the rest.
+ */
+async function seedVariables(): Promise<boolean> {
+  const set = (kind: "primary" | "preview", body: Record<string, unknown>) =>
+    fetch(`${api}/variables?${new URLSearchParams({ project_id: projectId, kind }).toString()}`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    }).then((response) => response.ok);
+  try {
+    // One kind at a time: both write the same project's variables.
+    const primary = await set("primary", {
+      GOOGLE_CLIENT_ID: "prod-client-123",
+      GOOGLE_CLIENT_SECRET: { value: "dev-real-primary", secret: true },
+    });
+    const preview = await set("preview", {
+      GOOGLE_CLIENT_ID: "preview-client-456",
+      GOOGLE_CLIENT_SECRET: { value: "dev-real-preview", secret: true },
+    });
+    return primary && preview;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedVariables())) {
+  console.warn(
+    "[console-dev-real] could not seed variables; the project's Variables and Secrets card may miss values and a seeded release may not deploy.",
+  );
+}
+
+/**
  * Two releases pinning the project's configuration, and their deployments, so
  * the release and deployment screens render against real data: one built from
  * a clean tree with a message, pinning the newest revision of every user
@@ -597,7 +634,7 @@ async function seedReleases(): Promise<string | null> {
     await post("/deployments", {
       release_id: first.id,
       targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
-      ttl: "168h",
+      ttl: "P7D",
     });
     return null;
   } catch (error) {

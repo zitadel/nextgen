@@ -14,13 +14,13 @@ import { describe, expect, it } from "vitest";
  */
 const commandsDir = join(import.meta.dirname, "../../../../src/cli/commands/api");
 
-/** The dimension names each command passes to `recordTelemetry`. */
+/** The dimension names each command passes to `annotate`. */
 async function recordedDimensions(): Promise<Map<string, string[]>> {
   const files = (await readdir(commandsDir)).filter((name) => name.endsWith(".ts"));
   const entries = await Promise.all(
     files.map(async (file) => {
       const source = await readFile(join(commandsDir, file), "utf8");
-      const calls = [...source.matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
+      const calls = [...source.matchAll(/annotate\(\{([^}]*)\}/gs)];
       const keys = calls.flatMap((call) =>
         [...(call[1] ?? "").matchAll(/(\w+)\s*:/g)].map((key) => key[1] as string),
       );

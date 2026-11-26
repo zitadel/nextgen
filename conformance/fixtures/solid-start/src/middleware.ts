@@ -1,9 +1,9 @@
 // zitadel-cli: managed-file v1
 import { createMiddleware } from "@solidjs/start/middleware";
-import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+import { createZitadelMiddleware } from "@zitadel/sdk-solid-start/server";
 
 export default createMiddleware(
-  createNextgenMiddleware({
+  createZitadelMiddleware({
     protectedRoutes: ["/profile"],
     loginPath: "/login",
   }),

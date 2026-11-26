@@ -421,6 +421,32 @@ describe("Flow.findMethodUses", () => {
   });
 });
 
+describe("Flow.registerEntry", () => {
+  it("is the step the register purpose starts at", () => {
+    const flow = aFlow(SIGNS_IN_AND_REGISTERS);
+
+    const entry = flow.registerEntry;
+
+    expect(entry?.name).toBe("register");
+  });
+
+  it("is undefined for a flow with no register purpose", () => {
+    const flow = aFlow(aPasskeyFirstFlow({ purposes: { login: "passkey-first" } }));
+
+    const entry = flow.registerEntry;
+
+    expect(entry).toBeUndefined();
+  });
+
+  it("is undefined when the register purpose names no step", () => {
+    const flow = aFlow({ ...REGISTER_ONLY, purposes: { register: "missing" } });
+
+    const entry = flow.registerEntry;
+
+    expect(entry).toBeUndefined();
+  });
+});
+
 describe("Flow.loginJourney", () => {
   it("follows the transitions that stay in the login purpose", () => {
     const flow = aFlow(aPasskeyFirstFlow());

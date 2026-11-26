@@ -283,12 +283,8 @@ func uniqueFieldValues(values map[string]any, resolvedSets ...domain.FlowResolve
 			if field.Unique == domain.AttributeUniquenessUnspecified || seen[field.Name] {
 				continue
 			}
-			raw, present := values[field.Name]
-			if !present {
-				continue
-			}
-			s, _ := raw.(string)
-			if s == "" {
+			s, ok := collectedString(values, field.Name)
+			if !ok {
 				continue
 			}
 			seen[field.Name] = true

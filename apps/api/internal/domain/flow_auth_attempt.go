@@ -117,11 +117,13 @@ func (FlowPasskeyRegistrationChallengeParams) CheckType() AuthCheckType {
 // hands to its authenticator (for passkey, the PublicKeyCredential request or
 // creation options); ChallengeID binds the later proof to this issue. UserID
 // is the user a check binds at issue: a registration's WebAuthn user handle,
-// minted by the attempt service when the params had none.
+// minted by the attempt service when the params had none. Provisional is true
+// when verifying the proof creates that user.
 type FlowIssuedChallenge struct {
 	ChallengeID string
 	UserID      string
 	Options     []byte
+	Provisional bool
 }
 
 // FlowVerifyChallengeInput carries the client's Proof for the challenge

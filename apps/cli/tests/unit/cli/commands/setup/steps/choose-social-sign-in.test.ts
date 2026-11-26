@@ -204,7 +204,7 @@ describe("ChooseSocialSignIn", () => {
       expect(answers.sso).toEqual([]);
     });
 
-    it("asks before going on without SSO, where No goes back", async () => {
+    it("asks before going on without SSO, with Yes preselected so Enter goes on", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
@@ -212,7 +212,7 @@ describe("ChooseSocialSignIn", () => {
 
       expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
         message: "Would you like to continue without setting up SSO?",
-        initialValue: false,
+        initialValue: true,
       });
     });
 

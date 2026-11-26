@@ -1,0 +1,8 @@
+{
+  // TypeDoc cannot read `.svelte`; it reads the declarations `vite build`
+  // emits into dist (svelte2tsx keeps each component's `@component` comment).
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": { "rootDir": "." },
+  "include": ["dist/**/*.d.ts"],
+  "exclude": []
+}

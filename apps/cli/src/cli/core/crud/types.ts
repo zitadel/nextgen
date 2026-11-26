@@ -221,6 +221,11 @@ export type WriteShape = Readonly<{
    * `team`, which no generated example can know.
    */
   example?: string;
+  /**
+   * What the write knows about its run from the body it sends: enums and
+   * counts only, never a value the developer typed.
+   */
+  facts?(body: Json): Readonly<Record<string, string | number | boolean | undefined>>;
 }>;
 export type DeleteSpec<Ctx> = Readonly<{
   /**
@@ -254,6 +259,13 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * another way names it.
    */
   plural?: string;
+  /**
+   * What the resource is called when a run that changes it is reported
+   * (`user`, `team`): a short, stable name from a fixed vocabulary, never a
+   * name a person gave it. A resource that leaves it off is reported as
+   * changed by no one, and its commands name no action.
+   */
+  kind?: string;
   /**
    * Group the root help lists this resource's commands under. Generated
    * commands have no file to carry a `static group`, so the table says it.

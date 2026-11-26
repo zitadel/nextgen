@@ -5,7 +5,6 @@ import type { SetupServer } from "msw/node";
 import { afterEach, describe, expect, vi } from "vitest";
 
 import InvitationCancel from "@/cli/commands/invitation/cancel";
-import { BaseCommand } from "@/cli/core/base";
 import { it } from "@tests/fixtures";
 import { parseArg } from "@tests/helpers/inputs";
 import { answering } from "@tests/helpers/keyboard";
@@ -208,7 +207,7 @@ describe("invitation cancel, run by a person with an id", () => {
 /** Watches the product events the command sends. */
 function trackedEvents() {
   return vi.spyOn(
-    BaseCommand.prototype as unknown as { trackEvent: (...args: unknown[]) => void },
+    InvitationCancel.prototype as unknown as { trackEvent: (...args: unknown[]) => void },
     "trackEvent",
   );
 }

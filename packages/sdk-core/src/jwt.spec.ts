@@ -6,7 +6,7 @@ import {
   JWKS_TTL_MS,
   clearJwksCache,
   verifyJwt,
-  type VerifyJwtOptions,
+  type ZitadelVerifyJwtOptions,
 } from "./jwt.js";
 
 const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -46,7 +46,7 @@ function serveJwks(keys: () => readonly Record<string, unknown>[]) {
   return fetchMock;
 }
 
-function opts(issuer: string): VerifyJwtOptions {
+function opts(issuer: string): ZitadelVerifyJwtOptions {
   return {
     issuerUrl: issuer,
     clockSkewMs: 0,

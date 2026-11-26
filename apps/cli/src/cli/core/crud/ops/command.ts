@@ -1,7 +1,7 @@
 import { Flags, type Command, type Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
-import type { BaseCommand } from "@/cli/core/base";
+import type { BaseCommand, Facts } from "@/cli/core/base";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "@/cli/core/crud/types";
 import { EnvironmentCommand } from "@/cli/core/environment-command";
@@ -89,6 +89,31 @@ export abstract class ResourceCommand extends Tabulatable(EnvironmentCommand) {
       );
     }
     return definition as OperationDefinition<Ctx, Spec>;
+  }
+
+  /**
+   * What the command does to its resource, when it changes one: `create`,
+   * `update`, or the verb a delete goes by. A read leaves it unset.
+   */
+  protected get action(): string | undefined {
+    return undefined;
+  }
+
+  /**
+   * Which resource a run changed and how, when the resource names itself and
+   * the command changes it; a read, and a resource that names no kind, say
+   * nothing.
+   *
+   * @returns The facts, with the layers below.
+   */
+  protected override describe(): Facts {
+    const { kind } = this.defined<unknown, unknown>().resource;
+    const { action } = this;
+    if (kind === undefined || action === undefined) {
+      return super.describe();
+    }
+
+    return { ...super.describe(), resource_type: kind, action };
   }
 
   /** Open the platform connection; deferred so `--dry-run` connects only to ask the server. */

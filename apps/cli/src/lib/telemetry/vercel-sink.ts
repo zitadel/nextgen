@@ -18,6 +18,8 @@ export type VercelSettings = {
 
 /** Sends a copy of each event to Vercel Web Analytics. */
 export class VercelSink implements TelemetrySink {
+  readonly destination = "vercel" as const;
+
   private readonly target: VercelTarget;
   private readonly debug: boolean;
   private readonly post: typeof fetch;

@@ -2,7 +2,7 @@ import type { StoryObj } from "@storybook/web-components-vite";
 
 import {
   clickAction,
-  freezePasskeyCeremony,
+  holdPasskeyCeremony,
   mock,
   orchestratorArgTypes,
   orchestratorBeforeEach,
@@ -69,22 +69,28 @@ export const PasskeyOffered: Story = { args: { passkey: true } };
  * in with a passkey" on the identifier. That step mounts the invisible
  * `<zl-passkey>`, which fires a real `navigator.credentials.get()` ceremony -- the
  * OS passkey prompt -- the instant it renders, and that can't complete in the
- * workbench. `freezePasskeyCeremony` stubs `navigator.credentials` with a promise
- * that never settles (kept in the workbench, not on the shipped component), so the
- * atom stays in its in-flight state and shows the real "waiting for your passkey"
- * UI instead of raising the prompt; the returned teardown restores it. The legacy
+ * workbench. `holdPasskeyCeremony` keeps it in flight: under Vitest a virtual
+ * authenticator that never answers the touch (a real WebAuthn, nothing stubbed),
+ * in the gallery `freezePasskeyCeremony`, which stubs `navigator.credentials`
+ * with a promise that never settles (kept in the workbench, not on the shipped
+ * component). Either way the atom stays in its in-flight state and shows the real
+ * "waiting for your passkey" UI instead of raising the prompt; the returned
+ * teardown restores it. This is the one story here that runs in the Storybook
+ * test run (`!no-test`), on the design-system default branding, because the
+ * `centered` preset's primary button misses the 4.5:1 contrast check. The legacy
  * `passkey-setup` / `passkey-upsell` pair is deliberately not storied -- the
  * default flow no longer routes through it. See apps/storybook/AGENTS.md.
  */
 export const PasskeyLogin: Story = {
-  args: { passkey: true },
+  args: { passkey: true, branding: "none" },
   // This story drives a fixed identifier → passkey-login journey, so the
   // operator-preview control doesn't apply (preview freezes the entry step and
   // submits nothing). Lock it rather than let it silently no-op in the URL.
   argTypes: {
     previewState: { control: false, table: { disable: true } },
   },
-  beforeEach: () => freezePasskeyCeremony(),
+  tags: ["!no-test"],
+  beforeEach: () => holdPasskeyCeremony(),
   play: async ({ canvasElement }) => {
     await clickAction(canvasElement, "passkey");
     await waitFor(() =>

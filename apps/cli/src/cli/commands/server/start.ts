@@ -21,6 +21,7 @@ import { Previewable } from "@/cli/core/previewable";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 const MIN_PORT = 1;
 const MAX_PORT = 65_535;
@@ -154,9 +155,12 @@ const NOT_READY_REASONS = {
  * exists, and the port it actually got afterwards, so an agent that follows it
  * targets the server that was started.
  */
-export default class Start extends LocalServerCommand(Previewable(BaseCommand), "exact") {
+export default class Start extends Telemetered(
+  LocalServerCommand(Previewable(BaseCommand), "exact"),
+) {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.localServer;
+  static override readonly headline = "runtime";
   static override groupOrder = 1;
 
   static override examples = [
@@ -456,7 +460,7 @@ export default class Start extends LocalServerCommand(Previewable(BaseCommand), 
       shell: this.env,
     };
     const plan = await server.plan(request);
-    this.recordTelemetry({ runtime: plan.backend });
+    this.annotate({ runtime: plan.backend });
 
     return {
       server,

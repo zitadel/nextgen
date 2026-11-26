@@ -416,4 +416,81 @@ describe("Wizard", () => {
       expect(answer).toBe("finished normally");
     });
   });
+
+  describe("watching a run", () => {
+    it("reports each step as it starts and finishes, in order", async () => {
+      const seen: string[] = [];
+      const wizard = started()
+        .step(new Adds([], "first", 1))
+        .step(new Adds([], "second", 2))
+        .finish(() => "done");
+
+      await wizard.run(
+        { input: "x" },
+        {
+          watch: {
+            started: (key) => {
+              seen.push(`started ${key}`);
+            },
+            finished: (key, known) => {
+              seen.push(`finished ${key} knowing ${Object.keys(known).join(",")}`);
+            },
+          },
+        },
+      );
+
+      expect(seen).toEqual([
+        "started first",
+        "finished first knowing input,first",
+        "started second",
+        "finished second knowing input,first,second",
+      ]);
+    });
+
+    it("reports the step that failed and the error, once, before anything is undone", async () => {
+      const log: Log = [];
+      const failures: string[] = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new Fails())
+        .step(new Adds(log, "never", 3))
+        .finish(() => "done");
+
+      await expect(
+        wizard.run(
+          { input: "x" },
+          {
+            watch: {
+              failed: (key, error) => {
+                failures.push(`${key}: ${(error as Error).message} after ${log.join(" > ")}`);
+              },
+            },
+          },
+        ),
+      ).rejects.toThrow("boom");
+
+      expect(failures).toEqual(["fails: boom after run first"]);
+    });
+
+    it("does not report a step that ends the wizard as finished", async () => {
+      const finished: string[] = [];
+      const wizard = started()
+        .endWhen(new EndsWhen(true))
+        .step(new Adds([], "first", 1))
+        .finish(() => "finished normally");
+
+      await wizard.run(
+        { input: "x" },
+        {
+          watch: {
+            finished: (key) => {
+              finished.push(key);
+            },
+          },
+        },
+      );
+
+      expect(finished).toEqual([]);
+    });
+  });
 });
