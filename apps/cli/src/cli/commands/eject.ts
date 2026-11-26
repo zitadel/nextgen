@@ -5,15 +5,7 @@ import { LocalRuntime } from "@/lib/server";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
-import {
-  FsDeniedError,
-  FsIsDirectoryError,
-  pathExists,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from "@/lib/fs";
+import { FsError, pathExists, readFile, rename, rm, writeFile } from "@/lib/fs";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { createOrca, Orca, OrcaError } from "@/lib/orca";
@@ -62,7 +54,13 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
       rendererId: config.rendererId,
     });
   } catch (error) {
-    if (error instanceof ProjectError || error instanceof OrcaError) {
+    if (error instanceof FsError) {
+      return fallback;
+    }
+    if (error instanceof ProjectError) {
+      return fallback;
+    }
+    if (error instanceof OrcaError) {
       return fallback;
     }
     throw error;
@@ -110,27 +108,20 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    try {
-      const contents = await readFile(abs, "utf8");
-      if (!Orca.isManaged(contents)) {
-        preserved.push(rel);
-        continue;
-      }
-      if (!dryRun) {
-        await rm(abs, { force: true });
-      }
-      removed.push(rel);
-    } catch (error) {
-      if (error instanceof FsDeniedError) {
-        preserved.push(rel);
-        continue;
-      }
-      if (error instanceof FsIsDirectoryError) {
-        preserved.push(rel);
-        continue;
+    const contents = await readFile(abs, "utf8").catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return "";
       }
       throw error;
+    });
+    if (!Orca.isManaged(contents)) {
+      preserved.push(rel);
+      continue;
     }
+    if (!dryRun) {
+      await rm(abs, { force: true });
+    }
+    removed.push(rel);
   }
 
   for (const rel of actions.rootConfigFiles) {
@@ -178,30 +169,25 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    try {
-      const contents = await readFile(abs, "utf8");
-      const stripped = removeGuidanceSection(contents);
-      if (stripped === contents) {
-        continue;
-      }
-      const husk = stripped.trim() === "" || stripped.trim() === AGENTS_HEADER.trim();
-      if (!dryRun) {
-        if (husk) {
-          await rm(abs, { force: true });
-        } else {
-          await writeFile(abs, stripped);
-        }
-      }
-      removed.push(husk ? rel : `${rel} (managed section)`);
-    } catch (error) {
-      if (error instanceof FsDeniedError) {
-        continue;
-      }
-      if (error instanceof FsIsDirectoryError) {
-        continue;
+    const contents = await readFile(abs, "utf8").catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return "";
       }
       throw error;
+    });
+    const stripped = removeGuidanceSection(contents);
+    if (stripped === contents) {
+      continue;
     }
+    const husk = stripped.trim() === "" || stripped.trim() === AGENTS_HEADER.trim();
+    if (!dryRun) {
+      if (husk) {
+        await rm(abs, { force: true });
+      } else {
+        await writeFile(abs, stripped);
+      }
+    }
+    removed.push(husk ? rel : `${rel} (managed section)`);
   }
   return {
     actions,

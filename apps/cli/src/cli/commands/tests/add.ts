@@ -1,7 +1,7 @@
 import { join, relative, sep } from "node:path";
 import { Flags } from "@oclif/core";
 
-import { FsNotFoundError, pathExists } from "@/lib/fs";
+import { FsError, pathExists } from "@/lib/fs";
 import { isObject } from "@/lib/json";
 import { log } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -333,42 +333,40 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
         throw refusalError(PLAYWRIGHT_CONFIG_REFUSAL, { config });
       }
     }
-    try {
-      const packageJson: PackageJson = await PM.manifest(this.cwd);
-      const manifest: Manifest = {
-        dependencies: new Set(
-          [packageJson.dependencies, packageJson.devDependencies].flatMap((section) => {
-            return section === undefined ? [] : Object.keys(section);
-          }),
-        ),
-        scripts: isObject(packageJson.scripts) ? packageJson.scripts : {},
-      };
-      const plan = new TestKit(framework).plan({
-        cliVersion: this.cliVersion,
-        declared: manifest.dependencies,
-        scripts: new Set(Object.keys(manifest.scripts)),
-      });
-      const planned = await new FileWriter({
-        cwd: this.cwd,
-        dryRun: true,
-        force: this.force,
-      }).scaffold(plan);
-
-      return {
-        framework,
-        manifest,
-        plan,
-        planned,
-      };
-    } catch (error) {
-      if (error instanceof FsNotFoundError) {
+    const packageJson: PackageJson = await PM.manifest(this.cwd).catch((error: unknown) => {
+      if (error instanceof FsError) {
         throw refusalError(MANIFEST_REFUSAL, {});
       }
       if (error instanceof PmManifestInvalidError) {
         throw refusalError(MANIFEST_REFUSAL, {});
       }
       throw error;
-    }
+    });
+    const manifest: Manifest = {
+      dependencies: new Set(
+        [packageJson.dependencies, packageJson.devDependencies].flatMap((section) => {
+          return section === undefined ? [] : Object.keys(section);
+        }),
+      ),
+      scripts: isObject(packageJson.scripts) ? packageJson.scripts : {},
+    };
+    const plan = new TestKit(framework).plan({
+      cliVersion: this.cliVersion,
+      declared: manifest.dependencies,
+      scripts: new Set(Object.keys(manifest.scripts)),
+    });
+    const planned = await new FileWriter({
+      cwd: this.cwd,
+      dryRun: true,
+      force: this.force,
+    }).scaffold(plan);
+
+    return {
+      framework,
+      manifest,
+      plan,
+      planned,
+    };
   }
 
   /** A package manager command as the reader runs it, from the shell's directory. */
