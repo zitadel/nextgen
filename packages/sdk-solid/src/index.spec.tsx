@@ -17,20 +17,21 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
-  type WidgetTag,
-  type WidgetName,
+  type ZitadelWidgetTag,
+  type ZitadelWidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 
 import {
   businessLocales,
   ZitadelLogin,
-  type ZitadelLoginSolidProps,
+  type ZitadelLoginProps,
   ZitadelLogout,
-  type ZitadelLogoutSolidProps,
+  type ZitadelLogoutProps,
   ZitadelSession,
-  type ZitadelSessionSolidProps,
+  type ZitadelSessionProps,
 } from "./index";
 
 import {
@@ -38,14 +39,46 @@ import {
   cssProperties,
   describeStandardAttributes,
 } from "@zitadel/client-sdk-contract/standard-attributes";
+import { describeSharedConfigHelpers } from "@zitadel/client-sdk-contract/config-helpers";
+import * as sdk from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+function widgetIn<Tag extends ZitadelWidgetTag>(
+  root: ParentNode,
+  tag: Tag,
+): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
-  if (!element) throw new Error(`no <${tag}> was rendered`);
+  if (!element) {
+    throw new Error(`no <${tag}> was rendered`);
+  }
   return element;
 }
+
+describeSharedConfigHelpers(sdk);
+
+describe("the exported props types describe what the components accept", () => {
+  it("ZitadelLoginProps is accepted by ZitadelLogin", () => {
+    type Accepted = Parameters<typeof ZitadelLogin>[0];
+
+    expectTypeOf<keyof ZitadelLoginProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLoginProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelLogoutProps is accepted by ZitadelLogout", () => {
+    type Accepted = Parameters<typeof ZitadelLogout>[0];
+
+    expectTypeOf<keyof ZitadelLogoutProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLogoutProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelSessionProps is accepted by ZitadelSession", () => {
+    type Accepted = Parameters<typeof ZitadelSession>[0];
+
+    expectTypeOf<keyof ZitadelSessionProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelSessionProps>().toExtend<Accepted>();
+  });
+});
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
@@ -421,8 +454,12 @@ describe("package manifest", () => {
   };
 
   function targets(value: unknown): string[] {
-    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
-    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    if (typeof value === "string") {
+      return value.startsWith("./") ? [value] : [];
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(targets);
+    }
     return [];
   }
 
@@ -452,9 +489,9 @@ type ForwardedAttributes = {
 };
 
 type WidgetProps = {
-  login: ZitadelLoginSolidProps;
-  logout: ZitadelLogoutSolidProps;
-  session: ZitadelSessionSolidProps;
+  login: ZitadelLoginProps;
+  logout: ZitadelLogoutProps;
+  session: ZitadelSessionProps;
 };
 
 const staleOnRemoval: readonly string[] = [];
@@ -462,8 +499,9 @@ const staleOnRemoval: readonly string[] = [];
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref`, the way a consumer does. `update` renders it
 // again with other attributes.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
+async function mountWidget(widget: ZitadelWidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  configureZitadel(project);
   const [current, setCurrent] = createSignal(attributes);
   const propsOf = ({ style, hidden, ...rest }: Attributes) => ({
     ...rest,
@@ -487,6 +525,10 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     },
   };
 }
+
+afterEach(() => {
+  _resetConfigForTesting();
+});
 
 describeStandardAttributes<ForwardedAttributes, WidgetProps>({
   mountWidget,

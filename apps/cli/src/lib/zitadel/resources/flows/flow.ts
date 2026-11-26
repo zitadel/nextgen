@@ -210,6 +210,20 @@ export class Flow extends ConfigDocument<FlowValue> {
   }
 
   /**
+   * The step the flow starts its register purpose at.
+   *
+   * @returns The step, or `undefined` when the flow has no register purpose or
+   *   no step by its name.
+   */
+  get registerEntry(): Step | undefined {
+    const register = this.value.purposes.register;
+    if (register === undefined) {
+      return undefined;
+    }
+    return this.findStep(register);
+  }
+
+  /**
    * What `user_schema` names.
    *
    * @remarks

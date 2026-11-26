@@ -70,14 +70,14 @@ export function appComponentTemplate(ctx: PatchContext): string {
   const business = ctx.useCase === "business";
   const importNames = business
     ? `
-  ZitadelLoginComponent,
-  ZitadelSessionComponent,
+  ZitadelLogin,
+  ZitadelSession,
   businessLocales,
   configureZitadel,
 `
     : `
-  ZitadelLoginComponent,
-  ZitadelSessionComponent,
+  ZitadelLogin,
+  ZitadelSession,
   configureZitadel,
 `;
   // The overlay ships with the SDK, so the generated app only wires it up
@@ -98,7 +98,7 @@ import { ZITADEL_PROJECT_ID } from "${PROJECT_ID_IMPORT}";
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [ZitadelLoginComponent, ZitadelSessionComponent],
+  imports: [ZitadelLogin, ZitadelSession],
   templateUrl: "./app.html",
 })
 export class App implements OnInit {
@@ -264,23 +264,26 @@ export function appTemplateHtml(ctx: PatchContext): string {
   const localesBinding = ctx.useCase === "business" ? `\n      [locales]="locales"` : "";
   return `<!-- ${ManagedFile.MARKER} -->
 @if (path.startsWith('/profile')) {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-session
+      style="display:block;width:100%"
       [project]="project"
       [postSignOutUrl]="'/login'"
     ></zitadel-auth-session>
   </div>
 } @else if (path.startsWith('/register')) {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
+      style="display:block;width:100%"
       [project]="project"${localesBinding}
       purpose="register"
       [postSignInUrl]="'/profile'"
     ></zitadel-auth-login>
   </div>
 } @else {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
+      style="display:block;width:100%"
       [project]="project"${localesBinding}
       purpose="login"
       [postSignInUrl]="'/profile'"

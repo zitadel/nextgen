@@ -7,6 +7,7 @@ import { Destructive } from "@/cli/core/destructive";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * What a reset reports about the server it removes: a process, a container, or
@@ -21,9 +22,11 @@ type ResetTarget =
  * A folder with no server is not refused: there is nothing to reset, and the
  * result says so.
  */
-export default class Reset extends Destructive(
-  LocalServerCommand(Previewable(BaseCommand), "exact"),
-  "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
+export default class Reset extends Telemetered(
+  Destructive(
+    LocalServerCommand(Previewable(BaseCommand), "exact"),
+    "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localServer;

@@ -1,8 +1,8 @@
 import type { RequestEvent } from "@sveltejs/kit";
 
-import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
+import { createZitadelHandle } from "@zitadel/sdk-sveltekit/server";
 
-import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
 
@@ -22,7 +22,7 @@ const span: RequestEvent["tracing"]["root"] = {
 };
 
 /** Sends a request through the built handle, the way SvelteKit would, and returns the answer. */
-async function serve(request: Request, options: NextgenMiddlewareOptions): Promise<Response> {
+async function serve(request: Request, options: ZitadelMiddlewareOptions): Promise<Response> {
   const event: RequestEvent = {
     url: new URL(request.url),
     request,
@@ -46,7 +46,7 @@ async function serve(request: Request, options: NextgenMiddlewareOptions): Promi
     isRemoteRequest: false,
     tracing: { enabled: false, root: span, current: span },
   };
-  return createNextgenHandle(options)({ event, resolve: () => new Response("ok") });
+  return createZitadelHandle(options)({ event, resolve: () => new Response("ok") });
 }
 
 describeEdgeServer(serve);

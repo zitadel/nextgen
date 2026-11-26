@@ -7,6 +7,7 @@
   "type": "module",
   "exports": {
     "./client-edge": "./src/client-edge.ts",
+    "./config-helpers": "./src/config-helpers.ts",
     "./server-render": "./src/server-render.ts",
     "./standard-attributes": "./src/standard-attributes.ts"
   },

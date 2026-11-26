@@ -3,6 +3,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import type { CommandResult } from "@/cli/core";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The values that grant access, never printed — only named and masked. */
 const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
@@ -22,7 +23,7 @@ const REDACTED = "••••••••";
  * and which source supplied each value. It never prints a secret in full, so
  * the output is safe to paste into a bug report.
  */
-export default class Env extends ReadCommand {
+export default class Env extends Telemetered(ReadCommand) {
   static override description =
     "Show which server and project resolve, and where each value came from.";
   static override group = CommandGroups.projectSettings;

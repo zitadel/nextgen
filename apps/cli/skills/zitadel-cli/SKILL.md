@@ -56,7 +56,7 @@ passes. Each of `doctor`'s `data.checks` has a `category`: `versions`,
 The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. The Angular CLI checks each major on its own, so only 22.22.3+ on 22, 24.15.0+ on 24 and 26.x are accepted (23 and 25 run with a warning), and Node 27 or later is refused even though the published range reads `>=26.0.0`. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
 
 The app's framework must be at or above a minimum version: Next.js 15.2.3,
-React 18, Vue 3.2, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
+React 18, Vue 3.2, Nuxt 4, Angular 19, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
 versions are not refused. `setup` and `doctor` refuse an app below its minimum,
 by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
 (exit 3); `setup` refuses before it scaffolds or patches anything, while
@@ -237,7 +237,11 @@ nothing; `data.skills` and `data.directories` say what it added where.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
   it (`ZITADEL_TELEMETRY=0`, or the standard `DO_NOT_TRACK`, in their
   environment), but that is the user's environment choice, not a flag to attach
-  to every call.
+  to every call. The CLI prints a one-time notice about it only in an interactive
+  terminal, so a run you drive never shows it: when you first run the CLI for a
+  user, tell them it sends anonymous usage data (never project IDs,
+  never server URLs or file contents), that it records the coding agent it runs inside, and
+  how to turn it off. Never turn it off for them without being asked.
 - **Flag conventions.** Flags follow what a model already expects from curl, ssh
   and wget: `--help`/`-h` (also `zitadel api help`), `--version`, `-v`/`--verbose`,
   kebab-case long flags, both `--flag value` and `--flag=value`, and
@@ -687,6 +691,7 @@ Ask about:
   those too. In an interactive `setup`, Space ticks a provider and Enter
   continues; pressing Enter with none ticked asks whether to continue without
   setting up SSO, where No goes back to the list, so nothing is skipped by accident.
+  Yes is preselected, so pressing Enter at every question finishes setup.
   A non-interactive run names the providers with `--sso` instead.
 - **Profile fields** — which attributes sign-up collects. The starting field
   set depends on the use-case you pick (see *Presets and use-cases* below) —
@@ -971,9 +976,22 @@ holds the warnings and errors, and `--tail` counts only those lines. `logs
 errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
 running, name it in `data.next_actions`.
 
-To move a set-up app to another dev port (setup's `warnings` say the port is
-already in use, the dev server exits with `EADDRINUSE`, or another app needs
-the port), run `setup --dev-port <port>` in the app; never change the port in
+Setup pins the app's dev script to its dev port and registers
+`http://localhost:<port>` as the origin and issuer. A process running in the
+app's folder that holds the port is the app's own dev server: setup keeps the
+port and says nothing, so leave a running dev server up while setup runs. When
+something else holds it, a run that asks nothing warns in `warnings`. A warning
+that names the holder (`node (pid 4242)`) found it running outside the app's
+folder: stop it, or run the `setup --dev-port` it gives. A warning that names
+none could not see the holder (no `lsof`, or another user's process). Either
+way, if the holder is this app's dev server after all (in a container it shows
+as Docker's process), ignore the warning and keep the port: moved off the port
+its own dev server serves, the app's origin and issuer no longer match the
+running app.
+
+To move a set-up app to another dev port (a setup warning names another process
+on it, the dev server exits with `EADDRINUSE`, or another app needs the port),
+run `setup --dev-port <port>` in the app; never change the port in
 one file by hand. In a directory with a
 `zitadel.json`, `setup` returns `status: "skipped"` with `reason:
 "already-initialized"`, unless `--dev-port` is given: then it moves the app.

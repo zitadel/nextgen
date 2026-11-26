@@ -872,6 +872,7 @@ describe("failures", () => {
   it("are the types that record something failing", () => {
     expect(FAILURE_TYPES).toEqual([
       "auth.check.failed",
+      "auth.request.exchange.failed",
       "auth.sso.authorization.failed",
       "auth.sso.exchange.failed",
       "user.create.failed",

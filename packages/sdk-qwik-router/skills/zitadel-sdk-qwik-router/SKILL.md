@@ -11,11 +11,11 @@ description: >-
 
 # @zitadel/sdk-qwik-router
 
-A Qwik Router request handler and helpers that add Zitadel (Nextgen) auth to a
+A Qwik Router request handler and helpers that add Zitadel auth to a
 Qwik 2 app. The handler proxies auth traffic same-origin under `/__nextgen`,
 verifies the session JWT via JWKS on the server, stores the result on
 `requestEvent.sharedMap`, and redirects unauthenticated requests on protected
-routes. The package is server-only; the widgets come from `@zitadel/sdk-qwik`.
+routes. It also re-exports the widgets from `/components`, so one package is enough.
 
 ## When to use
 
@@ -29,8 +29,6 @@ adjusting a scaffolded wiring.
 
 ```bash
 pnpm add -D @zitadel/sdk-qwik-router@latest
-# the login/logout/session widgets are a separate package:
-pnpm add -D @zitadel/sdk-qwik@latest
 ```
 
 Install both as **dev dependencies**: Qwik bundles `devDependencies` into the
@@ -40,12 +38,12 @@ must migrate to `@qwik.dev/*` first.
 
 ## Integrate
 
-**1. Request handler.** Add a root plugin, e.g. `src/routes/plugin@nextgen.ts`:
+**1. Request handler.** Add a root plugin, e.g. `src/routes/plugin@zitadel.ts`:
 
 ```ts
-import { createNextgenOnRequest } from '@zitadel/sdk-qwik-router/server';
+import { createZitadelOnRequest } from '@zitadel/sdk-qwik-router/server';
 
-export const onRequest = createNextgenOnRequest({
+export const onRequest = createZitadelOnRequest({
   protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
   loginPath: '/login',
 });
@@ -57,7 +55,7 @@ read per request from Qwik Router's `requestEvent.env` (where Vite loads
 Sessions count only in the app's own project: `projectId`, else
 `ZITADEL_PROJECT_ID`, else `PUBLIC_ZITADEL_PROJECT_ID`, read the same way. With
 none set, nobody is signed in. To run
-alongside your own handler, export an array: `[createNextgenOnRequest({...}), myOnRequest]`.
+alongside your own handler, export an array: `[createZitadelOnRequest({...}), myOnRequest]`.
 
 **2. Read auth server-side** with `getAuth(ev)` in a `routeLoader$`, action, or
 endpoint:
@@ -77,11 +75,11 @@ export const useUser = routeLoader$((ev) => {
 all without a session, export a loader like this one from the route itself —
 Qwik Router runs it on the server for `<Link>` navigation too.
 
-**3. Render the widgets** from `@zitadel/sdk-qwik`:
+**3. Render the widgets** from `@zitadel/sdk-qwik-router/components`:
 
 ```tsx
 import { component$ } from '@qwik.dev/core';
-import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik';
+import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik-router/components';
 
 const project = configureZitadel({
   projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID,
@@ -98,7 +96,7 @@ signed-in card with sign-out, and `<ZitadelLogout>` a sign-out control on its ow
 
 ## Widget props and events
 
-This SDK is server-only. The widgets come from `@zitadel/sdk-qwik`, so read its skill for the widget props and events.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` from `@zitadel/sdk-qwik-router/components` are the `@zitadel/sdk-qwik` widgets, so read its skill for the widget props and events.
 
 ## Read these, don't guess
 
@@ -118,8 +116,8 @@ names and defaults against the installed version rather than assuming.
 - **Dev dependency, not dependency.** Qwik's starter `vite.config.ts` throws if a
   package is listed in both sections, and a regular dependency stays external to
   the server bundle.
-- **`@zitadel/sdk-qwik-router` renders no widgets.** They come from
-  `@zitadel/sdk-qwik`.
+- **Import widgets from `/components`, not `/server` or `/client`.** Those two
+  entries load on edge runtimes and export no widgets.
 - **Env comes from `requestEvent.env`.** Vite loads `.env.local` there, not onto
   `process.env`, so the handler reads it per request.
 - **Client-side `<Link>` navigation skips the handler.** Without a route

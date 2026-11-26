@@ -7,6 +7,7 @@ import { deletedData } from "@/cli/core/envelope";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { RemoveCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -14,8 +15,10 @@ import { RemoveCommand } from "@/cli/commands/bases";
  * It says what stops being admitted. Removing a preview pattern leaves its live
  * previews to expire on their own.
  */
-export default class OriginRm extends RemoveCommand(
-  "Remove the pattern without the confirmation prompt. Required when non-interactive.",
+export default class OriginRm extends Telemetered(
+  RemoveCommand(
+    "Remove the pattern without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description = "Remove an origin pattern from the project.";
   static override group = CommandGroups.projectSettings;

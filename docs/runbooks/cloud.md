@@ -820,7 +820,7 @@ the root admin.
 - **Webhook delivery:** for the same reason the server's delivery loop is
   off here (`events.webhooks.trigger_secret` is `CRON_SECRET`), and two things
   call `/cron/events-webhooks` in its place
-  ([ADR 090](../adrs/090-project-webhooks.md) §4,
+  ([ADR 091](../adrs/091-project-webhooks.md) §4,
   [configuration](../quick-start/configuration.md#webhook-delivery)).
   - **The hourly round.** A second Vercel Cron Job calls the path at 47
     minutes past every hour, for every project. It delivers whatever a

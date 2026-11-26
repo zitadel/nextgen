@@ -62,7 +62,6 @@ describe("vercelEventBody", () => {
 
 describe("resolveVercelEndpoint", () => {
   it("sends production runs to the cloud's intake", () => {
-    expect(resolveVercelEndpoint({})).toBe(VERCEL_ENDPOINT);
     expect(resolveVercelEndpoint({ ZITADEL_TELEMETRY_ENV: "production" })).toBe(VERCEL_ENDPOINT);
   });
 
@@ -96,7 +95,10 @@ describe("resolveVercelEndpoint", () => {
 describe("Telemetry's Vercel copy", () => {
   function create(
     vercelKeys: readonly string[] | undefined,
-    { flag, env = {} }: { flag?: boolean; env?: NodeJS.ProcessEnv } = {},
+    {
+      flag,
+      env = { ZITADEL_TELEMETRY_ENV: "production" },
+    }: { flag?: boolean; env?: NodeJS.ProcessEnv } = {},
   ) {
     const posts: { url: string; body: string }[] = [];
     const tracked: string[] = [];
@@ -134,12 +136,20 @@ describe("Telemetry's Vercel copy", () => {
     });
   });
 
-  it("sends the copy, and Mixpanel nothing, without a Mixpanel token", async () => {
+  it("sends the copy to the intake and the event to Mixpanel's project alike", async () => {
     const { telemetry, posts, tracked } = create(["command"]);
     telemetry.track("cli_command_started", { command: "doctor" });
     await telemetry.shutdown();
     expect(posts).toHaveLength(1);
-    expect(tracked).toEqual([]);
+    expect(tracked).toEqual(["cli_command_started"]);
+  });
+
+  it("sends an event limited to Mixpanel to Mixpanel only", async () => {
+    const { telemetry, posts, tracked } = create(["command"]);
+    telemetry.track("flow_started", { command: "setup" }, ["mixpanel"]);
+    await telemetry.shutdown();
+    expect(posts).toHaveLength(0);
+    expect(tracked).toEqual(["flow_started"]);
   });
 
   it("sends no copy without keys", async () => {
@@ -166,8 +176,8 @@ describe("Telemetry's Vercel copy", () => {
     expect(posts).toHaveLength(0);
   });
 
-  it("is off on the development channel without a Mixpanel token", () => {
-    const { telemetry } = create(["command"], { env: { ZITADEL_TELEMETRY_ENV: "development" } });
+  it("is off in CI, which has no Mixpanel project and no copy", () => {
+    const { telemetry } = create(["command"], { env: { CI: "true" } });
     expect(telemetry.enabled).toBe(false);
   });
 });

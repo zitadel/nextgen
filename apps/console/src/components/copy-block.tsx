@@ -1,3 +1,4 @@
+import { MONO_VALUE } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 
 /**
@@ -24,11 +25,11 @@ export function CopyBlock({
   return (
     <div className="flex items-start gap-2 rounded-md border border-border bg-muted pr-1 pl-3">
       {prompt && (
-        <span aria-hidden className="py-1.5 font-mono text-xs leading-5 text-muted-foreground">
+        <span aria-hidden className={`py-1.5 ${MONO_VALUE} text-muted-foreground`}>
           $
         </span>
       )}
-      <code className="min-w-0 flex-1 py-1.5 font-mono text-xs leading-5 text-foreground wrap-anywhere">
+      <code className={`min-w-0 flex-1 py-1.5 ${MONO_VALUE} text-foreground wrap-anywhere`}>
         {value}
       </code>
       <CopyButton value={value} label={label} size="sm" onCopied={onCopied} />

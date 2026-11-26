@@ -8,6 +8,7 @@ import { deletedData } from "@/cli/core/envelope";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { RemoveCommand } from "@/cli/commands/bases";
 import { variableNameArg } from "./name";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -15,8 +16,10 @@ import { variableNameArg } from "./name";
  * `--preview` removes the preview value and leaves the primary one standing;
  * without it the variable is removed for both kinds.
  */
-export default class VariableRm extends RemoveCommand(
-  "Remove the variable without the confirmation prompt. Required when non-interactive.",
+export default class VariableRm extends Telemetered(
+  RemoveCommand(
+    "Remove the variable without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.projectSettings;

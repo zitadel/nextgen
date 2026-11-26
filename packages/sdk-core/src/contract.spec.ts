@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import ts from "typescript";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
 import { DISPATCHED_EVENTS } from "@zitadel/components/events";
 import { describe, expect, it } from "vitest";
@@ -18,6 +19,31 @@ import {
   standardAttributes,
   widgetTags,
 } from "./types.js";
+
+/**
+ * The `packages/` directory, located from this file rather than from the process's working
+ * directory, so the guards below read the same folders whichever directory vitest starts in.
+ */
+const PACKAGES_ROOT = resolve(import.meta.dirname, "..", "..");
+
+/**
+ * The directories of the thirteen SDKs the guards below iterate over.
+ */
+const EXPECTED_SDK_DIRS = [
+  "sdk-angular",
+  "sdk-core",
+  "sdk-next",
+  "sdk-nuxt",
+  "sdk-qwik",
+  "sdk-qwik-router",
+  "sdk-react",
+  "sdk-solid",
+  "sdk-solid-start",
+  "sdk-svelte",
+  "sdk-sveltekit",
+  "sdk-tanstack-start",
+  "sdk-vue",
+];
 
 /**
  * The element↔contract drift guard.
@@ -152,7 +178,9 @@ function publicProperties(ctor: ElementCtor, tag: string): string[] {
   document.createElement(tag);
   const names: string[] = [];
   for (const [prop, decl] of ctor.elementProperties) {
-    if (!decl.state) names.push(String(prop));
+    if (!decl.state) {
+      names.push(String(prop));
+    }
   }
   return names;
 }
@@ -221,7 +249,7 @@ describe("standard attributes ↔ widget props", () => {
  * every tarball that points at nothing.
  */
 describe("published packages ↔ declaration maps", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const published = readdirSync(packagesDir).filter((dir) => {
     const path = `${packagesDir}${dir}/package.json`;
     return (
@@ -254,8 +282,7 @@ describe("published packages ↔ declaration maps", () => {
  * a user to add it.
  */
 describe("widget loading ↔ SDK packages", () => {
-  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const sdkDirs = readdirSync(packagesDir).filter((dir) => dir.startsWith("sdk-"));
   const WIDGET_SDKS = [
     "sdk-angular",
@@ -283,7 +310,7 @@ describe("widget loading ↔ SDK packages", () => {
   // Apps go through their framework's SDK, which owns these packages as its own
   // dependencies, so no demo declares or imports them.
   const SDK_OWNED = ["@zitadel/components", "@zitadel/api", "@zitadel/design-tokens"];
-  const appsDir = `${resolve(process.cwd(), "../..")}/apps/`;
+  const appsDir = `${resolve(PACKAGES_ROOT, "..")}/apps/`;
   const demoDirs = readdirSync(appsDir).filter((dir) => dir.startsWith("demo-"));
   const SKIPPED_DIRS = /^(node_modules|dist|\.output|\.next.*|\.nuxt.*)$/;
   // Next's own file, which `next build` and `next dev` write: no test input.
@@ -386,8 +413,7 @@ describe("widget loading ↔ SDK packages", () => {
 });
 
 describe("SDK READMEs ↔ opening structure", () => {
-  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const readmeDirs = readdirSync(packagesDir).filter(
     (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
   );
@@ -397,9 +423,13 @@ describe("SDK READMEs ↔ opening structure", () => {
     const title: string[] = [];
     const sections: string[] = [];
     for (const line of readFileSync(`${packagesDir}${dir}/README.md`, "utf8").split("\n")) {
-      if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
-      else if (!fenced && line.startsWith("# ")) title.push(line.slice(2).trim());
-      else if (!fenced && line.startsWith("## ")) sections.push(line.slice(3).trim());
+      if (/^\s*(```|~~~)/.test(line)) {
+        fenced = !fenced;
+      } else if (!fenced && line.startsWith("# ")) {
+        title.push(line.slice(2).trim());
+      } else if (!fenced && line.startsWith("## ")) {
+        sections.push(line.slice(3).trim());
+      }
     }
     return { title, sections };
   };
@@ -450,14 +480,18 @@ describe("SDK READMEs ↔ opening structure", () => {
  * would make one SDK export what the others do not.
  */
 const IMPORT_BLOCK = [
-  "// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.",
-  "// The edge build of the components package has no elements, so this does nothing there.",
+  "/*",
+  " * Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.",
+  " * The edge build of the components package has no elements, so this does nothing there.",
+  " */",
   'import "@zitadel/components";',
 ].join("\n");
 
 const EXPORT_BLOCK = [
-  "// Re-exported so scaffolded apps can wire the business copy overlay without a",
-  "// direct @zitadel/components dependency (strict package managers reject those).",
+  "/*",
+  " * Re-exported so scaffolded apps can wire the business copy overlay without a",
+  " * direct @zitadel/components dependency (strict package managers reject those).",
+  " */",
   'export { businessLocales } from "@zitadel/components";',
 ].join("\n");
 
@@ -504,7 +538,7 @@ const entryProblems = (source: string): string[] => {
 };
 
 describe("client SDK entries ↔ @zitadel/components", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const ENTRIES: [string, string][] = [
     ["sdk-react", "sdk-react/src/index.tsx"],
     ["sdk-vue", "sdk-vue/src/index.ts"],
@@ -514,7 +548,7 @@ describe("client SDK entries ↔ @zitadel/components", () => {
     ["sdk-qwik", "sdk-qwik/src/index.tsx"],
     ["sdk-next", "sdk-next/src/client.ts"],
     ["sdk-nuxt", "sdk-nuxt/src/index.ts"],
-    ["sdk-tanstack-start", "sdk-tanstack-start/src/react.tsx"],
+    ["sdk-tanstack-start", "sdk-tanstack-start/src/components.tsx"],
   ];
 
   it.each(ENTRIES)("%s registers the elements and re-exports no element class", (_sdk, path) => {
@@ -614,7 +648,7 @@ const edgeConfigProblems = (source: string): string[] => {
 };
 
 describe("edge project declarations", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
 
   it("declares the edge project the same way in every config", () => {
@@ -666,7 +700,7 @@ describe("edge project declarations", () => {
  * its cached test results in place.
  */
 describe("SDK specs ↔ the contract packages", () => {
-  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const packagesDir = `${PACKAGES_ROOT}/`;
   const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
   type Task = { dependsOn?: string[]; inputs?: string[] };
   /** A package's turbo tasks: its turbo.json, read as JSON without its comment lines. */
@@ -690,6 +724,14 @@ describe("SDK specs ↔ the contract packages", () => {
         "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
         "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
         "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
+      ],
+      "describeClientEntry(": [
+        "sdk-next/src/__tests__/client.test.ts",
+        "sdk-nuxt/src/__tests__/client.test.ts",
+        "sdk-sveltekit/src/__tests__/client.test.ts",
+        "sdk-qwik-router/src/__tests__/client.test.ts",
+        "sdk-solid-start/src/__tests__/client.test.ts",
+        "sdk-tanstack-start/src/__tests__/client.test.ts",
       ],
     },
     "@zitadel/client-sdk-contract": {
@@ -716,18 +758,27 @@ describe("SDK specs ↔ the contract packages", () => {
         "sdk-react/src/index.spec.tsx",
         "sdk-vue/src/components.spec.ts",
         "sdk-angular/src/lib/components.spec.ts",
-        "sdk-svelte/src/index.spec.ts",
+        "sdk-svelte/src/index.ssr.spec.ts",
         "sdk-solid/src/index.ssr.spec.tsx",
         "sdk-qwik/src/index.ssr.spec.tsx",
       ],
       // Angular's component tag already is the element that carries the standard
-      // attributes, so its wrapper forwards none and runs neither of these.
+      // attributes, so its wrapper forwards none and runs neither of the two
+      // standard-attribute cases; it runs every other shared case.
       "describeServerStandardAttributes(": [
         "sdk-react/src/index.spec.tsx",
         "sdk-vue/src/components.spec.ts",
         "sdk-svelte/src/index.ssr.spec.ts",
         "sdk-solid/src/index.ssr.spec.tsx",
         "sdk-qwik/src/index.ssr.spec.tsx",
+      ],
+      "describeSharedConfigHelpers(": [
+        "sdk-react/src/index.spec.tsx",
+        "sdk-vue/src/components.spec.ts",
+        "sdk-angular/src/lib/components.spec.ts",
+        "sdk-svelte/src/index.spec.ts",
+        "sdk-solid/src/index.spec.tsx",
+        "sdk-qwik/src/index.spec.tsx",
       ],
       "describeStandardAttributes<": [
         "sdk-react/src/index.spec.tsx",
@@ -775,5 +826,327 @@ describe("SDK specs ↔ the contract packages", () => {
       .filter((input) => /\.(spec|test)\.tsx?$/.test(input))
       .map((input) => input.replace("$TURBO_ROOT$/packages/", ""));
     expect(inputs.sort()).toEqual([...new Set(specs.map(([path]) => path))].sort());
+  });
+});
+
+/**
+ * The public API standard of every SDK (ADR 090).
+ *
+ * Each `sdk-*` package declares its entries in `public-api.json`. An entry has
+ * a kind, and the kind decides which names it must export; `extras` lists the
+ * names its framework needs beyond those. The spec reads the real exports of
+ * each entry's source file with the TypeScript compiler, so a name added,
+ * renamed or dropped in an SDK fails here until the standard, or the SDK's
+ * declared extras, say so.
+ */
+describe("SDK public API ↔ the standard", () => {
+  const packagesDir = `${PACKAGES_ROOT}/`;
+  const sdkDirs = readdirSync(packagesDir).filter(
+    (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
+  );
+
+  type Kind = "ui" | "widgets" | "client" | "server" | "other";
+  /** A name an SDK chose for something that other SDKs name differently, and why. */
+  interface ReasonedName {
+    readonly name: string;
+    readonly why: string;
+  }
+  interface EntryDeclaration {
+    readonly source: string;
+    readonly kind: Kind;
+    readonly widgets?: boolean;
+    readonly handler?: ReasonedName;
+    readonly authReader?: ReasonedName;
+    readonly extras?: ReadonlyArray<string>;
+  }
+  interface PublicApi {
+    readonly entries: Readonly<Record<string, EntryDeclaration>>;
+  }
+
+  const COMPONENTS = ["ZitadelLogin", "ZitadelLogout", "ZitadelSession"];
+  const WIDGET_TYPES = [
+    "ZitadelLoginProps",
+    "ZitadelLogoutProps",
+    "ZitadelSessionProps",
+    "ZitadelFlowStepDetail",
+    "ZitadelFlowInputDetail",
+    "ZitadelFlowCompleteDetail",
+    "ZitadelFlowRedirectDetail",
+    "ZitadelFlowErrorDetail",
+    "ZitadelSignoutDetail",
+    "ZitadelFlowPurpose",
+    "ZitadelFlowStep",
+    "ZitadelFlowBehavior",
+  ];
+  const SETUP = [
+    "configureZitadel",
+    "getApi",
+    "getZitadelConfig",
+    "ZitadelProject",
+    "ZitadelConfig",
+  ];
+  const SERVER_TYPES = [
+    "ZitadelMiddlewareOptions",
+    "ZitadelAuthSession",
+    "ZitadelAuthResult",
+    "ZitadelAuthState",
+    "ZitadelUnauthState",
+    "ZitadelClientAuthResult",
+  ];
+
+  /** The names an entry must export, from its kind (ADR 090). */
+  function required(entry: EntryDeclaration): string[] {
+    return [...requiredByKind(entry), ...(entry.handler ? [entry.handler.name] : [])];
+  }
+
+  /** The names that the kind of an entry requires, before its declared handler. */
+  function requiredByKind(entry: EntryDeclaration): string[] {
+    const components = COMPONENTS;
+    switch (entry.kind) {
+      case "ui":
+        return [...components, ...WIDGET_TYPES, ...SETUP, "businessLocales"];
+      case "widgets":
+        return [...components, ...WIDGET_TYPES];
+      case "client":
+        return [...SETUP, ...(entry.widgets ? ["businessLocales"] : [])];
+      case "server":
+        return [...(entry.authReader ? [entry.authReader.name] : []), ...SERVER_TYPES];
+      case "other":
+        return [];
+    }
+  }
+
+  /** The names a source file exports, read with the package's own compiler options. */
+  function exportsOf(dir: string, source: string): string[] {
+    const configPath = `${packagesDir}${dir}/tsconfig.lib.json`;
+    const config = ts.readConfigFile(configPath, ts.sys.readFile);
+    const options = ts.parseJsonConfigFileContent(
+      config.config,
+      ts.sys,
+      `${packagesDir}${dir}`,
+    ).options;
+    const entryFile = `${packagesDir}${dir}/${source}`;
+    const program = ts.createProgram([entryFile], { ...options, noEmit: true, skipLibCheck: true });
+    const checker = program.getTypeChecker();
+    const file = program.getSourceFile(entryFile);
+    const symbol = file ? checker.getSymbolAtLocation(file) : undefined;
+    return symbol
+      ? checker
+          .getExportsOfModule(symbol)
+          .map((exported) => exported.name)
+          .sort()
+      : [];
+  }
+
+  const read = (dir: string): PublicApi =>
+    JSON.parse(readFileSync(`${packagesDir}${dir}/public-api.json`, "utf8")) as PublicApi;
+
+  it.each(sdkDirs)("%s declares public-api.json", (dir) => {
+    expect(existsSync(`${packagesDir}${dir}/public-api.json`)).toBe(true);
+  });
+
+  it.each(sdkDirs)("%s declares every entry its package.json exports", (dir) => {
+    const exported = Object.keys(
+      (
+        JSON.parse(readFileSync(`${packagesDir}${dir}/package.json`, "utf8")) as {
+          exports?: Record<string, unknown>;
+        }
+      ).exports ?? {},
+    ).filter((key) => key !== "./package.json");
+    expect(Object.keys(read(dir).entries).sort()).toEqual(exported.sort());
+  });
+
+  describe.each(sdkDirs)("%s", (dir) => {
+    const api = existsSync(`${packagesDir}${dir}/public-api.json`) ? read(dir) : { entries: {} };
+    it.each(Object.entries(api.entries))(
+      "entry %s exports the standard and its declared extras, nothing else",
+      (_entry, declaration) => {
+        const expected = [...required(declaration), ...(declaration.extras ?? [])].sort();
+        expect(exportsOf(dir, declaration.source)).toEqual(expected);
+      },
+      120_000,
+    );
+  });
+});
+
+/**
+ * The documentation standard of every SDK (ADR 090): a doc comment is always a multi-line block.
+ *
+ * A one-line `/** text *\/` leaves no room for the reason, the behaviour or an example, and the
+ * SDKs' references are read by people and by coding agents that have nothing else to go on. The
+ * check reads the source of every `sdk-*` package, specs and tests excluded.
+ */
+describe("SDK doc comments ↔ the documentation standard", () => {
+  const packagesDir = `${PACKAGES_ROOT}/`;
+  const sdkDirs = readdirSync(packagesDir).filter((dir) => dir.startsWith("sdk-"));
+  const SINGLE_LINE_DOC = /\/\*\*[^\n*][^\n]*\*\//;
+  const TEST_FILE = /\.(spec|test)\.[cm]?[jt]sx?$|__tests__|test-setup|\.d\.ts$/;
+  const SOURCE_FILE = /\.(ts|tsx|vue|svelte)$/;
+
+  /** Every source file below `dir`, as paths relative to the packages directory. */
+  const sourcesOf = (dir: string): string[] =>
+    readdirSync(`${packagesDir}${dir}/src`, { recursive: true, encoding: "utf8" })
+      .filter((file) => SOURCE_FILE.test(file) && !TEST_FILE.test(file))
+      .map((file) => `${dir}/src/${file}`);
+
+  it.each(sdkDirs)("%s has no single-line doc comment", (dir) => {
+    const offenders = sourcesOf(dir).flatMap((path) =>
+      readFileSync(`${packagesDir}${path}`, "utf8")
+        .split("\n")
+        .flatMap((line, at) => (SINGLE_LINE_DOC.test(line) ? [`${path}:${at + 1}`] : [])),
+    );
+    expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * Where the SDKs meet the API package (ADR 090).
+ *
+ * The API package is generated from the OpenAPI document and changes with it. So `sdk-core` is the
+ * only SDK that imports it, through `config.ts`, and its public type files declare the types an app
+ * can see themselves. An SDK that imported the API package directly, or a public type that named a
+ * generated one, would tie that SDK's public API to every API change.
+ */
+describe("SDK sources ↔ the API package", () => {
+  const packagesDir = `${PACKAGES_ROOT}/`;
+  const sdkDirs = readdirSync(packagesDir).filter(
+    (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
+  );
+  const API_IMPORT = /(?:from|import\()\s*["']@zitadel\/api(?:\/[^"']*)?["']/;
+  const TEST_FILE = /\.(spec|test)\.[cm]?[jt]sx?$|__tests__|test-setup/;
+  const SOURCE_FILE = /\.(ts|tsx|vue|svelte)$/;
+
+  it.each(sdkDirs)("%s reaches the API package only through sdk-core", (dir) => {
+    const offenders = readdirSync(`${packagesDir}${dir}/src`, { recursive: true, encoding: "utf8" })
+      .filter((file) => SOURCE_FILE.test(file) && !TEST_FILE.test(file))
+      .filter((file) => API_IMPORT.test(readFileSync(`${packagesDir}${dir}/src/${file}`, "utf8")));
+    expect(offenders).toEqual([]);
+  });
+
+  it.each(["types.ts", "config.ts"])("sdk-core's public %s names no generated type", (file) => {
+    expect(readFileSync(`${packagesDir}sdk-core/src/${file}`, "utf8")).not.toMatch(
+      /@zitadel\/api\/generated/,
+    );
+  });
+});
+
+describe("SDK directories ↔ the guards in this file", () => {
+  it("finds every SDK, so no guard silently iterates over nothing", () => {
+    const found = readdirSync(PACKAGES_ROOT).filter((dir) => dir.startsWith("sdk-"));
+    expect(found.sort()).toEqual(EXPECTED_SDK_DIRS);
+  });
+});
+
+describe("published SDK packages ↔ their contents", () => {
+  const sdkDirs = readdirSync(PACKAGES_ROOT).filter(
+    (dir) => dir.startsWith("sdk-") && existsSync(`${PACKAGES_ROOT}/${dir}/package.json`),
+  );
+
+  it.each(sdkDirs)("%s keeps the generated API reference out of the tarball", (dir) => {
+    const manifest = JSON.parse(readFileSync(`${PACKAGES_ROOT}/${dir}/package.json`, "utf8")) as {
+      files?: string[];
+    };
+    const files = manifest.files ?? [];
+    // A negation only removes what an earlier pattern added, so it must come after `dist`.
+    expect(files).toContain("dist");
+    expect(files.indexOf("!dist/api-docs")).toBeGreaterThan(files.indexOf("dist"));
+  });
+});
+
+/**
+ * The cases every server SDK writes out in its own middleware test.
+ *
+ * Each block below sits in the middleware test of all six server SDKs, and the text must be the
+ * same in every one. A copy that drifts means one SDK checks something its siblings do not.
+ */
+describe("server SDK middleware tests ↔ the blocks they share", () => {
+  const files = [
+    "sdk-next/src/__tests__/middleware.test.ts",
+    "sdk-nuxt/src/__tests__/server/middleware.test.ts",
+    "sdk-sveltekit/src/__tests__/handle.test.ts",
+    "sdk-qwik-router/src/__tests__/request-handler.test.ts",
+    "sdk-solid-start/src/__tests__/middleware.test.ts",
+    "sdk-tanstack-start/src/__tests__/middleware.test.ts",
+  ];
+  const titles = [
+    "protected routes and encoded paths",
+    "an empty backend URL",
+    "an empty project secret",
+    "a login redirect",
+    "a proxied redirect",
+    "a handoff exchange",
+    "proxied OAuth paths of another project",
+    "an unsafe login path",
+    "a cleared session cookie",
+    "a request with the internal auth header",
+    "proxied request headers",
+    "proxied requests without a body",
+  ];
+
+  /**
+   * Cuts a top-level `describe` block out of a test file.
+   *
+   * @param path - The path of the file below `packages/`.
+   * @param title - The title of the block.
+   * @returns The text of the block, from `describe(` to its closing line.
+   */
+  const blockOf = (path: string, title: string): string => {
+    const source = readFileSync(`${PACKAGES_ROOT}/${path}`, "utf8");
+    const start = source.indexOf(`describe("${title}"`);
+    const end = source.indexOf("\n});\n", start);
+    return start === -1 || end === -1 ? "" : source.slice(start, end + 5);
+  };
+
+  it.each(titles)("%s is in every SDK, word for word", (title) => {
+    const blocks = files.map((path) => blockOf(path, title));
+    expect(blocks[0]).not.toBe("");
+    for (const block of blocks) {
+      expect(block).toBe(blocks[0]);
+    }
+  });
+});
+
+describe("server SDK sources ↔ the default backend URL", () => {
+  const serverSdks = readdirSync(PACKAGES_ROOT).filter(
+    (dir) =>
+      dir.startsWith("sdk-") &&
+      existsSync(`${PACKAGES_ROOT}/${dir}/package.json`) &&
+      JSON.parse(readFileSync(`${PACKAGES_ROOT}/${dir}/package.json`, "utf8")).devDependencies?.[
+        "@zitadel/server-sdk-contract"
+      ] !== undefined,
+  );
+
+  /**
+   * Lists the source files of a package that hold code, without its tests and generated output.
+   *
+   * @param directory - The directory to read.
+   * @returns The paths of the TypeScript files below it.
+   */
+  const sourcesOf = (directory: string): string[] => {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) {
+        return entry.name === "__tests__" ? [] : sourcesOf(path);
+      }
+      return /\.tsx?$/.test(entry.name) && !/\.(spec|test)\./.test(entry.name) ? [path] : [];
+    });
+  };
+
+  it("finds the six server SDKs", () => {
+    expect(serverSdks).toHaveLength(6);
+  });
+
+  it.each(serverSdks)("%s falls back to http://localhost:8080 and no other address", (dir) => {
+    const addresses = sourcesOf(`${PACKAGES_ROOT}/${dir}/src`).flatMap((path) => {
+      const code = readFileSync(path, "utf8")
+        .split("\n")
+        .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
+        .join("\n");
+      return [...code.matchAll(/["'`](http:\/\/localhost:\d+)["'`]/g)].map((match) => match[1]);
+    });
+    expect(addresses).not.toEqual([]);
+    for (const address of addresses) {
+      expect(address).toBe("http://localhost:8080");
+    }
   });
 });

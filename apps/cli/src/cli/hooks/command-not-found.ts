@@ -8,7 +8,6 @@ import { aliasedNouns } from "@/lib/oclif/plural-aliases";
 import type { CommandResult } from "@/cli/core/types";
 import { regularPlural } from "@/lib/plural";
 import { commandOf, type SuggestedCommand } from "@/lib/suggestion";
-import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { ServerCommand } from "@/cli/commands/server-command";
 
 /** The exit code a shell reports for a command it cannot find, which scripts already branch on. */
@@ -194,16 +193,6 @@ export class NotFound extends ServerCommand(BaseCommand) {
   public override exit(code = 0): never {
     const refused = this.unknown && code === EXIT_CODES.E_VALIDATION;
     return super.exit(refused ? UNKNOWN_COMMAND_EXIT_CODE : code);
-  }
-
-  /**
-   * Sends nothing: the words typed are free text, which analytics never carry.
-   *
-   * @param deps - What telemetry is built from.
-   * @returns Telemetry that is off.
-   */
-  protected override createTelemetry(deps: TelemetryDeps): Telemetry {
-    return super.createTelemetry({ ...deps, flag: false });
   }
 }
 

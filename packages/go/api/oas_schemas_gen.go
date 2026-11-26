@@ -6888,6 +6888,587 @@ func (s *AuthRequestCreatedPayload) SetClientID(val string) {
 
 // Merged schema.
 // Ref: #
+type AuthRequestExchangeFailedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category AuthRequestExchangeFailedEventCategory `json:"category"`
+	// When the action happened, on the server's clock, to the millisecond.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock, to the millisecond.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilAuthRequestExchangeFailedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a session, a token, a sign-in
+	// check or a credential belongs to, or the user a change was made to. Absent on an event that concerns
+	// no user.
+	UserID OptNilString `json:"user_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptAuthRequestExchangeFailedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                       `json:"delegation_id"`
+	Grantor        OptString                                       `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
+	// `request.api` event of a request carries `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString                     `json:"flow_id"`
+	Metadata OptEventMetadata                 `json:"metadata"`
+	Payload  AuthRequestExchangeFailedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *AuthRequestExchangeFailedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *AuthRequestExchangeFailedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *AuthRequestExchangeFailedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *AuthRequestExchangeFailedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *AuthRequestExchangeFailedEvent) GetCategory() AuthRequestExchangeFailedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *AuthRequestExchangeFailedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *AuthRequestExchangeFailedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *AuthRequestExchangeFailedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *AuthRequestExchangeFailedEvent) GetActorType() OptNilAuthRequestExchangeFailedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *AuthRequestExchangeFailedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *AuthRequestExchangeFailedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthRequestExchangeFailedEvent) GetUserID() OptNilString {
+	return s.UserID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AuthRequestExchangeFailedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *AuthRequestExchangeFailedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *AuthRequestExchangeFailedEvent) GetDelegationType() OptAuthRequestExchangeFailedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *AuthRequestExchangeFailedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *AuthRequestExchangeFailedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *AuthRequestExchangeFailedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *AuthRequestExchangeFailedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *AuthRequestExchangeFailedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *AuthRequestExchangeFailedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *AuthRequestExchangeFailedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *AuthRequestExchangeFailedEvent) GetPayload() AuthRequestExchangeFailedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *AuthRequestExchangeFailedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *AuthRequestExchangeFailedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *AuthRequestExchangeFailedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *AuthRequestExchangeFailedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *AuthRequestExchangeFailedEvent) SetCategory(val AuthRequestExchangeFailedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *AuthRequestExchangeFailedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *AuthRequestExchangeFailedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *AuthRequestExchangeFailedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *AuthRequestExchangeFailedEvent) SetActorType(val OptNilAuthRequestExchangeFailedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *AuthRequestExchangeFailedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *AuthRequestExchangeFailedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthRequestExchangeFailedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthRequestExchangeFailedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *AuthRequestExchangeFailedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *AuthRequestExchangeFailedEvent) SetDelegationType(val OptAuthRequestExchangeFailedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *AuthRequestExchangeFailedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *AuthRequestExchangeFailedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *AuthRequestExchangeFailedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *AuthRequestExchangeFailedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *AuthRequestExchangeFailedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *AuthRequestExchangeFailedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *AuthRequestExchangeFailedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *AuthRequestExchangeFailedEvent) SetPayload(val AuthRequestExchangeFailedPayload) {
+	s.Payload = val
+}
+
+type AuthRequestExchangeFailedEventActorType string
+
+const (
+	AuthRequestExchangeFailedEventActorTypeHuman   AuthRequestExchangeFailedEventActorType = "human"
+	AuthRequestExchangeFailedEventActorTypeService AuthRequestExchangeFailedEventActorType = "service"
+	AuthRequestExchangeFailedEventActorTypeSystem  AuthRequestExchangeFailedEventActorType = "system"
+	AuthRequestExchangeFailedEventActorTypeAgent   AuthRequestExchangeFailedEventActorType = "agent"
+)
+
+// AllValues returns all AuthRequestExchangeFailedEventActorType values.
+func (AuthRequestExchangeFailedEventActorType) AllValues() []AuthRequestExchangeFailedEventActorType {
+	return []AuthRequestExchangeFailedEventActorType{
+		AuthRequestExchangeFailedEventActorTypeHuman,
+		AuthRequestExchangeFailedEventActorTypeService,
+		AuthRequestExchangeFailedEventActorTypeSystem,
+		AuthRequestExchangeFailedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestExchangeFailedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestExchangeFailedEventActorTypeHuman:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventActorTypeService:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventActorTypeSystem:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestExchangeFailedEventActorType) UnmarshalText(data []byte) error {
+	switch AuthRequestExchangeFailedEventActorType(data) {
+	case AuthRequestExchangeFailedEventActorTypeHuman:
+		*s = AuthRequestExchangeFailedEventActorTypeHuman
+		return nil
+	case AuthRequestExchangeFailedEventActorTypeService:
+		*s = AuthRequestExchangeFailedEventActorTypeService
+		return nil
+	case AuthRequestExchangeFailedEventActorTypeSystem:
+		*s = AuthRequestExchangeFailedEventActorTypeSystem
+		return nil
+	case AuthRequestExchangeFailedEventActorTypeAgent:
+		*s = AuthRequestExchangeFailedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type AuthRequestExchangeFailedEventCategory string
+
+const (
+	AuthRequestExchangeFailedEventCategoryRequest AuthRequestExchangeFailedEventCategory = "request"
+	AuthRequestExchangeFailedEventCategoryAuth    AuthRequestExchangeFailedEventCategory = "auth"
+	AuthRequestExchangeFailedEventCategorySession AuthRequestExchangeFailedEventCategory = "session"
+	AuthRequestExchangeFailedEventCategoryAdmin   AuthRequestExchangeFailedEventCategory = "admin"
+	AuthRequestExchangeFailedEventCategoryEntity  AuthRequestExchangeFailedEventCategory = "entity"
+	AuthRequestExchangeFailedEventCategorySignal  AuthRequestExchangeFailedEventCategory = "signal"
+)
+
+// AllValues returns all AuthRequestExchangeFailedEventCategory values.
+func (AuthRequestExchangeFailedEventCategory) AllValues() []AuthRequestExchangeFailedEventCategory {
+	return []AuthRequestExchangeFailedEventCategory{
+		AuthRequestExchangeFailedEventCategoryRequest,
+		AuthRequestExchangeFailedEventCategoryAuth,
+		AuthRequestExchangeFailedEventCategorySession,
+		AuthRequestExchangeFailedEventCategoryAdmin,
+		AuthRequestExchangeFailedEventCategoryEntity,
+		AuthRequestExchangeFailedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestExchangeFailedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestExchangeFailedEventCategoryRequest:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategoryAuth:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategorySession:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategoryAdmin:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategoryEntity:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestExchangeFailedEventCategory) UnmarshalText(data []byte) error {
+	switch AuthRequestExchangeFailedEventCategory(data) {
+	case AuthRequestExchangeFailedEventCategoryRequest:
+		*s = AuthRequestExchangeFailedEventCategoryRequest
+		return nil
+	case AuthRequestExchangeFailedEventCategoryAuth:
+		*s = AuthRequestExchangeFailedEventCategoryAuth
+		return nil
+	case AuthRequestExchangeFailedEventCategorySession:
+		*s = AuthRequestExchangeFailedEventCategorySession
+		return nil
+	case AuthRequestExchangeFailedEventCategoryAdmin:
+		*s = AuthRequestExchangeFailedEventCategoryAdmin
+		return nil
+	case AuthRequestExchangeFailedEventCategoryEntity:
+		*s = AuthRequestExchangeFailedEventCategoryEntity
+		return nil
+	case AuthRequestExchangeFailedEventCategorySignal:
+		*s = AuthRequestExchangeFailedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type AuthRequestExchangeFailedEventDelegationType string
+
+const (
+	AuthRequestExchangeFailedEventDelegationTypeDirect    AuthRequestExchangeFailedEventDelegationType = "direct"
+	AuthRequestExchangeFailedEventDelegationTypeDelegated AuthRequestExchangeFailedEventDelegationType = "delegated"
+	AuthRequestExchangeFailedEventDelegationTypePatShared AuthRequestExchangeFailedEventDelegationType = "pat_shared"
+	AuthRequestExchangeFailedEventDelegationTypeExchanged AuthRequestExchangeFailedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all AuthRequestExchangeFailedEventDelegationType values.
+func (AuthRequestExchangeFailedEventDelegationType) AllValues() []AuthRequestExchangeFailedEventDelegationType {
+	return []AuthRequestExchangeFailedEventDelegationType{
+		AuthRequestExchangeFailedEventDelegationTypeDirect,
+		AuthRequestExchangeFailedEventDelegationTypeDelegated,
+		AuthRequestExchangeFailedEventDelegationTypePatShared,
+		AuthRequestExchangeFailedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestExchangeFailedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestExchangeFailedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestExchangeFailedEventDelegationType) UnmarshalText(data []byte) error {
+	switch AuthRequestExchangeFailedEventDelegationType(data) {
+	case AuthRequestExchangeFailedEventDelegationTypeDirect:
+		*s = AuthRequestExchangeFailedEventDelegationTypeDirect
+		return nil
+	case AuthRequestExchangeFailedEventDelegationTypeDelegated:
+		*s = AuthRequestExchangeFailedEventDelegationTypeDelegated
+		return nil
+	case AuthRequestExchangeFailedEventDelegationTypePatShared:
+		*s = AuthRequestExchangeFailedEventDelegationTypePatShared
+		return nil
+	case AuthRequestExchangeFailedEventDelegationTypeExchanged:
+		*s = AuthRequestExchangeFailedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `auth.request.exchange.failed` events. The code, the `code_verifier` and the
+// `redirect_uri` the client sent stay out.
+// Ref: #
+type AuthRequestExchangeFailedPayload struct {
+	// The client that presented the code.
+	ClientID string `json:"client_id"`
+	// The check that refused the code.
+	Reason AuthRequestExchangeFailedPayloadReason `json:"reason"`
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AuthRequestExchangeFailedPayload) GetClientID() string {
+	return s.ClientID
+}
+
+// GetReason returns the value of Reason.
+func (s *AuthRequestExchangeFailedPayload) GetReason() AuthRequestExchangeFailedPayloadReason {
+	return s.Reason
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthRequestExchangeFailedPayload) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *AuthRequestExchangeFailedPayload) SetReason(val AuthRequestExchangeFailedPayloadReason) {
+	s.Reason = val
+}
+
+// The check that refused the code.
+type AuthRequestExchangeFailedPayloadReason string
+
+const (
+	AuthRequestExchangeFailedPayloadReasonClientMismatch         AuthRequestExchangeFailedPayloadReason = "client_mismatch"
+	AuthRequestExchangeFailedPayloadReasonCodeExpired            AuthRequestExchangeFailedPayloadReason = "code_expired"
+	AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch    AuthRequestExchangeFailedPayloadReason = "redirect_uri_mismatch"
+	AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing    AuthRequestExchangeFailedPayloadReason = "code_verifier_missing"
+	AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid    AuthRequestExchangeFailedPayloadReason = "code_verifier_invalid"
+	AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected AuthRequestExchangeFailedPayloadReason = "code_verifier_unexpected"
+	AuthRequestExchangeFailedPayloadReasonReleaseRevoked         AuthRequestExchangeFailedPayloadReason = "release_revoked"
+	AuthRequestExchangeFailedPayloadReasonSessionNotActive       AuthRequestExchangeFailedPayloadReason = "session_not_active"
+	AuthRequestExchangeFailedPayloadReasonUserNotActive          AuthRequestExchangeFailedPayloadReason = "user_not_active"
+)
+
+// AllValues returns all AuthRequestExchangeFailedPayloadReason values.
+func (AuthRequestExchangeFailedPayloadReason) AllValues() []AuthRequestExchangeFailedPayloadReason {
+	return []AuthRequestExchangeFailedPayloadReason{
+		AuthRequestExchangeFailedPayloadReasonClientMismatch,
+		AuthRequestExchangeFailedPayloadReasonCodeExpired,
+		AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch,
+		AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing,
+		AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid,
+		AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected,
+		AuthRequestExchangeFailedPayloadReasonReleaseRevoked,
+		AuthRequestExchangeFailedPayloadReasonSessionNotActive,
+		AuthRequestExchangeFailedPayloadReasonUserNotActive,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestExchangeFailedPayloadReason) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestExchangeFailedPayloadReasonClientMismatch:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonCodeExpired:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonReleaseRevoked:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonSessionNotActive:
+		return []byte(s), nil
+	case AuthRequestExchangeFailedPayloadReasonUserNotActive:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestExchangeFailedPayloadReason) UnmarshalText(data []byte) error {
+	switch AuthRequestExchangeFailedPayloadReason(data) {
+	case AuthRequestExchangeFailedPayloadReasonClientMismatch:
+		*s = AuthRequestExchangeFailedPayloadReasonClientMismatch
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonCodeExpired:
+		*s = AuthRequestExchangeFailedPayloadReasonCodeExpired
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch:
+		*s = AuthRequestExchangeFailedPayloadReasonRedirectURIMismatch
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing:
+		*s = AuthRequestExchangeFailedPayloadReasonCodeVerifierMissing
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid:
+		*s = AuthRequestExchangeFailedPayloadReasonCodeVerifierInvalid
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected:
+		*s = AuthRequestExchangeFailedPayloadReasonCodeVerifierUnexpected
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonReleaseRevoked:
+		*s = AuthRequestExchangeFailedPayloadReasonReleaseRevoked
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonSessionNotActive:
+		*s = AuthRequestExchangeFailedPayloadReasonSessionNotActive
+		return nil
+	case AuthRequestExchangeFailedPayloadReasonUserNotActive:
+		*s = AuthRequestExchangeFailedPayloadReasonUserNotActive
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
 type AuthSSOAuthorizationFailedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
@@ -8730,6 +9311,8 @@ func (s *AuthTokenIssuedEventDelegationType) UnmarshalText(data []byte) error {
 // Ref: #
 type AuthTokenIssuedPayload struct {
 	Scopes []string `json:"scopes"`
+	// The client that redeemed the authorization code. Only a token issued for a code has it.
+	ClientID OptString `json:"client_id"`
 }
 
 // GetScopes returns the value of Scopes.
@@ -8737,9 +9320,19 @@ func (s *AuthTokenIssuedPayload) GetScopes() []string {
 	return s.Scopes
 }
 
+// GetClientID returns the value of ClientID.
+func (s *AuthTokenIssuedPayload) GetClientID() OptString {
+	return s.ClientID
+}
+
 // SetScopes sets the value of Scopes.
 func (s *AuthTokenIssuedPayload) SetScopes(val []string) {
 	s.Scopes = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthTokenIssuedPayload) SetClientID(val OptString) {
+	s.ClientID = val
 }
 
 // Merged schema.
@@ -28583,6 +29176,7 @@ type Event struct {
 	AuthFactorPasskeyEnrolledEvent   AuthFactorPasskeyEnrolledEvent
 	AuthFactorPasswordSetEvent       AuthFactorPasswordSetEvent
 	AuthRequestCreatedEvent          AuthRequestCreatedEvent
+	AuthRequestExchangeFailedEvent   AuthRequestExchangeFailedEvent
 	AuthSSOAuthorizationFailedEvent  AuthSSOAuthorizationFailedEvent
 	AuthSSOExchangeFailedEvent       AuthSSOExchangeFailedEvent
 	AuthSSOExchangeSucceededEvent    AuthSSOExchangeSucceededEvent
@@ -28649,6 +29243,7 @@ const (
 	AuthFactorPasskeyEnrolledEventEvent   EventType = "auth.factor.passkey.enrolled"
 	AuthFactorPasswordSetEventEvent       EventType = "auth.factor.password.set"
 	AuthRequestCreatedEventEvent          EventType = "auth.request.created"
+	AuthRequestExchangeFailedEventEvent   EventType = "auth.request.exchange.failed"
 	AuthSSOAuthorizationFailedEventEvent  EventType = "auth.sso.authorization.failed"
 	AuthSSOExchangeFailedEventEvent       EventType = "auth.sso.exchange.failed"
 	AuthSSOExchangeSucceededEventEvent    EventType = "auth.sso.exchange.succeeded"
@@ -28729,6 +29324,11 @@ func (s Event) IsAuthFactorPasswordSetEvent() bool { return s.Type == AuthFactor
 
 // IsAuthRequestCreatedEvent reports whether Event is AuthRequestCreatedEvent.
 func (s Event) IsAuthRequestCreatedEvent() bool { return s.Type == AuthRequestCreatedEventEvent }
+
+// IsAuthRequestExchangeFailedEvent reports whether Event is AuthRequestExchangeFailedEvent.
+func (s Event) IsAuthRequestExchangeFailedEvent() bool {
+	return s.Type == AuthRequestExchangeFailedEventEvent
+}
 
 // IsAuthSSOAuthorizationFailedEvent reports whether Event is AuthSSOAuthorizationFailedEvent.
 func (s Event) IsAuthSSOAuthorizationFailedEvent() bool {
@@ -29076,6 +29676,27 @@ func (s Event) GetAuthRequestCreatedEvent() (v AuthRequestCreatedEvent, ok bool)
 func NewAuthRequestCreatedEventEvent(v AuthRequestCreatedEvent) Event {
 	var s Event
 	s.SetAuthRequestCreatedEvent(v)
+	return s
+}
+
+// SetAuthRequestExchangeFailedEvent sets Event to AuthRequestExchangeFailedEvent.
+func (s *Event) SetAuthRequestExchangeFailedEvent(v AuthRequestExchangeFailedEvent) {
+	s.Type = AuthRequestExchangeFailedEventEvent
+	s.AuthRequestExchangeFailedEvent = v
+}
+
+// GetAuthRequestExchangeFailedEvent returns AuthRequestExchangeFailedEvent and true boolean if Event is AuthRequestExchangeFailedEvent.
+func (s Event) GetAuthRequestExchangeFailedEvent() (v AuthRequestExchangeFailedEvent, ok bool) {
+	if !s.IsAuthRequestExchangeFailedEvent() {
+		return v, false
+	}
+	return s.AuthRequestExchangeFailedEvent, true
+}
+
+// NewAuthRequestExchangeFailedEventEvent returns new Event from AuthRequestExchangeFailedEvent.
+func NewAuthRequestExchangeFailedEventEvent(v AuthRequestExchangeFailedEvent) Event {
+	var s Event
+	s.SetAuthRequestExchangeFailedEvent(v)
 	return s
 }
 
@@ -58100,318 +58721,6 @@ func (s *ListPreviewsResponse) SetNextPageToken(val OptNilPageToken) {
 
 func (*ListPreviewsResponse) listProjectPreviewsRes() {}
 
-type ListProjectAdminsBadRequest ErrorDetails
-
-func (*ListProjectAdminsBadRequest) listProjectAdminsRes() {}
-
-// ListProjectAdminsErrorResponse represents sum type.
-type ListProjectAdminsErrorResponse struct {
-	// Type selects the active sum variant, switch on this field.
-	Type                 ListProjectAdminsErrorResponseType
-	AuthUnauthorized     AuthUnauthorized
-	Internal             Internal
-	NotImplemented       NotImplemented
-	ProjMissingID        ProjMissingID
-	ProjNotFound         ProjNotFound
-	ProjPermissionDenied ProjPermissionDenied
-	ReqInvalid           ReqInvalid
-	Unavailable          Unavailable
-}
-
-// ListProjectAdminsErrorResponseType is oneOf type of ListProjectAdminsErrorResponse.
-type ListProjectAdminsErrorResponseType string
-
-// Possible values for ListProjectAdminsErrorResponseType.
-const (
-	AuthUnauthorizedListProjectAdminsErrorResponse     ListProjectAdminsErrorResponseType = "auth.unauthorized"
-	InternalListProjectAdminsErrorResponse             ListProjectAdminsErrorResponseType = "internal"
-	NotImplementedListProjectAdminsErrorResponse       ListProjectAdminsErrorResponseType = "not_implemented"
-	ProjMissingIDListProjectAdminsErrorResponse        ListProjectAdminsErrorResponseType = "proj.missing_id"
-	ProjNotFoundListProjectAdminsErrorResponse         ListProjectAdminsErrorResponseType = "proj.not_found"
-	ProjPermissionDeniedListProjectAdminsErrorResponse ListProjectAdminsErrorResponseType = "proj.permission_denied"
-	ReqInvalidListProjectAdminsErrorResponse           ListProjectAdminsErrorResponseType = "req.invalid"
-	UnavailableListProjectAdminsErrorResponse          ListProjectAdminsErrorResponseType = "unavailable"
-)
-
-// IsAuthUnauthorized reports whether ListProjectAdminsErrorResponse is AuthUnauthorized.
-func (s ListProjectAdminsErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedListProjectAdminsErrorResponse
-}
-
-// IsInternal reports whether ListProjectAdminsErrorResponse is Internal.
-func (s ListProjectAdminsErrorResponse) IsInternal() bool {
-	return s.Type == InternalListProjectAdminsErrorResponse
-}
-
-// IsNotImplemented reports whether ListProjectAdminsErrorResponse is NotImplemented.
-func (s ListProjectAdminsErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedListProjectAdminsErrorResponse
-}
-
-// IsProjMissingID reports whether ListProjectAdminsErrorResponse is ProjMissingID.
-func (s ListProjectAdminsErrorResponse) IsProjMissingID() bool {
-	return s.Type == ProjMissingIDListProjectAdminsErrorResponse
-}
-
-// IsProjNotFound reports whether ListProjectAdminsErrorResponse is ProjNotFound.
-func (s ListProjectAdminsErrorResponse) IsProjNotFound() bool {
-	return s.Type == ProjNotFoundListProjectAdminsErrorResponse
-}
-
-// IsProjPermissionDenied reports whether ListProjectAdminsErrorResponse is ProjPermissionDenied.
-func (s ListProjectAdminsErrorResponse) IsProjPermissionDenied() bool {
-	return s.Type == ProjPermissionDeniedListProjectAdminsErrorResponse
-}
-
-// IsReqInvalid reports whether ListProjectAdminsErrorResponse is ReqInvalid.
-func (s ListProjectAdminsErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidListProjectAdminsErrorResponse
-}
-
-// IsUnavailable reports whether ListProjectAdminsErrorResponse is Unavailable.
-func (s ListProjectAdminsErrorResponse) IsUnavailable() bool {
-	return s.Type == UnavailableListProjectAdminsErrorResponse
-}
-
-// SetAuthUnauthorized sets ListProjectAdminsErrorResponse to AuthUnauthorized.
-func (s *ListProjectAdminsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedListProjectAdminsErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListProjectAdminsErrorResponse is AuthUnauthorized.
-func (s ListProjectAdminsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedListProjectAdminsErrorResponse returns new ListProjectAdminsErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedListProjectAdminsErrorResponse(v AuthUnauthorized) ListProjectAdminsErrorResponse {
-	var s ListProjectAdminsErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
-}
-
-// SetInternal sets ListProjectAdminsErrorResponse to Internal.
-func (s *ListProjectAdminsErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalListProjectAdminsErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if ListProjectAdminsErrorResponse is Internal.
-func (s ListProjectAdminsErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalListProjectAdminsErrorResponse returns new ListProjectAdminsErrorResponse from Internal.
-func NewInternalListProjectAdminsErrorResponse(v Internal) ListProjectAdminsErrorResponse {
-	var s ListProjectAdminsErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets ListProjectAdminsErrorResponse to NotImplemented.
-func (s *ListProjectAdminsErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedListProjectAdminsErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if ListProjectAdminsErrorResponse is NotImplemented.
-func (s ListProjectAdminsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedListProjectAdminsErrorResponse returns new ListProjectAdminsErrorResponse from NotImplemented.
-func NewNotImplementedListProjectAdminsErrorResponse(v NotImplemented) ListProjectAdminsErrorResponse {
-	var s ListProjectAdminsErrorResponse
-	s.SetNotImplemented(v)
-	return s
-}
-
-// SetProjMissingID sets ListProjectAdminsErrorResponse to ProjMissingID.
-func (s *ListProjectAdminsErrorResponse) SetProjMissingID(v ProjMissingID) {
-	s.Type = ProjMissingIDListProjectAdminsErrorResponse
-	s.ProjMissingID = v
-}
-
-// GetProjMissingID returns ProjMissingID and true boolean if ListProjectAdminsErrorResponse is ProjMissingID.
-func (s ListProjectAdminsErrorResponse) GetProjMissingID() (v ProjMissingID, ok bool) {
-	if !s.IsProjMissingID() {
-		return v, false
-	}
-	return s.ProjMissingID, true
-}
-
-// NewProjMissingIDListProjectAdminsErrorResponse returns new ListProjectAdminsErrorResponse from ProjMissingID.
-func NewProjMissingIDListProjectAdminsErrorResponse(v ProjMissingID) ListProjectAdminsErrorResponse {
-	var s ListProjectAdminsErrorResponse
-	s.SetProjMissingID(v)
-	return s
-}
-
-// SetProjNotFound sets ListProjectAdminsErrorResponse to ProjNotFound.
-func (s *ListProjectAdminsErrorResponse) SetProjNotFound(v ProjNotFound) {
-	s.Type = ProjNotFoundListProjectAdminsErrorResponse
-	s.ProjNotFound = v
-}
-
-// GetProjNotFound returns ProjNotFound and true boolean if ListProjectAdminsErrorResponse is ProjNotFound.
-func (s ListProjectAdminsErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
-	if !s.IsProjNotFound() {
-		return v, false
-	}
-	return s.ProjNotFound, true
-}
-
-// NewProjNotFoundListProjectAdminsErrorResponse returns new ListProjectAdminsErrorResponse from ProjNotFound.
-func NewProjNotFoundListProjectAdminsErrorResponse(v ProjNotFound) ListProjectAdminsErrorResponse {
-	var s ListProjectAdminsErrorResponse
-	s.SetProjNotFound(v)
-	return s
-}
-
-// SetProjPermissionDenied sets ListProjectAdminsErrorResponse to ProjPermissionDenied.
-func (s *ListProjectAdminsErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
-	s.Type = ProjPermissionDeniedListProjectAdminsErrorResponse
-	s.ProjPermissionDenied = v
-}
-
-// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if ListProjectAdminsErrorResponse is ProjPermissionDenied.
-func (s ListProjectAdminsErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
-	if !s.IsProjPermissionDenied() {
-		return v, false
-	}
-	return s.ProjPermissionDenied, true
-}
-
-// NewProjPermissionDeniedListProjectAdminsErrorResponse returns new ListProjectAdminsErrorResponse from ProjPermissionDenied.
-func NewProjPermissionDeniedListProjectAdminsErrorResponse(v ProjPermissionDenied) ListProjectAdminsErrorResponse {
-	var s ListProjectAdminsErrorResponse
-	s.SetProjPermissionDenied(v)
-	return s
-}
-
-// SetReqInvalid sets ListProjectAdminsErrorResponse to ReqInvalid.
-func (s *ListProjectAdminsErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidListProjectAdminsErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if ListProjectAdminsErrorResponse is ReqInvalid.
-func (s ListProjectAdminsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidListProjectAdminsErrorResponse returns new ListProjectAdminsErrorResponse from ReqInvalid.
-func NewReqInvalidListProjectAdminsErrorResponse(v ReqInvalid) ListProjectAdminsErrorResponse {
-	var s ListProjectAdminsErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// SetUnavailable sets ListProjectAdminsErrorResponse to Unavailable.
-func (s *ListProjectAdminsErrorResponse) SetUnavailable(v Unavailable) {
-	s.Type = UnavailableListProjectAdminsErrorResponse
-	s.Unavailable = v
-}
-
-// GetUnavailable returns Unavailable and true boolean if ListProjectAdminsErrorResponse is Unavailable.
-func (s ListProjectAdminsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
-	if !s.IsUnavailable() {
-		return v, false
-	}
-	return s.Unavailable, true
-}
-
-// NewUnavailableListProjectAdminsErrorResponse returns new ListProjectAdminsErrorResponse from Unavailable.
-func NewUnavailableListProjectAdminsErrorResponse(v Unavailable) ListProjectAdminsErrorResponse {
-	var s ListProjectAdminsErrorResponse
-	s.SetUnavailable(v)
-	return s
-}
-
-// ListProjectAdminsErrorResponseStatusCode wraps ListProjectAdminsErrorResponse with StatusCode.
-type ListProjectAdminsErrorResponseStatusCode struct {
-	StatusCode int
-	Response   ListProjectAdminsErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ListProjectAdminsErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *ListProjectAdminsErrorResponseStatusCode) GetResponse() ListProjectAdminsErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ListProjectAdminsErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *ListProjectAdminsErrorResponseStatusCode) SetResponse(val ListProjectAdminsErrorResponse) {
-	s.Response = val
-}
-
-func (*ListProjectAdminsErrorResponseStatusCode) listProjectAdminsRes() {}
-
-type ListProjectAdminsForbidden ErrorDetails
-
-func (*ListProjectAdminsForbidden) listProjectAdminsRes() {}
-
-type ListProjectAdminsNotFound ErrorDetails
-
-func (*ListProjectAdminsNotFound) listProjectAdminsRes() {}
-
-// A page of the people who administer a project.
-// Ref: #
-type ListProjectAdminsResponse struct {
-	Admins []ProjectAdmin `json:"admins"`
-	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
-	// no more results.
-	NextPageToken OptNilPageToken `json:"next_page_token"`
-}
-
-// GetAdmins returns the value of Admins.
-func (s *ListProjectAdminsResponse) GetAdmins() []ProjectAdmin {
-	return s.Admins
-}
-
-// GetNextPageToken returns the value of NextPageToken.
-func (s *ListProjectAdminsResponse) GetNextPageToken() OptNilPageToken {
-	return s.NextPageToken
-}
-
-// SetAdmins sets the value of Admins.
-func (s *ListProjectAdminsResponse) SetAdmins(val []ProjectAdmin) {
-	s.Admins = val
-}
-
-// SetNextPageToken sets the value of NextPageToken.
-func (s *ListProjectAdminsResponse) SetNextPageToken(val OptNilPageToken) {
-	s.NextPageToken = val
-}
-
-func (*ListProjectAdminsResponse) listProjectAdminsRes() {}
-
-type ListProjectAdminsUnauthorized ErrorDetails
-
-func (*ListProjectAdminsUnauthorized) listProjectAdminsRes() {}
-
 type ListProjectMembersBadRequest ErrorDetails
 
 func (*ListProjectMembersBadRequest) listProjectMembersRes() {}
@@ -68893,6 +69202,141 @@ func (o NilWebhookEvent58Entity) Or(d WebhookEvent58Entity) WebhookEvent58Entity
 	return d
 }
 
+// NewNilWebhookEvent59Actor returns new NilWebhookEvent59Actor with value set to v.
+func NewNilWebhookEvent59Actor(v WebhookEvent59Actor) NilWebhookEvent59Actor {
+	return NilWebhookEvent59Actor{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent59Actor is nullable WebhookEvent59Actor.
+type NilWebhookEvent59Actor struct {
+	Value WebhookEvent59Actor
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent59Actor) SetTo(v WebhookEvent59Actor) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent59Actor) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent59Actor) SetToNull() {
+	o.Null = true
+	var v WebhookEvent59Actor
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent59Actor) Get() (v WebhookEvent59Actor, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent59Actor) Or(d WebhookEvent59Actor) WebhookEvent59Actor {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilWebhookEvent59ActorType returns new NilWebhookEvent59ActorType with value set to v.
+func NewNilWebhookEvent59ActorType(v WebhookEvent59ActorType) NilWebhookEvent59ActorType {
+	return NilWebhookEvent59ActorType{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent59ActorType is nullable WebhookEvent59ActorType.
+type NilWebhookEvent59ActorType struct {
+	Value WebhookEvent59ActorType
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent59ActorType) SetTo(v WebhookEvent59ActorType) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent59ActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent59ActorType) SetToNull() {
+	o.Null = true
+	var v WebhookEvent59ActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent59ActorType) Get() (v WebhookEvent59ActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent59ActorType) Or(d WebhookEvent59ActorType) WebhookEvent59ActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilWebhookEvent59Entity returns new NilWebhookEvent59Entity with value set to v.
+func NewNilWebhookEvent59Entity(v WebhookEvent59Entity) NilWebhookEvent59Entity {
+	return NilWebhookEvent59Entity{
+		Value: v,
+	}
+}
+
+// NilWebhookEvent59Entity is nullable WebhookEvent59Entity.
+type NilWebhookEvent59Entity struct {
+	Value WebhookEvent59Entity
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilWebhookEvent59Entity) SetTo(v WebhookEvent59Entity) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilWebhookEvent59Entity) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilWebhookEvent59Entity) SetToNull() {
+	o.Null = true
+	var v WebhookEvent59Entity
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilWebhookEvent59Entity) Get() (v WebhookEvent59Entity, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilWebhookEvent59Entity) Or(d WebhookEvent59Entity) WebhookEvent59Entity {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewNilWebhookEvent5Actor returns new NilWebhookEvent5Actor with value set to v.
 func NewNilWebhookEvent5Actor(v WebhookEvent5Actor) NilWebhookEvent5Actor {
 	return NilWebhookEvent5Actor{
@@ -71549,6 +71993,52 @@ func (o OptAuthRequestCreatedEventDelegationType) Get() (v AuthRequestCreatedEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthRequestCreatedEventDelegationType) Or(d AuthRequestCreatedEventDelegationType) AuthRequestCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAuthRequestExchangeFailedEventDelegationType returns new OptAuthRequestExchangeFailedEventDelegationType with value set to v.
+func NewOptAuthRequestExchangeFailedEventDelegationType(v AuthRequestExchangeFailedEventDelegationType) OptAuthRequestExchangeFailedEventDelegationType {
+	return OptAuthRequestExchangeFailedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthRequestExchangeFailedEventDelegationType is optional AuthRequestExchangeFailedEventDelegationType.
+type OptAuthRequestExchangeFailedEventDelegationType struct {
+	Value AuthRequestExchangeFailedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptAuthRequestExchangeFailedEventDelegationType was set.
+func (o OptAuthRequestExchangeFailedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthRequestExchangeFailedEventDelegationType) Reset() {
+	var v AuthRequestExchangeFailedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthRequestExchangeFailedEventDelegationType) SetTo(v AuthRequestExchangeFailedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthRequestExchangeFailedEventDelegationType) Get() (v AuthRequestExchangeFailedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthRequestExchangeFailedEventDelegationType) Or(d AuthRequestExchangeFailedEventDelegationType) AuthRequestExchangeFailedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -79521,6 +80011,74 @@ func (o OptNilAuthRequestCreatedEventActorType) Get() (v AuthRequestCreatedEvent
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilAuthRequestCreatedEventActorType) Or(d AuthRequestCreatedEventActorType) AuthRequestCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilAuthRequestExchangeFailedEventActorType returns new OptNilAuthRequestExchangeFailedEventActorType with value set to v.
+func NewOptNilAuthRequestExchangeFailedEventActorType(v AuthRequestExchangeFailedEventActorType) OptNilAuthRequestExchangeFailedEventActorType {
+	return OptNilAuthRequestExchangeFailedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilAuthRequestExchangeFailedEventActorType is optional nullable AuthRequestExchangeFailedEventActorType.
+type OptNilAuthRequestExchangeFailedEventActorType struct {
+	Value AuthRequestExchangeFailedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilAuthRequestExchangeFailedEventActorType was set.
+func (o OptNilAuthRequestExchangeFailedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilAuthRequestExchangeFailedEventActorType) Reset() {
+	var v AuthRequestExchangeFailedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilAuthRequestExchangeFailedEventActorType) SetTo(v AuthRequestExchangeFailedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilAuthRequestExchangeFailedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilAuthRequestExchangeFailedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v AuthRequestExchangeFailedEventActorType
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilAuthRequestExchangeFailedEventActorType) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilAuthRequestExchangeFailedEventActorType) Get() (v AuthRequestExchangeFailedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilAuthRequestExchangeFailedEventActorType) Or(d AuthRequestExchangeFailedEventActorType) AuthRequestExchangeFailedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -97037,251 +97595,6 @@ func (s *ProjPreviewNotLiveDetails) init() ProjPreviewNotLiveDetails {
 	return m
 }
 
-// One person who can administer the project, with every way they hold that access.
-// Ref: #
-type ProjectAdmin struct {
-	// The person. A user-ref: render `display`, falling back to `identifier`, then `user_id`.
-	User UserRef `json:"user"`
-	// How the person holds admin access: owning-team access first, then grants to teams, then grants to
-	// the person.
-	Sources []ProjectAdminSource `json:"sources"`
-}
-
-// GetUser returns the value of User.
-func (s *ProjectAdmin) GetUser() UserRef {
-	return s.User
-}
-
-// GetSources returns the value of Sources.
-func (s *ProjectAdmin) GetSources() []ProjectAdminSource {
-	return s.Sources
-}
-
-// SetUser sets the value of User.
-func (s *ProjectAdmin) SetUser(val UserRef) {
-	s.User = val
-}
-
-// SetSources sets the value of Sources.
-func (s *ProjectAdmin) SetSources(val []ProjectAdminSource) {
-	s.Sources = val
-}
-
-// Admin access through an `admin` grant on the project, to the person or to a team they are an active
-// member of.
-// Ref: #
-type ProjectAdminGrantSource struct {
-	Type ProjectAdminGrantSourceType `json:"type"`
-	// The grant (`asgn_<opaque>`), as served by `GET /grants/{grant_id}`.
-	GrantID string `json:"grant_id"`
-	// The team the grant is to, absent for a grant to the person directly.
-	Team OptTeamRef `json:"team"`
-}
-
-// GetType returns the value of Type.
-func (s *ProjectAdminGrantSource) GetType() ProjectAdminGrantSourceType {
-	return s.Type
-}
-
-// GetGrantID returns the value of GrantID.
-func (s *ProjectAdminGrantSource) GetGrantID() string {
-	return s.GrantID
-}
-
-// GetTeam returns the value of Team.
-func (s *ProjectAdminGrantSource) GetTeam() OptTeamRef {
-	return s.Team
-}
-
-// SetType sets the value of Type.
-func (s *ProjectAdminGrantSource) SetType(val ProjectAdminGrantSourceType) {
-	s.Type = val
-}
-
-// SetGrantID sets the value of GrantID.
-func (s *ProjectAdminGrantSource) SetGrantID(val string) {
-	s.GrantID = val
-}
-
-// SetTeam sets the value of Team.
-func (s *ProjectAdminGrantSource) SetTeam(val OptTeamRef) {
-	s.Team = val
-}
-
-type ProjectAdminGrantSourceType string
-
-const (
-	ProjectAdminGrantSourceTypeGrant ProjectAdminGrantSourceType = "grant"
-)
-
-// AllValues returns all ProjectAdminGrantSourceType values.
-func (ProjectAdminGrantSourceType) AllValues() []ProjectAdminGrantSourceType {
-	return []ProjectAdminGrantSourceType{
-		ProjectAdminGrantSourceTypeGrant,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s ProjectAdminGrantSourceType) MarshalText() ([]byte, error) {
-	switch s {
-	case ProjectAdminGrantSourceTypeGrant:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *ProjectAdminGrantSourceType) UnmarshalText(data []byte) error {
-	switch ProjectAdminGrantSourceType(data) {
-	case ProjectAdminGrantSourceTypeGrant:
-		*s = ProjectAdminGrantSourceTypeGrant
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Admin access as an active member of the team that owns the project.
-// Ref: #
-type ProjectAdminOwningTeamSource struct {
-	Type ProjectAdminOwningTeamSourceType `json:"type"`
-	// The owning team.
-	Team TeamRef `json:"team"`
-}
-
-// GetType returns the value of Type.
-func (s *ProjectAdminOwningTeamSource) GetType() ProjectAdminOwningTeamSourceType {
-	return s.Type
-}
-
-// GetTeam returns the value of Team.
-func (s *ProjectAdminOwningTeamSource) GetTeam() TeamRef {
-	return s.Team
-}
-
-// SetType sets the value of Type.
-func (s *ProjectAdminOwningTeamSource) SetType(val ProjectAdminOwningTeamSourceType) {
-	s.Type = val
-}
-
-// SetTeam sets the value of Team.
-func (s *ProjectAdminOwningTeamSource) SetTeam(val TeamRef) {
-	s.Team = val
-}
-
-type ProjectAdminOwningTeamSourceType string
-
-const (
-	ProjectAdminOwningTeamSourceTypeOwningTeam ProjectAdminOwningTeamSourceType = "owning_team"
-)
-
-// AllValues returns all ProjectAdminOwningTeamSourceType values.
-func (ProjectAdminOwningTeamSourceType) AllValues() []ProjectAdminOwningTeamSourceType {
-	return []ProjectAdminOwningTeamSourceType{
-		ProjectAdminOwningTeamSourceTypeOwningTeam,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s ProjectAdminOwningTeamSourceType) MarshalText() ([]byte, error) {
-	switch s {
-	case ProjectAdminOwningTeamSourceTypeOwningTeam:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *ProjectAdminOwningTeamSourceType) UnmarshalText(data []byte) error {
-	switch ProjectAdminOwningTeamSourceType(data) {
-	case ProjectAdminOwningTeamSourceTypeOwningTeam:
-		*s = ProjectAdminOwningTeamSourceTypeOwningTeam
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// One way a person holds admin access to the project. Discriminate on `type`.
-//
-//   - `owning_team`: the person is an active member of the owning team named by `team`. There is no
-//     `grant_id`: this access is not a grant, so the grants API cannot revoke it.
-//   - `grant`: an `admin` grant on the project, named by `grant_id`. `team` is present when the grant
-//     is to a team the person is an active member of. It is absent when the grant is to the person
-//     directly.
-//
-// Ref: #
-// ProjectAdminSource represents sum type.
-type ProjectAdminSource struct {
-	// Type selects the active sum variant, switch on this field.
-	Type                         ProjectAdminSourceType
-	ProjectAdminOwningTeamSource ProjectAdminOwningTeamSource
-	ProjectAdminGrantSource      ProjectAdminGrantSource
-}
-
-// ProjectAdminSourceType is oneOf type of ProjectAdminSource.
-type ProjectAdminSourceType string
-
-// Possible values for ProjectAdminSourceType.
-const (
-	ProjectAdminOwningTeamSourceProjectAdminSource ProjectAdminSourceType = "owning_team"
-	ProjectAdminGrantSourceProjectAdminSource      ProjectAdminSourceType = "grant"
-)
-
-// IsProjectAdminOwningTeamSource reports whether ProjectAdminSource is ProjectAdminOwningTeamSource.
-func (s ProjectAdminSource) IsProjectAdminOwningTeamSource() bool {
-	return s.Type == ProjectAdminOwningTeamSourceProjectAdminSource
-}
-
-// IsProjectAdminGrantSource reports whether ProjectAdminSource is ProjectAdminGrantSource.
-func (s ProjectAdminSource) IsProjectAdminGrantSource() bool {
-	return s.Type == ProjectAdminGrantSourceProjectAdminSource
-}
-
-// SetProjectAdminOwningTeamSource sets ProjectAdminSource to ProjectAdminOwningTeamSource.
-func (s *ProjectAdminSource) SetProjectAdminOwningTeamSource(v ProjectAdminOwningTeamSource) {
-	s.Type = ProjectAdminOwningTeamSourceProjectAdminSource
-	s.ProjectAdminOwningTeamSource = v
-}
-
-// GetProjectAdminOwningTeamSource returns ProjectAdminOwningTeamSource and true boolean if ProjectAdminSource is ProjectAdminOwningTeamSource.
-func (s ProjectAdminSource) GetProjectAdminOwningTeamSource() (v ProjectAdminOwningTeamSource, ok bool) {
-	if !s.IsProjectAdminOwningTeamSource() {
-		return v, false
-	}
-	return s.ProjectAdminOwningTeamSource, true
-}
-
-// NewProjectAdminOwningTeamSourceProjectAdminSource returns new ProjectAdminSource from ProjectAdminOwningTeamSource.
-func NewProjectAdminOwningTeamSourceProjectAdminSource(v ProjectAdminOwningTeamSource) ProjectAdminSource {
-	var s ProjectAdminSource
-	s.SetProjectAdminOwningTeamSource(v)
-	return s
-}
-
-// SetProjectAdminGrantSource sets ProjectAdminSource to ProjectAdminGrantSource.
-func (s *ProjectAdminSource) SetProjectAdminGrantSource(v ProjectAdminGrantSource) {
-	s.Type = ProjectAdminGrantSourceProjectAdminSource
-	s.ProjectAdminGrantSource = v
-}
-
-// GetProjectAdminGrantSource returns ProjectAdminGrantSource and true boolean if ProjectAdminSource is ProjectAdminGrantSource.
-func (s ProjectAdminSource) GetProjectAdminGrantSource() (v ProjectAdminGrantSource, ok bool) {
-	if !s.IsProjectAdminGrantSource() {
-		return v, false
-	}
-	return s.ProjectAdminGrantSource, true
-}
-
-// NewProjectAdminGrantSourceProjectAdminSource returns new ProjectAdminSource from ProjectAdminGrantSource.
-func NewProjectAdminGrantSourceProjectAdminSource(v ProjectAdminGrantSource) ProjectAdminSource {
-	var s ProjectAdminSource
-	s.SetProjectAdminGrantSource(v)
-	return s
-}
-
 // Merged schema.
 // Ref: #
 type ProjectCreatedEvent struct {
@@ -98222,7 +98535,8 @@ type ProjectDetailResponse struct {
 	// project, for example before it is claimed.
 	//
 	// The team lives in the platform project, so treat this ID as opaque.
-	// `GET /projects/{project_id}/admins` lists the people who administer the project through it.
+	// `GET /projects/{project_id}/members?relation=admin` lists the people who administer the project,
+	// through it or through a grant.
 	OwningTeamID NilTeamID `json:"owning_team_id"`
 }
 
@@ -129468,6 +129782,7 @@ type WebhookEvent struct {
 	WebhookEvent56 WebhookEvent56
 	WebhookEvent57 WebhookEvent57
 	WebhookEvent58 WebhookEvent58
+	WebhookEvent59 WebhookEvent59
 }
 
 // WebhookEventType is oneOf type of WebhookEvent.
@@ -129484,56 +129799,57 @@ const (
 	WebhookEvent6WebhookEvent  WebhookEventType = "auth.factor.passkey.enrolled"
 	WebhookEvent7WebhookEvent  WebhookEventType = "auth.factor.password.set"
 	WebhookEvent8WebhookEvent  WebhookEventType = "auth.request.created"
-	WebhookEvent9WebhookEvent  WebhookEventType = "auth.sso.authorization.failed"
-	WebhookEvent10WebhookEvent WebhookEventType = "auth.sso.exchange.failed"
-	WebhookEvent11WebhookEvent WebhookEventType = "auth.sso.exchange.succeeded"
-	WebhookEvent12WebhookEvent WebhookEventType = "auth.token.issued"
-	WebhookEvent13WebhookEvent WebhookEventType = "auth.token.revoked"
-	WebhookEvent14WebhookEvent WebhookEventType = "authz.granted"
-	WebhookEvent15WebhookEvent WebhookEventType = "authz.revoked"
-	WebhookEvent16WebhookEvent WebhookEventType = "branding.created"
-	WebhookEvent17WebhookEvent WebhookEventType = "deployment.created"
-	WebhookEvent18WebhookEvent WebhookEventType = "flow.signup_challenge.consumed"
-	WebhookEvent19WebhookEvent WebhookEventType = "flow.signup_challenge.issued"
-	WebhookEvent20WebhookEvent WebhookEventType = "flowdef.created"
-	WebhookEvent21WebhookEvent WebhookEventType = "flowdef.deleted"
-	WebhookEvent22WebhookEvent WebhookEventType = "flowdef.updated"
-	WebhookEvent23WebhookEvent WebhookEventType = "idp.created"
-	WebhookEvent24WebhookEvent WebhookEventType = "idp.identity_link.created"
-	WebhookEvent25WebhookEvent WebhookEventType = "idp.updated"
-	WebhookEvent26WebhookEvent WebhookEventType = "invitation.accepted"
-	WebhookEvent27WebhookEvent WebhookEventType = "invitation.cancelled"
-	WebhookEvent28WebhookEvent WebhookEventType = "invitation.created"
-	WebhookEvent29WebhookEvent WebhookEventType = "invitation.rejected"
-	WebhookEvent30WebhookEvent WebhookEventType = "oauth_settings.created"
-	WebhookEvent31WebhookEvent WebhookEventType = "origin.added"
-	WebhookEvent32WebhookEvent WebhookEventType = "origin.removed"
-	WebhookEvent33WebhookEvent WebhookEventType = "policy.created"
-	WebhookEvent34WebhookEvent WebhookEventType = "policy.updated"
-	WebhookEvent35WebhookEvent WebhookEventType = "preview.removed"
-	WebhookEvent36WebhookEvent WebhookEventType = "project.created"
-	WebhookEvent37WebhookEvent WebhookEventType = "project.deleted"
-	WebhookEvent38WebhookEvent WebhookEventType = "project.updated"
-	WebhookEvent39WebhookEvent WebhookEventType = "release.created"
-	WebhookEvent40WebhookEvent WebhookEventType = "release.revoked"
-	WebhookEvent41WebhookEvent WebhookEventType = "request.api"
-	WebhookEvent42WebhookEvent WebhookEventType = "schema.created"
-	WebhookEvent43WebhookEvent WebhookEventType = "session.deleted"
-	WebhookEvent44WebhookEvent WebhookEventType = "session.established"
-	WebhookEvent45WebhookEvent WebhookEventType = "team.created"
-	WebhookEvent46WebhookEvent WebhookEventType = "team.deactivated"
-	WebhookEvent47WebhookEvent WebhookEventType = "team.updated"
-	WebhookEvent48WebhookEvent WebhookEventType = "user.create.failed"
-	WebhookEvent49WebhookEvent WebhookEventType = "user.created"
-	WebhookEvent50WebhookEvent WebhookEventType = "user.deleted"
-	WebhookEvent51WebhookEvent WebhookEventType = "user.updated"
-	WebhookEvent52WebhookEvent WebhookEventType = "variable.removed"
-	WebhookEvent53WebhookEvent WebhookEventType = "variable.set"
-	WebhookEvent54WebhookEvent WebhookEventType = "webhook.created"
-	WebhookEvent55WebhookEvent WebhookEventType = "webhook.deleted"
-	WebhookEvent56WebhookEvent WebhookEventType = "webhook.disabled"
-	WebhookEvent57WebhookEvent WebhookEventType = "webhook.secret_rotated"
-	WebhookEvent58WebhookEvent WebhookEventType = "webhook.updated"
+	WebhookEvent9WebhookEvent  WebhookEventType = "auth.request.exchange.failed"
+	WebhookEvent10WebhookEvent WebhookEventType = "auth.sso.authorization.failed"
+	WebhookEvent11WebhookEvent WebhookEventType = "auth.sso.exchange.failed"
+	WebhookEvent12WebhookEvent WebhookEventType = "auth.sso.exchange.succeeded"
+	WebhookEvent13WebhookEvent WebhookEventType = "auth.token.issued"
+	WebhookEvent14WebhookEvent WebhookEventType = "auth.token.revoked"
+	WebhookEvent15WebhookEvent WebhookEventType = "authz.granted"
+	WebhookEvent16WebhookEvent WebhookEventType = "authz.revoked"
+	WebhookEvent17WebhookEvent WebhookEventType = "branding.created"
+	WebhookEvent18WebhookEvent WebhookEventType = "deployment.created"
+	WebhookEvent19WebhookEvent WebhookEventType = "flow.signup_challenge.consumed"
+	WebhookEvent20WebhookEvent WebhookEventType = "flow.signup_challenge.issued"
+	WebhookEvent21WebhookEvent WebhookEventType = "flowdef.created"
+	WebhookEvent22WebhookEvent WebhookEventType = "flowdef.deleted"
+	WebhookEvent23WebhookEvent WebhookEventType = "flowdef.updated"
+	WebhookEvent24WebhookEvent WebhookEventType = "idp.created"
+	WebhookEvent25WebhookEvent WebhookEventType = "idp.identity_link.created"
+	WebhookEvent26WebhookEvent WebhookEventType = "idp.updated"
+	WebhookEvent27WebhookEvent WebhookEventType = "invitation.accepted"
+	WebhookEvent28WebhookEvent WebhookEventType = "invitation.cancelled"
+	WebhookEvent29WebhookEvent WebhookEventType = "invitation.created"
+	WebhookEvent30WebhookEvent WebhookEventType = "invitation.rejected"
+	WebhookEvent31WebhookEvent WebhookEventType = "oauth_settings.created"
+	WebhookEvent32WebhookEvent WebhookEventType = "origin.added"
+	WebhookEvent33WebhookEvent WebhookEventType = "origin.removed"
+	WebhookEvent34WebhookEvent WebhookEventType = "policy.created"
+	WebhookEvent35WebhookEvent WebhookEventType = "policy.updated"
+	WebhookEvent36WebhookEvent WebhookEventType = "preview.removed"
+	WebhookEvent37WebhookEvent WebhookEventType = "project.created"
+	WebhookEvent38WebhookEvent WebhookEventType = "project.deleted"
+	WebhookEvent39WebhookEvent WebhookEventType = "project.updated"
+	WebhookEvent40WebhookEvent WebhookEventType = "release.created"
+	WebhookEvent41WebhookEvent WebhookEventType = "release.revoked"
+	WebhookEvent42WebhookEvent WebhookEventType = "request.api"
+	WebhookEvent43WebhookEvent WebhookEventType = "schema.created"
+	WebhookEvent44WebhookEvent WebhookEventType = "session.deleted"
+	WebhookEvent45WebhookEvent WebhookEventType = "session.established"
+	WebhookEvent46WebhookEvent WebhookEventType = "team.created"
+	WebhookEvent47WebhookEvent WebhookEventType = "team.deactivated"
+	WebhookEvent48WebhookEvent WebhookEventType = "team.updated"
+	WebhookEvent49WebhookEvent WebhookEventType = "user.create.failed"
+	WebhookEvent50WebhookEvent WebhookEventType = "user.created"
+	WebhookEvent51WebhookEvent WebhookEventType = "user.deleted"
+	WebhookEvent52WebhookEvent WebhookEventType = "user.updated"
+	WebhookEvent53WebhookEvent WebhookEventType = "variable.removed"
+	WebhookEvent54WebhookEvent WebhookEventType = "variable.set"
+	WebhookEvent55WebhookEvent WebhookEventType = "webhook.created"
+	WebhookEvent56WebhookEvent WebhookEventType = "webhook.deleted"
+	WebhookEvent57WebhookEvent WebhookEventType = "webhook.disabled"
+	WebhookEvent58WebhookEvent WebhookEventType = "webhook.secret_rotated"
+	WebhookEvent59WebhookEvent WebhookEventType = "webhook.updated"
 )
 
 // IsWebhookEvent0 reports whether WebhookEvent is WebhookEvent0.
@@ -129712,6 +130028,9 @@ func (s WebhookEvent) IsWebhookEvent57() bool { return s.Type == WebhookEvent57W
 
 // IsWebhookEvent58 reports whether WebhookEvent is WebhookEvent58.
 func (s WebhookEvent) IsWebhookEvent58() bool { return s.Type == WebhookEvent58WebhookEvent }
+
+// IsWebhookEvent59 reports whether WebhookEvent is WebhookEvent59.
+func (s WebhookEvent) IsWebhookEvent59() bool { return s.Type == WebhookEvent59WebhookEvent }
 
 // SetWebhookEvent0 sets WebhookEvent to WebhookEvent0.
 func (s *WebhookEvent) SetWebhookEvent0(v WebhookEvent0) {
@@ -130952,6 +131271,27 @@ func NewWebhookEvent58WebhookEvent(v WebhookEvent58) WebhookEvent {
 	return s
 }
 
+// SetWebhookEvent59 sets WebhookEvent to WebhookEvent59.
+func (s *WebhookEvent) SetWebhookEvent59(v WebhookEvent59) {
+	s.Type = WebhookEvent59WebhookEvent
+	s.WebhookEvent59 = v
+}
+
+// GetWebhookEvent59 returns WebhookEvent59 and true boolean if WebhookEvent is WebhookEvent59.
+func (s WebhookEvent) GetWebhookEvent59() (v WebhookEvent59, ok bool) {
+	if !s.IsWebhookEvent59() {
+		return v, false
+	}
+	return s.WebhookEvent59, true
+}
+
+// NewWebhookEvent59WebhookEvent returns new WebhookEvent from WebhookEvent59.
+func NewWebhookEvent59WebhookEvent(v WebhookEvent59) WebhookEvent {
+	var s WebhookEvent
+	s.SetWebhookEvent59(v)
+	return s
+}
+
 // Merged schema.
 type WebhookEvent0 struct {
 	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
@@ -131666,7 +132006,7 @@ type WebhookEvent12 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent12Entity `json:"entity"`
-	Data   AuthTokenIssuedPayload  `json:"data"`
+	Data   AuthCheckPayload        `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -131700,7 +132040,7 @@ func (s *WebhookEvent12) GetEntity() NilWebhookEvent12Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent12) GetData() AuthTokenIssuedPayload {
+func (s *WebhookEvent12) GetData() AuthCheckPayload {
 	return s.Data
 }
 
@@ -131735,7 +132075,7 @@ func (s *WebhookEvent12) SetEntity(val NilWebhookEvent12Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent12) SetData(val AuthTokenIssuedPayload) {
+func (s *WebhookEvent12) SetData(val AuthCheckPayload) {
 	s.Data = val
 }
 
@@ -131867,7 +132207,7 @@ type WebhookEvent13 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent13Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   AuthTokenIssuedPayload  `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -131901,7 +132241,7 @@ func (s *WebhookEvent13) GetEntity() NilWebhookEvent13Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent13) GetData() EmptyEventPayload {
+func (s *WebhookEvent13) GetData() AuthTokenIssuedPayload {
 	return s.Data
 }
 
@@ -131936,7 +132276,7 @@ func (s *WebhookEvent13) SetEntity(val NilWebhookEvent13Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent13) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent13) SetData(val AuthTokenIssuedPayload) {
 	s.Data = val
 }
 
@@ -132068,7 +132408,7 @@ type WebhookEvent14 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent14Entity `json:"entity"`
-	Data   AuthzGrantedPayload     `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -132102,7 +132442,7 @@ func (s *WebhookEvent14) GetEntity() NilWebhookEvent14Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent14) GetData() AuthzGrantedPayload {
+func (s *WebhookEvent14) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -132137,7 +132477,7 @@ func (s *WebhookEvent14) SetEntity(val NilWebhookEvent14Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent14) SetData(val AuthzGrantedPayload) {
+func (s *WebhookEvent14) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -132470,7 +132810,7 @@ type WebhookEvent16 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent16Entity `json:"entity"`
-	Data   BrandingCreatedPayload  `json:"data"`
+	Data   AuthzGrantedPayload     `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -132504,7 +132844,7 @@ func (s *WebhookEvent16) GetEntity() NilWebhookEvent16Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent16) GetData() BrandingCreatedPayload {
+func (s *WebhookEvent16) GetData() AuthzGrantedPayload {
 	return s.Data
 }
 
@@ -132539,7 +132879,7 @@ func (s *WebhookEvent16) SetEntity(val NilWebhookEvent16Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent16) SetData(val BrandingCreatedPayload) {
+func (s *WebhookEvent16) SetData(val AuthzGrantedPayload) {
 	s.Data = val
 }
 
@@ -132670,8 +133010,8 @@ type WebhookEvent17 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent17Entity  `json:"entity"`
-	Data   DeploymentCreatedPayload `json:"data"`
+	Entity NilWebhookEvent17Entity `json:"entity"`
+	Data   BrandingCreatedPayload  `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -132705,7 +133045,7 @@ func (s *WebhookEvent17) GetEntity() NilWebhookEvent17Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent17) GetData() DeploymentCreatedPayload {
+func (s *WebhookEvent17) GetData() BrandingCreatedPayload {
 	return s.Data
 }
 
@@ -132740,7 +133080,7 @@ func (s *WebhookEvent17) SetEntity(val NilWebhookEvent17Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent17) SetData(val DeploymentCreatedPayload) {
+func (s *WebhookEvent17) SetData(val BrandingCreatedPayload) {
 	s.Data = val
 }
 
@@ -132871,8 +133211,8 @@ type WebhookEvent18 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent18Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Entity NilWebhookEvent18Entity  `json:"entity"`
+	Data   DeploymentCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -132906,7 +133246,7 @@ func (s *WebhookEvent18) GetEntity() NilWebhookEvent18Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent18) GetData() EmptyEventPayload {
+func (s *WebhookEvent18) GetData() DeploymentCreatedPayload {
 	return s.Data
 }
 
@@ -132941,7 +133281,7 @@ func (s *WebhookEvent18) SetEntity(val NilWebhookEvent18Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent18) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent18) SetData(val DeploymentCreatedPayload) {
 	s.Data = val
 }
 
@@ -133475,7 +133815,7 @@ type WebhookEvent20 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent20Entity `json:"entity"`
-	Data   FlowdefPayload          `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -133509,7 +133849,7 @@ func (s *WebhookEvent20) GetEntity() NilWebhookEvent20Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent20) GetData() FlowdefPayload {
+func (s *WebhookEvent20) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -133544,7 +133884,7 @@ func (s *WebhookEvent20) SetEntity(val NilWebhookEvent20Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent20) SetData(val FlowdefPayload) {
+func (s *WebhookEvent20) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -133658,8 +133998,6 @@ func (s *WebhookEvent20Entity) SetID(val NilString) {
 }
 
 // Merged schema.
-//
-// Deprecated: schema marks this type as deprecated.
 type WebhookEvent21 struct {
 	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
 	// `getEvent` (`GET /events/{event_id}`) takes.
@@ -133678,7 +134016,7 @@ type WebhookEvent21 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent21Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   FlowdefPayload          `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -133712,7 +134050,7 @@ func (s *WebhookEvent21) GetEntity() NilWebhookEvent21Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent21) GetData() EmptyEventPayload {
+func (s *WebhookEvent21) GetData() FlowdefPayload {
 	return s.Data
 }
 
@@ -133747,7 +134085,7 @@ func (s *WebhookEvent21) SetEntity(val NilWebhookEvent21Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent21) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent21) SetData(val FlowdefPayload) {
 	s.Data = val
 }
 
@@ -133881,7 +134219,7 @@ type WebhookEvent22 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent22Entity `json:"entity"`
-	Data   FlowdefPayload          `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -133915,7 +134253,7 @@ func (s *WebhookEvent22) GetEntity() NilWebhookEvent22Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent22) GetData() FlowdefPayload {
+func (s *WebhookEvent22) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -133950,7 +134288,7 @@ func (s *WebhookEvent22) SetEntity(val NilWebhookEvent22Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent22) SetData(val FlowdefPayload) {
+func (s *WebhookEvent22) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -134064,6 +134402,8 @@ func (s *WebhookEvent22Entity) SetID(val NilString) {
 }
 
 // Merged schema.
+//
+// Deprecated: schema marks this type as deprecated.
 type WebhookEvent23 struct {
 	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
 	// `getEvent` (`GET /events/{event_id}`) takes.
@@ -134082,7 +134422,7 @@ type WebhookEvent23 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent23Entity `json:"entity"`
-	Data   IdpPayload              `json:"data"`
+	Data   FlowdefPayload          `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -134116,7 +134456,7 @@ func (s *WebhookEvent23) GetEntity() NilWebhookEvent23Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent23) GetData() IdpPayload {
+func (s *WebhookEvent23) GetData() FlowdefPayload {
 	return s.Data
 }
 
@@ -134151,7 +134491,7 @@ func (s *WebhookEvent23) SetEntity(val NilWebhookEvent23Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent23) SetData(val IdpPayload) {
+func (s *WebhookEvent23) SetData(val FlowdefPayload) {
 	s.Data = val
 }
 
@@ -134282,8 +134622,8 @@ type WebhookEvent24 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent24Entity       `json:"entity"`
-	Data   IdpIdentityLinkCreatedPayload `json:"data"`
+	Entity NilWebhookEvent24Entity `json:"entity"`
+	Data   IdpPayload              `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -134317,7 +134657,7 @@ func (s *WebhookEvent24) GetEntity() NilWebhookEvent24Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent24) GetData() IdpIdentityLinkCreatedPayload {
+func (s *WebhookEvent24) GetData() IdpPayload {
 	return s.Data
 }
 
@@ -134352,7 +134692,7 @@ func (s *WebhookEvent24) SetEntity(val NilWebhookEvent24Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent24) SetData(val IdpIdentityLinkCreatedPayload) {
+func (s *WebhookEvent24) SetData(val IdpPayload) {
 	s.Data = val
 }
 
@@ -134483,8 +134823,8 @@ type WebhookEvent25 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent25Entity `json:"entity"`
-	Data   IdpPayload              `json:"data"`
+	Entity NilWebhookEvent25Entity       `json:"entity"`
+	Data   IdpIdentityLinkCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -134518,7 +134858,7 @@ func (s *WebhookEvent25) GetEntity() NilWebhookEvent25Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent25) GetData() IdpPayload {
+func (s *WebhookEvent25) GetData() IdpIdentityLinkCreatedPayload {
 	return s.Data
 }
 
@@ -134553,7 +134893,7 @@ func (s *WebhookEvent25) SetEntity(val NilWebhookEvent25Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent25) SetData(val IdpPayload) {
+func (s *WebhookEvent25) SetData(val IdpIdentityLinkCreatedPayload) {
 	s.Data = val
 }
 
@@ -134684,8 +135024,8 @@ type WebhookEvent26 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent26Entity   `json:"entity"`
-	Data   InvitationAcceptedPayload `json:"data"`
+	Entity NilWebhookEvent26Entity `json:"entity"`
+	Data   IdpPayload              `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -134719,7 +135059,7 @@ func (s *WebhookEvent26) GetEntity() NilWebhookEvent26Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent26) GetData() InvitationAcceptedPayload {
+func (s *WebhookEvent26) GetData() IdpPayload {
 	return s.Data
 }
 
@@ -134754,7 +135094,7 @@ func (s *WebhookEvent26) SetEntity(val NilWebhookEvent26Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent26) SetData(val InvitationAcceptedPayload) {
+func (s *WebhookEvent26) SetData(val IdpPayload) {
 	s.Data = val
 }
 
@@ -134885,8 +135225,8 @@ type WebhookEvent27 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent27Entity    `json:"entity"`
-	Data   InvitationCancelledPayload `json:"data"`
+	Entity NilWebhookEvent27Entity   `json:"entity"`
+	Data   InvitationAcceptedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -134920,7 +135260,7 @@ func (s *WebhookEvent27) GetEntity() NilWebhookEvent27Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent27) GetData() InvitationCancelledPayload {
+func (s *WebhookEvent27) GetData() InvitationAcceptedPayload {
 	return s.Data
 }
 
@@ -134955,7 +135295,7 @@ func (s *WebhookEvent27) SetEntity(val NilWebhookEvent27Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent27) SetData(val InvitationCancelledPayload) {
+func (s *WebhookEvent27) SetData(val InvitationAcceptedPayload) {
 	s.Data = val
 }
 
@@ -135086,8 +135426,8 @@ type WebhookEvent28 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent28Entity  `json:"entity"`
-	Data   InvitationCreatedPayload `json:"data"`
+	Entity NilWebhookEvent28Entity    `json:"entity"`
+	Data   InvitationCancelledPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -135121,7 +135461,7 @@ func (s *WebhookEvent28) GetEntity() NilWebhookEvent28Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent28) GetData() InvitationCreatedPayload {
+func (s *WebhookEvent28) GetData() InvitationCancelledPayload {
 	return s.Data
 }
 
@@ -135156,7 +135496,7 @@ func (s *WebhookEvent28) SetEntity(val NilWebhookEvent28Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent28) SetData(val InvitationCreatedPayload) {
+func (s *WebhookEvent28) SetData(val InvitationCancelledPayload) {
 	s.Data = val
 }
 
@@ -135287,8 +135627,8 @@ type WebhookEvent29 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent29Entity   `json:"entity"`
-	Data   InvitationRejectedPayload `json:"data"`
+	Entity NilWebhookEvent29Entity  `json:"entity"`
+	Data   InvitationCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -135322,7 +135662,7 @@ func (s *WebhookEvent29) GetEntity() NilWebhookEvent29Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent29) GetData() InvitationRejectedPayload {
+func (s *WebhookEvent29) GetData() InvitationCreatedPayload {
 	return s.Data
 }
 
@@ -135357,7 +135697,7 @@ func (s *WebhookEvent29) SetEntity(val NilWebhookEvent29Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent29) SetData(val InvitationRejectedPayload) {
+func (s *WebhookEvent29) SetData(val InvitationCreatedPayload) {
 	s.Data = val
 }
 
@@ -135689,8 +136029,8 @@ type WebhookEvent30 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent30Entity     `json:"entity"`
-	Data   OAuthSettingsCreatedPayload `json:"data"`
+	Entity NilWebhookEvent30Entity   `json:"entity"`
+	Data   InvitationRejectedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -135724,7 +136064,7 @@ func (s *WebhookEvent30) GetEntity() NilWebhookEvent30Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent30) GetData() OAuthSettingsCreatedPayload {
+func (s *WebhookEvent30) GetData() InvitationRejectedPayload {
 	return s.Data
 }
 
@@ -135759,7 +136099,7 @@ func (s *WebhookEvent30) SetEntity(val NilWebhookEvent30Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent30) SetData(val OAuthSettingsCreatedPayload) {
+func (s *WebhookEvent30) SetData(val InvitationRejectedPayload) {
 	s.Data = val
 }
 
@@ -135890,8 +136230,8 @@ type WebhookEvent31 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent31Entity `json:"entity"`
-	Data   OriginPayload           `json:"data"`
+	Entity NilWebhookEvent31Entity     `json:"entity"`
+	Data   OAuthSettingsCreatedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -135925,7 +136265,7 @@ func (s *WebhookEvent31) GetEntity() NilWebhookEvent31Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent31) GetData() OriginPayload {
+func (s *WebhookEvent31) GetData() OAuthSettingsCreatedPayload {
 	return s.Data
 }
 
@@ -135960,7 +136300,7 @@ func (s *WebhookEvent31) SetEntity(val NilWebhookEvent31Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent31) SetData(val OriginPayload) {
+func (s *WebhookEvent31) SetData(val OAuthSettingsCreatedPayload) {
 	s.Data = val
 }
 
@@ -136293,7 +136633,7 @@ type WebhookEvent33 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent33Entity `json:"entity"`
-	Data   PolicyPayload           `json:"data"`
+	Data   OriginPayload           `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -136327,7 +136667,7 @@ func (s *WebhookEvent33) GetEntity() NilWebhookEvent33Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent33) GetData() PolicyPayload {
+func (s *WebhookEvent33) GetData() OriginPayload {
 	return s.Data
 }
 
@@ -136362,7 +136702,7 @@ func (s *WebhookEvent33) SetEntity(val NilWebhookEvent33Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent33) SetData(val PolicyPayload) {
+func (s *WebhookEvent33) SetData(val OriginPayload) {
 	s.Data = val
 }
 
@@ -136695,7 +137035,7 @@ type WebhookEvent35 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent35Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   PolicyPayload           `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -136729,7 +137069,7 @@ func (s *WebhookEvent35) GetEntity() NilWebhookEvent35Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent35) GetData() EmptyEventPayload {
+func (s *WebhookEvent35) GetData() PolicyPayload {
 	return s.Data
 }
 
@@ -136764,7 +137104,7 @@ func (s *WebhookEvent35) SetEntity(val NilWebhookEvent35Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent35) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent35) SetData(val PolicyPayload) {
 	s.Data = val
 }
 
@@ -136896,7 +137236,7 @@ type WebhookEvent36 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent36Entity `json:"entity"`
-	Data   ProjectPayload          `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -136930,7 +137270,7 @@ func (s *WebhookEvent36) GetEntity() NilWebhookEvent36Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent36) GetData() ProjectPayload {
+func (s *WebhookEvent36) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -136965,7 +137305,7 @@ func (s *WebhookEvent36) SetEntity(val NilWebhookEvent36Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent36) SetData(val ProjectPayload) {
+func (s *WebhookEvent36) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -137097,7 +137437,7 @@ type WebhookEvent37 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent37Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   ProjectPayload          `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -137131,7 +137471,7 @@ func (s *WebhookEvent37) GetEntity() NilWebhookEvent37Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent37) GetData() EmptyEventPayload {
+func (s *WebhookEvent37) GetData() ProjectPayload {
 	return s.Data
 }
 
@@ -137166,7 +137506,7 @@ func (s *WebhookEvent37) SetEntity(val NilWebhookEvent37Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent37) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent37) SetData(val ProjectPayload) {
 	s.Data = val
 }
 
@@ -137298,7 +137638,7 @@ type WebhookEvent38 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent38Entity `json:"entity"`
-	Data   ProjectPayload          `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -137332,7 +137672,7 @@ func (s *WebhookEvent38) GetEntity() NilWebhookEvent38Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent38) GetData() ProjectPayload {
+func (s *WebhookEvent38) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -137367,7 +137707,7 @@ func (s *WebhookEvent38) SetEntity(val NilWebhookEvent38Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent38) SetData(val ProjectPayload) {
+func (s *WebhookEvent38) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -137499,7 +137839,7 @@ type WebhookEvent39 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent39Entity `json:"entity"`
-	Data   ReleaseCreatedPayload   `json:"data"`
+	Data   ProjectPayload          `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -137533,7 +137873,7 @@ func (s *WebhookEvent39) GetEntity() NilWebhookEvent39Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent39) GetData() ReleaseCreatedPayload {
+func (s *WebhookEvent39) GetData() ProjectPayload {
 	return s.Data
 }
 
@@ -137568,7 +137908,7 @@ func (s *WebhookEvent39) SetEntity(val NilWebhookEvent39Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent39) SetData(val ReleaseCreatedPayload) {
+func (s *WebhookEvent39) SetData(val ProjectPayload) {
 	s.Data = val
 }
 
@@ -137901,7 +138241,7 @@ type WebhookEvent40 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent40Entity `json:"entity"`
-	Data   ReleaseRevokedPayload   `json:"data"`
+	Data   ReleaseCreatedPayload   `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -137935,7 +138275,7 @@ func (s *WebhookEvent40) GetEntity() NilWebhookEvent40Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent40) GetData() ReleaseRevokedPayload {
+func (s *WebhookEvent40) GetData() ReleaseCreatedPayload {
 	return s.Data
 }
 
@@ -137970,7 +138310,7 @@ func (s *WebhookEvent40) SetEntity(val NilWebhookEvent40Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent40) SetData(val ReleaseRevokedPayload) {
+func (s *WebhookEvent40) SetData(val ReleaseCreatedPayload) {
 	s.Data = val
 }
 
@@ -138102,7 +138442,7 @@ type WebhookEvent41 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent41Entity `json:"entity"`
-	Data   RequestAPIPayload       `json:"data"`
+	Data   ReleaseRevokedPayload   `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -138136,7 +138476,7 @@ func (s *WebhookEvent41) GetEntity() NilWebhookEvent41Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent41) GetData() RequestAPIPayload {
+func (s *WebhookEvent41) GetData() ReleaseRevokedPayload {
 	return s.Data
 }
 
@@ -138171,7 +138511,7 @@ func (s *WebhookEvent41) SetEntity(val NilWebhookEvent41Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent41) SetData(val RequestAPIPayload) {
+func (s *WebhookEvent41) SetData(val ReleaseRevokedPayload) {
 	s.Data = val
 }
 
@@ -138303,7 +138643,7 @@ type WebhookEvent42 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent42Entity `json:"entity"`
-	Data   SchemaCreatedPayload    `json:"data"`
+	Data   RequestAPIPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -138337,7 +138677,7 @@ func (s *WebhookEvent42) GetEntity() NilWebhookEvent42Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent42) GetData() SchemaCreatedPayload {
+func (s *WebhookEvent42) GetData() RequestAPIPayload {
 	return s.Data
 }
 
@@ -138372,7 +138712,7 @@ func (s *WebhookEvent42) SetEntity(val NilWebhookEvent42Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent42) SetData(val SchemaCreatedPayload) {
+func (s *WebhookEvent42) SetData(val RequestAPIPayload) {
 	s.Data = val
 }
 
@@ -138504,7 +138844,7 @@ type WebhookEvent43 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent43Entity `json:"entity"`
-	Data   SessionDeletedPayload   `json:"data"`
+	Data   SchemaCreatedPayload    `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -138538,7 +138878,7 @@ func (s *WebhookEvent43) GetEntity() NilWebhookEvent43Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent43) GetData() SessionDeletedPayload {
+func (s *WebhookEvent43) GetData() SchemaCreatedPayload {
 	return s.Data
 }
 
@@ -138573,7 +138913,7 @@ func (s *WebhookEvent43) SetEntity(val NilWebhookEvent43Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent43) SetData(val SessionDeletedPayload) {
+func (s *WebhookEvent43) SetData(val SchemaCreatedPayload) {
 	s.Data = val
 }
 
@@ -138704,8 +139044,8 @@ type WebhookEvent44 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent44Entity   `json:"entity"`
-	Data   SessionEstablishedPayload `json:"data"`
+	Entity NilWebhookEvent44Entity `json:"entity"`
+	Data   SessionDeletedPayload   `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -138739,7 +139079,7 @@ func (s *WebhookEvent44) GetEntity() NilWebhookEvent44Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent44) GetData() SessionEstablishedPayload {
+func (s *WebhookEvent44) GetData() SessionDeletedPayload {
 	return s.Data
 }
 
@@ -138774,7 +139114,7 @@ func (s *WebhookEvent44) SetEntity(val NilWebhookEvent44Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent44) SetData(val SessionEstablishedPayload) {
+func (s *WebhookEvent44) SetData(val SessionDeletedPayload) {
 	s.Data = val
 }
 
@@ -138905,8 +139245,8 @@ type WebhookEvent45 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent45Entity `json:"entity"`
-	Data   TeamPayload             `json:"data"`
+	Entity NilWebhookEvent45Entity   `json:"entity"`
+	Data   SessionEstablishedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -138940,7 +139280,7 @@ func (s *WebhookEvent45) GetEntity() NilWebhookEvent45Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent45) GetData() TeamPayload {
+func (s *WebhookEvent45) GetData() SessionEstablishedPayload {
 	return s.Data
 }
 
@@ -138975,7 +139315,7 @@ func (s *WebhookEvent45) SetEntity(val NilWebhookEvent45Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent45) SetData(val TeamPayload) {
+func (s *WebhookEvent45) SetData(val SessionEstablishedPayload) {
 	s.Data = val
 }
 
@@ -139107,7 +139447,7 @@ type WebhookEvent46 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent46Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   TeamPayload             `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -139141,7 +139481,7 @@ func (s *WebhookEvent46) GetEntity() NilWebhookEvent46Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent46) GetData() EmptyEventPayload {
+func (s *WebhookEvent46) GetData() TeamPayload {
 	return s.Data
 }
 
@@ -139176,7 +139516,7 @@ func (s *WebhookEvent46) SetEntity(val NilWebhookEvent46Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent46) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent46) SetData(val TeamPayload) {
 	s.Data = val
 }
 
@@ -139308,7 +139648,7 @@ type WebhookEvent47 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent47Entity `json:"entity"`
-	Data   TeamPayload             `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -139342,7 +139682,7 @@ func (s *WebhookEvent47) GetEntity() NilWebhookEvent47Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent47) GetData() TeamPayload {
+func (s *WebhookEvent47) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -139377,7 +139717,7 @@ func (s *WebhookEvent47) SetEntity(val NilWebhookEvent47Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent47) SetData(val TeamPayload) {
+func (s *WebhookEvent47) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -139509,7 +139849,7 @@ type WebhookEvent48 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent48Entity `json:"entity"`
-	Data   UserCreateFailedPayload `json:"data"`
+	Data   TeamPayload             `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -139543,7 +139883,7 @@ func (s *WebhookEvent48) GetEntity() NilWebhookEvent48Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent48) GetData() UserCreateFailedPayload {
+func (s *WebhookEvent48) GetData() TeamPayload {
 	return s.Data
 }
 
@@ -139578,7 +139918,7 @@ func (s *WebhookEvent48) SetEntity(val NilWebhookEvent48Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent48) SetData(val UserCreateFailedPayload) {
+func (s *WebhookEvent48) SetData(val TeamPayload) {
 	s.Data = val
 }
 
@@ -139710,7 +140050,7 @@ type WebhookEvent49 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent49Entity `json:"entity"`
-	Data   UserCreatedPayload      `json:"data"`
+	Data   UserCreateFailedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -139744,7 +140084,7 @@ func (s *WebhookEvent49) GetEntity() NilWebhookEvent49Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent49) GetData() UserCreatedPayload {
+func (s *WebhookEvent49) GetData() UserCreateFailedPayload {
 	return s.Data
 }
 
@@ -139779,7 +140119,7 @@ func (s *WebhookEvent49) SetEntity(val NilWebhookEvent49Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent49) SetData(val UserCreatedPayload) {
+func (s *WebhookEvent49) SetData(val UserCreateFailedPayload) {
 	s.Data = val
 }
 
@@ -140112,7 +140452,7 @@ type WebhookEvent50 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent50Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   UserCreatedPayload      `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -140146,7 +140486,7 @@ func (s *WebhookEvent50) GetEntity() NilWebhookEvent50Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent50) GetData() EmptyEventPayload {
+func (s *WebhookEvent50) GetData() UserCreatedPayload {
 	return s.Data
 }
 
@@ -140181,7 +140521,7 @@ func (s *WebhookEvent50) SetEntity(val NilWebhookEvent50Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent50) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent50) SetData(val UserCreatedPayload) {
 	s.Data = val
 }
 
@@ -140313,7 +140653,7 @@ type WebhookEvent51 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent51Entity `json:"entity"`
-	Data   UserUpdatedPayload      `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -140347,7 +140687,7 @@ func (s *WebhookEvent51) GetEntity() NilWebhookEvent51Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent51) GetData() UserUpdatedPayload {
+func (s *WebhookEvent51) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -140382,7 +140722,7 @@ func (s *WebhookEvent51) SetEntity(val NilWebhookEvent51Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent51) SetData(val UserUpdatedPayload) {
+func (s *WebhookEvent51) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -140514,7 +140854,7 @@ type WebhookEvent52 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent52Entity `json:"entity"`
-	Data   VariableRemovedPayload  `json:"data"`
+	Data   UserUpdatedPayload      `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -140548,7 +140888,7 @@ func (s *WebhookEvent52) GetEntity() NilWebhookEvent52Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent52) GetData() VariableRemovedPayload {
+func (s *WebhookEvent52) GetData() UserUpdatedPayload {
 	return s.Data
 }
 
@@ -140583,7 +140923,7 @@ func (s *WebhookEvent52) SetEntity(val NilWebhookEvent52Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent52) SetData(val VariableRemovedPayload) {
+func (s *WebhookEvent52) SetData(val UserUpdatedPayload) {
 	s.Data = val
 }
 
@@ -140715,7 +141055,7 @@ type WebhookEvent53 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent53Entity `json:"entity"`
-	Data   VariableSetPayload      `json:"data"`
+	Data   VariableRemovedPayload  `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -140749,7 +141089,7 @@ func (s *WebhookEvent53) GetEntity() NilWebhookEvent53Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent53) GetData() VariableSetPayload {
+func (s *WebhookEvent53) GetData() VariableRemovedPayload {
 	return s.Data
 }
 
@@ -140784,7 +141124,7 @@ func (s *WebhookEvent53) SetEntity(val NilWebhookEvent53Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent53) SetData(val VariableSetPayload) {
+func (s *WebhookEvent53) SetData(val VariableRemovedPayload) {
 	s.Data = val
 }
 
@@ -140916,7 +141256,7 @@ type WebhookEvent54 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent54Entity `json:"entity"`
-	Data   WebhookPayload          `json:"data"`
+	Data   VariableSetPayload      `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -140950,7 +141290,7 @@ func (s *WebhookEvent54) GetEntity() NilWebhookEvent54Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent54) GetData() WebhookPayload {
+func (s *WebhookEvent54) GetData() VariableSetPayload {
 	return s.Data
 }
 
@@ -140985,7 +141325,7 @@ func (s *WebhookEvent54) SetEntity(val NilWebhookEvent54Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent54) SetData(val WebhookPayload) {
+func (s *WebhookEvent54) SetData(val VariableSetPayload) {
 	s.Data = val
 }
 
@@ -141117,7 +141457,7 @@ type WebhookEvent55 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent55Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   WebhookPayload          `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -141151,7 +141491,7 @@ func (s *WebhookEvent55) GetEntity() NilWebhookEvent55Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent55) GetData() EmptyEventPayload {
+func (s *WebhookEvent55) GetData() WebhookPayload {
 	return s.Data
 }
 
@@ -141186,7 +141526,7 @@ func (s *WebhookEvent55) SetEntity(val NilWebhookEvent55Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent55) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent55) SetData(val WebhookPayload) {
 	s.Data = val
 }
 
@@ -141318,7 +141658,7 @@ type WebhookEvent56 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent56Entity `json:"entity"`
-	Data   WebhookDisabledPayload  `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -141352,7 +141692,7 @@ func (s *WebhookEvent56) GetEntity() NilWebhookEvent56Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent56) GetData() WebhookDisabledPayload {
+func (s *WebhookEvent56) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -141387,7 +141727,7 @@ func (s *WebhookEvent56) SetEntity(val NilWebhookEvent56Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent56) SetData(val WebhookDisabledPayload) {
+func (s *WebhookEvent56) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -141519,7 +141859,7 @@ type WebhookEvent57 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent57Entity `json:"entity"`
-	Data   EmptyEventPayload       `json:"data"`
+	Data   WebhookDisabledPayload  `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -141553,7 +141893,7 @@ func (s *WebhookEvent57) GetEntity() NilWebhookEvent57Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent57) GetData() EmptyEventPayload {
+func (s *WebhookEvent57) GetData() WebhookDisabledPayload {
 	return s.Data
 }
 
@@ -141588,7 +141928,7 @@ func (s *WebhookEvent57) SetEntity(val NilWebhookEvent57Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent57) SetData(val EmptyEventPayload) {
+func (s *WebhookEvent57) SetData(val WebhookDisabledPayload) {
 	s.Data = val
 }
 
@@ -141720,7 +142060,7 @@ type WebhookEvent58 struct {
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
 	Entity NilWebhookEvent58Entity `json:"entity"`
-	Data   WebhookPayload          `json:"data"`
+	Data   EmptyEventPayload       `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -141754,7 +142094,7 @@ func (s *WebhookEvent58) GetEntity() NilWebhookEvent58Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent58) GetData() WebhookPayload {
+func (s *WebhookEvent58) GetData() EmptyEventPayload {
 	return s.Data
 }
 
@@ -141789,7 +142129,7 @@ func (s *WebhookEvent58) SetEntity(val NilWebhookEvent58Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent58) SetData(val WebhookPayload) {
+func (s *WebhookEvent58) SetData(val EmptyEventPayload) {
 	s.Data = val
 }
 
@@ -141899,6 +142239,207 @@ func (s *WebhookEvent58Entity) SetType(val NilString) {
 
 // SetID sets the value of ID.
 func (s *WebhookEvent58Entity) SetID(val NilString) {
+	s.ID = val
+}
+
+// Merged schema.
+type WebhookEvent59 struct {
+	// The event ID, in the form `evt_<opaque>`. It is the same on every retry, and the `id` that
+	// `getEvent` (`GET /events/{event_id}`) takes.
+	ID string `json:"id"`
+	// Merged property.
+	Type string `json:"type"`
+	// When the event was stored, on the server's clock, in UTC.
+	CreatedAt time.Time `json:"created_at"`
+	ProjectID ProjectID `json:"project_id"`
+	// Who triggered the event: the event's `actor_type` and `actor_id`. `null` when the event has neither.
+	// When it has only one, the other is `null`: a project token acting for no user gives a `type` of
+	// `service` and an `id` of `null`.
+	Actor NilWebhookEvent59Actor `json:"actor"`
+	// The resource the event affected: the event's `entity_type` and `entity_id`. `null` when the event
+	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
+	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
+	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
+	Entity NilWebhookEvent59Entity `json:"entity"`
+	Data   WebhookPayload          `json:"data"`
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent59) GetID() string {
+	return s.ID
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent59) GetType() string {
+	return s.Type
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *WebhookEvent59) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *WebhookEvent59) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetActor returns the value of Actor.
+func (s *WebhookEvent59) GetActor() NilWebhookEvent59Actor {
+	return s.Actor
+}
+
+// GetEntity returns the value of Entity.
+func (s *WebhookEvent59) GetEntity() NilWebhookEvent59Entity {
+	return s.Entity
+}
+
+// GetData returns the value of Data.
+func (s *WebhookEvent59) GetData() WebhookPayload {
+	return s.Data
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent59) SetID(val string) {
+	s.ID = val
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent59) SetType(val string) {
+	s.Type = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *WebhookEvent59) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *WebhookEvent59) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetActor sets the value of Actor.
+func (s *WebhookEvent59) SetActor(val NilWebhookEvent59Actor) {
+	s.Actor = val
+}
+
+// SetEntity sets the value of Entity.
+func (s *WebhookEvent59) SetEntity(val NilWebhookEvent59Entity) {
+	s.Entity = val
+}
+
+// SetData sets the value of Data.
+func (s *WebhookEvent59) SetData(val WebhookPayload) {
+	s.Data = val
+}
+
+type WebhookEvent59Actor struct {
+	// The kind of actor.
+	Type NilWebhookEvent59ActorType `json:"type"`
+	// The ID of the actor, a user's for a `human`.
+	ID NilString `json:"id"`
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent59Actor) GetType() NilWebhookEvent59ActorType {
+	return s.Type
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent59Actor) GetID() NilString {
+	return s.ID
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent59Actor) SetType(val NilWebhookEvent59ActorType) {
+	s.Type = val
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent59Actor) SetID(val NilString) {
+	s.ID = val
+}
+
+type WebhookEvent59ActorType string
+
+const (
+	WebhookEvent59ActorTypeHuman   WebhookEvent59ActorType = "human"
+	WebhookEvent59ActorTypeService WebhookEvent59ActorType = "service"
+	WebhookEvent59ActorTypeSystem  WebhookEvent59ActorType = "system"
+	WebhookEvent59ActorTypeAgent   WebhookEvent59ActorType = "agent"
+)
+
+// AllValues returns all WebhookEvent59ActorType values.
+func (WebhookEvent59ActorType) AllValues() []WebhookEvent59ActorType {
+	return []WebhookEvent59ActorType{
+		WebhookEvent59ActorTypeHuman,
+		WebhookEvent59ActorTypeService,
+		WebhookEvent59ActorTypeSystem,
+		WebhookEvent59ActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s WebhookEvent59ActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case WebhookEvent59ActorTypeHuman:
+		return []byte(s), nil
+	case WebhookEvent59ActorTypeService:
+		return []byte(s), nil
+	case WebhookEvent59ActorTypeSystem:
+		return []byte(s), nil
+	case WebhookEvent59ActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *WebhookEvent59ActorType) UnmarshalText(data []byte) error {
+	switch WebhookEvent59ActorType(data) {
+	case WebhookEvent59ActorTypeHuman:
+		*s = WebhookEvent59ActorTypeHuman
+		return nil
+	case WebhookEvent59ActorTypeService:
+		*s = WebhookEvent59ActorTypeService
+		return nil
+	case WebhookEvent59ActorTypeSystem:
+		*s = WebhookEvent59ActorTypeSystem
+		return nil
+	case WebhookEvent59ActorTypeAgent:
+		*s = WebhookEvent59ActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type WebhookEvent59Entity struct {
+	// The type of resource, for example `user`.
+	Type NilString `json:"type"`
+	// The ID of the resource.
+	ID NilString `json:"id"`
+}
+
+// GetType returns the value of Type.
+func (s *WebhookEvent59Entity) GetType() NilString {
+	return s.Type
+}
+
+// GetID returns the value of ID.
+func (s *WebhookEvent59Entity) GetID() NilString {
+	return s.ID
+}
+
+// SetType sets the value of Type.
+func (s *WebhookEvent59Entity) SetType(val NilString) {
+	s.Type = val
+}
+
+// SetID sets the value of ID.
+func (s *WebhookEvent59Entity) SetID(val NilString) {
 	s.ID = val
 }
 
@@ -142632,8 +143173,8 @@ type WebhookEvent9 struct {
 	// has neither. When it has only one, the other is `null`: deleting a session revokes its tokens with a
 	// `type` of `token` and an `id` of `null`. To read the resource as it is now, pass `id` to the
 	// operation that reads its type, such as `GetUserByID` (`GET /users/{user_id}`).
-	Entity NilWebhookEvent9Entity `json:"entity"`
-	Data   AuthCheckPayload       `json:"data"`
+	Entity NilWebhookEvent9Entity           `json:"entity"`
+	Data   AuthRequestExchangeFailedPayload `json:"data"`
 }
 
 // GetID returns the value of ID.
@@ -142667,7 +143208,7 @@ func (s *WebhookEvent9) GetEntity() NilWebhookEvent9Entity {
 }
 
 // GetData returns the value of Data.
-func (s *WebhookEvent9) GetData() AuthCheckPayload {
+func (s *WebhookEvent9) GetData() AuthRequestExchangeFailedPayload {
 	return s.Data
 }
 
@@ -142702,7 +143243,7 @@ func (s *WebhookEvent9) SetEntity(val NilWebhookEvent9Entity) {
 }
 
 // SetData sets the value of Data.
-func (s *WebhookEvent9) SetData(val AuthCheckPayload) {
+func (s *WebhookEvent9) SetData(val AuthRequestExchangeFailedPayload) {
 	s.Data = val
 }
 

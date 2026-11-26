@@ -373,6 +373,7 @@ export function RowMenu({
 }: {
   /** The row's name, for the trigger's accessible name. */
   name: string;
+  /** The trigger's glyph: `EllipsisVertical` where the design draws the menu vertical. */
   icon?: LucideIcon;
   /** `icon-xs`: the 24px trigger a detail card's rows draw. */
   size?: "icon" | "icon-xs";

@@ -50,6 +50,15 @@ export abstract class DeleteOperation<Ctx> extends Destructive(Previewable(Resou
   }
 
   /**
+   * A delete is the verb its resource gives it.
+   *
+   * @returns `delete`, or the lifecycle verb the resource declares.
+   */
+  protected override get action(): string {
+    return this.defined<Ctx, DeleteSpec<Ctx>>().spec.verb ?? "delete";
+  }
+
+  /**
    * What the deletion would do, said without reading, asking or acting.
    *
    * @param input - The flags and arguments the command accepts.

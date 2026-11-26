@@ -12,6 +12,7 @@ import { invitationIdSchema } from "./id";
 import { Promptable } from "@/cli/core/promptable";
 import { Destructive } from "@/cli/core/destructive";
 import { ChangeCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The invitation `invitation cancel` cancels, as the API spells an invitation
@@ -72,9 +73,11 @@ function describe(invitation: Invitation): string {
  * Without an id it offers the pending, expired and declined invitations to
  * pick from.
  */
-export default class InvitationCancel extends Destructive(
-  Promptable(ChangeCommand),
-  "Cancel the invitation without the confirmation prompt. Required when non-interactive.",
+export default class InvitationCancel extends Telemetered(
+  Destructive(
+    Promptable(ChangeCommand),
+    "Cancel the invitation without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description =
     "Cancel a pending invitation so its link stops working, or remove an expired or declined one.";

@@ -6,7 +6,7 @@ cloud's origin (repo-root [`vercel.json`](../../vercel.json)). It answers the
 console add-on's RPC, checks BotID in front of the sign-in widget's calls,
 takes Stripe's webhooks and runs the workflows that talk to Stripe and HubSpot.
 It also carries the server's webhook wake-ups over a Vercel queue
-([root ADR 090](../../docs/adrs/090-project-webhooks.md) §4, `src/webhook-wake.ts`).
+([root ADR 091](../../docs/adrs/091-project-webhooks.md) §4, `src/webhook-wake.ts`).
 
 - Keep vendor SDKs behind the ports in `src/ports.ts`; a route or a workflow
   names a port, never Stripe or HubSpot.

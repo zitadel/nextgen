@@ -11,6 +11,7 @@ import { fieldsFlag } from "@/cli/core/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
 import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
@@ -34,7 +35,7 @@ const DEPLOYMENT_ID: Refused<string> = {
  * froze. `--fields` cuts the data and the rows to the dot-paths it names,
  * judged by the deployment's shape, and leaves the frozen variables out.
  */
-export default class DeploymentGet extends ReadCommand {
+export default class DeploymentGet extends Telemetered(ReadCommand) {
   static override description = "Read one deployment by id.";
   static override group = CommandGroups.releases;
   static override groupOrder = 5;

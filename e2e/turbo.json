@@ -316,7 +316,7 @@
     },
     "journey:nuxt": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-nuxt#build"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-nuxt#build", "@zitadel/sdk-vue#build"],
       "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
       "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -370,7 +370,7 @@
     },
     "journey:preexisting-nuxt": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-nuxt#build"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-nuxt#build", "@zitadel/sdk-vue#build"],
       "env": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*", "!JOURNEY_WORK_DIR"],
       "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_WORK_DIR", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },

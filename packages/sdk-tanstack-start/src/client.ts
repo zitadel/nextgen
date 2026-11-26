@@ -1,14 +1,21 @@
 /**
- * Client-side SDK configuration for TanStack Start apps.
+ * The client-side configuration entry for TanStack Start apps.
  *
- * The login/logout/session widgets are the React components from
- * `@zitadel/sdk-tanstack-start/react`. This entry just re-exports
- * `configureZitadel()` so a consuming app that only declares
- * `@zitadel/sdk-tanstack-start` as a direct dependency can configure the SDK
- * without depending on `@zitadel/api/config` directly (which strict package
- * managers would not resolve). Like the other meta-framework SDKs' `/client`,
- * it exports no element classes, so an auto-import of `ZitadelLogin` cannot
- * pick a Lit class in place of the React component.
+ * The sign-in, sign-out and session widgets are the React components from
+ * `@zitadel/sdk-tanstack-start/components`. This entry re-exports {@link configureZitadel} so that an
+ * app which declares only `@zitadel/sdk-tanstack-start` as a direct dependency can configure the
+ * SDK from the one package it depends on, which a strict package manager requires. Like the `/client` entry of the other meta-framework SDKs, it exports no element
+ * classes, so an auto-import of `ZitadelLogin` cannot pick a web component class in place of the
+ * React component.
+ *
+ * @example
+ * ```ts
+ * import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
+ *
+ * export const project = configureZitadel({ projectId: "demo", proxyPath: "/__nextgen" });
+ * ```
+ *
+ * @module
  */
-export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
-export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
+export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/sdk-core/config";
+export type { ZitadelConfig, ZitadelProject } from "@zitadel/sdk-core/config";

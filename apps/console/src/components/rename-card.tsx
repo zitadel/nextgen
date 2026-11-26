@@ -17,7 +17,7 @@ import { useSubmit } from "@/hooks/use-submit";
  */
 export function RenameCard({
   id,
-  title = "Details",
+  title,
   label,
   value,
   onSave,
@@ -26,7 +26,8 @@ export function RenameCard({
 }: {
   /** The input's id and name. */
   id: string;
-  title?: string;
+  /** The card's heading, naming what is being renamed. */
+  title: string;
   label: string;
   value: string;
   /** Saves the trimmed name and reloads the record. */

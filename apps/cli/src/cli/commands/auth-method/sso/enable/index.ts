@@ -9,10 +9,11 @@ import {
   parseIssuer,
   parseScopes,
   RESERVED_SLUGS,
+  selectionName,
 } from "@zitadel/config/idp";
 
-import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
-import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { AuthMethodCommand, providerKind } from "@/cli/commands/auth-method/command";
+import type { EnableFacts, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
 import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
@@ -165,6 +166,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
+    this.annotate({ provider_type: providerKind(flags.provider) });
 
     return await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
       .step(
@@ -261,6 +263,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       .run(
         { flags },
         {
+          watch: this.watchWizard({
+            flow: "oidc_provider_setup",
+            with: { entry_point: "standalone" },
+            step: (key, known) => {
+              const settled = known as Partial<EnableFacts> | undefined;
+              return key === "selection" && settled?.selection !== undefined
+                ? { choice: { provider_type: selectionName(settled.selection) } }
+                : undefined;
+            },
+          }),
           onUndoError: (key, error) => {
             warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
           },

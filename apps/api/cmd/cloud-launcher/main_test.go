@@ -780,7 +780,7 @@ func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
 // its path is the server's trigger, and nothing routes it anywhere but the
 // server: a redirect would end the run, which a cron job does not follow, and
 // another service would answer 404. The same holds for the hourly round of
-// webhook delivery, which makes up for a wake-up that was lost (ADR 090 §4).
+// webhook delivery, which makes up for a wake-up that was lost (ADR 091 §4).
 func TestVercelJSONSchedulesTheServersTriggers(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "vercel.json"))
 	require.NoError(t, err)
