@@ -1,6 +1,7 @@
 import { chmod, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { isErrno } from "@/lib/errno";
 import { warnings } from "@/lib/ui/warnings";
 
 /** A file that may carry a credential is owner read/write only. */
@@ -30,7 +31,7 @@ export class SecretFile {
    * re-prompting, so a throw would be one confusing failure followed by silent
    * success with the same file. It warns once that the file could not be locked
    * down, and proceeds. This is the only place the CLI calls `chmod` after a
-   * write: a bare `chmod(...).catch(() => undefined)` hides the failure from
+   * write: a bare `chmod` whose failure is swallowed hides the failure from
    * the user and the JSON envelope, and a lint rule (`no-swallowed-chmod`)
    * rejects it.
    *
@@ -83,21 +84,22 @@ export class SecretFile {
     const probe = join(dir, `.modes-probe-${process.pid}`);
     try {
       await writeFile(probe, "", { mode: SECRET_MODE });
-      const accepted = await chmod(probe, 0o640).then(
-        () => {
-          return true;
-        },
-        () => {
-          return false;
-        },
-      );
-      return accepted && ((await stat(probe)).mode & 0o777) === 0o640;
+      try {
+        await chmod(probe, 0o640);
+      } catch {
+        return false;
+      }
+      return ((await stat(probe)).mode & 0o777) === 0o640;
     } catch {
       return true;
     } finally {
-      await rm(probe, { force: true }).catch(() => {
-        return undefined;
-      });
+      try {
+        await rm(probe, { force: true });
+      } catch (error) {
+        if (!isErrno(error, "EACCES") && !isErrno(error, "EPERM")) {
+          throw error;
+        }
+      }
     }
   }
 

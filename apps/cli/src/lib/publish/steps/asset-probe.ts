@@ -4,6 +4,7 @@ import type { RequestOptions } from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Agent, type Dispatcher } from "undici";
 
+import { PublishAssetTargetUnsafeError } from "@/lib/publish/errors";
 import { log } from "@/lib/ui/log";
 import { Runtime } from "@/lib/runtime";
 import { isJsonObject, type JsonObject, type JsonValue } from "@/lib/zitadel";
@@ -281,7 +282,7 @@ export async function probeAsset(
       return { kind: "inconclusive" };
     }
     log.debug(`asset probe ${url} failed:`, error);
-    return { kind: "unreachable", detail: describeProbeError(error, timeoutMs) };
+    return { kind: "unreachable", detail: describeProbeError(error, timeoutMs, signal) };
   }
 }
 
@@ -365,20 +366,15 @@ type HeadResponse = {
 };
 
 /**
- * The code an error carries when the lookup refused a non-public address.
- */
-const UNSAFE_PROBE_TARGET_CODE = "ERR_ZITADEL_UNSAFE_ASSET_TARGET";
-
-/**
  * The error the lookup fails with when a host resolves to a non-public address.
  *
  * @param hostname - The host.
- * @returns The error, carrying {@link UNSAFE_PROBE_TARGET_CODE}.
+ * @returns The error.
  */
-function unsafeProbeTargetError(hostname: string): NodeJS.ErrnoException {
-  return Object.assign(new Error(`asset target ${hostname} resolves to a non-public address`), {
-    code: UNSAFE_PROBE_TARGET_CODE,
-  });
+function unsafeProbeTargetError(hostname: string): PublishAssetTargetUnsafeError {
+  return new PublishAssetTargetUnsafeError(
+    `asset target ${hostname} resolves to a non-public address`,
+  );
 }
 
 /**
@@ -458,7 +454,7 @@ function isUnsafeProbeTargetError(error: unknown, depth: number): boolean {
   if (depth >= 4 || !(error instanceof Error)) {
     return false;
   }
-  if ("code" in error && error.code === UNSAFE_PROBE_TARGET_CODE) {
+  if (error instanceof PublishAssetTargetUnsafeError) {
     return true;
   }
   return isUnsafeProbeTargetError(error.cause, depth + 1);
@@ -547,16 +543,15 @@ function probeTimeoutMs(): number {
  *
  * @param error - What the request threw.
  * @param timeoutMs - The budget it ran out of, when it timed out.
+ * @param signal - The budget's abort signal, aborted once the budget ran out.
  * @returns The reason.
  */
-function describeProbeError(error: unknown, timeoutMs: number): string {
+function describeProbeError(error: unknown, timeoutMs: number, signal: AbortSignal): string {
   if (!(error instanceof Error)) {
     return String(error);
   }
   const cause = error.cause;
-  const timedOut =
-    error.name === "TimeoutError" || (cause instanceof Error && cause.name === "TimeoutError");
-  if (timedOut) {
+  if (signal.aborted) {
     return `no response within ${timeoutMs}ms`;
   }
   const detail = cause instanceof Error ? cause.message : error.message;

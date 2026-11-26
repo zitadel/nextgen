@@ -29,3 +29,12 @@ export class PublishConnectionVariableMissingError extends PublishError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CREDENTIAL_MISSING";
 }
+
+/**
+ * A probed asset URL resolves to an address that is not public, so the probe does not send it a request.
+ */
+export class PublishAssetTargetUnsafeError extends PublishError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}

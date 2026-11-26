@@ -158,9 +158,11 @@ export class Project {
    * @returns The project's configuration, empty when it cannot be read.
    */
   async configOrEmpty(): Promise<ProjectConfig> {
-    return this.config().catch(() => {
+    try {
+      return await this.config();
+    } catch {
       return new ProjectConfig();
-    });
+    }
   }
 
   /**

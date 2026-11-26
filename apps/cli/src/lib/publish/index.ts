@@ -13,6 +13,7 @@ export {
   type ReleaseRequest,
 } from "./publisher";
 export {
+  PublishAssetTargetUnsafeError,
   PublishConfigInvalidError,
   PublishConnectionVariableMissingError,
   PublishError,

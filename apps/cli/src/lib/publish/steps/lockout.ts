@@ -1,4 +1,4 @@
-import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
+import { BackendError, type Credential, type QueriedUser, type UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
@@ -272,9 +272,16 @@ function lazyNames(ctx: StepContext): Names {
   // biome-ignore lint/plugin: the memoised read, started on first use
   let listed: Promise<Listing | undefined> | undefined;
   return () => {
-    listed ??= objectTypes(ctx).catch(() => {
-      return undefined;
-    });
+    listed ??= (async (): Promise<Listing | undefined> => {
+      try {
+        return await objectTypes(ctx);
+      } catch (error) {
+        if (error instanceof BackendError) {
+          return undefined;
+        }
+        throw error;
+      }
+    })();
     return listed;
   };
 }
