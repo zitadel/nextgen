@@ -1,0 +1,13 @@
+language js
+
+// A lib error's hint is advice about the world: a file, a permission, a port,
+// a value (apps/cli/AGENTS.md, Errors). Advice that names a command or a flag
+// of the CLI is the CLI's, in src/cli/core/error-support/, so a hint under
+// src/lib never holds `zitadel …`, a `--flag` or a backticked command.
+or {
+  JsPropertyClassMember() as $hint where { $hint <: r"^(?:override\s+)?readonly\s+hint\b[\s\S]*" },
+  `this.hint = $_` as $hint
+} where {
+  $hint <: r"[\s\S]*(?:zitadel |--[a-z]|\\`|=\s*\"[^\"\n]*`|=\s*'[^'\n]*`)[\s\S]*",
+  register_diagnostic(span=$hint, message="A lib error's hint names no command, flag or backticked command of the CLI; put that advice in src/cli/core/error-support/.", severity="error")
+}

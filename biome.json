@@ -120,6 +120,10 @@
       ]
     },
     {
+      "includes": ["**/apps/cli/src/lib/**", "!**/apps/cli/src/lib/orca/patchers/**"],
+      "plugins": ["./biome-plugins/error-hint-names-no-command.grit"]
+    },
+    {
       "includes": [
         "**/apps/cli/src/**",
         "**/apps/cli/tests/**",
