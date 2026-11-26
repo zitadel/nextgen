@@ -1,5 +1,4 @@
-import { PreviewService, type ZitadelClient } from "@/lib/backend";
-import { isCancellation, toZitadelError } from "@/lib/errors";
+import { BackendError, PreviewService, type ZitadelClient } from "@/lib/backend";
 import { warnings } from "@/lib/ui/warnings";
 
 /**
@@ -51,13 +50,15 @@ export class PreviewExpiries {
    * @throws ZitadelError `E_CANCELLED` when the run was cancelled while reading.
    */
   static async reading<T>(read: () => Promise<T>, none: T): Promise<T> {
-    return read().catch((error: unknown): T => {
-      if (isCancellation(error)) {
-        throw error;
+    try {
+      return await read();
+    } catch (error) {
+      if (error instanceof BackendError) {
+        warnings.report(`Could not read when the previews expire: ${error.message}`);
+        return none;
       }
-      warnings.report(`Could not read when the previews expire: ${toZitadelError(error).message}`);
-      return none;
-    });
+      throw error;
+    }
   }
 
   /**
