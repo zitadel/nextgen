@@ -359,12 +359,17 @@
 - Use no lookup table for errors; duplicate the refusal instead.
 - Import file-system calls from `@/lib/fs`, never from `node:fs/promises`; catch
   `FsNotFoundError` etc. by class; only `src/lib/fs` reads a Node error's code.
+  Exceptions: `src/lib/skills/bundle.ts` (`tsdown.config.ts` loads it with plain
+  Node, which does not resolve `@/`) and `src/lib/orca/patchers/` (no sweeps there).
 - The only other places that read a foreign error's `code` or `reason` are
   boundaries that turn it into one of our classes in the same function:
   `signalProcess` in `binary-launcher.ts`, `translateFailure` in
   `src/lib/backend/client.ts`, the injected `FileSystem` in
   `src/lib/zitadel/storage/backend/store.ts` and the docker spawn in
-  `src/cli/commands/doctor/checks/local-runtime.ts`.
+  `src/cli/commands/doctor/checks/local-runtime.ts`, and the spawn results in
+  `runDocker` in `src/lib/server/local/internal/docker-launcher.ts`,
+  `src/lib/pm/package-command.ts`, `src/lib/git/git.ts` and
+  `src/lib/orca/scaffolders/cli.ts`.
 - Let an error nobody anticipated bubble up unwrapped.
 
 ## Telemetry
