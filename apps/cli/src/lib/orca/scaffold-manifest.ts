@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { isAbsolute, join, relative, sep } from "node:path";
 
-import { FsNotFoundError, readFile } from "@/lib/fs";
+import { FsError, readFile } from "@/lib/fs";
 import { isObject } from "@/lib/json";
 import { readState, updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldManifest, ScaffoldPosture } from "@/lib/sync/types";
@@ -120,7 +120,7 @@ export class ScaffoldManifestFile {
             contents,
           };
         } catch (error) {
-          if (error instanceof FsNotFoundError) {
+          if (error instanceof FsError) {
             return {
               path,
               key,

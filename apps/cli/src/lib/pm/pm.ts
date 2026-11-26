@@ -1,6 +1,6 @@
 import { dirname, join, resolve } from "node:path";
 
-import { FsNotFoundError, pathExists } from "@/lib/fs";
+import { FsError, pathExists } from "@/lib/fs";
 import { Output } from "@/lib/ui/output";
 
 import { PmManifestInvalidError } from "./errors";
@@ -354,7 +354,7 @@ export class PM {
         ? name
         : undefined;
     } catch (error) {
-      if (error instanceof FsNotFoundError) {
+      if (error instanceof FsError) {
         return undefined;
       }
       if (error instanceof PmManifestInvalidError) {

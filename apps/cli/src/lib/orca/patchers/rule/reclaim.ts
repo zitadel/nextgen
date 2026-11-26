@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { FsNotFoundError, pathExists } from "@/lib/fs";
+import { FsError, pathExists } from "@/lib/fs";
 import { PM, PmManifestInvalidError } from "@/lib/pm";
 import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
@@ -100,7 +100,7 @@ async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
     const pkg = await PM.manifest(cwd);
     return pkg.dependencies?.[name] !== undefined || pkg.devDependencies?.[name] !== undefined;
   } catch (error) {
-    if (error instanceof FsNotFoundError) {
+    if (error instanceof FsError) {
       return false;
     }
     if (error instanceof PmManifestInvalidError) {

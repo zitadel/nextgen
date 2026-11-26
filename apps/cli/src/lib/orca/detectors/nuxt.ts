@@ -1,4 +1,4 @@
-import { FsNotFoundError, stat } from "@/lib/fs";
+import { FsError, stat } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
 import { join } from "node:path";
 
@@ -37,7 +37,7 @@ export class NuxtDetector implements Detector {
       const devPort = await detectDevPort(cwd, pkg);
       return { id: "nuxt", appDir, devPort, url: issuerFromPort(devPort) };
     } catch (error) {
-      if (error instanceof FsNotFoundError) {
+      if (error instanceof FsError) {
         return null;
       }
       if (error instanceof PmManifestInvalidError) {

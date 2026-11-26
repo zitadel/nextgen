@@ -1,4 +1,4 @@
-import { FsNotFoundError } from "@/lib/fs";
+import { FsError } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
 import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
@@ -45,7 +45,7 @@ export class ReactDetector implements Detector {
         ...(versionMajor === undefined ? {} : { versionMajor }),
       };
     } catch (error) {
-      if (error instanceof FsNotFoundError) {
+      if (error instanceof FsError) {
         return null;
       }
       if (error instanceof PmManifestInvalidError) {

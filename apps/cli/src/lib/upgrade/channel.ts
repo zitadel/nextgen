@@ -110,18 +110,23 @@ export class ReleaseChannel {
     const response = await fetch(`${registry}${path}`, {
       signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
     }).catch((error: unknown) => {
-      if (error instanceof TypeError || error instanceof DOMException) {
+      if (error instanceof TypeError) {
+        return undefined;
+      }
+      if (error instanceof DOMException) {
         return undefined;
       }
       throw error;
     });
     const parsed: unknown = response?.ok
       ? await (response.json() as Promise<unknown>).catch((error: unknown) => {
-          if (
-            error instanceof SyntaxError ||
-            error instanceof TypeError ||
-            error instanceof DOMException
-          ) {
+          if (error instanceof SyntaxError) {
+            return undefined;
+          }
+          if (error instanceof TypeError) {
+            return undefined;
+          }
+          if (error instanceof DOMException) {
             return undefined;
           }
           throw error;

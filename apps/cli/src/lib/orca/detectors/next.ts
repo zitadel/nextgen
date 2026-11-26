@@ -1,4 +1,4 @@
-import { FsNotFoundError, stat } from "@/lib/fs";
+import { FsError, FsNotFoundError, stat } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
 import { join } from "node:path";
 
@@ -59,7 +59,7 @@ export class NextDetector implements Detector {
         ...(versionMajor === undefined ? {} : { versionMajor }),
       };
     } catch (error) {
-      if (error instanceof FsNotFoundError) {
+      if (error instanceof FsError) {
         return null;
       }
       if (error instanceof PmManifestInvalidError) {

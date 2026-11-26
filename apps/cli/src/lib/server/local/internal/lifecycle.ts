@@ -19,7 +19,7 @@ import {
   LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server/errors";
-import { FsDeniedError } from "@/lib/fs";
+import { FsError } from "@/lib/fs";
 import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/server/local/runtime";
 import { type Clock, SystemClock } from "@/lib/clock";
 
@@ -449,7 +449,7 @@ export class Lifecycle<R extends ServerRecord> {
       if (error instanceof LocalServerInvalidError) {
         return undefined;
       }
-      if (error instanceof FsDeniedError) {
+      if (error instanceof FsError) {
         return undefined;
       }
       throw error;

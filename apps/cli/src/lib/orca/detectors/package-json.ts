@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import semver from "semver";
 
-import { FsNotFoundError, readFile, realpath } from "@/lib/fs";
+import { FsError, readFile, realpath } from "@/lib/fs";
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
 import { PM, PmManifestInvalidError, type PackageJson } from "@/lib/pm";
 import { ancestors } from "@/lib/paths";
@@ -154,7 +154,7 @@ async function isWorkspaceRoot(dir: string): Promise<boolean> {
     await readFile(join(dir, "pnpm-workspace.yaml"));
     return true;
   } catch (error) {
-    if (!(error instanceof FsNotFoundError)) {
+    if (!(error instanceof FsError)) {
       throw error;
     }
   }
@@ -162,7 +162,7 @@ async function isWorkspaceRoot(dir: string): Promise<boolean> {
     const pkg = await readPackageJson(dir);
     return pkg.workspaces !== undefined && pkg.workspaces !== null;
   } catch (error) {
-    if (error instanceof FsNotFoundError) {
+    if (error instanceof FsError) {
       return false;
     }
     if (error instanceof PmManifestInvalidError) {
@@ -187,7 +187,7 @@ export async function installedPackage(
 ): Promise<InstalledPackage | undefined> {
   const resolved = resolve(cwd);
   const real = await realpath(resolved).catch((error: unknown) => {
-    if (error instanceof FsNotFoundError) {
+    if (error instanceof FsError) {
       return undefined;
     }
     throw error;
@@ -200,7 +200,7 @@ export async function installedPackage(
       const version = versionIn(contents);
       return version === undefined ? undefined : { version, path };
     } catch (error) {
-      if (!(error instanceof FsNotFoundError)) {
+      if (!(error instanceof FsError)) {
         throw error;
       }
     }

@@ -13,7 +13,7 @@ import {
   type SetupServices,
 } from "@/cli/commands/setup/shared";
 import { Claim } from "@/lib/claim";
-import { FsNotFoundError, pathExists } from "@/lib/fs";
+import { FsError, pathExists } from "@/lib/fs";
 import { callbackUriFor, unpublished } from "@/lib/idp";
 import type { CommandResult } from "@/cli/core";
 import { asStepsShown } from "@/cli/core/next-steps";
@@ -342,7 +342,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
           if (error instanceof PmManifestInvalidError) {
             return undefined;
           }
-          if (error instanceof FsNotFoundError) {
+          if (error instanceof FsError) {
             return undefined;
           }
           throw error;

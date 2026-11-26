@@ -4,6 +4,7 @@ import semver from "semver";
 
 import {
   FsDeniedError,
+  FsError,
   FsIsDirectoryError,
   FsNotDirectoryError,
   mkdir,
@@ -185,6 +186,9 @@ export class SchemaWriter {
       }
       return { name: pin.name, version: pin.specifier };
     } catch (error) {
+      if (error instanceof FsError) {
+        return undefined;
+      }
       if (error instanceof PmManifestInvalidError) {
         return undefined;
       }
