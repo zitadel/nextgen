@@ -7035,7 +7035,7 @@
               "type": {
                 "text": "Locale | undefined"
               },
-              "description": "The built-in dictionary for the tag's language, which the\n *   caller loads ({@link loadBuiltinLocale}); `undefined` when there is none.\n * "
+              "description": "The built-in dictionary for the tag's language, which the\n *   caller loads ({@link loadLocale}); `undefined` for English or a language with none.\n * "
             }
           ],
           "description": "The dictionary for a BCP 47 language tag. Its layers, strongest first: the\nintegrator's `locales` entries for the tag's primary subtag, the built-in\ndictionary for it, their `en` entries, and the built-in English.\n\nThe integrator's English is thus the fallback for every language: a key a\nlanguage has no text for, such as one for a step they added, shows their\nEnglish rather than the raw key, while a built-in translation still beats it."
@@ -7072,7 +7072,7 @@
         },
         {
           "kind": "function",
-          "name": "loadBuiltinLocale",
+          "name": "loadLocale",
           "return": {
             "type": {
               "text": ""
@@ -7085,9 +7085,16 @@
                 "text": "string"
               },
               "description": "The BCP 47 language tag."
+            },
+            {
+              "name": "locales",
+              "type": {
+                "text": "Readonly<Record<string, Partial<Locale>>> | undefined"
+              },
+              "description": "The integrator's dictionaries, by primary subtag."
             }
           ],
-          "description": "The built-in dictionary for a language tag. English is bundled; the other\ntranslations load with a dynamic import, so a page downloads only the one it\nshows."
+          "description": "Loads the dictionary for a BCP 47 language tag: its built-in translation,\nif there is one, with the integrator's `locales` merged over it\n(localeFor)."
         }
       ],
       "exports": [
@@ -7173,9 +7180,9 @@
         },
         {
           "kind": "js",
-          "name": "loadBuiltinLocale",
+          "name": "loadLocale",
           "declaration": {
-            "name": "loadBuiltinLocale",
+            "name": "loadLocale",
             "module": "src/orchestrator/locales/index.ts"
           }
         }
@@ -7201,6 +7208,222 @@
           "declaration": {
             "name": "it",
             "module": "src/orchestrator/locales/it.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/locales/step-text.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "SSO_DESCRIPTION_SUFFIX",
+          "type": {
+            "text": "string"
+          },
+          "default": "\".description.sso\""
+        },
+        {
+          "kind": "function",
+          "name": "stepTexts",
+          "return": {
+            "type": {
+              "text": "StepTexts"
+            }
+          },
+          "parameters": [
+            {
+              "name": "texts",
+              "type": {
+                "text": "StepTexts"
+              }
+            },
+            {
+              "name": "fields",
+              "type": {
+                "text": "readonly CreateFlow201StepFieldsItem[]"
+              }
+            },
+            {
+              "name": "locale",
+              "type": {
+                "text": "Locale"
+              }
+            }
+          ],
+          "description": "A step's texts as the template renders them. A step that collects an\nidentifier other than an email address (a schema whose `x-identifier` is\n`employee_number`, say) describes itself with the\n`<step>.description.custom_identifier` variant where the locale has one,\nsince the plain sentence may name the email: \"Enter your email to continue\"\nabove an \"Employee number\" field. The variant replaces the `.sso` one too:\na provider sentence may name the email as well, and leaving the providers\nout of the subtitle is the smaller loss, as they show on the step anyway."
+        },
+        {
+          "kind": "function",
+          "name": "stepNotice",
+          "return": {
+            "type": {
+              "text": "string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "notice",
+              "type": {
+                "text": "string"
+              }
+            },
+            {
+              "name": "fields",
+              "type": {
+                "text": "readonly CreateFlow201StepFieldsItem[]"
+              }
+            },
+            {
+              "name": "locale",
+              "type": {
+                "text": "Locale"
+              }
+            }
+          ],
+          "description": "The key a step's `notice` renders with. Like stepTexts, a step that\ncollects an identifier other than an email address asks for the\n`notice.<reason>.custom_identifier` variant where the locale has one: the\nregister step a sign-in moved to sign-up says the email had no account, and\npoints at an email field it does not show.\n\nA step that does not collect the identifier, such as the password step a\nsign-up moves to sign-in, cannot tell: `step.identifier` carries no type.\nIts notices are worded for any identifier instead."
+        },
+        {
+          "kind": "function",
+          "name": "localiseFlowErrorKeys",
+          "return": {
+            "type": {
+              "text": "FlowError[] | null"
+            }
+          },
+          "parameters": [
+            {
+              "name": "raw",
+              "type": {
+                "text": "string"
+              }
+            },
+            {
+              "name": "ctx",
+              "type": {
+                "text": "FlowErrorKeyContext"
+              }
+            }
+          ],
+          "description": "Localises a `step.error` payload of `error.*` catalog keys —\nfield-validation violations and general engine failures (e.g.\n`error.invalid_credentials`, `error.passkey_invalid`) alike.\nReturns `null` unless EVERY `\"; \"`-joined segment is an `error.*` key\n— the caller keeps any other payload verbatim.\n\nKeys the locale knows pass through as `text_key` entries: the template\nlocalises them via `| t`, and `fieldErrorKeys` routes the known ones\ninline to their field. Unknown keys with a recognised rule suffix are\npre-localised here from their generic FLOW_ERROR_RULE_FALLBACKS\nentry; unknown keys without one pass through as `text_key` (matching\n`| t`'s behaviour for non-validation keys such as\n`error.sign_in_server`, which localises via `.title`/`.body`)."
+        },
+        {
+          "kind": "function",
+          "name": "humaniseFieldName",
+          "return": {
+            "type": {
+              "text": "string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "field",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "`x-auth-methods#password` → \"password\", `givenName` → \"given name\",\n`date_of_birth` → \"date of birth\"."
+        },
+        {
+          "kind": "function",
+          "name": "capitaliseFirst",
+          "return": {
+            "type": {
+              "text": "string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "text",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Messages may open with a lowercase field label; sentence-case them."
+        },
+        {
+          "kind": "function",
+          "name": "interpolate",
+          "return": {
+            "type": {
+              "text": "string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "template",
+              "type": {
+                "text": "string"
+              }
+            },
+            {
+              "name": "args",
+              "type": {
+                "text": "readonly string[]"
+              }
+            }
+          ],
+          "description": "Positional `{n}` substitution shared by the `| t` filter and the\npre-localising fallback in localiseFlowErrorKeys, so both\nproduce byte-identical output for the same template and args."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "SSO_DESCRIPTION_SUFFIX",
+          "declaration": {
+            "name": "SSO_DESCRIPTION_SUFFIX",
+            "module": "src/orchestrator/locales/step-text.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "stepTexts",
+          "declaration": {
+            "name": "stepTexts",
+            "module": "src/orchestrator/locales/step-text.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "stepNotice",
+          "declaration": {
+            "name": "stepNotice",
+            "module": "src/orchestrator/locales/step-text.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "localiseFlowErrorKeys",
+          "declaration": {
+            "name": "localiseFlowErrorKeys",
+            "module": "src/orchestrator/locales/step-text.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "humaniseFieldName",
+          "declaration": {
+            "name": "humaniseFieldName",
+            "module": "src/orchestrator/locales/step-text.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "capitaliseFirst",
+          "declaration": {
+            "name": "capitaliseFirst",
+            "module": "src/orchestrator/locales/step-text.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "interpolate",
+          "declaration": {
+            "name": "interpolate",
+            "module": "src/orchestrator/locales/step-text.ts"
           }
         }
       ]
@@ -7389,16 +7612,7 @@
     {
       "kind": "javascript-module",
       "path": "src/orchestrator/sanitiser.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "elements"
-        },
-        {
-          "kind": "variable",
-          "name": "attributes"
-        }
-      ],
+      "declarations": [],
       "exports": []
     },
     {
@@ -7668,222 +7882,6 @@
           "declaration": {
             "name": "solveSignupPow",
             "module": "src/orchestrator/signup-pow.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/orchestrator/step-texts.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "SSO_DESCRIPTION_SUFFIX",
-          "type": {
-            "text": "string"
-          },
-          "default": "\".description.sso\""
-        },
-        {
-          "kind": "function",
-          "name": "stepTexts",
-          "return": {
-            "type": {
-              "text": "StepTexts"
-            }
-          },
-          "parameters": [
-            {
-              "name": "texts",
-              "type": {
-                "text": "StepTexts"
-              }
-            },
-            {
-              "name": "fields",
-              "type": {
-                "text": "readonly CreateFlow201StepFieldsItem[]"
-              }
-            },
-            {
-              "name": "locale",
-              "type": {
-                "text": "Locale"
-              }
-            }
-          ],
-          "description": "A step's texts as the template renders them. A step that collects an\nidentifier other than an email address (a schema whose `x-identifier` is\n`employee_number`, say) describes itself with the\n`<step>.description.custom_identifier` variant where the locale has one,\nsince the plain sentence may name the email: \"Enter your email to continue\"\nabove an \"Employee number\" field. The variant replaces the `.sso` one too:\na provider sentence may name the email as well, and leaving the providers\nout of the subtitle is the smaller loss, as they show on the step anyway."
-        },
-        {
-          "kind": "function",
-          "name": "stepNotice",
-          "return": {
-            "type": {
-              "text": "string"
-            }
-          },
-          "parameters": [
-            {
-              "name": "notice",
-              "type": {
-                "text": "string"
-              }
-            },
-            {
-              "name": "fields",
-              "type": {
-                "text": "readonly CreateFlow201StepFieldsItem[]"
-              }
-            },
-            {
-              "name": "locale",
-              "type": {
-                "text": "Locale"
-              }
-            }
-          ],
-          "description": "The key a step's `notice` renders with. Like stepTexts, a step that\ncollects an identifier other than an email address asks for the\n`notice.<reason>.custom_identifier` variant where the locale has one: the\nregister step a sign-in moved to sign-up says the email had no account, and\npoints at an email field it does not show.\n\nA step that does not collect the identifier, such as the password step a\nsign-up moves to sign-in, cannot tell: `step.identifier` carries no type.\nIts notices are worded for any identifier instead."
-        },
-        {
-          "kind": "function",
-          "name": "localiseFlowErrorKeys",
-          "return": {
-            "type": {
-              "text": "FlowError[] | null"
-            }
-          },
-          "parameters": [
-            {
-              "name": "raw",
-              "type": {
-                "text": "string"
-              }
-            },
-            {
-              "name": "ctx",
-              "type": {
-                "text": "FlowErrorKeyContext"
-              }
-            }
-          ],
-          "description": "Localises a `step.error` payload of `error.*` catalog keys —\nfield-validation violations and general engine failures (e.g.\n`error.invalid_credentials`, `error.passkey_invalid`) alike.\nReturns `null` unless EVERY `\"; \"`-joined segment is an `error.*` key\n— the caller keeps any other payload verbatim.\n\nKeys the locale knows pass through as `text_key` entries: the template\nlocalises them via `| t`, and `fieldErrorKeys` routes the known ones\ninline to their field. Unknown keys with a recognised rule suffix are\npre-localised here from their generic FLOW_ERROR_RULE_FALLBACKS\nentry; unknown keys without one pass through as `text_key` (matching\n`| t`'s behaviour for non-validation keys such as\n`error.sign_in_server`, which localises via `.title`/`.body`)."
-        },
-        {
-          "kind": "function",
-          "name": "humaniseFieldName",
-          "return": {
-            "type": {
-              "text": "string"
-            }
-          },
-          "parameters": [
-            {
-              "name": "field",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "`x-auth-methods#password` → \"password\", `givenName` → \"given name\",\n`date_of_birth` → \"date of birth\"."
-        },
-        {
-          "kind": "function",
-          "name": "capitaliseFirst",
-          "return": {
-            "type": {
-              "text": "string"
-            }
-          },
-          "parameters": [
-            {
-              "name": "text",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Messages may open with a lowercase field label; sentence-case them."
-        },
-        {
-          "kind": "function",
-          "name": "interpolate",
-          "return": {
-            "type": {
-              "text": "string"
-            }
-          },
-          "parameters": [
-            {
-              "name": "template",
-              "type": {
-                "text": "string"
-              }
-            },
-            {
-              "name": "args",
-              "type": {
-                "text": "readonly string[]"
-              }
-            }
-          ],
-          "description": "Positional `{n}` substitution shared by the `| t` filter and the\npre-localising fallback in localiseFlowErrorKeys, so both\nproduce byte-identical output for the same template and args."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "SSO_DESCRIPTION_SUFFIX",
-          "declaration": {
-            "name": "SSO_DESCRIPTION_SUFFIX",
-            "module": "src/orchestrator/step-texts.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "stepTexts",
-          "declaration": {
-            "name": "stepTexts",
-            "module": "src/orchestrator/step-texts.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "stepNotice",
-          "declaration": {
-            "name": "stepNotice",
-            "module": "src/orchestrator/step-texts.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "localiseFlowErrorKeys",
-          "declaration": {
-            "name": "localiseFlowErrorKeys",
-            "module": "src/orchestrator/step-texts.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "humaniseFieldName",
-          "declaration": {
-            "name": "humaniseFieldName",
-            "module": "src/orchestrator/step-texts.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "capitaliseFirst",
-          "declaration": {
-            "name": "capitaliseFirst",
-            "module": "src/orchestrator/step-texts.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "interpolate",
-          "declaration": {
-            "name": "interpolate",
-            "module": "src/orchestrator/step-texts.ts"
           }
         }
       ]
@@ -8722,8 +8720,8 @@
               "name": "rendering",
               "privacy": "private",
               "readonly": true,
-              "default": "new Task(this, { args: () => [this.resolveLanguage(), this.locales] as const, task: async ([language, locales]) => { const [builtin, { createLiquidEngine }, sanitise] = await Promise.all([ loadBuiltinLocale(language), import(\"./liquid.js\"), createSanitiser(), ]); const locale = localeFor(language, locales, builtin); return { locale, engine: createLiquidEngine({ locale }), sanitise }; }, })",
-              "description": "The dictionary, the LiquidJS engine and the sanitiser for the page's\nlanguage. Each loads on demand in its own chunk: the translation the page\nshows, the engine, and DOMPurify where the browser has no `setHTML()`. The loader shows until they are there, and a change of `lang` or\n`locales` loads them again."
+              "default": "new Task(this, { args: () => [this.resolveLanguage(), this.locales] as const, task: async ([language, locales]) => { const [locale, { createLiquidEngine }, sanitiser] = await Promise.all([ loadLocale(language, locales), import(\"./liquid.js\"), createSanitiser(), ]); return { locale, engine: createLiquidEngine({ locale }), sanitiser }; }, })",
+              "description": "What a step renders with: the dictionary for the page's language, the\nLiquidJS engine and the sanitiser. Each loads on demand in its own chunk\n(the translation the page shows, the engine, and DOMPurify where the\nbrowser has no `setHTML()`). The loader shows until they are there, and a\nchange of `lang` or `locales` loads them again."
             },
             {
               "kind": "field",
@@ -9097,9 +9095,9 @@
                   }
                 },
                 {
-                  "name": "sanitise",
+                  "name": "sanitiser",
                   "type": {
-                    "text": "(html: string) => string"
+                    "text": "Sanitiser"
                   }
                 }
               ]

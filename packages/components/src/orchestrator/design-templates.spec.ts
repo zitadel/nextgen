@@ -19,13 +19,13 @@ import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
 import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import { createLiquidEngine } from "./liquid.js";
-import { localiseFlowErrorKeys } from "./step-texts.js";
+import { localiseFlowErrorKeys } from "./locales/step-text.js";
 import { en } from "./locales/en.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
 import { createSanitiser } from "./sanitiser.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 
-const sanitise = await createSanitiser();
+const sanitiser = await createSanitiser();
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
@@ -97,7 +97,7 @@ function templateFor(design: string): string {
 function renderDesign(design: string): string {
   const engine = createLiquidEngine({ locale });
   const rendered = engine.parseAndRenderSync(templateFor(design), context);
-  const sanitised = sanitise(rendered);
+  const sanitised = sanitiser.sanitise(rendered);
   return patchMandatoryGates(sanitised, step, locale);
 }
 
@@ -144,7 +144,7 @@ describe("account chip", () => {
 
   function chip(design: string, data: Record<string, unknown>): Element | null {
     const engine = createLiquidEngine({ locale });
-    const html = sanitise(engine.parseAndRenderSync(templateFor(design), data));
+    const html = sanitiser.sanitise(engine.parseAndRenderSync(templateFor(design), data));
     const doc = document.createElement("template");
     doc.innerHTML = html;
     return doc.content.querySelector('zl-account[data-testid="zitadel-account"]');
@@ -214,7 +214,7 @@ describe("branding design catalog", () => {
           ...context,
           actions: [...step.actions, { name: "back", kind: "back", text_key: "action.back" }],
         });
-        const html2 = sanitise(rendered);
+        const html2 = sanitiser.sanitise(rendered);
         // Back-navigation is gesture-only (ADR 022): the template renders no
         // control for the action, and the kind-based exclusion keeps it out
         // of the secondary-button loop.
@@ -235,7 +235,7 @@ describe("branding design catalog", () => {
         { name: "given_name", type: "text", text_key: "identifier.field.email" },
       ],
     });
-    const fields = sanitise(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
+    const fields = sanitiser.sanitise(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
 
     expect(fields).toHaveLength(2);
     expect(fields.find((f) => f.includes('name="email"'))).toMatch(/\sreadonly[\s>=]/);
@@ -255,7 +255,7 @@ describe("branding design catalog", () => {
     function render(ctx: Record<string, unknown>): string {
       const engine = createLiquidEngine({ locale });
       const { template } = getDefaultBrandingConfig(design);
-      return sanitise(engine.parseAndRenderSync(template, ctx));
+      return sanitiser.sanitise(engine.parseAndRenderSync(template, ctx));
     }
 
     it("renders the provider atom with the step's providers", () => {
@@ -348,7 +348,7 @@ describe("branding design catalog", () => {
           design === "default.liquid"
             ? engine.renderFileSync(TEMPLATE_NAMES.default, ctx)
             : engine.parseAndRenderSync(getDefaultBrandingConfig(design).template, ctx);
-        return sanitise(rendered);
+        return sanitiser.sanitise(rendered);
       }
 
       it.each(["error.sso_cancelled", "error.sso_failed"])("renders %s's title and body", (key) => {
@@ -378,12 +378,12 @@ describe("branding design catalog", () => {
     const noAssets = { ...context, branding: {} };
     for (const design of ["split", "split-right"]) {
       const template = legacyTemplate(design);
-      const bare = sanitise(engine.parseAndRenderSync(template, noAssets));
+      const bare = sanitiser.sanitise(engine.parseAndRenderSync(template, noAssets));
       // An empty brand pane renders the whole design as a lonely off-centre
       // card; the decorative panel must survive the sanitiser.
       expect(bare, design).toContain("zl-split__placeholder");
 
-      const branded = sanitise(engine.parseAndRenderSync(template, context));
+      const branded = sanitiser.sanitise(engine.parseAndRenderSync(template, context));
       expect(branded, design).not.toContain("zl-split__placeholder");
     }
   });
@@ -405,7 +405,7 @@ describe("branding design catalog", () => {
     for (const design of ["split", "split-right"]) {
       const template = legacyTemplate(design);
       const html = patchMandatoryGates(
-        sanitise(engine.parseAndRenderSync(template, heroOnly)),
+        sanitiser.sanitise(engine.parseAndRenderSync(template, heroOnly)),
         step,
         locale,
       );
@@ -449,7 +449,7 @@ describe("branding design catalog", () => {
       messages: [{ level: "info", text_key: "notice.user_not_found" }],
     };
     for (const design of BRANDING_DESIGNS) {
-      const html = sanitise(engine.parseAndRenderSync(templateFor(design), withNotice));
+      const html = sanitiser.sanitise(engine.parseAndRenderSync(templateFor(design), withNotice));
       expect(html, design).toContain(
         '<zl-alert severity="info" data-zl-step-message="">No account</zl-alert>',
       );

@@ -75,7 +75,7 @@ export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
  * @param tag - The BCP 47 language tag.
  * @param locales - The integrator's dictionaries, by primary subtag.
  * @param builtin - The built-in dictionary for the tag's language, which the
- *   caller loads ({@link loadBuiltinLocale}); `undefined` when there is none.
+ *   caller loads ({@link loadLocale}); `undefined` for English or a language with none.
  * @returns The merged dictionary.
  */
 export function localeFor(
@@ -113,25 +113,28 @@ export function isHidden(
 }
 
 /**
- * The built-in dictionary for a language tag. English is bundled; the other
- * translations load with a dynamic import, so a page downloads only the one it
- * shows.
+ * The built-in translations besides English, which is bundled. Each loads with
+ * a dynamic import, so a page downloads only the one it shows.
+ */
+const TRANSLATIONS: Readonly<Record<string, () => Promise<Locale>>> = {
+  de: async () => (await import("./de.js")).de,
+  it: async () => (await import("./it.js")).it,
+};
+
+/**
+ * Loads the dictionary for a BCP 47 language tag: its built-in translation,
+ * if there is one, with the integrator's `locales` merged over it
+ * ({@link localeFor}).
  *
  * @param tag - The BCP 47 language tag.
- * @returns The dictionary, or `undefined` for a language with no built-in one.
+ * @param locales - The integrator's dictionaries, by primary subtag.
+ * @returns The merged dictionary.
  */
-export async function loadBuiltinLocale(tag: string): Promise<Locale | undefined> {
-  const language = primaryLanguage(tag);
-  if (language === "de") {
-    return (await import("./de.js")).de;
-  }
-  if (language === "it") {
-    return (await import("./it.js")).it;
-  }
-  if (language === "en") {
-    return en;
-  }
-  return undefined;
+export async function loadLocale(
+  tag: string,
+  locales: Readonly<Record<string, Partial<Locale>>> | undefined,
+): Promise<Locale> {
+  return localeFor(tag, locales, await TRANSLATIONS[primaryLanguage(tag)]?.());
 }
 
 /**

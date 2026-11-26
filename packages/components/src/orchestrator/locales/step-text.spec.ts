@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { en as fullLocale } from "./locales/en.js";
-import { localiseFlowErrorKeys } from "./step-texts.js";
+import { en as fullLocale } from "./en.js";
+import { localiseFlowErrorKeys } from "./step-text.js";
 
 describe("localiseFlowErrorKeys", () => {
   const ctx = { locale: fullLocale, stepName: "register" };

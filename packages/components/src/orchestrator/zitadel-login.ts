@@ -34,13 +34,13 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { localiseFlowErrorKeys, stepNotice, stepTexts } from "./step-texts.js";
-import { isHidden, loadBuiltinLocale, localeFor, type Locale } from "./locales/index.js";
+import { localiseFlowErrorKeys, stepNotice, stepTexts } from "./locales/step-text.js";
+import { isHidden, loadLocale, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
 import { resolveApi } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
-import { createSanitiser } from "./sanitiser.js";
+import { createSanitiser, type Sanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
@@ -457,21 +457,21 @@ export class ZitadelLogin extends ZitadelSurface {
   private previewRepaint = false;
 
   /**
-   * The dictionary, the LiquidJS engine and the sanitiser for the page's
-   * language. Each loads on demand in its own chunk: the translation the page
-   * shows, the engine, and DOMPurify where the browser has no `setHTML()`. The loader shows until they are there, and a change of `lang` or
-   * `locales` loads them again.
+   * What a step renders with: the dictionary for the page's language, the
+   * LiquidJS engine and the sanitiser. Each loads on demand in its own chunk
+   * (the translation the page shows, the engine, and DOMPurify where the
+   * browser has no `setHTML()`). The loader shows until they are there, and a
+   * change of `lang` or `locales` loads them again.
    */
   private readonly rendering = new Task(this, {
     args: () => [this.resolveLanguage(), this.locales] as const,
     task: async ([language, locales]) => {
-      const [builtin, { createLiquidEngine }, sanitise] = await Promise.all([
-        loadBuiltinLocale(language),
+      const [locale, { createLiquidEngine }, sanitiser] = await Promise.all([
+        loadLocale(language, locales),
         import("./liquid.js"),
         createSanitiser(),
       ]);
-      const locale = localeFor(language, locales, builtin);
-      return { locale, engine: createLiquidEngine({ locale }), sanitise };
+      return { locale, engine: createLiquidEngine({ locale }), sanitiser };
     },
   });
 
@@ -555,10 +555,12 @@ export class ZitadelLogin extends ZitadelSurface {
     return root;
   }
 
+  /**
+   * Renders again on every attach: a detached element renders no step, as
+   * what it loads on demand can finish after it left the page.
+   */
   override connectedCallback(): void {
     super.connectedCallback();
-    // A detached element renders no step (see `render`), so one moved back
-    // into the page renders again.
     this.requestUpdate();
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", this.handlePopState);
@@ -790,14 +792,13 @@ export class ZitadelLogin extends ZitadelSurface {
     }
     // `completing` holds the loader through the terminal step: painting a
     // success screen the host immediately navigates away from shows the user
-    // two confirmations for one sign-in. A detached element renders no step:
-    // what it loads on demand can finish after it left the page.
+    // two confirmations for one sign-in.
     const rendering = this.rendering.value;
     if (!this.response || !rendering || this.completing || !this.isConnected) {
       return html`<slot name="loader"></slot>`;
     }
     const rendered = this.injectAttribution(
-      this.renderStep(this.response.step, rendering.engine, rendering.sanitise),
+      this.renderStep(this.response.step, rendering.engine, rendering.sanitiser),
     );
     return html`<form
       class="zl-mount"
@@ -1259,11 +1260,7 @@ export class ZitadelLogin extends ZitadelSurface {
     return returnPathFromLocation() ?? this.postSignInUrl;
   }
 
-  private renderStep(
-    step: CreateFlow201Step,
-    engine: Liquid,
-    sanitise: (html: string) => string,
-  ): string {
+  private renderStep(step: CreateFlow201Step, engine: Liquid, sanitiser: Sanitiser): string {
     const tenantSource =
       typeof this.branding?.liquid_template === "string" && this.branding.liquid_template.length > 0
         ? this.branding.liquid_template
@@ -1356,7 +1353,7 @@ export class ZitadelLogin extends ZitadelSurface {
     }
 
     const patched = patchMandatoryGates(raw, step, this.resolveLocale());
-    return sanitise(patched);
+    return sanitiser.sanitise(patched);
   }
 
   /**

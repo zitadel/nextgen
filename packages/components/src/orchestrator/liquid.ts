@@ -26,7 +26,7 @@ import {
   capitaliseFirst,
   humaniseFieldName,
   interpolate,
-} from "./step-texts.js";
+} from "./locales/step-text.js";
 import defaultTemplate from "./templates/default.liquid";
 
 export const TEMPLATE_NAMES = {

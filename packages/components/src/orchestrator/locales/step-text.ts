@@ -5,9 +5,9 @@
  * engine (`liquid.ts`) only when it renders.
  */
 import type { CreateFlow201Step, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
-import type { FlowError } from "./template-context.js";
-import type { Locale } from "./locales/en.js";
-import { CUSTOM_IDENTIFIER_SUFFIX } from "./locales/index.js";
+import type { FlowError } from "../template-context.js";
+import type { Locale } from "./en.js";
+import { CUSTOM_IDENTIFIER_SUFFIX } from "./index.js";
 
 /**
  * Maps catalog `error.*` keys with no `_<rule>` suffix (so

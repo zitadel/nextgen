@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { de } from "./de.js";
 import { en } from "./en.js";
 import { it as italian } from "./it.js";
-import { builtinLocales, isHidden, localeFor, mergeLocale } from "./index.js";
+import { builtinLocales, isHidden, loadLocale, localeFor, mergeLocale } from "./index.js";
 
 describe("built-in locale dictionaries", () => {
   it("keeps translated locale keys aligned with English", () => {
@@ -206,5 +206,22 @@ describe("isHidden", () => {
   it("hides nothing without integrator text", () => {
     expect(isHidden("en", undefined, key)).toBe(false);
     expect(isHidden("en", { en: { [key]: "New account" } }, key)).toBe(false);
+  });
+});
+
+describe("loadLocale", () => {
+  it.each([
+    ["de-CH", de],
+    ["it", italian],
+    ["en-GB", en],
+    ["fr", en],
+  ])("loads the built-in dictionary for %s", async (tag, expected) => {
+    expect(await loadLocale(tag, undefined)).toEqual(expected);
+  });
+
+  it("merges the integrator's text over the loaded translation", async () => {
+    const locale = await loadLocale("de", { de: { "identifier.title": "Willkommen" } });
+
+    expect(locale["identifier.title"]).toBe("Willkommen");
   });
 });

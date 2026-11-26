@@ -15,7 +15,7 @@
  * Runs after Liquid finishes rendering and before the HTML is handed to Lit's
  * `unsafeHTML` directive.
  */
-import type { Config } from "dompurify";
+import type { Config, DOMPurify } from "dompurify";
 
 import { manifestRegistry } from "../manifests.js";
 
@@ -61,7 +61,9 @@ const STRUCTURAL_TAGS: readonly string[] = [
 /**
  * Attributes templates may carry on structural tags. Per-atom attributes are
  * derived from the manifest registry below — manifests are the single source
- * of truth for "what attributes does `<zl-field>` accept?".
+ * of truth for "what attributes does `<zl-field>` accept?". `data-*` is
+ * allowed as a whole, so none is listed: the Sanitizer API rejects a
+ * configuration that lists one, or lists any attribute twice.
  */
 const COMMON_ATTRS: readonly string[] = [
   "id",
@@ -82,28 +84,8 @@ const COMMON_ATTRS: readonly string[] = [
   "style",
   "name",
   "for",
-  "data-testid",
-  "data-theme",
   "hidden",
 ];
-
-function buildAllowedTagList(): string[] {
-  const set = new Set<string>(STRUCTURAL_TAGS);
-  for (const manifest of manifestRegistry) {
-    set.add(manifest.tag);
-  }
-  return [...set];
-}
-
-function buildAllowedAttrList(): string[] {
-  const set = new Set<string>(COMMON_ATTRS);
-  for (const manifest of manifestRegistry) {
-    for (const attr of manifest.attrs) {
-      set.add(attr);
-    }
-  }
-  return [...set];
-}
 
 /**
  * The `aria-*` attributes (WAI-ARIA 1.2). The Sanitizer API has no wildcard
@@ -160,53 +142,119 @@ const ARIA_ATTRS: readonly string[] = [
 ];
 
 /**
- * Loads a sanitiser bound to the current manifest registry. In a browser with
- * `Element.setHTML()` it uses that; elsewhere it imports DOMPurify, in its own
- * chunk, with the same allowlist. Callers should keep the result.
- *
- * The output is meant for the `<zitadel-login>` shadow root, so callers must
- * not inject it into the document itself.
- *
- * @returns A function from untrusted HTML to sanitised HTML.
- * @internal
+ * The elements a template may use: the structural tags and every atom.
  */
-export async function createSanitiser(): Promise<(html: string) => string> {
-  const elements = buildAllowedTagList();
-  // Each attribute once, and no `data-*`: `dataAttributes` covers those, and
-  // the Sanitizer API rejects a configuration that lists one or repeats one.
-  const attributes = [...new Set([...buildAllowedAttrList(), ...ARIA_ATTRS])].filter(
-    (attribute) => !attribute.startsWith("data-"),
-  );
-  if (typeof Element !== "undefined" && "setHTML" in Element.prototype) {
-    const sanitizer = { elements, attributes, dataAttributes: true, comments: false };
-    return function sanitise(html: string): string {
-      // An inert document: nothing in it loads or runs, and no custom element
-      // upgrades while the markup is sanitised.
-      const host = document.implementation.createHTMLDocument("").createElement("div");
-      host.setHTML(html, { sanitizer });
-      return host.innerHTML;
-    };
+const ELEMENTS: readonly string[] = [
+  ...new Set([...STRUCTURAL_TAGS, ...manifestRegistry.map((manifest) => manifest.tag)]),
+];
+
+/**
+ * The attributes a template may use, each once: the common ones, every atom's,
+ * and the ARIA ones.
+ */
+const ATTRIBUTES: readonly string[] = [
+  ...new Set([
+    ...COMMON_ATTRS,
+    ...manifestRegistry.flatMap((manifest) => manifest.attrs),
+    ...ARIA_ATTRS,
+  ]),
+];
+
+/**
+ * Turns untrusted template output into markup that is safe to render.
+ */
+export interface Sanitiser {
+  /**
+   * Sanitises one rendered template.
+   *
+   * @param html - The untrusted markup.
+   * @returns The markup with everything outside the allowlist removed.
+   */
+  sanitise(html: string): string;
+}
+
+/**
+ * Sanitises with the browser's own HTML Sanitizer API, `Element.setHTML()`.
+ *
+ * The markup is parsed into an inert document, so nothing in it loads or runs
+ * and no custom element upgrades while it is sanitised.
+ */
+class NativeSanitiser implements Sanitiser {
+  private readonly sanitizer: SanitizerConfig = {
+    elements: [...ELEMENTS],
+    attributes: [...ATTRIBUTES],
+    dataAttributes: true,
+    comments: false,
+  };
+
+  /**
+   * @param html - The untrusted markup.
+   * @returns The sanitised markup.
+   */
+  sanitise(html: string): string {
+    const host = document.implementation.createHTMLDocument("").createElement("div");
+    host.setHTML(html, { sanitizer: this.sanitizer });
+    return host.innerHTML;
   }
-  const { default: DOMPurify } = await import("dompurify");
-  // DOMPurify's defaults differ from the Sanitizer API's; these match them:
-  // only the listed elements and attributes, `data-*`, and a removed
-  // element's content removed with it.
-  const config: Config = {
-    ALLOWED_TAGS: [...elements, "#text"],
-    ALLOWED_ATTR: attributes,
+}
+
+/**
+ * Sanitises with DOMPurify, for browsers without the HTML Sanitizer API.
+ *
+ * Its configuration matches {@link NativeSanitiser}: only the listed elements
+ * and attributes plus `data-*`, and a removed element's content removed with
+ * it. DOM clobbering protection is off because the output renders inside the
+ * `<zitadel-login>` shadow root, which named access on `document` and `window`
+ * cannot reach, and the guard would drop field names such as `name` (#2532).
+ *
+ * Each call makes an instance for the current `window`: DOMPurify keeps the
+ * DOM classes it finds when an instance is made, and a server render (such as
+ * Angular's) swaps those globals while it runs.
+ */
+class DomPurifySanitiser implements Sanitiser {
+  private readonly config: Config = {
+    ALLOWED_TAGS: [...ELEMENTS, "#text"],
+    ALLOWED_ATTR: [...ATTRIBUTES],
     ALLOW_DATA_ATTR: true,
     ALLOW_ARIA_ATTR: false,
     KEEP_CONTENT: false,
     RETURN_TRUSTED_TYPE: false,
-    // The output renders inside the <zitadel-login> shadow root, which document and window
-    // named access cannot reach. The clobbering guard would otherwise drop common field
-    // names such as "name" or "title" (#2532).
     SANITIZE_DOM: false,
   };
-  return function sanitise(html: string): string {
-    // An instance per call, bound to the window as it is now: DOMPurify keeps
-    // the DOM classes it finds when an instance is made, and a server render
-    // (Angular's, for one) swaps those globals for its own while it runs.
-    return String(DOMPurify(window).sanitize(html, config));
-  };
+
+  private readonly purify: DOMPurify;
+
+  /**
+   * @param purify - DOMPurify's factory.
+   */
+  constructor(purify: DOMPurify) {
+    this.purify = purify;
+  }
+
+  /**
+   * @param html - The untrusted markup.
+   * @returns The sanitised markup.
+   */
+  sanitise(html: string): string {
+    return String(this.purify(window).sanitize(html, this.config));
+  }
+}
+
+/**
+ * Creates the sanitiser for this browser: the HTML Sanitizer API where it
+ * exists, and otherwise DOMPurify, which then loads in its own chunk. Callers
+ * should keep the result.
+ *
+ * The output is meant for the `<zitadel-login>` shadow root, so callers must
+ * not inject it into the document itself.
+ *
+ * @returns The sanitiser.
+ * @internal
+ */
+export async function createSanitiser(): Promise<Sanitiser> {
+  if ("setHTML" in Element.prototype) {
+    return new NativeSanitiser();
+  }
+  const { default: purify } = await import("dompurify");
+  return new DomPurifySanitiser(purify);
 }
