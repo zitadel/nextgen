@@ -74,16 +74,18 @@ export class UserService extends ApiService {
    * @returns True when the user holds at least one provider account.
    */
   async hasIdentityLink(userId: string): Promise<boolean> {
-    const links = await this.identityLinks(userId).catch((error: unknown): IdentityLinks => {
+    try {
+      const links = await this.identityLinks(userId);
+      return links.length > 0;
+    } catch (error) {
       if (error instanceof BackendNotFoundError) {
-        return [];
+        return false;
       }
       if (error instanceof BackendGoneError) {
-        return [];
+        return false;
       }
       throw error;
-    });
-    return links.length > 0;
+    }
   }
 
   /**

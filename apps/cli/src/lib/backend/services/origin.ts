@@ -3,6 +3,7 @@ import escapeStringRegexp from "escape-string-regexp";
 
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
+import { BackendError } from "@/lib/backend/errors";
 
 /** The two kinds an origin pattern can be. */
 export type OriginKind = AddProjectOriginBody["kind"];
@@ -368,9 +369,14 @@ export class OriginService extends ApiService {
     try {
       await this.add(pattern, "primary");
     } catch (error) {
-      await this.add(pattern, "preview").catch(() => {
-        return undefined;
-      });
+      try {
+        await this.add(pattern, "preview");
+      } catch (restore) {
+        if (restore instanceof BackendError) {
+          throw error;
+        }
+        throw restore;
+      }
       throw error;
     }
   }

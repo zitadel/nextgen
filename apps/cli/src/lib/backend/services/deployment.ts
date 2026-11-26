@@ -8,7 +8,11 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { isCancelled, pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { BackendConflictError, BackendReleaseRevokedError } from "@/lib/backend/errors";
+import {
+  BackendConflictError,
+  BackendError,
+  BackendReleaseRevokedError,
+} from "@/lib/backend/errors";
 
 import { OriginService } from "./origin";
 import { Variable } from "./variable";
@@ -576,17 +580,22 @@ export class DeploymentService extends ApiService {
       // above asks what this deploy was replacing, while this asks what the
       // project serves now, which is what the caller is told and what it would
       // guard against on a retry.
-      return {
-        outcome: "raced",
-        current: await this.newestPrimary().catch((cause: unknown): undefined => {
-          // A cancellation is not a winner that could not be named: the person
-          // asked the command to stop, and nothing was deployed to report.
-          if (isCancelled(this.client)) {
-            throw cause;
-          }
-          return undefined;
-        }),
-      };
+      try {
+        return {
+          outcome: "raced",
+          current: await this.newestPrimary(),
+        };
+      } catch (cause) {
+        // A cancellation is not a winner that could not be named: the person
+        // asked the command to stop, and nothing was deployed to report.
+        if (cause instanceof BackendError && !isCancelled(this.client)) {
+          return {
+            outcome: "raced",
+            current: undefined,
+          };
+        }
+        throw cause;
+      }
     }
   }
 

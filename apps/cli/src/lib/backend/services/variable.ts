@@ -577,24 +577,24 @@ export class VariableService extends ApiService {
    * @returns True when the name's primary value is a secret.
    */
   private async secretHeldAsPrimary(name: string): Promise<boolean> {
-    const held = await this.client
-      .getVariable(name, {
+    try {
+      const held = await this.client.getVariable(name, {
         project_id: this.projectId,
         kind: "primary",
-      })
-      .catch((error: unknown): GetVariable200 => {
-        if (error instanceof BackendNotFoundError) {
-          return {};
-        }
-        if (error instanceof BackendGoneError) {
-          return {};
-        }
-        if (error instanceof BackendForbiddenError) {
-          return {};
-        }
-        throw error;
       });
-    return typeof held.primary === "object" && held.primary !== null;
+      return typeof held.primary === "object" && held.primary !== null;
+    } catch (error) {
+      if (error instanceof BackendNotFoundError) {
+        return false;
+      }
+      if (error instanceof BackendGoneError) {
+        return false;
+      }
+      if (error instanceof BackendForbiddenError) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**
