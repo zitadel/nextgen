@@ -329,38 +329,41 @@
 
 - Keep each package's errors in one `errors.ts` beside `index.ts`; import them
   from the barrel outside the package.
-- Name an error `<Package><Condition>Error`.
-- Extend `<Package>Error`, which extends `ZitadelLibError` in `src/lib/errors.ts`.
-- Derive `name` once, in `ZitadelLibError`; never per class.
-- Add an error class only when a catch site or a wording names it, or it reports
-  a different `code`, `category` or `retryable`.
-- Give an error a template-literal `message` that carries its facts, and an
-  optional `cause`.
-- Give an error a field for each fact a person or a script needs (a path, a port,
-  the sources consulted), and no other property, parameter or method.
+- Name an error `<Package><Condition>Error` and extend `<Package>Error`, which
+  extends `ZitadelLibError` (`src/lib/lib-error.ts`); derive `name` there only.
+- Add a class only when a catch names it by `instanceof`, it reports another
+  `code`, `category` or `retryable`, or ErrorSupport advises on it apart.
+- Otherwise carry the fact in a field or the message of its parent or sibling;
+  make `<Package>Error` concrete when the package needs one class.
 - State `category`, `retryable` and `code` as literals in each class.
 - Add no type for errors beyond `ErrorCategory`.
-- `toZitadelError` has one branch for `ZitadelLibError`; add no per-package branch.
-- Never put a hint, flag, command or suggestion in a lib error.
+- Write the `message` a person reads, with its facts, as a template literal, and
+  keep a foreign error as `cause`.
+- Give an error a field for each fact a person or a script needs; `details`
+  reports each in snake_case.
+- Override `details` only where the report shows other facts; report the
+  foreign error a lib error stands for as `original: originalOf(this)`.
+- Put advice about the world (a file, a permission, a value) on the class as a
+  `readonly hint`, set where the error is made from its own facts.
+- Never name a CLI command, a `--flag` or a backticked command in a lib error's
+  hint: `biome-plugins/error-hint-names-no-command.grit` fails `biome check` on one.
 - Never throw `ZitadelError` or a `Refusal` from `src/lib`.
-- Word each lib error once, in `src/cli/core/error-support/<package>.ts`: a
-  `*_REFUSAL` and a `[Class, REFUSAL]` row, most specific class first.
-- `ErrorSupport` (`src/cli/core/error-support.ts`), under `BaseCommand`, words
-  every lib error a command lets through; a command wires nothing.
-- Use `derived(Class, REFUSAL, fn)` where the words need more than the fields: a
-  path quoted, a list joined, a follow-up aimed at another folder.
+- Put advice that names a command or a flag, and every next command, in
+  `src/cli/core/error-support/<package>.ts`: an `*_ADVICE` and a `[Class, ADVICE]` row.
+- Give a wording only what names the CLI; the error states its message, its
+  hint about the world and its facts itself.
+- A wording advises exactly its class: a subclass without one states itself.
+- Use `derived(Class, ADVICE, fn)` where the advice needs more than the fields:
+  a path quoted, a list joined, a follow-up aimed at another folder.
+- `ErrorSupport` (`src/cli/core/error-support.ts`), under `BaseCommand`, advises
+  on every lib error a command lets through; a command wires nothing.
+- `toZitadelError` reports any other lib error from its own code, message,
+  hint and `details`, in one branch for `ZitadelLibError`.
 - Catch a class in a command only where its context changes the words (its own
   rerun, a flag it was given, a check it ran); never to repeat the wording.
 - Inside such a catch write one flat `if (error instanceof X)` per class that
   throws `refusalError(X_REFUSAL, ...)`, then `throw error;`.
 - Spread the error into the refusal's values so no property is dropped.
-- Let `details` come from the error's fields, which `ErrorSupport` reports in
-  snake_case; a refusal that names `details` reports exactly that set (`{}` for none).
-- `{original}` names the foreign error a lib error stands for; a `{name}` detail nothing fills is dropped.
-- `error-support/<package>.ts` beside `error-support.test.ts` holds, per class, what main showed;
-  a row that differs on purpose says why in its `deviation`.
-- `error-support.test.ts` fails on a concrete lib error with no wording; exempt
-  only a bug of the CLI's own code, with why.
 - Recognise an error only by `instanceof`, never by `reason`, `code`, `hint`,
   `message`, `status` or `name`.
 - Where a call yields a value that falls back to a default, use one
