@@ -9,16 +9,41 @@ import type { Sanitiser } from "./sanitiser.js";
  * `allowlist.ts`. The markup is parsed into an inert document, so nothing in
  * it loads or runs and no custom element upgrades while it is sanitised.
  */
+/**
+ * The `Sanitizer` methods {@link NativeSanitiser} configures itself with.
+ */
+const CONFIGURE_METHODS = [
+  "get",
+  "allowElement",
+  "allowAttribute",
+  "removeElement",
+  "replaceElementWithChildren",
+  "setDataAttributes",
+  "setComments",
+] as const;
+
 export class NativeSanitiser implements Sanitiser {
   private readonly sanitizer: Sanitizer = NativeSanitiser.configure();
 
   /**
-   * Whether this browser has the HTML Sanitizer API.
+   * Whether this browser has the HTML Sanitizer API as specified today.
    *
-   * @returns `true` where `Element.setHTML()` exists.
+   * `Element.setHTML()` alone does not say so: Chrome 105 to 118 shipped an
+   * earlier draft with that method and a `Sanitizer` that has none of the
+   * methods {@link configure} calls. So every one of them is checked.
+   *
+   * @returns `true` where `Element.setHTML()` and a configurable `Sanitizer` exist.
    */
   static isSupported(): boolean {
-    return "setHTML" in Element.prototype;
+    if (typeof Element === "undefined" || !("setHTML" in Element.prototype)) {
+      return false;
+    }
+    const prototype: unknown = globalThis.Sanitizer?.prototype;
+    return (
+      typeof prototype === "object" &&
+      prototype !== null &&
+      CONFIGURE_METHODS.every((method) => typeof Reflect.get(prototype, method) === "function")
+    );
   }
 
   /**
