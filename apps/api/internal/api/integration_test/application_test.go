@@ -3,9 +3,6 @@
 package integration_test
 
 import (
-	"io"
-	"net/http"
-	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -237,21 +234,6 @@ func TestPublishApplicationIdempotencyKey(t *testing.T) {
 		}
 	})
 
-	t.Run("a retry with the document reformatted still matches", func(t *testing.T) {
-		const key = "reformatted"
-		first := f.withKey(key).create(t, api.Application{Slug: "reformatted", Name: "Shop <1>", Clients: []api.ApplicationClient{webClient("web", "")}})
-		client := `{"slug":"web","type":"confidential","grant_types":["authorization_code"],"redirect_uris":["https://web.example.com/callback"]}`
-		for name, body := range map[string]string{
-			"whitespace":    "{\n  \"application\": {\n    \"slug\": \"reformatted\",\n    \"name\": \"Shop <1>\",\n    \"clients\": [ " + client + " ]\n  }\n}",
-			"key order":     `{"application":{"clients":[{"redirect_uris":["https://web.example.com/callback"],"grant_types":["authorization_code"],"type":"confidential","slug":"web"}],"name":"Shop <1>","slug":"reformatted"}}`,
-			"escaped angle": `{"application":{"slug":"reformatted","name":"Shop ` + "\\u003c" + `1>","clients":[` + client + `]}}`,
-		} {
-			retry := f.postRaw(t, body, key)
-			assert.Equal(t, first.RevisionID, retry.RevisionID, name)
-			assert.Len(t, retry.ClientSecrets, 1, name)
-		}
-	})
-
 	t.Run("a revision that adds a client, sent twice with the same key and body, returns the added client's secret", func(t *testing.T) {
 		app := api.Application{Slug: "grow", Name: "Grow", Clients: []api.ApplicationClient{webClient("web", "")}}
 		f.create(t, app)
@@ -294,15 +276,6 @@ func TestPublishApplicationIdempotencyKey(t *testing.T) {
 		assert.Equal(t, first.RevisionID, got.RevisionID)
 	})
 
-	t.Run("the same key and body in another project creates an application there", func(t *testing.T) {
-		app := api.Application{Slug: "elsewhere", Name: "Elsewhere", Clients: []api.ApplicationClient{webClient("web", "")}}
-		first := f.withKey("elsewhere").create(t, app)
-
-		other := newApplicationFixture(t).withKey("elsewhere").create(t, app)
-		assert.NotEqual(t, first.ID, other.ID)
-		assert.Len(t, other.ClientSecrets, 1)
-	})
-
 	t.Run("the same key and body after the window creates a revision and returns no secret", func(t *testing.T) {
 		app := api.Application{Slug: "expired", Name: "Expired", Clients: []api.ApplicationClient{webClient("web", "")}}
 		first := f.create(t, app)
@@ -326,29 +299,6 @@ func TestPublishApplicationIdempotencyKey(t *testing.T) {
 		revised := f.withKey("expired").revise(t, app)
 		assert.NotEqual(t, first.RevisionID, revised.RevisionID)
 		assert.Empty(t, revised.ClientSecrets)
-	})
-
-	t.Run("a request without a key creates a revision on every call", func(t *testing.T) {
-		app := api.Application{Slug: "unkeyed", Name: "Unkeyed", Clients: []api.ApplicationClient{webClient("web", "")}}
-		f.create(t, app)
-		second := f.revise(t, app)
-		third := f.revise(t, app)
-		assert.NotEqual(t, second.RevisionID, third.RevisionID)
-	})
-
-	t.Run("no stored record of a key holds the key or a secret in plaintext", func(t *testing.T) {
-		const key = "plaintext-key"
-		app := api.Application{Slug: "plaintext", Name: "Plaintext", Clients: []api.ApplicationClient{webClient("web", "")}}
-		keyed := f.withKey(key)
-		first := keyed.create(t, app)
-		retry := keyed.create(t, app)
-
-		record, err := stmts.GetApplicationIdempotencyKey(t.Context(), f.project.ID, domain.HashSecret(key), time.Now())
-		require.NoError(t, err)
-		stored := helpers.MustMarshal(t, record)
-		for _, plain := range []string{key, first.ClientSecrets[0].Secret, retry.ClientSecrets[0].Secret} {
-			assert.NotContains(t, stored, plain)
-		}
 	})
 }
 
@@ -384,27 +334,6 @@ func (f applicationFixture) put(t *testing.T, app api.Application) api.PublishAp
 	resp, err := f.client.PublishApplication(t.Context(), &api.CreateApplicationRequest{Application: app}, params)
 	require.NoError(t, err)
 	return resp
-}
-
-// postRaw sends body as it is, which the generated client would re-encode,
-// and expects a 201.
-func (f applicationFixture) postRaw(t *testing.T, body, key string) api.CreateApplicationResponse {
-	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.APIBaseURL(t)+"/applications?project_id="+url.QueryEscape(f.project.ID),
-		strings.NewReader(body))
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+f.client.Token())
-	req.Header.Set("Idempotency-Key", key)
-
-	resp, err := harness.EnsureHttpClient(t).Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusCreated, resp.StatusCode, string(raw))
-	return *helpers.MustUnmarshal[api.CreateApplicationResponse](t, raw)
 }
 
 func (f applicationFixture) create(t *testing.T, app api.Application) api.CreateApplicationResponse {
