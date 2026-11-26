@@ -125,6 +125,25 @@ describe("console", () => {
         });
       });
 
+      it("refuses a malformed runtime record, and says to reset and start again", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+        await app.run(["stop", "--json"]);
+        await app.writeMalformedServerRecord();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "Run `zitadel reset --force`, then `zitadel start`.",
+          next_commands: [
+            expectedPublicCliCommand(`reset --force --cwd ${app.path}`),
+            expectedPublicCliCommand(`start --cwd ${app.path}`),
+          ],
+        });
+      });
+
       it("refuses when the recorded server does not answer, and says to start it", async () => {
         const app = await aSetUpApp();
         await app.startLocalServer();

@@ -1,7 +1,11 @@
 import { Flags } from "@oclif/core";
 
 import { openInBrowser } from "@/lib/browser";
-import { Environment } from "@/lib/environment";
+import {
+  Environment,
+  EnvironmentNameInvalidError,
+  EnvironmentSourcesConflictError,
+} from "@/lib/environment";
 import {
   AdminSession,
   LocalRuntime,
@@ -11,6 +15,8 @@ import {
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
   LocalServerPlatformMissingError,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
   ZitadelRuntime,
 } from "@/lib/server";
 import { section } from "@/lib/ui";
@@ -44,6 +50,33 @@ const PLATFORM_MISSING_REFUSAL = {
       id: "start",
     },
   ],
+} as const satisfies Refusal;
+
+/** How a run is refused when an environment is named by its name and by a file. */
+const SOURCES_CONFLICT_REFUSAL = {
+  message: "{message}",
+  hint: "--env picks the .env.<name>.local files; --env-file names one file outright.",
+} as const satisfies Refusal;
+
+/** How a run is refused when an environment name cannot be used in a path. */
+const NAME_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Pass a safe --env or set ZITADEL_ENV.",
+} as const satisfies Refusal;
+
+/** How a run is refused when the runtime record is not in the shape it is written in. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  next: ["{reset}", "{start}"],
+} as const satisfies Refusal;
+
+/** How a run is refused when the runtime record cannot be read. */
+const RECORD_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that the runtime record and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /** How a run is refused when no local server was started here or in a parent. */
@@ -132,22 +165,108 @@ export default class Console extends Telemetered(
    * the run's error, not a missing local setup.
    */
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
-    const found = await LocalRuntime.findAdminDir(cwd);
-    if (found === undefined) {
-      const environment = await Environment.resolve({
-        servers: ZitadelRuntime,
-        cwd,
-        env: process.env,
-        serverFlag: typeof flags.server === "string" ? flags.server : undefined,
-      });
-      this.named = environment.values.ZITADEL_URL?.value;
-    }
+    try {
+      const found = await LocalRuntime.findAdminDir(cwd);
+      if (found === undefined) {
+        const environment = await Environment.resolve({
+          servers: ZitadelRuntime,
+          cwd,
+          env: process.env,
+          serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+        });
+        this.named = environment.values.ZITADEL_URL?.value;
+      }
 
-    return (
-      this.named ??
-      (await this.serverInThisFolder(found ?? cwd).record())?.server_url ??
-      LocalRuntime.DEFAULT_URL
-    );
+      return (
+        this.named ??
+        (await this.serverInThisFolder(found ?? cwd).record())?.server_url ??
+        LocalRuntime.DEFAULT_URL
+      );
+    } catch (error) {
+      if (error instanceof EnvironmentSourcesConflictError) {
+        throw refusalError(SOURCES_CONFLICT_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof EnvironmentNameInvalidError) {
+        throw refusalError(NAME_INVALID_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerNotRunningError) {
+        throw refusalError(NOT_RUNNING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerNotRespondingError) {
+        throw refusalError(NOT_RESPONDING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerNotRespondingElsewhereError) {
+        throw refusalError(
+          NOT_RESPONDING_ELSEWHERE_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {
+                cwd: error.directory,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof LocalServerRecordMalformedError) {
+        const holder =
+          (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE).catch((lookup: unknown) => {
+            if (lookup instanceof LocalServerRecordUnreadableError) {
+              return undefined;
+            }
+            throw lookup;
+          })) ?? cwd;
+        const elsewhere =
+          holder === cwd
+            ? {}
+            : {
+                cwd: holder,
+              };
+        throw refusalError(
+          RECORD_MALFORMED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            reset: {
+              id: "reset",
+              flags: {
+                force: true,
+                ...elsewhere,
+              },
+            },
+            start: {
+              id: "start",
+              flags: elsewhere,
+            },
+          },
+        );
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -303,6 +422,47 @@ export default class Console extends Telemetered(
       }
       if (error instanceof LocalServerDeniedError) {
         throw refusalError(ADMIN_DENIED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerRecordMalformedError) {
+        const holder =
+          (await LocalRuntime.findUpward(localDir, LocalRuntime.FILE).catch((lookup: unknown) => {
+            if (lookup instanceof LocalServerRecordUnreadableError) {
+              return undefined;
+            }
+            throw lookup;
+          })) ?? localDir;
+        const elsewhere =
+          holder === this.cwd
+            ? {}
+            : {
+                cwd: holder,
+              };
+        throw refusalError(
+          RECORD_MALFORMED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            reset: {
+              id: "reset",
+              flags: {
+                force: true,
+                ...elsewhere,
+              },
+            },
+            start: {
+              id: "start",
+              flags: elsewhere,
+            },
+          },
+        );
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           ...error,
           message: error.message,
         });
