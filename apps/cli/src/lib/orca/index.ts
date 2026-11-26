@@ -21,8 +21,8 @@ import {
   OrcaFrameworkMissingError,
   OrcaFrameworkUnknownError,
   OrcaFrameworkUnsupportedError,
-  OrcaInternalError,
   OrcaPatcherMissingError,
+  OrcaScaffolderMissingError,
 } from "./errors";
 import { ManagedFile } from "./managed-file";
 import { patchers } from "./patchers";
@@ -37,7 +37,9 @@ export { issuerFromPort } from "./detectors/port";
 export {
   OrcaAngularJsonMissingError,
   OrcaAngularProjectAmbiguousError,
+  OrcaAngularProjectMissingError,
   OrcaAngularRoutesNotInlineError,
+  OrcaAngularServeTargetMissingError,
   OrcaBoundaryConflictError,
   OrcaBoundaryDuplicateError,
   OrcaBoundaryRenamedError,
@@ -74,7 +76,9 @@ export {
   OrcaRendererPendingError,
   OrcaRendererUnknownError,
   OrcaRootComponentMountError,
+  OrcaScaffolderMissingError,
   OrcaSolidStartConfigMissingError,
+  OrcaSolidStartOptionsError,
   OrcaSolidStartPluginMissingError,
   OrcaSvelteKitEnvVarsError,
   OrcaVersionBelowFloorError,
@@ -353,7 +357,7 @@ export class Orca {
   }
 
   /**
-   * Resolves the scaffolder for a framework, throwing OrcaInternalError (with the
+   * Resolves the scaffolder for a framework, throwing OrcaScaffolderMissingError (with the
    * available list) when none matches.
    */
   scaffolderFor(framework: string): Scaffolder {
@@ -361,12 +365,13 @@ export class Orca {
       return candidate.canScaffold(framework);
     });
     if (!scaffolder) {
-      throw new OrcaInternalError(
-        `No scaffolder supports "${framework}"; available frameworks: ${this.availableFrameworks()
+      throw new OrcaScaffolderMissingError(
+        `No scaffolder supports "${framework}"`,
+        this.availableFrameworks()
           .map((f) => {
             return f.id;
           })
-          .join(", ")}`,
+          .join(", "),
       );
     }
     return scaffolder;

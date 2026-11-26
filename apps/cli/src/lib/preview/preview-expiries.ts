@@ -1,4 +1,5 @@
 import { BackendError, PreviewService, type ZitadelClient } from "@/lib/backend";
+import { toZitadelError } from "@/lib/errors";
 import { warnings } from "@/lib/ui/warnings";
 
 /**
@@ -54,7 +55,9 @@ export class PreviewExpiries {
       return await read();
     } catch (error) {
       if (error instanceof BackendError) {
-        warnings.report(`Could not read when the previews expire: ${error.message}`);
+        warnings.report(
+          `Could not read when the previews expire: ${toZitadelError(error).message}`,
+        );
         return none;
       }
       throw error;

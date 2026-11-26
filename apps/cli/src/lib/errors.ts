@@ -283,7 +283,7 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof Error) {
     const errno = errnoOf(error);
-    const details = { original: pickErrorShape(error) };
+    const details = { original: originalOf(error) };
     if (errno === "EACCES") {
       return new ZitadelError("E_AUTH", `Permission denied: ${error.message}`, {
         hint: "Check file permissions or run with the right user.",
@@ -553,10 +553,22 @@ export function errorMessage(error: unknown): string {
   return String(error);
 }
 
-function pickErrorShape(error: Error): Record<string, unknown> {
+/**
+ * An error as a failure's `details.original` reports it: its name, its
+ * message and the errno it carries, if any. A lib error that stands for a
+ * foreign one, which it holds as its `cause`, reports that one, as the CLI
+ * did when the foreign error escaped as it was; one that stands for nothing
+ * else reports itself, with no errno, as its product code is not one.
+ *
+ * @param error - The error.
+ * @returns The name, message and errno of the error it stands for.
+ */
+export function originalOf(error: Error): Record<string, unknown> {
+  const source =
+    error instanceof ZitadelLibError && error.cause instanceof Error ? error.cause : error;
   return {
-    name: error.name,
-    message: error.message,
-    code: errnoOf(error),
+    name: source.name,
+    message: source.message,
+    code: source instanceof ZitadelLibError ? undefined : errnoOf(source),
   };
 }

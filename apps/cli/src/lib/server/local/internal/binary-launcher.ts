@@ -8,7 +8,6 @@ import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 import { ExecaError, execa } from "execa";
 import pWaitFor from "p-wait-for";
 
-import { errorMessage } from "@/lib/errors";
 import { FsNotFoundError, mkdir, open, readFile, stat } from "@/lib/fs";
 import {
   LocalServerLaunchFailedError,
@@ -22,7 +21,7 @@ import type { BinaryRuntimeMetadata } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
 import { type Clock, SystemClock } from "@/lib/clock";
 import { stopSignal } from "./stop-signal";
-import { type Launched, type Launcher, launched } from "./lifecycle";
+import { type LaunchFacts, type Launched, type Launcher, launched } from "./lifecycle";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const COMMAND_ENV = "ZITADEL_SERVER_BINARY";
@@ -188,6 +187,16 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
   }
 
   /**
+   * How the server runs, which is where to look when a start fails.
+   *
+   * @param record - The server's record.
+   * @returns Its runtime and its process and the file it logs to.
+   */
+  describe(record: BinaryRuntimeMetadata): LaunchFacts {
+    return { runtime: "binary", pid: record.pid, logPath: record.log_path };
+  }
+
+  /**
    * The end of the server's log file, for explaining a failed start.
    */
   logTail(record: BinaryRuntimeMetadata, lines: number): Promise<string> {
@@ -260,8 +269,12 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return find();
     } catch (error) {
+      if (error instanceof LocalServerPackageMissingError) {
+        throw error;
+      }
       throw new LocalServerPackageMissingError(
-        `Zitadel server npm package is not available: ${errorMessage(error)}`,
+        "Zitadel server npm package is not available",
+        SERVER_NPM_PACKAGE,
         error,
       );
     }
@@ -547,7 +560,8 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
     return pid;
   } catch (error) {
     throw new LocalServerLaunchFailedError(
-      `The Zitadel server (${command}) could not be started: ${errorMessage(error)}`,
+      "The Zitadel server could not be started",
+      command,
       error,
     );
   }
@@ -558,7 +572,8 @@ function resolveServerPackageManifest(): string {
     return require.resolve(`${SERVER_NPM_PACKAGE}/package.json`);
   } catch (error) {
     throw new LocalServerPackageMissingError(
-      `Missing ${SERVER_NPM_PACKAGE}. Reinstall @zitadel/cli.`,
+      "Zitadel server npm package is not available",
+      SERVER_NPM_PACKAGE,
       error,
     );
   }

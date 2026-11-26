@@ -19,7 +19,6 @@ import { join } from "node:path";
 import { parseEnv } from "node:util";
 
 import { FsNotFoundError, readFile } from "@/lib/fs";
-import { errorMessage } from "@/lib/errors";
 import { LocalServerEnvUnreadableError } from "@/lib/server/errors";
 import { isObject } from "@/lib/json";
 
@@ -108,11 +107,7 @@ const readEnvFile = async (path: string): Promise<Readonly<Record<string, string
     if (error instanceof FsNotFoundError) {
       return {};
     }
-    throw new LocalServerEnvUnreadableError(
-      `Cannot read ${path}: ${errorMessage(error)}`,
-      path,
-      error,
-    );
+    throw new LocalServerEnvUnreadableError(`Cannot read ${path}`, path, error);
   }
 };
 

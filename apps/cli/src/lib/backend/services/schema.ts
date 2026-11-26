@@ -134,7 +134,7 @@ export class SchemaService extends ApiService {
     });
     const current = first.items[0];
     if (current === undefined) {
-      throw new BackendNameUnknownError(`No schema named "${reference}"`);
+      throw new BackendNameUnknownError(`No schema named "${reference}"`, "schema", reference);
     }
     return current;
   }

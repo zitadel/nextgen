@@ -6,7 +6,7 @@ describe("the consent errors", () => {
   it.each([
     [new ConsentInternalError("bug"), "fault", "E_VALIDATION"],
     [
-      new ConsentRequiredError("Cannot remove X without --force"),
+      new ConsentRequiredError("Cannot remove X without --force", "Remove X?"),
       "denied",
       "E_CONFIRMATION_REQUIRED",
     ],

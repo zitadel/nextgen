@@ -155,6 +155,22 @@ describe("status", () => {
       });
     });
 
+    describe("that refuses the reads the user probe makes", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.refusesProjectReads();
+
+        const result = await app.status();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "ok",
+          data: {
+            next_actions: [],
+          },
+        });
+      });
+    });
+
     describe("that accepts the connection and never answers", () => {
       // The presence probe degrades to "unknown" on its own deadline, and the
       // request it gave up on must be given up on too: left in flight it would

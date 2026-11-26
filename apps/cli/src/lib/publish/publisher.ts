@@ -19,7 +19,7 @@ import { Output } from "@/lib/ui";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
-import { PublishConfigInvalidError } from "./errors";
+import { PublishReleaseBodyInvalidError } from "./errors";
 import { bundleIsDirty, headSha } from "./git";
 import {
   type ConfigurationType,
@@ -444,7 +444,7 @@ export class Publisher {
    *
    * @param bundle - The bundle read from disk.
    * @returns The same bundle, typed as the API takes it.
-   * @throws {@link PublishConfigInvalidError} naming each field the API does
+   * @throws {@link PublishReleaseBodyInvalidError} naming each field the API does
    *   not take.
    */
   private static narrow(bundle: ConfigurationBundle): ReleaseBundle {
@@ -457,7 +457,7 @@ export class Publisher {
       const field = issue.path.join(".") || "(root)";
       return `  - bundle.${field} ${issue.message}`;
     });
-    throw new PublishConfigInvalidError(
+    throw new PublishReleaseBodyInvalidError(
       `The release body does not match what the API takes, so nothing was sent:\n${lines.join("\n")}`,
       issues,
     );

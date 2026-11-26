@@ -3,7 +3,6 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { errorMessage } from "@/lib/errors";
 import {
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
@@ -299,11 +298,7 @@ async function isOwnFile(path: string): Promise<boolean> {
     if (error instanceof FsNotDirectoryError) {
       return false;
     }
-    throw new LocalServerRecordUnreadableError(
-      `${path} cannot be read: ${errorMessage(error)}`,
-      path,
-      error,
-    );
+    throw new LocalServerRecordUnreadableError(`${path} cannot be read`, path, error);
   }
 }
 
@@ -415,7 +410,7 @@ export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
   const raw = await readIfExists(paths.runtimeFile).catch((error: unknown) => {
     if (error instanceof FsError) {
       throw new LocalServerRecordUnreadableError(
-        `${paths.runtimeFile} cannot be read: ${error.message}`,
+        `${paths.runtimeFile} cannot be read`,
         paths.runtimeFile,
         error,
       );

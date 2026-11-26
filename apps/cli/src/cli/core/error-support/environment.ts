@@ -21,6 +21,7 @@ const SOURCES_CONFLICT_REFUSAL = {
 const NAME_INVALID_REFUSAL = {
   message: "{message}",
   hint: 'The {source} environment name may use only letters, digits, dot, dash and underscore, may not contain "..", and may not be `local` or end in `.local`. Pass a safe --env or set ZITADEL_ENV.',
+  details: {},
 } as const satisfies Refusal;
 
 /** How an `--env-file` that is not there is refused. */
@@ -42,12 +43,22 @@ const VALUE_UNBOUND_REFUSAL = {
   message: "{message}",
   hint: "Consulted, in order: {sources}. Set {variable} in {file} or the process environment, or run `zitadel env add {environment}`.",
   next: ["{next}"],
+  details: {
+    environment: "{environment}",
+    variable: "{variable}",
+    consulted: "{consulted}",
+  },
 } as const satisfies Refusal;
 
 /** How a value set in no source is refused. */
 const VALUE_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Consulted, in order: {sources}. Set {variable} in {file} or the process environment.",
+  details: {
+    environment: "{environment}",
+    variable: "{variable}",
+    consulted: "{consulted}",
+  },
 } as const satisfies Refusal;
 
 /** How the errors of `@/lib/environment` are worded, most specific class first. */

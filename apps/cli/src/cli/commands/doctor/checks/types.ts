@@ -1,5 +1,12 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { ZitadelError, ZitadelLibError, type ZitadelErrorCode, errorMessage } from "@/lib/errors";
+import { wordedError } from "@/cli/core/error-support";
+import {
+  ZitadelError,
+  ZitadelLibError,
+  type ZitadelErrorCode,
+  errorMessage,
+  toZitadelError,
+} from "@/lib/errors";
 import { FsNotFoundError } from "@/lib/fs";
 import type { Orca } from "@/lib/orca";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
@@ -101,6 +108,10 @@ export abstract class AbstractSanityCheck implements SanityCheck {
    * failure it threw as `failureStatus`, with the details a {@link CheckFailure}
    * carries.
    *
+   * A lib error it threw is worded as a command's failure is, so the row says
+   * what the run would have said.
+   *
+   * @param cwd - The folder the run acts on.
    * @param name - The check's name.
    * @param fallback - The message when the error it threw carries none.
    * @param run - The probe; it returns the passing message and throws to fail.
@@ -108,6 +119,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
    * @returns The check's outcome.
    */
   static async attempt(
+    cwd: string,
     name: string,
     fallback: string,
     run: () => Promise<string>,
@@ -129,10 +141,11 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         };
       }
       if (error instanceof ZitadelLibError) {
+        const worded = toZitadelError(wordedError(error, cwd));
         return {
           name,
           status: failureStatus,
-          message: error.message === "" ? fallback : error.message,
+          message: worded.message === "" ? fallback : worded.message,
         };
       }
       if (error instanceof ZitadelError) {
@@ -183,16 +196,17 @@ export abstract class AbstractSanityCheck implements SanityCheck {
           status: "fail",
           message: `${this.path} was not found`,
           path: this.path,
-          code: error.code,
         };
       }
       if (error instanceof ZitadelLibError) {
+        const worded = toZitadelError(wordedError(error, ctx.cwd));
         return {
           name: this.name,
           status: "fail",
-          message: error.message,
+          message: worded.message,
           path: this.path,
-          code: error.code,
+          code: worded.code,
+          hint: worded.hint,
         };
       }
       if (error instanceof SyntaxError) {

@@ -9,6 +9,8 @@ import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/l
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 import { Project, ProjectError } from "@/lib/project";
 import { Orca, OrcaError } from "@/lib/orca";
+import { PmError } from "@/lib/pm";
+import { ZitadelConfigError } from "@/lib/zitadel";
 
 /**
  * Per-file classification reported in the check's `details`:
@@ -364,6 +366,12 @@ async function probeConfigWiring(ctx: CheckContext): Promise<ReadonlyArray<Confi
     if (error instanceof FsError) {
       return [];
     }
+    if (error instanceof ZitadelConfigError) {
+      return [];
+    }
+    if (error instanceof PmError) {
+      return [];
+    }
     throw error;
   }
 }
@@ -427,6 +435,12 @@ async function materializeManifest(
       return;
     }
     if (error instanceof FsError) {
+      return;
+    }
+    if (error instanceof ZitadelConfigError) {
+      return;
+    }
+    if (error instanceof PmError) {
       return;
     }
     throw error;
@@ -510,6 +524,12 @@ export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions 
       return undefined;
     }
     if (error instanceof FsError) {
+      return undefined;
+    }
+    if (error instanceof ZitadelConfigError) {
+      return undefined;
+    }
+    if (error instanceof PmError) {
       return undefined;
     }
     throw error;

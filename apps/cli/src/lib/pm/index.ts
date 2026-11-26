@@ -1,5 +1,6 @@
 export {
   PmCommandFailedError,
+  PmCommandMissingError,
   PmCommandNotPermittedError,
   PmError,
   PmManifestInvalidError,

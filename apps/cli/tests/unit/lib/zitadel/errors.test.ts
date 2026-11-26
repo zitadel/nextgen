@@ -144,7 +144,9 @@ describe("ZitadelConfigFlowMethodInUseError", () => {
 
 describe("ZitadelConfigFlowUncheckedError", () => {
   it("is a validation failure", () => {
-    expect(new ZitadelConfigFlowUncheckedError("a flow has errors")).toMatchObject({
+    expect(
+      new ZitadelConfigFlowUncheckedError("a flow has errors", { file: "user.json", issues: [] }),
+    ).toMatchObject({
       category: "invalid",
       code: "E_VALIDATION",
     });

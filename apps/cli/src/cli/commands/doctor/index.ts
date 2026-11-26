@@ -1,3 +1,4 @@
+import { wordedError } from "@/cli/core/error-support";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
@@ -17,7 +18,7 @@ import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { Environment, EnvironmentError } from "@/lib/environment";
 import { FsError } from "@/lib/fs";
-import { errorMessage, isCancellation, ZitadelError, ZitadelLibError } from "@/lib/errors";
+import { isCancellation, toZitadelError, ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { Output, warnings as invocationWarnings } from "@/lib/ui";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -562,7 +563,7 @@ async function runEnvironmentChecks(input: {
       {
         name: "environment",
         status: "fail",
-        message: errorMessage(resolved.failure),
+        message: toZitadelError(wordedError(resolved.failure, input.cwd)).message,
       },
     ];
   }
@@ -570,6 +571,7 @@ async function runEnvironmentChecks(input: {
   const name = environment.name.value;
   return [
     await AbstractSanityCheck.attempt(
+      input.cwd,
       `environment`,
       `Resolved ${name} environment connects`,
       async () => {

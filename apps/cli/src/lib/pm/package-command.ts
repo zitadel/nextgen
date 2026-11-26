@@ -3,7 +3,7 @@ import { execa } from "execa";
 import { Cmd } from "@/lib/cmd";
 import { Output } from "@/lib/ui/output";
 
-import { PmCommandFailedError, PmCommandNotPermittedError } from "./errors";
+import { PmCommandFailedError, PmCommandMissingError, PmCommandNotPermittedError } from "./errors";
 import type { PMName } from "./pm";
 
 /**
@@ -129,6 +129,7 @@ export class PackageCommand {
    *
    * @param options - Where and how it runs.
    * @throws {@link PmCommandNotPermittedError} When the operating system refuses to run it.
+   * @throws {@link PmCommandMissingError} When the program it runs is not installed.
    * @throws {@link PmCommandFailedError} When the command cannot start otherwise or exits non-zero.
    */
   async run(options: RunOptions): Promise<void> {
@@ -154,7 +155,10 @@ export class PackageCommand {
     if (result.code !== undefined && result.exitCode === undefined) {
       const message = result.originalMessage ?? result.message ?? "";
       if (result.code === "EACCES" || result.code === "EPERM") {
-        throw new PmCommandNotPermittedError(`Permission denied: ${message}`, result.code);
+        throw new PmCommandNotPermittedError(message, result.code);
+      }
+      if (result.code === "ENOENT") {
+        throw new PmCommandMissingError(message, result.code);
       }
       throw new PmCommandFailedError(message, result.code);
     }

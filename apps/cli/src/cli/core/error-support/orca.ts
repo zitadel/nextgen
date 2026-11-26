@@ -1,7 +1,9 @@
 import {
   OrcaAngularJsonMissingError,
   OrcaAngularProjectAmbiguousError,
+  OrcaAngularProjectMissingError,
   OrcaAngularRoutesNotInlineError,
+  OrcaAngularServeTargetMissingError,
   OrcaBoundaryDuplicateError,
   OrcaBoundaryRenamedError,
   OrcaBoundaryVersionUnknownError,
@@ -34,7 +36,9 @@ import {
   OrcaRendererPendingError,
   OrcaRendererUnknownError,
   OrcaRootComponentMountError,
+  OrcaScaffolderMissingError,
   OrcaSolidStartConfigMissingError,
+  OrcaSolidStartOptionsError,
   OrcaSolidStartPluginMissingError,
   OrcaSvelteKitEnvVarsError,
   OrcaVersionBelowFloorError,
@@ -98,12 +102,14 @@ const CONFIG_UNPARSEABLE_REFUSAL = {
 const CONFIG_COMMON_JS_REFUSAL = {
   message: "{message}",
   hint: 'The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.',
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaConfigObjectMissingError} is refused. */
 const CONFIG_OBJECT_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Add the Zitadel configuration to {filename} manually (see the SDK README).",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaConfigUnwritableError} is refused. */
@@ -119,12 +125,14 @@ const CONFIG_UNWRITABLE_REFUSAL = {
 const CONFIG_OBJECT_EXPECTED_REFUSAL = {
   message: "{message}",
   hint: 'Set "{key}" to an inline object literal, or add the Zitadel settings manually.',
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaConfigArrayExpectedError} is refused. */
 const CONFIG_ARRAY_EXPECTED_REFUSAL = {
   message: "{message}",
   hint: 'Set "{key}" to an inline array literal, or add the Zitadel settings manually.',
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaFrameworkMismatchError} is refused. */
@@ -150,12 +158,14 @@ const DIRECTORY_NOT_EMPTY_REFUSAL = {
 const VERSION_BELOW_FLOOR_REFUSAL = {
   message: "{message}",
   hint: "Upgrade the app to {displayName} {versionFloor} or later and rerun.{note}",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaPagesRouterError} is refused. */
 const PAGES_ROUTER_REFUSAL = {
   message: "{message}",
   hint: "Create an App Router project with an app/ or src/app/ directory.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaNodeUnsupportedError} is refused. */
@@ -181,54 +191,70 @@ const COMMAND_SPAWN_FAILED_REFUSAL = {
 /** How {@link OrcaCommandFailedError} is refused. */
 const COMMAND_FAILED_REFUSAL = {
   message: "{message}",
+  hint: "{remedy}",
+  details: {
+    command: "{command}",
+    args: "{args}",
+    cwd: "{cwd}",
+    stdout: "{stdout}",
+    stderr: "{stderr}",
+  },
 } as const satisfies Refusal;
 
 /** How {@link OrcaFrameworkUnknownError} is refused. */
 const FRAMEWORK_UNKNOWN_REFUSAL = {
   message: "{message}",
   hint: "Supported frameworks: {supported}.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaPatcherMissingError} is refused. */
 const PATCHER_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Zitadel integration currently supports Next.js.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaPatchOpEmptyError} is refused. */
 const PATCH_OP_EMPTY_REFUSAL = {
   message: "{message}",
   hint: "This is an internal patcher error — please report it if you hit it.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaAngularJsonMissingError} is refused. */
 const ANGULAR_JSON_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Run setup from an Angular project.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaAngularProjectAmbiguousError} is refused. */
 const ANGULAR_PROJECT_AMBIGUOUS_REFUSAL = {
   message: "{message}",
   hint: `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: {projects}.`,
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaAngularRoutesNotInlineError} is refused. */
 const ANGULAR_ROUTES_NOT_INLINE_REFUSAL = {
   message: "{message}",
   hint: 'Set "routes" in {label} to an inline Routes array, or add /login, /register, and /profile manually.',
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaPackageJsonMissingError} is refused. */
 const PACKAGE_JSON_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Run setup from a project that has a package.json.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaZitadelConfigMissingError} is refused. */
 const ZITADEL_CONFIG_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Run `zitadel setup` first.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaFileOverwriteError} is refused. */
@@ -244,12 +270,14 @@ const FILE_OVERWRITE_REFUSAL = {
 const RENDERER_UNKNOWN_REFUSAL = {
   message: "{message}",
   hint: "Available renderers: {renderers}.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaProxyCredentialLeakError} is refused. */
 const PROXY_CREDENTIAL_LEAK_REFUSAL = {
   message: "{message}",
   hint: "Review the proxy manually: restrict the bearer to the exact POST /sessions/exchange or {exchangePath} pathname and preserve caller-provided authorization.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaRootComponentMountError} is refused. */
@@ -267,61 +295,100 @@ const ROOT_COMPONENT_MOUNT_REFUSAL = {
 const SOLID_START_CONFIG_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Run setup from a SolidStart project that has a vite.config.ts.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaSolidStartPluginMissingError} is refused. */
 const SOLID_START_PLUGIN_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaSvelteKitEnvVarsError} is refused. */
 const SVELTE_KIT_ENV_VARS_REFUSAL = {
   message: "{message}",
   hint: "Export them as `export const variables = defineEnvVars({ ... })` from @sveltejs/kit/env, or declare {variables} there by hand.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaConfigFileMissingError} is refused. */
 const CONFIG_FILE_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Run setup from a project that has {filename}.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaFrameworkMissingError} is refused. */
 const FRAMEWORK_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaFrameworkUnsupportedError} is refused. */
 const FRAMEWORK_UNSUPPORTED_REFUSAL = {
   message: "{message}",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaInvalidError} is refused. */
 const INVALID_REFUSAL = {
   message: "{message}",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaPatchFileMissingError} is refused. */
 const PATCH_FILE_MISSING_REFUSAL = {
   message: "{message}",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaRendererPendingError} is refused. */
 const RENDERER_PENDING_REFUSAL = {
   message: "{message}",
   hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaInternalError} is refused. */
 const INTERNAL_REFUSAL = {
   message: "{message}",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link OrcaConflictError} is refused. */
 const CONFLICT_REFUSAL = {
   message: "{message}",
+  details: {},
+} as const satisfies Refusal;
+
+/** How {@link OrcaScaffolderMissingError} is refused. */
+const SCAFFOLDER_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: "Available frameworks: {frameworks}.",
+  details: {},
+} as const satisfies Refusal;
+
+/** How {@link OrcaAngularProjectMissingError} is refused. */
+const ANGULAR_PROJECT_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: 'Add "proxyConfig" to your serve target manually.',
+  details: {},
+} as const satisfies Refusal;
+
+/** How {@link OrcaAngularServeTargetMissingError} is refused. */
+const ANGULAR_SERVE_TARGET_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: 'Add "proxyConfig" to your serve options manually.',
+  details: {},
+} as const satisfies Refusal;
+
+/** How {@link OrcaSolidStartOptionsError} is refused. */
+const SOLID_START_OPTIONS_REFUSAL = {
+  message: "{message}",
+  hint: 'Pass an options object to solidStart(), e.g. solidStart({ middleware: "./src/middleware.ts" }).',
+  details: {},
 } as const satisfies Refusal;
 
 /** How the errors of `@/lib/orca` are worded, most specific class first. */
@@ -354,9 +421,22 @@ export const ORCA_WORDINGS: readonly Wording[] = [
   [OrcaPagesRouterError, PAGES_ROUTER_REFUSAL],
   [OrcaNodeUnsupportedError, NODE_UNSUPPORTED_REFUSAL],
   [OrcaCommandSpawnFailedError, COMMAND_SPAWN_FAILED_REFUSAL],
-  [OrcaCommandFailedError, COMMAND_FAILED_REFUSAL],
+  derived(OrcaCommandFailedError, COMMAND_FAILED_REFUSAL, (error) => {
+    return {
+      values: {
+        remedy:
+          error.output === ""
+            ? "Run the command directly for more detail."
+            : `Command output:\n${error.output}`,
+      },
+    };
+  }),
   [OrcaFrameworkUnknownError, FRAMEWORK_UNKNOWN_REFUSAL],
   [OrcaPatcherMissingError, PATCHER_MISSING_REFUSAL],
+  [OrcaScaffolderMissingError, SCAFFOLDER_MISSING_REFUSAL],
+  [OrcaAngularProjectMissingError, ANGULAR_PROJECT_MISSING_REFUSAL],
+  [OrcaAngularServeTargetMissingError, ANGULAR_SERVE_TARGET_MISSING_REFUSAL],
+  [OrcaSolidStartOptionsError, SOLID_START_OPTIONS_REFUSAL],
   [OrcaPatchOpEmptyError, PATCH_OP_EMPTY_REFUSAL],
   [OrcaAngularJsonMissingError, ANGULAR_JSON_MISSING_REFUSAL],
   [OrcaAngularProjectAmbiguousError, ANGULAR_PROJECT_AMBIGUOUS_REFUSAL],

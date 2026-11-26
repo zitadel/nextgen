@@ -107,7 +107,11 @@ export class FlowService extends ApiService {
     });
     const current = first.items[0];
     if (current === undefined) {
-      throw new BackendNameUnknownError(`No flow definition named "${reference}"`);
+      throw new BackendNameUnknownError(
+        `No flow definition named "${reference}"`,
+        "flow",
+        reference,
+      );
     }
     return current;
   }

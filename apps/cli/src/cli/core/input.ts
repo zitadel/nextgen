@@ -541,7 +541,7 @@ export class Input {
       if (error instanceof FsError) {
         throw refusalError(UNREADABLE_REFUSAL, {
           path,
-          problem: error.message,
+          problem: error.reason,
         });
       }
       throw error;

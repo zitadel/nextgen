@@ -82,6 +82,34 @@ export class ZitadelConfigFlowBrokenError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path of the schema whose edit was checked.
+   */
+  readonly file: string;
+
+  /**
+   * Every issue found in the flows.
+   */
+  readonly issues: readonly FlowIssue[];
+
+  /**
+   * Make the failure for these issues.
+   *
+   * @param message - What is wrong, naming each issue.
+   * @param facts - The schema whose edit was checked, and the issues found.
+   */
+  constructor(
+    message: string,
+    facts: {
+      readonly file: string;
+      readonly issues: readonly FlowIssue[];
+    },
+  ) {
+    super(message);
+    this.file = facts.file;
+    this.issues = facts.issues;
+  }
 }
 
 /**
@@ -91,6 +119,34 @@ export class ZitadelConfigFlowUncheckedError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path of the schema whose edit was checked.
+   */
+  readonly file: string;
+
+  /**
+   * Every issue found in the flows.
+   */
+  readonly issues: readonly FlowIssue[];
+
+  /**
+   * Make the failure for these issues.
+   *
+   * @param message - What is wrong, naming each issue.
+   * @param facts - The schema whose edit was checked, and the issues found.
+   */
+  constructor(
+    message: string,
+    facts: {
+      readonly file: string;
+      readonly issues: readonly FlowIssue[];
+    },
+  ) {
+    super(message);
+    this.file = facts.file;
+    this.issues = facts.issues;
+  }
 }
 
 /**
@@ -456,6 +512,11 @@ export class ZitadelConfigSchemaMissingError extends ZitadelConfigResourceMissin
   readonly known: readonly UserSchema[];
 
   /**
+   * The name asked for, or `null` when none was.
+   */
+  readonly requested: string | null;
+
+  /**
    * Make the failure for this name.
    *
    * @param requested - The name asked for, if any.
@@ -467,6 +528,7 @@ export class ZitadelConfigSchemaMissingError extends ZitadelConfigResourceMissin
       ? "There is no user schema under .zitadel/schemas"
       : `No user schema is named ${requested}`;
     super(message);
+    this.requested = requested ?? null;
     this.known = known;
   }
 }
@@ -491,6 +553,11 @@ export class ZitadelConfigSchemaAmbiguousError extends ZitadelConfigError {
   readonly candidates: readonly UserSchema[];
 
   /**
+   * The name asked for, or `null` when none was.
+   */
+  readonly requested: string | null;
+
+  /**
    * Make the failure for these schemas.
    *
    * @param requested - The name asked for, if any.
@@ -502,6 +569,7 @@ export class ZitadelConfigSchemaAmbiguousError extends ZitadelConfigError {
         ? "There is more than one user schema, and none was named"
         : `More than one user schema is named ${requested}`;
     super(message);
+    this.requested = requested ?? null;
     this.candidates = candidates;
   }
 }

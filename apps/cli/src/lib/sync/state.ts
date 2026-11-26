@@ -2,9 +2,9 @@ import { join } from "node:path";
 
 import { errorMessage } from "@/lib/errors";
 import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
-import { isObject, parseJsonOrUndefined } from "@/lib/json";
+import { isObject } from "@/lib/json";
 
-import { SyncStateMalformedError } from "./errors";
+import { SyncStateMalformedError, SyncStateUnreadableError } from "./errors";
 import type { ScaffoldManifest, StoredState } from "./types.js";
 
 export type { StoredState, ZitadelState } from "./types.js";
@@ -13,6 +13,22 @@ export type { StoredState, ZitadelState } from "./types.js";
  * Where the state file lives, relative to the project root.
  */
 const STATE_PATH = ".zitadel/state.json";
+
+/**
+ * The state file's text as JSON.
+ *
+ * @param raw - The file's text.
+ * @returns What it parses as.
+ * @throws {@link SyncStateUnreadableError} When it is not JSON, with the parser's message and error.
+ */
+function parsedJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    // The boundary: `JSON.parse` throws an untyped SyntaxError.
+    throw new SyncStateUnreadableError(errorMessage(error), error);
+  }
+}
 
 /**
  * Read and parse `.zitadel/state.json`.
@@ -25,13 +41,13 @@ const STATE_PATH = ".zitadel/state.json";
  * @param cwd - The project root.
  * @returns The file's sections, unchecked.
  * @throws {@link FsError} When the file is missing or cannot be read.
- * @throws {@link SyncStateMalformedError} When it is not JSON or does not hold an object.
+ * @throws {@link SyncStateUnreadableError} When it is not JSON or does not hold an object.
  */
 export async function readState(cwd: string): Promise<StoredState> {
   const raw = await readFile(join(cwd, STATE_PATH), "utf8");
-  const parsed = parseJsonOrUndefined(raw);
+  const parsed = parsedJson(raw);
   if (!isObject(parsed)) {
-    throw new SyncStateMalformedError(`Cannot read ${STATE_PATH}: it does not hold a JSON object`);
+    throw new SyncStateUnreadableError(`${STATE_PATH} does not hold an object`);
   }
   return parsed;
 }

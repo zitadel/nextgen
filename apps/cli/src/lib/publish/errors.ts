@@ -23,11 +23,39 @@ export class PublishConfigInvalidError extends PublishError {
   /** Each finding the refusal is about, as `--json` lists it: its rule, file and message. */
   readonly issues: readonly unknown[];
 
+  /** Whether a finding refuses a key a user schema does not allow, which a newer server may have added. */
+  readonly refusedKey: boolean;
+
   /**
    * Make the failure.
    *
    * @param message - What went wrong, with the facts it is about.
    * @param issues - Each finding it is about.
+   * @param refusedKey - Whether a finding refuses a key a user schema does not allow.
+   */
+  constructor(message: string, issues: readonly unknown[], refusedKey: boolean) {
+    super(message);
+    this.issues = issues;
+    this.refusedKey = refusedKey;
+  }
+}
+
+/**
+ * The release body read from disk does not match what the API takes, so nothing was sent.
+ */
+export class PublishReleaseBodyInvalidError extends PublishError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** Each field the API does not take, as its schema reports it. */
+  readonly issues: readonly unknown[];
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with each field it is about.
+   * @param issues - Each field the API does not take.
    */
   constructor(message: string, issues: readonly unknown[]) {
     super(message);
@@ -46,15 +74,20 @@ export class PublishConnectionSecretLiteralError extends PublishError {
   /** Each finding the refusal is about, as `--json` lists it: its rule, file and message. */
   readonly issues: readonly unknown[];
 
+  /** Whether a finding refuses a key a user schema does not allow, which a newer server may have added. */
+  readonly refusedKey: boolean;
+
   /**
    * Make the failure.
    *
    * @param message - What went wrong, with the facts it is about.
    * @param issues - Each finding it is about.
+   * @param refusedKey - Whether a finding refuses a key a user schema does not allow.
    */
-  constructor(message: string, issues: readonly unknown[]) {
+  constructor(message: string, issues: readonly unknown[], refusedKey: boolean) {
     super(message);
     this.issues = issues;
+    this.refusedKey = refusedKey;
   }
 }
 

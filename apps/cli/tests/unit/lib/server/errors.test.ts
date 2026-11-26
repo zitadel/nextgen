@@ -35,6 +35,7 @@ import {
 /** The server a failed start was to answer on, for the start failures. */
 const STARTED = {
   serverUrl: "http://localhost:8080",
+  runtime: "binary",
 } as const;
 
 describe("the local server errors", () => {
@@ -65,26 +66,51 @@ describe("the local server errors", () => {
     ],
     [
       "unreadable record",
-      new LocalServerRecordUnreadableError("bad", "/r"),
+      new LocalServerRecordUnreadableError("bad", "/r", new Error("denied")),
       "invalid",
       "E_VALIDATION",
     ],
     ["not started", new LocalServerNotStartedError("none"), "invalid", "E_VALIDATION"],
-    ["package missing", new LocalServerPackageMissingError("none"), "invalid", "E_VALIDATION"],
-    ["launch failed", new LocalServerLaunchFailedError("no"), "invalid", "E_VALIDATION"],
-    ["docker failed", new LocalServerDockerFailedError("no"), "invalid", "E_VALIDATION"],
-    ["env unreadable", new LocalServerEnvUnreadableError("no", "/e"), "invalid", "E_VALIDATION"],
     [
-      "admin unreadable",
-      new LocalServerAdminUnreadableError("no", "/a"),
+      "package missing",
+      new LocalServerPackageMissingError("none", "@zitadel/server", new Error("gone")),
       "invalid",
       "E_VALIDATION",
     ],
-    ["admin malformed", new LocalServerAdminMalformedError("no", "/a"), "invalid", "E_VALIDATION"],
+    [
+      "launch failed",
+      new LocalServerLaunchFailedError("no", "/bin/zitadel", new Error("denied")),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "docker failed",
+      new LocalServerDockerFailedError("no", ["docker"], "no"),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "env unreadable",
+      new LocalServerEnvUnreadableError("no", "/e", new Error("denied")),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "admin unreadable",
+      new LocalServerAdminUnreadableError("no", "/a", new Error("denied")),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "admin malformed",
+      new LocalServerAdminMalformedError("no", "/a", "/"),
+      "invalid",
+      "E_VALIDATION",
+    ],
     ["permit mismatch", new LocalServerPermitMismatchError("no"), "invalid", "E_VALIDATION"],
     [
       "processes unlistable",
-      new LocalServerProcessesUnlistableError("no"),
+      new LocalServerProcessesUnlistableError("no", undefined),
       "invalid",
       "E_VALIDATION",
     ],
@@ -99,7 +125,12 @@ describe("the local server errors", () => {
     ["stop", new LocalServerStopError("stuck", {}), "invalid", "E_VALIDATION"],
     ["port busy", new LocalServerPortBusyError(8080), "unavailable", "E_PORT_IN_USE"],
     ["port full", new LocalServerPortFullError("full", 8080), "unavailable", "E_PORT_IN_USE"],
-    ["docker", new LocalServerDockerMissingError("no daemon"), "unavailable", "E_NETWORK"],
+    [
+      "docker",
+      new LocalServerDockerMissingError("no daemon", "no daemon"),
+      "unavailable",
+      "E_NETWORK",
+    ],
     ["admin not found", new LocalServerAdminNotFoundError("no"), "denied", "E_AUTH"],
     ["session refused", new LocalServerSessionRefusedError("no", 401), "denied", "E_AUTH"],
     ["process gone", new LocalServerProcessGoneError("gone"), "unavailable", "E_NETWORK"],
@@ -118,7 +149,7 @@ describe("the local server errors", () => {
     ],
     [
       "start cleanup failed",
-      new LocalServerStartCleanupFailedError("stuck", STARTED),
+      new LocalServerStartCleanupFailedError("stuck", STARTED, "timeout", {}),
       "unavailable",
       "E_NETWORK",
     ],
@@ -131,13 +162,15 @@ describe("the local server errors", () => {
   it("is retryable only while another start holds the lock", () => {
     expect(new LocalServerBusyError("busy", "/lock", 4242).retryable).toBe(true);
     expect(new LocalServerPortBusyError(8080).retryable).toBe(false);
-    expect(new LocalServerDockerMissingError("no daemon").retryable).toBe(false);
+    expect(new LocalServerDockerMissingError("no daemon", "no daemon").retryable).toBe(false);
   });
 
   it("keeps the cause it wraps", () => {
     const cause = new Error("no daemon");
 
-    expect(new LocalServerDockerMissingError("Docker is not reachable", cause)).toMatchObject({
+    expect(
+      new LocalServerDockerMissingError("Docker is not reachable", "no daemon", cause),
+    ).toMatchObject({
       message: "Docker is not reachable",
       cause,
     });

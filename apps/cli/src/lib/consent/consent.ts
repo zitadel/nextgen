@@ -119,6 +119,8 @@ export class Consent {
       if (!session.force && !session.interactive) {
         throw new ConsentRequiredError(
           `Cannot ${gate.name} without --force in non-interactive mode`,
+          gate.message,
+          gate.retry,
         );
       }
       const agreed = await (session.confirmer ?? Ui.asker(session)).confirm({

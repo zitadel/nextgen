@@ -105,6 +105,17 @@ describe("auth-method passkey disable", () => {
         });
       });
 
+      it("refuses a record of what was synced that is not JSON, saying where it stops parsing", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run(["auth-method", "passkey", "disable", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          message: expect.stringMatching(/^Cannot read \.zitadel\/state\.json: .* position \d+/),
+        });
+      });
+
       it("turns passkey off", async () => {
         const app = await aSetUpApp();
 

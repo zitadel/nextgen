@@ -1,5 +1,7 @@
 import {
+  BackendInternalError,
   BackendMethodMismatchError,
+  BackendNameUnknownError,
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
   BackendPageMalformedError,
@@ -34,6 +36,7 @@ const RELEASE_CONTENT_REVOKED_REFUSAL = {
 const PATH_UNKNOWN_REFUSAL = {
   message: "{message}",
   hint: "List the paths with `zitadel api ls`.",
+  details: {},
   next: [
     {
       id: "api:ls",
@@ -48,6 +51,7 @@ const PATH_UNKNOWN_REFUSAL = {
 const OPERATION_UNKNOWN_REFUSAL = {
   message: "{message}",
   hint: "{fix}",
+  details: {},
   next: [
     {
       id: "api:ls",
@@ -62,6 +66,7 @@ const OPERATION_UNKNOWN_REFUSAL = {
 const METHOD_MISMATCH_REFUSAL = {
   message: "{message}",
   hint: "Leave out -X, or pass -X {method}.",
+  details: {},
   next: [
     {
       id: "api:ls",
@@ -76,6 +81,7 @@ const METHOD_MISMATCH_REFUSAL = {
 const OPERATION_AMBIGUOUS_REFUSAL = {
   message: "{message}",
   hint: "Pass -X with one of {offered}.",
+  details: {},
   next: [
     {
       id: "api:ls",
@@ -85,6 +91,27 @@ const OPERATION_AMBIGUOUS_REFUSAL = {
     },
   ],
 } as const satisfies Refusal;
+
+/** How a name no flow or schema carries is refused, with where to list them. */
+const NAME_UNKNOWN_REFUSAL = {
+  message: "{message}",
+  hint: "{fix}",
+  details: {},
+} as const satisfies Refusal;
+
+/** How a bug in the backend's own code is reported, with the failure it is. */
+const INTERNAL_REFUSAL = {
+  message: "{message}",
+  details: {
+    original: "{original}",
+  },
+} as const satisfies Refusal;
+
+/** The command that lists each kind of named record, as the hint names it. */
+const LISTED_BY = {
+  flow: "Run `flow-definition list` to see the flows this project has.",
+  schema: "Run `schema list` to see the object types this project has.",
+} as const;
 
 /** How a page that does not hold the list its operation pages through is refused. */
 const PAGE_MALFORMED_REFUSAL = {
@@ -122,4 +149,12 @@ export const BACKEND_WORDINGS: readonly Wording[] = [
     };
   }),
   [BackendPageMalformedError, PAGE_MALFORMED_REFUSAL],
+  derived(BackendNameUnknownError, NAME_UNKNOWN_REFUSAL, (error) => {
+    return {
+      values: {
+        fix: LISTED_BY[error.kind],
+      },
+    };
+  }),
+  [BackendInternalError, INTERNAL_REFUSAL],
 ];

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { ExecaError, execa } from "execa";
 
 import { errorMessage } from "@/lib/errors";
+import { isObject } from "@/lib/json";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { painted } from "@/lib/oclif/rendering";
@@ -411,7 +412,11 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
         cancelSignal: this.signal,
       });
       this.signal.throwIfAborted();
-      const envelope = JSON.parse(child.stdout) as { status?: unknown };
+      const envelope: unknown = JSON.parse(child.stdout);
+      // Anything but an object, `null` included, is no envelope: doctor did not report.
+      if (!isObject(envelope)) {
+        return "failed";
+      }
       if (envelope.status === "ok") {
         return "done";
       }

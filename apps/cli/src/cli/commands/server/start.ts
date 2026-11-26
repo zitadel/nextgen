@@ -6,7 +6,9 @@ import {
   LocalServerDockerMissingError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
+  LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
+  LocalServerStartFailedError,
   LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server";
@@ -50,7 +52,7 @@ const DOCKER_UNAVAILABLE_REFUSAL = {
   next: ["{check}", "{retry}"],
   details: {
     message:
-      "{message}; managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.",
+      "Docker is not reachable ({detail}); managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.",
   },
 } as const satisfies Refusal;
 
@@ -101,8 +103,35 @@ const SERVER_NOT_READY_REFUSAL = {
       flags: { force: true },
     },
   ],
+  details: "{details}",
+} as const satisfies Refusal;
+
+/**
+ * How a start is refused when the server did not become ready and stopping it
+ * failed too, so it may still be running with nothing recording it.
+ */
+const SERVER_NOT_READY_AND_RUNNING_REFUSAL = {
+  code: "E_NETWORK",
+  message: "{message}; cleanup did not stop the spawned local runtime",
+  hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
+  next: [
+    { id: "logs" },
+    {
+      id: "reset",
+      flags: { force: true },
+    },
+    {
+      id: "stop",
+      flags: { all: true },
+    },
+  ],
   details: {
-    server_url: "{serverUrl}",
+    startup_error: {
+      code: "E_NETWORK",
+      message: "{message}",
+      details: "{details}",
+    },
+    stop_result: "{stopResult}",
   },
 } as const satisfies Refusal;
 
@@ -110,7 +139,23 @@ const SERVER_NOT_READY_REFUSAL = {
 const SERVER_WOULD_NOT_STOP_REFUSAL = {
   message: "Existing local Zitadel server did not stop",
   hint: "Stop the existing local runtime manually, then rerun start.",
+  details: {
+    runtime: "{runtime}",
+    stop_result: "{stopResult}",
+  },
 } as const satisfies Refusal;
+
+/** What a server that launched but did not become ready is reported as, by why. */
+const NOT_READY_REASONS = {
+  exited: {
+    message: "Local Zitadel server process exited before becoming healthy",
+    hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
+  },
+  timeout: {
+    message: "Local Zitadel server did not become healthy",
+    hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
+  },
+} as const;
 
 /**
  * `zitadel start`: starts this folder's server, or finds it already running.
@@ -388,24 +433,46 @@ export default class Start extends Telemetered(
           message: error.message,
         });
       }
-      if (error instanceof LocalServerStartExitedError) {
-        throw refusalError(SERVER_NOT_READY_REFUSAL, {
-          ...error,
-          message: error.message,
-          hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-        });
-      }
-      if (error instanceof LocalServerStartTimeoutError) {
-        throw refusalError(SERVER_NOT_READY_REFUSAL, {
-          ...error,
-          message: error.message,
-          hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
-        });
+      if (error instanceof LocalServerStartFailedError) {
+        // What identifies the server and what it logged, as main reported them.
+        const details = Object.fromEntries(
+          Object.entries({
+            runtime: error.runtime,
+            pid: error.pid,
+            log_path: error.logPath,
+            container_name: error.containerName,
+            server_url: error.serverUrl,
+            log_tail: error.logTail || undefined,
+          }).filter(([, value]) => {
+            return value !== undefined;
+          }),
+        );
+        if (error instanceof LocalServerStartCleanupFailedError) {
+          throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+            message: NOT_READY_REASONS[error.reason].message,
+            details,
+            stopResult: error.stopResult,
+          });
+        }
+        if (error instanceof LocalServerStartExitedError) {
+          throw refusalError(SERVER_NOT_READY_REFUSAL, {
+            ...NOT_READY_REASONS.exited,
+            details,
+          });
+        }
+        if (error instanceof LocalServerStartTimeoutError) {
+          throw refusalError(SERVER_NOT_READY_REFUSAL, {
+            ...NOT_READY_REASONS.timeout,
+            details,
+          });
+        }
       }
       if (error instanceof LocalServerStopError) {
         throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
           ...error,
           message: error.message,
+          runtime: error.runtime ?? {},
+          stopResult: error.stopResult ?? {},
         });
       }
       throw error;

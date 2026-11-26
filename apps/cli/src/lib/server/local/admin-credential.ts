@@ -6,7 +6,6 @@ import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
 import { FsExistsError, FsNotFoundError, mkdir, readFile, rename, writeFile } from "@/lib/fs";
-import { errorMessage } from "@/lib/errors";
 import {
   LocalServerAdminMalformedError,
   LocalServerAdminUnreadableError,
@@ -88,20 +87,22 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     }
     if (error instanceof SyntaxError) {
       throw new LocalServerAdminMalformedError(
-        `${join(cwd, LOCAL_ADMIN_FILE)} is malformed: ${errorMessage(error)}`,
+        `${LOCAL_ADMIN_FILE} is malformed`,
         join(cwd, LOCAL_ADMIN_FILE),
+        cwd,
         error,
       );
     }
     throw new LocalServerAdminUnreadableError(
-      `${join(cwd, LOCAL_ADMIN_FILE)} cannot be read: ${errorMessage(error)}`,
+      `${LOCAL_ADMIN_FILE} cannot be read`,
       join(cwd, LOCAL_ADMIN_FILE),
       error,
     );
   }
   throw new LocalServerAdminMalformedError(
-    `${join(cwd, LOCAL_ADMIN_FILE)} is malformed`,
+    `${LOCAL_ADMIN_FILE} is malformed`,
     join(cwd, LOCAL_ADMIN_FILE),
+    cwd,
   );
 }
 

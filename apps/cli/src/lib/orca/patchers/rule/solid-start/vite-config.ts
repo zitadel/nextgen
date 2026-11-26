@@ -1,6 +1,7 @@
 import {
   OrcaInvalidError,
   OrcaSolidStartConfigMissingError,
+  OrcaSolidStartOptionsError,
   OrcaSolidStartPluginMissingError,
 } from "@/lib/orca/errors";
 
@@ -50,7 +51,7 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
     const option = `middleware: ${JSON.stringify(MIDDLEWARE_PATH)}`;
     if (inner !== "" && !inner.startsWith("{")) {
       // Unusual: a non-object argument (e.g. a variable). Don't guess — fail loud.
-      throw new OrcaInvalidError(
+      throw new OrcaSolidStartOptionsError(
         "Cannot wire middleware: solidStart() is called with a non-object argument",
       );
     }

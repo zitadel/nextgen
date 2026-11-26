@@ -74,9 +74,14 @@ class World {
       return this.alive.has(record.pid);
     },
     isLaunchedAlive: async (server) => this.alive.has(server.pid),
+    describe: (record) => ({ runtime: "fake", pid: record.pid }),
     logTail: async () => {
       if (this.logsGone) {
-        throw new LocalServerDockerFailedError("no such container");
+        throw new LocalServerDockerFailedError(
+          "Read the server log failed",
+          ["docker", "logs"],
+          "no such container",
+        );
       }
       return this.logs;
     },
@@ -389,7 +394,7 @@ describe("Lifecycle", () => {
       const rejection = expect(world.server().start()).rejects;
       await rejection.toBeInstanceOf(LocalServerStartExitedError);
       await rejection.toMatchObject({
-        message: expect.stringContaining("listen tcp :8080: bind: address already in use"),
+        logTail: "listen tcp :8080: bind: address already in use",
       });
     });
 
@@ -565,7 +570,11 @@ describe("Lifecycle", () => {
       const world = new World();
       world.writeError = new Error("read-only file system");
       world.launcher.terminate = async () => {
-        throw new LocalServerDockerFailedError("docker daemon is gone");
+        throw new LocalServerDockerFailedError(
+          "Stop the container failed",
+          ["docker", "stop"],
+          "docker daemon is gone",
+        );
       };
 
       await expect(world.server().start()).rejects.toBeInstanceOf(LocalServerStopError);

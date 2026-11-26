@@ -54,7 +54,7 @@ describe("the package manager errors", () => {
   });
 
   it("reports a refused command as denied", () => {
-    const error = new PmCommandNotPermittedError("Permission denied: spawn npm EACCES", "EACCES");
+    const error = new PmCommandNotPermittedError("spawn npm EACCES", "EACCES");
 
     expect(error).toBeInstanceOf(PmError);
     expect(error.category).toBe("denied");

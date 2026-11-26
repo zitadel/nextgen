@@ -68,3 +68,13 @@ export class PmCommandNotPermittedError extends PmCommandFailedError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";
 }
+
+/**
+ * A package manager command that could not start because the program it runs
+ * is not there. Its `status` is the errno it was refused with (`ENOENT`).
+ */
+export class PmCommandMissingError extends PmCommandFailedError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}

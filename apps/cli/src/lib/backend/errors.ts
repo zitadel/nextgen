@@ -297,11 +297,33 @@ export class BackendMethodMismatchError extends BackendOperationAmbiguousError {
   }
 }
 
+/** What kind of record a {@link BackendNameUnknownError} looked for. */
+export type BackendNamedKind = "flow" | "schema";
+
 /** A flow or schema named by its name, which no record carries. */
 export class BackendNameUnknownError extends BackendNotFoundError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+
+  /** What kind of record the name was looked up as. */
+  readonly kind: BackendNamedKind;
+
+  /** The name no record carries. */
+  readonly reference: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, naming the record.
+   * @param kind - What kind of record the name was looked up as.
+   * @param reference - The name no record carries.
+   */
+  constructor(message: string, kind: BackendNamedKind, reference: string) {
+    super(message);
+    this.kind = kind;
+    this.reference = reference;
+  }
 }
 
 /** A bug in the backend's own code: something that cannot happen unless the code is wrong. */

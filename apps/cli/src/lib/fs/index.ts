@@ -86,22 +86,22 @@ export * from "./errors";
 export function fsFailure(error: unknown, operation: string, path: PathLike): unknown {
   const message = `Cannot ${operation} ${String(path)}`;
   if (isErrno(error, "ENOENT")) {
-    return new FsNotFoundError(message, error);
+    return new FsNotFoundError(message, error, "ENOENT");
   }
   if (isErrno(error, "EACCES")) {
-    return new FsDeniedError(message, error);
+    return new FsDeniedError(message, error, "EACCES");
   }
   if (isErrno(error, "EPERM")) {
-    return new FsDeniedError(message, error);
+    return new FsDeniedError(message, error, "EPERM");
   }
   if (isErrno(error, "ENOTDIR")) {
-    return new FsNotDirectoryError(message, error);
+    return new FsNotDirectoryError(message, error, "ENOTDIR");
   }
   if (isErrno(error, "EISDIR")) {
-    return new FsIsDirectoryError(message, error);
+    return new FsIsDirectoryError(message, error, "EISDIR");
   }
   if (isErrno(error, "EEXIST")) {
-    return new FsExistsError(message, error);
+    return new FsExistsError(message, error, "EEXIST");
   }
   // Only a failure of the system call itself: Node's own argument errors
   // (`ERR_*`) are bugs in the caller and stay as they are.

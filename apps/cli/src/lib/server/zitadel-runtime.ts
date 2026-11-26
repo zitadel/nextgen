@@ -1188,7 +1188,8 @@ export class LocalRuntime extends ZitadelRuntime {
         const docker = await this.directory.docker.available();
         if (docker.status !== 0) {
           throw new LocalServerDockerMissingError(
-            `Docker is not reachable: ${docker.stderr.trim() || "docker version failed"}`,
+            "Docker is not reachable",
+            docker.stderr.trim() || "docker version failed",
           );
         }
       } catch (error) {
@@ -1196,7 +1197,8 @@ export class LocalRuntime extends ZitadelRuntime {
           throw error;
         }
         throw new LocalServerDockerMissingError(
-          `Docker is not reachable: ${errorMessage(error).trim() || "no reason given"}`,
+          "Docker is not reachable",
+          errorMessage(error).trim() || "no reason given",
           error,
         );
       }
@@ -1351,6 +1353,7 @@ export class LocalRuntime extends ZitadelRuntime {
         if (recordReadable) {
           throw new LocalServerProcessesUnlistableError(
             "The local runtime record cannot be read and the machine's processes cannot be listed",
+            discovery.error,
           );
         }
       }

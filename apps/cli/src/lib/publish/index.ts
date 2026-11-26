@@ -13,6 +13,7 @@ export {
   type ReleaseRequest,
 } from "./publisher";
 export {
+  PublishAssetLookupFailedError,
   PublishAssetTargetUnsafeError,
   PublishConfigInvalidError,
   PublishConnectionSecretLiteralError,
@@ -20,4 +21,5 @@ export {
   PublishConnectionVariableMissingError,
   PublishConnectionVariableSharedError,
   PublishError,
+  PublishReleaseBodyInvalidError,
 } from "./errors";

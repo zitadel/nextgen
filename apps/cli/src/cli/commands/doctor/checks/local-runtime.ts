@@ -79,6 +79,7 @@ export class LocalRuntimeChecks {
     if (backend === "binary") {
       before.push(
         await AbstractSanityCheck.attempt(
+          this.runtimeDir,
           "server-binary",
           "Server npm package is available",
           () => {
@@ -93,6 +94,7 @@ export class LocalRuntimeChecks {
         return `Docker is not reachable${because}; managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.`;
       };
       const docker = await AbstractSanityCheck.attempt(
+        this.runtimeDir,
         "docker-cli",
         "Docker is reachable",
         async () => {
@@ -120,6 +122,7 @@ export class LocalRuntimeChecks {
       if (docker.status === "pass") {
         before.push(
           await AbstractSanityCheck.attempt(
+            this.runtimeDir,
             "image",
             `Image ${image} is available`,
             async () => {
@@ -150,6 +153,7 @@ export class LocalRuntimeChecks {
     }
 
     const stateDirectory = await AbstractSanityCheck.attempt(
+      this.runtimeDir,
       "state-dir",
       "Local state directory is writable",
       async () => {
@@ -164,6 +168,7 @@ export class LocalRuntimeChecks {
     );
 
     const portAvailable = await AbstractSanityCheck.attempt(
+      this.runtimeDir,
       "port",
       `Port ${String(port)} is available`,
       async () => {
@@ -193,6 +198,7 @@ export class LocalRuntimeChecks {
     );
 
     const runtimeHealthy = await AbstractSanityCheck.attempt(
+      this.runtimeDir,
       "runtime",
       "Existing local runtime is healthy",
       async () => {

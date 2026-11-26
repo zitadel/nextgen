@@ -1,1 +1,1 @@
-export { SyncError, SyncStateMalformedError } from "./errors";
+export { SyncError, SyncStateMalformedError, SyncStateUnreadableError } from "./errors";

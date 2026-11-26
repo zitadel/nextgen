@@ -115,6 +115,7 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
         return `  - ${item.path}: ${item.issue.message}`;
       }),
     ].join("\n"),
+    { file: edit.edited.path, issues: introduced },
   );
 }
 
@@ -248,6 +249,7 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
           return `  - ${item.path}: ${item.issue.message}`;
         }),
       ].join("\n"),
+      { file: edit.edited.path, issues: unchecked },
     );
   }
   return checks.flatMap((check) => {

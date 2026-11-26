@@ -79,7 +79,7 @@ export class ProjectSecret {
     try {
       const secret = parseJsonOrUndefined(await readFile(join(cwd, PATH), "utf8"));
       if (!isObject(secret)) {
-        throw new ProjectInvalidError(`${PATH} is not a JSON object`);
+        throw new ProjectInvalidError(`${PATH} must contain a JSON object`);
       }
       if (
         typeof secret.project_id !== "string" ||

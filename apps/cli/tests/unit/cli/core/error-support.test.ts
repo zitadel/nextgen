@@ -9,7 +9,8 @@ import { ErrorSupport } from "@/cli/core/error-support";
 import { WORDINGS } from "@/cli/core/error-support/index";
 import { BackendTimeoutError } from "@/lib/backend";
 import { EnvironmentValueMissingError } from "@/lib/environment";
-import { ZitadelError } from "@/lib/errors";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { isObject } from "@/lib/json";
 import {
   OrcaAngularJsonMissingError,
   OrcaAngularProjectAmbiguousError,
@@ -44,6 +45,9 @@ import { it } from "@tests/fixtures";
 import { nodesOf, parsedFile, sourcesUnder } from "@tests/helpers/declarations";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
+import { CWD, type Row, type Shown } from "./error-support/row";
+import { ROWS } from "./error-support/rows";
+
 const lib = fileURLToPath(new URL("../../../../src/lib", import.meta.url));
 
 /**
@@ -51,17 +55,7 @@ const lib = fileURLToPath(new URL("../../../../src/lib", import.meta.url));
  * code, which is not a refusal to word, or an error that never leaves the
  * code that raises it.
  */
-const UNWORDED: ReadonlyMap<string, string> = new Map([
-  ["GitInternalError", "a bug in the git package, never a refusal"],
-  ["ConsentInternalError", "a bug in the consent package, never a refusal"],
-  ["ZitadelConfigInternalError", "a bug in the configuration library, never a refusal"],
-  ["WizardDefinitionError", "a wizard built with two steps of one name, a bug in its command"],
-  ["SuggestionInvalidError", "a follow-up the code wrote wrong, a bug in its command"],
-  ["TelemetryHomeUnknownError", "caught inside telemetry, which never stops a run"],
-  ["TelemetryClientError", "caught inside telemetry, which never stops a run"],
-  ["PublishAssetTargetUnsafeError", "the asset probe reports it as a warning"],
-  ["PublishAssetLookupFailedError", "the asset probe reports it as a warning"],
-]);
+const UNWORDED: ReadonlyMap<string, string> = new Map<string, string>();
 
 /**
  * The lib error families worded elsewhere, each with where: every class that
@@ -147,8 +141,42 @@ async function aWordingCommand(): Promise<Wording> {
   return new Wording([], await Config.load(cliPackageRoot));
 }
 
-/** The folder a test's run acts on. */
-const CWD = "/work/app";
+/** A `{name}` a wording left in what it shows, which nothing filled. */
+const UNFILLED = /\{[A-Za-z_][\w-]*\}/;
+
+/**
+ * What a run shows of what a command threw, as the base command's catch
+ * reports it: worded by the mixin, then made the CLI's own error.
+ *
+ * @param reported - What the mixin made of what the command threw.
+ * @returns What the envelope and the exit show.
+ */
+function shownOf(reported: unknown): Shown {
+  const error = toZitadelError(reported);
+  return {
+    code: error.code,
+    message: error.message,
+    hint: error.hint,
+    details: isObject(error.details) ? error.details : undefined,
+    next: error.nextCommands,
+    exitCode: error.exitCode,
+  };
+}
+
+/**
+ * The name a row's tests go by: its class, and the situation it samples.
+ *
+ * @param row - The row.
+ * @returns Its name.
+ */
+function nameOf(row: Row): string {
+  return row.case === undefined ? row.error.name : `${row.error.name} (${row.case})`;
+}
+
+/** Every row, by the name its tests go by. */
+const NAMED = ROWS.map((row) => {
+  return [nameOf(row), row] as const;
+});
 
 /**
  * The note every conflict `--force` cannot settle ends with.
@@ -187,6 +215,58 @@ describe("ErrorSupport", () => {
     });
 
     expect(unknown).toEqual([]);
+  });
+
+  describe("as main worded each failure", () => {
+    it("has a row for every concrete lib error", async () => {
+      const classes = await libClasses();
+      const sampled = new Set(
+        ROWS.map((row) => {
+          return row.error.name;
+        }),
+      );
+
+      const missing = [...classes.entries()].flatMap(([name, declared]) => {
+        return declared.abstract ||
+          !chainOf(classes, name).includes("ZitadelLibError") ||
+          name === "ZitadelLibError" ||
+          sampled.has(name)
+          ? []
+          : [name];
+      });
+
+      expect(missing).toEqual([]);
+    });
+
+    it.each(NAMED)("shows %s as main did", async (_name, row) => {
+      const command = await aWordingCommand();
+
+      const shown = shownOf(command.wording(row.error, CWD));
+
+      expect(shown).toEqual({ ...row.expected, ...row.deviation?.shown });
+    });
+
+    it.each(NAMED)("fills every placeholder of %s", async (_name, row) => {
+      const command = await aWordingCommand();
+
+      const shown = shownOf(command.wording(row.error, CWD));
+
+      expect(JSON.stringify([shown.message, shown.hint, shown.details, shown.next])).not.toMatch(
+        UNFILLED,
+      );
+    });
+
+    it.each(NAMED)("states a value for every detail of %s", async (_name, row) => {
+      const command = await aWordingCommand();
+
+      const shown = shownOf(command.wording(row.error, CWD));
+
+      expect(
+        Object.entries(shown.details ?? {}).filter(([, value]) => {
+          return value === undefined || value === "undefined";
+        }),
+      ).toEqual([]);
+    });
   });
 
   describe("with a lib error that has a wording", () => {
@@ -252,10 +332,7 @@ describe("ErrorSupport", () => {
       [
         "the folder the run acts on",
         CWD,
-        [
-          { id: "reset", flags: { force: true } },
-          { id: "start", flags: {} },
-        ],
+        [{ id: "reset", flags: { force: true } }, { id: "start" }],
       ],
       [
         "another folder",

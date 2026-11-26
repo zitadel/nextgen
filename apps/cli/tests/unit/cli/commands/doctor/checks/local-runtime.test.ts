@@ -163,7 +163,8 @@ describe("LocalRuntimeChecks", () => {
       [
         "why the launcher found no Docker",
         new LocalServerDockerMissingError(
-          "Docker is not reachable: spawn docker ENOENT",
+          "Docker is not reachable",
+          "spawn docker ENOENT",
           new Error("spawn docker ENOENT"),
         ),
         " (spawn docker ENOENT)",

@@ -1,7 +1,8 @@
 import {
   OrcaAngularJsonMissingError,
   OrcaAngularProjectAmbiguousError,
-  OrcaInvalidError,
+  OrcaAngularProjectMissingError,
+  OrcaAngularServeTargetMissingError,
 } from "@/lib/orca/errors";
 import { isObject, parseJsonObject } from "@/lib/json";
 
@@ -40,7 +41,7 @@ export function angularProxyEdit(opts: {
       typeof root.defaultProject === "string" ? root.defaultProject : projectNames[0];
     const project = projects && projectName ? projects[projectName] : undefined;
     if (!isObject(project)) {
-      throw new OrcaInvalidError("No project found in angular.json");
+      throw new OrcaAngularProjectMissingError("No project found in angular.json");
     }
     // Angular CLI has used both "architect" and "targets" for the target map.
     const targets = isObject(project.architect)
@@ -51,7 +52,7 @@ export function angularProxyEdit(opts: {
     const serve =
       targets && isObject(targets.serve) ? (targets.serve as Record<string, unknown>) : undefined;
     if (!serve) {
-      throw new OrcaInvalidError("No serve target in angular.json");
+      throw new OrcaAngularServeTargetMissingError("No serve target in angular.json");
     }
     const options = isObject(serve.options) ? (serve.options as Record<string, unknown>) : {};
     const addsProxy = options.proxyConfig === undefined;

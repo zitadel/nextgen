@@ -898,3 +898,57 @@ export class OrcaConfigArrayExpectedError extends OrcaConfigKeyError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
   override readonly retryable: boolean = false;
 }
+
+/**
+ * A framework asked to be scaffolded that no scaffolder supports.
+ */
+export class OrcaScaffolderMissingError extends OrcaInternalError {
+  override readonly category: ErrorCategory = "fault";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The framework ids that can be scaffolded, joined with commas.
+   */
+  readonly frameworks: string;
+
+  /**
+   * Make the failure for a framework no scaffolder supports.
+   *
+   * @param message - Which framework was asked for.
+   * @param frameworks - The framework ids that can be scaffolded, joined with commas.
+   */
+  constructor(message: string, frameworks: string) {
+    super(message);
+    this.frameworks = frameworks;
+  }
+}
+
+/**
+ * An `angular.json` that names no project to wire the dev proxy into.
+ */
+export class OrcaAngularProjectMissingError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * An Angular project in `angular.json` with no serve target to wire the dev
+ * proxy into.
+ */
+export class OrcaAngularServeTargetMissingError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A SolidStart Vite config that calls `solidStart()` with something other
+ * than an options object.
+ */
+export class OrcaSolidStartOptionsError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}

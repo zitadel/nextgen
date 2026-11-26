@@ -10,9 +10,12 @@ import { PM_WORDINGS } from "./pm";
 import { PROJECT_WORDINGS } from "./project";
 import { PUBLISH_WORDINGS } from "./publish";
 import { SERVER_WORDINGS } from "./server";
+import { SUGGESTION_WORDINGS } from "./suggestion";
 import { SYNC_WORDINGS } from "./sync";
+import { TELEMETRY_WORDINGS } from "./telemetry";
 import { UPGRADE_WORDINGS } from "./upgrade";
 import type { Wording } from "./wording";
+import { WIZARD_WORDINGS } from "./wizard";
 import { ZITADEL_WORDINGS } from "./zitadel";
 
 export { derived, type Derived, type LibErrorClass, type Wording } from "./wording";
@@ -35,7 +38,10 @@ export const WORDINGS: readonly Wording[] = [
   ...PROJECT_WORDINGS,
   ...PUBLISH_WORDINGS,
   ...SERVER_WORDINGS,
+  ...SUGGESTION_WORDINGS,
   ...SYNC_WORDINGS,
+  ...TELEMETRY_WORDINGS,
   ...UPGRADE_WORDINGS,
+  ...WIZARD_WORDINGS,
   ...ZITADEL_WORDINGS,
 ];

@@ -12,6 +12,7 @@ import { VercelSink } from "./vercel-sink";
 
 export type { Properties, Modifiers } from "mixpanel";
 export type { TelemetryRegion } from "./config";
+export { TelemetryClientError, TelemetryError, TelemetryHomeUnknownError } from "./errors";
 
 /** Property bag accepted by {@link Telemetry.track} / {@link Telemetry.profile}. */
 export type TelemetryProperties = Properties;

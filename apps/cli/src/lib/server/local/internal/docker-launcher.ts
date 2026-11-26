@@ -18,7 +18,13 @@ import {
 } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
 import { stopSignal } from "./stop-signal";
-import { type Launched, type Launcher, type StopOutcome, launched } from "./lifecycle";
+import {
+  type LaunchFacts,
+  type Launched,
+  type Launcher,
+  type StopOutcome,
+  launched,
+} from "./lifecycle";
 
 export type DockerResult = {
   status: number;
@@ -123,6 +129,16 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
   /** A container just started is asked the same question as a recorded one: its name cannot be another's. */
   isLaunchedAlive(server: Launched<DockerRuntimeMetadata>): Promise<boolean> {
     return this.isAlive(server);
+  }
+
+  /**
+   * How the server runs, which is where to look when a start fails.
+   *
+   * @param record - The server's record.
+   * @returns Its runtime and the container it runs in.
+   */
+  describe(record: DockerRuntimeMetadata): LaunchFacts {
+    return { runtime: "docker", containerName: record.container_name };
   }
 
   /**
@@ -252,8 +268,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
         return "remote";
       }
       throw new LocalServerDockerFailedError(
-        `Inspect Docker image ${image} failed: ${result.stderr}`,
-        result,
+        `Inspect Docker image ${image} failed`,
+        ["docker", ...args],
+        result.stderr,
       );
     } catch (error) {
       if (error instanceof LocalServerDockerFailedError) {
@@ -261,11 +278,18 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       }
       if (error instanceof ExecaError) {
         throw new LocalServerDockerFailedError(
-          `Inspect Docker image ${image} failed: ${String(error.stderr)}`,
+          `Inspect Docker image ${image} failed`,
+          ["docker", ...args],
+          String(error.stderr),
           error,
         );
       }
-      throw new LocalServerDockerFailedError(`Inspect Docker image ${image} failed`, error);
+      throw new LocalServerDockerFailedError(
+        `Inspect Docker image ${image} failed`,
+        ["docker", ...args],
+        undefined,
+        error,
+      );
     }
   }
 
@@ -387,7 +411,8 @@ async function runDocker(
   const result = await execa("docker", args, { stdin: "ignore", env, reject: false });
   if (result.code === "ENOENT") {
     throw new LocalServerDockerMissingError(
-      `Docker is not reachable: ${errorMessage(result).trim() || "no reason given"}`,
+      "Docker is not reachable",
+      errorMessage(result).trim() || "no reason given",
       result,
     );
   }
@@ -456,7 +481,11 @@ async function requireDocker(
   try {
     const result = await runDocker(args, env);
     if (result.status !== 0) {
-      throw new LocalServerDockerFailedError(`${action} failed: ${result.stderr}`, result);
+      throw new LocalServerDockerFailedError(
+        `${action} failed`,
+        ["docker", ...args],
+        result.stderr,
+      );
     }
     return result;
   } catch (error) {
@@ -464,9 +493,19 @@ async function requireDocker(
       throw error;
     }
     if (error instanceof ExecaError) {
-      throw new LocalServerDockerFailedError(`${action} failed: ${String(error.stderr)}`, error);
+      throw new LocalServerDockerFailedError(
+        `${action} failed`,
+        ["docker", ...args],
+        String(error.stderr),
+        error,
+      );
     }
-    throw new LocalServerDockerFailedError(`${action} failed`, error);
+    throw new LocalServerDockerFailedError(
+      `${action} failed`,
+      ["docker", ...args],
+      undefined,
+      error,
+    );
   }
 }
 
@@ -481,11 +520,18 @@ async function imageExists(image: string): Promise<boolean> {
   } catch (error) {
     if (error instanceof ExecaError) {
       throw new LocalServerDockerFailedError(
-        `Inspect Docker image ${image} failed: ${String(error.stderr)}`,
+        `Inspect Docker image ${image} failed`,
+        ["docker", ...args],
+        String(error.stderr),
         error,
       );
     }
-    throw new LocalServerDockerFailedError(`Inspect Docker image ${image} failed`, error);
+    throw new LocalServerDockerFailedError(
+      `Inspect Docker image ${image} failed`,
+      ["docker", ...args],
+      undefined,
+      error,
+    );
   }
 }
 

@@ -21,7 +21,7 @@ const SECRET_USE = {
 
 describe("the publish errors", () => {
   it.each([
-    ["config", new PublishConfigInvalidError("bad", []), "invalid", "E_VALIDATION"],
+    ["config", new PublishConfigInvalidError("bad", [], false), "invalid", "E_VALIDATION"],
     [
       "missing variable",
       new PublishConnectionVariableMissingError("missing", SECRET_USE),
@@ -42,7 +42,7 @@ describe("the publish errors", () => {
     ],
     [
       "literal secret",
-      new PublishConnectionSecretLiteralError("literal", []),
+      new PublishConnectionSecretLiteralError("literal", [], false),
       "invalid",
       "E_VALIDATION",
     ],

@@ -4,7 +4,7 @@ import {
   PublishConnectionSecretLiteralError,
 } from "@/lib/publish/errors";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
-import { CONFIG_DIRECTORIES, type Issue, type RuleId } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
 
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
@@ -65,6 +65,11 @@ type ServerFinding = {
 };
 
 /**
+ * What a user schema's check says of a key it does not allow.
+ */
+const REFUSED_KEY = " is not an allowed key";
+
+/**
  * Stop the deploy on every error, named in one refusal, before anything is
  * sent.
  *
@@ -98,10 +103,15 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
       message: finding.message,
     };
   });
+  // Any refused key may be one a newer server declares and this CLI's
+  // meta-schema does not know yet, so the refusal says what fixes that too.
+  const refusedKey = errors.some((finding) => {
+    return finding.rule === UserSchema.CONTRACT.rule && finding.message.includes(REFUSED_KEY);
+  });
   if (literalSecret) {
-    throw new PublishConnectionSecretLiteralError(message, issues);
+    throw new PublishConnectionSecretLiteralError(message, issues, refusedKey);
   }
-  throw new PublishConfigInvalidError(message, issues);
+  throw new PublishConfigInvalidError(message, issues, refusedKey);
 }
 
 /**

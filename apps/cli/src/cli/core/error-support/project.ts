@@ -49,6 +49,9 @@ const ENV_VALUE_UNQUOTABLE_REFUSAL = {
 /** How a project file that cannot be used as it is is refused. */
 const INVALID_REFUSAL = {
   message: "{message}",
+  details: {
+    original: "{original}",
+  },
 } as const satisfies Refusal;
 
 /** How the errors of `@/lib/project` are worded, most specific class first. */

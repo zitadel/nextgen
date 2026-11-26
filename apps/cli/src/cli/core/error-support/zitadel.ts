@@ -47,6 +47,14 @@ import {
   ZitadelConfigVariableSharedError,
 } from "@/lib/zitadel";
 
+import {
+  type FlowIssue,
+  type FlowMethodUse,
+  PASSWORD_FIELD,
+  type ToggleableMethod,
+  type UserSchema,
+} from "@/lib/zitadel";
+
 import type { Refusal } from "@/cli/core/refusal";
 import { derived, type Wording } from "./wording";
 
@@ -54,10 +62,7 @@ import { derived, type Wording } from "./wording";
 const CONNECTION_NOT_OIDC_REFUSAL = {
   message: "{message}",
   hint: "Fix the file, or choose another slug, then run the command again.",
-  details: {
-    file: "{path}",
-    slug: "{slug}",
-  },
+  details: { file: "{path}", slug: "{slug}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigConnectionIssuerClashError} is refused. */
@@ -76,36 +81,27 @@ const CONNECTION_ISSUER_CLASH_REFUSAL = {
 const PROVIDER_FILE_TAKEN_REFUSAL = {
   message: "{message}",
   hint: "Rename or remove that file, then run the command again.",
-  details: {
-    file: "{path}",
-    slug: "{slug}",
-  },
+  details: { file: "{path}", slug: "{slug}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigConnectionFileTakenError} is refused. */
 const CONNECTION_FILE_TAKEN_REFUSAL = {
   message: "{message}",
   hint: "Rename or remove that file, or choose another slug, then run the command again.",
-  details: {
-    file: "{path}",
-    slug: "{slug}",
-  },
+  details: { file: "{path}", slug: "{slug}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigSchemaMissingError} is refused. */
 const SCHEMA_MISSING_REFUSAL = {
   message: "{message}",
+  details: { requested: "{requested}", known: "{knownNames}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigReferenceUnreadableError} is refused. */
 const REFERENCE_UNREADABLE_REFUSAL = {
   message: "{message}",
   hint: "Create the referenced file or fix the path.",
-  details: {
-    file: "{path}",
-    ref: "{ref}",
-    code: "{errno}",
-  },
+  details: { file: "{path}", ref: "{ref}", code: "{errno}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigHandleClashError} is refused. */
@@ -122,36 +118,32 @@ const HANDLE_CLASH_REFUSAL = {
 const CONNECTION_DUPLICATED_REFUSAL = {
   message: "{message}",
   hint: "Keep the one this project should use and remove the others, then run the command again.",
-  details: {
-    provider: "{provider}",
-    files: "{paths}",
-  },
+  details: { provider: "{provider}", files: "{paths}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigSlugDuplicatedError} is refused. */
 const SLUG_DUPLICATED_REFUSAL = {
   message: "{message}",
   hint: "A slug names one connection. Remove or rename all but one, then run the command again.",
-  details: {
-    slug: "{slug}",
-    files: "{paths}",
-  },
+  details: { slug: "{slug}", files: "{paths}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigProviderUnknownError} is refused. */
 const PROVIDER_UNKNOWN_REFUSAL = {
   message: "{message}",
   hint: "{schema} offers: {offeredList}. Connections under .zitadel/idps/: {connectionList}.",
+  details: {
+    requested: "{requested}",
+    offered: "{offered}",
+    connections: "{connections}",
+  },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigConnectionProviderMismatchError} is refused. */
 const CONNECTION_PROVIDER_MISMATCH_REFUSAL = {
   message: "{message}",
   hint: "Point it at the provider if it is that connection. Otherwise change its slug, in the file and in the schemas and flows that name it, then run the command again.",
-  details: {
-    file: "{path}",
-    slug: "{slug}",
-  },
+  details: { file: "{path}", slug: "{slug}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigCredentialsDoubledError} is refused. */
@@ -180,31 +172,36 @@ const VARIABLE_SHARED_REFUSAL = {
 const FLOW_MISSING_REFUSAL = {
   message: "{message}",
   hint: "The provider is offered by a flow, and none of the files under .zitadel/flows/ names this schema. Check that the flow's user_schema names the schema's objectType.",
-  details: {
-    schema: "{path}",
-  },
+  details: { schema: "{path}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigReferenceBrokenError} is refused. */
 const REFERENCE_BROKEN_REFUSAL = {
   message: "{message}",
   hint: "Create the referenced file or fix the path.",
-  details: {
-    file: "{path}",
-    ref: "{ref}",
-    code: "{errno}",
-  },
+  details: { file: "{path}", ref: "{ref}", code: "{errno}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigFlowMethodInUseError} is refused. */
 const FLOW_METHOD_IN_USE_REFUSAL = {
   message: "{message}",
+  hint: "Edit those steps first; login flows are not edited for you. From each step, remove its {removed}.{deletion} `zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+  next: [
+    {
+      id: "deploy",
+      flags: {
+        dryRun: true,
+      },
+    },
+  ],
+  details: { file: "{file}", issues: "{issueDetails}", steps: "{steps}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigFlowBrokenError} is refused. */
 const FLOW_BROKEN_REFUSAL = {
   message: "{message}",
   hint: "Fix the steps named above, then run the command again.",
+  details: { file: "{file}", issues: "{issueDetails}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigFlowUncheckedError} is refused. */
@@ -219,6 +216,7 @@ const FLOW_UNCHECKED_REFUSAL = {
       },
     },
   ],
+  details: { file: "{file}", issues: "{issueDetails}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigFilesBrokenError} is refused. */
@@ -251,20 +249,14 @@ const CLIENT_ID_MISMATCH_REFUSAL = {
 const SETTING_UNUSABLE_REFUSAL = {
   message: "{message}",
   hint: "Fix it in that file, or choose another slug.",
-  details: {
-    file: "{path}",
-    slug: "{slug}",
-  },
+  details: { file: "{path}", slug: "{slug}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigPathUnreadableError} is refused. */
 const PATH_UNREADABLE_REFUSAL = {
   message: "{message}",
   hint: "Check that the file is readable, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "{errno}",
-  },
+  details: { file: "{path}", code: "{errno}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigResourceClashError} is refused. */
@@ -280,66 +272,55 @@ const RESOURCE_MISSING_REFUSAL = {
 /** How {@link ZitadelConfigSchemaAmbiguousError} is refused. */
 const SCHEMA_AMBIGUOUS_REFUSAL = {
   message: "{message}",
+  details: { requested: "{requested}", candidates: "{candidateNames}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigEditLockoutError} is refused. */
 const EDIT_LOCKOUT_REFUSAL = {
   message: "{message}",
-  details: {
-    file: "{path}",
-  },
+  details: { file: "{path}", usable: "{usable}", alternatives: "{alternatives}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigFileExistsError} is refused. */
 const FILE_EXISTS_REFUSAL = {
   message: "{message}",
   hint: "Move or rename the file that is already there, then run the command again.",
-  details: {
-    file: "{path}",
-  },
+  details: { file: "{path}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigConnectionExistsError} is refused. */
 const CONNECTION_EXISTS_REFUSAL = {
   message: "{message}",
   hint: "A connection file is yours to keep, so it is never replaced or removed. Remove it to scaffold a fresh one, or keep it and enable the provider to reuse it.",
-  details: {
-    file: "{path}",
-  },
+  details: { file: "{path}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigFileUnreadableError} is refused. */
 const FILE_UNREADABLE_REFUSAL = {
   message: "{message}",
   hint: "Check that the file is readable, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "{errno}",
-  },
+  details: { file: "{path}", code: "{errno}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigBrandingDuplicatedError} is refused. */
 const BRANDING_DUPLICATED_REFUSAL = {
   message: "{message}",
   hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigPasswordPolicyInvalidError} is refused. */
 const PASSWORD_POLICY_INVALID_REFUSAL = {
   message: "{message}",
   hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
-  details: {
-    file: "{path}",
-  },
+  details: { file: "{path}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigSignupPolicyInvalidError} is refused. */
 const SIGNUP_POLICY_INVALID_REFUSAL = {
   message: "{message}",
   hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from the default.",
-  details: {
-    file: "{path}",
-  },
+  details: { file: "{path}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigHandleInvalidError} is refused. */
@@ -355,10 +336,7 @@ const HANDLE_INVALID_REFUSAL = {
 const REGION_UNEDITABLE_REFUSAL = {
   message: "{message}",
   hint: "This command edits that region, and it is not the shape it edits. Fix it against the dialect in .zitadel/meta/, then run the command again.",
-  details: {
-    file: "{path}",
-    region: "{region}",
-  },
+  details: { file: "{path}", region: "{region}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigRenameActionClashError} is refused. */
@@ -395,52 +373,42 @@ const OUTCOME_ACTION_CLASH_REFUSAL = {
 const IDENTIFIER_MISSING_REFUSAL = {
   message: "{message}",
   hint: 'A password is checked against the user found by the schema\'s identifier. Set "x-identifier" to the property users sign in with, e.g. "email", then run the command again.',
-  details: {
-    file: "{path}",
-    method: "password",
-  },
+  details: { file: "{path}", method: "password" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigReferenceMissingError} is refused. */
 const REFERENCE_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Create the referenced file or fix the path.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigReferenceOutsideError} is refused. */
 const REFERENCE_OUTSIDE_REFUSAL = {
   message: "{message}",
   hint: "Keep referenced files inside the project, next to the file that references them; a symlink on the way must resolve inside the project too.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigPathOutsideError} is refused. */
 const PATH_OUTSIDE_REFUSAL = {
   message: "{message}",
   hint: "Files are only written and removed inside .zitadel/.",
-  details: {
-    file: "{path}",
-  },
+  details: { file: "{path}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigPathBlockedError} is refused. */
 const PATH_BLOCKED_REFUSAL = {
   message: "{message}",
   hint: "Remove {blocker}, which is a file where a directory is needed, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "ENOTDIR",
-    blocker: "{blocker}",
-  },
+  details: { file: "{path}", code: "ENOTDIR", blocker: "{blocker}" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigDirectoryInTheWayError} is refused. */
 const DIRECTORY_IN_THE_WAY_REFUSAL = {
   message: "{message}",
   hint: "Remove {path}, which is a directory where a file is expected, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "EISDIR",
-  },
+  details: { file: "{path}", code: "EISDIR" },
 } as const satisfies Refusal;
 
 /** How {@link ZitadelConfigSchemaExternalError} is refused. */
@@ -455,6 +423,123 @@ const CONFIG_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
+ * What a step that uses a method holds once the method is gone: the part of
+ * the step a person removes from it.
+ */
+const REMOVED_PART = {
+  password: `${PASSWORD_FIELD} field`,
+  passkey: "passkey actions and their transitions",
+} as const satisfies Record<ToggleableMethod, string>;
+
+/**
+ * The names of user schemas, as a refusal reports them.
+ *
+ * @param schemas - The schemas.
+ * @returns Their names, in order.
+ */
+function namesOf(schemas: readonly UserSchema[]): readonly string[] {
+  return schemas.map((schema) => {
+    return schema.name;
+  });
+}
+
+/**
+ * Flow issues in the shape `--json` reports them.
+ *
+ * @param issues - The issues.
+ * @returns Each issue's path, rule, message and, when it has one, step.
+ */
+function issueDetailsOf(
+  issues: readonly FlowIssue[],
+): readonly Readonly<Record<string, unknown>>[] {
+  return issues.map((item) => {
+    if (item.issue.step === undefined) {
+      return {
+        path: item.path,
+        rule: item.issue.rule,
+        message: item.issue.message,
+      };
+    }
+    return {
+      path: item.path,
+      rule: item.issue.rule,
+      message: item.issue.message,
+      step: item.issue.step,
+    };
+  });
+}
+
+/**
+ * The steps that still use a method, in the shape `--json` reports them.
+ *
+ * @param uses - The steps.
+ * @returns Each step with what it keeps, what it is the entry step of and
+ *   what leads to it.
+ */
+function stepDetailsOf(
+  uses: readonly FlowMethodUse[],
+): readonly Readonly<Record<string, unknown>>[] {
+  return uses.map((use) => {
+    return {
+      path: use.path,
+      step: use.step,
+      keeps: use.keeps,
+      entry_for: use.entryFor,
+      targeted_by: use.targetedBy.map((item) => {
+        if (item.purpose === undefined) {
+          return {
+            step: item.step,
+            transition: item.transition,
+          };
+        }
+        return {
+          step: item.step,
+          transition: item.transition,
+          purpose: item.purpose,
+        };
+      }),
+    };
+  });
+}
+
+/**
+ * What to do about a step left with no field or sign-in method, as the hint
+ * of {@link FLOW_METHOD_IN_USE_REFUSAL} says it.
+ *
+ * @param uses - The steps that still use the method.
+ * @returns The sentence, led by a space, or an empty string when no step is
+ *   left with nothing.
+ */
+function deletionOf(uses: readonly FlowMethodUse[]): string {
+  const emptied = uses.filter((use) => {
+    return use.keeps.length === 0;
+  });
+  if (emptied.length === 0) {
+    return "";
+  }
+  const incoming = emptied.flatMap((use) => {
+    return use.staying;
+  });
+  const viaPurpose = incoming.some((item) => {
+    return item.purpose !== undefined;
+  });
+  const retarget = viaPurpose
+    ? "retarget the transitions listed for it (one marked via purposes.<key> follows that key instead)"
+    : "retarget the transitions listed for it";
+  const isEntry = emptied.some((use) => {
+    return use.entryFor.length > 0;
+  });
+  const fixes = [
+    ...(incoming.length > 0 ? [retarget] : []),
+    ...(isEntry ? ["point the purposes key it is the entry step of at another step"] : []),
+  ];
+  if (fixes.length === 0) {
+    return " Delete a step left with no field or sign-in method.";
+  }
+  return ` Delete a step left with no field or sign-in method: ${fixes.join(", and ")}.`;
+}
+
+/**
  * How the errors of `@/lib/zitadel` are worded, most specific class first.
  * `ZitadelConfigInternalError` is a bug in the package, not a refusal, so it
  * has none.
@@ -464,7 +549,13 @@ export const ZITADEL_WORDINGS: readonly Wording[] = [
   [ZitadelConfigConnectionIssuerClashError, CONNECTION_ISSUER_CLASH_REFUSAL],
   [ZitadelConfigProviderFileTakenError, PROVIDER_FILE_TAKEN_REFUSAL],
   [ZitadelConfigConnectionFileTakenError, CONNECTION_FILE_TAKEN_REFUSAL],
-  [ZitadelConfigSchemaMissingError, SCHEMA_MISSING_REFUSAL],
+  derived(ZitadelConfigSchemaMissingError, SCHEMA_MISSING_REFUSAL, (error) => {
+    return {
+      values: {
+        knownNames: namesOf(error.known),
+      },
+    };
+  }),
   [ZitadelConfigReferenceUnreadableError, REFERENCE_UNREADABLE_REFUSAL],
   [ZitadelConfigHandleClashError, HANDLE_CLASH_REFUSAL],
   [ZitadelConfigConnectionDuplicatedError, CONNECTION_DUPLICATED_REFUSAL],
@@ -482,9 +573,30 @@ export const ZITADEL_WORDINGS: readonly Wording[] = [
   [ZitadelConfigVariableSharedError, VARIABLE_SHARED_REFUSAL],
   [ZitadelConfigFlowMissingError, FLOW_MISSING_REFUSAL],
   [ZitadelConfigReferenceBrokenError, REFERENCE_BROKEN_REFUSAL],
-  [ZitadelConfigFlowMethodInUseError, FLOW_METHOD_IN_USE_REFUSAL],
-  [ZitadelConfigFlowBrokenError, FLOW_BROKEN_REFUSAL],
-  [ZitadelConfigFlowUncheckedError, FLOW_UNCHECKED_REFUSAL],
+  derived(ZitadelConfigFlowMethodInUseError, FLOW_METHOD_IN_USE_REFUSAL, (error) => {
+    return {
+      values: {
+        removed: REMOVED_PART[error.method],
+        deletion: deletionOf(error.uses),
+        issueDetails: issueDetailsOf(error.issues),
+        steps: stepDetailsOf(error.uses),
+      },
+    };
+  }),
+  derived(ZitadelConfigFlowBrokenError, FLOW_BROKEN_REFUSAL, (error) => {
+    return {
+      values: {
+        issueDetails: issueDetailsOf(error.issues),
+      },
+    };
+  }),
+  derived(ZitadelConfigFlowUncheckedError, FLOW_UNCHECKED_REFUSAL, (error) => {
+    return {
+      values: {
+        issueDetails: issueDetailsOf(error.issues),
+      },
+    };
+  }),
   [ZitadelConfigFilesBrokenError, FILES_BROKEN_REFUSAL],
   [ZitadelConfigNothingToDeployError, NOTHING_TO_DEPLOY_REFUSAL],
   [ZitadelConfigClientIdMismatchError, CLIENT_ID_MISMATCH_REFUSAL],
@@ -492,7 +604,13 @@ export const ZITADEL_WORDINGS: readonly Wording[] = [
   [ZitadelConfigPathUnreadableError, PATH_UNREADABLE_REFUSAL],
   [ZitadelConfigResourceClashError, RESOURCE_CLASH_REFUSAL],
   [ZitadelConfigResourceMissingError, RESOURCE_MISSING_REFUSAL],
-  [ZitadelConfigSchemaAmbiguousError, SCHEMA_AMBIGUOUS_REFUSAL],
+  derived(ZitadelConfigSchemaAmbiguousError, SCHEMA_AMBIGUOUS_REFUSAL, (error) => {
+    return {
+      values: {
+        candidateNames: namesOf(error.candidates),
+      },
+    };
+  }),
   [ZitadelConfigEditLockoutError, EDIT_LOCKOUT_REFUSAL],
   [ZitadelConfigFileExistsError, FILE_EXISTS_REFUSAL],
   [ZitadelConfigConnectionExistsError, CONNECTION_EXISTS_REFUSAL],

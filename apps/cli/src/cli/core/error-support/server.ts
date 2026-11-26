@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 
 import { Cmd } from "@/lib/cmd";
+import { errorMessage } from "@/lib/errors";
 import { PM } from "@/lib/pm";
 import {
   LocalServerAdminMalformedError,
@@ -34,7 +35,7 @@ import {
   LocalServerUrlInvalidError,
   ZitadelRuntime,
 } from "@/lib/server";
-import { shellCommand, suggestedCommandOf } from "@/lib/suggestion";
+import { shellCommand, type Suggested, suggestedCommandOf } from "@/lib/suggestion";
 import { CliPackage } from "@/lib/upgrade";
 
 import type { Refusal } from "@/cli/core/refusal";
@@ -57,6 +58,7 @@ const NOT_RESPONDING_ELSEWHERE_REFUSAL = {
   hint: "No healthy local server responded at {serverUrl}. It was started in {directory}, so run `zitadel start --cwd {directory}` to bring it back.",
   next: ["{start}"],
   details: {
+    server_url: "{serverUrl}",
     suggested_args: "{suggestedArgs}",
   },
 } as const satisfies Refusal;
@@ -86,38 +88,43 @@ const NOT_STARTED_REFUSAL = {
 /** How a run is refused when the runtime record of a folder cannot be read. */
 const RECORD_UNREADABLE_REFUSAL = {
   message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
+  hint: "Check that {quotedPath} and its directory are readable by you.",
+  details: {
+    path: "{path}",
+    cause: "{failure}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the runtime record of a folder is not in the shape it is written in. */
 const RECORD_MALFORMED_REFUSAL = {
   message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  hint: "{advice}",
   next: ["{reset}", "{start}"],
+  details: {
+    suggested_args: "{suggestedArgs}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the local admin's credential cannot be read. */
 const ADMIN_UNREADABLE_REFUSAL = {
   message: "{message}",
-  hint: "Check that {path} is readable by you; `zitadel start` writes it owner-only.",
+  hint: "Check that {quotedPath} is readable by you; `zitadel start` writes it owner-only.",
+  details: {
+    path: "{path}",
+    cause: "{failure}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the local admin's credential is not in the shape it is written in. */
 const ADMIN_MALFORMED_REFUSAL = {
   message: "{message}",
-  hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
-  next: [
-    "{remove}",
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
+  hint: "Delete {quotedPath} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
+  next: ["{remove}", "{reset}", "{start}"],
+  details: {
+    path: "{path}",
+    cause: "{failure}",
+    suggested_args: "{suggestedArgs}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the local server cannot find its local admin. */
@@ -140,7 +147,11 @@ const SESSION_REFUSED_REFUSAL = {
 /** How a run is refused when an environment file the server reads cannot be read. */
 const ENV_UNREADABLE_REFUSAL = {
   message: "{message}",
-  hint: "The file {path} exists but could not be read; fix its permissions or remove it.",
+  hint: "The file {quotedPath} exists but could not be read; fix its permissions or remove it.",
+  details: {
+    path: "{path}",
+    message: "{failure}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the server npm package cannot be found. */
@@ -148,6 +159,10 @@ const PACKAGE_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
   next: ["{reinstall}"],
+  details: {
+    package: "{package}",
+    message: "{failure}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the server binary was found but could not be launched. */
@@ -155,6 +170,10 @@ const LAUNCH_FAILED_REFUSAL = {
   message: "{message}",
   hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
   next: ["{reinstall}"],
+  details: {
+    command: "{command}",
+    message: "{failure}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when a command it ran with Docker failed. */
@@ -166,6 +185,11 @@ const DOCKER_FAILED_REFUSAL = {
       id: "doctor",
     },
   ],
+  details: {
+    command: "{command}",
+    stderr: "{stderr}",
+    cause: "{original}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when Docker, which the managed local runtime needs, does not answer. */
@@ -182,7 +206,7 @@ const DOCKER_MISSING_REFUSAL = {
 /** How a run is refused when another start in the folder still holds its lock. */
 const BUSY_REFUSAL = {
   message: "{message}",
-  hint: "Wait for it to finish, or delete {lockFile} if no start is running.",
+  hint: "Wait for it to finish, or delete {quotedLockFile} if no start is running.",
 } as const satisfies Refusal;
 
 /** How a run is refused when the local server does not host the platform project. */
@@ -205,6 +229,7 @@ const STOP_ALL_FAILED_REFUSAL = {
   hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
   details: {
     supported: true,
+    results: "{results}",
   },
 } as const satisfies Refusal;
 
@@ -244,6 +269,12 @@ const START_CLEANUP_FAILED_REFUSAL = {
       },
     },
   ],
+  details: {
+    runtime: "{runtime}",
+    pid: "{pid}",
+    log_path: "{logPath}",
+    container_name: "{containerName}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the server it started did not become ready. */
@@ -258,12 +289,21 @@ const START_FAILED_REFUSAL = {
       id: "start",
     },
   ],
+  details: {
+    runtime: "{runtime}",
+    pid: "{pid}",
+    log_path: "{logPath}",
+    container_name: "{containerName}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the record cannot be read and the machine's processes cannot be listed. */
 const PROCESSES_UNLISTABLE_REFUSAL = {
   message: "{message}",
   hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
+  details: {
+    error: "{failure}",
+  },
 } as const satisfies Refusal;
 
 /** How a reset is refused when its permit is for another folder. */
@@ -296,11 +336,76 @@ const PROCESS_GONE_REFUSAL = {
 
 /** How a process the operating system will not let the CLI signal is refused. */
 const PROCESS_DENIED_REFUSAL = {
-  message: "{message}",
+  message: "Permission denied: {refused}",
+  hint: "Check file permissions or run with the right user.",
+  details: {
+    original: "{original}",
+  },
 } as const satisfies Refusal;
 
 /** The command that reinstalls the CLI, which brings the server binary with it. */
 const REINSTALL = suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`]));
+
+/** The hint for a malformed record in the run's own folder. */
+const RECORD_MALFORMED_HERE = "Run `zitadel reset --force`, then `zitadel start`.";
+
+/** The hint for a malformed record in another folder than the run's. */
+const RECORD_MALFORMED_ELSEWHERE =
+  "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.";
+
+/**
+ * The reset and start that replace a folder's local state, aimed at that folder
+ * when it is not the run's, with the arguments that spell them.
+ *
+ * @param directory - The folder that holds the state.
+ * @param cwd - The folder the run acts on.
+ * @returns Whether the folder is another, the follow-ups, and their arguments when it is.
+ */
+function replacement(
+  directory: string,
+  cwd: string,
+): Readonly<{
+  elsewhere: boolean;
+  reset: Suggested;
+  start: Suggested;
+  suggestedArgs: readonly (readonly string[])[] | undefined;
+}> {
+  if (resolve(directory) === resolve(cwd)) {
+    return {
+      elsewhere: false,
+      reset: {
+        id: "reset",
+        flags: {
+          force: true,
+        },
+      },
+      start: {
+        id: "start",
+      },
+      suggestedArgs: undefined,
+    };
+  }
+  return {
+    elsewhere: true,
+    reset: {
+      id: "reset",
+      flags: {
+        force: true,
+        cwd: directory,
+      },
+    },
+    start: {
+      id: "start",
+      flags: {
+        cwd: directory,
+      },
+    },
+    suggestedArgs: [
+      ["reset", "--force", "--cwd", directory],
+      ["start", "--cwd", directory],
+    ],
+  };
+}
 
 /** How the errors of `@/lib/server` are worded, most specific class first. */
 export const SERVER_WORDINGS: readonly Wording[] = [
@@ -326,47 +431,41 @@ export const SERVER_WORDINGS: readonly Wording[] = [
   derived(LocalServerRecordUnreadableError, RECORD_UNREADABLE_REFUSAL, (error) => {
     return {
       values: {
-        path: Cmd.quote(error.path),
+        quotedPath: Cmd.quote(error.path),
       },
     };
   }),
   derived(LocalServerRecordMalformedError, RECORD_MALFORMED_REFUSAL, (error, cwd) => {
-    const elsewhere =
-      resolve(error.directory) === resolve(cwd)
-        ? {}
-        : {
-            cwd: error.directory,
-          };
+    const { elsewhere, reset, start, suggestedArgs } = replacement(error.directory, cwd);
     return {
+      values: {
+        advice: elsewhere ? RECORD_MALFORMED_ELSEWHERE : RECORD_MALFORMED_HERE,
+        suggestedArgs,
+      },
       next: {
-        reset: {
-          id: "reset",
-          flags: {
-            force: true,
-            ...elsewhere,
-          },
-        },
-        start: {
-          id: "start",
-          flags: elsewhere,
-        },
+        reset,
+        start,
       },
     };
   }),
   derived(LocalServerAdminUnreadableError, ADMIN_UNREADABLE_REFUSAL, (error) => {
     return {
       values: {
-        path: Cmd.quote(error.path),
+        quotedPath: Cmd.quote(error.path),
       },
     };
   }),
-  derived(LocalServerAdminMalformedError, ADMIN_MALFORMED_REFUSAL, (error) => {
+  derived(LocalServerAdminMalformedError, ADMIN_MALFORMED_REFUSAL, (error, cwd) => {
+    const { reset, start, suggestedArgs } = replacement(error.directory, cwd);
     return {
       values: {
-        path: Cmd.quote(error.path),
+        quotedPath: Cmd.quote(error.path),
+        suggestedArgs,
       },
       next: {
         remove: shellCommand("rm", Cmd.quote(error.path)),
+        reset,
+        start,
       },
     };
   }),
@@ -375,7 +474,7 @@ export const SERVER_WORDINGS: readonly Wording[] = [
   derived(LocalServerEnvUnreadableError, ENV_UNREADABLE_REFUSAL, (error) => {
     return {
       values: {
-        path: Cmd.quote(error.path),
+        quotedPath: Cmd.quote(error.path),
       },
     };
   }),
@@ -393,12 +492,22 @@ export const SERVER_WORDINGS: readonly Wording[] = [
       },
     };
   }),
-  [LocalServerDockerFailedError, DOCKER_FAILED_REFUSAL],
+  derived(LocalServerDockerFailedError, DOCKER_FAILED_REFUSAL, (error) => {
+    // Docker's stderr says why it failed; only a run that printed none reports what was raised.
+    if (error.stderr === undefined) {
+      return {};
+    }
+    return {
+      values: {
+        original: undefined,
+      },
+    };
+  }),
   [LocalServerDockerMissingError, DOCKER_MISSING_REFUSAL],
   derived(LocalServerBusyError, BUSY_REFUSAL, (error) => {
     return {
       values: {
-        lockFile: Cmd.quote(error.lockFile),
+        quotedLockFile: Cmd.quote(error.lockFile),
       },
     };
   }),
@@ -420,5 +529,11 @@ export const SERVER_WORDINGS: readonly Wording[] = [
   }),
   [LocalServerProgramFailedError, PROGRAM_FAILED_REFUSAL],
   [LocalServerProcessGoneError, PROCESS_GONE_REFUSAL],
-  [LocalServerProcessDeniedError, PROCESS_DENIED_REFUSAL],
+  derived(LocalServerProcessDeniedError, PROCESS_DENIED_REFUSAL, (error) => {
+    return {
+      values: {
+        refused: errorMessage(error.cause),
+      },
+    };
+  }),
 ];

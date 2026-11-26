@@ -1,4 +1,4 @@
-import { ZitadelLibError } from "@/lib/errors";
+import { errorMessage, ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 import type { StopBinaryRuntimeResult } from "@/lib/server/local/internal/binary-launcher";
 import type { ManagedRuntimeProcess } from "@/lib/server/local/processes";
@@ -85,6 +85,25 @@ export class LocalServerPackageMissingError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The npm package that cannot be found. */
+  readonly package: string;
+
+  /** What looking for it failed with. */
+  readonly failure: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param pkg - The npm package that cannot be found.
+   * @param cause - The failure that looking for it raised.
+   */
+  constructor(message: string, pkg: string, cause: unknown) {
+    super(message, cause);
+    this.package = pkg;
+    this.failure = errorMessage(cause);
+  }
 }
 
 /** The server binary was found but could not be launched. */
@@ -92,6 +111,25 @@ export class LocalServerLaunchFailedError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The server binary that was run. */
+  readonly command: string;
+
+  /** What running it failed with. */
+  readonly failure: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param command - The server binary that was run.
+   * @param cause - The failure that running it raised.
+   */
+  constructor(message: string, command: string, cause: unknown) {
+    super(message, cause);
+    this.command = command;
+    this.failure = errorMessage(cause);
+  }
 }
 
 /** Docker answered, but a command the CLI ran with it failed. The message says what Docker said. */
@@ -99,6 +137,31 @@ export class LocalServerDockerFailedError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The Docker command that was run. */
+  readonly command: readonly string[];
+
+  /** What Docker printed on stderr, when it ran and said something. */
+  readonly stderr: string | undefined;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param command - The Docker command that was run.
+   * @param stderr - What Docker printed on stderr, when it ran.
+   * @param cause - The failure running it raised, when it raised one.
+   */
+  constructor(
+    message: string,
+    command: readonly string[],
+    stderr: string | undefined,
+    cause?: unknown,
+  ) {
+    super(message, cause);
+    this.command = command;
+    this.stderr = stderr;
+  }
 }
 
 /** The folder's env file exists but cannot be read. */
@@ -110,16 +173,20 @@ export class LocalServerEnvUnreadableError extends LocalServerError {
   /** The env file, which the refusal names. */
   readonly path: string;
 
+  /** What reading it failed with. */
+  readonly failure: string;
+
   /**
    * Creates the error.
    *
    * @param message - What went wrong, with the facts it is about.
-   * @param path - The env file.
+   * @param path - The env file, which the refusal names.
    * @param cause - The failure that reading it raised.
    */
-  constructor(message: string, path: string, cause?: unknown) {
+  constructor(message: string, path: string, cause: unknown) {
     super(message, cause);
     this.path = path;
+    this.failure = errorMessage(cause);
   }
 }
 
@@ -132,16 +199,20 @@ export class LocalServerAdminUnreadableError extends LocalServerError {
   /** The admin file, which the refusal names. */
   readonly path: string;
 
+  /** What reading it failed with. */
+  readonly failure: string;
+
   /**
    * Creates the error.
    *
    * @param message - What went wrong, with the facts it is about.
-   * @param path - The admin file.
+   * @param path - The admin file, which the refusal names.
    * @param cause - The failure that reading it raised.
    */
-  constructor(message: string, path: string, cause?: unknown) {
+  constructor(message: string, path: string, cause: unknown) {
     super(message, cause);
     this.path = path;
+    this.failure = errorMessage(cause);
   }
 }
 
@@ -154,16 +225,25 @@ export class LocalServerAdminMalformedError extends LocalServerError {
   /** The admin file, which the refusal says to delete. */
   readonly path: string;
 
+  /** The folder that holds the admin file, which a reset and a start must run in to replace it. */
+  readonly directory: string;
+
+  /** What parsing it failed with, when it did not parse. */
+  readonly failure: string | undefined;
+
   /**
    * Creates the error.
    *
    * @param message - What went wrong, with the facts it is about.
    * @param path - The admin file.
+   * @param directory - The folder that holds it.
    * @param cause - The parse failure, when there is one.
    */
-  constructor(message: string, path: string, cause?: unknown) {
+  constructor(message: string, path: string, directory: string, cause?: unknown) {
     super(message, cause);
     this.path = path;
+    this.directory = directory;
+    this.failure = cause === undefined ? undefined : errorMessage(cause);
   }
 }
 
@@ -182,6 +262,20 @@ export class LocalServerProcessesUnlistableError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** What listing the processes failed with, when it said. */
+  readonly failure: string | undefined;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param failure - What listing the processes failed with, when it said.
+   */
+  constructor(message: string, failure: string | undefined) {
+    super(message);
+    this.failure = failure;
+  }
 }
 
 /** Stopping every managed server left at least one process running. */
@@ -280,6 +374,21 @@ export class LocalServerDockerMissingError extends LocalServerError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
+
+  /** What Docker said, or that it said nothing. */
+  readonly detail: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param detail - What Docker said, or that it said nothing.
+   * @param cause - The failure asking Docker raised, when it raised one.
+   */
+  constructor(message: string, detail: string, cause?: unknown) {
+    super(message, cause);
+    this.detail = detail;
+  }
 }
 
 /**
@@ -394,13 +503,13 @@ export class LocalServerStopError extends LocalServerError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /** The record of the server that did not stop, when one server was stopped. */
-  readonly runtime: unknown;
+  readonly runtime: object | undefined;
 
   /** What stopping that server did. */
-  readonly stopResult: unknown;
+  readonly stopResult: object | undefined;
 
   /** What stopping each process did, when several were stopped. */
-  readonly stopResults: unknown;
+  readonly stopResults: object | undefined;
 
   /**
    * Make the failure.
@@ -411,9 +520,9 @@ export class LocalServerStopError extends LocalServerError {
   constructor(
     message: string,
     stopped: Readonly<{
-      runtime?: unknown;
-      stopResult?: unknown;
-      stopResults?: unknown;
+      runtime?: object;
+      stopResult?: object;
+      stopResults?: object;
     }>,
   ) {
     super(message);
@@ -432,16 +541,20 @@ export class LocalServerRecordUnreadableError extends LocalServerError {
   /** The record, which the refusal names. */
   readonly path: string;
 
+  /** What reading it failed with. */
+  readonly failure: string;
+
   /**
    * Creates the error.
    *
    * @param message - What went wrong, with the facts it is about.
-   * @param path - The record that cannot be read.
+   * @param path - The record, which the refusal names.
    * @param cause - The failure that reading it raised.
    */
-  constructor(message: string, path: string, cause?: unknown) {
+  constructor(message: string, path: string, cause: unknown) {
     super(message, cause);
     this.path = path;
+    this.failure = errorMessage(cause);
   }
 }
 
@@ -465,10 +578,17 @@ export class LocalServerPortBusyError extends LocalServerError {
   }
 }
 
-/**
- * A server was launched and did not become ready. The message carries what it
- * logged.
- */
+/** What is known of a server that was launched: where it was to answer, how it ran, and what it last logged. */
+export type FailedStart = Readonly<{
+  serverUrl: string;
+  logTail?: string | undefined;
+  runtime: string;
+  pid?: number | undefined;
+  logPath?: string | undefined;
+  containerName?: string | undefined;
+}>;
+
+/** A server was launched and did not become ready. */
 export abstract class LocalServerStartFailedError extends LocalServerError {
   /** The address the server was to answer on. */
   readonly serverUrl: string;
@@ -476,39 +596,77 @@ export abstract class LocalServerStartFailedError extends LocalServerError {
   /** The last lines the server logged, when there were any to read. */
   readonly logTail: string | undefined;
 
+  /** Which runtime ran it: `binary` or `docker`. */
+  readonly runtime: string;
+
+  /** The process it ran as, for a binary server. */
+  readonly pid: number | undefined;
+
+  /** The file it logged to, for a binary server. */
+  readonly logPath: string | undefined;
+
+  /** The container it ran in, for a Docker server. */
+  readonly containerName: string | undefined;
+
   /**
    * Make the failure.
    *
    * @param message - What went wrong, with the facts it is about.
-   * @param started - The address it was to answer on and what it last logged.
+   * @param started - Where it was to answer, how it ran and what it last logged.
    */
-  constructor(
-    message: string,
-    started: Readonly<{ serverUrl: string; logTail?: string | undefined }>,
-  ) {
+  constructor(message: string, started: FailedStart) {
     super(message);
     this.serverUrl = started.serverUrl;
     this.logTail = started.logTail;
+    this.runtime = started.runtime;
+    this.pid = started.pid;
+    this.logPath = started.logPath;
+    this.containerName = started.containerName;
   }
 }
 
-/** A server was launched and exited before it became ready. The message carries what it logged. */
+/** A server was launched and exited before it became ready. */
 export class LocalServerStartExitedError extends LocalServerStartFailedError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 }
 
-/** A server was launched and did not become ready in time. The message carries what it logged. */
+/** A server was launched and did not become ready in time. */
 export class LocalServerStartTimeoutError extends LocalServerStartFailedError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 }
 
-/** A server was launched and did not become ready, and stopping it failed, so it may still be running. The message carries what it logged. */
+/** A server was launched and did not become ready, and stopping it failed, so it may still be running. */
 export class LocalServerStartCleanupFailedError extends LocalServerStartFailedError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
+
+  /** Why it did not become ready: it exited, or it ran out of time. */
+  readonly reason: "exited" | "timeout";
+
+  /** What stopping it came to. */
+  readonly stopResult: object;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param started - Where it was to answer, how it ran and what it last logged.
+   * @param reason - Why it did not become ready.
+   * @param stopResult - What stopping it came to.
+   */
+  constructor(
+    message: string,
+    started: FailedStart,
+    reason: "exited" | "timeout",
+    stopResult: object,
+  ) {
+    super(message, started);
+    this.reason = reason;
+    this.stopResult = stopResult;
+  }
 }

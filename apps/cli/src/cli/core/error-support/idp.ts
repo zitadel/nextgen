@@ -18,18 +18,25 @@ const SETTINGS_INVALID_REFUSAL = {
 const SETTINGS_UNUSED_REFUSAL = {
   message: "{message}",
   hint: "Add {providerFlag} custom, or remove {pronoun}.",
+  details: {
+    flags: "{flags}",
+  },
 } as const satisfies Refusal;
 
 /** How a custom connection described without every setting it needs is refused. */
 const SETTINGS_MISSING_REFUSAL = {
   message: "{message}",
   hint: "Describe the connection, e.g. {example}",
+  details: {
+    missing: "{missing}",
+  },
 } as const satisfies Refusal;
 
 /** How a provider that is neither in the catalog nor a custom connection is refused. */
 const PROVIDER_UNKNOWN_REFUSAL = {
   message: "{message}",
   hint: "Use one of {list}.",
+  details: {},
 } as const satisfies Refusal;
 
 /** How the errors of `@/lib/idp` are worded, most specific class first. */

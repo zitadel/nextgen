@@ -355,7 +355,10 @@
   throws `refusalError(X_REFUSAL, ...)`, then `throw error;`.
 - Spread the error into the refusal's values so no property is dropped.
 - Let `details` come from the error's fields, which `ErrorSupport` reports in
-  snake_case; a refusal's `details` add only what no field holds.
+  snake_case; a refusal that names `details` reports exactly that set (`{}` for none).
+- `{original}` names the foreign error a lib error stands for; a `{name}` detail nothing fills is dropped.
+- `error-support/<package>.ts` beside `error-support.test.ts` holds, per class, what main showed;
+  a row that differs on purpose says why in its `deviation`.
 - `error-support.test.ts` fails on a concrete lib error with no wording; exempt
   only a bug of the CLI's own code, with why.
 - Recognise an error only by `instanceof`, never by `reason`, `code`, `hint`,

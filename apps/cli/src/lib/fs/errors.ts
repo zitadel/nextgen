@@ -10,7 +10,34 @@ import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
  * operation and the path, and `cause` is Node's own error. A failure with no
  * class here is rethrown as Node raised it.
  */
-export abstract class FsError extends ZitadelLibError {}
+export abstract class FsError extends ZitadelLibError {
+  /** What Node said went wrong (`ENOENT: no such file or directory, open '...'`), or the message when Node gave no error. */
+  readonly reason: string;
+
+  /** The errno Node failed with (`ENOENT`, `EACCES`), when it gave one. */
+  readonly errno: string | undefined;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the path it is about.
+   * @param cause - Node's own error.
+   * @param errno - The errno Node failed with, as `fsFailure` read it.
+   */
+  constructor(message: string, cause?: unknown, errno?: string) {
+    super(message, cause);
+    // Node's errors are only ever read for their message here, so any cause
+    // that carries one is taken as it is.
+    this.reason =
+      typeof cause === "object" &&
+      cause !== null &&
+      "message" in cause &&
+      typeof cause.message === "string"
+        ? cause.message
+        : message;
+    this.errno = errno;
+  }
+}
 
 /** Nothing exists at the path (`ENOENT`). */
 export class FsNotFoundError extends FsError {
@@ -57,7 +84,7 @@ export class FsFailedError extends FsError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /** The code Node reported, such as `ELOOP`, for a reason a report shows. */
-  readonly errno: string;
+  override readonly errno: string;
 
   /**
    * Make the failure.
@@ -67,7 +94,7 @@ export class FsFailedError extends FsError {
    * @param cause - Node's own error.
    */
   constructor(message: string, errno: string, cause?: unknown) {
-    super(message, cause);
+    super(message, cause, errno);
     this.errno = errno;
   }
 }

@@ -1,5 +1,6 @@
 import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * Anything asking for consent fails with on purpose.
@@ -27,4 +28,23 @@ export class ConsentRequiredError extends ConsentError {
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFIRMATION_REQUIRED";
+
+  /** What a person would have been asked. */
+  readonly question: string;
+
+  /** The command that runs the action again with `--force`, when the gate names one. */
+  readonly retry: SuggestedCommand | undefined;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What was stopped, naming the action.
+   * @param question - What a person would have been asked.
+   * @param retry - The command that runs the action again with `--force`, when there is one.
+   */
+  constructor(message: string, question: string, retry?: SuggestedCommand) {
+    super(message);
+    this.question = question;
+    this.retry = retry;
+  }
 }

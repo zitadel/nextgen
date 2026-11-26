@@ -6,11 +6,17 @@ import type { Wording } from "./wording";
 /** How a release that cannot be looked up is refused. */
 const RELEASE_LOOKUP_REFUSAL = {
   message: "{message}",
+  details: {
+    original: "{original}",
+  },
 } as const satisfies Refusal;
 
 /** How an install of the new packages that failed is refused. */
 const INSTALL_FAILED_REFUSAL = {
   message: "{message}",
+  details: {
+    original: "{original}",
+  },
 } as const satisfies Refusal;
 
 /**

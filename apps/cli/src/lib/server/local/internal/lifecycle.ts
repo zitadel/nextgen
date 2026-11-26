@@ -13,9 +13,12 @@
 import { ExecaError } from "execa";
 import {
   LocalServerDockerFailedError,
+  LocalServerDockerMissingError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
   LocalServerProcessDeniedError,
+  LocalServerProcessGoneError,
+  LocalServerProgramFailedError,
   LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
   LocalServerStartTimeoutError,
@@ -24,6 +27,12 @@ import {
 import { FsError } from "@/lib/fs";
 import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/server/local/runtime";
 import { type Clock, SystemClock } from "@/lib/clock";
+
+/** What a start says when its server did not become ready, by why. */
+const START_FAILURES = {
+  exited: "The server exited before it became healthy",
+  timeout: "The server did not become healthy in time",
+} as const;
 
 /**
  * What the lifecycle needs to know about a running server, whatever started it.
@@ -74,6 +83,14 @@ export function launched<R extends ServerRecord>(record: R): Launched<R> {
   return record as Launched<R>;
 }
 
+/** How a launched server runs: its runtime, and its process and log or its container. */
+export type LaunchFacts = Readonly<{
+  runtime: string;
+  pid?: number;
+  logPath?: string;
+  containerName?: string;
+}>;
+
 /**
  * Runs the server. The binary and Docker runtimes are two implementations; the
  * lifecycle treats a record as opaque beyond its port and URL, so a new way of
@@ -96,6 +113,14 @@ export interface Launcher<R extends ServerRecord> {
    * (this took down every journey lane once).
    */
   isLaunchedAlive(server: Launched<R>): Promise<boolean>;
+  /**
+   * How the server runs: its runtime and what identifies it there, which is
+   * where to look when a start fails.
+   *
+   * @param record - The server's record.
+   * @returns Its runtime, and its process and log or its container.
+   */
+  describe(record: R): LaunchFacts;
   /** Stops it, `stale` when there was nothing left to stop. */
   terminate(record: R): Promise<StopOutcome>;
   /** The end of its own log, for explaining a failed start; read before it is cleaned up. */
@@ -358,7 +383,16 @@ export class Lifecycle<R extends ServerRecord> {
       if (error instanceof LocalServerProcessDeniedError) {
         return { status: "failed" };
       }
+      if (error instanceof LocalServerProcessGoneError) {
+        return { status: "failed" };
+      }
       if (error instanceof LocalServerDockerFailedError) {
+        return { status: "failed" };
+      }
+      if (error instanceof LocalServerDockerMissingError) {
+        return { status: "failed" };
+      }
+      if (error instanceof LocalServerProgramFailedError) {
         return { status: "failed" };
       }
       if (error instanceof ExecaError) {
@@ -468,34 +502,32 @@ export class Lifecycle<R extends ServerRecord> {
       if (error instanceof LocalServerDockerFailedError) {
         return undefined;
       }
+      if (error instanceof LocalServerDockerMissingError) {
+        return undefined;
+      }
       if (error instanceof FsError) {
         return undefined;
       }
       throw error;
     });
     const outcome = await this.terminateQuietly(record);
-    const logged = logTail ? `\nThe server logged:\n${logTail}` : "";
-
     const started = {
+      ...this.deps.launcher.describe(record),
       serverUrl: record.server_url,
       logTail,
     };
     if (outcome.status === "failed") {
       return new LocalServerStartCleanupFailedError(
-        `The server did not become healthy and is still running${logged}`,
+        START_FAILURES[reason],
         started,
+        reason,
+        outcome,
       );
     }
     if (reason === "exited") {
-      return new LocalServerStartExitedError(
-        `The server exited before it became healthy${logged}`,
-        started,
-      );
+      return new LocalServerStartExitedError(START_FAILURES[reason], started);
     }
-    return new LocalServerStartTimeoutError(
-      `The server did not become healthy in time${logged}`,
-      started,
-    );
+    return new LocalServerStartTimeoutError(START_FAILURES[reason], started);
   }
 }
 

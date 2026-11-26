@@ -524,6 +524,19 @@ describe("doctor", () => {
         });
       });
 
+      it("still reports its managed files when the project's configuration cannot be loaded", async () => {
+        const app = await aSetUpApp();
+        await app.writeConfig({ project: "p", userSchemas: "not a list" });
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          data: {
+            checks: expect.arrayContaining([expect.objectContaining({ name: "managed-files" })]),
+          },
+        });
+      });
+
       it("reports an unsupported framework version, pointing at the upgrade and offering no repair", async () => {
         const app = await aSetUpApp();
         await downgradeTheFramework(app);

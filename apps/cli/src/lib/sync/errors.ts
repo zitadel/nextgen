@@ -21,3 +21,14 @@ export class SyncStateMalformedError extends SyncError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
+
+/**
+ * The state file as a whole does not read: it is not JSON, or it does not hold
+ * an object. A {@link SyncStateMalformedError}, so a caller that catches that
+ * kind catches this one too; its `cause` is the parser's error, when there is one.
+ */
+export class SyncStateUnreadableError extends SyncStateMalformedError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
