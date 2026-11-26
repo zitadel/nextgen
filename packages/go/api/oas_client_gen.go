@@ -1035,11 +1035,11 @@ type Invoker interface {
 	//
 	// Filters combine. These are answered from an index and fill their pages: no filter, `category`,
 	// `event_type`, `status_class`, `operation_id` with or without `status_class`, `request_id`,
-	// `flow_id`, and `session_id`, `entity_id`, `user_id`, `actor_id` or `entity_type` with or without
-	// `category`, each with or without the time bounds. Any other filter or combination is matched event
-	// by event, over at most a few thousand events per request. Such a page can hold fewer events than
-	// `limit`, or none, and still carry `next_page_token`: keep passing the token until a response has
-	// none.
+	// `flow_id`, `correlation_id`, and `session_id`, `entity_id`, `user_id`, `actor_id` or `entity_type`
+	// with or without `category`, each with or without the time bounds. Any other filter or combination is
+	// matched event by event, over at most a few thousand events per request. Such a page can hold fewer
+	// events than `limit`, or none, and still carry `next_page_token`: keep passing the token until a
+	// response has none.
 	//
 	// [claim]: /docs/concepts/project-team-user#claim
 	//
@@ -11705,11 +11705,11 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 //
 // Filters combine. These are answered from an index and fill their pages: no filter, `category`,
 // `event_type`, `status_class`, `operation_id` with or without `status_class`, `request_id`,
-// `flow_id`, and `session_id`, `entity_id`, `user_id`, `actor_id` or `entity_type` with or without
-// `category`, each with or without the time bounds. Any other filter or combination is matched event
-// by event, over at most a few thousand events per request. Such a page can hold fewer events than
-// `limit`, or none, and still carry `next_page_token`: keep passing the token until a response has
-// none.
+// `flow_id`, `correlation_id`, and `session_id`, `entity_id`, `user_id`, `actor_id` or `entity_type`
+// with or without `category`, each with or without the time bounds. Any other filter or combination is
+// matched event by event, over at most a few thousand events per request. Such a page can hold fewer
+// events than `limit`, or none, and still carry `next_page_token`: keep passing the token until a
+// response has none.
 //
 // [claim]: /docs/concepts/project-team-user#claim
 //
@@ -11909,6 +11909,23 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.FlowID.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "correlation_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "correlation_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.CorrelationID.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil

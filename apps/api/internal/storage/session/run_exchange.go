@@ -104,6 +104,7 @@ func RunExchange(ctx context.Context, store ExchangeStore, projectID, handoffTok
 		return nil, exchangeConflict(err)
 	}
 	refreshed.FlowID = attempt.FlowID
+	refreshed.CorrelationID = attempt.CorrelationID
 	return refreshed, nil
 }
 

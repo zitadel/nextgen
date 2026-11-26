@@ -93,6 +93,11 @@ func TestListEvents_FilterPlans(t *testing.T) {
 			search: "SEARCH events USING INDEX idx_events_project_flow (project_id=? AND flow_id=?",
 		},
 		{
+			name:   "one chain",
+			filter: database.Equal(database.Col(domain.EventFieldCorrelationID), "chain_1"),
+			search: "SEARCH events USING INDEX idx_events_project_correlation (project_id=? AND correlation_id=?",
+		},
+		{
 			name:   "one type",
 			filter: database.Equal(database.Col(domain.EventFieldEventType), "user.created"),
 			search: "SEARCH events USING INDEX idx_events_project_type (project_id=? AND event_type=?",

@@ -129,12 +129,13 @@ func TestAuthAttemptStatements_RuntimeSealRoundTrip(t *testing.T) {
 	})
 }
 
-// An attempt keeps the flow that created it, which the handoff exchange
-// stamps on its events; one created outside a flow keeps none.
+// An attempt keeps the flow that created it and the chain it belongs to,
+// which the handoff exchange joins before it writes its events; one stored
+// without either keeps none.
 func TestAuthAttemptStatements_FlowIDRoundTrip(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
-		inFlow := &domain.AuthAttempt{ProjectID: projectID, FlowID: "flow_roundtrip1"}
+		inFlow := &domain.AuthAttempt{ProjectID: projectID, FlowID: "flow_roundtrip1", CorrelationID: "chain_roundtrip1"}
 		require.NoError(t, d.stmts.CreateAuthAttempt(t.Context(), inFlow))
 		direct := &domain.AuthAttempt{ProjectID: projectID}
 		require.NoError(t, d.stmts.CreateAuthAttempt(t.Context(), direct))
@@ -142,9 +143,11 @@ func TestAuthAttemptStatements_FlowIDRoundTrip(t *testing.T) {
 		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, inFlow.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "flow_roundtrip1", got.FlowID)
+		assert.Equal(t, "chain_roundtrip1", got.CorrelationID, "the chain the exchange and the callback join")
 
 		got, err = d.stmts.GetAuthAttemptByID(t.Context(), projectID, direct.ID)
 		require.NoError(t, err)
 		assert.Empty(t, got.FlowID)
+		assert.Empty(t, got.CorrelationID, "an attempt stored without a chain reads back none")
 	})
 }
