@@ -18,3 +18,13 @@ export class ConsentInternalError extends ConsentError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
+
+/**
+ * A destructive action stopped for want of `--force` with nobody to ask. Only a
+ * person can agree to it, so the command that catches this words the refusal.
+ */
+export class ConsentRequiredError extends ConsentError {
+  override readonly category: ErrorCategory = "denied";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFIRMATION_REQUIRED";
+}

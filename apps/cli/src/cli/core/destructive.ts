@@ -5,8 +5,18 @@ import { CANCELLED } from "@/lib/errors";
 
 import type { BaseCommand } from "./base";
 import type { EFFECT } from "./effect";
+import { type Refusal, refusalError } from "./refusal";
 import type { CommandResult } from "./types";
 import type { CommandClass } from "@/lib/oclif/command-class";
+
+/** How a gate refuses when nobody can be asked and `--force` was not given. */
+const CONFIRMATION_REQUIRED_REFUSAL = {
+  code: "E_CONFIRMATION_REQUIRED",
+  message: "{message}",
+  hint: "Ask a person first: {question} Pass --force only once they agree.",
+  details: { question: "{question}" },
+  next: ["{retry}"],
+} as const satisfies Refusal;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
 export class Settled {
@@ -154,10 +164,30 @@ export function Destructive<
         dryRun: this.meta.dryRun,
       };
 
-      return Consent.request(retried, {
-        ...session,
-        confirmer: this.ui.confirmer(session),
-      });
+      return Consent.request(
+        {
+          ...retried,
+          refuse:
+            retried.refuse ??
+            ((error) => {
+              return refusalError(
+                CONFIRMATION_REQUIRED_REFUSAL,
+                {
+                  ...error,
+                  message: error.message,
+                  question: gate.message,
+                },
+                {
+                  retry: retried.retry === undefined ? [] : retried.retry,
+                },
+              );
+            }),
+        },
+        {
+          ...session,
+          confirmer: this.ui.confirmer(session),
+        },
+      );
     }
   }
 

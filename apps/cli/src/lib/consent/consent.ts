@@ -1,10 +1,9 @@
 import { allowDestructive, type ZitadelClient } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { Confirmer } from "@/lib/ui/questions";
 
-import { ConsentInternalError } from "./errors";
+import { ConsentInternalError, ConsentRequiredError } from "./errors";
 
 /**
  * What a destructive command does, as one word. It is the stable token of the
@@ -44,11 +43,11 @@ export type Gate = Readonly<{
    */
   arguments?: readonly string[];
   /**
-   * Refuses in place of the default "Cannot … without --force" when nobody
-   * can be asked and `--force` was not given, for a refusal that says more.
-   * It throws an `E_CONFIRMATION_REQUIRED` too, or {@link Consent.isRefusal} misses it.
+   * Words the refusal when nobody can be asked and `--force` was not given:
+   * it returns the error to throw in place of the {@link ConsentRequiredError}.
+   * Without it the {@link ConsentRequiredError} is what is thrown.
    */
-  refuse?: () => never;
+  refuse?: (error: ConsentRequiredError) => Error;
 }>;
 
 /** Who can answer, and whether the run may change anything at all. */
@@ -97,8 +96,8 @@ export class Consent {
 
   /**
    * Ask for consent. `--force` gives it without asking; with nobody to ask
-   * and no `--force` the gate refuses (an `E_CONFIRMATION_REQUIRED` naming
-   * `--force`, which only a person may agree to);
+   * and no `--force` the gate refuses (a {@link ConsentRequiredError}, or what
+   * the gate's `refuse` makes of it);
    * otherwise the person is asked, and `undefined` is their no. Ctrl-C
    * throws `E_CANCELLED`, as every prompt does.
    *
@@ -108,8 +107,8 @@ export class Consent {
    * @param gate - What is being confirmed and how it refuses.
    * @param session - Who can answer, and whether the run may change anything.
    * @returns The consent, or `undefined` when the person said no.
-   * @throws {ZitadelError} `E_CONFIRMATION_REQUIRED` when nobody can be asked
-   * and `--force` was not given, or `E_CANCELLED` on Ctrl-C.
+   * @throws {@link ConsentRequiredError} When nobody can be asked and `--force`
+   * was not given, unless the gate's `refuse` words another error; `E_CANCELLED` on Ctrl-C.
    * @throws {@link ConsentInternalError} When a dry run asks.
    */
   static async request(gate: Gate, session: ConsentSession): Promise<Consent | undefined> {
@@ -118,7 +117,9 @@ export class Consent {
     }
     try {
       if (!session.force && !session.interactive) {
-        gate.refuse?.();
+        throw new ConsentRequiredError(
+          `Cannot ${gate.name} without --force in non-interactive mode`,
+        );
       }
       const agreed = await (session.confirmer ?? Ui.asker(session)).confirm({
         name: gate.name,
@@ -134,8 +135,10 @@ export class Consent {
       granted.add(consent);
       return consent;
     } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_CONFIRMATION_REQUIRED") {
-        refusals.add(error);
+      if (error instanceof ConsentRequiredError) {
+        const refusal = gate.refuse?.(error) ?? error;
+        refusals.add(refusal);
+        throw refusal;
       }
       throw error;
     }
