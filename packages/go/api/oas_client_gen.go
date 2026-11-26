@@ -35,8 +35,8 @@ type Invoker interface {
 	//
 	// Send the plaintext token from the invitation link fragment. Acceptance grants the invitation's role
 	// (a project grant for `project_member`) when the invitation is pending and unexpired, the project is
-	// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
-	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
+	// claimed, and the creator still holds `admin` unless `created_by` is null. The inviter cannot accept
+	// their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
 	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
 	// that scheme's CSRF rules.
@@ -338,11 +338,12 @@ type Invoker interface {
 	// `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
 	// invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 	// `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
-	// and the original is deleted in the same transaction unless it was accepted.
+	// and the original is deleted in the same transaction. An accepted original cannot be replaced: the
+	// request answers `404`.
 	//
-	// The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
-	// can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-	// platform project, and when the project already has 100 pending unexpired invitations.
+	// The `link` appears only in this response. Send it to the recipient yourself; whoever opens it and is
+	// signed in can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server
+	// without a platform project, and when the project already has 100 pending unexpired invitations.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 	// Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -1881,8 +1882,8 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 //
 // Send the plaintext token from the invitation link fragment. Acceptance grants the invitation's role
 // (a project grant for `project_member`) when the invitation is pending and unexpired, the project is
-// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
-// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
+// claimed, and the creator still holds `admin` unless `created_by` is null. The inviter cannot accept
+// their own invitation. Every unknown or finished token answers the same opaque `404`.
 //
 // Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
 // that scheme's CSRF rules.
@@ -3861,11 +3862,12 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 // `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
 // invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 // `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
-// and the original is deleted in the same transaction unless it was accepted.
+// and the original is deleted in the same transaction. An accepted original cannot be replaced: the
+// request answers `404`.
 //
-// The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
-// can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-// platform project, and when the project already has 100 pending unexpired invitations.
+// The `link` appears only in this response. Send it to the recipient yourself; whoever opens it and is
+// signed in can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server
+// without a platform project, and when the project already has 100 pending unexpired invitations.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 // Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
