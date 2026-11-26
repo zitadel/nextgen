@@ -1,5 +1,5 @@
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import { isCancelled, Origins, OriginService } from "@/lib/backend";
+import { BackendError, isCancelled, Origins, OriginService } from "@/lib/backend";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -43,16 +43,19 @@ export class ReadOrigins extends WizardStep<"remote", Fact<"remote" | "origins">
    */
   async run(_needs: object): Promise<Fact<"remote" | "origins">> {
     const remote = await this.deps.connect();
-    return {
-      remote,
-      origins: await new OriginService(remote.client, remote.projectId)
-        .list()
-        .catch((cause: unknown) => {
-          if (isCancelled(remote.client)) {
-            throw cause;
-          }
-          return Origins.wrap([]);
-        }),
-    };
+    try {
+      return {
+        remote,
+        origins: await new OriginService(remote.client, remote.projectId).list(),
+      };
+    } catch (cause) {
+      if (cause instanceof BackendError && !isCancelled(remote.client)) {
+        return {
+          remote,
+          origins: Origins.wrap([]),
+        };
+      }
+      throw cause;
+    }
   }
 }

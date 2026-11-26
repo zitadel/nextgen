@@ -13,7 +13,6 @@ import {
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
-import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { pathExists } from "@/lib/fs";
 import { MetaSchemas } from "@/lib/meta-schemas";
@@ -289,9 +288,7 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
         filesWritten.push(relPath);
       } catch (error) {
         if (isErrno(error, "EEXIST")) {
-          throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
-            hint: "Rerun with --force to replace it, or edit the existing file directly.",
-          });
+          return;
         }
         throw error;
       }
@@ -341,12 +338,7 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
       join(CONFIG_DIRECTORIES.branding, "README.md"),
       Spelling.at(this.cliVersion).normalizeProse(brandingReadmeContent()),
       false,
-    ).catch((error: unknown) => {
-      if (error instanceof ZitadelError && error.code === "E_CONFLICT") {
-        return;
-      }
-      throw error;
-    });
+    );
     const brandingMeta = MetaSchemas.of(this.cliVersion).only((file) => {
       return file.path === `${META_SCHEMA_DIR}/branding.json`;
     });

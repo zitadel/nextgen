@@ -13,7 +13,8 @@ import { createOrca } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
-import { type PackageCommand, PM } from "@/lib/pm";
+import { isErrno } from "@/lib/errno";
+import { type PackageCommand, type PackageJson, PM, PmManifestInvalidError } from "@/lib/pm";
 import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
@@ -333,9 +334,18 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
         throw refusalError(PLAYWRIGHT_CONFIG_REFUSAL, { config });
       }
     }
-    const packageJson = await PM.manifest(this.cwd).catch(() => undefined);
-    if (packageJson === undefined) {
-      throw refusalError(MANIFEST_REFUSAL, {});
+    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
+    let packageJson: PackageJson;
+    try {
+      packageJson = await PM.manifest(this.cwd);
+    } catch (error) {
+      if (isErrno(error, "ENOENT")) {
+        throw refusalError(MANIFEST_REFUSAL, {});
+      }
+      if (error instanceof PmManifestInvalidError) {
+        throw refusalError(MANIFEST_REFUSAL, {});
+      }
+      throw error;
     }
     const manifest: Manifest = {
       dependencies: new Set(

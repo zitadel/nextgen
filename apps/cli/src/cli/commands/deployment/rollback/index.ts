@@ -2,13 +2,14 @@ import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
 import {
+  BackendError,
   DeploymentService,
   type ReleasePointer,
   ReleaseService,
   type ZitadelClient,
 } from "@/lib/backend";
 import { RollbackDeploymentParams } from "@/lib/backend/schemas";
-import { isCancellation, toZitadelError } from "@/lib/errors";
+import { toZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
@@ -89,45 +90,43 @@ async function originChanges(
   projectId: string,
   deploymentId: string,
 ): Promise<{ dropped: string[]; restored: string[]; unserved: string[] } | undefined> {
-  const read = await Promise.all([
-    client.getDeployment(deploymentId, { project_id: projectId }),
-    client.getProject(projectId),
-    deployments.newestPrimary(),
-  ]).catch((error: unknown) => {
-    if (isCancellation(error)) {
-      throw error;
-    }
-    warnings.report(
-      `Could not check which origins rolling back to ${deploymentId} changes: ${toZitadelError(error).message}`,
-    );
-    return undefined;
-  });
-  if (read === undefined) {
-    return undefined;
-  }
-  const [deployment, project, live] = read;
-  const frozen = deployment.targets.map((target) => {
-    return target.origin;
-  });
-  const listed = (project.origins ?? [])
-    .filter((origin) => {
-      return origin.kind === "primary";
-    })
-    .map((origin) => {
-      return origin.pattern;
+  try {
+    const [deployment, project, live] = await Promise.all([
+      client.getDeployment(deploymentId, { project_id: projectId }),
+      client.getProject(projectId),
+      deployments.newestPrimary(),
+    ]);
+    const frozen = deployment.targets.map((target) => {
+      return target.origin;
     });
-  const served = live?.origins ?? [];
-  return {
-    dropped: listed.filter((origin) => {
-      return !frozen.includes(origin);
-    }),
-    restored: frozen.filter((origin) => {
-      return listed.includes(origin) && !served.includes(origin);
-    }),
-    unserved: frozen.filter((origin) => {
-      return !listed.includes(origin);
-    }),
-  };
+    const listed = (project.origins ?? [])
+      .filter((origin) => {
+        return origin.kind === "primary";
+      })
+      .map((origin) => {
+        return origin.pattern;
+      });
+    const served = live?.origins ?? [];
+    return {
+      dropped: listed.filter((origin) => {
+        return !frozen.includes(origin);
+      }),
+      restored: frozen.filter((origin) => {
+        return listed.includes(origin) && !served.includes(origin);
+      }),
+      unserved: frozen.filter((origin) => {
+        return !listed.includes(origin);
+      }),
+    };
+  } catch (error) {
+    if (error instanceof BackendError) {
+      warnings.report(
+        `Could not check which origins rolling back to ${deploymentId} changes: ${toZitadelError(error).message}`,
+      );
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -258,16 +257,18 @@ export default class DeploymentRollback extends Telemetered(
           ...(guard === undefined ? {} : { expected_deployment_id: guard }),
         });
         const releaseService = await this.service(ReleaseService);
-        const release = await releaseService.get(deployment.release_id).catch((error: unknown) => {
-          if (isCancellation(error)) {
+        // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
+        let pointers: readonly ReleasePointer[] | undefined;
+        try {
+          pointers = (await releaseService.get(deployment.release_id)).pointers;
+        } catch (error) {
+          if (!(error instanceof BackendError)) {
             throw error;
           }
           warnings.report(
             `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
           );
-          return undefined;
-        });
-        const pointers: readonly ReleasePointer[] | undefined = release?.pointers;
+        }
 
         const pointerTable =
           pointers === undefined

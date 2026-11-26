@@ -507,77 +507,83 @@ export default class Claim extends Telemetered(ChangeCommand) {
     deadline: number,
     startOver: SuggestedCommand,
   ): Promise<{ team_id: string; claimed_at: string; dashboard_url: string }> {
-    return pRetry(
-      async (attempt) => {
-        const isExpired = Date.now() >= deadline;
+    try {
+      return await pRetry(
+        async (attempt) => {
+          const isExpired = Date.now() >= deadline;
 
-        if (isExpired) {
-          throw new NotFinished(attempt - 1);
-        }
+          if (isExpired) {
+            throw new NotFinished(attempt - 1);
+          }
 
-        const progress = await claimService.status(challengeId).catch((error: unknown) => {
-          this.annotate({ poll_count: attempt });
-          throw new AbortError(error instanceof Error ? error : new Error(String(error)));
-        });
-        switch (progress.outcome) {
-          case "completed": {
+          // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
+          let progress: Awaited<ReturnType<typeof claimService.status>>;
+          try {
+            progress = await claimService.status(challengeId);
+          } catch (error) {
             this.annotate({ poll_count: attempt });
-            return progress.claim;
+            throw new AbortError(error instanceof Error ? error : new Error(String(error)));
           }
-          case "window-expired": {
-            this.annotate({
-              claim_outcome: "window_expired",
-              poll_count: attempt,
-            });
-            throw new AbortError(refusalError(WINDOW_CLOSED_REFUSAL, {}));
+          switch (progress.outcome) {
+            case "completed": {
+              this.annotate({ poll_count: attempt });
+              return progress.claim;
+            }
+            case "window-expired": {
+              this.annotate({
+                claim_outcome: "window_expired",
+                poll_count: attempt,
+              });
+              throw new AbortError(refusalError(WINDOW_CLOSED_REFUSAL, {}));
+            }
+            case "expired": {
+              this.annotate({
+                claim_outcome: "expired",
+                poll_count: attempt,
+              });
+              throw new AbortError(refusalError(LINK_EXPIRED_REFUSAL, {}, { claim: startOver }));
+            }
+            case "not-found": {
+              this.annotate({
+                claim_outcome: "not_found",
+                poll_count: attempt,
+              });
+              throw new AbortError(
+                new ZitadelError(
+                  "E_NOT_FOUND",
+                  "This project has no claim link with that challenge id.",
+                  {
+                    hint: "Start a new link.",
+                    nextCommands: [startOver],
+                  },
+                ),
+              );
+            }
+            case "pending": {
+              throw new NotFinished(attempt);
+            }
           }
-          case "expired": {
-            this.annotate({
-              claim_outcome: "expired",
-              poll_count: attempt,
-            });
-            throw new AbortError(refusalError(LINK_EXPIRED_REFUSAL, {}, { claim: startOver }));
-          }
-          case "not-found": {
-            this.annotate({
-              claim_outcome: "not_found",
-              poll_count: attempt,
-            });
-            throw new AbortError(
-              new ZitadelError(
-                "E_NOT_FOUND",
-                "This project has no claim link with that challenge id.",
-                {
-                  hint: "Start a new link.",
-                  nextCommands: [startOver],
-                },
-              ),
-            );
-          }
-          case "pending": {
-            throw new NotFinished(attempt);
-          }
-        }
-      },
-      {
-        maxRetryTime: Math.max(deadline - Date.now(), 0),
-        retries: Number.POSITIVE_INFINITY,
-        minTimeout: INITIAL_POLL_MS,
-        maxTimeout: MAX_POLL_MS,
-        factor: POLL_BACKOFF_FACTOR,
-        randomize: false,
-        signal: this.signal,
-      },
-    ).catch((error: unknown) => {
-      if (!(error instanceof NotFinished)) {
-        throw error;
+        },
+        {
+          maxRetryTime: Math.max(deadline - Date.now(), 0),
+          retries: Number.POSITIVE_INFINITY,
+          minTimeout: INITIAL_POLL_MS,
+          maxTimeout: MAX_POLL_MS,
+          factor: POLL_BACKOFF_FACTOR,
+          randomize: false,
+          signal: this.signal,
+        },
+      );
+    } catch (error) {
+      if (error instanceof NotFinished) {
+        this.annotate({
+          claim_outcome: "timeout",
+          poll_count: error.attempt,
+        });
+        throw refusalError(WAIT_STOPPED_REFUSAL, {}, { claim: startOver });
       }
-      this.annotate({
-        claim_outcome: "timeout",
-        poll_count: error.attempt,
-      });
-      throw refusalError(WAIT_STOPPED_REFUSAL, {}, { claim: startOver });
-    });
+      throw error;
+    }
   }
 
   /**
