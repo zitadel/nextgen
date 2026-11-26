@@ -34,7 +34,7 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { localiseFlowErrorKeys, stepNotice, stepTexts } from "./locales/step-text.js";
+import { createLiquidEngine, localiseFlowErrorKeys, stepNotice, stepTexts } from "./liquid.js";
 import { isHidden, loadLocale, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
@@ -466,12 +466,11 @@ export class ZitadelLogin extends ZitadelSurface {
   private readonly rendering = new Task(this, {
     args: () => [this.resolveLanguage(), this.locales] as const,
     task: async ([language, locales]) => {
-      const [locale, { createLiquidEngine }, sanitiser] = await Promise.all([
+      const [locale, sanitiser] = await Promise.all([
         loadLocale(language, locales),
-        import("./liquid.js"),
         createSanitiser(),
       ]);
-      return { locale, engine: createLiquidEngine({ locale }), sanitiser };
+      return { locale, engine: await createLiquidEngine({ locale }), sanitiser };
     },
   });
 

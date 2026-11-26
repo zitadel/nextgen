@@ -54,8 +54,8 @@ describe.each(Object.entries(builtinLocales))("locale %s covers the sso steps", 
   // providers; each must render as copy, through its own key or the fallback.
   it.each(["identifier", "register", "password", "sso-conflict"])(
     "renders the description %s asks for when it offers providers",
-    (step) => {
-      const engine = createLiquidEngine({ locale });
+    async (step) => {
+      const engine = await createLiquidEngine({ locale });
       const key = `${step}.description.sso`;
 
       expect(engine.parseAndRenderSync("{{ key | t }}", { key })).not.toBe(key);

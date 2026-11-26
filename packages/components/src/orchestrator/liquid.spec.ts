@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createLiquidEngine } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
 import { builtinLocales } from "../locales.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
@@ -43,24 +43,24 @@ function withAlertTexts(errorKeys: readonly string[]): Record<string, string> {
 }
 
 describe("LiquidJS engine", () => {
-  it("auto-escapes {{ }} output by default", () => {
-    const engine = createLiquidEngine({ locale });
+  it("auto-escapes {{ }} output by default", async () => {
+    const engine = await createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync("<p>{{ value }}</p>", {
       value: "<img src=x onerror=alert(1)>",
     });
     expect(result).toBe("<p>&lt;img src=x onerror=alert(1)&gt;</p>");
   });
 
-  it("the | t filter resolves text_key strings", () => {
-    const engine = createLiquidEngine({ locale });
+  it("the | t filter resolves text_key strings", async () => {
+    const engine = await createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync("{{ key | t }}", { key: "identifier.title" });
     expect(result).toBe("Sign in");
   });
 
-  it("the | t filter falls through to the raw key when missing", () => {
+  it("the | t filter falls through to the raw key when missing", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({ locale });
+      const engine = await createLiquidEngine({ locale });
       const result = engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
       expect(result).toBe("unknown.key");
       expect(warn).toHaveBeenCalledWith(
@@ -71,10 +71,10 @@ describe("LiquidJS engine", () => {
     }
   });
 
-  it("warns once per missing key, and never for fallback-served or empty keys", () => {
+  it("warns once per missing key, and never for fallback-served or empty keys", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({
+      const engine = await createLiquidEngine({
         locale: { ...locale, "action.back": "Back", "identifier.description": "Email" },
       });
       // Raw-key miss: warns on first render only.
@@ -96,28 +96,28 @@ describe("LiquidJS engine", () => {
     }
   });
 
-  it("the | t filter falls back to the generic action.back for custom step names", () => {
+  it("the | t filter falls back to the generic action.back for custom step names", async () => {
     // The engine injects `<step>.action.back` from tenant-chosen step names
     // (flow_state_machine.go buildStep) — no dictionary can enumerate them.
-    const engine = createLiquidEngine({ locale: { ...locale, "action.back": "Back" } });
+    const engine = await createLiquidEngine({ locale: { ...locale, "action.back": "Back" } });
     const result = engine.parseAndRenderSync("{{ key | t }}", {
       key: "passkey-first.action.back",
     });
     expect(result).toBe("Back");
   });
 
-  it("a step-specific action.back key wins over the generic fallback", () => {
-    const engine = createLiquidEngine({
+  it("a step-specific action.back key wins over the generic fallback", async () => {
+    const engine = await createLiquidEngine({
       locale: { ...locale, "action.back": "Back", "recover.action.back": "Back to sign in" },
     });
     const result = engine.parseAndRenderSync("{{ key | t }}", { key: "recover.action.back" });
     expect(result).toBe("Back to sign in");
   });
 
-  it("action.back keys still fall through to the raw key when no generic exists", () => {
+  it("action.back keys still fall through to the raw key when no generic exists", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({ locale });
+      const engine = await createLiquidEngine({ locale });
       const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.action.back" });
       expect(result).toBe("custom.action.back");
       expect(warn).toHaveBeenCalledWith(
@@ -128,18 +128,20 @@ describe("LiquidJS engine", () => {
     }
   });
 
-  it("the | t filter falls back from a step's SSO description to its plain one", () => {
+  it("the | t filter falls back from a step's SSO description to its plain one", async () => {
     // The engine asks for `<step>.description.sso` once the step offers providers
     // (flow_state_machine.go buildStep); only some steps need their own wording.
-    const engine = createLiquidEngine({ locale: { ...locale, "identifier.description": "Email" } });
+    const engine = await createLiquidEngine({
+      locale: { ...locale, "identifier.description": "Email" },
+    });
     const result = engine.parseAndRenderSync("{{ key | t }}", {
       key: "identifier.description.sso",
     });
     expect(result).toBe("Email");
   });
 
-  it("a step's own SSO description wins over its plain one", () => {
-    const engine = createLiquidEngine({
+  it("a step's own SSO description wins over its plain one", async () => {
+    const engine = await createLiquidEngine({
       locale: {
         ...locale,
         "password.description": "Password",
@@ -150,10 +152,10 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("Password or provider");
   });
 
-  it("an SSO description with no plain one shows the plain key, which is the one to add", () => {
+  it("an SSO description with no plain one shows the plain key, which is the one to add", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({ locale });
+      const engine = await createLiquidEngine({ locale });
       const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.description.sso" });
       expect(result).toBe("custom.description");
       expect(warn).toHaveBeenCalledWith(
@@ -175,11 +177,11 @@ describe("LiquidJS engine", () => {
     expect(fullLocale["action.back"]).toBe("Back");
   });
 
-  it("the | t filter humanises uncatalogued field-label keys", () => {
+  it("the | t filter humanises uncatalogued field-label keys", async () => {
     // Custom schema properties (`department`, `dateOfBirth`) produce
     // `<step>.field.<name>` label keys no catalog can enumerate — the
     // form must not render the raw key.
-    const engine = createLiquidEngine({ locale });
+    const engine = await createLiquidEngine({ locale });
     expect(engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.department" })).toBe(
       "Department",
     );
@@ -191,8 +193,8 @@ describe("LiquidJS engine", () => {
     ).toBe("Emergency contact");
   });
 
-  it("a catalogued field-label key wins over the humanised fallback", () => {
-    const engine = createLiquidEngine({
+  it("a catalogued field-label key wins over the humanised fallback", async () => {
+    const engine = await createLiquidEngine({
       locale: { ...locale, "register.field.department": "Team" },
     });
     const result = engine.parseAndRenderSync("{{ key | t }}", {
@@ -201,22 +203,22 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("Team");
   });
 
-  it("splits on the last .field. for step names that contain the marker", () => {
+  it("splits on the last .field. for step names that contain the marker", async () => {
     // Step names are tenant-chosen: "signup.field.v2" is a legal step
     // name, and the property name always follows the final ".field.".
-    const engine = createLiquidEngine({ locale });
+    const engine = await createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync("{{ key | t }}", {
       key: "signup.field.v2.field.department",
     });
     expect(result).toBe("Department");
   });
 
-  it("field sub-keys (placeholder/help) do not take the humanised fallback", () => {
+  it("field sub-keys (placeholder/help) do not take the humanised fallback", async () => {
     // `.placeholder`/`.help` resolve through their own filters, which stay
     // empty on a miss; `| t` keeps returning the raw key for them.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({ locale });
+      const engine = await createLiquidEngine({ locale });
       const result = engine.parseAndRenderSync("{{ key | t }}", {
         key: "register.field.department.placeholder",
       });
@@ -229,8 +231,8 @@ describe("LiquidJS engine", () => {
     }
   });
 
-  it("fieldPlaceholder resolves sibling keys", () => {
-    const engine = createLiquidEngine({ locale });
+  it("fieldPlaceholder resolves sibling keys", async () => {
+    const engine = await createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync(
       `{{ "identifier.field.email" | fieldPlaceholder }}`,
       {},
@@ -238,14 +240,14 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("you@company.com");
   });
 
-  it("fieldPlaceholder returns empty when undefined", () => {
-    const engine = createLiquidEngine({ locale });
+  it("fieldPlaceholder returns empty when undefined", async () => {
+    const engine = await createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync(`{{ "password.title" | fieldPlaceholder }}`, {});
     expect(result).toBe("");
   });
 
-  it("the | raw filter is overridden to escape", () => {
-    const engine = createLiquidEngine({ locale });
+  it("the | raw filter is overridden to escape", async () => {
+    const engine = await createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync("<p>{{ value | raw }}</p>", {
       value: "<script>alert(1)</script>",
     });
@@ -253,14 +255,14 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("&lt;script&gt;");
   });
 
-  it("emits the mandatory_gates marker comment", () => {
-    const engine = createLiquidEngine({ locale });
+  it("emits the mandatory_gates marker comment", async () => {
+    const engine = await createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync("{% mandatory_gates %}", {});
     expect(result).toBe(mandatoryGatesMarkerComment);
   });
 
-  it("renders the bundled default template through the auth-form partial", () => {
-    const engine = createLiquidEngine({ locale });
+  it("renders the bundled default template through the auth-form partial", async () => {
+    const engine = await createLiquidEngine({ locale });
     const f = toArray({
       identifier: { type: "email", text_key: "identifier.title", required: true },
     });
@@ -288,10 +290,10 @@ describe("LiquidJS engine", () => {
     expect(result).toContain(mandatoryGatesMarkerComment);
   });
 
-  it("normalises auth-method credential names in testids but not in name", () => {
+  it("normalises auth-method credential names in testids but not in name", async () => {
     // The real flow engine names the credential field
     // `x-auth-methods#password`; the documented hook is method-named.
-    const engine = createLiquidEngine({ locale });
+    const engine = await createLiquidEngine({ locale });
     const f = toArray({
       "x-auth-methods#password": {
         type: "password",
@@ -318,8 +320,8 @@ describe("LiquidJS engine", () => {
     expect(result).toContain('name="x-auth-methods#password"');
   });
 
-  it("renders step title from locale via default template", () => {
-    const engine = createLiquidEngine({ locale });
+  it("renders step title from locale via default template", async () => {
+    const engine = await createLiquidEngine({ locale });
     const a = toArray({ submit: { text_key: "submit.continue", primary: true } });
     const context = {
       step: { name: "password", texts: { title_key: "password.title" } },
@@ -337,8 +339,8 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("Sign in");
   });
 
-  it("renders passkey upsell: card, primary + secondary CTAs", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders passkey upsell: card, primary + secondary CTAs", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const a = toArray({
       setup: { text_key: "passkey-upsell.action.setup", primary: true },
       skip: { text_key: "passkey-upsell.action.skip" },
@@ -364,8 +366,8 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("<zl-field");
   });
 
-  it("renders passkey upsell setup error: form-level alert, retry allowed", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders passkey upsell setup error: form-level alert, retry allowed", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const a = toArray({
       setup: { text_key: "passkey-upsell.action.setup", primary: true },
       skip: { text_key: "passkey-upsell.action.skip" },
@@ -389,8 +391,8 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("invalid");
   });
 
-  it("opens the card with a notice, as information rather than an error", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("opens the card with a notice, as information rather than an error", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const context = {
       step: { name: "register", texts: { title_key: "register.title" } },
       fields: [],
@@ -411,8 +413,8 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("data-zl-step-error");
   });
 
-  it("renders the engine's passkey proof rejection as a localized alert", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders the engine's passkey proof rejection as a localized alert", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const a = toArray({
       submit: { text_key: "identifier.action.continue", primary: true },
     });
@@ -436,8 +438,8 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("error.passkey_invalid");
   });
 
-  it("renders the engine's passkey registration rejection as a localized alert", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders the engine's passkey registration rejection as a localized alert", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const a = toArray({
       setup: { text_key: "passkey-upsell.action.setup", primary: true },
       skip: { text_key: "passkey-upsell.action.skip" },
@@ -462,8 +464,8 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("error.passkey_registration_invalid");
   });
 
-  it("renders passkey registration challenges with registration ceremony", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders passkey registration challenges with registration ceremony", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const context = {
       step: { name: "passkey-enroll", texts: { title_key: "passkey-enroll.title" } },
       fields: [],
@@ -494,8 +496,8 @@ describe("LiquidJS engine", () => {
     expect(result).toContain('challenge-id="reg-1"');
   });
 
-  it("keeps legacy passkey registration challenges working when options.user is present", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("keeps legacy passkey registration challenges working when options.user is present", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const context = {
       step: { name: "passkey-enroll", texts: { title_key: "passkey-enroll.title" } },
       fields: [],
@@ -521,8 +523,8 @@ describe("LiquidJS engine", () => {
     expect(result).toContain('method="passkey_register"');
   });
 
-  it("renders the signed-in screen when the step is the signed-in confirmation", () => {
-    const engine = createLiquidEngine({ locale });
+  it("renders the signed-in screen when the step is the signed-in confirmation", async () => {
+    const engine = await createLiquidEngine({ locale });
     const context = {
       step: { name: "signed-in", texts: { title_key: "complete.title" } },
       fields: [],
@@ -543,8 +545,8 @@ describe("LiquidJS engine", () => {
   // email and credential across two steps. The template must still render
   // whatever field set a tenant's flow definition declares on one step,
   // including an email+password pair.
-  it("renders an email+password step on one card: autocomplete, forgot link, sign-in CTA", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders an email+password step on one card: autocomplete, forgot link, sign-in CTA", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: {
         type: "email",
@@ -591,8 +593,8 @@ describe("LiquidJS engine", () => {
     expect(passkeyButtons[0]).toContain('hierarchy="secondary"');
   });
 
-  it("renders a primary passkey action as exactly one button (passkey-first flow)", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders a primary passkey action as exactly one button (passkey-first flow)", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const a = toArray({
       passkey: { text_key: "identifier.action.passkey", primary: true },
       register: { text_key: "identifier.action.register.link" },
@@ -617,8 +619,8 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain('hierarchy="secondary"');
   });
 
-  it("renders sign-in wrong credentials: inline password error, no form alert", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders sign-in wrong credentials: inline password error, no form alert", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: {
         type: "email",
@@ -656,8 +658,8 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("<zl-alert data-zl-step-error");
   });
 
-  it("renders sign-in server error: heading + body alert, fields unchanged", () => {
-    const engine = createLiquidEngine({ locale: withAlertTexts(["error.sign_in_server"]) });
+  it("renders sign-in server error: heading + body alert, fields unchanged", async () => {
+    const engine = await createLiquidEngine({ locale: withAlertTexts(["error.sign_in_server"]) });
     const f = toArray({
       email: {
         type: "email",
@@ -696,8 +698,8 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("Wrong password.");
   });
 
-  it("renders sign-up field annotations: autocomplete, help, inline email error", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("renders sign-up field annotations: autocomplete, help, inline email error", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: {
         type: "email",
@@ -748,16 +750,16 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("compact");
   });
 
-  it("fieldRuleHint names the minimum length of a password the user chooses", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("fieldRuleHint names the minimum length of a password the user chooses", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const result = engine.parseAndRenderSync('{{ "" | fieldRuleHint: f }}', {
       f: { type: "password", validation: { min_length: 15, max_length: 64 } },
     });
     expect(result).toBe("At least 15 characters.");
   });
 
-  it("fieldRuleHint keeps the help text it is given", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("fieldRuleHint keeps the help text it is given", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const result = engine.parseAndRenderSync('{{ "Use a passphrase." | fieldRuleHint: f }}', {
       f: { type: "password", validation: { min_length: 15 } },
     });
@@ -769,17 +771,17 @@ describe("LiquidJS engine", () => {
     ["a password with a zero minimum", { type: "password", validation: { min_length: 0 } }],
     ["a field that is not a password", { type: "text", validation: { min_length: 3 } }],
     ["a field with no validation", { type: "password" }],
-  ])("fieldRuleHint says nothing for %s", (_name, f) => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  ])("fieldRuleHint says nothing for %s", async (_name, f) => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     expect(engine.parseAndRenderSync('{{ "" | fieldRuleHint: f }}', { f })).toBe("");
   });
 
   describe("a password the user chooses, on the default template", () => {
-    const renderRegisterPassword = (
+    const renderRegisterPassword = async (
       locale: Record<string, string>,
       errors: Array<Record<string, string>> = [],
     ) => {
-      const engine = createLiquidEngine({ locale });
+      const engine = await createLiquidEngine({ locale });
       const f = toArray({
         "x-auth-methods#password": {
           type: "password",
@@ -804,22 +806,22 @@ describe("LiquidJS engine", () => {
       });
     };
 
-    it("shows its minimum length under the field before anything is typed", () => {
-      expect(renderRegisterPassword(fullLocale)).toContain(
+    it("shows its minimum length under the field before anything is typed", async () => {
+      expect(await renderRegisterPassword(fullLocale)).toContain(
         '<span slot="help">At least 15 characters.</span>',
       );
     });
 
-    it("keeps the help text beside an error, for the field to show once the error clears", () => {
-      const result = renderRegisterPassword(fullLocale, [
+    it("keeps the help text beside an error, for the field to show once the error clears", async () => {
+      const result = await renderRegisterPassword(fullLocale, [
         { field: "x-auth-methods#password", message: "Password must be at least 15 characters." },
       ]);
       expect(result).toContain('error="Password must be at least 15 characters."');
       expect(result).toContain('slot="help"');
     });
 
-    it("shows the field's own help text instead, when the locale has one", () => {
-      const result = renderRegisterPassword({
+    it("shows the field's own help text instead, when the locale has one", async () => {
+      const result = await renderRegisterPassword({
         ...fullLocale,
         "register-password.field.password.help": "Use a long passphrase.",
       });
@@ -828,8 +830,8 @@ describe("LiquidJS engine", () => {
     });
   });
 
-  it("renders the default template when the API returns a terminal step (complete: show)", () => {
-    const engine = createLiquidEngine({ locale });
+  it("renders the default template when the API returns a terminal step (complete: show)", async () => {
+    const engine = await createLiquidEngine({ locale });
     const context = {
       step: { name: "done", complete: "show", texts: { title_key: "complete.title" } },
       fields: [],
@@ -859,8 +861,8 @@ describe("provider names are server data", () => {
   // apostrophes, so what keeps the attribute intact is the engine's
   // `outputEscape: "escape"` — a single global option. This pins it: flip it
   // off and the attribute closes early and the list is corrupt.
-  it("escapes an apostrophe in a provider name rather than closing the attribute", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+  it("escapes an apostrophe in a provider name rather than closing the attribute", async () => {
+    const engine = await createLiquidEngine({ locale: fullLocale });
     const context = {
       step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
       fields: [],
@@ -900,8 +902,8 @@ function decodeEntities(value: string): string {
 }
 
 describe("provider error renders in the alert", () => {
-  const render = (errors: unknown) => {
-    const engine = createLiquidEngine({
+  const render = async (errors: unknown) => {
+    const engine = await createLiquidEngine({
       locale: withAlertTexts(["error.sso_cancelled", "error.invalid_credentials"]),
     });
     return engine.renderFileSync(TEMPLATE_NAMES.default, {
@@ -918,8 +920,8 @@ describe("provider error renders in the alert", () => {
     });
   };
 
-  it("shows the provider description and a styled link, escaping both", () => {
-    const out = render([
+  it("shows the provider description and a styled link, escaping both", async () => {
+    const out = await render([
       {
         text_key: "error.sso_cancelled",
         code: "access_denied",
@@ -937,9 +939,191 @@ describe("provider error renders in the alert", () => {
     expect(out).toContain("https://provider.example/e?x=1&amp;y=2");
   });
 
-  it("renders neither row when the error carries no detail or uri", () => {
-    const out = render([{ text_key: "error.invalid_credentials" }]);
+  it("renders neither row when the error carries no detail or uri", async () => {
+    const out = await render([{ text_key: "error.invalid_credentials" }]);
     expect(out).not.toContain('slot="detail"');
     expect(out).not.toContain('slot="link"');
+  });
+});
+
+describe("localiseFlowErrorKeys", () => {
+  const ctx = { locale: fullLocale, stepName: "register" };
+
+  it("passes catalog-known field-specific keys through as text keys, tagged with their field", () => {
+    expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
+      { field: "email", text_key: "error.email_required" },
+    ]);
+    // The server spells format violations `_invalid` — the catalog's
+    // existing convention, which fieldErrorKeys routes inline.
+    expect(localiseFlowErrorKeys("error.email_invalid", ctx)).toEqual([
+      { field: "email", text_key: "error.email_invalid" },
+    ]);
+    expect(localiseFlowErrorKeys("error.password_required", ctx)).toEqual([
+      { field: "password", text_key: "error.password_required" },
+    ]);
+  });
+
+  it("falls back to a localised generic message with the step's field label", () => {
+    // No `error.email_min_length` key exists; the label comes from
+    // `register.field.email` when present, else the humanised name.
+    const result = localiseFlowErrorKeys("error.email_min_length", {
+      locale: { ...fullLocale, "register.field.email": "Work email" },
+      stepName: "register",
+    });
+    expect(result).toEqual([{ message: "Work email is too short." }]);
+  });
+
+  it("humanises unknown field names (camelCase, snake_case, x-auth-methods#…)", () => {
+    expect(localiseFlowErrorKeys("error.givenName_required", ctx)).toEqual([
+      { message: "Given name is required." },
+    ]);
+    expect(localiseFlowErrorKeys("error.date_of_birth_invalid", ctx)).toEqual([
+      { message: "Please enter a valid date of birth." },
+    ]);
+    expect(localiseFlowErrorKeys("error.x-auth-methods#password_min_length", ctx)).toEqual([
+      { message: "Password is too short." },
+    ]);
+  });
+
+  it("names the bound a length error's field carries", () => {
+    const validations = { "x-auth-methods#password": { min_length: 12, max_length: 64 } };
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password must be at least 12 characters." }]);
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_max_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password must be at most 64 characters." }]);
+  });
+
+  it("keeps the generic length message when the field carries no such bound", () => {
+    // A max_length bound does not name a min_length violation.
+    const validations = { "x-auth-methods#password": { max_length: 64 } };
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password is too short." }]);
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", {
+        ...ctx,
+        validations: {},
+      }),
+    ).toEqual([{ message: "Password is too short." }]);
+  });
+
+  it("covers every rule suffix's generic fallback, including unknown_field", () => {
+    expect(localiseFlowErrorKeys("error.nickname_max_length", ctx)).toEqual([
+      { message: "Nickname is too long." },
+    ]);
+    expect(localiseFlowErrorKeys("error.nickname_unknown_field", ctx)).toEqual([
+      { message: "Please check nickname." },
+    ]);
+  });
+
+  it("splits '; '-joined violations into one error per key", () => {
+    const result = localiseFlowErrorKeys("error.email_invalid; error.password_min_length", {
+      locale: { ...fullLocale, "register.field.password": "Password" },
+      stepName: "register",
+    });
+    expect(result).toEqual([
+      { field: "email", text_key: "error.email_invalid" },
+      { message: "Password is too short." },
+    ]);
+  });
+
+  it("passes non-validation error keys through for the template's key lookups", () => {
+    // `error.sign_in_server` localises via its `.title`/`.body` sub-keys
+    // in the alert filters; no rule suffix must not mean a lost error.
+    expect(localiseFlowErrorKeys("error.sign_in_server", ctx)).toEqual([
+      { text_key: "error.sign_in_server" },
+    ]);
+  });
+
+  it("localises the engine's credential rejections via the catalog", () => {
+    // SubmitPassword / SubmitPasskey rejections re-render the step with
+    // these catalog keys (flow_state_machine.go) — invalid_credentials
+    // routes inline to the password field via fieldErrorKeys; passkey_invalid
+    // has no field mapping, so it stays a form-level (banner) text key.
+    expect(localiseFlowErrorKeys("error.invalid_credentials", ctx)).toEqual([
+      { field: "password", text_key: "error.invalid_credentials" },
+    ]);
+    expect(localiseFlowErrorKeys("error.passkey_invalid", ctx)).toEqual([
+      { text_key: "error.passkey_invalid" },
+    ]);
+  });
+
+  it("returns null for anything that is not an error.* key payload", () => {
+    // Any other payload stays verbatim with the caller.
+    expect(localiseFlowErrorKeys("not_a_key", ctx)).toBeNull();
+    expect(localiseFlowErrorKeys("", ctx)).toBeNull();
+    // A single non-key segment rejects the whole payload.
+    expect(localiseFlowErrorKeys("error.email_required; not_a_key", ctx)).toBeNull();
+  });
+
+  it("survives a locale without the generic keys via the hardcoded fallback", () => {
+    const result = localiseFlowErrorKeys("error.nickname_required", {
+      locale: {},
+      stepName: "register",
+    });
+    expect(result).toEqual([{ message: "Please check nickname." }]);
+  });
+
+  it("downgrades inline-routed keys to a banner message when the step lacks the field", () => {
+    // fieldErrorKeys routes error.email_* inline to the email field, and
+    // formLevelError suppresses their banner. On a step without an email
+    // field the inline outlet doesn't exist — without the downgrade the
+    // error would render nowhere.
+    // The label resolves through the step's catalog entry
+    // (`register.field.email` → "Email"), not the bare field name.
+    expect(localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["password"] })).toEqual(
+      [{ message: "Email is required." }],
+    );
+    // Inline key without a recognised rule suffix: its catalog copy
+    // becomes the banner message verbatim.
+    expect(localiseFlowErrorKeys("error.email_exists", { ...ctx, fields: ["password"] })).toEqual([
+      { message: "An account with this email already exists." },
+    ]);
+  });
+
+  it("keeps inline routing when the step carries the field", () => {
+    expect(
+      localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["email", "password"] }),
+    ).toEqual([{ field: "email", text_key: "error.email_required" }]);
+    // Without a fields list (pure lookups) the check is skipped entirely.
+    expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
+      { field: "email", text_key: "error.email_required" },
+    ]);
+  });
+
+  it("routes the password credential errors onto a sign-in method's pointer field", () => {
+    // The server keys the password field by its schema pointer, so a step
+    // has `x-auth-methods#password`, never a plain `password`.
+    for (const key of ["error.invalid_credentials", "error.password_required"]) {
+      expect(localiseFlowErrorKeys(key, { ...ctx, fields: ["x-auth-methods#password"] })).toEqual([
+        { field: "x-auth-methods#password", text_key: key },
+      ]);
+    }
+  });
+
+  it("routes a generic (non-catalog) field error inline when the step renders that field", () => {
+    // `error.<field>_<rule>` for a schema field the step shows: the pre-localised
+    // message is tagged with its field so the template renders it inline under
+    // the control (the select/checkbox/text field) instead of the banner.
+    expect(
+      localiseFlowErrorKeys("error.country_required", {
+        ...ctx,
+        fields: ["email", "country"],
+      }),
+    ).toEqual([{ field: "country", message: "Country is required." }]);
+    // A rule-suffixed key without a catalog entry, label from the step catalog.
+    expect(
+      localiseFlowErrorKeys("error.email_min_length", {
+        locale: { ...fullLocale, "register.field.email": "Work email" },
+        stepName: "register",
+        fields: ["email"],
+      }),
+    ).toEqual([{ field: "email", message: "Work email is too short." }]);
+    // The same key with the field absent stays a fieldless banner message.
+    expect(localiseFlowErrorKeys("error.country_required", { ...ctx, fields: ["email"] })).toEqual([
+      { message: "Country is required." },
+    ]);
   });
 });
