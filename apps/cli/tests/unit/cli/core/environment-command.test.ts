@@ -10,6 +10,7 @@ import { it } from "@tests/fixtures";
 import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import type { ZitadelClient } from "@/lib/backend";
 import { Consent } from "@/lib/consent";
+import { EnvironmentValueMissingError } from "@/lib/environment";
 import { CREDENTIALS } from "@/cli/core/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/cli/core/environment-command";
 import type { ConnectOptions } from "@/cli/core/types";
@@ -372,9 +373,11 @@ describe("EnvironmentCommand.connect", () => {
 
     await expect(
       new ProjectProbe(["--cwd", dir, "--env-file", join(dir, "ci.env")], config).probe(),
-    ).rejects.toMatchObject({
-      message: expect.stringContaining("Set ZITADEL_PROJECT_ID in"),
-      nextCommands: undefined,
+    ).rejects.toSatisfy((error: unknown) => {
+      return (
+        error instanceof EnvironmentValueMissingError &&
+        error.message.includes("Set ZITADEL_PROJECT_ID in")
+      );
     });
   });
 
@@ -386,9 +389,11 @@ describe("EnvironmentCommand.connect", () => {
 
     await expect(
       new ProjectProbe(["--cwd", dir, "--env", "production"], config).probe(),
-    ).rejects.toMatchObject({
-      message: expect.stringContaining("Set ZITADEL_PROJECT_SECRET in .env.production.local"),
-      nextCommands: undefined,
+    ).rejects.toSatisfy((error: unknown) => {
+      return (
+        error instanceof EnvironmentValueMissingError &&
+        error.message.includes("Set ZITADEL_PROJECT_SECRET in .env.production.local")
+      );
     });
   });
 
@@ -400,9 +405,7 @@ describe("EnvironmentCommand.connect", () => {
 
     await expect(
       new ProjectProbe(["--cwd", dir, "--env", "production"], config).probe(),
-    ).rejects.toMatchObject({
-      nextCommands: undefined,
-    });
+    ).rejects.toBeInstanceOf(EnvironmentValueMissingError);
   });
 
   it("never asks for a missing value on a dry run, even on a terminal", async ({ dir }) => {

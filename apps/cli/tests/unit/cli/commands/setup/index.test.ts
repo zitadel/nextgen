@@ -44,7 +44,8 @@ import { ReadSsoFlags } from "@/cli/commands/setup/steps/read-sso-flags";
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { customExample, IdpSettingsInvalidError, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { FsIsDirectoryError } from "@/lib/fs";
 import { Ui, warnings } from "@/lib/ui";
 import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
 import { FakeMachine } from "@tests/helpers/local-machine";
@@ -1079,7 +1080,7 @@ describe("setup", () => {
 
       expect(res).toFailWith("E_LOCAL_SERVER_NOT_RUNNING");
       expect(parseJson(res.stdout)).toMatchObject({
-        hint: expect.stringContaining("Run `zitadel start`"),
+        hint: expect.stringContaining(`Run ${expectedPublicCliCommand("start")}`),
         next_commands: [
           expectedPublicCliCommand(`start --cwd ${dir}`),
           expectedPublicCliCommand(`setup --framework next --server local --cwd ${dir}`),
@@ -3428,8 +3429,7 @@ describe("PatchApp", () => {
         return readingCredentialFiles(dir);
       });
 
-      expect(error).toBeInstanceOf(Error);
-      expect(error).toMatchObject({ code: "EISDIR" });
+      expect(error).toBeInstanceOf(FsIsDirectoryError);
     });
   });
 
@@ -3613,24 +3613,29 @@ describe("refuseUnusableFlags", () => {
       flags: { sso: "google", ssoIssuer: "https://x", ssoSlug: "x" },
       scripted: false,
       refusal: {
-        message:
-          "--sso-slug, --sso-issuer only applies to a custom connection; add --sso custom, or remove them",
+        message: "--sso-slug, --sso-issuer only applies to a custom connection",
+        hint: expect.stringContaining("remove them"),
+        details: {
+          flags: ["--sso-slug", "--sso-issuer"],
+        },
       },
     },
     {
       situation: "one custom connection setting beside a catalog provider, saying it, not them",
       flags: { sso: "google", ssoIssuer: "https://x" },
       scripted: false,
-      refusal: { message: expect.stringContaining("remove it") },
+      refusal: { hint: expect.stringContaining("remove it") },
     },
     {
       situation: "a custom connection a scripted run did not describe, naming what was left out",
       flags: { sso: "custom", ssoSlug: "x", ssoClientId: "abc" },
       scripted: true,
       refusal: {
-        message: expect.stringMatching(
-          /^A custom connection needs --sso-display-name, --sso-issuer; describe it, e\.g\. .*--sso custom --sso-slug/,
-        ),
+        message: "A custom connection needs --sso-display-name, --sso-issuer",
+        hint: expect.stringContaining("--sso custom --sso-slug"),
+        details: {
+          missing: ["--sso-display-name", "--sso-issuer"],
+        },
       },
     },
     {
@@ -4077,7 +4082,7 @@ describe("ReadSsoFlags", () => {
           return readingFlags(true);
         });
 
-        expect(error).toBeInstanceOf(ZitadelError);
+        expect(error).toBeInstanceOf(IdpSettingsInvalidError);
         expect(error).toMatchObject({
           code: "E_VALIDATION",
           message: expect.stringContaining("describe it, e.g."),

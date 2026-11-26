@@ -962,7 +962,7 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({
         status: "error",
         code: "E_VALIDATION",
-        message: MISSING,
+        message: expect.stringContaining(MISSING),
       });
     });
 

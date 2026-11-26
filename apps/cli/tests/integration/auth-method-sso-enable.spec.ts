@@ -1061,6 +1061,10 @@ describe("auth-method sso enable", () => {
             code: "E_VALIDATION",
             message:
               '--slug: "google" is a built-in provider. Choose another name for this connection.',
+            hint: "Fix --slug and run the command again.",
+            details: {
+              flag: "--slug",
+            },
           });
         });
       });

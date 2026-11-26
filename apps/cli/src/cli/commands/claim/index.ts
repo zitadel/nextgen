@@ -6,6 +6,7 @@ import { BackendError, ClaimService } from "@/lib/backend";
 import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
+import { EnvironmentValueUnboundError } from "@/lib/environment";
 import { ZitadelError } from "@/lib/errors";
 import { announce, section, warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -110,6 +111,12 @@ const WAIT_STOPPED_REFUSAL = {
   message: "Stopped waiting for the browser step to finish",
   hint: "Links are valid for 10 minutes. Start a new one.",
   next: ["{claim}"],
+} as const satisfies Refusal;
+
+/** How a directory that was never set up is refused. */
+const NOT_SET_UP_REFUSAL = {
+  message: "{message}",
+  next: ["{setup}"],
 } as const satisfies Refusal;
 
 /**
@@ -381,6 +388,40 @@ export default class Claim extends Telemetered(ChangeCommand) {
   }
 
   /**
+   * The project the resolved environment points at.
+   *
+   * @returns Its id.
+   * @throws {@link ZitadelError} When the environment has no project, pointing at `setup`.
+   */
+  private projectIdOfEnvironment(): string {
+    try {
+      return this.environment.require("ZITADEL_PROJECT_ID");
+    } catch (error) {
+      if (error instanceof EnvironmentValueUnboundError) {
+        throw refusalError(
+          NOT_SET_UP_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            setup: {
+              id: "setup",
+              flags:
+                this.cwd === process.cwd()
+                  ? {}
+                  : {
+                      cwd: this.cwd,
+                    },
+            },
+          },
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Resolves what both a dry run and a claim start from: the project to claim,
    * its local record when the secret describes this very project, and the
    * command that hands a fresh link back when this one dies.
@@ -410,7 +451,7 @@ export default class Claim extends Telemetered(ChangeCommand) {
             id: "claim",
             flags: { noOpen: flags.noOpen, timeout: flags.timeout },
           });
-    const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
+    const projectId = prompted?.projectId ?? this.projectIdOfEnvironment();
     const localSecret = (await Project.at(this.cwd).hasSecret())
       ? await Project.at(this.cwd).secret()
       : undefined;

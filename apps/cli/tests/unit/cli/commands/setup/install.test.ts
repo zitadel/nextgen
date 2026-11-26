@@ -8,7 +8,7 @@ import { InstallDependencies } from "@/cli/commands/setup/steps/install-dependen
 import { Ui, log, warnings, type BoxAction } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
 import { createOrca } from "@/lib/orca";
-import type { PackageCommand, Runner } from "@/lib/pm";
+import { PmCommandFailedError, type PackageCommand, type Runner } from "@/lib/pm";
 import type { Suggest } from "@/lib/suggestion";
 import { it } from "@tests/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
@@ -98,7 +98,7 @@ function aFailingRunner() {
 function aRunnerFailingAfterInstall(output = "") {
   return vi.fn<Runner>(async (command) => {
     if (command.verb === "run") {
-      throw Object.assign(new Error(`${command.display} failed with exit 1`), { output });
+      throw new PmCommandFailedError(`${command.display} failed with exit 1`, output);
     }
   });
 }

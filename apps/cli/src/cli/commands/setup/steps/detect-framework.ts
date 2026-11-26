@@ -1,8 +1,10 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca, OrcaFrameworkMissingError } from "@/lib/orca";
+import { createOrca, OrcaConflictError, OrcaFrameworkMissingError } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
+
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 
 import {
   type Fact,
@@ -15,6 +17,16 @@ import {
  * The framework a rerun is told to scaffold when the available ones include it.
  */
 const PREFERRED_FRAMEWORK = "next";
+
+/**
+ * How a `--framework` the app is not is refused: setup never scaffolds a new
+ * app over one it detects.
+ */
+const FRAMEWORK_MISMATCH_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun setup without --framework, or with the --framework this app is, to set up this app, or point --cwd at the app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -117,6 +129,12 @@ export class DetectFramework extends WizardStep<
         scaffoldedFramework: found.detected === undefined,
       };
     } catch (error) {
+      if (error instanceof OrcaConflictError) {
+        detecting.fail();
+        throw refusalError(FRAMEWORK_MISMATCH_REFUSAL, {
+          message: error.message,
+        });
+      }
       if (error instanceof OrcaFrameworkMissingError) {
         const target = await orca.inspectScaffoldTarget(this.deps.cwd);
         if (!target.scaffoldable && !this.deps.force) {
