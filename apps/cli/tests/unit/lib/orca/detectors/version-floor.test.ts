@@ -173,7 +173,7 @@ describe("enforceVersionFloor note", () => {
       ),
     );
     expect(error.message).toContain(
-      "Upgrade the app to Fake 2 or later. Older releases are insecure.",
+      "Upgrade the app to Fake 2 or later and rerun. Older releases are insecure.",
     );
   });
 });

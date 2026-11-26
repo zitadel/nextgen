@@ -628,7 +628,7 @@ describe("Orca.planScaffold", () => {
 
     await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: 'No patcher supports "next"',
+      message: 'No patcher supports "next"; Zitadel integration currently supports Next.js',
     });
   });
 });

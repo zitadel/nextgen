@@ -6,6 +6,7 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
+import { FsNotDirectoryError } from "@/lib/fs";
 import { Workspace } from "@/lib/orca/patchers/rule/file-writer/workspace";
 
 function workspaceIn(cwd: string, options: { dryRun?: boolean; force?: boolean } = {}) {
@@ -48,9 +49,7 @@ describe("Workspace", () => {
     expect(await workspaceIn(dir).inspect(join(dir, "missing"))).toBeUndefined();
     expect(
       await rejectionOf(() => workspaceIn(dir).inspect(join(dir, "f", "below"))),
-    ).toMatchObject({
-      code: "ENOTDIR",
-    });
+    ).toBeInstanceOf(FsNotDirectoryError);
   });
 
   it("locates the first candidate that exists, in order", async ({ dir }) => {

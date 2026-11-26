@@ -163,7 +163,7 @@ describe("NextDetector", () => {
 
       await expect(detector.detect(dir)).rejects.toThrow(
         new RegExp(
-          `^Next\\.js ${installed.replaceAll(".", "\\.")} is installed \\(.*node_modules/next/package\\.json\\), below the supported floor — the CLI integrates Next\\.js 15\\.2\\.3 and newer$`,
+          `^Next\\.js ${installed.replaceAll(".", "\\.")} is installed \\(.*node_modules/next/package\\.json\\), below the supported floor — the CLI integrates Next\\.js 15\\.2\\.3 and newer\\. Upgrade the app to Next\\.js 15\\.2\\.3 or later and rerun\\. Earlier releases let a request skip middleware \\(CVE-2025-29927\\)\\.$`,
         ),
       );
     },
