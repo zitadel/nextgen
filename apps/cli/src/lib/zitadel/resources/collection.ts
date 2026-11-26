@@ -239,7 +239,9 @@ export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
         return file.path;
       });
       throw new ZitadelConfigResourceClashError(
-        `${new Intl.ListFormat("en", { type: "conjunction" }).format(paths)} both hold ${handle}; remove or fix all but one of them`,
+        `${new Intl.ListFormat("en", {
+          type: "conjunction",
+        }).format(paths)} both hold ${handle}; remove or fix all but one of them`,
       );
     }
     const holder = holders[0];

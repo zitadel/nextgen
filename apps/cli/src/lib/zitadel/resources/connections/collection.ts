@@ -671,7 +671,7 @@ export class Connections extends Collection<Connection> {
     });
     if (doubled !== undefined) {
       throw new ZitadelConfigResourceClashError(
-        `This connection points both credentials at ${doubled}; give client_id and client_secret separate \${{ NAME }} references`,
+        `This connection points both credentials at ${doubled}; give client_id and client_secret separate \${{NAME}} references`,
       );
     }
     const others = this.all.filter((connection) => {
