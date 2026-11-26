@@ -7,7 +7,6 @@ import { Origins } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
 import { confirmationHint, ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
-import { prepareOrRefuse } from "@/cli/commands/publish-refusals";
 import type { Admitted, Connection, CommandResult } from "@/cli/core";
 import { reads, type Refused } from "@/cli/core/flags";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -18,6 +17,11 @@ import {
   type Lockout,
   messageTooLong,
   Publisher,
+  PublishConfigInvalidError,
+  PublishConnectionSecretLiteralError,
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
 } from "@/lib/publish";
 import {
   type NextOf,
@@ -32,6 +36,50 @@ import { warnings } from "@/lib/ui";
 import { Project } from "@/lib/project";
 import { RemoveCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
+
+/** How a configuration with errors is refused. */
+const CONFIG_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the files named above and rerun; no changes were made.",
+} as const satisfies Refusal;
+
+/** How a connection that holds its secret itself is refused. */
+const SECRET_LITERAL_REFUSAL = {
+  message: "{message}",
+  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
+  next: [
+    {
+      id: "variable:set",
+      args: {
+        name: "NAME",
+      },
+      flags: {
+        secret: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a connection whose client id and secret name one variable is refused. */
+const VARIABLE_SHARED_REFUSAL = {
+  message: "{message}",
+  hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+} as const satisfies Refusal;
+
+/** How a connection that names a variable the project does not have is refused. */
+const VARIABLE_MISSING_REFUSAL = {
+  code: "E_CREDENTIAL_MISSING",
+  message: "{message}",
+  hint: "Publish it with the command below, then deploy again.",
+  next: ["{set}"],
+} as const satisfies Refusal;
+
+/** How a connection that names a variable of the wrong kind is refused. */
+const VARIABLE_KIND_REFUSAL = {
+  message: "{message}",
+  hint: "{hint}",
+  next: ["{set}"],
+} as const satisfies Refusal;
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -221,7 +269,7 @@ export default class Deploy extends Telemetered(
   protected async preview({ flags }: Admitted<typeof Deploy>): Promise<CommandResult> {
     const publisher = await this.service(Publisher);
     this.annotate({ stage: "validation" });
-    const prepared = await prepareOrRefuse(publisher, {
+    const prepared = await this.prepare(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "deploy",
@@ -306,7 +354,7 @@ export default class Deploy extends Telemetered(
     const publisher = new Publisher(client, projectId);
     await this.requirePrimaryOrigin(publisher, projectId, environment);
     this.annotate({ stage: "validation" });
-    const prepared = await prepareOrRefuse(publisher, {
+    const prepared = await this.prepare(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "deploy",
@@ -448,6 +496,87 @@ export default class Deploy extends Telemetered(
     return prepared.notices.flatMap((notice, at) => {
       return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
     });
+  }
+
+  /**
+   * Prepares what is published, refusing a configuration that cannot be
+   * published and saying how to fix it.
+   *
+   * @param publisher - The publisher.
+   * @param input - What to prepare.
+   * @returns What was prepared.
+   * @throws {@link ZitadelError} The refusal for the condition publishing stopped on; an
+   *   error nobody anticipated is thrown as it was.
+   */
+  private async prepare(publisher: Publisher, input: Parameters<Publisher["prepare"]>[0]) {
+    try {
+      return await publisher.prepare(input);
+    } catch (error) {
+      if (error instanceof PublishConnectionSecretLiteralError) {
+        throw refusalError(SECRET_LITERAL_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof PublishConnectionVariableSharedError) {
+        throw refusalError(VARIABLE_SHARED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof PublishConnectionVariableMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            set: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: error.secret,
+                preview: input.mode === "preview",
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableKindError) {
+        throw refusalError(
+          VARIABLE_KIND_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            hint: error.secret
+              ? "The client secret must be a secret variable: publish it with the command below."
+              : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
+          },
+          {
+            set: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: error.secret,
+                preview: input.mode === "preview",
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConfigInvalidError) {
+        throw refusalError(CONFIG_INVALID_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   }
 
   /**

@@ -4,13 +4,22 @@ import { z } from "zod";
 import { BackendForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
-import { prepareOrRefuse } from "@/cli/commands/publish-refusals";
 import { type Admitted, type CommandResult, CREDENTIALS, PREVIEW_CREDENTIAL } from "@/cli/core";
 import { filled, reads, type Refused } from "@/cli/core/flags";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { PreviewExpiries, PreviewUrls } from "@/lib/preview";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
+import {
+  deployMessage,
+  MESSAGE_MAX_LENGTH,
+  messageTooLong,
+  Publisher,
+  PublishConfigInvalidError,
+  PublishConnectionSecretLiteralError,
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
+} from "@/lib/publish";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Ttl, TtlError } from "@/lib/ttl";
@@ -34,6 +43,50 @@ const NO_URLS_REFUSAL = {
 const PRIMARY_ORIGIN_REFUSAL = {
   message: "{origins} is a primary origin",
   hint: "Pass the preview URLs with --origin; production is deployed after merge.",
+} as const satisfies Refusal;
+
+/** How a configuration with errors is refused. */
+const CONFIG_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the files named above and rerun; no changes were made.",
+} as const satisfies Refusal;
+
+/** How a connection that holds its secret itself is refused. */
+const SECRET_LITERAL_REFUSAL = {
+  message: "{message}",
+  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
+  next: [
+    {
+      id: "variable:set",
+      args: {
+        name: "NAME",
+      },
+      flags: {
+        secret: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a connection whose client id and secret name one variable is refused. */
+const VARIABLE_SHARED_REFUSAL = {
+  message: "{message}",
+  hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+} as const satisfies Refusal;
+
+/** How a connection that names a variable the project does not have is refused. */
+const VARIABLE_MISSING_REFUSAL = {
+  code: "E_CREDENTIAL_MISSING",
+  message: "{message}",
+  hint: "Publish it with the command below, then deploy again.",
+  next: ["{set}"],
+} as const satisfies Refusal;
+
+/** How a connection that names a variable of the wrong kind is refused. */
+const VARIABLE_KIND_REFUSAL = {
+  message: "{message}",
+  hint: "{hint}",
+  next: ["{set}"],
 } as const satisfies Refusal;
 
 /** The shortest and longest a preview may live, as the server fixes them. */
@@ -276,7 +329,7 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, publisher } = await this.connected(flags);
-    const prepared = await prepareOrRefuse(publisher, {
+    const prepared = await this.prepare(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "preview",
@@ -342,7 +395,7 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
       return skipped;
     }
     const { urls, client, projectId, publisher } = await this.connected(flags);
-    const prepared = await prepareOrRefuse(publisher, {
+    const prepared = await this.prepare(publisher, {
       cwd: this.cwd,
       env: this.env,
       mode: "preview",
@@ -478,6 +531,87 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
           },
         };
       }
+    }
+  }
+
+  /**
+   * Prepares what is published, refusing a configuration that cannot be
+   * published and saying how to fix it.
+   *
+   * @param publisher - The publisher.
+   * @param input - What to prepare.
+   * @returns What was prepared.
+   * @throws {@link ZitadelError} The refusal for the condition publishing stopped on; an
+   *   error nobody anticipated is thrown as it was.
+   */
+  private async prepare(publisher: Publisher, input: Parameters<Publisher["prepare"]>[0]) {
+    try {
+      return await publisher.prepare(input);
+    } catch (error) {
+      if (error instanceof PublishConnectionSecretLiteralError) {
+        throw refusalError(SECRET_LITERAL_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof PublishConnectionVariableSharedError) {
+        throw refusalError(VARIABLE_SHARED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof PublishConnectionVariableMissingError) {
+        throw refusalError(
+          VARIABLE_MISSING_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            set: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: error.secret,
+                preview: input.mode === "preview",
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConnectionVariableKindError) {
+        throw refusalError(
+          VARIABLE_KIND_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            hint: error.secret
+              ? "The client secret must be a secret variable: publish it with the command below."
+              : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
+          },
+          {
+            set: {
+              id: "variable:set",
+              args: {
+                name: error.variable,
+              },
+              flags: {
+                secret: error.secret,
+                preview: input.mode === "preview",
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof PublishConfigInvalidError) {
+        throw refusalError(CONFIG_INVALID_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
     }
   }
 
