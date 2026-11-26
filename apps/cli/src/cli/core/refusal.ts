@@ -35,7 +35,7 @@ export type Placeholders = Readonly<Record<string, unknown>>;
  * {@link Placeholders}, which takes any value, so a `next` entry can never be
  * filled with a string written by hand.
  */
-type NextPlaceholders = Readonly<Record<string, Suggested | readonly Suggested[]>>;
+export type NextPlaceholders = Readonly<Record<string, Suggested | readonly Suggested[]>>;
 
 /**
  * The names a refusal's wording would leave unfilled, given the values it

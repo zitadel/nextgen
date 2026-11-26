@@ -148,8 +148,14 @@ describe("origin rm", () => {
           command: "origin:rm",
           source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
-          message:
-            "ZITADEL_PROJECT_SECRET is not set for the ci environment. Consulted, in order: --server, process environment, .env.ci.local, .env.ci, .env. Set ZITADEL_PROJECT_SECRET in .env.ci.local or the process environment.",
+          message: "ZITADEL_PROJECT_SECRET is not set for the ci environment",
+          hint: "Consulted, in order: --server, process environment, .env.ci.local, .env.ci, .env. Set ZITADEL_PROJECT_SECRET in .env.ci.local or the process environment.",
+          details: {
+            environment: "ci",
+            variable: "ZITADEL_PROJECT_SECRET",
+            consulted: ["--server", "process environment", ".env.ci.local", ".env.ci", ".env"],
+            file: ".env.ci.local",
+          },
         });
       });
 

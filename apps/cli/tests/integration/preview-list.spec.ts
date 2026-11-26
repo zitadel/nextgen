@@ -146,7 +146,20 @@ describe("preview list", () => {
           command: "preview:list",
           source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
-          message: `${credential} is not set for the preview environment. Consulted, in order: --server, process environment, .env.preview.local, .env.preview, .env. Set ${credential} in .env.preview.local or the process environment.`,
+          message: `${credential} is not set for the preview environment`,
+          hint: `Consulted, in order: --server, process environment, .env.preview.local, .env.preview, .env. Set ${credential} in .env.preview.local or the process environment.`,
+          details: {
+            environment: "preview",
+            variable: credential,
+            consulted: [
+              "--server",
+              "process environment",
+              ".env.preview.local",
+              ".env.preview",
+              ".env",
+            ],
+            file: ".env.preview.local",
+          },
         });
       });
 

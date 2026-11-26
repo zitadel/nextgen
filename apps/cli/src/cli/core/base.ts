@@ -7,6 +7,7 @@ import { byName, type ByName } from "@/lib/names";
 import { nonBlankString } from "./flags";
 import { inputFlag } from "./input";
 import { Documented } from "./documented";
+import { ErrorSupport } from "./error-support";
 import { Failure } from "./failure";
 import { Interruptible } from "./interruptible";
 import { Loggable } from "./loggable";
@@ -88,7 +89,9 @@ export type Admitted<C extends typeof BaseCommand> = ReadonlyDeep<{
  * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
  * help, and JSON emission.
  */
-export abstract class BaseCommand extends Loggable(Documented(Interruptible(Command))) {
+export abstract class BaseCommand extends ErrorSupport(
+  Loggable(Documented(Interruptible(Command))),
+) {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
@@ -688,7 +691,9 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
         ? commandOf(["--help"], meta.cliVersion)
         : this.suggest(helpOf(meta.command));
     const failure = new Failure(
-      this.suggestions.renderedFailure(cancelled ? reason : toZitadelError(error)),
+      this.suggestions.renderedFailure(
+        cancelled ? reason : toZitadelError(this.worded(error, meta.cwd)),
+      ),
       meta,
       help,
     );

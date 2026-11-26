@@ -5,10 +5,6 @@ import { ApiCall, type PathValues } from "@/cli/core/crud/api-call";
 import {
   type ApiRequest,
   createZitadelClient,
-  BackendMethodMismatchError,
-  BackendOperationAmbiguousError,
-  BackendOperationUnknownError,
-  BackendPathUnknownError,
   Operation,
   OperationService,
   type Target,
@@ -68,46 +64,6 @@ const FORCE_REQUIRED_REFUSAL = {
   details: { question: "{question}" },
 } as const satisfies Refusal;
 
-/** How an operation id or a path that names nothing the API has is refused. */
-const OPERATION_UNKNOWN_REFUSAL = {
-  message: "{message}",
-  hint: "List them with `zitadel api ls`, or give a path such as /users/query.",
-  next: [
-    {
-      id: "api:ls",
-      flags: {
-        json: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a path whose method does not pick one operation is refused. */
-const OPERATION_AMBIGUOUS_REFUSAL = {
-  message: "{message}",
-  hint: "Pass -X with one of the methods named above.",
-  next: [
-    {
-      id: "api:ls",
-      flags: {
-        json: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a path that matches no operation's template is refused. */
-const PATH_UNKNOWN_REFUSAL = {
-  message: "{message}",
-  hint: "List the paths with `zitadel api ls`.",
-} as const satisfies Refusal;
-
-/** How an operation id given a method that is not its own is refused. */
-const METHOD_MISMATCH_REFUSAL = {
-  message: "{message}",
-  hint: "Leave out -X, or pass -X {method}.",
-} as const satisfies Refusal;
-
 /** How a call the server did not authenticate is refused. */
 const UNAUTHORIZED_SECRET_REFUSAL = {
   code: "E_AUTH",
@@ -117,42 +73,6 @@ const UNAUTHORIZED_SECRET_REFUSAL = {
     server: "{server}",
   },
 } as const satisfies Refusal;
-
-/**
- * The operation an operation id or a path names, or the refusal that says how to
- * list them.
- */
-function resolveTarget(ref: string, method?: string): Target {
-  try {
-    return Operation.named(ref, method);
-  } catch (error) {
-    if (error instanceof BackendPathUnknownError) {
-      throw refusalError(PATH_UNKNOWN_REFUSAL, {
-        ...error,
-        message: error.message,
-      });
-    }
-    if (error instanceof BackendMethodMismatchError) {
-      throw refusalError(METHOD_MISMATCH_REFUSAL, {
-        ...error,
-        message: error.message,
-      });
-    }
-    if (error instanceof BackendOperationUnknownError) {
-      throw refusalError(OPERATION_UNKNOWN_REFUSAL, {
-        ...error,
-        message: error.message,
-      });
-    }
-    if (error instanceof BackendOperationAmbiguousError) {
-      throw refusalError(OPERATION_AMBIGUOUS_REFUSAL, {
-        ...error,
-        message: error.message,
-      });
-    }
-    throw error;
-  }
-}
 
 /**
  * The operation the command line points at: an operation id or a path, with
@@ -167,7 +87,7 @@ export function readOperation(
   if (ref === undefined) {
     return undefined;
   }
-  const target = resolveTarget(ref, method);
+  const target = Operation.named(ref, method);
   const reason = target.operation.uncallable;
   if (reason !== undefined) {
     throw refusalError(UNCALLABLE_REFUSAL, {
@@ -533,7 +453,7 @@ export default class Api extends Telemetered(
     const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
 
-    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate));
+    const target = named ?? Operation.named(await this.chooseOperation(flags.paginate));
     const { operation } = target;
     this.annotate({
       operation: operation.id,

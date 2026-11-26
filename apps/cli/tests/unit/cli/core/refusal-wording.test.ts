@@ -227,6 +227,57 @@ function thrownWith(
 }
 
 /**
+ * The keys each wording of `name` in `source` gives values for, one list per
+ * wording. `ErrorSupport` raises a wording's refusal with the fields of its
+ * class and the error's message (`src/cli/core/error-support/`), and a
+ * `derived` wording with the `values` and `next` its function returns as well.
+ *
+ * @param source - The parsed module.
+ * @param classes - The classes under `src`.
+ * @param name - The refusal's const.
+ * @returns The keys, per wording.
+ */
+function wordedWith(
+  source: ts.SourceFile,
+  classes: ReadonlyMap<string, Shape>,
+  name: string,
+): string[][] {
+  const plain = nodesOf(source, ts.isArrayLiteralExpression).flatMap((pair) => {
+    const [named, refusal] = pair.elements;
+    return named !== undefined &&
+      refusal !== undefined &&
+      ts.isIdentifier(named) &&
+      ts.isIdentifier(refusal) &&
+      refusal.text === name
+      ? [[...fieldsOf(classes, named.text), "message"]]
+      : [];
+  });
+  const derived = callsOf(source, ["derived"]).flatMap((call) => {
+    const [named, refusal, derive] = call.arguments;
+    if (
+      named === undefined ||
+      refusal === undefined ||
+      !ts.isIdentifier(named) ||
+      !ts.isIdentifier(refusal) ||
+      refusal.text !== name
+    ) {
+      return [];
+    }
+    const values =
+      derive === undefined
+        ? []
+        : nodesOf(derive, ts.isPropertyAssignment).flatMap((property) => {
+            return ts.isIdentifier(property.name) &&
+              (property.name.text === "values" || property.name.text === "next")
+              ? keysOf(property.initializer)
+              : [];
+          });
+    return [[...fieldsOf(classes, named.text), "message", ...values]];
+  });
+  return [...plain, ...derived];
+}
+
+/**
  * Whether `read` fills `name` as a flag's refusal: a declaration names it as
  * its `refusal`, or a `ParseRefusal` is given it, as `readsFilled`'s empty
  * value is.
@@ -271,8 +322,9 @@ function raisedAny(ways: readonly (readonly string[])[]): readonly (readonly str
  * Every refusal declared in `src`, each with the ways it is raised. A
  * `Refused` is raised by `read`, which fills its own names and the
  * declaration's `values`. A `Refusal` or a `ParseRefusal` is raised by each
- * throw of it in its module, and by `read` where a flag raises it
- * ({@link readWith}); one raised no way at all fills nothing. A name one way
+ * throw of it in its module, by `read` where a flag raises it
+ * ({@link readWith}), and by `ErrorSupport` where a wording names it
+ * ({@link wordedWith}); one raised no way at all fills nothing. A name one way
  * leaves out reaches the person as braces.
  *
  * @returns The refusals.
@@ -301,6 +353,7 @@ async function weighed(): Promise<Weighed[]> {
         raised: raisedAny([
           ...(readWith(source, name) ? [ALWAYS] : []),
           ...thrownWith(source, classes, name),
+          ...wordedWith(source, classes, name),
         ]),
       });
     }

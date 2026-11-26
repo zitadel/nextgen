@@ -332,20 +332,32 @@
 - Name an error `<Package><Condition>Error`.
 - Extend `<Package>Error`, which extends `ZitadelLibError` in `src/lib/errors.ts`.
 - Derive `name` once, in `ZitadelLibError`; never per class.
-- Add an error class only when a catch site names it or it reports a different
-  `code`, `category` or `retryable`.
+- Add an error class only when a catch site or a wording names it, or it reports
+  a different `code`, `category` or `retryable`.
 - Give an error a template-literal `message` that carries its facts, and an
   optional `cause`.
-- Add no other property, parameter or method to an error, except data the
-  catching command needs to word its refusal (a name, a folder, a command).
+- Give an error a field for each fact a person or a script needs (a path, a port,
+  the sources consulted), and no other property, parameter or method.
 - State `category`, `retryable` and `code` as literals in each class.
 - Add no type for errors beyond `ErrorCategory`.
 - `toZitadelError` has one branch for `ZitadelLibError`; add no per-package branch.
 - Never put a hint, flag, command or suggestion in a lib error.
 - Never throw `ZitadelError` or a `Refusal` from `src/lib`.
-- Catch a lib error where its command words it, in a plain `try`/`catch`.
-- Inside the catch write one flat `if (error instanceof X)` per class that
+- Word each lib error once, in `src/cli/core/error-support/<package>.ts`: a
+  `*_REFUSAL` and a `[Class, REFUSAL]` row, most specific class first.
+- `ErrorSupport` (`src/cli/core/error-support.ts`), under `BaseCommand`, words
+  every lib error a command lets through; a command wires nothing.
+- Use `derived(Class, REFUSAL, fn)` where the words need more than the fields: a
+  path quoted, a list joined, a follow-up aimed at another folder.
+- Catch a class in a command only where its context changes the words (its own
+  rerun, a flag it was given, a check it ran); never to repeat the wording.
+- Inside such a catch write one flat `if (error instanceof X)` per class that
   throws `refusalError(X_REFUSAL, ...)`, then `throw error;`.
+- Spread the error into the refusal's values so no property is dropped.
+- Let `details` come from the error's fields, which `ErrorSupport` reports in
+  snake_case; a refusal's `details` add only what no field holds.
+- `error-support.test.ts` fails on a concrete lib error with no wording; exempt
+  only a bug of the CLI's own code, with why.
 - Recognise an error only by `instanceof`, never by `reason`, `code`, `hint`,
   `message`, `status` or `name`.
 - Where a call yields a value that falls back to a default, use one
@@ -353,10 +365,7 @@
   never chain or nest `.catch`, and never use `let`, an IIFE, `Promise.allSettled` or `.then(ok, err)` as a catch.
 - Make a class for a server code where an `ApiError` becomes a backend error, in
   `src/lib/backend/client.ts`.
-- Write every hint and next command in the catching command's `*_REFUSAL`.
-- Spread the error into the refusal's values so no property is dropped.
 - Use no `as`, `!` or `any` on errors.
-- Use no lookup table for errors; duplicate the refusal instead.
 - Import file-system calls from `@/lib/fs`, never from `node:fs/promises`; catch
   `FsNotFoundError` etc. by class; only `src/lib/fs` reads a Node error's code.
   Exceptions: `src/lib/skills/bundle.ts` (`tsdown.config.ts` loads it with plain
