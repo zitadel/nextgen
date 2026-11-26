@@ -1340,6 +1340,9 @@ importers:
       '@faker-js/faker':
         specifier: 'catalog:'
         version: 10.6.0
+      '@lit/task':
+        specifier: 'catalog:'
+        version: 1.0.3
       '@storybook/addon-a11y':
         specifier: 'catalog:'
         version: 10.6.5(storybook@10.6.7(@types/react@19.3.0)(prettier@3.9.10)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
