@@ -1,3 +1,4 @@
+import { isCancellation } from "@/lib/errors";
 import {
   type Deployment,
   DeploymentService,
@@ -241,7 +242,14 @@ export class Publisher {
         deployedUnknown: false,
       };
     }
-    const deployed = await this.connections.deployedSlugs();
+    // A safety net: a listing that fails for any reason other than the person
+    // stopping the command means not knowing, so it never hides what the files say.
+    const deployed = await this.connections.deployedSlugs().catch((error: unknown) => {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return undefined;
+    });
     if (deployed === undefined) {
       return {
         config: unknown,

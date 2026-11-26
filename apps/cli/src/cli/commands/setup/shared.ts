@@ -908,17 +908,20 @@ export function setupRefusal(
     return refusalError(PASSWORD_POLICY_EXISTS_REFUSAL, {
       ...error,
       message: error.message,
+      path: error.path,
     });
   }
   if (error.path === SignupPolicy.PATH) {
     return refusalError(SIGNUP_POLICY_EXISTS_REFUSAL, {
       ...error,
       message: error.message,
+      path: error.path,
     });
   }
   return refusalError(FILE_EXISTS_REFUSAL, {
     ...error,
     message: error.message,
+    path: error.path,
   });
 }
 
