@@ -28,8 +28,8 @@ const UNSAFE_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:",
  * `href` on `<a>`. An atom that renders a link from its own attribute
  * (`<zl-pill href>`, `<zl-field forgot-password-href>`) would still follow it,
  * so afterwards a `javascript:`, `vbscript:` or `data:` URL is dropped from
- * every `href`, `src` and `srcset` attribute and every `*-href` one, as DOMPurify does
- * (which still allows a `data:` image).
+ * every `href`, `src` and `srcset` attribute and every `*-href` one, as
+ * DOMPurify does (which still allows a `data:` image).
  */
 export class NativeSanitiser implements Sanitiser {
   private readonly sanitizer: Sanitizer = NativeSanitiser.configure();
@@ -92,15 +92,7 @@ export class NativeSanitiser implements Sanitiser {
     if (element.localName === "img" && name === "src" && value.trimStart().startsWith("data:")) {
       return false;
     }
-    return NativeSanitiser.isUnsafeScheme(value);
-  }
-
-  /**
-   * @param url - A URL as written.
-   * @returns Whether it uses a scheme an atom's link may not use.
-   */
-  private static isUnsafeScheme(url: string): boolean {
-    return UNSAFE_SCHEMES.has(URL.parse(url, document.baseURI)?.protocol ?? "");
+    return UNSAFE_SCHEMES.has(URL.parse(value, document.baseURI)?.protocol ?? "");
   }
 
   /**
