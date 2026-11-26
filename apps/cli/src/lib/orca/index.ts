@@ -1,8 +1,15 @@
-import { mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { isErrno } from "@/lib/errno";
-import { readDirIfExists } from "@/lib/fs";
+import {
+  FsNotDirectoryError,
+  FsNotFoundError,
+  mkdir,
+  readDirIfExists,
+  readdir,
+  readFile,
+  rm,
+  stat,
+} from "@/lib/fs";
 
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -417,10 +424,10 @@ export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
       return stats.isDirectory();
     },
     (error: unknown) => {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         return true;
       }
-      if (isErrno(error, "ENOTDIR")) {
+      if (error instanceof FsNotDirectoryError) {
         return false;
       }
       throw error;
