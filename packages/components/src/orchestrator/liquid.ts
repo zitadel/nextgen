@@ -16,9 +16,10 @@
 import { MANDATORY_GATES_TAG } from "@zitadel/config/template";
 import { Liquid } from "liquidjs";
 
-import type { CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
+import type { CreateFlow201Step, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
+import { CUSTOM_IDENTIFIER_SUFFIX } from "./locales/index.js";
 import { hookName } from "../internal/hook-name.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import defaultTemplate from "./templates/default.liquid";
@@ -249,6 +250,64 @@ function injectedKeyFallback(locale: Locale, key: string): string | undefined {
     return locale[key.slice(0, -".sso".length)];
   }
   return undefined;
+}
+
+type StepTexts = NonNullable<CreateFlow201Step["texts"]>;
+
+/**
+ * A step's texts as the template renders them. A step that collects an
+ * identifier other than an email address (a schema whose `x-identifier` is
+ * `employee_number`, say) describes itself with the
+ * `<step>.description.custom_identifier` variant where the locale has one,
+ * since the plain sentence may name the email: "Enter your email to continue"
+ * above an "Employee number" field. The variant replaces the `.sso` one too:
+ * a provider sentence may name the email as well, and leaving the providers
+ * out of the subtitle is the smaller loss, as they show on the step anyway.
+ */
+export function stepTexts(
+  texts: StepTexts,
+  fields: readonly CreateFlow201StepFieldsItem[],
+  locale: Locale,
+): StepTexts {
+  const key = texts.description_key;
+  if (!key || !collectsCustomIdentifier(fields)) return texts;
+  const plain = key.endsWith(SSO_DESCRIPTION_SUFFIX) ? key.slice(0, -".sso".length) : key;
+  const variant = `${plain}${CUSTOM_IDENTIFIER_SUFFIX}`;
+  return plain.endsWith(".description") && locale[variant] !== undefined
+    ? { ...texts, description_key: variant }
+    : texts;
+}
+
+/**
+ * The key a step's `notice` renders with. Like {@link stepTexts}, a step that
+ * collects an identifier other than an email address asks for the
+ * `notice.<reason>.custom_identifier` variant where the locale has one: the
+ * register step a sign-in moved to sign-up says the email had no account, and
+ * points at an email field it does not show.
+ *
+ * A step that does not collect the identifier, such as the password step a
+ * sign-up moves to sign-in, cannot tell: `step.identifier` carries no type.
+ * Its notices are worded for any identifier instead.
+ */
+export function stepNotice(
+  notice: string,
+  fields: readonly CreateFlow201StepFieldsItem[],
+  locale: Locale,
+): string {
+  const variant = `${notice}${CUSTOM_IDENTIFIER_SUFFIX}`;
+  return collectsCustomIdentifier(fields) && locale[variant] !== undefined ? variant : notice;
+}
+
+/**
+ * Whether the step collects the user's identifier and it is not an email
+ * address. The server marks the identifier field `autocomplete="username"`
+ * whatever its type (`field.yaml`), so that token finds it.
+ */
+function collectsCustomIdentifier(fields: readonly CreateFlow201StepFieldsItem[]): boolean {
+  const identifier = fields.find((field) =>
+    (field.autocomplete ?? "").toLowerCase().split(/\s+/).includes("username"),
+  );
+  return identifier !== undefined && identifier.type !== "email";
 }
 
 /**

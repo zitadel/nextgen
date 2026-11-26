@@ -57,7 +57,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // Registered applications are written through the API by other systems,
   // not from `.zitadel/`; the CLI has no command for them yet (#2788).
   applications: "registered applications are written through the API, not the CLI (#2788)",
-  // The OpenAPI contract lands first (ADR 090); the CLI commands follow.
+  // The OpenAPI contract lands first (ADR 091); the CLI commands follow.
   webhooks: "not yet exposed — `zitadel webhook` lands with the webhooks CLI surface",
   search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
   // OAuth settings are written only through a release, so there is nothing to
@@ -147,7 +147,6 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
     "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
   removeProjectOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
-  listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
   listProjectMembers: "not yet exposed; a project sub-resource listing, no command reads it yet",
   // Redeeming a link is the invitee's, in the browser, on their own session.
   lookupInvitation: "redeems a link in the browser; no command (ADR 086 §8)",

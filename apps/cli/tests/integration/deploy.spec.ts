@@ -1959,7 +1959,7 @@ describe("deploy", () => {
               expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
             ],
           },
-          warnings: [],
+          warnings: [expect.stringContaining("staffNumber")],
         });
       });
 

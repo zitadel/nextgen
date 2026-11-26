@@ -320,8 +320,21 @@ describe("branding design catalog", () => {
   describe.each([...BRANDING_DESIGNS, "default.liquid"])(
     "%s after a failed provider return",
     (design) => {
+      /**
+       * The templates look the already localized title and body up again, so the engine's
+       * dictionary maps each of those texts to itself and the lookup finds it.
+       */
+      const providerErrorTexts = ["error.sso_cancelled", "error.sso_failed"].flatMap((key) => {
+        return [en[`${key}.title`], en[`${key}.body`]];
+      });
+      const engineLocale: Record<string, string> = {
+        ...locale,
+        ...en,
+        ...Object.fromEntries(providerErrorTexts.map((text) => [text, text])),
+      };
+
       function render(stepError: string): string {
-        const engine = createLiquidEngine({ locale: en });
+        const engine = createLiquidEngine({ locale: engineLocale });
         const errors = localiseFlowErrorKeys(stepError, {
           locale: en,
           stepName: step.name ?? "",

@@ -31,8 +31,8 @@ export interface ZitadelConfig {
 }
 
 /**
- * The initialized project handle returned by {@link configureZitadel}.
- * Pure data — use factory functions like {@link getApi} to derive services.
+ * The initialized project handle returned by `configureZitadel`.
+ * Pure data — use factory functions like `getApi` to derive services.
  */
 export interface ZitadelProject {
   /** Proxy path for API requests. */

@@ -24,12 +24,14 @@ type Deps = Pick<
  * A taken one is worth the question, because setup pins the dev script to the
  * port and the dev server then fails to start on it.
  *
+ * A port held by a process running in the app's folder is not asked about: that
+ * is the app's own dev server, already on the port the app should keep, and
+ * Enter would move the app off the port it is running on.
+ *
  * The suggestion is the next free port, so Enter, which the developer has
  * pressed at every question before this one, gives a port the dev server can
- * start on. If what holds the detected port is this app's own dev server, the
- * next one works as well, and the detected one can still be typed back. The
- * validated answer becomes the issuer URL (`http://localhost:<port>`) via
- * `issuerFromPort`.
+ * start on. The validated answer becomes the issuer URL
+ * (`http://localhost:<port>`) via `issuerFromPort`.
  */
 export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs> {
   /**
@@ -72,7 +74,8 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs>
    *
    * @remarks
    * `--dev-port <n>` is authoritative: the prompt is skipped so an interactive answer cannot
-   * override the explicit flag, which the command already folded into `answers.devPort`.
+   * override the explicit flag, which the command already folded into `answers.devPort`. A port
+   * the app's own dev server holds is the app's already, so it is kept too.
    *
    * With the next ones all taken too, the detected port is still the best guess.
    *
@@ -81,7 +84,10 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs>
    * @returns The answers, with the port settled.
    */
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.devPortFromFlag || (await this.deps.machine.isPortFree(answers.devPort))) {
+    if (
+      ctx.devPortFromFlag ||
+      (await this.deps.machine.portHolder(answers.devPort, ctx.cwd)).kind !== "other"
+    ) {
       return answers;
     }
     const suggested = String(

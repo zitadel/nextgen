@@ -1,4 +1,4 @@
 import { conformanceSuite } from "@zitadel/conformance";
 
-// src/routes/plugin@nextgen.ts guards /profile.
+// src/routes/plugin@zitadel.ts guards /profile.
 conformanceSuite({ protectedRoute: "/profile" });

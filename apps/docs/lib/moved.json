@@ -18,6 +18,7 @@
   "/docs/reference/api/event-webhooks/authFactorPasskeyEnrolled": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/authFactorPasswordSet": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/authRequestCreated": "/docs/reference/api/event-webhooks/eventStored",
+  "/docs/reference/api/event-webhooks/authRequestExchangeFailed": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/authSsoAuthorizationFailed": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/authSsoExchangeFailed": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/authSsoExchangeSucceeded": "/docs/reference/api/event-webhooks/eventStored",

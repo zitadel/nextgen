@@ -12,6 +12,7 @@ import { ServerCommand } from "@/cli/commands/server-command";
 import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { PreviewCommand } from "@/cli/core";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The preview URL to remove. It refuses a blank value, and drops a trailing
@@ -34,9 +35,11 @@ const URL = {
  * history. Idempotent on the server, but destructive from the caller's point
  * of view.
  */
-export default class PreviewRm extends Destructive(
-  Previewable(ServerCommand(PreviewCommand)),
-  "Remove the preview without the confirmation prompt. Required when non-interactive.",
+export default class PreviewRm extends Telemetered(
+  Destructive(
+    Previewable(ServerCommand(PreviewCommand)),
+    "Remove the preview without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description = "Remove a live preview from the project.";
   static override group = CommandGroups.releases;

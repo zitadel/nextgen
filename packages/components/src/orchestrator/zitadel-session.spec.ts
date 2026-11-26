@@ -263,6 +263,28 @@ describe("<zitadel-session>", () => {
     expect(events[0]?.detail).toMatchObject({ display: "", identifier: "alice@acme.com" });
   });
 
+  it.each([
+    ["javascript:alert(1)", false],
+    ["data:text/html,x", false],
+    ["//evil.example/login", true],
+    ["/home", true],
+    ["https://app.test/login", true],
+  ])("checks the scheme of post-sign-out-url %s before navigating", async (url, allowed) => {
+    const loc = stubLocation();
+    const element = mount();
+    element.postSignOutUrl = url;
+    await flush(element);
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    await element.updateComplete;
+
+    expect(loc.current).toBe(allowed ? url : "");
+    expect(element.shadowRoot?.querySelector(".error")?.textContent ?? null).toBe(
+      allowed ? null : "Refused to navigate: the target URL must use http or https.",
+    );
+  });
+
   // The token read names the project too, so a session of another project is
   // refused before any revoke is sent: that session stays, and sign-out
   // completes.

@@ -120,7 +120,7 @@ describe("patcher file classification", () => {
   it.each([
     ["sveltekit", "src/hooks.server.ts"],
     ["solid-start", "src/middleware.ts"],
-    ["qwik-router", "src/routes/plugin@nextgen.ts"],
+    ["qwik-router", "src/routes/plugin@zitadel.ts"],
     ["tanstack-start", "src/start.ts"],
   ])("%s marks its auth boundary %s as infrastructure", (id, boundary) => {
     const { patcher, view } = PATCHERS.find((entry) => entry.view.framework.id === id)!;

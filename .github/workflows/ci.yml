@@ -10,8 +10,8 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
-  # Every task, nightly on main; it also saves main's Go cache, the one entry
-  # pull requests and merge groups can restore.
+  # Every task, nightly on main; it also saves the Go caches pull requests and
+  # merge groups restore.
   schedule:
     - cron: "17 3 * * *"
 
@@ -105,30 +105,38 @@ jobs:
             fi
           ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
-      # Keyed on go.work and every module's go.sum, so the entry holds what
-      # this job compiles; a key keeps its first save. A pull request or a
-      # merge group restores its own entry or main's, which the nightly run
-      # saves.
-      - uses: actions/setup-go@v7
+      - id: go
+        uses: actions/setup-go@v7
         with:
           go-version-file: apps/api/go.mod
-          cache: true
-          cache-dependency-path: |
-            go.work
-            apps/api/go.sum
-            packages/go/go.sum
-            tools/bench/go.sum
-            tools/oidc-mock/go.sum
-            go.work.sum
+          cache: false
+
+      # Go's module and build caches. Only the nightly run saves them, under a
+      # key of its own each night: it compiles every task from empty caches,
+      # so the entry is one full build of main, at most a day old. A pull
+      # request or a merge group restores the newest. setup-go's own cache
+      # keys on go.sum, and a key keeps its first save, so its entry falls
+      # further behind main every day go.sum stays the same. The restore comes
+      # before anything runs turbo, which fills the module cache.
+      - name: Restore the Go caches
+        if: ${{ github.event_name != 'schedule' }}
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ${{ steps.go.outputs.GOMODCACHE }}
+            ${{ steps.go.outputs.GOCACHE }}
+          key: ci-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ github.run_id }}
+          restore-keys: ci-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-
 
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           run_install: false
 
+      # No pnpm store cache: on this runner a cold install takes about 8
+      # seconds, less than restoring the store.
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: pnpm
 
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
@@ -178,6 +186,17 @@ jobs:
         env:
           # Each journey's work dir, with its diagnostics, under this one.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
+
+      # The nightly's Go caches, even when a task failed: the compiles that
+      # finished are still worth restoring.
+      - name: Save the Go caches
+        if: ${{ !cancelled() && github.event_name == 'schedule' }}
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ steps.go.outputs.GOMODCACHE }}
+            ${{ steps.go.outputs.GOCACHE }}
+          key: ci-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # The run's totals, critical path and slowest tasks on the run's
       # summary page. A run that stops before turbo starts has no file.

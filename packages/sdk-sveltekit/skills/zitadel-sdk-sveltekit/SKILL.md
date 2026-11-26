@@ -11,11 +11,11 @@ description: >-
 
 # @zitadel/sdk-sveltekit
 
-A SvelteKit `handle` hook and helpers that add Zitadel (Nextgen) auth to a
+A SvelteKit `handle` hook and helpers that add Zitadel auth to a
 SvelteKit app. The hook proxies auth traffic same-origin under `/__nextgen`,
 verifies the session JWT via JWKS on the server, writes the result to
-`event.locals.nextgenAuth`, and redirects unauthenticated requests on protected
-routes. The package is server-only; the widgets come from `@zitadel/sdk-svelte`.
+`event.locals.zitadelAuth`, and redirects unauthenticated requests on protected
+routes. It also re-exports the widgets from `/components`, so one package is enough.
 
 ## When to use
 
@@ -29,8 +29,6 @@ adjusting a scaffolded wiring.
 
 ```bash
 pnpm add @zitadel/sdk-sveltekit@latest
-# the login/logout/session widgets are a separate package:
-pnpm add @zitadel/sdk-svelte@latest
 ```
 
 Peer deps: `@sveltejs/kit ^3.0.0`, `svelte ^5.0.0`.
@@ -56,9 +54,9 @@ Then create or extend `src/hooks.server.ts`:
 
 ```ts
 import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from '$app/env/private';
-import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
+import { createZitadelHandle } from '@zitadel/sdk-sveltekit/server';
 
-export const handle = createNextgenHandle({
+export const handle = createZitadelHandle({
   url: ZITADEL_URL,
   projectSecret: ZITADEL_PROJECT_SECRET,
   projectId: ZITADEL_PROJECT_ID,
@@ -93,13 +91,13 @@ SvelteKit runs that load on the server for client-side navigation too. A
 universal `+page.ts` load does not work: it runs in the browser, where `locals`
 are not available.
 
-**3. Render the widgets** from `@zitadel/sdk-svelte`, mounted on the client only
+**3. Render the widgets** from `@zitadel/sdk-sveltekit/components`, mounted on the client only
 (set a flag in `onMount` and wrap the widget in `{#if mounted}`):
 
 ```svelte
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-svelte';
+  import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-sveltekit/components';
 
   const project = configureZitadel({
     projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
@@ -121,7 +119,7 @@ them the same way.
 
 ## Widget props and events
 
-This SDK is server-only. The widgets come from `@zitadel/sdk-svelte`, so read its skill for the widget props and events.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` from `@zitadel/sdk-sveltekit/components` are the `@zitadel/sdk-svelte` widgets, so read its skill for the widget props and events.
 
 ## Read these, don't guess
 
@@ -136,12 +134,12 @@ names and defaults against the installed version rather than assuming.
 
 ## Gotchas
 
-- **`@zitadel/sdk-sveltekit` renders no widgets.** Importing `ZitadelLogin` from
-  it fails; it comes from `@zitadel/sdk-svelte`.
+- **Import widgets from `/components`, not `/server` or `/client`.** Those two
+  entries load on edge runtimes and export no widgets.
 - **Mount the widgets client-side only.** Their config is set as element
   properties, which server-rendered markup cannot carry; use `onMount`, not the
   deprecated `$app/environment` (SvelteKit 3).
-- **Keep `App.Locals` declared.** The package merges `nextgenAuth` into it, so
+- **Keep `App.Locals` declared.** The package merges `zitadelAuth` into it, so
   `src/app.d.ts` must keep the `App` namespace with a `Locals` interface.
 - **Client-side navigation skips the hook.** Without a `+page.server.ts` guard,
   only the `ZitadelSession` card sends a signed-out visitor away.

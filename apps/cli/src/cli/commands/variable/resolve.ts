@@ -12,6 +12,7 @@ import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { VariableView } from "@/lib/variable";
 import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The deployment `variable resolve` reads. The schema is the API spec's own, so
@@ -57,7 +58,7 @@ const COLUMNS = ["name", "value"] as const;
  * deploy, and a preview origin is only ever served by a pull-request build,
  * never by `deploy`.
  */
-export default class VariableResolve extends ReadCommand {
+export default class VariableResolve extends Telemetered(ReadCommand) {
   static override description = "Show the variables a deployment froze, the live one by default.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 4;
@@ -201,7 +202,7 @@ export default class VariableResolve extends ReadCommand {
     where: string,
     carried: { origins?: string[] },
   ): Promise<CommandResult> {
-    this.recordTelemetry({
+    this.annotate({
       variable_count: items.length,
     });
 

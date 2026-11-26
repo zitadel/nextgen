@@ -12,6 +12,7 @@ import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Suggestion, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { RemoveCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The release `release revoke` revokes. The schema is the API spec's own, so a value that is not one is
@@ -61,8 +62,10 @@ const RELEASE_IN_USE_REFUSAL: Refusal = {
  * A release an origin still serves cannot be revoked; deploy another release
  * there or roll it back first. Revoking is idempotent and cannot be undone.
  */
-export default class ReleaseRevoke extends RemoveCommand(
-  "Revoke the release without the confirmation prompt. Required when non-interactive.",
+export default class ReleaseRevoke extends Telemetered(
+  RemoveCommand(
+    "Revoke the release without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description = "Revoke a release so its content is never served again.";
   static override group = CommandGroups.releases;

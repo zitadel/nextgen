@@ -16,6 +16,7 @@ import { relatedFlags } from "@/lib/suggestion/relations";
 import { ListInvitationsQueryParams, ListInvitationsResponse } from "@/lib/backend/schemas";
 import { fieldPaths } from "@/cli/core/crud";
 import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "name", "role", "status", "expires_at"] as const;
@@ -48,7 +49,7 @@ const LIMIT = {
  * with their status and expiry. `--status` and `--type` narrow the page; like
  * every list verb it fetches one page and reports `next_page_token`.
  */
-export default class InvitationList extends ReadCommand {
+export default class InvitationList extends Telemetered(ReadCommand) {
   static override description = "List the project's invitations, newest first.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 6;

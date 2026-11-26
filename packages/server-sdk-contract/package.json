@@ -6,6 +6,7 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./client": "./src/client.ts",
     "./edge": "./src/edge.ts",
     "./middleware": "./src/middleware.ts"
   },

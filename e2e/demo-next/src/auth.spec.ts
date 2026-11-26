@@ -13,10 +13,10 @@ const DEMO_PROJECT_ID = process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo
  * 4. The demo project's session cookie is set on the demo origin, and
  *    `<zitadel-login>`'s full-page navigation lands on the protected `/admin`
  *    route.
- * 5. `nextgenMiddleware` validates the opaque session cookie via
+ * 5. `zitadelMiddleware` validates the opaque session cookie via
  *    `GET /sessions/me` and the client-side `SessionDetails` component
  *    fetches the email through the `/__nextgen` proxy.
- * 6. The root layout seeds `NextgenProvider` from `auth()` and the client
+ * 6. The root layout seeds `ZitadelProvider` from `auth()` and the client
  *    `UserBadge` renders the identity via `useAuth()` — while the raw
  *    session token stays out of the server response entirely (the provider
  *    strips it before the RSC boundary).
@@ -61,7 +61,7 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
 
   // Leak guard: the raw session token must never appear anywhere in the
   // server's response for the page — not in the HTML and not in the inlined
-  // RSC flight payload. NextgenProvider strips it server-side; a regression
+  // RSC flight payload. ZitadelProvider strips it server-side; a regression
   // here means the token is readable by any script on the page.
   const response = await page.request.get("/admin");
   expect(response.ok()).toBe(true);

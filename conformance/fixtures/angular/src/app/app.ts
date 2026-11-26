@@ -1,8 +1,8 @@
 // zitadel-cli: managed-file v1
 import { Component, OnInit } from "@angular/core";
 import {
-  ZitadelLoginComponent,
-  ZitadelSessionComponent,
+  ZitadelLogin,
+  ZitadelSession,
   configureZitadel,
 } from "@zitadel/sdk-angular";
 // zitadel-ng.cjs writes this module from ZITADEL_PROJECT_ID: npm run dev, build and test run it.
@@ -11,7 +11,7 @@ import { ZITADEL_PROJECT_ID } from "./zitadel-project";
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [ZitadelLoginComponent, ZitadelSessionComponent],
+  imports: [ZitadelLogin, ZitadelSession],
   templateUrl: "./app.html",
 })
 export class App implements OnInit {

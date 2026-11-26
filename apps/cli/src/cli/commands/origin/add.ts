@@ -7,6 +7,7 @@ import { dryRunResult } from "@/cli/core/crud/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { ChangeCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -22,7 +23,7 @@ const ORIGIN_KINDS = ["primary", "preview"] as const;
  * had, which is why this is a deliberate command and never a side effect of a
  * deploy.
  */
-export default class OriginAdd extends ChangeCommand {
+export default class OriginAdd extends Telemetered(ChangeCommand) {
   static override description = "Add an origin pattern to the project.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 3;

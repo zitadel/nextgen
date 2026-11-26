@@ -2,6 +2,7 @@ import { DetailAccordion, DetailAccordionItem } from "@/components/detail-accord
 import { DETAIL_VALUE, DETAIL_VALUE_EMPTY, DetailRow, DetailRows } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { OriginLink } from "@/components/origin-link";
+import { MONO_VALUE } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -54,9 +55,7 @@ function ClientRows({ client }: { client: ApplicationClient }) {
       )}
       <DetailRow label="Client ID">
         {client.client_id ? (
-          <span className={cn(DETAIL_VALUE, "font-mono text-xs leading-5")}>
-            {client.client_id}
-          </span>
+          <span className={cn(DETAIL_VALUE, MONO_VALUE)}>{client.client_id}</span>
         ) : (
           <span className={DETAIL_VALUE_EMPTY}>—</span>
         )}

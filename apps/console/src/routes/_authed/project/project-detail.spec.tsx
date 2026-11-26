@@ -78,6 +78,13 @@ describe("project detail", () => {
     expect(screen.getByText("Created")).toBeInTheDocument();
   });
 
+  it("titles the card that holds the name for the project", async () => {
+    server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
+    await renderDetail();
+
+    expect(await screen.findByRole("heading", { name: "Project details" })).toBeInTheDocument();
+  });
+
   it("leaves out the issuer the API does not carry", async () => {
     server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
     await renderDetail();

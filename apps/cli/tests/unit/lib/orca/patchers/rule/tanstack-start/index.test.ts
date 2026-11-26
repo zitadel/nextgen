@@ -40,7 +40,7 @@ describe("TanStackStartPatcher.plan", () => {
 
     expect(writeContents(plan, "src/start.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/start.ts")).toContain("@zitadel/sdk-tanstack-start/server");
-    expect(writeContents(plan, "src/start.ts")).toContain("createNextgenRequestMiddleware");
+    expect(writeContents(plan, "src/start.ts")).toContain("createZitadelRequestMiddleware");
     // src/start.ts is TanStack's reserved server entry: it must export a
     // `startInstance` from `createStart`, not call `registerGlobalMiddleware`.
     expect(writeContents(plan, "src/start.ts")).toContain("createStart");
@@ -52,7 +52,7 @@ describe("TanStackStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain(
-      "@zitadel/sdk-tanstack-start/react",
+      "@zitadel/sdk-tanstack-start/components",
     );
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
@@ -157,7 +157,7 @@ describe("TanStackStartPatcher.plan", () => {
       expect(
         writeContents(new TanStackStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
       ).toContain(
-        'import { ZitadelLogin, businessLocales } from "@zitadel/sdk-tanstack-start/react";',
+        'import { ZitadelLogin, businessLocales } from "@zitadel/sdk-tanstack-start/components";',
       );
     },
   );
