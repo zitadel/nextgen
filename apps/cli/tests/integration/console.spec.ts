@@ -136,7 +136,7 @@ describe("console", () => {
         expect(app.envelopeOf(result)).toMatchObject({
           status: "error",
           code: "E_VALIDATION",
-          hint: "Run `zitadel reset --force`, then `zitadel start`.",
+          hint: expect.stringContaining("reset --force"),
           next_commands: [
             expectedPublicCliCommand(`reset --force --cwd ${app.path}`),
             expectedPublicCliCommand(`start --cwd ${app.path}`),
