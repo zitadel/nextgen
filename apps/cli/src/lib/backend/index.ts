@@ -33,6 +33,7 @@ export {
   BackendReleaseInUseError,
   BackendReleaseRevokedError,
   BackendRequestInvalidError,
+  BackendRequestMalformedError,
   BackendTooManyRequestsError,
   BackendUnauthorizedError,
   BackendTimeoutError,

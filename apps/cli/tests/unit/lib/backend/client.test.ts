@@ -164,7 +164,9 @@ describe("responseFailure", () => {
     [409, "rel.revoked", "BackendReleaseRevokedError"],
     [409, "rel.in_use", "BackendReleaseInUseError"],
     [409, "att.proof_rejected", "BackendProofRejectedError"],
-    [400, "req.invalid", "BackendRequestInvalidError"],
+    [400, "req.invalid", "BackendRequestMalformedError"],
+    [422, "pol.invalid", "BackendRequestInvalidError"],
+    [400, "pol.invalid", "BackendRequestInvalidError"],
   ])("raises a %i answering %s as a %s", (status, code, name) => {
     expect(
       responseFailure(

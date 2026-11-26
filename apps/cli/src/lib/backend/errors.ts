@@ -119,6 +119,13 @@ export class BackendRequestInvalidError extends BackendError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
+/**
+ * The server could not read the request at all (`req.invalid`), as a server
+ * that does not know the operation answers. A {@link BackendRequestInvalidError}
+ * like any other rejected request.
+ */
+export class BackendRequestMalformedError extends BackendRequestInvalidError {}
+
 /** The operation or path asked for names nothing the API has. */
 export class BackendOperationUnknownError extends BackendError {
   override readonly category: ErrorCategory = "missing";

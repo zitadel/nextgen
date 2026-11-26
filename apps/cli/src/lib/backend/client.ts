@@ -19,6 +19,7 @@ import {
   BackendReleaseInUseError,
   BackendReleaseRevokedError,
   BackendRequestInvalidError,
+  BackendRequestMalformedError,
   BackendTooManyRequestsError,
   BackendUnauthorizedError,
   BackendTimeoutError,
@@ -89,6 +90,9 @@ function refusalOf(error: ApiError): BackendError {
   }
   if (error.status >= 500) {
     return new BackendUnavailableError(message, options);
+  }
+  if (code === "req.invalid") {
+    return new BackendRequestMalformedError(message, options);
   }
   return new BackendRequestInvalidError(message, options);
 }

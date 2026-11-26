@@ -354,6 +354,8 @@ type CapturingPlatform = {
   rejectsReleases(): void;
   /** Refuses a sign-up policy's evaluation as malformed, as a server from before the policy does. */
   predatesTheSignupPolicy(): void;
+  /** Refuses a sign-up policy's evaluation for another reason (`422 pol.invalid`), as a server that knows the policy does. */
+  refusesTheSignupPolicyEvaluation(): void;
   /** Leaves a sign-up policy's evaluation unanswered; resolves once it has been asked. */
   hangsOnTheSignupPolicy(): Promise<void>;
 };
@@ -429,7 +431,12 @@ async function aCapturingPlatform(
   const createBodies: unknown[] = [];
   const projects: CreatedOnPlatform[] = [];
   const deployments: RequestedDeployment[] = [];
-  const failing = { releases: false, signupPolicy: false, signupPolicyHangs: false };
+  const failing = {
+    releases: false,
+    signupPolicy: false,
+    signupPolicyRefused: false,
+    signupPolicyHangs: false,
+  };
   const signupPolicyAsked = new EventEmitter();
   const url = await serve(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
@@ -463,6 +470,16 @@ async function aCapturingPlatform(
       res
         .writeHead(400, { "content-type": "application/json" })
         .end(JSON.stringify({ code: "req.invalid", message: "the request is invalid" }));
+      return;
+    }
+    if (
+      req.method === "POST" &&
+      path === "/api/v1/policies/evaluate" &&
+      failing.signupPolicyRefused
+    ) {
+      res
+        .writeHead(422, { "content-type": "application/json" })
+        .end(JSON.stringify({ code: "pol.invalid", message: "the policy is invalid" }));
       return;
     }
     if (req.method === "POST" && path === "/api/v1/releases/build") {
@@ -508,6 +525,9 @@ async function aCapturingPlatform(
     },
     predatesTheSignupPolicy() {
       failing.signupPolicy = true;
+    },
+    refusesTheSignupPolicyEvaluation() {
+      failing.signupPolicyRefused = true;
     },
     async hangsOnTheSignupPolicy() {
       failing.signupPolicyHangs = true;
@@ -2178,6 +2198,18 @@ describe("setup", () => {
           ),
         ],
       });
+    });
+  });
+
+  describe("against a server that refuses the sign-up evaluation for another reason", () => {
+    it("still writes the sign-up policy", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+      platform.refusesTheSignupPolicyEvaluation();
+
+      await runCliForTest(scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT));
+
+      expect(existsSync(join(dir, ".zitadel/policies/user.create.json"))).toBe(true);
     });
   });
 
