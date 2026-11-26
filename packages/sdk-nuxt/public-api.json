@@ -1,0 +1,54 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.ts",
+      "kind": "other",
+      "extras": [
+        "ZitadelAuthResult",
+        "ZitadelAuthState",
+        "ZitadelClientAuthResult",
+        "ZitadelUnauthState",
+        "ZitadelAuthSession",
+        "ZitadelMiddlewareOptions",
+        "ZitadelProject",
+        "businessLocales",
+        "createZitadelMiddleware",
+        "getAuth",
+        "useZitadelProject"
+      ]
+    },
+    "./module": {
+      "source": "src/module.ts",
+      "kind": "other",
+      "extras": [
+        "default"
+      ]
+    },
+    "./server": {
+      "source": "src/server.ts",
+      "kind": "server",
+      "handler": {
+        "name": "createZitadelMiddleware",
+        "why": "Nuxt calls these server middleware: a file in server/middleware that default-exports an h3 event handler. This factory returns that handler. It is a factory, called once, so it starts with create."
+      },
+      "authReader": {
+        "name": "getAuth",
+        "why": "Takes the framework's own request event or context and returns the verified result that the handler stored on it. It reads and never creates, so it is called getAuth, and it is synchronous because the framework has already handed over the event."
+      },
+      "extras": []
+    },
+    "./client": {
+      "source": "src/client.ts",
+      "kind": "client",
+      "extras": []
+    },
+    "./components": {
+      "source": "src/components.ts",
+      "kind": "widgets",
+      "extras": [
+        "businessLocales",
+        "configureZitadel"
+      ]
+    }
+  }
+}

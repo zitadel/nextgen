@@ -12,7 +12,8 @@
     },
     // contract.spec.ts reads these SDK specs to check that each still runs
     // @zitadel/client-sdk-contract, the client entries, every edge project's
-    // config, and every SDK's manifest and docs and the demo apps' manifests and sources
+    // config, every SDK's manifest, docs, public-api.json and sources (the public API standard,
+    // the doc-comment rule and the API-import rule read them) and the demo apps' manifests and sources
     // to check that apps go through their SDK, skipping what that check skips
     // (dependencies, build output and Next's next-env.d.ts).
     "test": {
@@ -36,9 +37,15 @@
         "$TURBO_ROOT$/packages/sdk-svelte/src/lib/index.ts",
         "$TURBO_ROOT$/packages/sdk-solid/src/index.tsx",
         "$TURBO_ROOT$/packages/sdk-qwik/src/index.tsx",
+        "$TURBO_ROOT$/packages/sdk-next/src/__tests__/client.test.ts",
+        "$TURBO_ROOT$/packages/sdk-nuxt/src/__tests__/client.test.ts",
+        "$TURBO_ROOT$/packages/sdk-sveltekit/src/__tests__/client.test.ts",
+        "$TURBO_ROOT$/packages/sdk-qwik-router/src/__tests__/client.test.ts",
+        "$TURBO_ROOT$/packages/sdk-solid-start/src/__tests__/client.test.ts",
+        "$TURBO_ROOT$/packages/sdk-tanstack-start/src/__tests__/client.test.ts",
         "$TURBO_ROOT$/packages/sdk-next/src/client.ts",
         "$TURBO_ROOT$/packages/sdk-nuxt/src/index.ts",
-        "$TURBO_ROOT$/packages/sdk-tanstack-start/src/react.tsx",
+        "$TURBO_ROOT$/packages/sdk-tanstack-start/src/components.tsx",
         "$TURBO_ROOT$/packages/sdk-react/src/index.edge.spec.tsx",
         "$TURBO_ROOT$/packages/sdk-vue/src/index.edge.spec.ts",
         "$TURBO_ROOT$/packages/sdk-angular/src/public-api.edge.spec.ts",
@@ -59,6 +66,8 @@
         "$TURBO_ROOT$/packages/sdk-solid-start/src/__tests__/middleware.edge.test.ts",
         "$TURBO_ROOT$/packages/sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
         "$TURBO_ROOT$/packages/sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
+        "$TURBO_ROOT$/packages/sdk-*/public-api.json",
+        "$TURBO_ROOT$/packages/sdk-*/src/**",
         "$TURBO_ROOT$/packages/sdk-*/package.json",
         "$TURBO_ROOT$/packages/sdk-*/README.md",
         "$TURBO_ROOT$/packages/sdk-*/skills/**/SKILL.md",

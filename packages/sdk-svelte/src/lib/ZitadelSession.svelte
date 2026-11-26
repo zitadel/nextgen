@@ -3,10 +3,10 @@
   import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
-  import type { ZitadelSessionSvelteProps } from './types';
+  import type { ZitadelSessionProps } from './types';
   import { assignGiven } from './given';
   import { withDetail } from './events';
-  import { onClient, proxyPathAttr } from './attributes';
+  import { flag, onClient, proxyPathAttr, serverOnly } from './attributes';
 
   let {
     project,
@@ -20,7 +20,7 @@
     suppressHeader,
     onSignout,
     ...rest
-  }: ZitadelSessionSvelteProps = $props();
+  }: ZitadelSessionProps = $props();
 
   // The standard HTML attributes are the only extra props the element takes.
   const attributes = $derived(standardAttributes(rest));
@@ -66,5 +66,41 @@
   project-id={project?.projectId ?? projectId}
   proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
   url={project?.url}
-  post-sign-out-url={postSignOutUrl}
+  publishable-key={project?.publishableKey}
+  post-sign-out-url={postSignOutUrl || undefined}
+  {...serverOnly({
+    heading,
+    'logout-label': logoutLabel,
+    variant,
+    theme,
+    'suppress-header': flag(suppressHeader)
+  })}
 ></zitadel-session>
+
+<!--
+  @component
+  Renders the signed-in session card as a `<zitadel-session>` custom element.
+
+  The card shows who is signed in and offers a sign-out action. Optional props such as `heading`,
+  `logoutLabel`, `variant`, `theme` and `suppressHeader` are assigned only when set, so an unset
+  prop keeps the element's own default instead of blanking it. `projectId` and `proxyPath` are
+  written as the `project-id` and `proxy-path` attributes so server-rendered markup carries them;
+  the project handle is assigned as a property in the browser and wins over the plain values when
+  both are given. On the server the same props are written as attributes, together with
+  `publishable-key`, and an empty `postSignOutUrl` writes no attribute.
+
+  `onSignout` receives the element's `zitadel-signout` event. A callback may return a promise. The
+  component registers it on the `waitUntil` of the event detail, so the widget waits for it, for
+  at most two seconds, before it navigates. Only `zitadel-signout` carries `waitUntil`.
+
+  Use it to show the current user, for example on a profile or dashboard page. Props are typed by
+  {@link ZitadelSessionProps}. `getElement()` returns the underlying element, or `undefined`
+  before mount, and is reachable through `bind:this`.
+
+  @example
+  <script lang="ts">
+    import { ZitadelSession } from '@zitadel/sdk-svelte';
+  </script>
+
+  <ZitadelSession {project} postSignOutUrl="/login" />
+-->

@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -29,6 +30,10 @@ const gate = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"))
         .split(/\s+/) ?? [],
   )
   .filter((word) => !word.startsWith("--"));
+// The SDKs that declare a public API: the contract spec reads each one's manifest and sources.
+const publicApiSdkDirs = readdirSync(join(repo, "packages")).filter(
+  (dir) => dir.startsWith("sdk-") && existsSync(join(repo, "packages", dir, "public-api.json")),
+);
 let root;
 let baseline;
 
@@ -344,8 +349,10 @@ describe.sequential("task graph cache and ordering contracts", () => {
       // The conformance fixtures reach their SDKs through `^build`
       // (conformance/suite/turbo.json), so only the ones that install it move:
       // the Svelte and the SvelteKit app.
+      // A fixture has no `docs:api` script, so that task runs nothing.
       const changedFixtures = [...next.values()]
         .filter(({ taskId }) => /^@zitadel\/conformance-[^#]+#/.test(taskId))
+        .filter(({ command }) => command !== "<NONEXISTENT>")
         .filter(({ taskId, hash }) => hash !== baseline.get(taskId).hash)
         .map(({ taskId }) => taskId)
         .sort();
@@ -475,4 +482,26 @@ describe.sequential("task graph cache and ordering contracts", () => {
       });
     });
   }
+
+  // sdk-core's contract spec reads every SDK's public-api.json and the entry
+  // sources it names, so they must be inputs of `@zitadel/sdk-core#test`.
+  test.each(publicApiSdkDirs)(
+    "%s's public API and every entry source invalidate the contract spec",
+    (dir) => {
+      const manifest = `packages/${dir}/public-api.json`;
+      const manifestText = readFileSync(join(repo, manifest), "utf8");
+      const before = baseline.get("@zitadel/sdk-core#test").hash;
+      changed(manifest, `${manifestText}\n`, () => {
+        expect(dry().get("@zitadel/sdk-core#test").hash).not.toBe(before);
+      });
+      const sources = new Set(Object.values(JSON.parse(manifestText).entries).map((e) => e.source));
+      for (const source of sources) {
+        const path = `packages/${dir}/${source}`;
+        const sourceText = readFileSync(join(repo, path), "utf8");
+        changed(path, `${sourceText}\n// changed entry source\n`, () => {
+          expect(dry().get("@zitadel/sdk-core#test").hash).not.toBe(before);
+        });
+      }
+    },
+  );
 });

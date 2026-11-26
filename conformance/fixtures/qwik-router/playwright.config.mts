@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 import { conformanceConfig } from "@zitadel/conformance/config";
 import type { AppEnvTemplate } from "@zitadel/testing/playwright";
 
-// What the app setup wrote reads: src/routes/plugin@nextgen.ts hands the
+// What the app setup wrote reads: src/routes/plugin@zitadel.ts hands the
 // request to the SDK's onRequest, which takes ZITADEL_URL,
 // ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET from the request's env (the
 // process environment in `vite --mode ssr`), and the pages read

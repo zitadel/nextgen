@@ -27,6 +27,16 @@ describe("resolveUrl", () => {
 });
 
 describe("resolveProjectSecret", () => {
+  it("prefers the middleware option over the runtime config and the environment", () => {
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+
+    expect(resolveProjectSecret({ projectSecret: "sk_config" }, "sk_option")).toBe("sk_option");
+  });
+
+  it("treats an empty middleware option as unset", () => {
+    expect(resolveProjectSecret({ projectSecret: "sk_config" }, "")).toBe("sk_config");
+  });
+
   it("prefers the runtime config over ZITADEL_PROJECT_SECRET", () => {
     vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
 

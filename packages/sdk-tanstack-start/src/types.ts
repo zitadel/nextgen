@@ -1,18 +1,20 @@
 /**
- * Re-exports shared SDK types from `@zitadel/sdk-core`.
+ * The shared middleware types, re-exported from `@zitadel/sdk-core`.
  *
- * The middleware-layer types are defined once in sdk-core and shared by every
- * server SDK (`sdk-next`, `sdk-nuxt`, `sdk-sveltekit`, `sdk-tanstack-start`,
- * `sdk-solid-start`, `sdk-qwik-router`).
+ * The middleware-layer types are defined once in `@zitadel/sdk-core` and shared by every server
+ * SDK, so a session, an auth result and the middleware options have the same shape in each.
+ * Their documentation lives with the definitions in core.
+ *
+ * @module
  */
 export type {
-  NextgenSession,
-  AuthState,
-  UnauthState,
-  AuthResult,
-  NextgenMiddlewareOptions,
-  // Client-safe auth shapes (token absent), declared once in sdk-core.
-  ClientSession,
-  ClientAuthState,
-  ClientAuthResult,
+  ZitadelAuthSession,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelAuthResult,
+  ZitadelMiddlewareOptions,
+  // The client-safe auth shapes, which carry no token.
+  ZitadelClientSession,
+  ZitadelClientAuthState,
+  ZitadelClientAuthResult,
 } from "@zitadel/sdk-core/middleware";

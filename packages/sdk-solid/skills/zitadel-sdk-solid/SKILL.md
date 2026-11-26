@@ -81,7 +81,7 @@ local runtime default port).
 | `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |
 | `projectId` | `string` | unset | Login, Logout, Session | Project id, read when no `project` handle is passed. |
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
-| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
+| `purpose` | `ZitadelFlowPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
 | `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
 | `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
@@ -119,8 +119,7 @@ Treat the installed package as authoritative over anything here — this skill
 and the package version move independently.
 
 - `node_modules/@zitadel/sdk-solid/README.md` — the shipped usage doc.
-- `node_modules/@zitadel/sdk-solid/dist/index.d.ts` and the re-exported
-  `@zitadel/sdk-core/types` — the real prop names, component props
+- `node_modules/@zitadel/sdk-solid/dist/index.d.ts` — the real prop names, component props
   (`ZitadelLoginProps`, `ZitadelLogoutProps`, `ZitadelSessionProps`), and
   `configureZitadel`'s config shape. Read the types before wiring a prop you
   are unsure of rather than assuming its name.

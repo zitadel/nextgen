@@ -1134,6 +1134,31 @@ export class ZitadelLogin extends ZitadelSurface {
       { waitForListeners: true },
     );
     if (typeof window === "undefined") return false;
+    return this.navigateTo(target);
+  }
+
+  /**
+   * Navigates the browser to `target` when it resolves to an `http:` or
+   * `https:` URL against the document base; any other scheme (`javascript:`,
+   * `data:`, …) is refused and reported through `zitadel-flow-error`.
+   *
+   * @param target - The server- or app-supplied URL to navigate to.
+   * @returns Whether the browser was sent to `target`.
+   */
+  private navigateTo(target: string): boolean {
+    let allowed = false;
+    try {
+      const { protocol } = new URL(target, document.baseURI);
+      allowed = protocol === "http:" || protocol === "https:";
+    } catch {
+      allowed = false;
+    }
+    if (!allowed) {
+      emit(this, "zitadel-flow-error", {
+        message: "Refused to navigate: the target URL must use http or https.",
+      });
+      return false;
+    }
     window.location.assign(target);
     return true;
   }
@@ -1169,7 +1194,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
     if (typeof window === "undefined") return;
     if (behavior === "redirect" && response.redirect_uri) {
-      window.location.assign(response.redirect_uri);
+      this.navigateTo(response.redirect_uri);
       return;
     }
 
@@ -1183,7 +1208,7 @@ export class ZitadelLogin extends ZitadelSurface {
           "<zitadel-login>",
         );
         await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
-        window.location.assign(this.postSignInTarget());
+        this.navigateTo(this.postSignInTarget());
       } catch (error) {
         this.handleTransportError(error);
       } finally {
