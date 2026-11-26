@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 
 import { FsNotFoundError, mkdir, pathExistsStrict, readFile, rename } from "@/lib/fs";
-import { parseJsonObject, stableStringify } from "@/lib/json";
+import { isObject, parseJsonOrUndefined, stableStringify } from "@/lib/json";
 
 import { ProjectFileMissingError, ProjectInvalidError } from "./errors";
 import { SecretFile } from "./secret-file";
@@ -77,7 +77,10 @@ export class ProjectSecret {
    */
   static async read(cwd: string): Promise<ProjectSecret> {
     try {
-      const secret = parseJsonObject(await readFile(join(cwd, PATH), "utf8"), PATH);
+      const secret = parseJsonOrUndefined(await readFile(join(cwd, PATH), "utf8"));
+      if (!isObject(secret)) {
+        throw new ProjectInvalidError(`${PATH} is not a JSON object`);
+      }
       if (
         typeof secret.project_id !== "string" ||
         typeof secret.project_secret !== "string" ||

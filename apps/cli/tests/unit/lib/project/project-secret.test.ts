@@ -83,14 +83,11 @@ describe("Project.secret", () => {
     });
   });
 
-  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async ({
-    dir: cwd,
-  }) => {
+  it("throws a ProjectInvalidError for a file that is not JSON", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/secret"), "{ broken");
 
-    await expect(Project.at(cwd).secret()).rejects.toThrow();
-    await expect(Project.at(cwd).secret()).rejects.not.toBeInstanceOf(ProjectFileMissingError);
+    await expect(Project.at(cwd).secret()).rejects.toBeInstanceOf(ProjectInvalidError);
   });
 });
 
