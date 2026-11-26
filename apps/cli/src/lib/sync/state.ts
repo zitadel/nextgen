@@ -1,8 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { errorMessage } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
+import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
 import { isObject } from "@/lib/json";
 
 import { SyncStateMalformedError } from "./errors";
@@ -113,7 +112,7 @@ export async function publishedIds(
     });
     return new Map(entries);
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return new Map();
     }
     throw new SyncStateMalformedError(`Cannot read ${STATE_PATH}: ${errorMessage(error)}`, error);
