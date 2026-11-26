@@ -7006,7 +7006,8 @@
           "type": {
             "text": "Readonly<Record<string, Partial<Locale>>>"
           },
-          "default": "{ en: { \"identifier.field.email\": \"Work email\", \"identifier.field.email.placeholder\": \"you@company.com\", \"collect-credentials.field.email\": \"Work email\", \"collect-credentials.field.email.placeholder\": \"you@company.com\", \"collect-passkey-email.field.email\": \"Work email\", \"collect-passkey-email.field.email.placeholder\": \"you@company.com\", \"register.field.email\": \"Work email\", \"register.field.email.placeholder\": \"you@company.com\", }, de: { \"identifier.field.email\": \"Geschäftliche E-Mail\", \"identifier.field.email.placeholder\": \"du@unternehmen.com\", \"collect-credentials.field.email\": \"Geschäftliche E-Mail\", \"collect-credentials.field.email.placeholder\": \"du@unternehmen.com\", \"collect-passkey-email.field.email\": \"Geschäftliche E-Mail\", \"collect-passkey-email.field.email.placeholder\": \"du@unternehmen.com\", \"register.field.email\": \"Geschäftliche E-Mail\", \"register.field.email.placeholder\": \"du@unternehmen.com\", }, it: { \"identifier.field.email\": \"E-mail aziendale\", \"identifier.field.email.placeholder\": \"tu@azienda.com\", \"collect-credentials.field.email\": \"E-mail aziendale\", \"collect-credentials.field.email.placeholder\": \"tu@azienda.com\", \"collect-passkey-email.field.email\": \"E-mail aziendale\", \"collect-passkey-email.field.email.placeholder\": \"tu@azienda.com\", \"register.field.email\": \"E-mail aziendale\", \"register.field.email.placeholder\": \"tu@azienda.com\", }, }"
+          "default": "{ en: { \"identifier.field.email\": \"Work email\", \"identifier.field.email.placeholder\": \"you@company.com\", \"collect-credentials.field.email\": \"Work email\", \"collect-credentials.field.email.placeholder\": \"you@company.com\", \"collect-passkey-email.field.email\": \"Work email\", \"collect-passkey-email.field.email.placeholder\": \"you@company.com\", \"register.field.email\": \"Work email\", \"register.field.email.placeholder\": \"you@company.com\", }, de: { \"identifier.field.email\": \"Geschäftliche E-Mail\", \"identifier.field.email.placeholder\": \"du@unternehmen.com\", \"collect-credentials.field.email\": \"Geschäftliche E-Mail\", \"collect-credentials.field.email.placeholder\": \"du@unternehmen.com\", \"collect-passkey-email.field.email\": \"Geschäftliche E-Mail\", \"collect-passkey-email.field.email.placeholder\": \"du@unternehmen.com\", \"register.field.email\": \"Geschäftliche E-Mail\", \"register.field.email.placeholder\": \"du@unternehmen.com\", }, it: { \"identifier.field.email\": \"E-mail aziendale\", \"identifier.field.email.placeholder\": \"tu@azienda.com\", \"collect-credentials.field.email\": \"E-mail aziendale\", \"collect-credentials.field.email.placeholder\": \"tu@azienda.com\", \"collect-passkey-email.field.email\": \"E-mail aziendale\", \"collect-passkey-email.field.email.placeholder\": \"tu@azienda.com\", \"register.field.email\": \"E-mail aziendale\", \"register.field.email.placeholder\": \"tu@azienda.com\", }, }",
+          "description": "The business copy overlay: the dictionary entries that frame the sign-in form for a business\naudience, for example \"Work email\" where the built-in copy says \"Email\".\n\nThe built-in dictionaries are neutral so that the default UI fits any audience. A product that\nserves businesses spreads this overlay on top of the matching built-in dictionary and passes the\nresult through the `locales` property of a widget. Each entry carries only the keys it changes,\nso it is not meant to stand alone as a dictionary, and it is exempt from the key-parity check\nthat guards the full built-in dictionaries.\n\nEvery SDK re-exports this value, so an app never needs a direct dependency on\n`@zitadel/components`, which strict package managers refuse to resolve from an app that does not\ndeclare it. On edge runtimes the components package resolves to a build without elements that\nstill carries this data, so it is safe to import everywhere."
         }
       ],
       "exports": [
@@ -8869,6 +8870,26 @@
             },
             {
               "kind": "method",
+              "name": "navigateTo",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "target",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The server- or app-supplied URL to navigate to."
+                }
+              ],
+              "description": "Navigates the browser to `target` when it resolves to an `http:` or\n`https:` URL against the document base; any other scheme (`javascript:`,\n`data:`, …) is refused and reported through `zitadel-flow-error`."
+            },
+            {
+              "kind": "method",
               "name": "maybeCompleteFlow",
               "privacy": "private",
               "return": {
@@ -9789,7 +9810,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "`<zitadel-logout>` — orchestrator-tier element that lets the signed-in user\nsign out without touching the flow API.\n\nReads the user's identity from the typed `getMySession` operation\n(`GET /sessions/me`, credentialed) — the same source as `<zitadel-session>`,\nso both signed-in surfaces stay consistent and work against the real backend.\nThe avatar/preview show `name`, then `email`, then the always-present\n`user_id`. NOTE: the current server response includes only the `user_id`, so\nthe avatar falls back to the id until the backend returns a human-readable\n`name`/`email`.\n\nIt renders an avatar trigger with a dropdown that exposes a \"Sign out\"\naction, and calls the typed `revokeMySession` operation in `@zitadel/api`\n(`DELETE /sessions/me`). The server clears the session cookie via\n`Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`\nand optionally navigates to `post-sign-out-url`.\n\n## Template-slot mode\n\nWhen the consumer projects a `<template>` child the element renders the\ntemplate's clone into its light DOM with `{{display}}`, `{{identifier}}`,\nand `{{initial}}` substituted (`{{name}}` and `{{email}}` fill as legacy\naliases of the first two). Any element with `data-action=\"logout\"` inside\nthe cloned template triggers the sign-out flow. This mirrors the\nplaceholder `<nextgen-logout>`'s contract so existing markup keeps working.\n\nDefault styles consume the `--zl-*` design tokens so tenant branding\napplies automatically.",
+          "description": "`<zitadel-logout>` — orchestrator-tier element that lets the signed-in user\nsign out without touching the flow API.\n\nReads the user's identity from the typed `getMySession` operation\n(`GET /sessions/me`, credentialed) — the same source as `<zitadel-session>`,\nso both signed-in surfaces stay consistent and work against the real backend.\nThe avatar/preview show `name`, then `email`, then the always-present\n`user_id`. NOTE: the current server response includes only the `user_id`, so\nthe avatar falls back to the id until the backend returns a human-readable\n`name`/`email`.\n\nIt renders an avatar trigger with a dropdown that exposes a \"Sign out\"\naction, and calls the typed `revokeMySession` operation in `@zitadel/api`\n(`DELETE /sessions/me`). The server clears the session cookie via\n`Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`\nand optionally navigates to `post-sign-out-url`.\n\n## Template-slot mode\n\nWhen the consumer projects a `<template>` child the element renders the\ntemplate's clone into its light DOM with `{{display}}`, `{{identifier}}`,\nand `{{initial}}` substituted (`{{name}}` and `{{email}}` fill as legacy\naliases of the first two). Any element with `data-action=\"logout\"` inside\nthe cloned template triggers the sign-out flow. This mirrors the\nplaceholder element's contract so existing markup keeps working.\n\nDefault styles consume the `--zl-*` design tokens so tenant branding\napplies automatically.",
           "name": "ZitadelLogout",
           "members": [
             {
@@ -9914,6 +9935,33 @@
                 }
               },
               "description": "Signs out, closes the menu, then optionally navigates to `postSignOutUrl`."
+            },
+            {
+              "kind": "method",
+              "name": "navigateTo",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "target",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The app-supplied URL to navigate to."
+                },
+                {
+                  "name": "assign",
+                  "type": {
+                    "text": "(url: string) => void"
+                  },
+                  "description": "Performs the navigation once the scheme is allowed."
+                }
+              ],
+              "description": "Navigates the browser to `target` when it resolves to an `http:` or\n`https:` URL against the document base; any other scheme (`javascript:`,\n`data:`, …) is refused and shown as the error message in the open menu."
             },
             {
               "kind": "method",
@@ -10171,6 +10219,33 @@
                 }
               },
               "description": "Signs out, then optionally navigates to `postSignOutUrl`; a failure stays put."
+            },
+            {
+              "kind": "method",
+              "name": "navigateTo",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "target",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The app-supplied URL to navigate to."
+                },
+                {
+                  "name": "assign",
+                  "type": {
+                    "text": "(url: string) => void"
+                  },
+                  "description": "Performs the navigation once the scheme is allowed."
+                }
+              ],
+              "description": "Navigates the browser to `target` when it resolves to an `http:` or\n`https:` URL against the document base; any other scheme (`javascript:`,\n`data:`, …) is refused and shown as the error message."
             },
             {
               "kind": "method",

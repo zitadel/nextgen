@@ -17,3 +17,26 @@ export function onClient<T>(value: T): T | undefined {
 export function proxyPathAttr(path: string | undefined): string | undefined {
   return path === "" ? "/" : path;
 }
+
+/**
+ * Returns the given attributes on the server and none in the browser.
+ *
+ * A prop the element has a property for, such as `variant`, `theme`, `lang` or `heading`, is
+ * assigned as a property in the browser, where an unset value would overwrite the element's own
+ * default. The browser assigns those through `assignGiven` instead, and this writes the same
+ * values as attributes into server markup, where the widget reads them as it upgrades. An
+ * `undefined` value writes no attribute.
+ */
+export function serverOnly(
+  attributes: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  return typeof document === "undefined" ? attributes : {};
+}
+
+/**
+ * A boolean prop as a boolean attribute: present, as an empty string, when `true`, otherwise
+ * omitted.
+ */
+export function flag(value: boolean | undefined): string | undefined {
+  return value ? "" : undefined;
+}

@@ -1,4 +1,4 @@
-# ADR 090: Project Webhooks
+# ADR 091: Project Webhooks
 
 > **Status:** Proposed
 > **Date:** 2026-11-11
@@ -13,7 +13,7 @@
 > (a project's webhooks are a resource of their own, not project-scoped sinks)
 > and [ADR 047 §2](047-dialect-id-generation.md) (registers the `hook`
 > prefix).
-> **Related:** ADR 091, proposed apart from this one (versions of event
+> **Related:** ADR 092, proposed apart from this one (versions of event
 > payloads).
 
 ## Context
@@ -164,7 +164,7 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 
 ### 4. Delivery
 
-![An API request writes an event to the events table; a wake-up starts the delivery engine, which reads the webhooks table and sends signed events to the endpoint; a failed delivery asks for a delayed wake-up.](../assets/adr-090-webhook-system.svg)
+![An API request writes an event to the events table; a wake-up starts the delivery engine, which reads the webhooks table and sends signed events to the endpoint; a failed delivery asks for a delayed wake-up.](../assets/adr-091-webhook-system.svg)
 
 The shipper delivers, with the cursor and the settled-events bound of
 ADR 049. The events table and each webhook's cursor decide what is sent. A
@@ -251,7 +251,7 @@ them. Their payloads hold `url` without its query, `description`,
 ### 6. Versions
 
 A webhook carries no version. Versions of event payloads are proposed apart
-from this ADR, as ADR 091. If they are accepted, a webhook gains a pinned
+from this ADR, as ADR 092. If they are accepted, a webhook gains a pinned
 version then, and every webhook that exists takes the first one: with one
 shape in existence there is nothing to guess.
 

@@ -70,14 +70,14 @@ export function appComponentTemplate(ctx: PatchContext): string {
   const business = ctx.useCase === "business";
   const importNames = business
     ? `
-  ZitadelLoginComponent,
-  ZitadelSessionComponent,
+  ZitadelLogin,
+  ZitadelSession,
   businessLocales,
   configureZitadel,
 `
     : `
-  ZitadelLoginComponent,
-  ZitadelSessionComponent,
+  ZitadelLogin,
+  ZitadelSession,
   configureZitadel,
 `;
   // The overlay ships with the SDK, so the generated app only wires it up
@@ -98,7 +98,7 @@ import { ZITADEL_PROJECT_ID } from "${PROJECT_ID_IMPORT}";
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [ZitadelLoginComponent, ZitadelSessionComponent],
+  imports: [ZitadelLogin, ZitadelSession],
   templateUrl: "./app.html",
 })
 export class App implements OnInit {

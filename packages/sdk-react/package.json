@@ -14,7 +14,8 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "!dist/api-docs"
   ],
   "exports": {
     ".": {
@@ -26,15 +27,15 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build && attw --pack . --profile=esm-only",
+    "build": "vite build && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "lint": "biome check .",
+    "docs:api": "typedoc",
     "prepack": "publint --strict"
   },
   "dependencies": {
     "@lit/react": "^1.0.8",
-    "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*"
   },
@@ -49,6 +50,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/client-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",

@@ -1,16 +1,16 @@
 package domain
 
 // PrefixWebhook is the dialect-minted ID prefix for a project's webhooks
-// (hook_<opaque>, ADR 090). The operator's configured sinks keep
+// (hook_<opaque>, ADR 091). The operator's configured sinks keep
 // PrefixEventSink.
 const PrefixWebhook ResourcePrefix = "hook"
 
 // WebhookErrorCodePrefix starts every webhook error code. The codes are
 // webhook.*, not hook.*: the ID prefix is short, the code names the resource
-// (ADR 090 §1).
+// (ADR 091 §1).
 const WebhookErrorCodePrefix = "webhook."
 
-// WebhookProjectLimit is how many webhooks one project holds (ADR 090 §1).
+// WebhookProjectLimit is how many webhooks one project holds (ADR 091 §1).
 const WebhookProjectLimit = 10
 
 func ErrWebhookInvalid() Error {

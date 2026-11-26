@@ -84,7 +84,7 @@ export function ProfilePage() {
 | `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |
 | `projectId` | `string` | unset | Login, Logout, Session | Project id, read when no `project` handle is passed. |
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
-| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
+| `purpose` | `ZitadelFlowPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
 | `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
 | `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
@@ -132,12 +132,12 @@ independently and a hardcoded API list here would drift.
 
 ## Gotchas
 
-- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` to the `ZitadelLogin` wrapper as strings (they are written into the server markup as attributes), because a widget that starts before its configuration arrives shows an error instead of the flow. React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `project-id` and `proxy-path` as strings instead of a `project` handle.
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `projectId` and `proxyPath` as strings instead of a `project` handle.
 - **TypeScript ≥ 5.0 required** — the published types use `export type *`, which
   older TypeScript cannot parse.
 - **Browser web components.** These wrap browser web components that only start
   in the browser. A server render emits a bare element, so follow the
-  server-rendering gotcha above: string `project-id` and `proxy-path` may be
+  server-rendering gotcha above: string `projectId` and `proxyPath` may be
   server-rendered, while an object such as `project` is client-only because
   React 19 does not apply object properties while hydrating.
 - **Same-origin proxy.** The widgets call `${proxyPath}/…` same-origin (default

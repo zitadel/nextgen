@@ -10,7 +10,7 @@
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import type { VerifyJwtOptions } from "../../lib/jwt";
+import type { ZitadelVerifyJwtOptions } from "../../lib/jwt";
 
 import { base64UrlDecode, decodeJwt, verifyJwt } from "../../lib/jwt";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
@@ -52,7 +52,7 @@ function mockJwks(kid: string): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
 }
 
-function baseOpts(overrides: Partial<VerifyJwtOptions> = {}): VerifyJwtOptions {
+function baseOpts(overrides: Partial<ZitadelVerifyJwtOptions> = {}): ZitadelVerifyJwtOptions {
   return {
     issuerUrl: "http://localhost:4000",
     clockSkewMs: 0,
