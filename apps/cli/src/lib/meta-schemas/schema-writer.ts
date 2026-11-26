@@ -1,10 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import semver from "semver";
 
 import { isErrno } from "@/lib/errno";
-import { pathExists } from "@/lib/fs";
+import { mkdir, pathExists, writeFile } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
 import { mapBounded } from "@/lib/map-bounded";
 import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
