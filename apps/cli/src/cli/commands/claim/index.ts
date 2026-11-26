@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 import pRetry, { AbortError } from "p-retry";
 import { z } from "zod";
 
-import { BackendError, ClaimService } from "@/lib/backend";
+import { ClaimService } from "@/lib/backend";
 import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
@@ -599,11 +599,11 @@ export default class Claim extends Telemetered(ChangeCommand) {
               }
             }
           } catch (error) {
-            if (error instanceof BackendError) {
-              this.annotate({ poll_count: attempt });
-              throw new AbortError(error);
+            if (error instanceof NotFinished || error instanceof AbortError) {
+              throw error;
             }
-            throw error;
+            this.annotate({ poll_count: attempt });
+            throw new AbortError(error instanceof Error ? error : new Error(String(error)));
           }
         },
         {
