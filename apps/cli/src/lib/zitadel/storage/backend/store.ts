@@ -18,8 +18,6 @@ import {
   CONFIG_ROOT,
   findFileReferences,
   inlineFileReferences,
-  outsideConfig,
-  outsideProject,
 } from "@/lib/zitadel/storage/references";
 import type {
   ConfigStore,
@@ -101,7 +99,12 @@ export abstract class Store implements ConfigStore {
         if (code === "ENOENT") {
           return [];
         }
-        throw Store.unreadable(directory, code);
+        if (code === "EACCES" || code === "EPERM") {
+          throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (${code})`);
+        }
+        throw new ZitadelConfigError(
+          `${directory} cannot be read${code === undefined ? "" : ` (${code})`}`,
+        );
       });
     // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
     const files = names
@@ -318,7 +321,9 @@ export abstract class Store implements ConfigStore {
       realTarget === undefined ||
       !realDirectory.contains(realTarget)
     ) {
-      throw outsideConfig(path);
+      throw new ZitadelConfigError(
+        `${path} points outside .zitadel/; files are only written and removed inside it`,
+      );
     }
     return target;
   }
@@ -334,7 +339,9 @@ export abstract class Store implements ConfigStore {
   private removable(path: string): string {
     const target = this.place(path).toString();
     if (this.fs.existsSync(target) && this.fs.lstatSync(target).isDirectory()) {
-      throw Store.directoryInTheWay(path);
+      throw new ZitadelConfigError(
+        `${path} cannot be removed (EISDIR): it is a directory where a file is expected`,
+      );
     }
     return target;
   }
@@ -363,7 +370,9 @@ export abstract class Store implements ConfigStore {
       realTarget === undefined ||
       !realRoot.contains(realTarget)
     ) {
-      throw outsideProject(ref);
+      throw new ZitadelConfigError(
+        `$file ${JSON.stringify(ref)} points outside the project; keep referenced files inside the project, next to the file that references them`,
+      );
     }
     return target;
   }
@@ -390,7 +399,12 @@ export abstract class Store implements ConfigStore {
         if (code === "EISDIR") {
           return undefined;
         }
-        throw Store.unreadable(path, code);
+        if (code === "EACCES" || code === "EPERM") {
+          throw new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`);
+        }
+        throw new ZitadelConfigError(
+          `${path} cannot be read${code === undefined ? "" : ` (${code})`}`,
+        );
       });
     if (text === undefined) {
       return UnparsedFile.directory(path);
@@ -408,26 +422,6 @@ export abstract class Store implements ConfigStore {
       return UnparsedFile.notAnObject(path);
     }
     return { path, body };
-  }
-
-  /**
-   * The failure for a file or directory that cannot be read.
-   *
-   * @remarks
-   * A refused permission is a ZitadelConfigFileUnreadableError; any other
-   * failure is a ZitadelConfigError.
-   *
-   * @param path - The project-relative path.
-   * @param code - The errno of the failed operation, when it had one.
-   * @returns The error to throw.
-   */
-  private static unreadable(path: string, code: string | undefined): ZitadelConfigError {
-    if (code === "EACCES" || code === "EPERM") {
-      return new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`);
-    }
-    return new ZitadelConfigError(
-      `${path} cannot be read${code === undefined ? "" : ` (${code})`}`,
-    );
   }
 
   /**
@@ -466,18 +460,6 @@ export abstract class Store implements ConfigStore {
         `${path} cannot be written (ENOTDIR): ${blocker} is a file where a directory is needed`,
       );
     }
-  }
-
-  /**
-   * The failure for a directory where a file is to be removed.
-   *
-   * @param path - The project-relative path.
-   * @returns The error to throw.
-   */
-  private static directoryInTheWay(path: string): ZitadelConfigError {
-    return new ZitadelConfigError(
-      `${path} cannot be removed (EISDIR): it is a directory where a file is expected`,
-    );
   }
 
   /**

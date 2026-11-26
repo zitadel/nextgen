@@ -160,33 +160,7 @@ export function inlineFileReferences(
 }
 
 /**
- * The failure for a `$file` reference that leads outside the project, which
- * every store refuses alike: a deploy uploads what a reference names.
- *
- * @param ref - The reference as written.
- * @returns The error to throw.
- */
-export function outsideProject(ref: string): ZitadelConfigError {
-  return new ZitadelConfigError(
-    `$file ${JSON.stringify(ref)} points outside the project; keep referenced files inside the project, next to the file that references them`,
-  );
-}
-
-/**
  * The directory, relative to the project, that every file a store writes or
  * removes must stay inside.
  */
 export const CONFIG_ROOT = ".zitadel";
-
-/**
- * The failure for a file to write or remove that leads outside `.zitadel/`,
- * which every store refuses alike.
- *
- * @param path - The project-relative path as given.
- * @returns The error to throw.
- */
-export function outsideConfig(path: string): ZitadelConfigError {
-  return new ZitadelConfigError(
-    `${path} points outside ${CONFIG_ROOT}/; files are only written and removed inside it`,
-  );
-}

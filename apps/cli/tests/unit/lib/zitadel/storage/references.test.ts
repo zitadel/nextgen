@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ZitadelConfigError } from "@/lib/zitadel";
-import {
-  findFileReferences,
-  inlineFileReferences,
-  outsideProject,
-} from "@/lib/zitadel/storage/references";
+import { findFileReferences, inlineFileReferences } from "@/lib/zitadel/storage/references";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
@@ -99,19 +95,5 @@ describe("inlineFileReferences", () => {
     inlineFileReferences(document, readA, "throw");
 
     expect(document).toEqual({ t: { $file: "./a.txt" } });
-  });
-});
-
-describe("outsideProject", () => {
-  it("names the reference that leaves the project", () => {
-    const error = outsideProject("../x");
-
-    expect(error.message).toBe('$file "../x" points outside the project');
-  });
-
-  it("says where a referenced file must be", () => {
-    const error = outsideProject("../x");
-
-    expect(error.message).toContain("inside the project");
   });
 });
