@@ -122,8 +122,32 @@ export class ZitadelSession extends ZitadelSurface {
   private async doLogout(): Promise<void> {
     if (!(await this.session.signOut())) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
-      window.location.assign(this.postSignOutUrl);
+      this.navigateTo(this.postSignOutUrl, (url) => window.location.assign(url));
     }
+  }
+
+  /**
+   * Navigates the browser to `target` when it resolves to an `http:` or
+   * `https:` URL against the document base; any other scheme (`javascript:`,
+   * `data:`, …) is refused and shown as the error message.
+   *
+   * @param target - The app-supplied URL to navigate to.
+   * @param assign - Performs the navigation once the scheme is allowed.
+   */
+  private navigateTo(target: string, assign: (url: string) => void): void {
+    let allowed = false;
+    try {
+      const { protocol } = new URL(target, document.baseURI);
+      allowed = protocol === "http:" || protocol === "https:";
+    } catch {
+      allowed = false;
+    }
+    if (!allowed) {
+      this.session.errorMessage = "Refused to navigate: the target URL must use http or https.";
+      this.requestUpdate();
+      return;
+    }
+    assign(target);
   }
 
   private handleLogout(event: Event): void {

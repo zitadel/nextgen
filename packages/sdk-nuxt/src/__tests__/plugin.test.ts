@@ -8,7 +8,7 @@ const privateReads = vi.hoisted(() => ({ count: 0 }));
 vi.mock("@zitadel/api/config", () => ({ configureZitadel }));
 
 // `defineNuxtPlugin` returns the setup function untouched here, so the test
-// calls it the way Nuxt would. The private `nextgen` key counts every read, as
+// calls it the way Nuxt would. The private `zitadel` key counts every read, as
 // Nuxt warns (NUXT_E1003) when the browser touches it.
 vi.mock("#imports", () => ({
   defineNuxtPlugin: (setup: () => unknown) => setup,
@@ -16,14 +16,14 @@ vi.mock("#imports", () => ({
   useState: () => ({}),
   useRuntimeConfig: () => ({
     public: { zitadelProxyPath: "/__nextgen", zitadelProjectId: "proj-1" },
-    get nextgen() {
+    get zitadel() {
       privateReads.count += 1;
       return { url: "http://zitadel.example" };
     },
   }),
 }));
 
-describe("nextgen plugin", () => {
+describe("zitadel plugin", () => {
   beforeEach(() => {
     configureZitadel.mockClear();
     privateReads.count = 0;

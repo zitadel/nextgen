@@ -17,15 +17,16 @@ const UNSET_BY_NITRO = {
 
 /**
  * Builds the server handler the module registers, against the given
- * `runtimeConfig.nextgen`. The handler reads its options when it is imported,
+ * `runtimeConfig.zitadel`. The handler reads its options when it is imported,
  * so each call imports it afresh after setting the config.
  */
 async function moduleHandler(
-  nextgen: Record<string, unknown>,
+  zitadel: Record<string, unknown>,
+  rest: Record<string, unknown> = {},
 ): Promise<ReturnType<typeof toWebHandler>> {
   vi.resetModules();
   const { setRuntimeConfig } = await import("../stubs/nuxt-imports");
-  setRuntimeConfig({ nextgen });
+  setRuntimeConfig({ zitadel, ...rest });
   const { default: handler } = await import("../../runtime/server/handler");
   const app = createApp();
   app.use(handler);
@@ -166,8 +167,8 @@ describe("middlewareOptions", () => {
   it.each([
     ["the stored project", { projectId: "proj_server" }, "proj_server"],
     ["the public project id", { projectId: "" }, "proj_public"],
-  ])("holds sessions to %s", (_label, nextgen, expected) => {
-    expect(middlewareOptions(nextgen, { zitadelProjectId: "proj_public" }).projectId).toBe(
+  ])("holds sessions to %s", (_label, zitadel, expected) => {
+    expect(middlewareOptions(zitadel, { zitadelProjectId: "proj_public" }).projectId).toBe(
       expected,
     );
   });
@@ -181,7 +182,7 @@ describe("middlewareOptions", () => {
   });
 
   it("reads values that environment overrides deliver as a single string or the wrong type", () => {
-    // NUXT_NEXTGEN_AUDIENCE=api arrives as "api"; =5s as the string "5s".
+    // NUXT_ZITADEL_AUDIENCE=api arrives as "api"; =5s as the string "5s".
     const options = middlewareOptions({
       audience: "api",
       protectedRoutes: "/admin",
@@ -191,5 +192,49 @@ describe("middlewareOptions", () => {
     expect(options.audience).toEqual(["api"]);
     expect(options.protectedRoutes).toEqual(["/admin"]);
     expect(options.clockSkewMs).toBeUndefined();
+  });
+
+  it.each([
+    ["/a,/b", ["/a", "/b"]],
+    [" /a , /b ,, ", ["/a", "/b"]],
+    ["/admin*", ["/admin*"]],
+    [",", undefined],
+  ])("splits the plain string %j on commas into %j", (value, expected) => {
+    expect(middlewareOptions({ protectedRoutes: value }).protectedRoutes).toEqual(expected ?? []);
+    expect(middlewareOptions({ ignoredRoutes: value }).ignoredRoutes).toEqual(expected);
+  });
+
+  it("keeps a list of routes as it is", () => {
+    const routes = ["/a,b", "/c"];
+
+    expect(middlewareOptions({ protectedRoutes: routes }).protectedRoutes).toEqual(routes);
+  });
+
+  it("refuses to start when only the running server's environment has an old name", async () => {
+    vi.stubEnv("NUXT_NEXTGEN_PROTECTED_ROUTES", '["/admin*"]');
+
+    await expect(moduleHandler({})).rejects.toThrow(
+      "NUXT_NEXTGEN_PROTECTED_ROUTES is now NUXT_ZITADEL_PROTECTED_ROUTES",
+    );
+  });
+
+  it.each([
+    [
+      "runtimeConfig.nextgen",
+      { nextgen: {} },
+      "runtimeConfig.nextgen is now runtimeConfig.zitadel",
+    ],
+    [
+      "runtimeConfig.public.nextgenProxyPath",
+      { public: { nextgenProxyPath: "/auth" } },
+      "runtimeConfig.public.nextgenProxyPath is now runtimeConfig.public.zitadelProxyPath",
+    ],
+    [
+      "runtimeConfig.public.nextgenApiBase",
+      { public: { nextgenApiBase: "/auth" } },
+      "runtimeConfig.public.nextgenApiBase is now runtimeConfig.public.zitadelApiBase",
+    ],
+  ])("refuses to start with %s in the runtime config", async (_label, rest, problem) => {
+    await expect(moduleHandler({}, rest)).rejects.toThrow(problem);
   });
 });

@@ -241,3 +241,33 @@ export async function createDistinctRelease(
   );
   return { id: release.id, message: release.metadata.message ?? "" };
 }
+
+/**
+ * Registers an application through `POST /applications` with one confidential
+ * client, as an integrator's backend would. Returns the application's id.
+ */
+export async function registerApplication(
+  zitadel: ConnectedZitadel,
+  slug: string,
+): Promise<string> {
+  const application = await withErrorBody(
+    zitadel.api.publishApplication(
+      {
+        application: {
+          slug,
+          name: slug,
+          clients: [
+            {
+              slug: "web",
+              type: "confidential",
+              grant_types: ["authorization_code"],
+              redirect_uris: ["https://shop.e2e.acme.test/callback"],
+            },
+          ],
+        },
+      },
+      { project_id: zitadel.handle.projectId },
+    ),
+  );
+  return application.id;
+}

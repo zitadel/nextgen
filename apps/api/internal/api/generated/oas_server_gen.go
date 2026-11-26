@@ -14,8 +14,8 @@ type Handler interface {
 	//
 	// Send the plaintext token from the invitation link fragment. Acceptance grants the invitation's role
 	// (a project grant for `project_member`) when the invitation is pending and unexpired, the project is
-	// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
-	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
+	// claimed, and the creator still holds `admin` unless `created_by` is null. The inviter cannot accept
+	// their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
 	// A user who already has access to the project gets `409 inv.already_member` with their strongest role
 	// as `details.details.relation`: no grant is written and the invitation stays pending.
@@ -322,11 +322,12 @@ type Handler interface {
 	// `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
 	// invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 	// `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
-	// and the original is deleted in the same transaction unless it was accepted.
+	// and the original is deleted in the same transaction. An accepted original cannot be replaced: the
+	// request answers `404`.
 	//
-	// The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
-	// can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-	// platform project, and when the project already has 100 pending unexpired invitations.
+	// The `link` appears only in this response. Send it to the recipient yourself; whoever opens it and is
+	// signed in can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server
+	// without a platform project, and when the project already has 100 pending unexpired invitations.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 	// Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -1137,34 +1138,6 @@ type Handler interface {
 	//
 	// GET /policies/{policy_id}/revisions
 	ListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (ListPolicyRevisionsRes, error)
-	// ListProjectAdmins implements listProjectAdmins operation.
-	//
-	// Lists the people who can administer a project, and how each of them holds that access.
-	//
-	// A person appears once, with one entry in `sources` per way they hold it:
-	//
-	//  - `owning_team`: an active member of the team that owns the project, the team a claim attaches the
-	//    project to. Removing a grant does not remove this access. It ends only when the person leaves the
-	//    team or the project changes owner.
-	//  - `grant`: an unexpired `admin` grant on the project, which is a role given to the person
-	//    (`grant_id` only) or to a team they are an active member of (`grant_id` and `team`). Revoking
-	//    that grant removes this source.
-	//
-	// The list follows the authorization check. A person who left a team, or whose team or user was
-	// deactivated, is not listed through it. Grants that expired or carry a lower role are left out. A
-	// person whose only access is a `viewer` or `editor` grant is not an admin and is not listed. Like the
-	// check, a direct user grant requires an active user, so a suspended person's direct grant is not
-	// listed.
-	//
-	// Every caller who passes the project read check sees every listed admin and every team name on
-	// `sources`. Co-membership no longer filters the roster.
-	//
-	// The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
-	// (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
-	// project.
-	//
-	// GET /projects/{project_id}/admins
-	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
 	// ListProjectMembers implements listProjectMembers operation.
 	//
 	// Lists the people who have a role on a project, with each person's strongest role and how they hold

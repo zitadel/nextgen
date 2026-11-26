@@ -7,8 +7,8 @@ post:
 
     Send the plaintext token from the invitation link fragment. Acceptance
     grants the invitation's role (a project grant for `project_member`) when
-    the invitation is pending and unexpired, the project is active and claimed,
-    and the creator still holds `admin` unless `created_by` is null. The
+    the invitation is pending and unexpired, the project is claimed, and the
+    creator still holds `admin` unless `created_by` is null. The
     inviter cannot accept their own invitation. Every unknown or finished token
     answers the same opaque `404`.
 
@@ -65,8 +65,8 @@ post:
             $ref: ../../../components/error-details.yaml
     '409':
       description: |
-        The user already has access to the project (`inv.already_member`), or
-        the project is unclaimed or inactive, so acceptance cannot complete.
+        The user already has access to the project (`inv.already_member`), the
+        project is unclaimed, or the server has no platform project.
       content:
         application/json:
           schema:

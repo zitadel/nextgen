@@ -15,14 +15,16 @@ import { type ApplicationClient, clientTypeLabel, grantTypeLabel } from "../mode
  * `client_id` is what a person opens the screen for.
  *
  * Read-only: a client is written by `POST /applications` or a deploy, never
- * here.
- *
- * The document has no CLI hint. Every application the API returns today was
- * registered through `POST /applications`, which a deploy does not revise, so
- * "edit locally, then deploy" would be wrong for it. The hint belongs on an
- * application a release declares, once the response says which is which.
+ * here. The document's "edit locally, then deploy" hint shows only for a
+ * declared application: a deploy never revises a registered one.
  */
-export function ApplicationClients({ clients }: { clients: ApplicationClient[] }) {
+export function ApplicationClients({
+  clients,
+  declared,
+}: {
+  clients: ApplicationClient[];
+  declared: boolean;
+}) {
   return (
     <DetailRow align="control" label={<h3>Clients</h3>}>
       <DetailAccordion defaultValue={clients.slice(0, 1).map((client) => client.slug)}>
@@ -30,8 +32,9 @@ export function ApplicationClients({ clients }: { clients: ApplicationClient[] }
           <DetailAccordionItem key={client.slug} value={client.slug} title={client.slug}>
             <ClientRows client={client} />
             {/* The document never carries a secret: the API shows one once,
-                when it creates the client. */}
-            <DocumentViewer document={client} noun="client" cliHint={false} />
+                when it creates the client, and a declared client names only
+                the variable holding it. */}
+            <DocumentViewer document={client} noun="client" cliHint={declared} />
           </DetailAccordionItem>
         ))}
       </DetailAccordion>
@@ -68,6 +71,19 @@ function ClientRows({ client }: { client: ApplicationClient }) {
       <DetailRow label="First-party">
         <span className={DETAIL_VALUE}>{client.first_party ? "Yes" : "No"}</span>
       </DetailRow>
+      {/* A confidential client has a secret. The API generates a registered
+          client's on create; a declared one names the variable that holds it,
+          which may have no value until a deploy checks it, so the row names
+          the variable rather than claim it is set. */}
+      {client.type === "confidential" && (
+        <DetailRow label="Client secret">
+          {client.secret ? (
+            <span className={cn(DETAIL_VALUE, MONO_VALUE)}>{client.secret}</span>
+          ) : (
+            <span className={DETAIL_VALUE}>Configured</span>
+          )}
+        </DetailRow>
+      )}
       <DetailRow align="center" label="Grant types">
         <span className="flex min-w-0 flex-wrap gap-2">
           {client.grant_types.map((grantType) => (

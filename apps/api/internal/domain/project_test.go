@@ -254,7 +254,7 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 		}
 
 		// The signing key hangs off the same KEK, and its seed is usable.
-		signer, err := keySet.TokenSigningKey.Signer(kekCrypter)
+		signer, err := keySet.TokenSigningKey.Signer(kekCrypter, nil)
 		require.NoError(t, err)
 		_, err = signer.Sign([]byte(`{"sub":"user-1"}`))
 		require.NoError(t, err)

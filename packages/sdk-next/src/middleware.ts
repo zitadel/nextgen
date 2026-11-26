@@ -1,8 +1,25 @@
-import type { ZitadelProject } from "@zitadel/api/config";
+/**
+ * The edge middleware entry of `@zitadel/sdk-next`: it proxies `/__nextgen/*` to the Zitadel
+ * backend, judges the session and protects routes.
+ *
+ * It uses only Web APIs (`fetch`, Web Crypto), so it runs in the Next.js edge runtime on Vercel and
+ * on Cloudflare Workers, and it imports no server-only module. Import it from `proxy.ts` (or
+ * `middleware.ts` on Next.js 15), never from a component. Next.js runs that file only on the routes
+ * its `matcher` covers, so the `matcher` decides where this code runs at all. Use
+ * {@link zitadelMiddleware} to configure it inline, or {@link createProxy} to derive it from
+ * the project handle of `configureZitadel()`.
+ *
+ * Use Next.js 15.2.3 or later. Earlier 15.x releases skip middleware for a request that sends an
+ * `x-middleware-subrequest` header, which on a self-hosted deployment would let any request past
+ * the protected routes.
+ *
+ * @module
+ */
+import type { ZitadelProject } from "@zitadel/sdk-core/config";
 import type {
-  NextgenMiddlewareOptions,
-  ProxyRoute,
-  ResolveSessionOptions,
+  ZitadelProxyRoute,
+  ZitadelResolveSessionOptions,
+  ZitadelMiddlewareOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 import type { NextRequest } from "next/server";
@@ -23,13 +40,12 @@ import {
 import { NextResponse } from "next/server";
 
 /**
- * Clones the incoming request headers, injects `extra` key/value pairs,
- * and registers them with the Next.js header-tunnelling mechanism so that
- * server components can read them via `headers()`.
+ * Clones the incoming request headers, injects extra headers, and registers them with the Next.js
+ * header-tunnelling mechanism so that Server Components can read them through `headers()`.
  *
- * @param req   - The incoming edge request.
- * @param extra - Additional headers to inject (e.g. `x-nextgen-auth-token`).
- * @returns A new `Headers` instance with the injected values registered.
+ * @param req - The incoming edge request.
+ * @param extra - The headers to inject, for example `x-zitadel-auth-token`.
+ * @returns A new `Headers` instance that carries the injected values, registered for tunnelling.
  */
 function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>): Headers {
   const headers = new Headers(req.headers);
@@ -43,7 +59,7 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
 
   const injectedNames = [];
 
-  // This is the only writer of x-nextgen-auth-token: it injects the session
+  // This is the only writer of x-zitadel-auth-token: it injects the session
   // token for server components, verified, or off a protected route an opaque
   // one unchecked, which auth() checks. A client-sent one never reaches here.
   for (const [name, value] of Object.entries(extra)) {
@@ -57,43 +73,86 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
 }
 
 /**
- * Next.js Edge middleware that handles proxying, JWT verification, and route
- * protection in a single pass.
+ * Handles the same-origin proxy, session verification and route protection of a Next.js app in a
+ * single middleware pass.
  *
- * Place this in your `middleware.ts` file:
+ * Call it from the `proxy.ts` file (`middleware.ts` on Next.js 15), as the app's only middleware.
+ * It does three things for each request the `matcher` covers:
  *
+ * - It proxies requests under `proxyPath` (default `/__nextgen`) to the Zitadel backend, so the
+ *   browser, the widgets and {@link session!getSession | getSession} talk only to the app's own
+ *   origin.
+ * - It judges the session. A JWT is verified on every route through the JWKS, which takes no
+ *   backend call. An opaque session token is checked against the backend only on a route in
+ *   `protectedRoutes`, where the result decides between a redirect and a `503`. On other routes the
+ *   token is handed on unchecked and {@link server!auth | auth} checks it once per render,
+ *   and only on a page that reads the session, so a page that never reads it costs no backend call.
+ * - It redirects a signed-out request for a protected route to `loginPath`, with the requested path
+ *   and query in `?next=`, where `<zitadel-login>` returns after sign-in.
+ *
+ * It passes the session token to the render in the internal `x-zitadel-auth-token` request header.
+ * This function is the only writer of that header. It answers `400` to any request that arrives
+ * with it, on every route, before anything else runs, so a client cannot forge a session. Because
+ * the `matcher` decides where it runs, a protected route that the `matcher` leaves out is never
+ * redirected and stays public. Use a `matcher` that covers every route except the Next.js build
+ * files, as the example does, so `protectedRoutes` is the one list that decides.
+ *
+ * A session counts only in the app's own project: `projectId`, else `ZITADEL_PROJECT_ID`, else
+ * `NEXT_PUBLIC_ZITADEL_PROJECT_ID`. With no project, nobody is signed in. The `loginPath` must be a
+ * relative path that starts with a single `/`, because anything else would redirect the browser to
+ * another host, which is an open-redirect hole. The function throws when it is not. The session
+ * cookie is named per project, so several apps and the Zitadel Console on one host do not sign one
+ * another out.
+ *
+ * Protected routes and ignored routes take path patterns, with a trailing `*` as a prefix match
+ * (`"/admin*"`). Routes in `ignoredRoutes` skip the middleware entirely, before the proxy.
+ *
+ * Naming: Next.js runs the function that middleware.ts (proxy.ts from Next.js 16) exports, with
+ * each request. zitadelMiddleware(request, options) is that function: it handles the request
+ * itself and returns the response. It is not a factory, so it has no create prefix.
+ * createProxy(project, options) is the factory that returns a handler.
+ *
+ * A signed-out request for a protected route is redirected with an absolute URL on the origin of
+ * the request, such as `https://app.example.com/login?next=%2Fadmin`, because
+ * `NextResponse.redirect` needs an absolute URL.
+ *
+ * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
+ * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer
+ * from a client, and the server builds the OAuth issuer and the `Secure` decision for session
+ * cookies from those headers, so strip them at the edge when clients can reach the app directly.
+ *
+ * @param req - The incoming Next.js edge request.
+ * @param options - The middleware configuration; see {@link ZitadelMiddlewareOptions}.
+ * @returns A response that continues the request, redirects it, answers `503` or `400`, or is the
+ *   proxied backend response.
+ * @throws When `options.loginPath` is not a relative path that starts with a single `/` and has no backslash.
+ *
+ * @example
  * ```ts
- * import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
+ * // proxy.ts (middleware.ts and `middleware` on Next.js 15).
+ * import { zitadelMiddleware } from "@zitadel/sdk-next/middleware";
  * import type { NextRequest } from "next/server";
  *
- * export function middleware(req: NextRequest) {
- *   return nextgenMiddleware(req, {
+ * export function proxy(req: NextRequest) {
+ *   return zitadelMiddleware(req, {
  *     url: process.env.ZITADEL_URL,
- *     protectedRoutes: ["/profile"],
+ *     protectedRoutes: ["/profile", "/dashboard*"],
  *     loginPath: "/login",
  *   });
  * }
  *
- * A session counts only in the app's own project: `projectId`, else
- * `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`.
- *
- * // Every route but Next.js's build files: a protected route the matcher
- * // leaves out never reaches the middleware, and stays public.
+ * // Every route but the Next.js build files: a protected route that the matcher leaves out
+ * // never reaches the middleware and stays public.
  * export const config = {
  *   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
  * };
  * ```
- *
- * @param req     - The incoming Next.js edge request.
- * @param options - Middleware configuration options.
- * @returns A `NextResponse` or `Response` to continue, redirect, or proxy.
  */
-export async function nextgenMiddleware(
+export async function zitadelMiddleware(
   req: NextRequest,
-  options: NextgenMiddlewareOptions = {},
+  options: ZitadelMiddlewareOptions = {},
 ): Promise<NextResponse | Response> {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
     projectId = process.env.ZITADEL_PROJECT_ID || process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -107,21 +166,22 @@ export async function nextgenMiddleware(
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
   } = options;
+  const url = options.url || process.env.ZITADEL_URL || "http://localhost:8080";
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
   // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//") || loginPath.includes("\\")) {
     throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+      `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
         `would allow open-redirect attacks.`,
     );
   }
 
-  // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+  // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
   // request that carries it, on every route, before anything else runs.
-  if (req.headers.has("x-nextgen-auth-token")) {
+  if (req.headers.has("x-zitadel-auth-token")) {
     return new Response("Bad Request", { status: 400 });
   }
 
@@ -138,7 +198,7 @@ export async function nextgenMiddleware(
     return refusedProxyResponse();
   }
   if (route) {
-    return proxyRequest(req, url, route, projectId, proxyTimeoutMs);
+    return proxyRequest(req, url, route, projectId, proxyTimeoutMs, options.projectSecret);
   }
 
   return handleAuth(req, {
@@ -157,30 +217,42 @@ export async function nextgenMiddleware(
 }
 
 /**
- * Forwards a request the proxy handles to the upstream auth backend and streams
- * the response back, stripping hop-by-hop headers in both directions. The
- * session cookie travels under this project's name in the browser and the
- * server's name upstream ({@link proxySessionCookies}).
+ * Forwards a request that the proxy handles to the Zitadel backend and returns the response, with
+ * hop-by-hop headers stripped in both directions. The session cookie travels under the name of this
+ * project in the browser and under the name of the server upstream ({@link proxySessionCookies}).
  *
- * All non-hop-by-hop headers from the incoming request are forwarded, including
- * any `X-Forwarded-For` chain already set by an upstream CDN or load balancer.
- * When `X-Forwarded-For` is absent (direct connection with no upstream proxy),
- * it is initialised from the runtime-provided client IP so the auth server
- * always receives origin information. `X-Forwarded-Host` and `X-Forwarded-Proto`
- * are set only when absent, preserving values injected by an upstream CDN.
+ * The session cookie travels under the project's own name in the browser and under the server's
+ * name upstream, so the proxy renames it each way and never forwards another project's session
+ * cookie. Every other request header is forwarded except the internal ones. The client address for
+ * `X-Forwarded-For` comes only from the runtime (`req.ip`), never from a request header such as
+ * `x-real-ip`, which any caller can set when the app is reachable directly. That address is
+ * appended to an existing `X-Forwarded-For` chain, so a CDN's hop is kept, and is omitted when the
+ * runtime provides none. `X-Forwarded-Host` and `X-Forwarded-Proto` are set only when absent, so
+ * values from an upstream CDN survive. The body is read eagerly into a buffer, because a
+ * streaming body is not accepted by the Node.js `fetch`. A redirect from the backend is not
+ * followed: a same-origin one is passed through to the browser, and the request times out after
+ * `proxyTimeoutMs`.
  *
- * @param req        - The incoming edge request.
- * @param authUrl    - Base URL of the auth backend.
- * @param route      - Where the request goes ({@link proxyRoute}).
- * @param projectId  - The project this app signs its users in to.
- * @returns The proxied upstream `Response`.
+ * It adds the project secret as a bearer token only to the session exchange, and only when the
+ * caller sent no credential of its own. Adding it to every proxied operation would turn this
+ * public boundary into an open relay with operator rights.
+ *
+ * @param req - The incoming edge request.
+ * @param authUrl - The base URL of the Zitadel backend.
+ * @param route - Where the request goes ({@link proxyRoute}).
+ * @param projectId - The project this app signs its users in to.
+ * @param proxyTimeoutMs - The time in milliseconds to wait for the backend.
+ * @param projectSecretOption - The `projectSecret` option, which wins over the
+ *   `ZITADEL_PROJECT_SECRET` environment variable, or `undefined` when none is set.
+ * @returns The proxied upstream response.
  */
 async function proxyRequest(
   req: NextRequest,
   authUrl: string,
-  route: ProxyRoute,
+  route: ZitadelProxyRoute,
   projectId: string | undefined,
   proxyTimeoutMs: number,
+  projectSecretOption: string | undefined,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = route.path;
@@ -242,8 +314,11 @@ async function proxyRequest(
   // turns this public request boundary into an operator-capable open relay.
   // Preserve an explicit caller credential so the exchange can use the future
   // publishable-key plane without being overwritten.
-  if (requiresProjectSecret(req.method, suffix) && !upstreamHeaders.has("authorization")) {
-    const secret = process.env.ZITADEL_PROJECT_SECRET;
+  if (
+    requiresProjectSecret(req.method, suffix, upstreamHeaders) &&
+    !upstreamHeaders.has("authorization")
+  ) {
+    const secret = projectSecretOption || process.env.ZITADEL_PROJECT_SECRET;
     if (secret) {
       upstreamHeaders.set("authorization", `Bearer ${secret}`);
     }
@@ -252,7 +327,8 @@ async function proxyRequest(
   // Read body eagerly so undici receives a concrete buffer rather than a
   // WinterCG ReadableStream, which is incompatible with Node.js fetch body
   // extraction.
-  const bodyBuffer = hasBody ? await req.arrayBuffer() : undefined;
+  const buffered = hasBody ? await req.arrayBuffer() : undefined;
+  const bodyBuffer = buffered && buffered.byteLength > 0 ? buffered : undefined;
 
   const upstream = await fetch(target, {
     method: req.method,
@@ -281,33 +357,28 @@ async function proxyRequest(
 }
 
 /**
- * Options passed internally to {@link handleAuth} after destructuring the
- * public-facing {@link NextgenMiddlewareOptions}: the route policy, plus what
- * the shared {@link resolveSession} judges the session by.
+ * The options {@link handleAuth} receives after {@link zitadelMiddleware} destructures its
+ * public options: the route policy, plus what the shared session resolver judges the session by.
  */
-interface AuthHandlerOptions extends ResolveSessionOptions {
+interface AuthHandlerOptions extends ZitadelResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
   readonly pathname: string;
 }
 
 /**
- * Judges the session and tunnels its token to server components via a request
- * header, where `auth()` verifies it before trusting it. Redirects to the
- * login page when nobody is signed in on a protected route. Either way the
- * response carries the session cookies the judgement asks for. When the
- * backend cannot say whether the session is live, a protected route answers
- * `503` instead.
+ * Judges the session, tunnels its token to Server Components and applies the route policy.
  *
- * Only a protected route checks an opaque session token with the backend, a
- * call to the server. Elsewhere the middleware decides nothing by the session,
- * so it hands the token on unchecked: `auth()` checks it, once per render, and
- * only on a page that reads the session (ADR 036). A JWT is judged on every
- * route, which takes no call.
+ * A signed-in request continues with its token in `x-zitadel-auth-token`. A signed-out request for
+ * a protected route is redirected to the login page. When the backend cannot say whether an opaque
+ * session is live, a protected route answers `503` instead of a redirect, because the user may well
+ * be signed in. Off a protected route an opaque token is handed on unchecked, which
+ * {@link server!auth | auth} verifies. Either way the response carries the cookie changes the
+ * judgement asks for.
  *
- * @param req  - The incoming edge request.
- * @param opts - Auth handler options.
- * @returns A `NextResponse` to continue, redirect, or answer `503`.
+ * @param req - The incoming edge request.
+ * @param opts - The route policy and verification options.
+ * @returns A response that continues, redirects, or answers `503`.
  */
 async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
   const { protectedRoutes, loginPath, pathname, ...verification } = opts;
@@ -328,17 +399,17 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
 
   let response: NextResponse;
   if (auth.isAuthenticated) {
-    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": auth.session.token });
+    const tunnelled = tunnelHeaders(req, { "x-zitadel-auth-token": auth.session.token });
     response = NextResponse.next({ request: { headers: tunnelled } });
   } else if (undecided && isProtected) {
     // The backend could not say whether the session is live. The user may well
     // be signed in, so a protected route answers 503 rather than send them to
     // the login page.
-    response = new NextResponse("Service Unavailable", { status: 503 });
+    return new NextResponse("Service Unavailable", { status: 503 });
   } else if (isProtected) {
     response = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
   } else {
-    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": unchecked ?? "" });
+    const tunnelled = tunnelHeaders(req, { "x-zitadel-auth-token": unchecked ?? "" });
     response = NextResponse.next({ request: { headers: tunnelled } });
   }
 
@@ -366,28 +437,54 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
 }
 
 /**
- * Options for {@link createProxy} that are separate from the shared
- * {@link ZitadelConfig}. These configure route protection, login
- * redirects, and JWT verification behaviour.
+ * The options of {@link createProxy}: everything in {@link ZitadelMiddlewareOptions} except
+ * `proxyPath` and `url`.
  *
- * `proxyPath` and `url` are omitted because they come from the
- * {@link ZitadelConfig} passed as the first argument.
+ * Those two come from the project handle that is the first argument of {@link createProxy}, so
+ * they are omitted here to keep a single source for each. The remaining options configure route
+ * protection, the login redirect and JWT verification, and have the meaning and defaults
+ * documented on {@link ZitadelMiddlewareOptions}. A `projectId` given here wins over the handle's.
+ *
+ * @example
+ * ```ts
+ * import type { ZitadelProxyOptions } from "@zitadel/sdk-next/middleware";
+ *
+ * const options: ZitadelProxyOptions = { protectedRoutes: ["/admin*"], loginPath: "/login" };
+ * ```
  */
-export type ProxyOptions = Omit<NextgenMiddlewareOptions, "proxyPath" | "url">;
+export type ZitadelProxyOptions = Omit<ZitadelMiddlewareOptions, "proxyPath" | "url">;
 
 /**
- * A pre-configured middleware handler returned by {@link createProxy}.
+ * The middleware handler that {@link createProxy} returns.
+ *
+ * It takes the incoming request and resolves to the response described on
+ * {@link zitadelMiddleware}. Export it from `proxy.ts` as `proxy`, or as `middleware` on
+ * Next.js 15.
  */
-export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response>;
+export type ZitadelProxyHandler = (req: NextRequest) => Promise<NextResponse | Response>;
 
 /**
- * Creates a pre-configured middleware handler from the SDK config
- * returned by `configureZitadel()`. This is the derived-service
- * derived service pattern:
+ * Creates a configured middleware handler from the project handle that `configureZitadel()`
+ * returns, so the project, backend URL and proxy path are configured once.
  *
+ * Use it when the app already calls `configureZitadel()`, and use {@link zitadelMiddleware}
+ * to configure the middleware inline. The handle supplies `url` and `proxyPath`, and its project id
+ * holds sessions to that project unless `options.projectId` names another. The handler behaves
+ * exactly as {@link zitadelMiddleware} does.
+ *
+ * {@link server!auth | auth} runs in the server runtime, where the middleware's handle may
+ * not be configured. It reads `ZITADEL_PROJECT_ID` or `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, else a
+ * handle configured there. When the project lives only in this handle, pass it as `auth({
+ * projectId })` too, or sessions read as signed out on the server.
+ *
+ * @param config - The project handle from `configureZitadel()`.
+ * @param options - Route protection and JWT options; see {@link ZitadelProxyOptions}.
+ * @returns A middleware handler to export from `proxy.ts`.
+ *
+ * @example
  * ```ts
  * // src/zitadel.ts
- * import { configureZitadel } from "@zitadel/api/config";
+ * import { configureZitadel } from "@zitadel/sdk-next/client";
  * import { createProxy } from "@zitadel/sdk-next/middleware";
  *
  * const zitadel = configureZitadel({
@@ -401,29 +498,21 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  * });
  * ```
  *
- * Then in middleware.ts:
- *
+ * @example
  * ```ts
- * import { proxy } from "./zitadel";
- * export const middleware = proxy;
+ * // proxy.ts
+ * export { proxy } from "./src/zitadel";
  * ```
- *
- * Sessions are held to the handle's project unless `options.projectId` names
- * another. `auth()` runs in the server runtime, where the middleware's handle
- * may not be configured: it reads `ZITADEL_PROJECT_ID` /
- * `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, else a handle configured there. When the
- * project lives only in this handle, pass it as `auth({ projectId })` too.
- *
- * @param config  - The SDK handle from `configureZitadel()`.
- * @param options - Route protection and JWT options.
- * @returns A middleware handler function.
  */
-export function createProxy(config: ZitadelProject, options: ProxyOptions = {}): ProxyHandler {
-  const mergedOptions: NextgenMiddlewareOptions = {
+export function createProxy(
+  config: ZitadelProject,
+  options: ZitadelProxyOptions = {},
+): ZitadelProxyHandler {
+  const mergedOptions: ZitadelMiddlewareOptions = {
     ...options,
     projectId: options.projectId ?? (config.projectId || undefined),
     proxyPath: config.proxyPath,
     url: config.url,
   };
-  return (req: NextRequest) => nextgenMiddleware(req, mergedOptions);
+  return (req: NextRequest) => zitadelMiddleware(req, mergedOptions);
 }

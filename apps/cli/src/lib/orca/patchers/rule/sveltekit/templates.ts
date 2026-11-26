@@ -9,7 +9,7 @@ const WIDGET_WRAP =
   "position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark";
 
 /**
- * `src/hooks.server.ts` — the SvelteKit server hook. `createNextgenHandle`
+ * `src/hooks.server.ts` — the SvelteKit server hook. `createZitadelHandle`
  * proxies `/__nextgen/*` to the auth backend (attaching the project service-key
  * from `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
  * unauthenticated requests away from protected routes. The settings come from
@@ -20,9 +20,9 @@ const WIDGET_WRAP =
 export function hooksServerTemplate(): string {
   return `${ManagedFile.MARKER}
 import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
-import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
+import { createZitadelHandle } from "@zitadel/sdk-sveltekit/server";
 
-export const handle = createNextgenHandle({
+export const handle = createZitadelHandle({
   url: ZITADEL_URL,
   projectSecret: ZITADEL_PROJECT_SECRET,
   projectId: ZITADEL_PROJECT_ID,
@@ -79,7 +79,7 @@ export function indexPageTemplate(): string {
 
 /**
  * A login/register page. Renders the idiomatic `<ZitadelLogin>` Svelte component
- * from `@zitadel/sdk-svelte` (typed props, callback events) behind an `onMount`
+ * from `@zitadel/sdk-sveltekit/components` (the widgets of `@zitadel/sdk-svelte`, re-exported: typed props, callback events) behind an `onMount`
  * guard so the widget only mounts on the client. `configureZitadel` returns the
  * project handle.
  *
@@ -106,7 +106,7 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
   return `<script lang="ts">
   ${ManagedFile.MARKER}
   import { onMount } from "svelte";
-  import { ${importNames} } from "@zitadel/sdk-svelte";${localesComment}
+  import { ${importNames} } from "@zitadel/sdk-sveltekit/components";${localesComment}
 
   const project = configureZitadel({
     projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",
@@ -141,7 +141,7 @@ export function profilePageTemplate(): string {
   return `<script lang="ts">
   ${ManagedFile.MARKER}
   import { onMount } from "svelte";
-  import { ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
+  import { ZitadelSession, configureZitadel } from "@zitadel/sdk-sveltekit/components";
 
   const project = configureZitadel({
     projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",

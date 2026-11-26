@@ -142,7 +142,7 @@ describe("guidance content", () => {
 
   it("tells each framework how its own chrome reads session state", () => {
     // Next: the client helper (works on any page), plus the server-side
-    // auth(), which the every-route matcher lets read the session anywhere.
+    // getAuth(), which the every-route matcher lets read the session anywhere.
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain("@zitadel/sdk-next/session");
     expect(agents).toContain("`matcher` covers every route");

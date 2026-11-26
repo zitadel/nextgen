@@ -79,6 +79,9 @@ const REPLACES_ACCEPTED_REFUSAL = {
   next: [{ id: "invitation:create" }],
 } as const satisfies Refusal;
 
+/** Says the link cannot be read again, in the console's words. */
+const SHOWN_ONCE = "This link is shown only once. Copy it now.";
+
 /**
  * `zitadel invitation create` — invite someone into the project with a link.
  *
@@ -188,6 +191,7 @@ export default class InvitationCreate extends Telemetered(Promptable(ChangeComma
         lines: [
           escapeControlCharacters(invitation.link),
           `Whoever opens it gets the ${invitationRole(invitation)} role. It expires in 72 hours.`,
+          SHOWN_ONCE,
         ],
       },
       next: {

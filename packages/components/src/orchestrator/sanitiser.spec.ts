@@ -42,6 +42,15 @@ describe("DOMPurify sanitiser", () => {
     expect(out).not.toContain("onerror");
   });
 
+  it.each(["onmouseover", "onpointerdown", "onanimationend"])(
+    "strips the %s handler from a custom element",
+    (handler) => {
+      const out = sanitise(`<zl-button ${handler}="alert(1)" action="submit">Go</zl-button>`);
+      expect(out).not.toContain(handler);
+      expect(out).toContain('action="submit"');
+    },
+  );
+
   it("strips <style> blocks (theming is orchestrator-owned)", () => {
     const out = sanitise(`<div><style>:host { color: red }</style>safe</div>`);
     expect(out).not.toContain("<style");
