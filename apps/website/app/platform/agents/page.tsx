@@ -1,0 +1,92 @@
+import { NumberedCommands, RowList } from "../../blocks";
+import { actorEventsCommand, appPath, userEventsCommand } from "../../commands";
+import { FeaturePage, featureMetadata } from "../../feature-page";
+
+export const metadata = featureMetadata("agents");
+
+export default function AgentsPage() {
+  return (
+    <FeaturePage
+      slug="agents"
+      content={{
+        points: [
+          "Each agent signs in as itself, with only the access you give it.",
+          "It acts for a user only after that user agrees.",
+          "Every action names the agent and the user it acted for.",
+        ],
+        asks: [
+          {
+            ask: "Register our support agent.",
+            reply:
+              "Done. The support agent has its own identity and signs in as itself, with only the access you gave it.",
+          },
+          {
+            ask: "Let it look up orders when a user agrees.",
+            reply:
+              "Users see a consent screen the first time the agent asks. Once they agree, each look-up names the agent and the user.",
+          },
+          {
+            ask: "Show everything the support agent did today.",
+            reply:
+              "It signed in as itself and looked up orders for users who had agreed. Every event names the agent and the user.",
+          },
+        ],
+        hood: {
+          line: "Every event carries the fields that name who acted and for whom. These are their descriptions in the API.",
+          artifact: (
+            // The shared event fields' descriptions in the API
+            // (apps/api/api/openapi/endpoints/events/event-base.yaml), cut
+            // to their first sentence.
+            <RowList
+              title="Event fields"
+              rows={[
+                { term: "actor_id", text: "The ID of the actor that triggered the event." },
+                {
+                  term: "user_id",
+                  text: "The ID of the user the event concerns, whoever triggered it.",
+                },
+                { term: "client_id", text: "The application or agent that produced the event." },
+                { term: "delegation_type", text: "The kind of delegation. Absent when unset." },
+              ]}
+            />
+          ),
+        },
+        tryIt: {
+          line: "Run them in your app's folder. They read the events every caller writes.",
+          content: (
+            <div className="max-w-3xl">
+              <NumberedCommands
+                title={appPath}
+                steps={[
+                  { label: "What one user did", command: actorEventsCommand },
+                  {
+                    label: "What happened to a user's account, whoever acted",
+                    command: userEventsCommand,
+                  },
+                ]}
+                placement="try_it"
+                numbered={false}
+              />
+            </div>
+          ),
+        },
+        questions: [
+          {
+            question: "How does an agent get its identity?",
+            answer:
+              "It signs in as itself, the way an app does, and gets only the access you give it.",
+          },
+          {
+            question: "Can an agent act for one of my users?",
+            answer:
+              "Only with that user's consent, and every action names both the agent and the user.",
+          },
+          {
+            question: "Does it work with MCP servers?",
+            answer: "Yes. An MCP client signs in as an app, and your MCP server checks its token.",
+          },
+        ],
+      }}
+    />
+  );
+}

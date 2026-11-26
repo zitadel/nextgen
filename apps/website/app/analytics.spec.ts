@@ -31,6 +31,11 @@ describe("pageOf", () => {
     expect(pageOf("/changelog")).toBe("changelog");
     expect(pageOf("/changelog/zitadel-deploy")).toBe("changelog");
   });
+
+  it("calls a feature page by its two segments", () => {
+    expect(pageOf("/platform/sign-in")).toBe("platform/sign-in");
+    expect(pageOf("/platform")).toBe("platform");
+  });
 });
 
 describe("trackEvent", () => {

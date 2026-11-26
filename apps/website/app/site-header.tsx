@@ -5,6 +5,7 @@ import { links } from "./links";
 import { Logo } from "./logo";
 import { NAV, type NavGroup } from "./nav";
 import type { PhaseSlug } from "./phases";
+import type { FeatureSlug } from "./platform";
 import { ThemeToggle } from "./theme-toggle";
 
 const NAV_LINK =
@@ -15,18 +16,31 @@ const PANEL =
   "absolute top-full z-50 mt-3 rounded-2xl border border-window-border bg-window p-2 text-left shadow-(--window-shadow)";
 
 /**
- * A menu's group: its heading over its pages, each counted when the group is
- * numbered. The list carries the heading as its name, which a screen reader
- * reads once.
+ * A menu's group: `heading` over its pages, each counted when the group is
+ * numbered; no heading where the menu's button already says it. The list
+ * carries the heading as its name, which a screen reader reads once.
  */
-function Group({ group, current }: { group: NavGroup; current?: string }) {
+function Group({
+  group,
+  heading,
+  current,
+}: {
+  group: NavGroup;
+  heading: string | null;
+  current?: string;
+}) {
   const List = group.numbered ? "ol" : "ul";
   return (
     <div className="flex flex-col gap-1">
-      <p aria-hidden="true" className="px-3 pt-2 pb-1 font-mono text-text-muted text-xs leading-4">
-        {group.heading}
-      </p>
-      <List aria-label={group.heading} className="flex flex-col">
+      {heading && (
+        <p
+          aria-hidden="true"
+          className="px-3 pt-2 pb-1 font-mono text-text-muted text-xs leading-4"
+        >
+          {heading}
+        </p>
+      )}
+      <List aria-label={heading ?? group.heading} className="flex flex-col">
         {group.entries.map((entry, index) => (
           <li key={entry.href}>
             <a
@@ -96,13 +110,23 @@ function MenuIcon() {
 }
 
 // The bar over the page, on a plane of frosted glass that floats over the
-// page as it scrolls: the logo, the preview's label and the top level of
-// app/nav.ts on the left; the theme (from sm up), GitHub (from md up) and the
-// one primary button on the right. Below md one menu holds the top level, each
-// menu's groups under their headings, then the links. The header keeps its
-// place (h-16), so the hero below keeps its measure.
-export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug }) {
-  const menus = NAV.flatMap((item) => (item.kind === "menu" ? item.groups : []));
+// page as it scrolls: the logo, the preview's label and, from a laptop up,
+// the top level of app/nav.ts on the left; the theme (from sm up), GitHub
+// (from md up) and the one primary button on the right. Below a laptop one
+// menu holds the top level: every menu's groups under their headings, then
+// the links. The header keeps its place (h-16), so the hero below keeps its
+// measure.
+export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug | FeatureSlug }) {
+  // A phone's headings name the menu too, where a group's own does not.
+  const groups = NAV.flatMap((item) =>
+    item.kind === "menu"
+      ? item.groups.map((group) => ({
+          group,
+          heading:
+            group.heading === item.label ? group.heading : `${item.label} · ${group.heading}`,
+        }))
+      : [],
+  );
   const navLinks = NAV.flatMap((item) => (item.kind === "link" ? [item] : []));
   return (
     <header className="sticky top-0 z-40 h-16 px-3 pt-3 sm:px-4">
@@ -114,7 +138,7 @@ export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug }) {
           <span className="rounded-full bg-tint/10 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-secondary leading-4">
             Preview
           </span>
-          <nav aria-label="Main" className="ml-3 hidden items-center gap-0.5 text-sm md:flex">
+          <nav aria-label="Main" className="ml-3 hidden items-center gap-0.5 text-sm lg:flex">
             {NAV.map((item) =>
               item.kind === "link" ? (
                 <a
@@ -138,9 +162,14 @@ export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug }) {
                   panelClassName={`${PANEL} left-0`}
                 >
                   {/* A column per group, so another group sits beside it. */}
-                  <div className="grid auto-cols-[minmax(19rem,1fr)] grid-flow-col gap-2">
+                  <div className="grid auto-cols-[17.5rem] grid-flow-col gap-2">
                     {item.groups.map((group) => (
-                      <Group key={group.heading} group={group} current={current} />
+                      <Group
+                        key={group.heading}
+                        group={group}
+                        heading={group.heading === item.label ? null : group.heading}
+                        current={current}
+                      />
                     ))}
                   </div>
                 </Disclosure>
@@ -158,7 +187,7 @@ export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug }) {
             <GitHubMark className="size-[1.125rem]" />
           </a>
           <GetStartedButton />
-          <nav aria-label="Main" className="md:hidden">
+          <nav aria-label="Main" className="lg:hidden">
             <Disclosure
               label={
                 <>
@@ -169,9 +198,9 @@ export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug }) {
               buttonClassName={`group ${NAV_LINK}`}
               panelClassName={`${PANEL} right-0 w-[calc(100vw-2.25rem)] max-w-[24rem]`}
             >
-              <div className="flex flex-col gap-2">
-                {menus.map((group) => (
-                  <Group key={group.heading} group={group} current={current} />
+              <div className="flex max-h-[calc(100svh-5.5rem)] flex-col gap-2 overflow-y-auto">
+                {groups.map(({ group, heading }) => (
+                  <Group key={heading} group={group} heading={heading} current={current} />
                 ))}
                 <ul className="flex flex-col border-window-border border-t pt-2">
                   {navLinks.map((item) => (

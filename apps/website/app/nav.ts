@@ -1,11 +1,12 @@
 import { links } from "./links";
 import { PHASES, phasePath } from "./phases";
+import { FEATURE_GROUPS, FEATURES, featurePath } from "./platform";
 
 // The header's top level after the logo, left to right (site-header.tsx):
 // each item a link, or a menu whose panel sets its groups side by side and
 // whose groups a phone's menu lists one under another, each under its
-// heading. A Solutions menu or a Pricing link is one more item here, and a
-// Features group one more group in Product: data, not layout.
+// heading. A Solutions menu (use cases) or a Pricing link is one more item
+// here, and another group one more entry in a menu's groups: data, not layout.
 
 /** A page in a menu's group; `id` is the page's, which marks it as the current one. */
 export type NavEntry = { label: string; href: string; line?: string; id?: string };
@@ -20,7 +21,7 @@ export type NavItem =
 export const NAV: readonly NavItem[] = [
   {
     kind: "menu",
-    label: "Product",
+    label: "How it works",
     groups: [
       {
         heading: "How it works",
@@ -33,6 +34,21 @@ export const NAV: readonly NavItem[] = [
         })),
       },
     ],
+  },
+  {
+    kind: "menu",
+    label: "Platform",
+    groups: FEATURE_GROUPS.map((group) => ({
+      heading: group,
+      entries: FEATURES.filter((feature) => feature.group === group).map(
+        ({ slug, name, title }) => ({
+          label: name,
+          href: featurePath(slug),
+          line: title,
+          id: slug,
+        }),
+      ),
+    })),
   },
   { kind: "link", label: "Docs", href: links.docs },
   { kind: "link", label: "Changelog", href: links.changelog, id: "changelog" },

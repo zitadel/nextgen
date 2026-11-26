@@ -41,3 +41,17 @@ export const correlationEventsCommand =
   "npx @zitadel/cli@latest event list --filter correlation_id=<id>";
 export const failedRequestsCommand =
   "npx @zitadel/cli@latest event list --filter status_class=4xx --filter status_class=5xx";
+
+// What the feature pages' Try it offers, spelled the same way.
+export const passkeyEnableCommand = "npx @zitadel/cli@latest auth-method passkey enable";
+export const googleEnableCommand =
+  "npx @zitadel/cli@latest auth-method sso enable --provider google";
+export const googleDisableCommand =
+  "npx @zitadel/cli@latest auth-method sso disable --provider google";
+export const customSsoCommand = "npx @zitadel/cli@latest auth-method sso enable --provider custom";
+export const idpListCommand = "npx @zitadel/cli@latest idp list";
+export const grantCreateCommand =
+  "npx @zitadel/cli@latest grant create --relation viewer --user-identifier <email>";
+export const membersCommand = "npx @zitadel/cli@latest api listProjectMembers";
+export const userListCommand = "npx @zitadel/cli@latest user list";
+export const invitationCommand = "npx @zitadel/cli@latest invitation create --relation admin";

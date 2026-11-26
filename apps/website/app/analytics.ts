@@ -3,18 +3,27 @@ import { track } from "@vercel/analytics";
 import {
   actorEventsCommand,
   correlationEventsCommand,
+  customSsoCommand,
   deployCommand,
   devCommand,
   dryRunCommand,
   failedRequestsCommand,
+  googleDisableCommand,
+  googleEnableCommand,
+  grantCreateCommand,
   grantDeleteCommand,
   grantListCommand,
+  idpListCommand,
+  invitationCommand,
+  membersCommand,
+  passkeyEnableCommand,
   policyTestCommand,
   rollbackCommand,
   setupCommand,
   skillsCommand,
   startCommand,
   userEventsCommand,
+  userListCommand,
   userSignInsCommand,
 } from "./commands";
 
@@ -27,14 +36,15 @@ import {
 
 /**
  * Where on its page a copy button or a call to action sits: `header` is the
- * bar over every page, `try_it` a phase page's Try it (phase-page.tsx), whose
- * page the event's `page` names.
+ * bar over every page, `try_it` the Try it of a phase or a feature page
+ * (phase-page.tsx, feature-page.tsx), whose page the event's `page` names.
  */
 export type Placement = "header" | "hero" | "showcase" | "try_it" | "footer";
 
 /**
  * What a copy button copied, never its text: `all` is a whole block of
- * commands, `event_list` any `event list` a page offers.
+ * commands, `event_list` any `event list` a page offers, `auth_method` any
+ * `auth-method` command.
  */
 export type Snippet =
   | "all"
@@ -47,8 +57,14 @@ export type Snippet =
   | "policy_test"
   | "rollback"
   | "grant_list"
+  | "grant_create"
   | "grant_delete"
-  | "event_list";
+  | "members"
+  | "event_list"
+  | "auth_method"
+  | "idp_list"
+  | "user_list"
+  | "invitation_create";
 
 const SNIPPETS = new Map<string, Snippet>([
   [startCommand, "start"],
@@ -66,6 +82,15 @@ const SNIPPETS = new Map<string, Snippet>([
   [actorEventsCommand, "event_list"],
   [correlationEventsCommand, "event_list"],
   [failedRequestsCommand, "event_list"],
+  [passkeyEnableCommand, "auth_method"],
+  [googleEnableCommand, "auth_method"],
+  [googleDisableCommand, "auth_method"],
+  [customSsoCommand, "auth_method"],
+  [idpListCommand, "idp_list"],
+  [grantCreateCommand, "grant_create"],
+  [membersCommand, "members"],
+  [userListCommand, "user_list"],
+  [invitationCommand, "invitation_create"],
 ]);
 
 /** The snippet `command` is, or `undefined` for a command the catalog has no name for. */
@@ -78,9 +103,16 @@ type Events = {
   clicked_link: { target: "quickstart" | "github" | "get_started"; placement: Placement };
 };
 
-/** A page's stable name: `home` for `/`, else its first path segment. */
+/**
+ * A page's stable name: `home` for `/`, a feature page's two segments
+ * (`platform/sign-in`), else its first path segment.
+ */
 export function pageOf(pathname: string): string {
-  return pathname.split("/")[1] || "home";
+  const [, first = "", second] = pathname.split("/");
+  if (first === "platform" && second) {
+    return `platform/${second}`;
+  }
+  return first || "home";
 }
 
 /**

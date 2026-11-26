@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { type Exchange, type Question, Questions, Transcript } from "./blocks";
 import { appPath } from "./commands";
 import og from "./og.jpg";
 import { PHASES, type PhaseSlug, phaseOf, phasePath } from "./phases";
+import { Part, TitleBlock, TopLight } from "./sections";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 
 /**
- * A phase page's title, description and share card. The share image is the
- * front page's (layout.tsx): a page's openGraph replaces the layout's whole.
+ * A page's title, description and share card. The share image is the front
+ * page's (layout.tsx): a page's openGraph replaces the layout's whole.
  */
-export function phaseMetadata(slug: PhaseSlug): Metadata {
-  const { phase } = phaseOf(slug);
-  const title = `${phase.title.replace(/\.$/, "")} — Zitadel`;
-  const { description } = phase;
+export function pageMetadata(title: string, description: string): Metadata {
   return {
     title,
     description,
@@ -27,6 +25,12 @@ export function phaseMetadata(slug: PhaseSlug): Metadata {
     },
     twitter: { card: "summary_large_image", title, description, images: [og.src] },
   };
+}
+
+/** A phase page's metadata: its title as the tag, and its description. */
+export function phaseMetadata(slug: PhaseSlug): Metadata {
+  const { phase } = phaseOf(slug);
+  return pageMetadata(`${phase.title.replace(/\.$/, "")} — Zitadel`, phase.description);
 }
 
 /**
@@ -42,23 +46,6 @@ export type PhaseContent = {
   tryIt: { line?: ReactNode; content: ReactNode };
   questions: readonly Question[];
 };
-
-const H2 = "font-heading text-2xl leading-8 tracking-[-0.02em] md:text-3xl md:leading-10";
-
-/** A title with each hyphenated word on one line, so a phone never breaks it at "sign-in". */
-function Unbroken({ text }: { text: string }) {
-  return text.split(/(\S*-\S*)/).map((part, index) =>
-    part.includes("-") ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed title, never reordered
-      <span key={index} className="whitespace-nowrap">
-        {part}
-      </span>
-    ) : (
-      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed title, never reordered
-      <Fragment key={index}>{part}</Fragment>
-    ),
-  );
-}
 
 /**
  * The four phases as numbered steps joined by hairlines, the page's own the
@@ -115,76 +102,20 @@ function PhaseStepper({ current }: { current: PhaseSlug }) {
 }
 
 /**
- * One of a phase page's parts: its heading and line over its content, or
- * from a laptop up, with `split`, beside it.
- */
-function Part({
-  id,
-  title,
-  line,
-  split = false,
-  children,
-}: {
-  id: string;
-  title: string;
-  line?: ReactNode;
-  split?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-20 px-6 py-12 md:py-16">
-      <div
-        className={`mx-auto max-w-5xl ${
-          split
-            ? "grid items-start gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14"
-            : "flex flex-col gap-8"
-        }`}
-      >
-        <header className="flex max-w-2xl flex-col gap-3">
-          <h2 id={`${id}-title`} className={H2}>
-            {title}
-          </h2>
-          {line && <p className="text-pretty text-text-secondary leading-7">{line}</p>}
-        </header>
-        <div className="min-w-0">{children}</div>
-      </div>
-    </section>
-  );
-}
-
-/**
  * A phase page, the same seven parts every time (AGENTS.md): the title with
  * the phases' stepper and what your agent does, Ask it, Under the hood, You
- * decide, Try it, Questions, and the way on to the phase after it. It looks
- * as the front page does: its light, its title, its windows.
+ * decide, Try it, Questions, and the way on to the phase after it.
  */
 export function PhasePage({ slug, content }: { slug: PhaseSlug; content: PhaseContent }) {
   const { phase, next } = phaseOf(slug);
   return (
     <>
-      {/* The front page's light over the top of the page (page.tsx). */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60rem] bg-[radial-gradient(45%_55%_at_28%_0%,color-mix(in_oklch,var(--color-text-accent)_16%,transparent),transparent),radial-gradient(45%_55%_at_74%_0%,color-mix(in_oklch,var(--color-step-end)_9%,transparent),transparent)]"
-      />
+      <TopLight />
       <SiteHeader current={slug} />
       <main>
-        <section aria-labelledby="phase-title" className="px-6 pt-12 pb-8 md:pt-20 md:pb-12">
-          <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
-            <p className="font-mono text-text-muted text-xs leading-4">{phase.name}</p>
-            <div className="mt-5">
-              <PhaseStepper current={slug} />
-            </div>
-            <h1 id="phase-title" className="hero-title mt-8">
-              <span className="display-title">
-                <Unbroken text={phase.title} />
-              </span>
-            </h1>
-            <p className="mt-5 max-w-2xl text-balance text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-              {phase.line}
-            </p>
-          </div>
-        </section>
+        <TitleBlock name={phase.name} title={phase.title} line={phase.line}>
+          <PhaseStepper current={slug} />
+        </TitleBlock>
 
         <Part id="ask-it" title="Ask it">
           <div className="max-w-3xl">

@@ -2,6 +2,7 @@ import { type Entry, entryPath } from "./changelog/entries";
 import { UPDATED } from "./choose-version/features";
 import { origin } from "./links";
 import { PHASES, phasePath } from "./phases";
+import { FEATURES, featurePath } from "./platform";
 
 // What search engines read on the cloud's host: /robots.txt and
 // /sitemap.xml, served by their routes from these. The robots file speaks
@@ -28,14 +29,16 @@ export function robotsTxt(production: boolean): string {
 
 /**
  * The website's pages, with absolute URLs on the production host: the front
- * page, the phase pages, the changelog and each entry's page, and the guide
- * to choosing a version. An entry's page last changed when it landed.
+ * page, the phase pages, the feature pages, the changelog and each entry's
+ * page, and the guide to choosing a version. An entry's page last changed
+ * when it landed.
  */
 export function sitemapXml(entries: Pick<Entry, "slug" | "date">[]): string {
   const day = (date: string) => new Date(date).toISOString().slice(0, 10);
   const pages: { path: string; lastmod?: string }[] = [
     { path: "/" },
     ...PHASES.map(({ slug }) => ({ path: phasePath(slug) })),
+    ...FEATURES.map(({ slug }) => ({ path: featurePath(slug) })),
     { path: "/changelog", lastmod: entries[0] && day(entries[0].date) },
     { path: "/choose-version", lastmod: UPDATED },
     ...entries.map((entry) => ({ path: entryPath(entry.slug), lastmod: day(entry.date) })),

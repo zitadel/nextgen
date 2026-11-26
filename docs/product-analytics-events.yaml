@@ -66,7 +66,8 @@ properties:
     type: string
     description: >-
       A stable page category, never a URL; on the docs, the page's path, such
-      as `/docs/reference/cli`.
+      as `/docs/reference/cli`; on the website, a feature page's two segments,
+      such as `platform/sign-in`.
   view:
     type: string
     values: [list, details]
@@ -81,7 +82,7 @@ properties:
     description: >-
       Where on its page a copy button or a call to action sits: `header` is
       the bar over every website page, `try_it` the Try it section of a
-      website phase page, which `page` names.
+      website phase or feature page, which `page` names.
   target:
     type: string
     values: [quickstart, github, get_started]
@@ -113,12 +114,31 @@ properties:
   snippet:
     type: string
     values:
-      [all, start, setup, dev, dry_run, deploy, skills, policy_test, rollback, grant_list, grant_delete, event_list]
+      - all
+      - start
+      - setup
+      - dev
+      - dry_run
+      - deploy
+      - skills
+      - policy_test
+      - rollback
+      - grant_list
+      - grant_create
+      - grant_delete
+      - members
+      - event_list
+      - auth_method
+      - idp_list
+      - user_list
+      - invitation_create
     description: >-
       What a copy button copied, never its text: the CLI command it runs
       (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`,
       `policy_test`, `rollback` for `deployment rollback`, `grant_list`,
-      `grant_delete`, and `event_list` for any `event list`), `dev` for the
+      `grant_create`, `grant_delete`, `members` for `api listProjectMembers`,
+      `event_list` for any `event list`, `auth_method` for any `auth-method`
+      command, `idp_list`, `user_list`, `invitation_create`), `dev` for the
       app's dev server, `skills` for the coding agents' skills, or `all` for
       a whole block of commands.
 

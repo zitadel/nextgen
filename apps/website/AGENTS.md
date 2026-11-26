@@ -1,22 +1,27 @@
 # Agent Instructions — `apps/website`
 
 The hosted cloud's front page at `/`, a page per phase (`/get-started`,
-`/operate`, `/investigate`, `/govern`), its changelog at `/changelog`, with a
-page per entry and a feed under it, and the guide to choosing it or Zitadel v4
-at `/choose-version`.
+`/operate`, `/investigate`, `/govern`) and per feature (`/platform/*`), its
+changelog at `/changelog`, with a page per entry and a feed under it, and the
+guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page shows how to start, then proves it, and nothing else: the
   hero with the commands as numbered steps, the quickstart and GitHub, then
-  the showcase's steps, ending on its closing band. The phase pages are
-  reached through the header's Product menu. Feature lists and roadmaps
-  belong on the docs and zitadel.com.
+  the showcase's steps, ending on its closing band. The phase and feature
+  pages are reached through the header's menus. Roadmaps belong on the docs
+  and zitadel.com.
 - Every phase page (`app/phases.ts`) has the same seven parts
   (`app/phase-page.tsx`): the title with the phases' stepper and what your
   agent does, Ask it, Under the hood, You decide, Try it, Questions, and the
   phase after it.
+- Every feature page (`app/platform.ts`) has the same seven parts
+  (`app/feature-page.tsx`): its group, title and line, What you get, Ask your
+  agent, Under the hood, Try it, Questions, and Related.
 - Under the hood shows one real thing from this repo, taken from code or
   docs; Try it only commands that work now (README, the CLI skill, `--help`).
+- "Solutions" is kept for use-case pages (B2B SaaS, consumer apps, agents and
+  MCP); a feature goes under Platform.
 - The header's links and menus of groups come from `app/nav.ts`: add a menu,
   a group or a link there, never in `site-header.tsx`.
 - It ports `zitadel/new-website`'s narrative redesign
@@ -89,10 +94,10 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## The commands and the showcase
 
-- `app/commands.ts` feeds the hero, the phase pages' Try it and `/llms.txt`.
-  The hero's follow the README's quick start; never add `--force`. When that
-  journey changes, change the commands and the showcase, and run them once
-  against the published CLI.
+- `app/commands.ts` feeds the hero, the phase and feature pages' Try it and
+  `/llms.txt`. The hero's follow the README's quick start; never add
+  `--force`. When that journey changes, change the commands and the
+  showcase, and run them once against the published CLI.
 - Steps 1 to 4 replay a recorded session (`app/showcase/sessions.ts`).
   Re-record rather than edit when what the CLI prints, the files setup writes
   or the flow format change.
