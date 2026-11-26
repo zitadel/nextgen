@@ -16,6 +16,7 @@ export {
   EnvironmentFileMissingError,
   EnvironmentNameInvalidError,
   EnvironmentSourcesConflictError,
+  EnvironmentValueInvalidError,
   EnvironmentValueMissingError,
   EnvironmentValueUnboundError,
 } from "./errors";

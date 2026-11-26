@@ -40,10 +40,18 @@ export class EnvironmentFileMissingError extends EnvironmentError {
 }
 
 /**
- * A value the command cannot run without is set in no source, or a server address a
- * source supplied is not a URL.
+ * A value the command cannot run without is set in no source.
  */
 export class EnvironmentValueMissingError extends EnvironmentError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
+ * A server address a source supplied is not a URL.
+ */
+export class EnvironmentValueInvalidError extends EnvironmentError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
