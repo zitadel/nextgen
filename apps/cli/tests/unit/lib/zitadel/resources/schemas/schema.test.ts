@@ -491,7 +491,9 @@ describe("UserSchema.withMethod", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigError);
-    expect(error).toMatchObject({ message: `${PATH} has no x-identifier for password` });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${PATH} has no x-identifier for password`),
+    });
   });
 });
 

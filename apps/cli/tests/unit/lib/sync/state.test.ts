@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { FsNotFoundError } from "@/lib/fs";
 import { SyncStateMalformedError } from "@/lib/sync";
 import { publishedIds, readState, updateScaffold, type ZitadelState } from "@/lib/sync/state";
 import { it } from "@tests/fixtures";
@@ -55,8 +56,7 @@ describe("readState", () => {
         return readState(dir);
       });
 
-      expect(error).toBeInstanceOf(Error);
-      expect(error).toMatchObject({ code: "ENOENT" });
+      expect(error).toBeInstanceOf(FsNotFoundError);
     });
   });
 

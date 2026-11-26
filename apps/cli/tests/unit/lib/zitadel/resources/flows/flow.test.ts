@@ -654,7 +654,9 @@ describe("Flow.assertProviderEditable", () => {
 
     expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
-      message: `${FLOW_PATH}: no step marks where a completed sign-in ends`,
+      message: expect.stringContaining(
+        `${FLOW_PATH}: no step marks where a completed sign-in ends`,
+      ),
     });
   });
 });

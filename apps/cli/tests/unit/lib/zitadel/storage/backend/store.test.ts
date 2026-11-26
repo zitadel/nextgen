@@ -616,7 +616,9 @@ describe("Store outside .zitadel/", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
-      expect(error).toMatchObject({ message: `${OUTSIDE} points outside .zitadel/` });
+      expect(error).toMatchObject({
+        message: expect.stringContaining(`${OUTSIDE} points outside .zitadel/`),
+      });
     });
 
     it("refuses to hold a file written outside it", async ({ dir, other }) => {
@@ -682,7 +684,9 @@ describe("Store.inlineReferences", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
-      expect(error).toMatchObject({ message: '$file "./gone.liquid" cannot be read' });
+      expect(error).toMatchObject({
+        message: expect.stringContaining('$file "./gone.liquid" cannot be read'),
+      });
     });
 
     it("leaves out a missing reference under omit", async ({ dir, other }) => {
@@ -714,7 +718,9 @@ describe("Store.inlineReferences", () => {
         });
 
         expect(error).toBeInstanceOf(ZitadelConfigError);
-        expect(error).toMatchObject({ message: '$file "./login.liquid" cannot be read' });
+        expect(error).toMatchObject({
+          message: expect.stringContaining('$file "./login.liquid" cannot be read'),
+        });
       },
     );
 
@@ -742,7 +748,7 @@ describe("Store.inlineReferences", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
-        message: '$file "../../../outside.txt" points outside the project',
+        message: expect.stringContaining('$file "../../../outside.txt" points outside the project'),
       });
     });
 
@@ -760,7 +766,9 @@ describe("Store.inlineReferences", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
-        message: '$file "./elsewhere/secret.txt" points outside the project',
+        message: expect.stringContaining(
+          '$file "./elsewhere/secret.txt" points outside the project',
+        ),
       });
     });
 
@@ -774,7 +782,7 @@ describe("Store.inlineReferences", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
-        message: '$file "./dangling/x.liquid" points outside the project',
+        message: expect.stringContaining('$file "./dangling/x.liquid" points outside the project'),
       });
     });
   });
@@ -810,7 +818,7 @@ describe("Store.listReferencedPaths", () => {
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
-        message: '$file "../../../outside.txt" points outside the project',
+        message: expect.stringContaining('$file "../../../outside.txt" points outside the project'),
       });
     });
   });

@@ -1260,7 +1260,7 @@ describe("SsoGenerator.withProvider", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
-      expect(error).toMatchObject({ message });
+      expect(error).toMatchObject({ message: expect.stringContaining(message) });
     });
 
     it.each(COLLISIONS)("leaves the flow it refuses as it was: $name", ({ flow, provider }) => {

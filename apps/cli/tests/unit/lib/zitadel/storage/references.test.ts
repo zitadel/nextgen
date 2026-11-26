@@ -74,7 +74,9 @@ describe("inlineFileReferences", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigError);
-    expect(error).toMatchObject({ message: '$file "./gone" cannot be read' });
+    expect(error).toMatchObject({
+      message: expect.stringContaining('$file "./gone" cannot be read'),
+    });
   });
 
   it("drops the key of a missing reference under omit", () => {

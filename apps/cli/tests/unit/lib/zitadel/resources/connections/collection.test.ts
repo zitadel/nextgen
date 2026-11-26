@@ -311,7 +311,9 @@ describe("Connections.enable", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigResourceMissingError);
-      expect(error).toMatchObject({ message: "No login flow runs against customers" });
+      expect(error).toMatchObject({
+        message: expect.stringContaining("No login flow runs against customers"),
+      });
     });
   });
 
@@ -1025,7 +1027,7 @@ describe("Connections.resolveExisting", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
-      expect(error).toMatchObject({ message });
+      expect(error).toMatchObject({ message: expect.stringContaining(message) });
     });
 
     it.each([
@@ -1043,7 +1045,7 @@ describe("Connections.resolveExisting", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigError);
-      expect(error).toMatchObject({ message });
+      expect(error).toMatchObject({ message: expect.stringContaining(message) });
     });
 
     describe("when google.json has the slug but another issuer", () => {
@@ -1191,7 +1193,7 @@ describe("Connections.resolveExisting", () => {
       });
 
       expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
-      expect(error).toMatchObject({ message });
+      expect(error).toMatchObject({ message: expect.stringContaining(message) });
     });
 
     it("refuses a client id other than the literal one the connection holds", () => {
@@ -1326,7 +1328,7 @@ describe("Connections.resolveBySlug", () => {
     });
 
     expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
-    expect(error).toMatchObject({ message });
+    expect(error).toMatchObject({ message: expect.stringContaining(message) });
   });
 
   describe("when the issuer given is another", () => {

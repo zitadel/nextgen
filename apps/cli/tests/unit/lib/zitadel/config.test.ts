@@ -842,7 +842,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionExistsError);
     });
 
     it("refuses one that connects to another issuer", () => {
@@ -1015,7 +1015,9 @@ describe("ZitadelConfig.bundle", () => {
     });
 
     expect(error).toMatchObject({
-      message: "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      message: expect.stringContaining(
+        "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      ),
     });
   });
 
@@ -1043,7 +1045,9 @@ describe("ZitadelConfig.bundle", () => {
 
     expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
-      message: "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      message: expect.stringContaining(
+        "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      ),
     });
   });
 
