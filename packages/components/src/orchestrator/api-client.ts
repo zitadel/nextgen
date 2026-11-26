@@ -21,7 +21,18 @@
  * orchestrator stores them as `CreateFlow201` because that is the alias
  * orval gives the start-of-flow response.
  */
-import type { ZitadelApi } from "@zitadel/api/config";
+import type { ZitadelProject } from "@zitadel/api/config";
+import {
+  createFlow,
+  exchangeHandoff,
+  getFlowStep,
+  getMySession,
+  getMySessionCsrfToken,
+  revokeMySession,
+  submitFlowStep,
+} from "@zitadel/api/generated/endpoints/zitadelNextGen";
+import { setApiAuthToken } from "@zitadel/api/runtime/auth";
+import { setProxyPath } from "@zitadel/api/runtime/base-url";
 import type {
   CreateFlow201,
   CreateFlowBody,
@@ -36,6 +47,17 @@ import { ApiError, CSRF_HEADER, apiErrorCode } from "@zitadel/api/runtime/fetch"
 const apiRequestInit: RequestInit = { credentials: "include" };
 
 /**
+ * Points the generated functions at the project's proxy path and key. It runs
+ * before each call, as another project on the page may have changed them.
+ *
+ * @param project - The project the call is for.
+ */
+function useProject(project: ZitadelProject): void {
+  setProxyPath(project.proxyPath);
+  setApiAuthToken(project.publishableKey);
+}
+
+/**
  * The signed-in session as the orchestrator renders it. `GET /sessions/me`
  * hydrates the user's conventional identity attributes, so the generated
  * schema carries optional `name` and `email` alongside `user_id`; both stay
@@ -43,20 +65,25 @@ const apiRequestInit: RequestInit = { credentials: "include" };
  */
 export type SessionIdentity = GetMySession200;
 
-export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise<CreateFlow201> {
-  return api.createFlow(input, apiRequestInit);
+export async function startFlow(
+  project: ZitadelProject,
+  input: CreateFlowBody,
+): Promise<CreateFlow201> {
+  useProject(project);
+  return createFlow(input, apiRequestInit);
 }
 
 // Field validation errors come back as 400 with the step echoed and
 // `step.error` set. Unwrap that shape so it flows through like a 200;
 // everything else bubbles.
 export async function submitStep(
-  api: ZitadelApi,
+  project: ZitadelProject,
   id: string,
   body: SubmitFlowStepBody,
 ): Promise<CreateFlow201> {
   try {
-    return await api.submitFlowStep(id, body, apiRequestInit);
+    useProject(project);
+    return await submitFlowStep(id, body, apiRequestInit);
   } catch (error) {
     if (error instanceof ApiError && error.status === 400 && isFlowResponse(error.body)) {
       return error.body;
@@ -69,8 +96,9 @@ function isFlowResponse(body: unknown): body is CreateFlow201 {
   return typeof body === "object" && body !== null && "step" in body;
 }
 
-export async function getCurrentStep(api: ZitadelApi, id: string): Promise<CreateFlow201> {
-  return api.getFlowStep(id, apiRequestInit);
+export async function getCurrentStep(project: ZitadelProject, id: string): Promise<CreateFlow201> {
+  useProject(project);
+  return getFlowStep(id, apiRequestInit);
 }
 
 /**
@@ -81,11 +109,12 @@ export async function getCurrentStep(api: ZitadelApi, id: string): Promise<Creat
  * `project_id` query parameter via {@link ExchangeHandoffParams}.
  */
 export async function exchangeSession(
-  api: ZitadelApi,
+  project: ZitadelProject,
   body: ExchangeHandoffBody,
   params: ExchangeHandoffParams,
 ): Promise<ExchangeHandoff200> {
-  return api.exchangeHandoff(body, params, apiRequestInit);
+  useProject(project);
+  return exchangeHandoff(body, params, apiRequestInit);
 }
 
 /**
@@ -99,14 +128,15 @@ export async function exchangeSession(
  * live, but not this app's. Any other failure rejects.
  */
 export async function getSession(
-  api: ZitadelApi,
+  project: ZitadelProject,
   projectId: string,
 ): Promise<SessionIdentity | null> {
+  useProject(project);
   if (!projectId) {
-    return api.getMySession(undefined, apiRequestInit);
+    return getMySession(undefined, apiRequestInit);
   }
   try {
-    const session = await api.getMySession({ project_id: projectId }, apiRequestInit);
+    const session = await getMySession({ project_id: projectId }, apiRequestInit);
     return session.project_id === projectId ? session : null;
   } catch (error) {
     if (apiErrorCode(error) === "sess.project_mismatch") {
@@ -129,11 +159,13 @@ export async function getSession(
  * another project on the same server (`403 sess.project_mismatch`), which stays
  * live and keeps its cookie. Any other failure rejects.
  */
-export async function revokeSession(api: ZitadelApi, projectId: string): Promise<void> {
+export async function revokeSession(project: ZitadelProject, projectId: string): Promise<void> {
   const params = projectId ? { project_id: projectId } : undefined;
   try {
-    const { csrf_token } = await api.getMySessionCsrfToken(params, apiRequestInit);
-    await api.revokeMySession(params, {
+    useProject(project);
+    const { csrf_token } = await getMySessionCsrfToken(params, apiRequestInit);
+    useProject(project);
+    await revokeMySession(params, {
       ...apiRequestInit,
       headers: { [CSRF_HEADER]: csrf_token },
     });

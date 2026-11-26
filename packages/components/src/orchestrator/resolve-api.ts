@@ -1,9 +1,4 @@
-import {
-  getApi,
-  getZitadelConfig,
-  type ZitadelApi,
-  type ZitadelProject,
-} from "@zitadel/api/config";
+import { getZitadelConfig, type ZitadelProject } from "@zitadel/api/config";
 
 /** Matches the `configureZitadel()` default so attribute and JS config agree. */
 const DEFAULT_PROXY_PATH = "/__nextgen";
@@ -21,10 +16,8 @@ export interface ProjectAttrs {
 
 /**
  * Cache of project handles synthesized from attributes, keyed by their value
- * tuple. `getApi()` caches its client in a `WeakMap` keyed by the project's
- * identity, so the same attribute values must yield the *same* frozen object
- * across the several `resolveApi()` calls a single flow makes — otherwise
- * every call misses the cache and re-wraps a fresh client. A real page uses a
+ * tuple, so the same attribute values yield the *same* frozen object across
+ * the several `resolveApi()` calls a single flow makes. A real page uses a
  * handful of distinct configs at most; the FIFO bound below is just a guard so
  * a pathological page that churns through unique configs can't leak memory.
  */
@@ -93,7 +86,7 @@ export function resolveApi(
   project: ZitadelProject | undefined,
   attrs: ProjectAttrs,
   element: string,
-): { project: ZitadelProject; api: ZitadelApi } {
+): { project: ZitadelProject } {
   const cfg = project ?? getZitadelConfig() ?? projectFromAttrs(attrs);
   if (!cfg) {
     throw new Error(
@@ -101,5 +94,5 @@ export function resolveApi(
         `set the \`project\` property, or call configureZitadel().`,
     );
   }
-  return { project: cfg, api: getApi(cfg) };
+  return { project: cfg };
 }
