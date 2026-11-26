@@ -24,6 +24,12 @@ describe("standalone artifact", () => {
     expect(findArtifactViolations(source)).toEqual([]);
   });
 
+  it("keeps the avatar's style binding the only part of its attribute", () => {
+    const source = readFileSync(STANDALONE_PATH, "utf8");
+    expect(source).toMatch(/style=\$\{\w+\(\w+\(this\.seed\)\)\}/);
+    expect(source).not.toMatch(/\(this\.seed\)\)\};/);
+  });
+
   it("the checker catches the known-bad shapes", () => {
     expect(
       findArtifactViolations(`import { MANDATORY_GATES_TAG } from "@zitadel/config/template";\n`),
