@@ -109,9 +109,15 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 	if err != nil {
 		return nil, err
 	}
-	journeyID, err := domain.NewInvitationJourneyID()
-	if err != nil {
-		return nil, err
+	// The invitation is a carrier, and its journey_id the chain it holds: a
+	// replace, a cancel and the link's answer reach the chain through it. A
+	// new invitation takes the chain of the request that creates it; a
+	// replacement joins the original's, inside the transaction.
+	var journeyID string
+	if input.ReplacesInvitationID == "" {
+		if journeyID, err = audit.EnsureCorrelation(ctx); err != nil {
+			return nil, err
+		}
 	}
 	var encryptedMetadata *string
 	if input.Metadata != nil {
@@ -207,6 +213,7 @@ func (s *InvitationService) releaseReplaced(ctx context.Context, stmts AllStatem
 	if err != nil {
 		return nil, err
 	}
+	audit.JoinCorrelation(ctx, original.JourneyID)
 	if original.Status == domain.InvitationStatusAccepted {
 		return nil, domain.ErrInvitationNotPending()
 	}
@@ -225,6 +232,7 @@ func (s *InvitationService) Get(ctx context.Context, projectID, id string) (_ *I
 	if err != nil {
 		return nil, mapInvitationError(err, "failed to get invitation")
 	}
+	audit.JoinCorrelation(ctx, entity.JourneyID)
 	return decryptInvitation(decrypterOfWritingKey(ctx, s.keys), entity)
 }
 
@@ -272,6 +280,7 @@ func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (e
 		if err != nil {
 			return err
 		}
+		audit.JoinCorrelation(ctx, entity.JourneyID)
 		if err := stmts.DeleteUnacceptedInvitation(ctx, projectID, id); err != nil {
 			return notPendingOnMiss(err)
 		}
@@ -544,6 +553,9 @@ func pendingInvitationByToken(ctx context.Context, stmts InvitationStatements, t
 		}
 		return nil, err
 	}
+	// The link's token names the invitation, so whoever presents it is in
+	// the invitation's chain: the look at it, and the answer.
+	audit.JoinCorrelation(ctx, entity.JourneyID)
 	if entity.StatusAt(now) != domain.InvitationStatusPending {
 		return nil, domain.ErrInvitationNotPending()
 	}

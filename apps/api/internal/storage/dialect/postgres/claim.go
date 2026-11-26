@@ -8,12 +8,13 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authattempt"
 )
 
 const (
-	createClaimChallengeStmt = `INSERT INTO zitadel_nextgen.claim_challenges (id, project_id, initiating_secret_hash, status, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING created_at`
+	createClaimChallengeStmt = `INSERT INTO zitadel_nextgen.claim_challenges (id, project_id, initiating_secret_hash, status, expires_at, correlation_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`
 
-	getClaimChallengeStmt = `SELECT id, project_id, initiating_secret_hash, status, expires_at, created_at FROM zitadel_nextgen.claim_challenges WHERE id = $1 AND project_id = $2`
+	getClaimChallengeStmt = `SELECT id, project_id, initiating_secret_hash, status, expires_at, created_at, correlation_id FROM zitadel_nextgen.claim_challenges WHERE id = $1 AND project_id = $2`
 
 	markClaimChallengeCompletedStmt = `UPDATE zitadel_nextgen.claim_challenges SET status = 'completed' WHERE id = $1 AND project_id = $2 AND status = 'pending'`
 
@@ -56,6 +57,7 @@ func newClaimStatements(client queryExecutor) claimStatements {
 func (s claimStatements) CreateChallenge(ctx context.Context, entity *domain.ClaimChallenge) error {
 	err := s.client.QueryRow(ctx, createClaimChallengeStmt,
 		entity.ID, entity.ProjectID, entity.InitiatingSecretHash, entity.Status.String(), entity.ExpiresAt,
+		authattempt.EmptyStringArg(entity.CorrelationID),
 	).Scan(&entity.CreatedAt)
 	if err != nil {
 		return wrapError(err)
@@ -116,7 +118,10 @@ func (s claimStatements) GetEarliestTeamMembership(ctx context.Context, projectI
 
 func scanClaimChallenge(row pgx.CollectableRow) (*domain.ClaimChallenge, error) {
 	challenge := new(domain.ClaimChallenge)
-	var status string
+	var (
+		status        string
+		correlationID *string
+	)
 	if err := row.Scan(
 		&challenge.ID,
 		&challenge.ProjectID,
@@ -124,8 +129,12 @@ func scanClaimChallenge(row pgx.CollectableRow) (*domain.ClaimChallenge, error) 
 		&status,
 		&challenge.ExpiresAt,
 		&challenge.CreatedAt,
+		&correlationID,
 	); err != nil {
 		return nil, err
+	}
+	if correlationID != nil {
+		challenge.CorrelationID = *correlationID
 	}
 	challenge.Status = domain.ClaimChallengeStatus(status)
 	return challenge, nil

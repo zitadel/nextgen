@@ -27,6 +27,15 @@ properties:
       actor_home_project_id:
         type: string
         description: The project the actor's user belongs to.
+  # ADR 048, amendment of 2026-11-26. The trust of an incoming trace context is ADR 080.
+  trace_id:
+    type: string
+    description: |
+      The OpenTelemetry trace ID of the request, set only on events from an
+      API request (`request.api`) whose trace was sampled. It leads from the
+      event to the request's trace in the operator's tracing backend. It is
+      observed context, not a filter: `correlation_id` and `request_id`
+      correlate events.
   client:
     description: The observed HTTP requestor context, set only on events from an API request (`request.api`).
     type: object

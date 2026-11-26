@@ -101,7 +101,7 @@ func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (
 		}
 		// CreateSession mints a session token; emit the peer when TokenID is set.
 		if session.TokenID != "" {
-			return emitAuthTokenIssued(ctx, tx.Statements(), session.ProjectID, session.TokenID, &session.ID, &session.FlowID, session.UserID, nil, "")
+			return emitAuthTokenIssued(ctx, tx.Statements(), session.ProjectID, session.TokenID, &session.ID, session.UserID, nil, "")
 		}
 		return nil
 	})
@@ -129,12 +129,18 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (_ *
 		if err != nil {
 			return err
 		}
+		// The exchange is a service call that names no flow: it reaches its
+		// flow and its chain through the attempt it consumed. Bound before
+		// the first emit, so its domain events and its request event carry
+		// them alike.
+		audit.BindFlow(ctx, session.FlowID)
+		audit.JoinCorrelation(ctx, session.CorrelationID)
 		if err := emitSessionEstablished(ctx, tx.Statements(), session); err != nil {
 			return err
 		}
 		if session.TokenID != "" {
 			// Session mint uses empty scopes today; pass through honestly.
-			if err := emitAuthTokenIssued(ctx, tx.Statements(), session.ProjectID, session.TokenID, &session.ID, &session.FlowID, session.UserID, nil, ""); err != nil {
+			if err := emitAuthTokenIssued(ctx, tx.Statements(), session.ProjectID, session.TokenID, &session.ID, session.UserID, nil, ""); err != nil {
 				return err
 			}
 		}
@@ -149,9 +155,6 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (_ *
 		}
 		return nil, domain.ErrInternal(err).WithMessage("Failed to exchange the session.")
 	}
-	// The exchange is a service call that names no flow, so its request event
-	// joins the flow only through the attempt it consumed.
-	audit.BindFlow(ctx, session.FlowID)
 	return session, nil
 }
 
@@ -426,16 +429,14 @@ func emitSessionEstablished(ctx context.Context, stmts EventStatements, session 
 		EntityID:   session.ID,
 		UserID:     payload.UserID,
 		SessionID:  &sid,
-		FlowID:     &session.FlowID,
 		Payload:    payload,
 	})
 }
 
-// flowID names the login flow whose handoff minted the token; nil or empty
-// leaves the request's own flow, if any. The minted token is the event's
-// entity; token_id stays the credential the request presented, if any.
-// clientID is the client that redeemed an authorization code, or empty.
-func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, tokenID string, sessionID, flowID, userID *string, scopes []string, clientID string) error {
+// The minted token is the event's entity; token_id stays the credential the
+// request presented, if any. clientID is the client that redeemed an
+// authorization code, or empty.
+func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, tokenID string, sessionID, userID *string, scopes []string, clientID string) error {
 	spec := audit.EmitSpec{
 		Type:       domain.EventTypeAuthTokenIssued,
 		Category:   domain.EventCategoryAuth,
@@ -444,7 +445,6 @@ func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, 
 		EntityID:   tokenID,
 		UserID:     stringValue(userID),
 		SessionID:  sessionID,
-		FlowID:     flowID,
 		Payload:    domain.AuthTokenIssuedPayload{Scopes: scopes, ClientID: clientID},
 	}
 	if userID != nil && *userID != "" {
