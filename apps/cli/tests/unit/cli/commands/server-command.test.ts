@@ -1,5 +1,8 @@
+import { chmod, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { Callback, Mixpanel as MixpanelClient, Modifiers } from "mixpanel";
-import { describe, expect, expectTypeOf } from "vitest";
+import { describe, expect, expectTypeOf, onTestFinished } from "vitest";
 
 import {
   ChoosingServerCommand,
@@ -9,7 +12,13 @@ import {
 import { type Admitted, BaseCommand, EnvironmentCommand } from "@/cli/core";
 import { Destructive } from "@/cli/core/destructive";
 import { Previewable } from "@/cli/core/previewable";
-import { LocalRuntime, PsLocalServers, RealMachine, ZitadelRuntime } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerRecordMalformedError,
+  PsLocalServers,
+  RealMachine,
+  ZitadelRuntime,
+} from "@/lib/server";
 import { shellCommand } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -77,6 +86,23 @@ class AboutTheNearestServer extends LocalServerCommand(BaseCommand, "nearest") {
 
   protected async execute(): Promise<never> {
     throw new Error("unused");
+  }
+
+  public sourceIn(cwd: string) {
+    return this.sourceOf({}, cwd);
+  }
+}
+
+/** The same, in a folder whose started server's record is malformed. */
+class AboutAMalformedServer extends LocalServerCommand(BaseCommand, "nearest") {
+  public static override readonly id: string = "about-a-malformed-server-test";
+
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  protected override serverInNearestFolder(): Promise<LocalRuntime | undefined> {
+    return Promise.reject(new LocalServerRecordMalformedError("the record is malformed"));
   }
 
   public sourceIn(cwd: string) {
@@ -173,6 +199,21 @@ describe("LocalServerCommand", () => {
 
     expect(command.theMachine).toBeInstanceOf(RealMachine);
     expect(command.theServers).toBeInstanceOf(PsLocalServers);
+  });
+
+  it("refuses a malformed record even when no folder above can be read", async ({ dir }) => {
+    const locked = join(dir, "locked");
+    await mkdir(join(locked, "inner"), { recursive: true });
+    await chmod(locked, 0o000);
+    onTestFinished(async () => {
+      await chmod(locked, 0o700);
+    });
+
+    const error = await rejectionOf(() => {
+      return new AboutAMalformedServer([], aConfigAt(VERSION)).sourceIn(join(locked, "inner"));
+    });
+
+    expect(error).toBeInstanceOf(ZitadelError);
   });
 
   it("names the default server for a folder that started none, in either rule", async ({

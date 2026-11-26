@@ -286,7 +286,13 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
           return (await (await this.serverInNearestFolder(cwd))?.url()) ?? LocalRuntime.DEFAULT_URL;
         } catch (error) {
           if (error instanceof LocalServerRecordMalformedError) {
-            const holder = (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE)) ?? cwd;
+            const holder =
+              (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE).catch((error: unknown) => {
+                if (error instanceof LocalServerRecordUnreadableError) {
+                  return undefined;
+                }
+                throw error;
+              })) ?? cwd;
             const elsewhere =
               holder === cwd
                 ? {}

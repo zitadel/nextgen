@@ -1,16 +1,18 @@
-import { writeFile } from "node:fs/promises";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { password, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
-import { describe, expect, vi } from "vitest";
+import { describe, expect, onTestFinished, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
 import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import type { ZitadelClient } from "@/lib/backend";
 import { Consent } from "@/lib/consent";
-import { EnvironmentValueMissingError } from "@/lib/environment";
+import { EnvironmentValueMissingError, type ServerAddresses } from "@/lib/environment";
+import { LocalServerRecordMalformedError, ZitadelRuntime } from "@/lib/server";
+import { ZitadelError } from "@/lib/errors";
 import { CREDENTIALS } from "@/cli/core/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/cli/core/environment-command";
 import type { ConnectOptions } from "@/cli/core/types";
@@ -33,6 +35,34 @@ class ProjectProbe extends ServerCommand(EnvironmentCommand) {
     const { flags } = await this.parse(ProjectProbe);
     await this.toMeta(flags);
     return { connection: await this.connect(), telemetry: this.describe() };
+  }
+}
+
+/** Resolves its server from a local record that is malformed. */
+class MalformedRecordProbe extends ServerCommand(EnvironmentCommand) {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  override log(): void {}
+
+  protected override servers(): ServerAddresses {
+    return {
+      resolve: () => {
+        return Promise.reject(new LocalServerRecordMalformedError("the record is malformed"));
+      },
+      parse: (value) => {
+        return ZitadelRuntime.parse(value);
+      },
+      origin: (value) => {
+        return ZitadelRuntime.origin(value);
+      },
+    };
+  }
+
+  async probe() {
+    const { flags } = await this.parse(MalformedRecordProbe);
+    await this.toMeta(flags);
   }
 }
 
@@ -366,6 +396,22 @@ describe("EnvironmentCommand.connect", () => {
         },
       ],
     });
+  });
+
+  it("refuses a malformed record even when no folder above can be read", async ({ dir }) => {
+    const locked = join(dir, "locked");
+    await mkdir(join(locked, "inner"), { recursive: true });
+    await chmod(locked, 0o000);
+    onTestFinished(async () => {
+      await chmod(locked, 0o700);
+    });
+
+    await expect(
+      new MalformedRecordProbe(
+        ["--cwd", join(locked, "inner"), "--server", "local"],
+        config,
+      ).probe(),
+    ).rejects.toBeInstanceOf(ZitadelError);
   });
 
   it("points an --env-file run at that file and never at setup", async ({ dir }) => {

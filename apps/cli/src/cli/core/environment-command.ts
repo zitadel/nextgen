@@ -211,8 +211,14 @@ export abstract class EnvironmentCommand extends BaseCommand {
       }
       if (error instanceof LocalServerRecordMalformedError) {
         const holder =
-          (await LocalRuntime.findUpward(resolveCwd(text(flags.cwd)), LocalRuntime.FILE)) ??
-          resolveCwd(text(flags.cwd));
+          (await LocalRuntime.findUpward(resolveCwd(text(flags.cwd)), LocalRuntime.FILE).catch(
+            (error: unknown) => {
+              if (error instanceof LocalServerRecordUnreadableError) {
+                return undefined;
+              }
+              throw error;
+            },
+          )) ?? resolveCwd(text(flags.cwd));
         const elsewhere =
           holder === resolveCwd(text(flags.cwd))
             ? {}
