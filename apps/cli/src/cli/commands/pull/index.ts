@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
 import { GetDeploymentParams, GetReleaseParams } from "@/lib/backend/schemas";
-import { ZitadelError } from "@/lib/errors";
+import { ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
@@ -426,10 +426,19 @@ export default class Pull extends Telemetered(ChangeCommand) {
               outcome: await this.fetchOne(configuration, config, pointer),
             };
           } catch (error) {
-            return {
-              kind: "failed",
-              error,
-            };
+            if (error instanceof ZitadelLibError) {
+              return {
+                kind: "failed",
+                error,
+              };
+            }
+            if (error instanceof ZitadelError) {
+              return {
+                kind: "failed",
+                error,
+              };
+            }
+            throw error;
           }
         },
       );

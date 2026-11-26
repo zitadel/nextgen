@@ -1,4 +1,4 @@
-import { AbstractSanityCheck, type CheckContext } from "./types";
+import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 import { Project } from "@/lib/project";
 
 /** Verifies the framework detected on disk matches the one recorded in config. */
@@ -12,7 +12,7 @@ export class FrameworkCheck extends AbstractSanityCheck {
     const detected = await ctx.orca.detect(ctx.cwd);
     const recorded = config.frameworkId;
     if (recorded !== detected.id) {
-      throw new Error(`expected ${String(recorded)}, detected ${detected.id}`);
+      throw new CheckFailure(`expected ${String(recorded)}, detected ${detected.id}`);
     }
   }
 }

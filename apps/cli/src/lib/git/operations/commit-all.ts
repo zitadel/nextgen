@@ -80,17 +80,13 @@ export class CommitAll implements Operation<CommitOutcome> {
       if (problem !== null) {
         return this.refused(problem);
       }
-      try {
-        if (identity.source === "fallback") {
-          await staging.commit(this.message, this.options.authorIfGitHasNone);
-        } else {
-          await staging.commit(this.message, null);
+      const author = identity.source === "fallback" ? this.options.authorIfGitHasNone : null;
+      await staging.commit(this.message, author).catch(async (error: unknown) => {
+        if (error instanceof GitError && (await new CurrentCommit().run(git)) !== before) {
+          return;
         }
-      } catch (error) {
-        if ((await new CurrentCommit().run(git)) === before) {
-          throw error;
-        }
-      }
+        throw error;
+      });
       const sha = await new CurrentCommit().run(git);
       if (sha === null) {
         throw new GitInternalError("the commit left no HEAD to record");
@@ -98,11 +94,20 @@ export class CommitAll implements Operation<CommitOutcome> {
       try {
         await git.run(["reset", "--quiet", "--", "."]);
       } catch (error) {
-        if (!(error instanceof GitError)) {
-          throw error;
+        if (error instanceof GitError) {
+          return {
+            committed: true,
+            sha,
+            author: identity.source,
+          };
         }
+        throw error;
       }
-      return { committed: true, sha, author: identity.source };
+      return {
+        committed: true,
+        sha,
+        author: identity.source,
+      };
     });
   }
 }

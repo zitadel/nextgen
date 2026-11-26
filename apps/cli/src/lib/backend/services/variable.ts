@@ -3,6 +3,7 @@ import type { GetVariable200, ListVariables200 } from "@zitadel/api/generated/mo
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
 import {
+  BackendError,
   BackendForbiddenError,
   BackendNotFoundError,
   BackendVariablePreviewMissingError,
@@ -543,17 +544,17 @@ export class VariableService extends ApiService {
         read: true,
         variable: held === undefined ? undefined : Variable.of(name, held),
       };
-    } catch (cause) {
+    } catch (error) {
       // A cancellation is not a kind that could not be read: the person asked
       // the command to stop, so it stops rather than reporting what it found.
-      if (isCancelled(this.client)) {
-        throw cause;
+      if (error instanceof BackendError && !isCancelled(this.client)) {
+        return {
+          kind,
+          read: false,
+          cause: error,
+        };
       }
-      return {
-        kind,
-        read: false,
-        cause,
-      };
+      throw error;
     }
   }
 

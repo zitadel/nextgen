@@ -80,8 +80,11 @@ async function readBody(res: Response): Promise<unknown> {
   }
   try {
     return JSON.parse(raw) as unknown;
-  } catch {
-    return raw;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return raw;
+    }
+    throw error;
   }
 }
 
@@ -115,8 +118,11 @@ function pageOf(request: ApiRequest, token: string | undefined): ApiRequest {
 function segmentsOf(path: string): readonly string[] | undefined {
   try {
     return path.split("/").slice(1).map(decodeURIComponent);
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof URIError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 
@@ -484,10 +490,11 @@ export class OperationService extends ApiService {
       items: (response) => {
         try {
           return fields.items(response.raw);
-        } catch (problem) {
-          throw new BackendRequestInvalidError(
-            problem instanceof Error ? problem.message : String(problem),
-          );
+        } catch (error) {
+          if (error instanceof TypeError) {
+            throw new BackendRequestInvalidError(error.message);
+          }
+          throw error;
         }
       },
       next: (response) => {

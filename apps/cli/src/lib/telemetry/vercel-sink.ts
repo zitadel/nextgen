@@ -63,29 +63,29 @@ export class VercelSink implements TelemetrySink {
   }
 
   /** Starts one send. It resolves when the intake answers, and also when the request fails. */
-  private deliver(body: string): Promise<void> {
-    return Promise.resolve()
-      .then(() => {
-        return this.post(this.target.endpoint, {
-          method: "POST",
-          // `x-va-server` is what `@vercel/analytics/server` sends.
-          headers: {
-            "content-type": "application/json",
-            "user-agent": Runtime.current().userAgent(),
-            "x-va-server": "1",
-          },
-          body,
-        });
-      })
-      .then(
-        (response) => {
-          trace(this.debug, () => {
-            return `vercel answered ${response.status}`;
-          });
-        },
-        () => {
-          return undefined;
-        },
-      );
+  private async deliver(body: string): Promise<void> {
+    const response = await this.post(this.target.endpoint, {
+      method: "POST",
+      // `x-va-server` is what `@vercel/analytics/server` sends.
+      headers: {
+        "content-type": "application/json",
+        "user-agent": Runtime.current().userAgent(),
+        "x-va-server": "1",
+      },
+      body,
+    }).catch((error: unknown) => {
+      if (error instanceof TypeError) {
+        return undefined;
+      }
+      if (error instanceof DOMException) {
+        return undefined;
+      }
+      throw error;
+    });
+    if (response !== undefined) {
+      trace(this.debug, () => {
+        return `vercel answered ${response.status}`;
+      });
+    }
   }
 }

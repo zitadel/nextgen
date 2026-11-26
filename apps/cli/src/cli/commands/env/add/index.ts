@@ -1,4 +1,4 @@
-import { stat } from "@/lib/fs";
+import { FsError, stat } from "@/lib/fs";
 import { basename, join } from "node:path";
 import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
@@ -7,7 +7,7 @@ import { z } from "zod";
 import { SERVER } from "@/constants";
 import { createZitadelClient, ProjectService } from "@/lib/backend";
 import { Environment, type InitialDeployment } from "@/lib/environment";
-import { toZitadelError } from "@/lib/errors";
+import { toZitadelError, ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type CommandResult, nonBlankString } from "@/cli/core";
@@ -543,14 +543,16 @@ export default class EnvAdd extends Telemetered(
     const { cwd, nonInteractive } = this.meta;
     const file = Project.envFileName(args.name);
     const path = join(cwd, file);
-    const exists = await stat(path).then(
-      () => {
+    const exists = await stat(path)
+      .then(() => {
         return true;
-      },
-      () => {
-        return false;
-      },
-    );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof FsError) {
+          return false;
+        }
+        throw error;
+      });
     if (exists && !flags.force) {
       throw refusalError(FILE_EXISTS_REFUSAL, {
         file,
@@ -632,15 +634,29 @@ export default class EnvAdd extends Telemetered(
       );
       return deployment;
     } catch (error) {
-      warnings.report(
-        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${opts.suggest(
-          {
-            id: "deploy",
-            flags: { message: WHAT_CHANGED },
-          },
-        )} to publish it.`,
-      );
-      return undefined;
+      if (error instanceof ZitadelLibError) {
+        warnings.report(
+          `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${opts.suggest(
+            {
+              id: "deploy",
+              flags: { message: WHAT_CHANGED },
+            },
+          )} to publish it.`,
+        );
+        return undefined;
+      }
+      if (error instanceof ZitadelError) {
+        warnings.report(
+          `The environment was bound but the first deploy failed: ${error.message}. Run ${opts.suggest(
+            {
+              id: "deploy",
+              flags: { message: WHAT_CHANGED },
+            },
+          )} to publish it.`,
+        );
+        return undefined;
+      }
+      throw error;
     }
   }
 }

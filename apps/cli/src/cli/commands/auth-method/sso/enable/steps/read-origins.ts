@@ -48,14 +48,14 @@ export class ReadOrigins extends WizardStep<"remote", Fact<"remote" | "origins">
         remote,
         origins: await new OriginService(remote.client, remote.projectId).list(),
       };
-    } catch (cause) {
-      if (cause instanceof BackendError && !isCancelled(remote.client)) {
+    } catch (error) {
+      if (error instanceof BackendError && !isCancelled(remote.client)) {
         return {
           remote,
           origins: Origins.wrap([]),
         };
       }
-      throw cause;
+      throw error;
     }
   }
 }

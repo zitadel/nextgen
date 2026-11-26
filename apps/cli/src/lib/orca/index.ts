@@ -1,6 +1,7 @@
 import { basename, dirname, join } from "node:path";
 
 import {
+  FsError,
   FsNotDirectoryError,
   FsNotFoundError,
   mkdir,
@@ -433,20 +434,17 @@ export async function inspectScaffoldTarget(
  * scaffold creates. One that is a file, or lies under one, is not.
  */
 export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
-  return stat(cwd).then(
-    (stats) => {
-      return stats.isDirectory();
-    },
-    (error: unknown) => {
-      if (error instanceof FsNotFoundError) {
-        return true;
-      }
-      if (error instanceof FsNotDirectoryError) {
-        return false;
-      }
-      throw error;
-    },
-  );
+  try {
+    return (await stat(cwd)).isDirectory();
+  } catch (error) {
+    if (error instanceof FsNotFoundError) {
+      return true;
+    }
+    if (error instanceof FsNotDirectoryError) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -473,8 +471,12 @@ async function isLocalRuntimeEntry(
         return ["", `${localDirectory}/`].includes(line.trim());
       });
     }
-  } catch {
+  } catch (error) {
     // Not a directory, or not a readable file: not what `start` wrote.
+    if (error instanceof FsError) {
+      return false;
+    }
+    throw error;
   }
   return false;
 }

@@ -6,6 +6,7 @@ import {
   BackendUnreachableError,
   BackendUnreadableError,
 } from "./backend";
+import { errnoOf } from "./errno";
 import { isObject } from "./json";
 import { ZitadelLibError } from "./lib-error";
 import type { Suggested } from "./suggestion";
@@ -274,28 +275,6 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(error.code, error.message);
   }
 
-  if (isErrnoException(error)) {
-    const details = { original: pickErrorShape(error) };
-    if (error.code === "EACCES" || error.code === "EPERM") {
-      return new ZitadelError("E_AUTH", `Permission denied: ${error.message}`, {
-        hint: "Check file permissions or run with the right user.",
-        details,
-      });
-    }
-    if (error.code === "EEXIST") {
-      return new ZitadelError("E_CONFLICT", error.message, {
-        hint: "A file already exists. Use --force to overwrite or remove it first.",
-        details,
-      });
-    }
-    if (error.code === "ENOENT") {
-      return new ZitadelError("E_VALIDATION", error.message, {
-        hint: "A required file or directory is missing.",
-        details,
-      });
-    }
-  }
-
   if (isZodLikeError(error)) {
     return new ZitadelError("E_VALIDATION", errorMessage(error), {
       details: { issues: (error as { issues: unknown }).issues },
@@ -303,8 +282,34 @@ export function toZitadelError(error: unknown): ZitadelError {
   }
 
   if (error instanceof Error) {
+    const errno = errnoOf(error);
+    const details = { original: pickErrorShape(error) };
+    if (errno === "EACCES") {
+      return new ZitadelError("E_AUTH", `Permission denied: ${error.message}`, {
+        hint: "Check file permissions or run with the right user.",
+        details,
+      });
+    }
+    if (errno === "EPERM") {
+      return new ZitadelError("E_AUTH", `Permission denied: ${error.message}`, {
+        hint: "Check file permissions or run with the right user.",
+        details,
+      });
+    }
+    if (errno === "EEXIST") {
+      return new ZitadelError("E_CONFLICT", error.message, {
+        hint: "A file already exists. Use --force to overwrite or remove it first.",
+        details,
+      });
+    }
+    if (errno === "ENOENT") {
+      return new ZitadelError("E_VALIDATION", error.message, {
+        hint: "A required file or directory is missing.",
+        details,
+      });
+    }
     return new ZitadelError("E_VALIDATION", error.message, {
-      details: { original: pickErrorShape(error) },
+      details,
     });
   }
 
@@ -528,10 +533,6 @@ export function isCancellation(error: unknown): boolean {
   return error instanceof ZitadelError && error.code === "E_CANCELLED";
 }
 
-function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string";
-}
-
 function isZodLikeError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -556,6 +557,6 @@ function pickErrorShape(error: Error): Record<string, unknown> {
   return {
     name: error.name,
     message: error.message,
-    code: (error as NodeJS.ErrnoException).code,
+    code: errnoOf(error),
   };
 }

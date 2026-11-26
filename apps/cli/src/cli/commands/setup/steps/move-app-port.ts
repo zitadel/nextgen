@@ -7,9 +7,9 @@ import {
   relativeDisplayPath as relativeDisplay,
   type SetupServices,
 } from "@/cli/commands/setup/shared";
-import { createZitadelClient, DeploymentService, OriginService } from "@/lib/backend";
+import { BackendError, createZitadelClient, DeploymentService, OriginService } from "@/lib/backend";
 import { Consent } from "@/lib/consent";
-import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
 import { pathExists } from "@/lib/fs";
 import { callbackUriFor } from "@/lib/idp";
 import type { CommandResult } from "@/cli/core";
@@ -185,11 +185,15 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
         try {
           await new OriginService(client, secret.data.project_id).add(issuer, "primary");
         } catch (error) {
-          const normalized = toZitadelError(error);
-          throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {
-            hint: `${normalized.message}. Nothing was changed; start the server this app uses (${source}) and retry.`,
-            details: { original: normalized.details },
-          });
+          if (error instanceof BackendError) {
+            const normalized = toZitadelError(error);
+            const hint = `${normalized.message}. Nothing was changed; start the server this app uses (${source}) and retry.`;
+            throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {
+              hint,
+              details: { original: normalized.details },
+            });
+          }
+          throw error;
         }
       }
       const result = await orca.patcherFor(context.framework.id).moveDevPort(
@@ -237,43 +241,41 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
           ? {}
           : await new DeploymentService(client, secret.data.project_id)
               .extendPrimary(issuer, `Moved the dev port to ${devPort}`)
-              .then(
-                (extended) => {
-                  switch (extended.outcome) {
-                    case "deployed": {
-                      return {
-                        deploymentId: extended.deployment.id,
-                      };
-                    }
-                    case "unchanged": {
-                      return {};
-                    }
-                    case "none": {
-                      return {
-                        undeployed: "nothing is deployed to the project yet",
-                      };
-                    }
-                    case "raced": {
-                      return {
-                        undeployed: "another deploy landed while the app moved",
-                      };
-                    }
-                    case "revoked": {
-                      return {
-                        undeployed: "the release the previous port ran is revoked",
-                      };
-                    }
+              .then((extended) => {
+                switch (extended.outcome) {
+                  case "deployed": {
+                    return {
+                      deploymentId: extended.deployment.id,
+                    };
                   }
-                },
-                (error: unknown) => {
-                  if (isCancellation(error)) {
-                    throw error;
+                  case "unchanged": {
+                    return {};
                   }
+                  case "none": {
+                    return {
+                      undeployed: "nothing is deployed to the project yet",
+                    };
+                  }
+                  case "raced": {
+                    return {
+                      undeployed: "another deploy landed while the app moved",
+                    };
+                  }
+                  case "revoked": {
+                    return {
+                      undeployed: "the release the previous port ran is revoked",
+                    };
+                  }
+                }
+              })
+              .catch((error: unknown) => {
+                if (error instanceof BackendError) {
                   return {
-                    undeployed: `deploying to it failed: ${errorMessage(error)}`,
+                    undeployed: `deploying to it failed: ${error.message}`,
                   };
-                },
-              );
+                }
+                throw error;
+              });
       for (const file of result.filesWritten) {
         moving.detail(
           `${this.deps.dryRun ? "Would update" : "Updated"} ${escapeControlCharacters(relativeDisplay(this.deps.cwd, file))}`,
@@ -307,10 +309,10 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
           ? await new OriginService(granted.unlock(client), secret.data.project_id)
               .remove(previousIssuer)
               .catch((error: unknown) => {
-                if (isCancellation(error)) {
-                  throw error;
+                if (error instanceof BackendError) {
+                  return previousIssuer;
                 }
-                return previousIssuer;
+                throw error;
               })
           : previousIssuer;
       const staleOrigin = replacing && typeof removal === "string" ? removal : undefined;

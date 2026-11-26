@@ -98,12 +98,12 @@ export class LocalRuntimeChecks {
           try {
             const result = await this.docker();
             if (result.status !== 0) {
-              throw new Error(unreachable(result.stderr || "docker version failed"));
+              throw new CheckFailure(unreachable(result.stderr || "docker version failed"));
             }
             return `Docker engine ${result.stdout.trim() || "available"}`;
           } catch (error) {
             if (isErrno(error, "ENOENT") || isErrno(error, "EACCES")) {
-              throw new Error(unreachable(errorMessage(error)), { cause: error });
+              throw new CheckFailure(unreachable(errorMessage(error)), undefined, { cause: error });
             }
             throw error;
           }
@@ -127,10 +127,8 @@ export class LocalRuntimeChecks {
               } catch (error) {
                 const detail = errorMessage(error).trim();
                 const suffix = detail ? ` (${detail})` : "";
-                throw new Error(
-                  `Image ${image} is not available to Docker${suffix}; ${this.suggest({ id: "start" })} may need a pull or a different image.`,
-                  { cause: error },
-                );
+                const message = `Image ${image} is not available to Docker${suffix}; ${this.suggest({ id: "start" })} may need a pull or a different image.`;
+                throw new CheckFailure(message, undefined, { cause: error });
               }
             },
             "warn",
@@ -196,12 +194,12 @@ export class LocalRuntimeChecks {
           return "No existing runtime metadata";
         }
         if (runtime.backend !== backend) {
-          throw new Error(
+          throw new CheckFailure(
             `Existing local runtime uses ${runtime.backend}; run start --runtime ${backend} to switch backends.`,
           );
         }
         if (!(await this.isHealthy(runtime.server_url))) {
-          throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
+          throw new CheckFailure(`${runtime.server_url} is not ready: /readyz did not answer ok`);
         }
         if (this.inheritedFrom === undefined) {
           return `${runtime.server_url} is healthy`;

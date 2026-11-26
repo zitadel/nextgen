@@ -1,4 +1,4 @@
-import { realpath } from "@/lib/fs";
+import { FsError, realpath } from "@/lib/fs";
 import { resolve } from "node:path";
 
 import type { Run, TcpListener } from "./local";
@@ -146,7 +146,10 @@ export class RealMachine implements LocalMachine {
 async function resolved(folder: string): Promise<string> {
   try {
     return await realpath(folder);
-  } catch {
-    return resolve(folder);
+  } catch (error) {
+    if (error instanceof FsError) {
+      return resolve(folder);
+    }
+    throw error;
   }
 }

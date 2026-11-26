@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { execa } from "execa";
+import { ExecaError, execa } from "execa";
 
 import { errorMessage } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -416,9 +416,15 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
         return "done";
       }
       return "issues";
-    } catch {
-      this.signal.throwIfAborted();
-      return "failed";
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        return "failed";
+      }
+      if (error instanceof ExecaError) {
+        this.signal.throwIfAborted();
+        return "failed";
+      }
+      throw error;
     }
   }
 }

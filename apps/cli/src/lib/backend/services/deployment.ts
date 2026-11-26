@@ -569,33 +569,29 @@ export class DeploymentService extends ApiService {
           outcome: "revoked",
         };
       }
-      if (!(error instanceof BackendConflictError)) {
-        throw error;
-      }
-      // The conflict is the answer; naming the deployment that won it is the
-      // report. A read that fails here leaves the winner unnamed rather than
-      // replacing a race the caller can act on with an error it cannot.
-      //
-      // The newest primary, not the newest to land on these origins: the guard
-      // above asks what this deploy was replacing, while this asks what the
-      // project serves now, which is what the caller is told and what it would
-      // guard against on a retry.
-      try {
+      if (error instanceof BackendConflictError) {
+        // The conflict is the answer; naming the deployment that won it is the
+        // report. A read that fails here leaves the winner unnamed rather than
+        // replacing a race the caller can act on with an error it cannot.
+        //
+        // The newest primary, not the newest to land on these origins: the guard
+        // above asks what this deploy was replacing, while this asks what the
+        // project serves now, which is what the caller is told and what it would
+        // guard against on a retry.
+        const current = await this.newestPrimary().catch((error: unknown) => {
+          // A cancellation is not a winner that could not be named: the person
+          // asked the command to stop, and nothing was deployed to report.
+          if (error instanceof BackendError && !isCancelled(this.client)) {
+            return undefined;
+          }
+          throw error;
+        });
         return {
           outcome: "raced",
-          current: await this.newestPrimary(),
+          current,
         };
-      } catch (cause) {
-        // A cancellation is not a winner that could not be named: the person
-        // asked the command to stop, and nothing was deployed to report.
-        if (cause instanceof BackendError && !isCancelled(this.client)) {
-          return {
-            outcome: "raced",
-            current: undefined,
-          };
-        }
-        throw cause;
       }
+      throw error;
     }
   }
 

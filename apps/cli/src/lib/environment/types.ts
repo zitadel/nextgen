@@ -49,7 +49,7 @@ export interface ServerAddresses {
    *
    * @param value - The address.
    * @returns The origin.
-   * @throws {ZitadelError} `E_VALIDATION` when it is not an http(s) URL.
+   * @throws {@link LocalServerUrlInvalidError} when it is not an http(s) URL.
    */
   origin(value: string): string;
 }

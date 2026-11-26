@@ -4,7 +4,8 @@ import type { RequestOptions } from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Agent, type Dispatcher } from "undici";
 
-import { PublishAssetTargetUnsafeError } from "@/lib/publish/errors";
+import { PublishAssetLookupFailedError, PublishAssetTargetUnsafeError } from "@/lib/publish/errors";
+import { errorMessage } from "@/lib/errors";
 import { log } from "@/lib/ui/log";
 import { Runtime } from "@/lib/runtime";
 import { isJsonObject, type JsonObject, type JsonValue } from "@/lib/zitadel";
@@ -277,12 +278,22 @@ export async function probeAsset(
     }
     return { kind: "content-type", contentType };
   } catch (error) {
-    if (isUnsafeProbeTargetError(error, 0)) {
-      log.debug(`asset probe ${url} skipped unsafe/private target`);
-      return { kind: "inconclusive" };
+    // fetch fails with a TypeError, its cause the lookup's refusal or the
+    // socket's failure; a redirect to an unparseable location is one too.
+    if (error instanceof TypeError) {
+      if (isUnsafeProbeTargetError(error, 0)) {
+        log.debug(`asset probe ${url} skipped unsafe/private target`);
+        return { kind: "inconclusive" };
+      }
+      log.debug(`asset probe ${url} failed:`, error);
+      return { kind: "unreachable", detail: describeProbeError(error, timeoutMs, signal) };
     }
-    log.debug(`asset probe ${url} failed:`, error);
-    return { kind: "unreachable", detail: describeProbeError(error, timeoutMs, signal) };
+    // The time budget ran out.
+    if (error instanceof DOMException) {
+      log.debug(`asset probe ${url} failed:`, error);
+      return { kind: "unreachable", detail: describeProbeError(error, timeoutMs, signal) };
+    }
+    throw error;
   }
 }
 
@@ -329,7 +340,14 @@ function isSafeProbeUrl(url: URL): boolean {
 export async function resolvePublicAddresses(
   hostname: string,
 ): Promise<readonly LookupAddress[] | undefined> {
-  const addresses = await lookup(hostname, { all: true, verbatim: true });
+  // The resolver's failures carry no class of their own, so each enters the
+  // CLI here as one.
+  const addresses = await lookup(hostname, {
+    all: true,
+    verbatim: true,
+  }).catch((error: unknown) => {
+    throw new PublishAssetLookupFailedError(`asset target ${hostname} cannot be resolved`, error);
+  });
   if (addresses.length === 0) {
     return undefined;
   }
@@ -394,8 +412,8 @@ function unsafeProbeTargetError(hostname: string): PublishAssetTargetUnsafeError
  */
 async function requestHead(url: URL, signal: AbortSignal): Promise<HeadResponse> {
   const safeLookup: NonNullable<RequestOptions["lookup"]> = (hostname, options, callback) => {
-    resolvePublicAddresses(hostname).then(
-      (addresses) => {
+    resolvePublicAddresses(hostname)
+      .then((addresses) => {
         if (!addresses) {
           callback(unsafeProbeTargetError(hostname), "", 0);
           return;
@@ -414,11 +432,14 @@ async function requestHead(url: URL, signal: AbortSignal): Promise<HeadResponse>
           return;
         }
         callback(null, candidate.address, candidate.family);
-      },
-      (error: NodeJS.ErrnoException) => {
-        callback(error, "", 0);
-      },
-    );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof PublishAssetLookupFailedError) {
+          callback(error, "", 0);
+          return;
+        }
+        throw error;
+      });
   };
 
   const dispatcher = new Agent({ connect: { lookup: safeLookup } });
@@ -451,13 +472,16 @@ async function requestHead(url: URL, signal: AbortSignal): Promise<HeadResponse>
  * @returns Whether it is that refusal.
  */
 function isUnsafeProbeTargetError(error: unknown, depth: number): boolean {
-  if (depth >= 4 || !(error instanceof Error)) {
+  if (depth >= 4) {
     return false;
   }
   if (error instanceof PublishAssetTargetUnsafeError) {
     return true;
   }
-  return isUnsafeProbeTargetError(error.cause, depth + 1);
+  if (error instanceof TypeError) {
+    return isUnsafeProbeTargetError(error.cause, depth + 1);
+  }
+  return false;
 }
 
 /**
@@ -546,14 +570,14 @@ function probeTimeoutMs(): number {
  * @param signal - The budget's abort signal, aborted once the budget ran out.
  * @returns The reason.
  */
-function describeProbeError(error: unknown, timeoutMs: number, signal: AbortSignal): string {
-  if (!(error instanceof Error)) {
-    return String(error);
-  }
-  const cause = error.cause;
+function describeProbeError(
+  error: TypeError | DOMException,
+  timeoutMs: number,
+  signal: AbortSignal,
+): string {
   if (signal.aborted) {
     return `no response within ${timeoutMs}ms`;
   }
-  const detail = cause instanceof Error ? cause.message : error.message;
+  const detail = error.cause === undefined ? error.message : errorMessage(error.cause);
   return detail || error.name;
 }

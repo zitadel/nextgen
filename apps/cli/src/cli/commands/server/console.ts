@@ -247,11 +247,11 @@ export default class Console extends Telemetered(
       }
       if (error instanceof LocalServerRecordMalformedError) {
         const holder =
-          (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE).catch((lookup: unknown) => {
-            if (lookup instanceof LocalServerRecordUnreadableError) {
+          (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE).catch((error: unknown) => {
+            if (error instanceof LocalServerRecordUnreadableError) {
               return undefined;
             }
-            throw lookup;
+            throw error;
           })) ?? cwd;
         const elsewhere =
           holder === cwd
@@ -450,11 +450,11 @@ export default class Console extends Telemetered(
       }
       if (error instanceof LocalServerRecordMalformedError) {
         const holder =
-          (await LocalRuntime.findUpward(localDir, LocalRuntime.FILE).catch((lookup: unknown) => {
-            if (lookup instanceof LocalServerRecordUnreadableError) {
+          (await LocalRuntime.findUpward(localDir, LocalRuntime.FILE).catch((error: unknown) => {
+            if (error instanceof LocalServerRecordUnreadableError) {
               return undefined;
             }
-            throw lookup;
+            throw error;
           })) ?? localDir;
         const elsewhere =
           holder === this.cwd

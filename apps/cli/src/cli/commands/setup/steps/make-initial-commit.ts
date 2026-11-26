@@ -177,7 +177,7 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
               createdRepository: existing === null,
             };
       })
-      .catch((error: unknown): InitialCommitOutcome => {
+      .catch((error: unknown) => {
         if (error instanceof GitError) {
           return {
             kind: "unavailable",

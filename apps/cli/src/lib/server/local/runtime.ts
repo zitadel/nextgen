@@ -77,8 +77,17 @@ export async function readPlatformRuntime(
     } else {
       return undefined;
     }
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return undefined;
+    }
+    if (error instanceof DOMException) {
+      return undefined;
+    }
+    if (error instanceof SyntaxError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 
@@ -310,8 +319,11 @@ export function sameLocalServer(a: string, b: string): boolean {
       left.hostname === right.hostname ||
       (isLoopbackHost(left.hostname) && isLoopbackHost(right.hostname));
     return sameHost && left.protocol === right.protocol && left.port === right.port;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
+    }
+    throw error;
   }
 }
 
@@ -341,8 +353,17 @@ export async function loopbackReach(
     } else {
       return "unknown";
     }
-  } catch {
-    return "unknown";
+  } catch (error) {
+    if (error instanceof FsError) {
+      return "unknown";
+    }
+    if (error instanceof LocalServerRecordUnreadableError) {
+      return "unknown";
+    }
+    if (error instanceof LocalServerRecordMalformedError) {
+      return "unknown";
+    }
+    throw error;
   }
 }
 
@@ -370,8 +391,14 @@ export async function readNearestRuntimeMetadata(
 export async function peekRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
   try {
     return await readRuntimeMetadata(cwd);
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof LocalServerRecordUnreadableError) {
+      return undefined;
+    }
+    if (error instanceof LocalServerRecordMalformedError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 
@@ -440,8 +467,14 @@ export async function checkLocalServerHealth(
     // no stream left to abort.
     await response.arrayBuffer();
     return response.ok;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
+    }
+    if (error instanceof DOMException) {
+      return false;
+    }
+    throw error;
   }
 }
 
@@ -539,9 +572,12 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       }
       return current;
     } catch (error) {
-      if (!(error instanceof FsNotFoundError) || dirname(current) === current) {
-        throw error;
+      if (error instanceof FsNotFoundError) {
+        if (dirname(current) !== current) {
+          continue;
+        }
       }
+      throw error;
     }
   }
   throw new Error(`${path} has no existing directory above it`);
@@ -590,8 +626,11 @@ function isValidServerUrl(value: string, port: number): boolean {
       url.hostname.length > 0 &&
       explicitUrlPort(value) === port
     );
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
+    }
+    throw error;
   }
 }
 

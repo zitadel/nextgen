@@ -1,4 +1,5 @@
 import { errorMessage, ZitadelError } from "@/lib/errors";
+import { SuggestionInvalidError } from "./errors";
 import { log } from "@/lib/ui/log";
 import { named } from "@/lib/names";
 
@@ -133,7 +134,7 @@ export class RunSuggestions {
    * @param scope - What it is aimed at.
    * @param cliVersion - The release it runs as.
    * @returns The command.
-   * @throws {Error} When it names no command this CLI loaded, or input its
+   * @throws {@link SuggestionInvalidError} When it names no command this CLI loaded, or input its
    *   command does not take.
    */
   render(
@@ -156,12 +157,12 @@ export class RunSuggestions {
    *
    * @param command - A command this run rendered.
    * @returns Its words.
-   * @throws {Error} When this run did not render `command`.
+   * @throws {@link SuggestionInvalidError} When this run did not render `command`.
    */
   argsOf(command: SuggestedCommand): readonly string[] {
     const words = this.words.get(command);
     if (words === undefined) {
-      throw new Error(`${command} was not rendered by this run`);
+      throw new SuggestionInvalidError(`${command} was not rendered by this run`);
     }
 
     return words;
@@ -179,7 +180,7 @@ export class RunSuggestions {
    * @param raw - Its command line, as oclif parsed it.
    * @param change - What the rerun changes.
    * @returns The command.
-   * @throws {Error} When the change leaves out a flag the command does not
+   * @throws {@link SuggestionInvalidError} When the change leaves out a flag the command does not
    *   declare, or, from the renderer, sets one.
    */
   rerun(
@@ -192,7 +193,9 @@ export class RunSuggestions {
       return !target.flags.has(spelled(name)) && !ANSWERING.includes(name);
     });
     if (undeclared.length > 0) {
-      throw new Error(`${id} declares no --${undeclared.map(spelled).join(", --")} to leave out`);
+      throw new SuggestionInvalidError(
+        `${id} declares no --${undeclared.map(spelled).join(", --")} to leave out`,
+      );
     }
     const redact = withoutCredentials;
     const positional = (
@@ -271,9 +274,12 @@ export class RunSuggestions {
       nextCommands: error.nextCommands.flatMap((next) => {
         try {
           return [suggest(next)];
-        } catch (cause) {
-          log.debug(`Left out a follow-up that could not be rendered: ${errorMessage(cause)}`);
-          return [];
+        } catch (error) {
+          if (error instanceof SuggestionInvalidError) {
+            log.debug(`Left out a follow-up that could not be rendered: ${errorMessage(error)}`);
+            return [];
+          }
+          throw error;
         }
       }),
       details: error.details,
@@ -285,7 +291,7 @@ export class RunSuggestions {
    *
    * @param id - The command, as oclif names it.
    * @returns Its flags and arguments.
-   * @throws {Error} When `id` is no command this CLI loaded.
+   * @throws {@link SuggestionInvalidError} When `id` is no command this CLI loaded.
    */
   private declared(id: string): Declared {
     return declaredOf(id, this.run.findCommand(id));

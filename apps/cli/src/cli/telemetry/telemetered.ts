@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { Flags } from "@oclif/core";
 
-import { toZitadelError } from "@/lib/errors";
+import { toZitadelError, ZitadelLibError } from "@/lib/errors";
 import type { BaseCommand, Facts, MetaOptions } from "@/cli/core/base";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import type { CommandResult, JsonEnvelope } from "@/cli/core";
@@ -249,7 +249,7 @@ export function Telemetered<
      */
     protected override async catch(error: unknown): Promise<never> {
       try {
-        return await super.catch(error);
+        return await super.catch.call(this, error);
       } finally {
         this.reportGuard(() => {
           this.reportBegin(this.argv.includes("--no-telemetry") ? false : undefined, false);
@@ -279,9 +279,12 @@ export function Telemetered<
      */
     protected override async finally(error: Error | undefined): Promise<void> {
       await super.finally(error);
-      try {
-        await this.reportClient?.shutdown(1000);
-      } catch {}
+      await this.reportClient?.shutdown(1000).catch((error: unknown) => {
+        if (error instanceof ZitadelLibError) {
+          return;
+        }
+        throw error;
+      });
       if (this.reportClient?.enabled) {
         this.armExitWatchdog();
       }
@@ -339,9 +342,12 @@ export function Telemetered<
     private reportFacts(): Facts {
       try {
         return this.describe();
-      } catch {
+      } catch (error) {
         // A run that failed before its flags were read has no facts of its own.
-        return {};
+        if (error instanceof TypeError) {
+          return {};
+        }
+        throw error;
       }
     }
 
@@ -368,8 +374,12 @@ export function Telemetered<
     private reportGuard(work: () => void): void {
       try {
         work();
-      } catch {
+      } catch (error) {
         // Reporting never changes what a command does.
+        if (error instanceof ZitadelLibError) {
+          return;
+        }
+        throw error;
       }
     }
 

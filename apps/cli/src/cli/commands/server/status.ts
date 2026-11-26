@@ -2,7 +2,7 @@ import pTimeout from "p-timeout";
 
 import { UserService } from "@/lib/backend";
 import { Claim, type ClaimState } from "@/lib/claim";
-import { isCancellation } from "@/lib/errors";
+import { isCancellation, ZitadelError, ZitadelLibError } from "@/lib/errors";
 import {
   LocalRuntime,
   LocalServerRecordMalformedError,
@@ -202,10 +202,16 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
       },
     });
   } catch (error) {
-    if (isCancellation(error)) {
-      throw error;
+    if (error instanceof ZitadelLibError) {
+      return "unknown";
     }
-    return "unknown";
+    if (error instanceof ZitadelError) {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return "unknown";
+    }
+    throw error;
   }
 }
 

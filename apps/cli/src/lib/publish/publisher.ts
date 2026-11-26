@@ -14,7 +14,6 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
-import { isCancellation } from "@/lib/errors";
 import { Output } from "@/lib/ui";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
@@ -242,7 +241,7 @@ export class Publisher {
         deployedUnknown: false,
       };
     }
-    const deployed = await this.listDeployed();
+    const deployed = await this.connections.deployedSlugs();
     if (deployed === undefined) {
       return {
         config: unknown,
@@ -254,26 +253,6 @@ export class Publisher {
       config: unknown.withOptions({ deployed }),
       deployedUnknown: false,
     };
-  }
-
-  /**
-   * List the connections the project has, treating any listing failure other
-   * than the person stopping the command as not knowing, so it never hides
-   * what the local files say.
-   *
-   * @returns The slugs, or undefined when the listing could not be read.
-   * @throws The run's cancellation, when the person stops the command.
-   */
-  private async listDeployed(): Promise<ReadonlySet<string> | undefined> {
-    try {
-      return await this.connections.deployedSlugs();
-    } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
-      }
-
-      return undefined;
-    }
   }
 
   /**

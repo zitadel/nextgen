@@ -1,6 +1,6 @@
-import { createZitadelClient, IdpService } from "@/lib/backend";
+import { BackendError, createZitadelClient, IdpService } from "@/lib/backend";
 import { ZitadelRuntime } from "@/lib/server";
-import { isCancellation } from "@/lib/errors";
+import { FsError } from "@/lib/fs";
 import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { Runtime } from "@/lib/runtime";
 import {
@@ -11,8 +11,8 @@ import {
   ZitadelConfigError,
 } from "@/lib/zitadel";
 
-import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
-import { Project } from "@/lib/project";
+import { AbstractSanityCheck, CheckFailure, type CheckContext, type CheckOutcome } from "./types";
+import { Project, ProjectError } from "@/lib/project";
 
 /**
  * What one read of the configuration found.
@@ -202,10 +202,16 @@ export class SchemaCheck extends AbstractSanityCheck {
       });
       return await new IdpService(client, secret.data.project_id).deployedSlugs();
     } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
+      if (error instanceof ProjectError) {
+        return undefined;
       }
-      return undefined;
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof BackendError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 
@@ -222,7 +228,7 @@ export class SchemaCheck extends AbstractSanityCheck {
       return issue.severity === "error";
     });
     if (errors.length > 0) {
-      throw new Error(described(errors));
+      throw new CheckFailure(described(errors));
     }
   }
 }

@@ -98,12 +98,16 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
         }),
       );
     } catch (error) {
-      try {
-        await DockerLauncher.remove(spec.containerName);
-      } catch {
-        // The launch failure is the one to report, whatever cleaning up threw.
+      // The launch failure is the one to report when cleaning up fails too.
+      await DockerLauncher.remove(spec.containerName).catch((error: unknown) => {
+        if (error instanceof LocalServerDockerFailedError) {
+          return false;
+        }
+        if (error instanceof ExecaError) {
+          return false;
+        }
         throw error;
-      }
+      });
       throw error;
     }
   }

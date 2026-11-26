@@ -25,6 +25,14 @@ import type {
   TimeLike,
   WriteFileOptions,
 } from "node:fs";
+import { unlinkSync as nodeUnlinkSync } from "node:fs";
+import {
+  mkdirSync as nodeMkdirSync,
+  readFileSync as nodeReadFileSync,
+  renameSync as nodeRenameSync,
+  rmSync as nodeRmSync,
+  writeFileSync as nodeWriteFileSync,
+} from "node:fs";
 import type { FileHandle } from "node:fs/promises";
 import {
   access as nodeAccess,
@@ -66,7 +74,8 @@ export * from "./errors";
  *
  * @remarks
  * Every wrapper in this module uses it, and it is the only reader of a Node
- * error's `code` in the CLI.
+ * error's `code` in the CLI. The config store uses it too, for the failures of
+ * the file system it is given, so it recognises them by class.
  *
  * @param error - Whatever the Node call threw.
  * @param operation - What the call was doing, as a verb, for the message.
@@ -74,7 +83,7 @@ export * from "./errors";
  * @returns The typed error for a known code, {@link FsFailedError} for any other
  *   failure of the system call, otherwise `error` itself.
  */
-function fsFailure(error: unknown, operation: string, path: PathLike): unknown {
+export function fsFailure(error: unknown, operation: string, path: PathLike): unknown {
   const message = `Cannot ${operation} ${String(path)}`;
   if (isErrno(error, "ENOENT")) {
     return new FsNotFoundError(message, error);
@@ -97,7 +106,8 @@ function fsFailure(error: unknown, operation: string, path: PathLike): unknown {
   // Only a failure of the system call itself: Node's own argument errors
   // (`ERR_*`) are bugs in the caller and stay as they are.
   if (
-    error instanceof Error &&
+    typeof error === "object" &&
+    error !== null &&
     "syscall" in error &&
     "code" in error &&
     typeof error.code === "string"
@@ -335,6 +345,20 @@ export async function open(
 export async function unlink(path: PathLike): Promise<void> {
   try {
     await nodeUnlink(path);
+  } catch (error) {
+    throw fsFailure(error, "remove", path);
+  }
+}
+
+/**
+ * Removes a file, synchronously, for a caller that cannot wait.
+ *
+ * @param path - The file to remove.
+ * @throws {@link FsError} When it cannot be removed.
+ */
+export function unlinkSync(path: PathLike): void {
+  try {
+    nodeUnlinkSync(path);
   } catch (error) {
     throw fsFailure(error, "remove", path);
   }
@@ -639,5 +663,95 @@ export async function isFile(path: string): Promise<boolean> {
       return false;
     }
     throw error;
+  }
+}
+
+/**
+ * Reads a file as text, blocking until it is read.
+ *
+ * @remarks
+ * For the few callers that must stay synchronous; everything else uses
+ * {@link readFile}.
+ *
+ * @param path - The file to read.
+ * @param encoding - How its bytes are decoded.
+ * @returns The file's text.
+ * @throws {@link FsError} When the file cannot be read.
+ */
+export function readFileSync(path: PathLike, encoding: BufferEncoding): string {
+  try {
+    return nodeReadFileSync(path, encoding);
+  } catch (error) {
+    throw fsFailure(error, "read", path);
+  }
+}
+
+/**
+ * Writes a file, blocking until it is written, replacing what it held unless
+ * `options.flag` says otherwise.
+ *
+ * @param path - The file to write.
+ * @param data - What it holds.
+ * @param options - Its encoding, mode and open flag.
+ * @throws {@link FsError} When the file cannot be written; {@link FsExistsError}
+ *   when `flag` is `wx` and the file is already there.
+ */
+export function writeFileSync(
+  path: PathLike,
+  data: string | Uint8Array,
+  options?: WriteFileOptions,
+): void {
+  try {
+    nodeWriteFileSync(path, data, options);
+  } catch (error) {
+    throw fsFailure(error, "write", path);
+  }
+}
+
+/**
+ * Creates a directory, blocking until it is created.
+ *
+ * @param path - The directory to create.
+ * @param options - Whether to create its parents too (`recursive`), and its mode.
+ * @returns With `recursive`, the first directory it created, or `undefined`
+ *   when every one was already there; otherwise `undefined`.
+ * @throws {@link FsError} When it cannot be created.
+ */
+export function mkdirSync(path: PathLike, options?: MakeDirectoryOptions): string | undefined {
+  try {
+    return nodeMkdirSync(path, options);
+  } catch (error) {
+    throw fsFailure(error, "create directory", path);
+  }
+}
+
+/**
+ * Moves a file or directory, blocking until it is moved.
+ *
+ * @param oldPath - Where it is.
+ * @param newPath - Where it goes, replacing a file already there.
+ * @throws {@link FsError} When it cannot be moved.
+ */
+export function renameSync(oldPath: PathLike, newPath: PathLike): void {
+  try {
+    nodeRenameSync(oldPath, newPath);
+  } catch (error) {
+    throw fsFailure(error, "rename", oldPath);
+  }
+}
+
+/**
+ * Removes a file or, with `recursive`, a directory and everything in it,
+ * blocking until it is removed.
+ *
+ * @param path - What to remove.
+ * @param options - Whether to recurse, and whether a missing path is fine (`force`).
+ * @throws {@link FsError} When it cannot be removed.
+ */
+export function rmSync(path: PathLike, options?: RmOptions): void {
+  try {
+    nodeRmSync(path, options);
+  } catch (error) {
+    throw fsFailure(error, "remove", path);
   }
 }

@@ -141,10 +141,10 @@ export class Branding extends ConfigDocument<BrandingValue> {
           return this.makeIssue("branding/template", `template ${issue.rule}: ${issue.message}`);
         });
     } catch (error) {
-      if (!(error instanceof ZitadelConfigError)) {
-        throw error;
+      if (error instanceof ZitadelConfigError) {
+        return [this.makeIssue("branding/template-file", error.message)];
       }
-      return [this.makeIssue("branding/template-file", error.message)];
+      throw error;
     }
   }
 

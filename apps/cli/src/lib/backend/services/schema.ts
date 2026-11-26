@@ -100,24 +100,28 @@ export class SchemaService extends ApiService {
    * @throws BackendNotFoundError when neither names a schema.
    */
   async get(reference: string): Promise<SchemaRecord> {
-    try {
-      // Scoped like every other call of this service: a schema id is unique
-      // within a project and not across them — the seeded default schema
-      // carries the same `$id` in every project — so a credential that can see
-      // more than one resolves it ambiguously without the project named.
-      return await this.client.getSchema(reference, {
+    // Scoped like every other call of this service: a schema id is unique
+    // within a project and not across them — the seeded default schema
+    // carries the same `$id` in every project — so a credential that can see
+    // more than one resolves it ambiguously without the project named.
+    const found = await this.client
+      .getSchema(reference, {
         project_id: this.projectId,
+      })
+      .catch((error: unknown) => {
+        // A 404 exactly, because this reads the failure as a statement about the
+        // reference rather than about the schema: nothing holds that id, so the
+        // reference must have been an object type.
+        if (error instanceof BackendGoneError) {
+          throw error;
+        }
+        if (error instanceof BackendNotFoundError) {
+          return undefined;
+        }
+        throw error;
       });
-    } catch (error) {
-      // A 404 exactly, because this reads the failure as a statement about the
-      // reference rather than about the schema: nothing holds that id, so the
-      // reference must have been an object type.
-      if (error instanceof BackendGoneError) {
-        throw error;
-      }
-      if (!(error instanceof BackendNotFoundError)) {
-        throw error;
-      }
+    if (found !== undefined) {
+      return found;
     }
     const first = await this.page({
       object_type: reference,

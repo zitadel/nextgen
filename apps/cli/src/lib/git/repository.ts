@@ -2,8 +2,8 @@ import { existsSync } from "node:fs";
 import { realpath, rm } from "@/lib/fs";
 import { join } from "node:path";
 
-import { entryExists } from "@/lib/fs";
-import { GitBinaryMissingError, GitCommandFailedError } from "./errors";
+import { entryExists, FsError } from "@/lib/fs";
+import { GitBinaryMissingError, GitCommandFailedError, GitError } from "./errors";
 import { Git } from "./git";
 import type { Operation } from "./operation";
 import { CommitAll } from "./operations/commit-all";
@@ -100,8 +100,14 @@ export class Repository {
         return otherwise;
       }
       return await question(repository);
-    } catch {
-      return otherwise;
+    } catch (error) {
+      if (error instanceof GitError) {
+        return otherwise;
+      }
+      if (error instanceof FsError) {
+        return otherwise;
+      }
+      throw error;
     }
   }
 
@@ -128,11 +134,13 @@ export class Repository {
       await new Git(real).run(["init", "--quiet"]);
     } catch (error) {
       if (!hadOne) {
-        try {
-          await rm(gitDir, { recursive: true, force: true });
-        } catch {
+        const failure = error;
+        await rm(gitDir, { recursive: true, force: true }).catch((error: unknown) => {
+          if (error instanceof FsError) {
+            throw failure;
+          }
           throw error;
-        }
+        });
       }
       throw error;
     }

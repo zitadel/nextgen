@@ -31,11 +31,12 @@ import semver from "semver";
 import type { CreatedProject } from "@/lib/backend";
 import type { Consent, Gate } from "@/lib/consent";
 import type { InitialDeployment } from "@/lib/environment";
-import { errorMessage, ZitadelError } from "@/lib/errors";
-import { Repository } from "@/lib/git";
+import { ZitadelError } from "@/lib/errors";
+import { GitError, Repository } from "@/lib/git";
 import {
   type CustomFlagValues,
   customFlagValues,
+  IdpError,
   type PublishState,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
@@ -1276,10 +1277,13 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
         }),
     };
   } catch (error) {
-    return {
-      kind: "unknown",
-      reason: errorMessage(error),
-    };
+    if (error instanceof GitError) {
+      return {
+        kind: "unknown",
+        reason: error.message,
+      };
+    }
+    throw error;
   }
 }
 
@@ -1376,36 +1380,7 @@ export function retryOptionsFromFlags(
     ssoScopes?: string;
   }>,
 ): SetupRetryOptions {
-  const selection = (() => {
-    try {
-      return flags.sso === undefined
-        ? undefined
-        : selectionFromFlags(
-            flags.sso,
-            customFlagValues(flags, SETUP_FLAG_KEYS),
-            SETUP_FLAG_NAMES,
-            "",
-          );
-    } catch {
-      return undefined;
-    }
-  })();
-  return {
-    ssoTyped:
-      selection === undefined &&
-      flags.sso !== undefined &&
-      (flags.sso === CUSTOM_PROVIDER ||
-        IDP_PROVIDERS.some((provider) => {
-          return provider === flags.sso;
-        }))
-        ? {
-            sso: flags.sso,
-            ssoSlug: flags.ssoSlug,
-            ssoDisplayName: flags.ssoDisplayName,
-            ssoIssuer: flags.ssoIssuer,
-            ssoScopes: flags.ssoScopes,
-          }
-        : undefined,
+  const typed = {
     framework: flags.framework,
     preset: SETUP_PRESETS.find((preset) => {
       return preset === flags.preset;
@@ -1416,8 +1391,49 @@ export function retryOptionsFromFlags(
     renderer: flags.renderer,
     devPort: flags.devPort,
     passwordMinLength: flags.passwordMinLength,
-    sso: selection === undefined ? undefined : [selection],
   };
+  if (flags.sso === undefined) {
+    return {
+      ...typed,
+      ssoTyped: undefined,
+      sso: undefined,
+    };
+  }
+  try {
+    return {
+      ...typed,
+      ssoTyped: undefined,
+      sso: [
+        selectionFromFlags(
+          flags.sso,
+          customFlagValues(flags, SETUP_FLAG_KEYS),
+          SETUP_FLAG_NAMES,
+          "",
+        ),
+      ],
+    };
+  } catch (error) {
+    if (error instanceof IdpError) {
+      return {
+        ...typed,
+        ssoTyped:
+          flags.sso === CUSTOM_PROVIDER ||
+          IDP_PROVIDERS.some((provider) => {
+            return provider === flags.sso;
+          })
+            ? {
+                sso: flags.sso,
+                ssoSlug: flags.ssoSlug,
+                ssoDisplayName: flags.ssoDisplayName,
+                ssoIssuer: flags.ssoIssuer,
+                ssoScopes: flags.ssoScopes,
+              }
+            : undefined,
+        sso: undefined,
+      };
+    }
+    throw error;
+  }
 }
 
 /**
@@ -1622,10 +1638,10 @@ export async function outdatedLocalServer(
       expected,
     };
   } catch (error) {
-    if (!(error instanceof LocalServerError)) {
-      throw error;
+    if (error instanceof LocalServerError) {
+      return undefined;
     }
-    return undefined;
+    throw error;
   }
 }
 

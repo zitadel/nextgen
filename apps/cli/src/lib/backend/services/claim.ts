@@ -215,11 +215,13 @@ export class ClaimService extends ApiService {
    * @returns The owning team and its dashboard, or undefined when the body names none.
    */
   private static ownerOf(error: BackendError): ClaimOwner | undefined {
-    if (
-      !(error instanceof BackendConflictError) ||
-      !hasDetails(error.body) ||
-      !isOwner(error.body.details)
-    ) {
+    if (!(error instanceof BackendConflictError)) {
+      return undefined;
+    }
+    if (!hasDetails(error.body)) {
+      return undefined;
+    }
+    if (!isOwner(error.body.details)) {
       return undefined;
     }
     return {

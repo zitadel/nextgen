@@ -38,7 +38,8 @@ import {
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
-import { Project } from "@/lib/project";
+import { FsError } from "@/lib/fs";
+import { Project, ProjectError } from "@/lib/project";
 import { RemoveCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
@@ -689,14 +690,18 @@ export default class Deploy extends Telemetered(
     }
     const setupProject = await Project.at(this.cwd)
       .secret()
-      .then(
-        (secret) => {
-          return secret.data.project_id;
-        },
-        () => {
+      .then((secret) => {
+        return secret.data.project_id;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ProjectError) {
           return undefined;
-        },
-      );
+        }
+        if (error instanceof FsError) {
+          return undefined;
+        }
+        throw error;
+      });
     const missing = missingPrimaryOrigin({
       origins,
       issuer: environment.values.ZITADEL_ISSUER?.value,

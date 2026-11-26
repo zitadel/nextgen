@@ -5,7 +5,7 @@ import {
   type SetupServices,
   signInOf,
 } from "@/cli/commands/setup/shared";
-import { toZitadelError } from "@/lib/errors";
+import { ZitadelLibError } from "@/lib/errors";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
@@ -60,13 +60,15 @@ export class KeepChanges extends WizardStep<"keep", Fact<"allFilesWritten" | "si
    */
   async run(needs: Needs): Promise<Fact<"allFilesWritten" | "signIn">> {
     const { answers, framework, newApp, patched, patching, scaffolded } = needs;
-    try {
-      await newApp?.keep();
-    } catch (error) {
-      warnings.report(
-        `Could not delete what the new app replaced, kept beside ${this.deps.cwd}: ${toZitadelError(error).message}`,
-      );
-    }
+    await newApp?.keep().catch((error: unknown) => {
+      if (error instanceof ZitadelLibError) {
+        warnings.report(
+          `Could not delete what the new app replaced, kept beside ${this.deps.cwd}: ${error.message}`,
+        );
+        return;
+      }
+      throw error;
+    });
     for (const file of scaffolded.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.deps.cwd, file), this.deps.dryRun);
       if (sentence) {

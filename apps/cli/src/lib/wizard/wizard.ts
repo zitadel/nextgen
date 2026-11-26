@@ -1,3 +1,4 @@
+import { FsError } from "@/lib/fs";
 import { WizardDefinitionError } from "./errors";
 import type { EndStep, WizardStep } from "./step";
 
@@ -16,6 +17,7 @@ type Observer<Known extends object> = (known: Known) => void;
  * Told how a run goes, for a caller that follows it without the steps knowing.
  * Each call comes from the engine, never from a step. A step that ends the
  * wizard is reported by {@link RunWatcher.ended}, never as finished.
+ * A watcher must not throw: what it throws stops the run like a failed step.
  */
 export type RunWatcher = Readonly<{
   /**
@@ -49,21 +51,6 @@ export type RunWatcher = Readonly<{
    */
   completed?: () => void;
 }>;
-
-/**
- * Tells a watcher something, and goes on whatever it does with it: a watcher
- * never changes the run, so one that throws cannot skip an undo or replace the
- * error that stopped the run.
- *
- * @param tell - Calls the watcher.
- */
-function told(tell: () => void): void {
-  try {
-    tell();
-  } catch {
-    // Following a run never changes it.
-  }
-}
 
 /**
  * How one run behaves.
@@ -224,13 +211,19 @@ export class Wizard<Initial extends object, State extends object, Result> {
       }
       const attempt = async (): Promise<Progress<State & Out, Result>> => {
         try {
-          told(() => options.watch?.started?.(step.key));
+          options.watch?.started?.(step.key);
           const out = await reader.run(before.state);
           const undo = async (): Promise<void> => {
             try {
               await reader.undo(out);
             } catch (error) {
-              options.onUndoError?.(step.key, error);
+              // A step's undo fails only with the file system, as both of setup's do.
+              if (error instanceof FsError) {
+                options.onUndoError?.(step.key, error);
+                await before.undo();
+                return;
+              }
+              throw error;
             }
             await before.undo();
           };
@@ -244,14 +237,14 @@ export class Wizard<Initial extends object, State extends object, Result> {
             undo,
           };
         } catch (error) {
-          told(() => options.watch?.failed?.(step.key, error));
+          options.watch?.failed?.(step.key, error);
           await before.undo();
           throw error;
         }
       };
       const finished = await attempt();
       if (finished.kind === "continue") {
-        told(() => options.watch?.finished?.(step.key, finished.state));
+        options.watch?.finished?.(step.key, finished.state);
         try {
           observe?.(finished.state);
         } catch (error) {
@@ -289,7 +282,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
           return before;
         }
         const result = await reader.run(before.state);
-        told(() => options.watch?.ended?.(step.key));
+        options.watch?.ended?.(step.key);
 
         return {
           kind: "end",
@@ -300,7 +293,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
       try {
         return await attempt();
       } catch (error) {
-        told(() => options.watch?.failed?.(step.key, error));
+        options.watch?.failed?.(step.key, error);
         await before.undo();
         throw error;
       }
@@ -348,7 +341,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
       }
       try {
         const answered = answer(progress.state);
-        told(() => options.watch?.completed?.());
+        options.watch?.completed?.();
 
         return answered;
       } catch (error) {

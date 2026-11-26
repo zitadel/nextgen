@@ -48,17 +48,16 @@ export async function updateNotice(input: {
   if (release.isNewerThan(cliVersion)) {
     behind.push(`CLI ${cliVersion} → ${release.version}`);
   }
-  try {
-    const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE);
-    for (const dependency of dependencies?.exact() ?? []) {
-      if (dependency.isBehind(release.version)) {
-        const name = escapeControlCharacters(dependency.name);
-        behind.push(`${name} ${dependency.specifier} → ${release.version}`);
-      }
+  const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE).catch((error: unknown) => {
+    if (error instanceof PmManifestInvalidError) {
+      return undefined;
     }
-  } catch (error) {
-    if (!(error instanceof PmManifestInvalidError)) {
-      throw error;
+    throw error;
+  });
+  for (const dependency of dependencies?.exact() ?? []) {
+    if (dependency.isBehind(release.version)) {
+      const name = escapeControlCharacters(dependency.name);
+      behind.push(`${name} ${dependency.specifier} → ${release.version}`);
     }
   }
   if (behind.length === 0) {

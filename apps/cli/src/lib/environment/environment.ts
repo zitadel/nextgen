@@ -3,6 +3,7 @@ import { readdir } from "@/lib/fs";
 import { join, resolve } from "node:path";
 
 import { Project } from "@/lib/project";
+import { LocalServerUrlInvalidError } from "@/lib/server";
 
 import { Dotenv } from "./dotenv";
 import { EnvironmentName } from "./environment-name";
@@ -335,10 +336,13 @@ export class Environment {
     try {
       return servers.origin(value);
     } catch (error) {
-      throw new EnvironmentValueInvalidError(
-        `ZITADEL_URL from ${source} is not a valid server: ${value}; it must be a URL such as ${SERVER}`,
-        error,
-      );
+      if (error instanceof LocalServerUrlInvalidError) {
+        throw new EnvironmentValueInvalidError(
+          `ZITADEL_URL from ${source} is not a valid server: ${value}; it must be a URL such as ${SERVER}`,
+          error,
+        );
+      }
+      throw error;
     }
   }
 }

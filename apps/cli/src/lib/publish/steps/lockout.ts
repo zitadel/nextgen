@@ -1,5 +1,4 @@
 import { BackendError, type Credential, type QueriedUser, type UserQuery } from "@/lib/backend";
-import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import type { Lockout, Step, StepContext, StepResult } from "@/lib/publish/pipeline";
@@ -224,16 +223,15 @@ export const lockoutStep: Step = {
       }
       return { lockouts: found.lockouts };
     } catch (error) {
-      // The person stopping the command is not a check that could not finish.
-      if (isCancellation(error)) {
-        throw error;
-      }
       // Never a failed deploy, but never a silent pass either.
-      warnings.report(
-        "Could not finish checking existing users for sign-in lockouts: an unexpected error stopped the check.",
-      );
+      if (error instanceof BackendError) {
+        warnings.report(
+          "Could not finish checking existing users for sign-in lockouts: an unexpected error stopped the check.",
+        );
+        return undefined;
+      }
+      throw error;
     }
-    return undefined;
   },
 };
 
@@ -346,21 +344,21 @@ async function findLockouts(ctx: StepContext): Promise<Found> {
   // One scan failing must not discard what the other found.
   const scans = await Promise.all([
     lookupWarnings(ctx, flows, share).catch((error: unknown) => {
-      if (error instanceof Error) {
+      if (error instanceof BackendError) {
         return { ...NOTHING, failed: true };
       }
       throw error;
     }),
     ssoSkipped === undefined
       ? unservedWarnings(ctx, flows, names, share).catch((error: unknown) => {
-          if (error instanceof Error) {
+          if (error instanceof BackendError) {
             return { ...NOTHING, failed: true };
           }
           throw error;
         })
       : NOTHING,
     credentialWarnings(ctx, disabling.changes, share).catch((error: unknown) => {
-      if (error instanceof Error) {
+      if (error instanceof BackendError) {
         return { ...NOTHING, failed: true };
       }
       throw error;
@@ -514,9 +512,12 @@ async function lookupWarnings(
         partial: [],
         failed: false,
       };
-    } catch {
+    } catch (error) {
       // One schema's failed read must not discard the warnings of the others.
-      return { warnings: [], partial: [], failed: true };
+      if (error instanceof BackendError) {
+        return { warnings: [], partial: [], failed: true };
+      }
+      throw error;
     }
   });
   return merged(scans);
@@ -563,10 +564,10 @@ async function unservedWarnings(
       // answers rather than raising: nothing to report for them.
       return await ctx.users.hasIdentityLink(user.id);
     } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
+      if (error instanceof BackendError) {
+        return undefined;
       }
-      return undefined;
+      throw error;
     }
   });
   const failed = hasLink.includes(undefined);
@@ -752,10 +753,10 @@ async function liveReleases(ctx: StepContext): Promise<readonly LiveRelease[] | 
       return [{ pinsFlow, schemas }];
     });
   } catch (error) {
-    if (isCancellation(error)) {
-      throw error;
+    if (error instanceof BackendError) {
+      return undefined;
     }
-    return undefined;
+    throw error;
   }
 }
 
@@ -798,10 +799,10 @@ async function credentialWarnings(
         try {
           return await ctx.users.credentials(user.id, asked);
         } catch (error) {
-          if (isCancellation(error)) {
-            throw error;
+          if (error instanceof BackendError) {
+            return undefined;
           }
-          return undefined;
+          throw error;
         }
       });
       const failed = held.includes(undefined);
@@ -835,11 +836,11 @@ async function credentialWarnings(
         failed,
       };
     } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
-      }
       // One schema's failed read must not discard the warnings of the others.
-      return { warnings: [], partial: [], failed: true };
+      if (error instanceof BackendError) {
+        return { warnings: [], partial: [], failed: true };
+      }
+      throw error;
     }
   });
   return merged(scans);

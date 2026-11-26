@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import {
   chmod,
   FsDeniedError,
+  FsError,
   FsFailedError,
   FsNotFoundError,
   rm,
@@ -50,9 +51,13 @@ export class SecretFile {
     try {
       await chmod(path, mode);
     } catch (error) {
-      warnings.report(
-        `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${error instanceof FsNotFoundError ? "ENOENT" : error instanceof FsDeniedError ? "EACCES" : error instanceof FsFailedError ? error.errno : "unknown"}); its permissions may be broader than intended.`,
-      );
+      if (error instanceof FsError) {
+        warnings.report(
+          `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${error instanceof FsNotFoundError ? "ENOENT" : error instanceof FsDeniedError ? "EACCES" : error instanceof FsFailedError ? error.errno : "unknown"}); its permissions may be broader than intended.`,
+        );
+        return;
+      }
+      throw error;
     }
   }
 
@@ -94,18 +99,26 @@ export class SecretFile {
       await writeFile(probe, "", { mode: SECRET_MODE });
       try {
         await chmod(probe, 0o640);
-      } catch {
-        return false;
+      } catch (error) {
+        if (error instanceof FsError) {
+          return false;
+        }
+        throw error;
       }
       return ((await stat(probe)).mode & 0o777) === 0o640;
-    } catch {
-      return true;
-    } finally {
-      try {
-        await rm(probe, { force: true });
-      } catch {
-        // The probe stays; a finally cannot throw without replacing the answer.
+    } catch (error) {
+      if (error instanceof FsError) {
+        return true;
       }
+      throw error;
+    } finally {
+      // A probe that cannot be removed stays: its failure must not replace the answer.
+      await rm(probe, { force: true }).catch((error: unknown) => {
+        if (error instanceof FsError) {
+          return undefined;
+        }
+        throw error;
+      });
     }
   }
 

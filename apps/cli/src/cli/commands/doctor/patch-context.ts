@@ -2,8 +2,8 @@ import { join } from "node:path";
 import { ZitadelRuntime } from "@/lib/server";
 import { parseEnv } from "node:util";
 
-import { Environment } from "@/lib/environment";
-import { readIfReadable } from "@/lib/fs";
+import { Environment, EnvironmentError } from "@/lib/environment";
+import { FsError, readIfReadable } from "@/lib/fs";
 import { issuerFromPort, Orca } from "@/lib/orca";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { Project } from "@/lib/project";
@@ -97,12 +97,17 @@ export async function configuredIssuer(cwd: string): Promise<string | undefined>
     servers: ZitadelRuntime,
     cwd,
     env: {},
-  }).then(
-    ({ values }) => {
+  })
+    .then(({ values }) => {
       return values.ZITADEL_ISSUER?.value;
-    },
-    () => {
-      return undefined;
-    },
-  );
+    })
+    .catch((error: unknown) => {
+      if (error instanceof EnvironmentError) {
+        return undefined;
+      }
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      throw error;
+    });
 }

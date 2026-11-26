@@ -730,7 +730,10 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
  * itself rather than matched out of oclif's wording, which is not ours.
  */
 function asRaised(error: unknown): unknown {
-  if (!(error instanceof ZitadelError) || error.message === error.raised) {
+  if (!(error instanceof ZitadelError)) {
+    return error;
+  }
+  if (error.message === error.raised) {
     return error;
   }
 

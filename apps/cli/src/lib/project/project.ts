@@ -1,4 +1,6 @@
+import { FsError } from "@/lib/fs";
 import { EnvFile } from "./env-file";
+import { ProjectError } from "./errors";
 import { Gitignore, type GitignoreRule } from "./gitignore";
 import { ProjectConfig } from "./project-config";
 import { ProjectSecret, type ProjectSecretData } from "./project-secret";
@@ -160,8 +162,14 @@ export class Project {
   async configOrEmpty(): Promise<ProjectConfig> {
     try {
       return await this.config();
-    } catch {
-      return new ProjectConfig();
+    } catch (error) {
+      if (error instanceof ProjectError) {
+        return new ProjectConfig();
+      }
+      if (error instanceof FsError) {
+        return new ProjectConfig();
+      }
+      throw error;
     }
   }
 

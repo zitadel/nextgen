@@ -7,7 +7,7 @@ import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schem
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
 import { EnvironmentValueUnboundError } from "@/lib/environment";
-import { ZitadelError } from "@/lib/errors";
+import { ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { announce, section, warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult, Connection } from "@/cli/core";
@@ -595,8 +595,15 @@ export default class Claim extends Telemetered(ChangeCommand) {
             if (error instanceof AbortError) {
               throw error;
             }
-            this.annotate({ poll_count: attempt });
-            throw new AbortError(error instanceof Error ? error : new Error(String(error)));
+            if (error instanceof ZitadelLibError) {
+              this.annotate({ poll_count: attempt });
+              throw new AbortError(error);
+            }
+            if (error instanceof ZitadelError) {
+              this.annotate({ poll_count: attempt });
+              throw new AbortError(error);
+            }
+            throw error;
           }
         },
         {
@@ -607,6 +614,9 @@ export default class Claim extends Telemetered(ChangeCommand) {
           factor: POLL_BACKOFF_FACTOR,
           randomize: false,
           signal: this.signal,
+          shouldRetry: ({ error }) => {
+            return error instanceof NotFinished;
+          },
         },
       );
     } catch (error) {

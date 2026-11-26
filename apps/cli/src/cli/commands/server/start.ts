@@ -287,7 +287,7 @@ export default class Start extends Telemetered(
    */
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
     const plan = await this.serverInThisFolder(cwd).plan({
-      port: z.number().optional().catch(undefined).parse(flags.port),
+      port: z.number().safeParse(flags.port).data,
       shell: process.env,
     });
 

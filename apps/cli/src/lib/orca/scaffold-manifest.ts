@@ -3,6 +3,7 @@ import { isAbsolute, join, relative, sep } from "node:path";
 
 import { FsError, readFile } from "@/lib/fs";
 import { isObject } from "@/lib/json";
+import { SyncStateMalformedError } from "@/lib/sync";
 import { readState, updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldManifest, ScaffoldPosture } from "@/lib/sync/types";
 
@@ -74,8 +75,17 @@ export class ScaffoldManifestFile {
         return undefined;
       }
       return scaffold as unknown as ScaffoldManifest;
-    } catch {
-      return undefined;
+    } catch (error) {
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof SyntaxError) {
+        return undefined;
+      }
+      if (error instanceof SyncStateMalformedError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 

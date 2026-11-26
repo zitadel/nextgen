@@ -1,5 +1,5 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { toZitadelError } from "@/lib/errors";
+import { ZitadelLibError } from "@/lib/errors";
 import {
   OrcaCommandFailedError,
   OrcaCommandNotFoundError,
@@ -244,9 +244,13 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
           )} holds what it did before setup`,
         );
       } catch (error) {
-        warnings.report(
-          `Could not remove the new app setup scaffolded in ${this.deps.cwd}: ${toZitadelError(error).message}`,
-        );
+        if (error instanceof ZitadelLibError) {
+          warnings.report(
+            `Could not remove the new app setup scaffolded in ${this.deps.cwd}: ${error.message}`,
+          );
+          return;
+        }
+        throw error;
       }
     }
   }

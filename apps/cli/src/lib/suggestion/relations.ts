@@ -1,4 +1,5 @@
 import type { Interfaces } from "@oclif/core";
+import { SuggestionInvalidError } from "./errors";
 
 /**
  * The relations between a command's flags (`exclusive`, `dependsOn`,
@@ -69,7 +70,7 @@ export type Requiring<Defs, Relations> = {
  * @param defs - The flags, as `Flags.*` declares them, by CLI spelling.
  * @param relations - What each flag requires of the others, by CLI spelling.
  * @returns The flags with their relations applied, typed with the relations.
- * @throws {Error} When a relation names a flag `defs` does not declare.
+ * @throws {@link SuggestionInvalidError} When a relation names a flag `defs` does not declare.
  * @example
  * static override flags = relatedFlags(
  *   { fix: Flags.boolean({ … }), force: Flags.boolean({ … }) },
@@ -86,7 +87,9 @@ export function relatedFlags<
   for (const [name, relation] of Object.entries(relations ?? {})) {
     const definition = declared[name];
     if (definition === undefined) {
-      throw new Error(`flags(): a relation names --${name}, which is not declared`);
+      throw new SuggestionInvalidError(
+        `flags(): a relation names --${name}, which is not declared`,
+      );
     }
     const { exclusive, dependsOn, excludedWhen, required } = relation as {
       exclusive?: readonly string[];

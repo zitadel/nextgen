@@ -1,8 +1,7 @@
 import { format } from "node:util";
 
-import type { Command } from "@oclif/core";
+import { type Command, Errors } from "@oclif/core";
 
-import { ZitadelError } from "@/lib/errors";
 import { refusalError, type Refusal } from "@/cli/core/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -143,13 +142,12 @@ export function Wrapped<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
           },
         };
       } catch (error) {
-        if (error instanceof ZitadelError) {
-          throw error;
+        if (error instanceof Errors.CLIError) {
+          throw refusalError(PLUGIN_REFUSED_REFUSAL, {
+            problem: error.message,
+          });
         }
-
-        throw refusalError(PLUGIN_REFUSED_REFUSAL, {
-          problem: error instanceof Error ? error.message : String(error),
-        });
+        throw error;
       } finally {
         process.stdout.write = write;
         console.log = consoleLog;

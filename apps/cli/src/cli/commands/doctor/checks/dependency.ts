@@ -1,7 +1,7 @@
 import { PM } from "@/lib/pm";
 
 import { ManagedFilesCheck, resolveArtifacts } from "./managed-files";
-import { AbstractSanityCheck, type CheckContext } from "./types";
+import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 
 /**
  * Verifies the project still declares every package its Zitadel integration
@@ -30,7 +30,7 @@ export class DependencyCheck extends AbstractSanityCheck {
           return name.startsWith("@zitadel");
         })
       ) {
-        throw new Error("no @zitadel* dependency found in package.json");
+        throw new CheckFailure("no @zitadel* dependency found in package.json");
       }
       return;
     }
@@ -38,7 +38,9 @@ export class DependencyCheck extends AbstractSanityCheck {
       return !names.has(name);
     });
     if (missing.length > 0) {
-      throw new Error(`package.json does not declare ${missing.join(", ")}, which the app imports`);
+      throw new CheckFailure(
+        `package.json does not declare ${missing.join(", ")}, which the app imports`,
+      );
     }
   }
 

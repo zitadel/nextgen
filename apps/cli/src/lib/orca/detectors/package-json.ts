@@ -150,13 +150,14 @@ export type InstalledPackage = { version: string; path: string };
 
 /** Whether `dir` is the root of a workspace, above which no app's dependencies are installed. */
 async function isWorkspaceRoot(dir: string): Promise<boolean> {
-  try {
-    await readFile(join(dir, "pnpm-workspace.yaml"));
-    return true;
-  } catch (error) {
-    if (!(error instanceof FsError)) {
-      throw error;
+  const marker = await readFile(join(dir, "pnpm-workspace.yaml")).catch((error: unknown) => {
+    if (error instanceof FsError) {
+      return undefined;
     }
+    throw error;
+  });
+  if (marker !== undefined) {
+    return true;
   }
   try {
     const pkg = await readPackageJson(dir);
@@ -195,14 +196,15 @@ export async function installedPackage(
   const start = real ?? resolved;
   for (const dir of ancestors(start)) {
     const path = join(dir, "node_modules", name, "package.json");
-    try {
-      const contents = await readFile(path, "utf8");
+    const contents = await readFile(path, "utf8").catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      throw error;
+    });
+    if (contents !== undefined) {
       const version = versionIn(contents);
       return version === undefined ? undefined : { version, path };
-    } catch (error) {
-      if (!(error instanceof FsError)) {
-        throw error;
-      }
     }
     if (await isWorkspaceRoot(dir)) {
       return undefined;

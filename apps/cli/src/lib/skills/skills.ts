@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { cp, readdir, rm } from "@/lib/fs";
+import { existsSync } from "node:fs";
+import { cp, FsError, mkdirSync, readdir, rm, unlinkSync, writeFileSync } from "@/lib/fs";
 import { dirname, join } from "node:path";
 import * as rosie from "rosie-skills";
 
@@ -108,12 +108,7 @@ export class Skills {
    * @returns `true` when the offer is still to be made.
    */
   async eligible(): Promise<boolean> {
-    try {
-      return (await this.pendingOffer()) !== undefined;
-    } catch {
-      // Nothing here may fail the command the person actually ran.
-      return false;
-    }
+    return (await this.pendingOffer()) !== undefined;
   }
 
   /**
@@ -138,8 +133,12 @@ export class Skills {
         text: "Using an AI coding agent? Add the Zitadel skills to your project so it can work with the CLI:",
         command: skillsAdd,
       };
-    } catch {
-      return undefined;
+    } catch (error) {
+      // Another run holding the marker, or a config directory that cannot be written.
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 
@@ -192,8 +191,12 @@ export class Skills {
         unlinkSync(shownPath);
         throw error;
       }
-    } catch {
-      // A hint must never break `setup` or the root help.
+    } catch (error) {
+      // A marker that cannot be written must never break `setup` or the root help.
+      if (error instanceof FsError) {
+        return;
+      }
+      throw error;
     }
   }
 
@@ -241,20 +244,15 @@ export class Skills {
   }
 
   /**
-   * Whether Claude Code is installed on this machine. A detection that fails
-   * counts as no: it only decides the extra folder, never whether the skills
-   * are added.
+   * Whether Claude Code is installed on this machine. It only decides the
+   * extra folder, never whether the skills are added.
    *
    * @returns `true` when it is installed.
    */
   private static async claudeCodeInstalled(): Promise<boolean> {
-    try {
-      return (await rosie.agents()).some((agent) => {
-        return agent.name === "claude" && agent.detected;
-      });
-    } catch {
-      return false;
-    }
+    return (await rosie.agents()).some((agent) => {
+      return agent.name === "claude" && agent.detected;
+    });
   }
 
   /**

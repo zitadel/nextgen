@@ -1,3 +1,4 @@
+import { ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { byName } from "@/lib/names";
 import { resolveCwd } from "@/lib/paths";
 import type { Scope } from "@/lib/suggestion";
@@ -175,16 +176,30 @@ export class RunContext {
         scope,
         false,
       );
-    } catch {
-      return new RunContext(
-        {
-          ...meta,
-          cwd,
-          serverFlag,
-        },
-        scope,
-        false,
-      );
+    } catch (error) {
+      if (error instanceof ZitadelLibError) {
+        return new RunContext(
+          {
+            ...meta,
+            cwd,
+            serverFlag,
+          },
+          scope,
+          false,
+        );
+      }
+      if (error instanceof ZitadelError) {
+        return new RunContext(
+          {
+            ...meta,
+            cwd,
+            serverFlag,
+          },
+          scope,
+          false,
+        );
+      }
+      throw error;
     }
   }
 

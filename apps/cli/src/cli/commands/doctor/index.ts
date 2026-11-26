@@ -14,8 +14,9 @@ import { createZitadelClient } from "@/lib/backend";
 import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
-import { Environment } from "@/lib/environment";
-import { errorMessage, ZitadelError } from "@/lib/errors";
+import { Environment, EnvironmentError } from "@/lib/environment";
+import { FsError } from "@/lib/fs";
+import { errorMessage, isCancellation, ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { Output, warnings as invocationWarnings } from "@/lib/ui";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -38,10 +39,11 @@ import {
   type SuggestWords,
 } from "@/lib/suggestion";
 import { Runtime } from "@/lib/runtime";
-import { Project } from "@/lib/project";
+import { Project, ProjectError } from "@/lib/project";
 
 import {
   AbstractSanityCheck,
+  CheckFailure,
   checkCliVersion,
   type CheckContext,
   type CheckOutcome,
@@ -110,7 +112,7 @@ const RECORD_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
+  hint: "Check that {path} and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /** What doctor is about, worked out once however many times it is asked for. */
@@ -542,14 +544,19 @@ async function runEnvironmentChecks(input: {
     envName: input.envName,
     envFile: input.envFile,
     serverFlag: input.serverFlag,
-  }).then(
-    (environment) => {
+  })
+    .then((environment) => {
       return { environment };
-    },
-    (error: unknown) => {
-      return { failure: error };
-    },
-  );
+    })
+    .catch((error: unknown) => {
+      if (error instanceof EnvironmentError) {
+        return { failure: error };
+      }
+      if (error instanceof FsError) {
+        return { failure: error };
+      }
+      throw error;
+    });
   if ("failure" in resolved) {
     return [
       {
@@ -570,12 +577,12 @@ async function runEnvironmentChecks(input: {
         const projectId = environment.values.ZITADEL_PROJECT_ID?.value;
         const token = environment.values.ZITADEL_PROJECT_SECRET?.value;
         if (server === undefined || projectId === undefined) {
-          throw new Error(
+          throw new CheckFailure(
             `ZITADEL_URL and ZITADEL_PROJECT_ID must resolve for the ${name} environment`,
           );
         }
         if (token === undefined) {
-          throw new Error(
+          throw new CheckFailure(
             `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
           );
         }
@@ -586,7 +593,7 @@ async function runEnvironmentChecks(input: {
           signal: input.signal,
         }).getProject(projectId);
         if (project.id !== projectId) {
-          throw new Error(
+          throw new CheckFailure(
             `${server} returned project ${project.id}, not the resolved ${projectId}`,
           );
         }
@@ -834,15 +841,24 @@ export default class Doctor extends Telemetered(
         try {
           await check.fix(ctx);
         } catch (error) {
-          if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
-            throw error;
-          }
-          if (Consent.isRefusal(error) && error instanceof ZitadelError) {
-            invocationWarnings.report(`${error.message}. ${error.hint ?? ""}`.trim());
+          if (error instanceof ZitadelError) {
+            if (isCancellation(error)) {
+              throw error;
+            }
+            if (Consent.isRefusal(error)) {
+              invocationWarnings.report(`${error.message}. ${error.hint ?? ""}`.trim());
+              continue;
+            }
+            this.debug(`doctor --fix: ${check.name} repair failed`, error);
+            invocationWarnings.report(`${check.name} could not be repaired: ${error.message}`);
             continue;
           }
-          this.debug(`doctor --fix: ${check.name} repair failed`, error);
-          invocationWarnings.report(`${check.name} could not be repaired: ${errorMessage(error)}`);
+          if (error instanceof ZitadelLibError) {
+            this.debug(`doctor --fix: ${check.name} repair failed`, error);
+            invocationWarnings.report(`${check.name} could not be repaired: ${error.message}`);
+            continue;
+          }
+          throw error;
         }
       }
     }
@@ -877,26 +893,34 @@ export default class Doctor extends Telemetered(
     const projectId = (await Project.at(this.cwd).hasSecret())
       ? await Project.at(this.cwd)
           .secret()
-          .then(
-            (secret) => {
-              return secret.data.project_id;
-            },
-            () => {
+          .then((secret) => {
+            return secret.data.project_id;
+          })
+          .catch((error: unknown) => {
+            if (error instanceof ProjectError) {
               return undefined;
-            },
-          )
+            }
+            if (error instanceof FsError) {
+              return undefined;
+            }
+            throw error;
+          })
       : undefined;
     const projectServer = hasConfig
       ? await Project.at(this.cwd)
           .config()
-          .then(
-            (config) => {
-              return config.server ?? ZitadelRuntime.DEFAULT;
-            },
-            () => {
+          .then((config) => {
+            return config.server ?? ZitadelRuntime.DEFAULT;
+          })
+          .catch((error: unknown) => {
+            if (error instanceof ProjectError) {
               return flags.server;
-            },
-          )
+            }
+            if (error instanceof FsError) {
+              return flags.server;
+            }
+            throw error;
+          })
       : flags.server;
     const bareResolves =
       projectId !== undefined &&
@@ -904,14 +928,19 @@ export default class Doctor extends Telemetered(
         servers: ZitadelRuntime,
         cwd: this.cwd,
         env: this.env,
-      }).then(
-        (environment) => {
+      })
+        .then((environment) => {
           return environment.values.ZITADEL_PROJECT_ID?.value === projectId;
-        },
-        () => {
-          return false;
-        },
-      ));
+        })
+        .catch((error: unknown) => {
+          if (error instanceof EnvironmentError) {
+            return false;
+          }
+          if (error instanceof FsError) {
+            return false;
+          }
+          throw error;
+        }));
     const developmentEnvFile = join(this.cwd, ".env.development.local");
     const namesProject =
       projectId !== undefined &&
@@ -921,17 +950,22 @@ export default class Doctor extends Telemetered(
         cwd: dirname(developmentEnvFile),
         env: {},
         envFile: developmentEnvFile,
-      }).then(
-        ({ values }) => {
+      })
+        .then(({ values }) => {
           return (
             values.ZITADEL_PROJECT_ID?.value === projectId &&
             values.ZITADEL_PROJECT_SECRET !== undefined
           );
-        },
-        () => {
-          return false;
-        },
-      ));
+        })
+        .catch((error: unknown) => {
+          if (error instanceof EnvironmentError) {
+            return false;
+          }
+          if (error instanceof FsError) {
+            return false;
+          }
+          throw error;
+        }));
     const claimSuggest = namesProject
       ? this.suggestWith({
           ...this.scope(),
@@ -1203,14 +1237,18 @@ export default class Doctor extends Telemetered(
     }
     const server = await Project.at(cwd)
       .config()
-      .then(
-        (config) => {
-          return config.server ?? ZitadelRuntime.DEFAULT;
-        },
-        () => {
+      .then((config) => {
+        return config.server ?? ZitadelRuntime.DEFAULT;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ProjectError) {
           return undefined;
-        },
-      );
+        }
+        if (error instanceof FsError) {
+          return undefined;
+        }
+        throw error;
+      });
     if (server === undefined || ZitadelRuntime.fromUrl(server).isLoopback()) {
       return undefined;
     }

@@ -50,7 +50,7 @@ export function Loggable<TBase extends CommandClass>(Base: TBase) {
      * @returns The input, as the oclif command's own `warn` does.
      */
     override warn(input: Error | string): Error | string {
-      warnings.report(input instanceof Error ? input.message : input);
+      warnings.report(typeof input === "string" ? input : input.message);
 
       return input;
     }

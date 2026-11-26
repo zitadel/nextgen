@@ -61,12 +61,11 @@ async function detectSrcDir(cwd: string): Promise<string> {
 }
 
 async function dirExists(path: string): Promise<boolean> {
-  return stat(path).then(
-    (s) => {
-      return s.isDirectory();
-    },
-    () => {
-      return false;
-    },
-  );
+  const stats = await stat(path).catch((error: unknown) => {
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
+  });
+  return stats?.isDirectory() ?? false;
 }

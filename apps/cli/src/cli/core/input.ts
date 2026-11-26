@@ -1,5 +1,4 @@
-import { constants } from "node:fs";
-import { FsError, open } from "@/lib/fs";
+import { FsError, readFile, stat } from "@/lib/fs";
 import { text } from "node:stream/consumers";
 
 import { Errors, Flags, type Command, type Interfaces, Parser } from "@oclif/core";
@@ -307,9 +306,10 @@ export class Input {
 
             return asksForJson && !argv.includes("--json") ? [...argv, "--json"] : argv;
           } catch (error) {
-            if (!(error instanceof ZitadelError)) {
-              throw error;
+            if (error instanceof ZitadelError) {
+              return argv;
             }
+            throw error;
           }
         }
 
@@ -338,8 +338,14 @@ export class Input {
         const { flags, args } = await this.check(body, line.given);
 
         return [...line.kept, ...flags, ...(args.length === 0 ? [] : ["--", ...args])];
-      } catch {
-        return fallback;
+      } catch (error) {
+        if (error instanceof ZitadelError) {
+          return fallback;
+        }
+        if (error instanceof SyntaxError) {
+          return fallback;
+        }
+        throw error;
       }
     } catch (error) {
       if (error instanceof ZitadelError) {
@@ -366,9 +372,6 @@ export class Input {
     try {
       await this.check(await Input.textOf(source));
     } catch (error) {
-      if (error instanceof ZitadelError) {
-        throw error;
-      }
       if (error instanceof JsonNotAnObjectError) {
         throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
           problem: error.message,
@@ -379,9 +382,7 @@ export class Input {
           problem: "--input is not valid JSON",
         });
       }
-      throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
-        problem: error instanceof Error ? error.message : String(error),
-      });
+      throw error;
     }
   }
 
@@ -526,31 +527,22 @@ export class Input {
       return piped.replace(/^\uFEFF/u, "");
     }
     const path = trimmed.replace(/^@|^file:\/\//u, "");
-    const unreadable = (error: unknown): never => {
-      throw refusalError(UNREADABLE_REFUSAL, {
-        path,
-        problem: error instanceof Error ? error.message : String(error),
-      });
-    };
     try {
-      const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
-      try {
-        const found = await handle.stat();
-        if (!found.isFile() || found.size > 8_000_000) {
-          throw refusalError(NOT_A_SMALL_FILE_REFUSAL, { path });
-        }
-        const content = await handle.readFile("utf8");
-
-        return content.replace(/^\uFEFF/u, "");
-      } finally {
-        await handle.close();
+      // Checked before it is read, so a FIFO or a device is refused rather than
+      // opened, which could block the run.
+      const found = await stat(path);
+      if (!found.isFile() || found.size > 8_000_000) {
+        throw refusalError(NOT_A_SMALL_FILE_REFUSAL, { path });
       }
+      const content = await readFile(path, "utf8");
+
+      return content.replace(/^\uFEFF/u, "");
     } catch (error) {
       if (error instanceof FsError) {
-        return unreadable(error);
-      }
-      if (!(error instanceof ZitadelError)) {
-        return unreadable(error);
+        throw refusalError(UNREADABLE_REFUSAL, {
+          path,
+          problem: error.message,
+        });
       }
       throw error;
     }

@@ -1,4 +1,4 @@
-import { isCancellation, toZitadelError } from "@/lib/errors";
+import { isCancellation, ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { AdminClaim } from "@/lib/claim";
 import { AdminSession, LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -142,17 +142,29 @@ export class ClaimOwnership extends WizardStep<
         isLocal,
       };
     } catch (error) {
-      if (isCancellation(error) || this.deps.signal.aborted) {
+      if (this.deps.signal.aborted) {
         throw error;
       }
-      warnings.report(
-        `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
-      );
-      return {
-        ownedByLocalAdmin: undefined,
-        hostsPlatform,
-        isLocal,
-      };
+      if (error instanceof ZitadelLibError) {
+        warnings.report(`Could not attach the project to the local admin: ${error.message}`);
+        return {
+          ownedByLocalAdmin: undefined,
+          hostsPlatform,
+          isLocal,
+        };
+      }
+      if (error instanceof ZitadelError) {
+        if (isCancellation(error)) {
+          throw error;
+        }
+        warnings.report(`Could not attach the project to the local admin: ${error.message}`);
+        return {
+          ownedByLocalAdmin: undefined,
+          hostsPlatform,
+          isLocal,
+        };
+      }
+      throw error;
     }
   }
 }

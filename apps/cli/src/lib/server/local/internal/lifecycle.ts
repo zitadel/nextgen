@@ -10,10 +10,12 @@
  * process is spawned or how a port is probed, the tests that make it cheap to
  * change stop being able to cover it.
  */
+import { ExecaError } from "execa";
 import {
   LocalServerDockerFailedError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
+  LocalServerProcessDeniedError,
   LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
   LocalServerStartTimeoutError,
@@ -311,11 +313,13 @@ export class Lifecycle<R extends ServerRecord> {
     } finally {
       // A claim that cannot be removed is a file whose owner is gone, which
       // the next start takes over; it must not hide how this start ended.
-      try {
-        await claim.release();
-      } catch {
-        // The claim stays; the next start takes it over.
-      }
+      // The claim stays when it cannot be removed; the next start takes it over.
+      await claim.release().catch((error: unknown) => {
+        if (error instanceof FsError) {
+          return undefined;
+        }
+        throw error;
+      });
     }
   }
 
@@ -347,8 +351,17 @@ export class Lifecycle<R extends ServerRecord> {
   private async terminateQuietly(record: R): Promise<StopOutcome> {
     try {
       return await this.deps.launcher.terminate(record);
-    } catch {
-      return { status: "failed" };
+    } catch (error) {
+      if (error instanceof LocalServerProcessDeniedError) {
+        return { status: "failed" };
+      }
+      if (error instanceof LocalServerDockerFailedError) {
+        return { status: "failed" };
+      }
+      if (error instanceof ExecaError) {
+        return { status: "failed" };
+      }
+      throw error;
     }
   }
 

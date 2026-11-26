@@ -1,4 +1,4 @@
-import { execa } from "execa";
+import { ExecaError, execa } from "execa";
 
 import { isLoopbackHost } from "@/lib/server/host";
 
@@ -48,8 +48,11 @@ export async function listListeningTcpListeners(opts?: {
       timeout: timeoutMs,
     });
     return parseLsofListeners(stdout);
-  } catch {
-    return [];
+  } catch (error) {
+    if (error instanceof ExecaError) {
+      return [];
+    }
+    throw error;
   }
 }
 
@@ -94,8 +97,11 @@ export async function workingDirectories(
         return pidLine.startsWith("p") && pid > 0 && folder ? [[pid, folder]] : [];
       }),
     );
-  } catch {
-    return new Map();
+  } catch (error) {
+    if (error instanceof ExecaError) {
+      return new Map();
+    }
+    throw error;
   }
 }
 

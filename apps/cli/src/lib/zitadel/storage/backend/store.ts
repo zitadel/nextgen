@@ -1,6 +1,7 @@
 import { stringify } from "safe-stable-stringify";
 
 import { isErrno } from "@/lib/errno";
+import { FsIsDirectoryError, FsNotDirectoryError, FsNotFoundError, fsFailure } from "@/lib/fs";
 import {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
@@ -164,7 +165,11 @@ export abstract class Store implements ConfigStore {
       await this.fs.promises.access(this.root.resolve(path).toString());
       return true;
     } catch (error) {
-      if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+      const failure = fsFailure(error, "access", path);
+      if (failure instanceof FsNotFoundError) {
+        return false;
+      }
+      if (failure instanceof FsNotDirectoryError) {
         return false;
       }
       throw error;
@@ -223,9 +228,14 @@ export abstract class Store implements ConfigStore {
     } catch (error) {
       // A file that is not there, or a directory on the way that is a file,
       // is already removed.
-      if (!isErrno(error, "ENOENT") && !isErrno(error, "ENOTDIR")) {
-        throw error;
+      const failure = fsFailure(error, "remove", path);
+      if (failure instanceof FsNotFoundError) {
+        return;
       }
+      if (failure instanceof FsNotDirectoryError) {
+        return;
+      }
+      throw error;
     }
   }
 
@@ -276,11 +286,18 @@ export abstract class Store implements ConfigStore {
         } catch (error) {
           // Only a file that is not there may be omitted; one that is there
           // but unreadable is refused, so a deploy never drops it silently.
-          if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+          const failure = fsFailure(error, "read", target.toString());
+          if (failure instanceof FsNotFoundError) {
+            return undefined;
+          }
+          if (failure instanceof FsNotDirectoryError) {
             return undefined;
           }
           const message = `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`;
-          if (isErrno(error, "EACCES") || isErrno(error, "EPERM")) {
+          if (isErrno(error, "EACCES")) {
+            throw new ZitadelConfigReferenceUnreadableError(message, error);
+          }
+          if (isErrno(error, "EPERM")) {
             throw new ZitadelConfigReferenceUnreadableError(message, error);
           }
           throw new ZitadelConfigError(message, error);
@@ -424,7 +441,7 @@ export abstract class Store implements ConfigStore {
     } catch (error) {
       // A directory named like a file cannot be parsed, but it hides nothing
       // else: it is reported as the broken entry it is.
-      if (isErrno(error, "EISDIR")) {
+      if (fsFailure(error, "read", path) instanceof FsIsDirectoryError) {
         return UnparsedFile.directory(path);
       }
       if (isErrno(error, "EACCES")) {

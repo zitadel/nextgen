@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
 
-import { AbstractSanityCheck, type CheckContext } from "./types";
+import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 
 /** The keys `.env.example` must document for a Zitadel-managed project. */
 const REQUIRED_KEYS = ["ZITADEL_PROJECT_ID", "ZITADEL_ENVIRONMENT", "ZITADEL_ISSUER"];
@@ -17,7 +17,7 @@ export class EnvExampleCheck extends AbstractSanityCheck {
     const contents = await readFile(join(ctx.cwd, ".env.example"), "utf8");
     for (const key of REQUIRED_KEYS) {
       if (!contents.includes(`${key}=`)) {
-        throw new Error(`missing ${key}`);
+        throw new CheckFailure(`missing ${key}`);
       }
     }
   }

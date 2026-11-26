@@ -89,7 +89,7 @@ const RECORD_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
+  hint: "Check that {path} and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /**
@@ -210,17 +210,16 @@ export abstract class EnvironmentCommand extends BaseCommand {
         );
       }
       if (error instanceof LocalServerRecordMalformedError) {
+        const folder = resolveCwd(text(flags.cwd));
         const holder =
-          (await LocalRuntime.findUpward(resolveCwd(text(flags.cwd)), LocalRuntime.FILE).catch(
-            (error: unknown) => {
-              if (error instanceof LocalServerRecordUnreadableError) {
-                return undefined;
-              }
-              throw error;
-            },
-          )) ?? resolveCwd(text(flags.cwd));
+          (await LocalRuntime.findUpward(folder, LocalRuntime.FILE).catch((error: unknown) => {
+            if (error instanceof LocalServerRecordUnreadableError) {
+              return undefined;
+            }
+            throw error;
+          })) ?? folder;
         const elsewhere =
-          holder === resolveCwd(text(flags.cwd))
+          holder === folder
             ? {}
             : {
                 cwd: holder,

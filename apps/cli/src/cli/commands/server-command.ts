@@ -27,7 +27,7 @@ const RECORD_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
+  hint: "Check that {path} and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /**

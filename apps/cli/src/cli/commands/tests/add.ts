@@ -13,7 +13,7 @@ import { createOrca } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
-import { type PackageCommand, type PackageJson, PM, PmManifestInvalidError } from "@/lib/pm";
+import { type PackageCommand, PM, PmManifestInvalidError } from "@/lib/pm";
 import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
@@ -333,17 +333,15 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
         throw refusalError(PLAYWRIGHT_CONFIG_REFUSAL, { config });
       }
     }
-    const packageJson: PackageJson | undefined = await PM.manifest(this.cwd).catch(
-      (error: unknown) => {
-        if (error instanceof FsError) {
-          return undefined;
-        }
-        if (error instanceof PmManifestInvalidError) {
-          return undefined;
-        }
-        throw error;
-      },
-    );
+    const packageJson = await PM.manifest(this.cwd).catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return undefined;
+      }
+      throw error;
+    });
     if (packageJson === undefined) {
       throw refusalError(MANIFEST_REFUSAL, {});
     }

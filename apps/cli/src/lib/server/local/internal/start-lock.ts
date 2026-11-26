@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 
-import { FsExistsError, mkdir, readFile, rm, stat, writeFile } from "@/lib/fs";
+import { FsError, FsExistsError, mkdir, readFile, rm, stat, writeFile } from "@/lib/fs";
 import { LocalServerBusyError } from "@/lib/server/errors";
 import { type Clock, SystemClock } from "@/lib/clock";
 import { BinaryLauncher } from "./binary-launcher";
@@ -55,16 +55,17 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
         }
       };
     } catch (error) {
-      if (!(error instanceof FsExistsError)) {
-        throw error;
+      if (error instanceof FsExistsError) {
+        const owner = await readOwner(lockFile);
+        const abandoned =
+          (owner === undefined && (await isUnwritten(lockFile))) ||
+          (owner !== undefined && !BinaryLauncher.isPidRunning(owner));
+        if (!abandoned || !(await clearStale(lockFile, owner))) {
+          return undefined;
+        }
+        continue;
       }
-    }
-    const owner = await readOwner(lockFile);
-    const abandoned =
-      (owner === undefined && (await isUnwritten(lockFile))) ||
-      (owner !== undefined && !BinaryLauncher.isPidRunning(owner));
-    if (!abandoned || !(await clearStale(lockFile, owner))) {
-      return undefined;
+      throw error;
     }
   }
 }
@@ -92,8 +93,11 @@ export const UNWRITTEN_LOCK_MS = 10_000;
 async function isUnwritten(lockFile: string): Promise<boolean> {
   try {
     return Date.now() - (await stat(lockFile)).mtimeMs > UNWRITTEN_LOCK_MS;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return false;
+    }
+    throw error;
   }
 }
 
@@ -152,16 +156,17 @@ async function takeGuard(guardFile: string): Promise<(() => Promise<void>) | und
         await rm(file, { force: true });
       };
     } catch (error) {
-      if (!(error instanceof FsExistsError)) {
-        throw error;
+      if (error instanceof FsExistsError) {
+        const holder = await readOwner(file);
+        if (
+          (holder === undefined && !(await isUnwritten(file))) ||
+          (holder !== undefined && BinaryLauncher.isPidRunning(holder))
+        ) {
+          return undefined;
+        }
+        continue;
       }
-    }
-    const holder = await readOwner(file);
-    if (
-      (holder === undefined && !(await isUnwritten(file))) ||
-      (holder !== undefined && BinaryLauncher.isPidRunning(holder))
-    ) {
-      return undefined;
+      throw error;
     }
   }
   return undefined;
@@ -199,7 +204,10 @@ async function readOwner(lockFile: string): Promise<number | undefined> {
     } else {
       return undefined;
     }
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
   }
 }

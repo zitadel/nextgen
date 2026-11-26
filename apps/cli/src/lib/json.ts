@@ -133,8 +133,11 @@ export function parseJsonObject(contents: string, path: string): Record<string, 
 export function parseJsonOrUndefined(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 

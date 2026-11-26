@@ -1,5 +1,5 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { errorMessage, ZitadelError, ZitadelLibError, type ZitadelErrorCode } from "@/lib/errors";
+import { ZitadelError, ZitadelLibError, type ZitadelErrorCode } from "@/lib/errors";
 import { FsNotFoundError } from "@/lib/fs";
 import type { Orca } from "@/lib/orca";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
@@ -86,10 +86,11 @@ export class CheckFailure extends Error {
 
   /**
    * @param message - What is wrong, in one sentence.
-   * @param details - The facts behind it, for the report.
+   * @param details - The facts behind it, for the report, if any.
+   * @param options - The error that caused it, if any.
    */
-  constructor(message: string, details: CheckOutcome["details"]) {
-    super(message);
+  constructor(message: string, details?: CheckOutcome["details"], options?: ErrorOptions) {
+    super(message, options);
     this.details = details;
   }
 }
@@ -101,7 +102,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
    * carries.
    *
    * @param name - The check's name.
-   * @param fallback - The message when what was thrown is not an error.
+   * @param fallback - The message when the error it threw carries none.
    * @param run - The probe; it returns the passing message and throws to fail.
    * @param failureStatus - What a failure counts as.
    * @returns The check's outcome.
@@ -127,11 +128,21 @@ export abstract class AbstractSanityCheck implements SanityCheck {
           details: error.details,
         };
       }
-      return {
-        name,
-        status: failureStatus,
-        message: error instanceof Error ? error.message : fallback,
-      };
+      if (error instanceof ZitadelLibError) {
+        return {
+          name,
+          status: failureStatus,
+          message: error.message === "" ? fallback : error.message,
+        };
+      }
+      if (error instanceof ZitadelError) {
+        return {
+          name,
+          status: failureStatus,
+          message: error.message === "" ? fallback : error.message,
+        };
+      }
+      throw error;
     }
   }
 
@@ -152,24 +163,51 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         path: this.path,
       };
     } catch (error) {
-      return {
-        name: this.name,
-        status: "fail",
-        message:
-          error instanceof FsNotFoundError ? `${this.path} was not found` : errorMessage(error),
-        path: this.path,
-        ...(error instanceof ZitadelError
-          ? {
-              code: error.code,
-              hint: error.hint,
-            }
-          : {}),
-        ...(error instanceof ZitadelLibError
-          ? {
-              code: error.code,
-            }
-          : {}),
-      };
+      if (error instanceof CheckFailure) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: error.message,
+          path: this.path,
+        };
+      }
+      if (error instanceof FsNotFoundError) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: `${this.path} was not found`,
+          path: this.path,
+          code: error.code,
+        };
+      }
+      if (error instanceof ZitadelLibError) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: error.message,
+          path: this.path,
+          code: error.code,
+        };
+      }
+      if (error instanceof SyntaxError) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: error.message,
+          path: this.path,
+        };
+      }
+      if (error instanceof ZitadelError) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: error.message,
+          path: this.path,
+          code: error.code,
+          hint: error.hint,
+        };
+      }
+      throw error;
     }
   }
 

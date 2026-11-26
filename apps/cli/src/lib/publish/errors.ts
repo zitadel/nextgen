@@ -111,3 +111,12 @@ export class PublishAssetTargetUnsafeError extends PublishError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
+
+/**
+ * A probed asset's host name could not be resolved, so the probe cannot reach it.
+ */
+export class PublishAssetLookupFailedError extends PublishError {
+  override readonly category: ErrorCategory = "unavailable";
+  override readonly retryable: boolean = true;
+  override readonly code: ZitadelErrorCode = "E_NETWORK";
+}

@@ -104,10 +104,17 @@ export class UnparsedFile {
     try {
       JSON.parse(text);
     } catch (error) {
-      const found = V8_PLACE.exec(error instanceof Error ? error.message : "")?.groups;
-      if (found?.line !== undefined && found.column !== undefined) {
+      if (error instanceof SyntaxError) {
+        const found = V8_PLACE.exec(error.message)?.groups;
+        if (found?.line === undefined) {
+          return undefined;
+        }
+        if (found.column === undefined) {
+          return undefined;
+        }
         return `line ${found.line}, column ${found.column}`;
       }
+      throw error;
     }
     return undefined;
   }
@@ -126,19 +133,15 @@ export class UnparsedFile {
    */
   private static placeParserFinds(text: string): string | undefined {
     const places: string[] = [];
-    try {
-      visit(
-        text,
-        {
-          onError: (_error, _offset, _length, line, character) => {
-            places.push(`line ${line + 1}, column ${character + 1}`);
-          },
+    visit(
+      text,
+      {
+        onError: (_error, _offset, _length, line, character) => {
+          places.push(`line ${line + 1}, column ${character + 1}`);
         },
-        STRICT_JSON,
-      );
-    } catch {
-      return undefined;
-    }
+      },
+      STRICT_JSON,
+    );
     return places[0];
   }
 }

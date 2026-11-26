@@ -93,7 +93,14 @@ export class SchemaWriter {
         const state = await SchemaState.at(cwd).of(file);
         return { kind: "judged", file, state };
       } catch (error) {
-        return { kind: "unreadable", file, reason: this.readErrorReason(error) };
+        if (error instanceof FsError) {
+          return {
+            kind: "unreadable",
+            file,
+            reason: this.readErrorReason(error),
+          };
+        }
+        throw error;
       }
     });
     const wanted = judged.flatMap((entry): readonly Stale[] => {

@@ -36,7 +36,7 @@ export { SchemaCheck } from "./schema";
 export { SecretCheck } from "./secret";
 export { SecretPermissionsCheck } from "./secret-permissions";
 export type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-export { AbstractSanityCheck } from "./types";
+export { AbstractSanityCheck, CheckFailure } from "./types";
 
 /** Every diagnostic the `doctor` command runs, in display order. */
 export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [

@@ -6,7 +6,7 @@ import { Project } from "@/lib/project";
 import { ZitadelRuntime } from "@/lib/server";
 import { Runtime } from "@/lib/runtime";
 
-import { AbstractSanityCheck, type CheckContext } from "./types";
+import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 
 /**
  * The env file the CLI reads, which setup fills with the project's credentials.
@@ -44,14 +44,14 @@ export class SecretCheck extends AbstractSanityCheck {
     const projectSecret = env?.ZITADEL_PROJECT_SECRET;
     const previewSecret = env?.ZITADEL_PREVIEW_TOKEN;
     if (!projectId || !projectSecret || !previewSecret) {
-      throw new Error(
+      throw new CheckFailure(
         `${DEVELOPMENT_ENV_FILE} must hold ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN to restore the project's secrets`,
       );
     }
     const config = await Project.at(ctx.cwd).config();
     const configured = config.data.project;
     if (projectId !== configured) {
-      throw new Error(
+      throw new CheckFailure(
         `${DEVELOPMENT_ENV_FILE} names project ${projectId} but zitadel.json names ${typeof configured === "string" ? configured : "no project"}, so its secrets are not restored`,
       );
     }
@@ -67,7 +67,7 @@ export class SecretCheck extends AbstractSanityCheck {
       }),
     ).get(projectId);
     if (project.id !== projectId) {
-      throw new Error(`The server returned project ${project.id}, not ${projectId}`);
+      throw new CheckFailure(`The server returned project ${project.id}, not ${projectId}`);
     }
     const origins = Origins.wrap(project.origins);
     await Project.at(ctx.cwd).writeSecret({

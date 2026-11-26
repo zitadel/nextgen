@@ -1,4 +1,4 @@
-import { readFile } from "@/lib/fs";
+import { FsError, readFile } from "@/lib/fs";
 
 import { isObject } from "@/lib/json";
 
@@ -81,8 +81,14 @@ async function pullRequestTitle(path: string | undefined): Promise<string | unde
     }
 
     return title;
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    if (error instanceof SyntaxError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 

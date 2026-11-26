@@ -15,8 +15,13 @@ import {
   setupRetryFlags,
   signInOf,
 } from "@/cli/commands/setup/shared";
-import { createZitadelClient, BackendRequestMalformedError, PolicyService } from "@/lib/backend";
-import { isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
+import {
+  BackendError,
+  createZitadelClient,
+  BackendRequestMalformedError,
+  PolicyService,
+} from "@/lib/backend";
+import { toZitadelError, ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { Spelling, WHAT_CHANGED } from "@/lib/suggestion";
 import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
@@ -125,10 +130,16 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
           input: { solved_challenge: "zitadel_pow" },
         })
         .catch((error: unknown) => {
-          if (isCancellation(error) || this.deps.signal.aborted) {
+          if (this.deps.signal.aborted) {
             throw error;
           }
-          return !(error instanceof BackendRequestMalformedError);
+          if (error instanceof BackendRequestMalformedError) {
+            return false;
+          }
+          if (error instanceof BackendError) {
+            return true;
+          }
+          throw error;
         });
       const signupPolicy = evaluated !== false;
       const scaffold = await scaffoldOf(this.deps.cwd, this.deps.force, answers, signupPolicy);
@@ -198,13 +209,22 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
         throw error;
       }
     } catch (error) {
-      const cause = toZitadelError(error);
+      const cause =
+        error instanceof ZitadelError
+          ? error
+          : error instanceof ZitadelLibError
+            ? toZitadelError(error)
+            : undefined;
+      if (cause === undefined) {
+        throw error;
+      }
       const rerun = setupRetryFlags({
         ...retry,
         server: this.deps.serverFlag ?? null,
       });
       patching?.fail();
-      throw new ZitadelError(cause.code, `Default configuration setup failed: ${cause.message}`, {
+      const message = `Default configuration setup failed: ${cause.message}`;
+      const options = {
         hint:
           newApp === undefined
             ? (cause.hint ??
@@ -234,7 +254,8 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
               ]
             : []),
         details: cause.details,
-      });
+      };
+      throw new ZitadelError(cause.code, message, options);
     }
   }
 }

@@ -1,3 +1,4 @@
+import { ExecaError } from "execa";
 import { join, resolve } from "node:path";
 
 import { SERVER } from "@/constants";
@@ -15,6 +16,8 @@ import {
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
   LocalServerPortBusyError,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
   LocalServerStopError,
   LocalServerUrlInvalidError,
 } from "@/lib/server/errors";
@@ -190,10 +193,13 @@ export abstract class ZitadelRuntime {
         value: ZitadelRuntime.origin(typed),
       };
     } catch (error) {
-      return {
-        ok: false,
-        problem: errorMessage(error),
-      };
+      if (error instanceof LocalServerUrlInvalidError) {
+        return {
+          ok: false,
+          problem: error.message,
+        };
+      }
+      throw error;
     }
   }
 
@@ -792,18 +798,18 @@ export class LocalRuntime extends ZitadelRuntime {
         return runtime.server_url;
       }
     } else {
-      try {
-        const container = await DockerLauncher.inspect(runtime.container_name);
-        if (
-          container.running &&
-          (await checkLocalServerHealth(runtime.server_url, undefined, fetcher))
-        ) {
-          return runtime.server_url;
+      const name = runtime.container_name;
+      const container = await DockerLauncher.inspect(name).catch((error: unknown) => {
+        if (error instanceof LocalServerDockerMissingError) {
+          return undefined;
         }
-      } catch (error) {
-        if (!(error instanceof LocalServerDockerMissingError)) {
-          throw error;
-        }
+        throw error;
+      });
+      if (
+        container?.running === true &&
+        (await checkLocalServerHealth(runtime.server_url, undefined, fetcher))
+      ) {
+        return runtime.server_url;
       }
     }
     if (resolve(nearest.dir) !== resolve(cwd)) {
@@ -829,8 +835,29 @@ export class LocalRuntime extends ZitadelRuntime {
   static async detectUrl(cwd: string, fetcher: typeof fetch = fetch): Promise<string | undefined> {
     try {
       return await LocalRuntime.resolveUrl(cwd, fetcher);
-    } catch {
-      return undefined;
+    } catch (error) {
+      if (error instanceof LocalServerNotRunningError) {
+        return undefined;
+      }
+      if (error instanceof LocalServerNotRespondingError) {
+        return undefined;
+      }
+      if (error instanceof LocalServerNotRespondingElsewhereError) {
+        return undefined;
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        return undefined;
+      }
+      if (error instanceof LocalServerRecordMalformedError) {
+        return undefined;
+      }
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof ExecaError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 
@@ -1216,7 +1243,13 @@ export class LocalRuntime extends ZitadelRuntime {
 
         return { container: inspected, dockerError: undefined };
       } catch (error) {
-        return { container: undefined, dockerError: errorMessage(error) };
+        if (error instanceof LocalServerDockerMissingError) {
+          return { container: undefined, dockerError: error.message };
+        }
+        if (error instanceof ExecaError) {
+          return { container: undefined, dockerError: errorMessage(error) };
+        }
+        throw error;
       }
     };
     const { container, dockerError } = await inspectContainer();
@@ -1303,22 +1336,30 @@ export class LocalRuntime extends ZitadelRuntime {
       // stopped before the data is deleted from under them.
       const discovery = await this.directory.servers.current();
       if (!discovery.supported) {
-        try {
-          await readFile(localRuntimePaths(this.cwd).runtimeFile, "utf8");
+        const recordReadable = await readFile(localRuntimePaths(this.cwd).runtimeFile, "utf8")
+          .then(() => {
+            return true;
+          })
+          .catch((error: unknown) => {
+            if (error instanceof FsError) {
+              return false;
+            }
+            throw error;
+          });
+        if (recordReadable) {
           throw new LocalServerProcessesUnlistableError(
             "The local runtime record cannot be read and the machine's processes cannot be listed",
           );
-        } catch (error) {
-          if (!(error instanceof FsError)) {
-            throw error;
-          }
         }
       }
       const realPath = async (path: string): Promise<string> => {
         try {
           return await realpath(path);
-        } catch {
-          return resolve(path);
+        } catch (error) {
+          if (error instanceof FsError) {
+            return resolve(path);
+          }
+          throw error;
         }
       };
       const dataDir = await realPath(localRuntimePaths(this.cwd).dataDir);

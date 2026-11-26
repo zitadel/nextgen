@@ -234,8 +234,14 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
   static bundledVersion(env: NodeJS.ProcessEnv = process.env): string | undefined {
     try {
       return BinaryLauncher.version(env);
-    } catch {
-      return undefined;
+    } catch (error) {
+      if (error instanceof LocalServerPackageMissingError) {
+        return undefined;
+      }
+      if (error instanceof SyntaxError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 
@@ -289,7 +295,13 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
       signalProcess(-pid, 0);
       return true;
     } catch (error) {
-      return error instanceof LocalServerProcessDeniedError;
+      if (error instanceof LocalServerProcessDeniedError) {
+        return true;
+      }
+      if (error instanceof LocalServerProcessGoneError) {
+        return false;
+      }
+      throw error;
     }
   }
 
@@ -302,7 +314,13 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
       signalProcess(pid, 0);
       return true;
     } catch (error) {
-      return error instanceof LocalServerProcessDeniedError;
+      if (error instanceof LocalServerProcessDeniedError) {
+        return true;
+      }
+      if (error instanceof LocalServerProcessGoneError) {
+        return false;
+      }
+      throw error;
     }
   }
 
@@ -539,7 +557,10 @@ function resolveServerPackageManifest(): string {
   try {
     return require.resolve(`${SERVER_NPM_PACKAGE}/package.json`);
   } catch (error) {
-    throw new Error(`Missing ${SERVER_NPM_PACKAGE}. Reinstall @zitadel/cli.`, { cause: error });
+    throw new LocalServerPackageMissingError(
+      `Missing ${SERVER_NPM_PACKAGE}. Reinstall @zitadel/cli.`,
+      error,
+    );
   }
 }
 
@@ -605,11 +626,27 @@ function signalRuntime(
       signalProcess(-pid, signal);
       return { sent: true, target: "process-group" };
     } catch (error) {
-      if (!(error instanceof LocalServerProcessGoneError)) {
-        throw error;
+      if (error instanceof LocalServerProcessGoneError) {
+        return signalLoneProcess(pid, signal);
       }
+      throw error;
     }
   }
+  return signalLoneProcess(pid, signal);
+}
+
+/**
+ * Signals one process on its own, for where its group is gone or there is none.
+ *
+ * @param pid - The process to signal.
+ * @param signal - The signal to send.
+ * @returns Whether the signal was sent, aimed at the process.
+ * @throws {LocalServerProcessDeniedError} When the process is not the CLI's to signal.
+ */
+function signalLoneProcess(
+  pid: number,
+  signal: NodeJS.Signals,
+): { sent: boolean; target: "process" | "process-group" } {
   try {
     signalProcess(pid, signal);
     return { sent: true, target: "process" };

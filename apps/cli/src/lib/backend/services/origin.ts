@@ -369,13 +369,14 @@ export class OriginService extends ApiService {
     try {
       await this.add(pattern, "primary");
     } catch (error) {
+      const failure = error;
       try {
         await this.add(pattern, "preview");
-      } catch (restore) {
-        if (restore instanceof BackendError) {
-          throw error;
+      } catch (error) {
+        if (error instanceof BackendError) {
+          throw failure;
         }
-        throw restore;
+        throw error;
       }
       throw error;
     }
@@ -399,18 +400,18 @@ export class OriginService extends ApiService {
         pattern,
         outcome: remaining.isEmpty ? "emptied" : "removed",
       };
-    } catch (cause) {
+    } catch (error) {
       // A cancellation is not a project that could not be read: the person
       // asked the command to stop, so it stops rather than reporting what the
       // removal left behind.
-      if (isCancelled(this.client)) {
-        throw cause;
+      if (error instanceof BackendError && !isCancelled(this.client)) {
+        return {
+          pattern,
+          outcome: "unverified",
+          cause: error,
+        };
       }
-      return {
-        pattern,
-        outcome: "unverified",
-        cause,
-      };
+      throw error;
     }
   }
 }

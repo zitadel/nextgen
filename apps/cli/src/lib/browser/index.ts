@@ -1,6 +1,10 @@
 import isWsl from "is-wsl";
 import open from "open";
 
+import { BrowserLaunchError } from "./errors";
+
+export * from "./errors";
+
 /**
  * Why a browser launch did not happen. Never an error condition: every reason
  * resolves to the same caller behaviour (show the link and let the user open
@@ -27,7 +31,7 @@ export type BrowserDeps = {
   platform: NodeJS.Platform;
   env: NodeJS.ProcessEnv;
   wsl: boolean;
-  /** Hands `url` to the desktop's opener, or to the program named by `app` when given. */
+  /** Hands `url` to the desktop's opener, or to the program named by `app` when given; rejects with a `BrowserLaunchError` when it cannot. */
   open: (url: string, app?: string) => Promise<void>;
 };
 
@@ -66,8 +70,14 @@ export async function openInBrowser(
   try {
     await deps.open(url, browser || undefined);
     return { opened: true };
-  } catch {
-    return { opened: false, reason: "spawn-failed" };
+  } catch (error) {
+    if (error instanceof BrowserLaunchError) {
+      return {
+        opened: false,
+        reason: "spawn-failed",
+      };
+    }
+    throw error;
   }
 }
 
@@ -90,9 +100,17 @@ function hasGraphicalSession(env: NodeJS.ProcessEnv): boolean {
  * Starts the opener fully detached: the CLI keeps polling for the claim while
  * the browser lives on, and must not hold the event loop open waiting for a
  * process it does not own.
+ *
+ * @param url - What to open.
+ * @param app - The program to open it with, instead of the desktop's opener.
+ * @returns Once the opener has started.
+ * @throws {@link BrowserLaunchError} When the opener cannot be started.
  */
 async function launch(url: string, app?: string): Promise<void> {
-  const child = await open(url, app ? { app: { name: app } } : {});
+  const child = await open(url, app ? { app: { name: app } } : {}).catch((error: unknown) => {
+    // The boundary: `open` rejects with untyped errors.
+    throw new BrowserLaunchError("Cannot start the browser opener", error);
+  });
   // A spawn error surfaces asynchronously; swallow it so an opener that
   // vanishes cannot crash the CLI with an unhandled 'error' event.
   child.on("error", () => {
