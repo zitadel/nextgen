@@ -3,7 +3,7 @@ title: Turn on the OAuth authorization server
 description: Enable your project's OAuth authorization server with the zitadel CLI, deploy the switch, and check that its metadata answers on your app's origin.
 ---
 
-Each project has its own OAuth 2.1 authorization server: the server other apps send their users to, to sign in and get an access token. It is off until a release turns it on. `zitadel settings oauth enable` writes the switch to `.zitadel/oauth/oauth.json`, and `zitadel deploy` ships it with the rest of your configuration ([Configuration as code](/docs/concepts/repo-config)).
+Each project has its own OAuth 2.1 authorization server: the server other apps redirect their users to, to sign in and get an access token. It is off until a release turns it on. `zitadel settings oauth enable` writes the switch to `.zitadel/oauth/oauth.json`, and `zitadel deploy` ships it with the rest of your configuration ([Configuration as code](/docs/concepts/repo-config)).
 
 The authorization server's issuer is your app's own address, for example `https://app.acme.com/__nextgen/oauth/<project-id>`. Your app's SDK proxy forwards its requests to Zitadel. [OAuth issuer and metadata](/docs/sdks/proxy#oauth-issuer-and-metadata) explains how.
 
@@ -88,7 +88,7 @@ Use your app's origin in place of `http://localhost:3000`. It answers with the m
 
 ## Turn it off
 
-Set `enabled` to `false` in `.zitadel/oauth/oauth.json`, or delete `.zitadel/oauth/`, then deploy. A release without OAuth settings turns the authorization server off. Its metadata and its authorization endpoint then answer `404`.
+There is no command for this yet. Set `enabled` to `false` in `.zitadel/oauth/oauth.json`, or delete `.zitadel/oauth/`, then deploy. A release without OAuth settings turns the authorization server off. Its metadata and its authorization endpoint then answer `404`.
 
 ## When the metadata answers 404
 
@@ -97,5 +97,5 @@ The answer is the same whatever the cause: `{"error":"invalid_request","error_de
 - **The switch is not live.** Run `deploy`, and check that the release went live on the origin you fetched.
 - **The origin is not a primary origin.** Add it with `origin add <url> --kind primary`, then deploy. A preview URL never serves an issuer.
 - **The project ID is another project's.** The proxy serves only its own project's issuer. Use the `ZITADEL_PROJECT_ID` from `.env.local`, and check that the app has one configured.
-- **The proxy path is not `/__nextgen`.** The server builds issuers only under `/__nextgen`, so an app that sets another `proxyPath` has none.
+- **The proxy path is not `/__nextgen`.** Through a proxy, the server builds issuers only under `/__nextgen`, so an app that sets another `proxyPath` has none ([why](/docs/sdks/proxy#oauth-issuer-and-metadata)).
 - **A Next.js app narrowed its middleware's `matcher`.** Add `/.well-known/oauth-authorization-server/:path*` to it, so the middleware sees the metadata request.
