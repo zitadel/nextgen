@@ -12,6 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -147,9 +148,10 @@ func (e *Engine) poll(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		zlog.Debug(ctx, "jobs: poll tick")
 		_, err := e.RunDueOnce(ctx, e.cfg.TakeBatchSize)
 		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			slog.Error("jobs: poll Take/Perform failed", slog.String("error", err.Error()))
+			zlog.Error(ctx, "jobs: poll Take/Perform failed", slog.Any("error", err))
 		}
 		select {
 		case <-ctx.Done():
@@ -221,11 +223,18 @@ func (e *Engine) RunDueOnce(ctx context.Context, budget int) (ran int, err error
 		if len(results) == 0 {
 			return ran, nil
 		}
+		zlog.Debug(ctx, "jobs: take claimed work",
+			slog.Int("count", len(results)),
+			slog.Int("limit", limit),
+			slog.Int("budget_remaining", remaining))
 		for _, result := range results {
 			if err := ctx.Err(); err != nil {
 				return ran, err
 			}
 			if result.DeadOnTake {
+				zlog.Debug(ctx, "jobs: dead on take",
+					slog.String("name", takeName(result)),
+					slog.String("lease_token", result.LeaseToken))
 				metrics.RecordJobExpired(ctx, takeName(result))
 				continue
 			}
@@ -269,7 +278,10 @@ func (e *Engine) performOne(ctx context.Context, result domain.TakeResult) error
 	reg, ok := e.lookup(work.Name)
 	if !ok {
 		// Allowlist should have prevented this; leave the lease to expire.
-		slog.Warn("jobs: took unregistered name; leaving lease", slog.String("name", work.Name))
+		zlog.Warn(ctx, "jobs: took unregistered name; leaving lease",
+			slog.String("name", work.Name),
+			slog.String("id", work.ID),
+			slog.String("lease_token", token))
 		return nil
 	}
 
@@ -294,6 +306,13 @@ func (e *Engine) performOne(ctx context.Context, result domain.TakeResult) error
 		defer cancel()
 	}
 
+	zlog.Debug(performCtx, "jobs: perform start",
+		slog.String("name", work.Name),
+		slog.String("id", work.ID),
+		slog.String("lease_token", token),
+		slog.Bool("periodic", work.Periodic),
+		slog.Int("attempt", work.Attempt))
+
 	hbStop := e.startHeartbeat(performCtx, work.ID, token)
 	defer hbStop()
 
@@ -310,6 +329,12 @@ func (e *Engine) performOne(ctx context.Context, result domain.TakeResult) error
 	if herr != nil {
 		failJobSpan(performCtx, herr)
 		backoff := backoffFor(work.Attempt, e.cfg.BackoffCap)
+		zlog.Debug(outCtx, "jobs: perform fail",
+			slog.String("name", work.Name),
+			slog.String("id", work.ID),
+			slog.String("lease_token", token),
+			slog.Duration("backoff", backoff),
+			slog.Any("error", herr))
 		if err := e.withJob(outCtx, func(ctx context.Context, stmts JobExec) error {
 			return stmts.Fail(ctx, work.ID, token, herr, backoff)
 		}); err != nil {
@@ -334,6 +359,11 @@ func (e *Engine) performOne(ctx context.Context, result domain.TakeResult) error
 	}); err != nil {
 		return err
 	}
+	zlog.Debug(outCtx, "jobs: perform complete",
+		slog.String("name", work.Name),
+		slog.String("id", work.ID),
+		slog.String("lease_token", token),
+		slog.Bool("periodic", work.Periodic))
 	metrics.RecordJobCompleted(outCtx, work.Name)
 	return nil
 }
@@ -361,11 +391,18 @@ func (e *Engine) startHeartbeat(ctx context.Context, id, token string) (stop fun
 					return stmts.Heartbeat(ctx, id, token, e.cfg.LeaseDuration)
 				})
 				cancel()
-				if err != nil && !errors.Is(err, context.Canceled) {
-					slog.Warn("jobs: heartbeat failed",
-						slog.String("id", id),
-						slog.String("error", err.Error()))
+				if err != nil {
+					if !errors.Is(err, context.Canceled) {
+						zlog.Warn(hbCtx, "jobs: heartbeat failed",
+							slog.String("id", id),
+							slog.String("lease_token", token),
+							slog.Any("error", err))
+					}
+					continue
 				}
+				zlog.Debug(hbCtx, "jobs: heartbeat",
+					slog.String("id", id),
+					slog.String("lease_token", token))
 			}
 		}
 	}()
