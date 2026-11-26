@@ -8,7 +8,7 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The TanStack Start SDK (`@zitadel/sdk-tanstack-start`) is a global request middleware that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. Its `/react` entry adds typed React wrappers for the login and logout components.
+The TanStack Start SDK (`@zitadel/sdk-tanstack-start`) is a global request middleware that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. Its `/components` entry exports the login, logout and session components for React, so this one package is enough.
 
 <Callout title="Generated setup" type="info">
   The CLI writes `src/start.ts`, the server entry TanStack Start loads on its own, and writes the backend URL, the project secret, and the project ID to `.env.local`.
@@ -67,14 +67,14 @@ Setup installs the SDK. To add it yourself, run:
 
     ```ts
     import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
-    import { createNextgenRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
+    import { createZitadelRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
 
     const csrfMiddleware = createCsrfMiddleware({
       filter: (ctx) => ctx.handlerType === "serverFn",
     });
 
     const authMiddleware = createMiddleware({ type: "request" }).server(
-      createNextgenRequestMiddleware({
+      createZitadelRequestMiddleware({
         protectedRoutes: ["/profile"],
         loginPath: "/login",
       }),
@@ -113,12 +113,12 @@ Setup installs the SDK. To add it yourself, run:
 
     Never return `getAuth(context)` itself from a server function: its `session` carries the raw session token, and a server function's result reaches browser scripts. Return only `userId` and other client-safe fields.
 
-    Render the components from `@zitadel/sdk-tanstack-start/react`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/react` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
+    Render the components from `@zitadel/sdk-tanstack-start/components`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/components` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
 
     ```tsx
     import { createFileRoute } from "@tanstack/react-router";
     import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
-    import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
+    import { ZitadelSession } from "@zitadel/sdk-tanstack-start/components";
 
     const project = configureZitadel({
       projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
@@ -138,7 +138,7 @@ Setup installs the SDK. To add it yourself, run:
 
 <Steps>
   <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
-  <Step>It verifies the session token and passes the result on as `nextgenAuth` in the request context, which server functions receive; read it with `getAuth(context)`.</Step>
+  <Step>It verifies the session token and passes the result on as `zitadelAuth` in the request context, which server functions receive; read it with `getAuth(context)`.</Step>
   <Step>It redirects unauthenticated document requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in. Routes guard client-side navigation in `beforeLoad`.</Step>
 </Steps>
 

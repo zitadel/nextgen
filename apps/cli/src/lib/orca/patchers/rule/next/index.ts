@@ -12,7 +12,7 @@ import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
 /**
- * Next.js request-boundary file at the project root. Wires `nextgenMiddleware` so the
+ * Next.js request-boundary file at the project root. Wires `zitadelMiddleware` so the
  * generated project config's `/__nextgen` proxy path is same-origin proxied
  * to `ZITADEL_URL` and `/profile` is gated. Next 16 renamed this convention to
  * `proxy.ts`; older projects keep `middleware.ts`.
@@ -23,11 +23,11 @@ import type { RendererSpec } from "./renderers/types";
  */
 function requestBoundaryTemplate(functionName: "middleware" | "proxy"): string {
   return `${ManagedFile.MARKER}
-import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
+import { zitadelMiddleware } from "@zitadel/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
 export function ${functionName}(req: NextRequest) {
-  return nextgenMiddleware(req, {
+  return zitadelMiddleware(req, {
     url: process.env.ZITADEL_URL,
     // The routes that need a sign-in. To protect another, add it here; a
     // trailing * covers every path that starts with it, as in "/orders*".

@@ -9,7 +9,7 @@ const WIDGET_WRAP =
   "position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark";
 
 /**
- * `src/middleware.ts` — the SolidStart middleware entrypoint. `createNextgenMiddleware`
+ * `src/middleware.ts` — the SolidStart middleware entrypoint. `createZitadelMiddleware`
  * returns a `{ onRequest: [...] }` config object that proxies `/__nextgen/*` to
  * the auth backend (attaching the project service-key from
  * `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
@@ -27,10 +27,10 @@ const WIDGET_WRAP =
 export function middlewareTemplate(): string {
   return `${ManagedFile.MARKER}
 import { createMiddleware } from "@solidjs/start/middleware";
-import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+import { createZitadelMiddleware } from "@zitadel/sdk-solid-start/server";
 
 export default createMiddleware(
-  createNextgenMiddleware({
+  createZitadelMiddleware({
     protectedRoutes: ["/profile"],
     loginPath: "/login",
   }),
@@ -61,7 +61,7 @@ export default function Index() {
 
 /**
  * A login/register page rendering the `<ZitadelLogin>` widget from
- * `@zitadel/sdk-solid`, loaded with SolidStart's `clientOnly`. The widget module
+ * `@zitadel/sdk-solid-start/components` (the widgets of `@zitadel/sdk-solid`, re-exported), loaded with SolidStart's `clientOnly`. The widget module
  * imports `@zitadel/components`, which registers Lit custom elements by calling
  * `customElements.define` at import time — undefined during SSR, so a static
  * import would crash the server render and the page would come back empty.
@@ -71,7 +71,7 @@ export default function Index() {
  * The public project id (`VITE_ZITADEL_PROJECT_ID`; Vite only exposes
  * `VITE_`-prefixed env to the client) and proxy path are passed as props rather
  * than a `configureZitadel` handle — building the handle here would require
- * importing `@zitadel/sdk-solid` at module scope, reintroducing the SSR crash.
+ * importing `@zitadel/sdk-solid-start/components` at module scope, reintroducing the SSR crash.
  *
  * Projects set up with the business use case additionally pass the SDK's
  * `businessLocales` overlay to the widget, restoring work-email copy on top of
@@ -87,7 +87,7 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
 // the login widget's neutral built-in dictionaries. Have the loader return the
 // plain ZitadelLogin to fall back to the neutral wording.
 const ZitadelLogin = clientOnly(() =>
-  import("@zitadel/sdk-solid").then(({ ZitadelLogin: Login, businessLocales }) => ({
+  import("@zitadel/sdk-solid-start/components").then(({ ZitadelLogin: Login, businessLocales }) => ({
     default: (props: ComponentProps<typeof Login>) => (
       <Login {...props} locales={businessLocales} />
     ),
@@ -95,7 +95,7 @@ const ZitadelLogin = clientOnly(() =>
 );`
     : `
 const ZitadelLogin = clientOnly(() =>
-  import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogin })),
+  import("@zitadel/sdk-solid-start/components").then((m) => ({ default: m.ZitadelLogin })),
 );`;
   return `${ManagedFile.MARKER}
 import { clientOnly } from "@solidjs/start";
@@ -126,7 +126,7 @@ export function registerPageTemplate(ctx: PatchContext): string {
 
 /**
  * `src/routes/profile.tsx` — the signed-in view: the "signed in as" session card, with sign-out. Loaded
- * with `clientOnly` for the same reason as the auth pages: `@zitadel/sdk-solid`
+ * with `clientOnly` for the same reason as the auth pages: `@zitadel/sdk-solid-start/components`
  * registers Lit custom elements at import time, which would crash SSR.
  */
 export function profilePageTemplate(): string {
@@ -134,7 +134,7 @@ export function profilePageTemplate(): string {
 import { clientOnly } from "@solidjs/start";
 
 const ZitadelSession = clientOnly(() =>
-  import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelSession })),
+  import("@zitadel/sdk-solid-start/components").then((m) => ({ default: m.ZitadelSession })),
 );
 
 export default function Profile() {

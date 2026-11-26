@@ -1,6 +1,6 @@
 // zitadel-cli: managed-file v1
 import { createFileRoute } from "@tanstack/react-router";
-import { ZitadelLogin } from "@zitadel/sdk-tanstack-start/react";
+import { ZitadelLogin } from "@zitadel/sdk-tanstack-start/components";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";

@@ -28,6 +28,20 @@ const locale: Record<string, string> = {
   "submit.continue": "Continue",
 };
 
+/**
+ * The full dictionary, plus each text the given error keys put in a banner mapped to itself. The
+ * default template looks an already localized heading and body up again, so a dictionary without
+ * these entries would report the texts as missing keys.
+ */
+function withAlertTexts(errorKeys: readonly string[]): Record<string, string> {
+  const texts = errorKeys.flatMap((key) => {
+    return [fullLocale[`${key}.title`], fullLocale[`${key}.body`]].filter(
+      (text): text is string => text !== undefined,
+    );
+  });
+  return { ...fullLocale, ...Object.fromEntries(texts.map((text) => [text, text])) };
+}
+
 describe("LiquidJS engine", () => {
   it("auto-escapes {{ }} output by default", () => {
     const engine = createLiquidEngine({ locale });
@@ -44,9 +58,17 @@ describe("LiquidJS engine", () => {
   });
 
   it("the | t filter falls through to the raw key when missing", () => {
-    const engine = createLiquidEngine({ locale });
-    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
-    expect(result).toBe("unknown.key");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const engine = createLiquidEngine({ locale });
+      const result = engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
+      expect(result).toBe("unknown.key");
+      expect(warn).toHaveBeenCalledWith(
+        '[zitadel-login] missing text key "unknown.key" — rendering the raw key',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("warns once per missing key, and never for fallback-served or empty keys", () => {
@@ -93,9 +115,17 @@ describe("LiquidJS engine", () => {
   });
 
   it("action.back keys still fall through to the raw key when no generic exists", () => {
-    const engine = createLiquidEngine({ locale });
-    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.action.back" });
-    expect(result).toBe("custom.action.back");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const engine = createLiquidEngine({ locale });
+      const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.action.back" });
+      expect(result).toBe("custom.action.back");
+      expect(warn).toHaveBeenCalledWith(
+        '[zitadel-login] missing text key "custom.action.back" — rendering the raw key',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("the | t filter falls back from a step's SSO description to its plain one", () => {
@@ -121,9 +151,17 @@ describe("LiquidJS engine", () => {
   });
 
   it("an SSO description with no plain one shows the plain key, which is the one to add", () => {
-    const engine = createLiquidEngine({ locale });
-    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.description.sso" });
-    expect(result).toBe("custom.description");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const engine = createLiquidEngine({ locale });
+      const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.description.sso" });
+      expect(result).toBe("custom.description");
+      expect(warn).toHaveBeenCalledWith(
+        '[zitadel-login] missing text key "custom.description" — rendering the raw key',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it.each(Object.entries(builtinLocales))(
@@ -176,11 +214,19 @@ describe("LiquidJS engine", () => {
   it("field sub-keys (placeholder/help) do not take the humanised fallback", () => {
     // `.placeholder`/`.help` resolve through their own filters, which stay
     // empty on a miss; `| t` keeps returning the raw key for them.
-    const engine = createLiquidEngine({ locale });
-    const result = engine.parseAndRenderSync("{{ key | t }}", {
-      key: "register.field.department.placeholder",
-    });
-    expect(result).toBe("register.field.department.placeholder");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const engine = createLiquidEngine({ locale });
+      const result = engine.parseAndRenderSync("{{ key | t }}", {
+        key: "register.field.department.placeholder",
+      });
+      expect(result).toBe("register.field.department.placeholder");
+      expect(warn).toHaveBeenCalledWith(
+        '[zitadel-login] missing text key "register.field.department.placeholder" — rendering the raw key',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("fieldPlaceholder resolves sibling keys", () => {
@@ -611,7 +657,7 @@ describe("LiquidJS engine", () => {
   });
 
   it("renders sign-in server error: heading + body alert, fields unchanged", () => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+    const engine = createLiquidEngine({ locale: withAlertTexts(["error.sign_in_server"]) });
     const f = toArray({
       email: {
         type: "email",
@@ -855,7 +901,9 @@ function decodeEntities(value: string): string {
 
 describe("provider error renders in the alert", () => {
   const render = (errors: unknown) => {
-    const engine = createLiquidEngine({ locale: fullLocale });
+    const engine = createLiquidEngine({
+      locale: withAlertTexts(["error.sso_cancelled", "error.invalid_credentials"]),
+    });
     return engine.renderFileSync(TEMPLATE_NAMES.default, {
       step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
       fields: [],

@@ -10,7 +10,7 @@ import { enforceVersionFloor } from "./version-floor";
  * `@qwik.dev/router` (the meta-framework, renamed from `@builder.io/qwik-city`
  * in Qwik 2). Like Next.js and SvelteKit, Qwik Router proxies the auth backend and
  * verifies the session through a server entrypoint (`@zitadel/sdk-qwik-router`) —
- * here the `onRequest` plugin in `src/routes/plugin@nextgen.ts`, a plain route
+ * here the `onRequest` plugin in `src/routes/plugin@zitadel.ts`, a plain route
  * file — not a Vite dev-server proxy.
  *
  * A Qwik 1 app (`@builder.io/qwik` + `@builder.io/qwik-city`) is intentionally

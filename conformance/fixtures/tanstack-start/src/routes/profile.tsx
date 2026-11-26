@@ -1,7 +1,7 @@
 // zitadel-cli: managed-file v1
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
+import { ZitadelSession } from "@zitadel/sdk-tanstack-start/components";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 import { getAuth } from "@zitadel/sdk-tanstack-start/server";
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import ts from "typescript";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import type { AuthResult } from "../../runtime/types";
+import type { ZitadelAuthResult } from "../../runtime/types";
 
 describe("useAuth composable", () => {
   beforeEach(() => {
@@ -14,7 +14,7 @@ describe("useAuth composable", () => {
   it("returns signed-out state when useState returns unauthenticated", async () => {
     vi.doMock("#imports", () => ({
       useState: vi.fn(() => ({
-        value: { isAuthenticated: false, session: null } as AuthResult,
+        value: { isAuthenticated: false, session: null } as ZitadelAuthResult,
       })),
     }));
 
@@ -35,7 +35,7 @@ describe("useAuth composable", () => {
             display: "NuxtUser",
             token: "tok123",
           },
-        } as AuthResult,
+        } as ZitadelAuthResult,
       })),
     }));
 

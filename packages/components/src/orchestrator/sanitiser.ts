@@ -122,7 +122,7 @@ export function createSanitiser(): (html: string) => string {
     FORBID_ATTR: ["onerror", "onclick", "onload", "onfocus", "onblur"],
     CUSTOM_ELEMENT_HANDLING: {
       tagNameCheck: CUSTOM_TAG_PATTERN,
-      attributeNameCheck: /^(?:[a-z][a-z0-9-]*)$/,
+      attributeNameCheck: /^(?!on)[a-z][a-z0-9-]*$/,
       allowCustomizedBuiltInElements: false,
     },
     KEEP_CONTENT: true,
