@@ -9218,6 +9218,16 @@
             },
             {
               "kind": "field",
+              "name": "skippedWhileDetached",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false",
+              "description": "Whether an update was skipped while detached. A load that settles then\nasks for an update without naming a property, so heldChanges\nalone would not bring it back on reattach."
+            },
+            {
+              "kind": "field",
               "name": "rendering",
               "privacy": "private",
               "readonly": true,

@@ -462,6 +462,13 @@ export class ZitadelLogin extends ZitadelSurface {
   private readonly heldChanges = new Map<PropertyKey, unknown>();
 
   /**
+   * Whether an update was skipped while detached. A load that settles then
+   * asks for an update without naming a property, so {@link heldChanges}
+   * alone would not bring it back on reattach.
+   */
+  private skippedWhileDetached = false;
+
+  /**
    * What a step renders with: the dictionary for the page's language, the
    * LiquidJS engine and the sanitiser. Each loads on demand in its own chunk
    * (the translation the page shows, the engine, and DOMPurify where the
@@ -586,6 +593,10 @@ export class ZitadelLogin extends ZitadelSurface {
       this.requestUpdate(name, oldValue);
     }
     this.heldChanges.clear();
+    if (this.skippedWhileDetached) {
+      this.skippedWhileDetached = false;
+      this.requestUpdate();
+    }
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", this.handlePopState);
     }
@@ -683,6 +694,7 @@ export class ZitadelLogin extends ZitadelSurface {
         this.heldChanges.set(name, oldValue);
       }
     }
+    this.skippedWhileDetached = true;
     return false;
   }
 

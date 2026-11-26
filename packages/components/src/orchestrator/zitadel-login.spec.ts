@@ -978,6 +978,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
   });
 
+  it("shows a language that finished loading while detached when attached again", async () => {
+    const element = await mount(host);
+    element.lang = "de";
+    await Promise.resolve();
+    await Promise.resolve();
+    element.remove();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    host.appendChild(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
+      de["identifier.title"],
+    );
+  });
+
   it("shows the startup error when what it loads on demand fails", async () => {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
