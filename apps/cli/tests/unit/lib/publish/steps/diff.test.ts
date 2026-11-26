@@ -238,6 +238,15 @@ describe("diffStep", () => {
       expect(result?.learned?.changedConfiguration).toEqual(["user_schema", "branding"]);
     });
 
+    it("counts the OAuth settings as their own kind of configuration", async ({ dir }) => {
+      const sha = await aLiveCommit(dir);
+      await write(dir, { ".zitadel/oauth/oauth.json": '{ "enabled": true }\n' });
+
+      const result = await diffStep.run(aRunIn(dir, [{ targets: [PRIMARY], sha }]));
+
+      expect(result?.learned?.changedConfiguration).toEqual(["oauth"]);
+    });
+
     it("does not count a README or a policy's test file as a changed policy", async ({ dir }) => {
       const sha = await aLiveCommit(dir);
       await write(dir, {

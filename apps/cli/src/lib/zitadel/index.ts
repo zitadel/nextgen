@@ -102,6 +102,11 @@ export {
   type StepName,
 } from "@/lib/zitadel/names";
 export {
+  OAuthSettings,
+  OAuthSettingsCollection,
+  type OAuthSettingsValue,
+} from "@/lib/zitadel/resources/oauth";
+export {
   PASSWORD_POLICY_OPERATION,
   PasswordPolicy,
   Policies,

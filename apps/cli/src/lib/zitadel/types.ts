@@ -52,7 +52,14 @@ export type JsonObject = { readonly [key: string]: JsonValue | undefined };
 /**
  * The directories the configuration is made of, one per kind of file.
  */
-export const CONFIG_KINDS = ["schemas", "flows", "connections", "policies", "branding"] as const;
+export const CONFIG_KINDS = [
+  "schemas",
+  "flows",
+  "connections",
+  "policies",
+  "branding",
+  "oauth",
+] as const;
 
 /**
  * One directory of the configuration.
@@ -68,6 +75,7 @@ export const CONFIG_DIRECTORIES = {
   connections: ".zitadel/idps",
   policies: ".zitadel/policies",
   branding: ".zitadel/branding",
+  oauth: ".zitadel/oauth",
 } as const satisfies Record<ConfigKind, `.zitadel/${string}`>;
 
 /**
@@ -274,6 +282,11 @@ export type ConfigurationBundle = {
    * The branding descriptor's wire body; absent when there is none.
    */
   readonly branding?: JsonObject;
+  /**
+   * The OAuth settings' wire body; absent when there are none, which leaves
+   * the project's authorization server off.
+   */
+  readonly oauth?: JsonObject;
 };
 
 /**
