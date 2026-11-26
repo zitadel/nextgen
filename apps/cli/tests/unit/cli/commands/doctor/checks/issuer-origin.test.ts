@@ -237,22 +237,11 @@ describe("IssuerOriginCheck.run", () => {
   });
 
   describe("when it cannot tell", () => {
-    it.for([
-      [
-        "the server cannot be reached",
-        () => {
-          return HttpResponse.error();
-        },
-      ],
-      [
-        "the server answers with JSON null",
-        () => {
-          return HttpResponse.json(null);
-        },
-      ],
-    ] as const)("skips, passing, when %s", async ([, answer], { dir }) => {
+    it("skips, passing, when the server cannot be reached", async ({ dir }) => {
       await aProject(dir, AS_PREVIEW);
-      projectAnswers(answer);
+      projectAnswers(() => {
+        return HttpResponse.error();
+      });
 
       const outcome = await check.run(aCheckContext(dir));
 

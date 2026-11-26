@@ -17,6 +17,7 @@ import { Consent } from "@/lib/consent";
 import { Environment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
 import { Output, warnings as invocationWarnings } from "@/lib/ui";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { environmentFlags, projectEnvFile } from "@/cli/core/environment-flags";
@@ -96,6 +97,21 @@ const PORT = {
     max: MAX_PORT,
   },
 } as const satisfies Refused<number>;
+
+/** How a run is refused when the runtime record of the folder it checks is not in the shape it is written in. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
+  next: ["{reset}", "{start}"],
+} as const satisfies Refusal;
+
+/** How a run is refused when the runtime record of the folder it checks cannot be read. */
+const RECORD_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that the runtime record and its directory are readable by you.",
+} as const satisfies Refusal;
 
 /** What doctor is about, worked out once however many times it is asked for. */
 /** What a doctor run found, for the report that tells it. */
@@ -272,6 +288,16 @@ export function failureAdvice(
       suggestedArgs: recovery.map(({ words }) => {
         return words;
       }),
+    };
+  }
+
+  const unsupported = failed.find((check) => {
+    return check.code === "E_UNSUPPORTED_PROJECT_SHAPE";
+  });
+  if (unsupported !== undefined) {
+    return {
+      hint: unsupported.message,
+      nextCommands: [again.rerun],
     };
   }
 
@@ -735,7 +761,40 @@ export default class Doctor extends Telemetered(
     ctx: CheckContext,
   ): Promise<Examination> {
     const { port, hostedServer, cwd } = await this.checks(flags, this.cwd);
-    const nearest = await this.started.of(cwd);
+    const nearest = await this.started.of(cwd).catch(async (error: unknown) => {
+      if (error instanceof LocalServerRecordMalformedError) {
+        const directory = (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE)) ?? cwd;
+        throw refusalError(
+          RECORD_MALFORMED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            reset: {
+              id: "reset",
+              flags: {
+                force: true,
+                cwd: directory,
+              },
+            },
+            start: {
+              id: "start",
+              flags: {
+                cwd: directory,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    });
     const existingRuntime = nearest?.runtime;
     const parentRuntimeDir =
       nearest !== undefined && nearest.dir !== this.cwd ? nearest.dir : undefined;

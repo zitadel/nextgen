@@ -1209,14 +1209,16 @@ describe("FrameworkCheck", () => {
       });
     });
 
-    it("carries the error's code and remedy for the doctor envelope", async ({ dir }) => {
+    it("carries the error's code and the upgrade in its message for the doctor envelope", async ({
+      dir,
+    }) => {
       await aDowngradedApp(dir);
 
       const outcome = await new FrameworkCheck().run(aCheckContext(dir));
 
       expect(outcome).toMatchObject({
         code: "E_UNSUPPORTED_PROJECT_SHAPE",
-        hint: expect.stringContaining("Upgrade"),
+        message: expect.stringContaining("Upgrade"),
       });
     });
   });

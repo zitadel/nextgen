@@ -152,7 +152,13 @@ describe("LocalRuntimeChecks", () => {
   describe("the Docker message", () => {
     it.each([
       ["a trimmed detail", { status: 1, stdout: "", stderr: "daemon down\n" }, " (daemon down)"],
-      ["no parentheses without a detail", new Error("  "), ""],
+      [
+        "no parentheses without a detail",
+        Object.assign(new Error("  "), {
+          code: "ENOENT",
+        }),
+        "",
+      ],
     ])("carries %s", async (_name, docker, detail) => {
       const { byName } = await outcomes({ backend: "docker", machine: { docker } });
 

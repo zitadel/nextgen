@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { FsNotFoundError, pathExistsStrict, readFile } from "@/lib/fs";
 import { isObject, parseJsonObject } from "@/lib/json";
 
-import { ProjectFileMissingError } from "./errors";
+import { ProjectFileMissingError, ProjectInvalidError } from "./errors";
 
 /**
  * A project's `zitadel.json`: the committed record of how setup configured it.
@@ -34,12 +34,13 @@ export class ProjectConfig {
 
   /**
    * Reads and parses `zitadel.json`. A missing file is a
-   * {@link ProjectFileMissingError}; other errors (malformed JSON)
-   * propagate unchanged.
+   * {@link ProjectFileMissingError} and text that is not JSON a
+   * {@link ProjectInvalidError}; other errors propagate unchanged.
    *
    * @param cwd - The project's directory.
    * @returns The project's configuration.
    * @throws {@link ProjectFileMissingError} When there is no `zitadel.json`.
+   * @throws {@link ProjectInvalidError} When it is not JSON.
    */
   static async read(cwd: string): Promise<ProjectConfig> {
     try {
@@ -49,6 +50,9 @@ export class ProjectConfig {
     } catch (error) {
       if (error instanceof FsNotFoundError) {
         throw new ProjectFileMissingError("zitadel.json was not found", error);
+      }
+      if (error instanceof SyntaxError) {
+        throw new ProjectInvalidError(error.message, error);
       }
       throw error;
     }
