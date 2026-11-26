@@ -80,7 +80,11 @@ export class NextPatcher extends AbstractRulePatcher {
         for (const extension of BOUNDARY_EXTENSIONS) {
           const path = join(dir, `${name}.${extension}`);
           if (path !== target && (await isFile(join(cwd, path)))) {
-            throw boundaryConflict(path, target);
+            throw new OrcaConflictError(
+              basename(path).split(".")[0] === basename(target, ".ts")
+                ? `Next.js runs one ${basename(target, ".ts")} file, and this app already has ${path}`
+                : `Next.js 16 will not start with both ${path} and the ${target} setup writes`,
+            );
           }
         }
       }
@@ -335,17 +339,3 @@ function requestBoundaryFile(framework: PatchContext["framework"]): {
 
 /** The extensions Next.js reads a request boundary under: its default `pageExtensions`. */
 const BOUNDARY_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
-
-/** Why the app's own request boundary at `existing` stops setup, which writes `target`. */
-function boundaryConflict(existing: string, target: string): OrcaConflictError {
-  const existingName = basename(existing).split(".")[0];
-  const targetName = basename(target, ".ts");
-  if (existingName === targetName) {
-    return new OrcaConflictError(
-      `Next.js runs one ${targetName} file, and this app already has ${existing}`,
-    );
-  }
-  return new OrcaConflictError(
-    `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
-  );
-}

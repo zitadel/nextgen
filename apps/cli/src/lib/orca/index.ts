@@ -188,7 +188,9 @@ export class Orca {
         }
         const facts = await detector.detect(cwd);
         if (facts) {
-          throw this.frameworkMismatch(requested, facts.id);
+          throw new OrcaConflictError(
+            `Setup detects ${this.displayName(facts.id)} here, not ${this.displayName(requested)}`,
+          );
         }
       }
     }
@@ -362,14 +364,6 @@ export class Orca {
         return framework.id === id;
       })?.displayName ?? id
     );
-  }
-
-  /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
-  private frameworkMismatch(requested: string, detected: string): OrcaConflictError {
-    const name = (id: string) => {
-      return this.displayName(id);
-    };
-    return new OrcaConflictError(`Setup detects ${name(detected)} here, not ${name(requested)}`);
   }
 }
 
