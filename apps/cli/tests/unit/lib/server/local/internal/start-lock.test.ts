@@ -294,7 +294,7 @@ describe("withStartLock", () => {
     await rejection.toMatchObject({
       code: "E_CONFLICT",
       retryable: true,
-      message: expect.stringContaining(lock),
+      message: "Another `zitadel start` is still running in this directory",
       lockFile: lock,
     });
     await release?.();

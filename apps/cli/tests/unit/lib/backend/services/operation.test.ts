@@ -437,7 +437,8 @@ describe("Operation.named", () => {
   it("suggests the operation a typo meant", () => {
     expect(() => Operation.named("querUsers")).toThrow(
       expect.objectContaining({
-        message: expect.stringContaining("did you mean queryUsers"),
+        message: "No operation is called querUsers",
+        near: expect.arrayContaining(["queryUsers"]),
       }),
     );
   });

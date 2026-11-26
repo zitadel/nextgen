@@ -292,7 +292,7 @@ export function failureAdvice(
   });
   if (unsupported !== undefined) {
     return {
-      hint: unsupported.message,
+      hint: unsupported.hint ?? unsupported.message,
       nextCommands: [again.rerun],
     };
   }

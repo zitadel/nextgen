@@ -1219,7 +1219,7 @@ describe("FrameworkCheck", () => {
       });
     });
 
-    it("carries the error's code and the upgrade in its message for the doctor envelope", async ({
+    it("carries the error's code and the upgrade in its hint for the doctor envelope", async ({
       dir,
     }) => {
       await aDowngradedApp(dir);
@@ -1228,7 +1228,7 @@ describe("FrameworkCheck", () => {
 
       expect(outcome).toMatchObject({
         code: "E_UNSUPPORTED_PROJECT_SHAPE",
-        message: expect.stringContaining("Upgrade"),
+        hint: expect.stringContaining("Upgrade the app to Next.js 15.2.3 or later and rerun."),
       });
     });
   });
