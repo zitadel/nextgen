@@ -17,7 +17,10 @@ import {
   BackendRequestInvalidError,
   BackendTooManyRequestsError,
   BackendUnauthorizedError,
+  BackendTimeoutError,
   BackendUnavailableError,
+  BackendUnreachableError,
+  BackendUnreadableError,
 } from "@/lib/backend/errors";
 
 describe("the backend errors", () => {
@@ -60,11 +63,12 @@ describe("the backend errors' codes", () => {
     expect(error.code).toBe(code);
   });
 
-  it("carries why a request got no usable response", () => {
-    expect(
-      new BackendUnavailableError("why", {
-        reason: "timeout",
-      }).reason,
-    ).toBe("timeout");
+  it("is a transport failure for each way no response came", () => {
+    expect(new BackendUnreachableError("why")).toMatchObject({
+      code: "E_NETWORK",
+      retryable: true,
+    });
+    expect(new BackendTimeoutError("why")).toMatchObject({ code: "E_NETWORK", retryable: true });
+    expect(new BackendUnreadableError("why")).toMatchObject({ code: "E_NETWORK", retryable: true });
   });
 });

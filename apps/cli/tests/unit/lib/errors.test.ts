@@ -4,7 +4,9 @@ import { responseFailure } from "@/lib/backend";
 import {
   BackendForbiddenError,
   BackendUnauthorizedError,
-  BackendUnavailableError,
+  BackendTimeoutError,
+  BackendUnreachableError,
+  BackendUnreadableError,
 } from "@/lib/backend";
 import {
   EXIT_CODES,
@@ -153,11 +155,10 @@ describe("toZitadelError", () => {
   });
 
   it("maps a request that got no response to E_NETWORK", () => {
-    const err = new BackendUnavailableError(
+    const err = new BackendUnreachableError(
       "GET http://localhost:8080/idps got no response (ECONNREFUSED)",
       {
         url: "http://localhost:8080/idps",
-        reason: "unreachable",
       },
     );
     const result = toZitadelError(err);
@@ -169,9 +170,8 @@ describe("toZitadelError", () => {
   });
 
   it("maps a request that timed out to E_NETWORK with a hint about the server", () => {
-    const err = new BackendUnavailableError("GET … timed out", {
+    const err = new BackendTimeoutError("GET … timed out", {
       url: "http://localhost:8080/idps",
-      reason: "timeout",
     });
     const result = toZitadelError(err);
     expect(result.code).toBe("E_NETWORK");
@@ -181,11 +181,10 @@ describe("toZitadelError", () => {
   });
 
   it("maps a response whose body could not be read to E_NETWORK with a hint about proxies", () => {
-    const err = new BackendUnavailableError(
+    const err = new BackendUnreadableError(
       "GET http://localhost:8080/idps answered 200, but its body could not be read",
       {
         url: "http://localhost:8080/idps",
-        reason: "unreadable",
       },
     );
     const result = toZitadelError(err);
