@@ -180,19 +180,11 @@ stateDiagram-v2
   adapter knows that service's errors and decides which of them mean
   "already done". Its outcome is success, which lets acceptance continue, or
   a failure, which aborts it.
-- **The `project_member` adapter** calls the grant service with the accepting
-  user and the relation. Grants are unique per user and relation, and roles
-  are additive, so:
-  - no grant for that relation yet: the grant service creates one;
-  - a different relation already held: a second grant is created, and the
-    strongest wins;
-  - an identical active grant: the grant service refuses a duplicate, and the
-    adapter treats that as success;
-  - an identical expired grant still holds the binding: the adapter revokes
-    it and creates a new one.
-
-  These rules follow the grant service as it is. If it starts accepting
-  duplicates, the adapter gets simpler; the invitation doesn't change.
+- **The `project_member` adapter** refuses a user who already has access to
+  the project (amendment of 2026-11-25), then calls the grant service with
+  the accepting user and the relation. Grants are unique per user and
+  relation, so an expired grant of that relation still holds the binding:
+  the grant service revokes it before it writes the new one.
 - **Provenance:** the grant row doesn't point back to the invitation (ADR 054
   §6 keeps provenance in events). The grant service emits `authz.granted`,
   and `authz.revoked` for a replaced expired grant. They share
@@ -429,19 +421,13 @@ This refines §3's lookup and §4's adapter and self-accept rules (#2853).
 
 - **The grant service takes the caller's transaction.** `GrantService.Create`
   opens its own transaction, and transactions don't nest, so the
-  `project_member` adapter calls `EnsureUserGrant`, which runs in the
+  `project_member` adapter calls `WriteUserGrant`, which runs in the
   invitation's transaction.
-- **The duplicate rules live in that method, not in the adapter.** On
-  Postgres a unique violation aborts the transaction, so a refused duplicate
-  can't be read as success afterwards. `EnsureUserGrant` reads the user's
-  grants on the project first, and compares them by relation:
-  - an active grant of the same relation is already done;
-  - an expired one is revoked and created again;
-  - otherwise it creates the grant.
-
-  §4 says "if it starts accepting duplicates, the adapter gets simpler":
-  `EnsureUserGrant` is that path, and the adapter only maps the invitation's
-  type to the call.
+- **The leftover-grant rule lives in that method, not in the adapter.** On
+  Postgres a unique violation aborts the transaction, so a collision can't be
+  read as success afterwards. `WriteUserGrant` revokes a leftover grant of
+  the same relation before it writes, and the adapter only maps the
+  invitation's type to the call.
 - **Accept changes the status before it grants.** The guarded status change
   locks the row, so of two racing accepts the loser misses it and gets
   `404 inv.not_found`, before any grant is written.
@@ -548,8 +534,8 @@ amendments.
 
 ## Amendment (2026-11-25): a user with access can't redeem an invitation
 
-This replaces §4's `project_member` adapter rules for a role the user already
-holds, and the same-relation rule of the first 2026-11-12 amendment (#3330).
+This refines §4's `project_member` adapter for a user who already has access
+(#3330).
 
 - **Invitations bring people into a project; they don't change anyone's
   access.** A user who already has access to the project can neither accept
@@ -572,8 +558,6 @@ holds, and the same-relation rule of the first 2026-11-12 amendment (#3330).
   `project_member` variant, or null, so the accept page can show it in place
   of Accept and Decline. Each type's variant carries its own, so access to a
   project never blocks a team invitation.
-- **The grant call writes; it no longer ensures.** `EnsureUserGrant` becomes
-  `WriteUserGrant`: the redeemer holds no unexpired grant, so it revokes any
-  leftover grant of the same relation before writing, without re-reading its
-  expiry against another clock. §4's "a different
-  relation already held: a second grant is created" no longer happens.
+- **The grant call only writes.** The redeemer holds no unexpired grant, so
+  `WriteUserGrant` revokes a leftover grant of the same relation without
+  re-reading its expiry against another clock.
