@@ -116,10 +116,11 @@ Canonical examples:
 | Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
 | Create or edit drawer | `FormSheet` (`src/components/form-sheet.tsx`) |
 | Mutation error inside a form or card | `FormError` (`src/components/form-error.tsx`) |
+| Field with a control inside its frame (a copy button under a message) | `InputGroup` (`src/components/ui/input-group.tsx`) |
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
-| Centred state in place of a screen's content (the project picker) | `Empty` (`src/components/ui/empty.tsx`) |
+| Centred state in place of a screen's content (the project picker), or of a table with nothing to list yet (in a `Card`) | `Empty` (`src/components/ui/empty.tsx`) |
 
 ### Status tones
 
@@ -132,7 +133,7 @@ neutral.
 | --- | --- | --- | --- |
 | `positive` | `success` | in force and working | `active`, `live` |
 | `caution` | `warning` | held for now; someone can lift it | `suspended` |
-| `critical` | `destructive` | on its way out, not coming back by itself | `pending_purge` |
+| `critical` | `destructive` | on its way out, or gone, not coming back by itself | `pending_purge`, `expired` |
 | `neutral` | `muted-foreground` | off, or not yet on | `deactivated`, `inactive`, `draft` |
 
 A hard stop that is not one state among several (a revoked release) is the
@@ -143,7 +144,7 @@ Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `src/components/typography.ts`.
 
 - `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
-  and section title, the project page's Project Detail, Origins and Variables
+  and section title, the project page's Project details, Origins and Variables
   and Secrets cards included. `DetailSection` renders it as an `h2`; so do
   Field definitions, a login flow's User schema, Release content and the
   settings sections.

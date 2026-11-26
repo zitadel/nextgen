@@ -33,7 +33,7 @@ type clients map[string]domain.ApplicationClientDocument
 func (c clients) Client(_ context.Context, _, _, clientID string) (domain.ApplicationClientDocument, error) {
 	doc, ok := c[clientID]
 	if !ok {
-		return domain.ApplicationClientDocument{}, domain.ErrApplicationNotFound()
+		return domain.ApplicationClientDocument{}, domain.ErrApplicationClientNotFound()
 	}
 	return doc, nil
 }
@@ -259,6 +259,7 @@ func TestAuthorizeShowsTheErrorPage(t *testing.T) {
 		{name: "missing_redirect_uri", set: map[string]string{"redirect_uri": ""}, wantStatus: http.StatusBadRequest},
 		{name: "clients_unavailable", clients: failing{domain.ErrUnavailable()}, wantStatus: http.StatusServiceUnavailable},
 		{name: "clients_fail", clients: failing{errors.New("boom")}, wantStatus: http.StatusInternalServerError},
+		{name: "release_revoked", clients: failing{domain.ErrReleaseRevoked()}, wantStatus: http.StatusNotFound},
 		{name: "oauth_off", settings: settings{}, wantStatus: http.StatusNotFound},
 		{name: "settings_without_deployment", settings: settings{settings: Settings{Enabled: true, ReleaseID: "rel_1"}}, wantStatus: http.StatusInternalServerError},
 		{name: "settings_without_release", settings: settings{settings: Settings{Enabled: true, DeploymentID: "dep_1"}}, wantStatus: http.StatusInternalServerError},
@@ -482,4 +483,16 @@ func assertErrorPage(t *testing.T, rec *httptest.ResponseRecorder, status int) {
 	assert.Contains(t, rec.Header().Get("Content-Type"), "text/html")
 	assert.Contains(t, rec.Header().Values("Vary"), "Accept")
 	assert.NotContains(t, rec.Body.String(), `"error":`, "the library's JSON is dropped")
+}
+
+// The Basic challenge belongs to the token endpoint's 401 only. Userinfo,
+// which takes a bearer token (RFC 6750), gets none.
+func TestUserinfoRefusalNamesNoBasicChallenge(t *testing.T) {
+	t.Parallel()
+	mux := newMux(t, Config{Clients: shop, AuthRequests: &codes{}})
+
+	rec := send(t, mux, http.MethodGet, "/oauth/proj_123/userinfo", "api.example.com", nil)
+
+	require.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
+	assert.Empty(t, rec.Header().Get("WWW-Authenticate"))
 }

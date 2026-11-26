@@ -45,6 +45,10 @@ type AuthRequestCreatedRes interface {
 	authRequestCreatedRes()
 }
 
+type AuthRequestExchangeFailedRes interface {
+	authRequestExchangeFailedRes()
+}
+
 type AuthSsoAuthorizationFailedRes interface {
 	authSsoAuthorizationFailedRes()
 }
@@ -199,6 +203,10 @@ type FlowdefUpdatedRes interface {
 
 type GetApplicationRes interface {
 	getApplicationRes()
+}
+
+type GetApplicationRevisionRes interface {
+	getApplicationRevisionRes()
 }
 
 type GetAuthAttemptRes interface {
@@ -401,8 +409,8 @@ type ListPolicyRevisionsRes interface {
 	listPolicyRevisionsRes()
 }
 
-type ListProjectAdminsRes interface {
-	listProjectAdminsRes()
+type ListProjectMembersRes interface {
+	listProjectMembersRes()
 }
 
 type ListProjectPreviewsRes interface {

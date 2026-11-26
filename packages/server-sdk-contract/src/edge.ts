@@ -1,4 +1,4 @@
-import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +10,7 @@ export const CLIENT_ADDRESS = "203.0.113.7";
  * would, from {@link CLIENT_ADDRESS}, and returns the answer: the handler's
  * own, or a 200 `ok` when it lets the request continue.
  */
-export type EdgeServe = (request: Request, options: NextgenMiddlewareOptions) => Promise<Response>;
+export type EdgeServe = (request: Request, options: ZitadelMiddlewareOptions) => Promise<Response>;
 
 /**
  * Sends requests through the built package, as a consumer's bundler resolves it,
@@ -22,7 +22,7 @@ export function describeEdgeServer(serve: EdgeServe): void {
   describe("the server SDK in the edge runtime", () => {
     const ORIGIN = "http://localhost:3000";
     const BACKEND = "http://localhost:4000";
-    const options: NextgenMiddlewareOptions = {
+    const options: ZitadelMiddlewareOptions = {
       url: BACKEND,
       projectId: "proj_app",
       protectedRoutes: ["/admin"],
@@ -87,7 +87,7 @@ export function describeEdgeServer(serve: EdgeServe): void {
 
     it("refuses a request that carries the auth header before forwarding it", async () => {
       const answer = await serve(
-        new Request(`${ORIGIN}/__nextgen/ping`, { headers: { "x-nextgen-auth-token": "forged" } }),
+        new Request(`${ORIGIN}/__nextgen/ping`, { headers: { "x-zitadel-auth-token": "forged" } }),
         options,
       );
       expect(answer.status).toBe(400);

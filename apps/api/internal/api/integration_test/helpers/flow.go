@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -43,7 +44,7 @@ func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 	return h.flowService.value
 }
 
-func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineRuntime {
+func (h *Harness) EnsureFlowStateMachine(t testing.TB) *flowengine.FlowStateMachineRuntime {
 	t.Helper()
 	h.flowStateMachine.mutex.Lock()
 	defer h.flowStateMachine.mutex.Unlock()
@@ -51,18 +52,18 @@ func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineR
 	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t), h.newSignupProtection(t))
-		h.flowStateMachine.value = domain.NewFlowStateMachine(
-			h.EnsureSchemaResolver(t),
-			h.EnsureSchemaStore(t),
-			fields,
-			h.EnsureCreateUserHandler(t),
-			authAdapter,
-			service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
-			service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t), h.EnsureProjectHashers(t), h.EnsurePasswordPolicy(t)),
-			service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
-			h.EnsurePasswordPolicy(t),
-			time.Now,
-		)
+		h.flowStateMachine.value = flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
+			Schemas:       h.EnsureSchemaResolver(t),
+			SchemaStore:   h.EnsureSchemaStore(t),
+			Fields:        fields,
+			CreateUser:    h.EnsureCreateUserHandler(t),
+			AuthAttempts:  authAdapter,
+			SSOProviders:  service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
+			SSOIdentities: service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t), h.EnsureProjectHashers(t), h.EnsurePasswordPolicy(t)),
+			SSORedirects:  service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
+			Passwords:     h.EnsurePasswordPolicy(t),
+			Now:           time.Now,
+		})
 	}
 	return h.flowStateMachine.value
 }

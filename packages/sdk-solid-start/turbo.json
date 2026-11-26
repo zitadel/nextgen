@@ -9,7 +9,7 @@
       "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
     },
     "build": {
-      "dependsOn": ["@zitadel/sdk-core#build"]
+      "dependsOn": ["@zitadel/sdk-core#build", "@zitadel/sdk-solid#build"]
     },
     "test": {
       "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
@@ -17,7 +17,7 @@
     // tsup's declaration pass resolves the workspace packages, which need
     // api's generated client and the built dependencies.
     "dev": {
-      "dependsOn": ["@zitadel/sdk-core#build"]
+      "dependsOn": ["@zitadel/sdk-core#build", "@zitadel/sdk-solid#build"]
     }
   }
 }

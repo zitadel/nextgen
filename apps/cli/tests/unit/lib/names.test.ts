@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { byName, named } from "@/lib/names";
+import { byName, kebab, named } from "@/lib/names";
 
 describe("named", () => {
   it.each([
@@ -13,6 +13,18 @@ describe("named", () => {
     ["page-token", "pageToken"],
   ])("spells %j as %j", (name, expected) => {
     expect(named(name)).toBe(expected);
+  });
+});
+
+describe("kebab", () => {
+  it.each([
+    ["given_name", "given-name"],
+    ["givenName", "given-name"],
+    ["given-name", "given-name"],
+    ["GivenName", "given-name"],
+    ["limit", "limit"],
+  ])("spells %s as %s", (name, expected) => {
+    expect(kebab(name)).toBe(expected);
   });
 });
 

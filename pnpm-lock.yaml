@@ -209,6 +209,9 @@ catalogs:
     '@custom-elements-manifest/analyzer':
       specifier: ^0.11.0
       version: 0.11.0
+    '@dagrejs/dagre':
+      specifier: ^3.1.3
+      version: 3.1.3
     '@edge-runtime/vm':
       specifier: ^5.0.0
       version: 5.0.0
@@ -386,6 +389,9 @@ catalogs:
     dompurify:
       specifier: ^3.4.16
       version: 3.4.17
+    dot-prop:
+      specifier: ^10.2.0
+      version: 10.2.0
     escape-string-regexp:
       specifier: ^5.0.0
       version: 5.0.0
@@ -560,6 +566,9 @@ catalogs:
     type-fest:
       specifier: ^5.10.0
       version: 5.10.0
+    typedoc:
+      specifier: ^0.28.20
+      version: 0.28.20
     typescript:
       specifier: ^6.0.3
       version: 6.0.3
@@ -630,6 +639,7 @@ overrides:
   markdown-it@>=14.0.0 <14.3.3: ^14.3.3
   minimatch@>=9.0.0 <11.0.1: ^11.0.1
   '@verdaccio/core>minimatch': 10.2.6
+  typedoc>minimatch: 10.2.6
   nanoid@>=5.0.0 <5.1.16: ^5.1.16
   node-forge@<1.4.1: ^1.4.1
   postcss@>=8.0.0 <8.5.18: ^8.5.18
@@ -688,6 +698,9 @@ importers:
       turbo:
         specifier: 'catalog:'
         version: 2.11.10
+      typedoc:
+        specifier: 'catalog:'
+        version: 0.28.20(typescript@6.0.3)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -742,9 +755,15 @@ importers:
       '@zitadel/server':
         specifier: workspace:*
         version: link:../server
+      agent-cli-detector:
+        specifier: ^0.1.7
+        version: 0.1.7
       ajv:
         specifier: 'catalog:'
         version: 8.20.0
+      dot-prop:
+        specifier: 'catalog:'
+        version: 10.2.0
       escape-string-regexp:
         specifier: 'catalog:'
         version: 5.0.0
@@ -982,6 +1001,9 @@ importers:
 
   apps/console:
     dependencies:
+      '@dagrejs/dagre':
+        specifier: 'catalog:'
+        version: 3.1.3
       '@fontsource/arimo':
         specifier: 'catalog:'
         version: 5.3.0
@@ -1988,7 +2010,7 @@ importers:
         version: 2.15.0(@types/node@24.19.2)(typescript@6.0.3)
       orval:
         specifier: 'catalog:'
-        version: 8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.3.1))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(prettier@3.9.10)(swr@2.5.1(react@19.3.1))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@6.0.3)))(typedoc@0.28.19(typescript@6.0.3))(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7)
+        version: 8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.3.1))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(prettier@3.9.10)(swr@2.5.1(react@19.3.1))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7)
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.30(typescript@6.0.3))(@vue/language-core@3.3.14)(oxc-resolver@11.21.2)(publint@0.3.25)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.3.14(typescript@6.0.3))
@@ -2236,9 +2258,6 @@ importers:
 
   packages/sdk-angular:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2291,6 +2310,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2361,9 +2383,6 @@ importers:
 
   packages/sdk-next:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2401,6 +2420,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/client-sdk-contract':
         specifier: workspace:*
         version: link:../client-sdk-contract
@@ -2431,15 +2453,15 @@ importers:
 
   packages/sdk-nuxt:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-vue':
+        specifier: workspace:*
+        version: link:../sdk-vue
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -2459,6 +2481,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2483,9 +2508,6 @@ importers:
 
   packages/sdk-qwik:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2511,6 +2533,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2541,12 +2566,12 @@ importers:
 
   packages/sdk-qwik-router:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-qwik':
+        specifier: workspace:*
+        version: link:../sdk-qwik
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -2563,6 +2588,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2587,9 +2615,6 @@ importers:
       '@lit/react':
         specifier: ^1.0.8
         version: 1.0.8(@types/react@19.3.0)
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2615,6 +2640,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2651,9 +2679,6 @@ importers:
 
   packages/sdk-solid:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2676,6 +2701,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2712,12 +2740,12 @@ importers:
 
   packages/sdk-solid-start:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-solid':
+        specifier: workspace:*
+        version: link:../sdk-solid
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -2734,6 +2762,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2758,9 +2789,6 @@ importers:
 
   packages/sdk-svelte:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2783,6 +2811,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -2819,12 +2850,12 @@ importers:
 
   packages/sdk-sveltekit:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-svelte':
+        specifier: workspace:*
+        version: link:../sdk-svelte
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -2838,6 +2869,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2865,9 +2899,6 @@ importers:
       '@tanstack/react-start':
         specifier: '>=1.168.10'
         version: 1.169.5(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.19)(rollup@4.67.4)(supports-color@10.2.2)(vite-plugin-solid@2.11.16(@testing-library/jest-dom@6.9.1)(solid-js@1.9.19)(supports-color@10.2.2)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.3(@swc/helpers@0.5.23))(cssnano@9.9.0(postcss@8.5.32))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(uglify-js@3.19.3))
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2893,6 +2924,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
@@ -2920,9 +2954,6 @@ importers:
 
   packages/sdk-vue:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../api
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
@@ -2939,6 +2970,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
@@ -3862,6 +3896,12 @@ packages:
   '@cypress/request@4.0.1':
     resolution: {integrity: sha512-y20e+e6dFYkOUUJLVUZTsJRuTiXZaUQ32WD+R/ux/HBybbTx4ge7cNINcua0pU8+SNkKuRbOF12mBmzuzM8n5w==}
     engines: {node: '>= 14.17.0'}
+
+  '@dagrejs/dagre@3.1.3':
+    resolution: {integrity: sha512-X4aUTwOReZvthaZWOVHqlJ52/ZdhZFEM4+Lh/uR4XooUSLE6p71bcy7MPGzYnNUcNh+nj+i/qJQpCMIdQnSmrg==}
+
+  '@dagrejs/graphlib@4.0.6':
+    resolution: {integrity: sha512-Hjv7hbfmSBMP4nVXMFt4gusqWWHghQF0qNT4V5KHo4Jatvd+2L5VHKFnnIjXVuDnaHIRz7ZuHSnlf0RuZkOwWA==}
 
   '@dxup/nuxt@0.5.10':
     resolution: {integrity: sha512-54Vehb7LmR7qYpC6KFwjDTSm6CB1CayBu+JXdHrPLrIjjr5xAgb43jvgOU+mnB+tsRh414fSsEy0QjBMKILQ8g==}
@@ -10570,6 +10610,11 @@ packages:
     resolution: {integrity: sha512-TQf59BsZnytt8GdJKLPfUZ54g/iaUL2OWDSFCCvMOhsHduDQxO8xC4PNeyIkVcA5KwL2phPSv0douC0fgWzmnA==}
     engines: {node: '>= 20'}
 
+  agent-cli-detector@0.1.7:
+    resolution: {integrity: sha512-d8OWDVdZMgjhLUT9ZPgSv/BdFFF9pVuscC0JdUSz3bjwE15gcp6u/o0/JooM2yyAWC49KThFhXlgTXRa9B7yng==}
+    engines: {node: '>=18.18'}
+    hasBin: true
+
   ajv-draft-04@1.0.0:
     resolution: {integrity: sha512-mv00Te6nmYbRp5DCwclxtt7yV/joXJPGS7nM+97GdxvuttCOfgI3K4U25zboyeX0O+myI8ERluxQe5wljMmVIw==}
     peerDependencies:
@@ -16578,8 +16623,8 @@ packages:
     peerDependencies:
       typedoc: 0.28.x
 
-  typedoc@0.28.19:
-    resolution: {integrity: sha512-wKh+lhdmMFivMlc6vRRcMGXeGEHGU2g8a2CkPTJjJlwRf1iXbimWIPcFolCqe4E0d/FRtGszpIrsp3WLpDB8Pw==}
+  typedoc@0.28.20:
+    resolution: {integrity: sha512-uSKqkh8Cr48vllnEy+jdaAgOeR6Y+QCBW7usgUsKj7gJEfR7stw9U/fE49LBnj2tPRKPY0c0EBJSWe9Appmplg==}
     engines: {node: '>= 18', pnpm: '>= 10'}
     hasBin: true
     peerDependencies:
@@ -17695,23 +17740,29 @@ packages:
   yuku-analyzer@0.17.0:
     resolution: {integrity: sha512-MJWtt5HvXVR51mGOR2uMXQ45t1X1oMkmx4vaP/Li1HNC69OFG/qYmxf++aVazkXH5pdxTYTHYRUPl67b7NYxjA==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-ast@0.10.2:
     resolution: {integrity: sha512-UnG9mA6giglCvSErft2/40TVFX750Sj1xgwddPLpG7J7rlr/P1wPADg9G2RK+d/1tNLtRVoLdMMOMVBB9561TQ==}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-ast@0.17.0:
     resolution: {integrity: sha512-htIzp3bLNdBtOSh8L8pJ7nkTft2kw/C3ghTToSg3FKtzi0YGkvAdEUUza9c744tnbeXtKUMEupFOYHuVNXn1yQ==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-codegen@0.10.2:
     resolution: {integrity: sha512-hentl2dtrF6cPjiAirtkfxfFZBA6Hdm61UqRJ7cA0qrlDNMk9PZGOjw5w1mx3E0hu/6pHcJF4dJW+D0SXHPZOA==}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-core@0.17.0:
     resolution: {integrity: sha512-4BgHT4euQ62wr/9h5UWoMzt4QTrmT3WUo96aRiY2R6RRCyKjCveU23MNwNJISzYvNnbFGZ7O2E1SU5zgWqzS+Q==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-parser@0.10.2:
     resolution: {integrity: sha512-CgaU0/PPjCAIEZ3WQroosOxTY3eeKldAN3h+vk8pMNz4+jl1CZzBR4pW+K/rRPF112VooCL5FdjJoiMNjDrL2A==}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   zbsearch@4.0.1:
     resolution: {integrity: sha512-lmnEEnb93QQcNv7qARDr7jBVPxYdZbZ9XdZ0dbZ0qaOvGne4jJMW4fjwPfVaUKQXv3FNWvGbDwRDgyaSb1pc8w==}
@@ -19069,6 +19120,12 @@ snapshots:
       tough-cookie: 5.1.2
       tunnel-agent: 0.6.0
 
+  '@dagrejs/dagre@3.1.3':
+    dependencies:
+      '@dagrejs/graphlib': 4.0.6
+
+  '@dagrejs/graphlib@4.0.6': {}
+
   '@dxup/nuxt@0.5.10(@nuxt/schema@4.6.4)(confbox@0.3.2)(dotenv@17.4.2)(esbuild@0.28.2)(giget@3.3.1)(jiti@2.7.0)(mlly@1.8.2)(oxc-parser@0.150.0)(rolldown@1.2.19)(rollup@4.67.4)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.3(@swc/helpers@0.5.23))(cssnano@9.9.0(postcss@8.5.32))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(uglify-js@3.19.3))':
     dependencies:
       '@dxup/unimport': 0.1.2
@@ -19448,7 +19505,6 @@ snapshots:
       '@shikijs/themes': 3.23.0
       '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.1.0
-    optional: true
 
   '@github/catalyst@1.8.1': {}
 
@@ -23757,7 +23813,6 @@ snapshots:
     dependencies:
       '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.1.0
-    optional: true
 
   '@shikijs/engine-oniguruma@4.6.0':
     dependencies:
@@ -23767,7 +23822,6 @@ snapshots:
   '@shikijs/langs@3.23.0':
     dependencies:
       '@shikijs/types': 3.23.0
-    optional: true
 
   '@shikijs/langs@4.6.0':
     dependencies:
@@ -23782,7 +23836,6 @@ snapshots:
   '@shikijs/themes@3.23.0':
     dependencies:
       '@shikijs/types': 3.23.0
-    optional: true
 
   '@shikijs/themes@4.6.0':
     dependencies:
@@ -23792,7 +23845,6 @@ snapshots:
     dependencies:
       '@shikijs/vscode-textmate': 10.1.0
       '@types/hast': 3.0.5
-    optional: true
 
   '@shikijs/types@4.6.0':
     dependencies:
@@ -26479,6 +26531,8 @@ snapshots:
   agent-base@7.1.4: {}
 
   agent-base@9.0.0: {}
+
+  agent-cli-detector@0.1.7: {}
 
   ajv-draft-04@1.0.0(ajv@8.18.0):
     optionalDependencies:
@@ -29851,7 +29905,6 @@ snapshots:
   linkify-it@5.0.2:
     dependencies:
       uc.micro: 2.1.0
-    optional: true
 
   liquidjs@10.30.1:
     dependencies:
@@ -30053,8 +30106,7 @@ snapshots:
 
   lucide@1.72.0: {}
 
-  lunr@2.3.9:
-    optional: true
+  lunr@2.3.9: {}
 
   lz-string@1.5.0: {}
 
@@ -30125,7 +30177,6 @@ snapshots:
       mdurl: 2.0.0
       punycode.js: 2.3.1
       uc.micro: 2.1.0
-    optional: true
 
   markdown-table@3.0.4: {}
 
@@ -30441,8 +30492,7 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mdurl@2.0.0:
-    optional: true
+  mdurl@2.0.0: {}
 
   media-typer@0.3.0: {}
 
@@ -31881,7 +31931,7 @@ snapshots:
   ordered-binary@1.6.1:
     optional: true
 
-  orval@8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.3.1))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(prettier@3.9.10)(swr@2.5.1(react@19.3.1))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@6.0.3)))(typedoc@0.28.19(typescript@6.0.3))(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7):
+  orval@8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.3.1))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(prettier@3.9.10)(swr@2.5.1(react@19.3.1))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7):
     dependencies:
       '@commander-js/extra-typings': 15.0.0(commander@15.0.0)
       '@orval/angular': 8.48.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)
@@ -31911,8 +31961,8 @@ snapshots:
       string-argv: 0.3.2
     optionalDependencies:
       prettier: 3.9.10
-      typedoc: 0.28.19(typescript@6.0.3)
-      typedoc-plugin-markdown: 4.11.0(typedoc@0.28.19(typescript@6.0.3))
+      typedoc: 0.28.20(typescript@6.0.3)
+      typedoc-plugin-markdown: 4.11.0(typedoc@0.28.20(typescript@6.0.3))
     transitivePeerDependencies:
       - '@faker-js/faker'
       - '@modelcontextprotocol/server'
@@ -32573,8 +32623,7 @@ snapshots:
       inherits: 2.0.4
       pump: 2.0.1
 
-  punycode.js@2.3.1:
-    optional: true
+  punycode.js@2.3.1: {}
 
   punycode@2.3.1: {}
 
@@ -34379,20 +34428,19 @@ snapshots:
 
   type-level-regexp@0.1.17: {}
 
-  typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@6.0.3)):
+  typedoc-plugin-markdown@4.11.0(typedoc@0.28.20(typescript@6.0.3)):
     dependencies:
-      typedoc: 0.28.19(typescript@6.0.3)
+      typedoc: 0.28.20(typescript@6.0.3)
     optional: true
 
-  typedoc@0.28.19(typescript@6.0.3):
+  typedoc@0.28.20(typescript@6.0.3):
     dependencies:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9
       markdown-it: 14.3.3
-      minimatch: 11.0.4
+      minimatch: 10.2.6
       typescript: 6.0.3
       yaml: 2.9.1
-    optional: true
 
   typescript@5.4.5: {}
 
@@ -34426,8 +34474,7 @@ snapshots:
 
   typical@4.0.0: {}
 
-  uc.micro@2.1.0:
-    optional: true
+  uc.micro@2.1.0: {}
 
   ufo@1.6.4: {}
 

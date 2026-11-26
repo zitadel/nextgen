@@ -17,16 +17,18 @@ import { describe, expect, it } from "vitest";
  * reason as in `variables-dimensions.test.ts`: consent gates the transport, so
  * a command test cannot see what a dimension is called.
  */
-const source = join(import.meta.dirname, "../../../../src/lib/oclif/environment-command.ts");
+const source = join(import.meta.dirname, "../../../../src/cli/core/environment-command.ts");
 const catalogDoc = join(
   import.meta.dirname,
   "../../../../../../docs/product-analytics-events.yaml",
 );
 
 async function recordedDimensions(): Promise<string[]> {
-  const calls = [...(await readFile(source, "utf8")).matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
+  const calls = [
+    ...(await readFile(source, "utf8")).matchAll(/describe\(\): Facts \{\s*return \{([^}]*)\}/gs),
+  ];
   return calls.flatMap((call) =>
-    [...(call[1] ?? "").matchAll(/(\w+)\s*[:,]/g)].map((key) => key[1] as string),
+    [...(call[1] ?? "").matchAll(/^\s+(\w+):/gm)].map((key) => key[1] as string),
   );
 }
 

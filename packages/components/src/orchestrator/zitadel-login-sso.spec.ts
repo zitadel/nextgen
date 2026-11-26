@@ -343,6 +343,74 @@ describe("<zitadel-login> with identity providers", () => {
     expect(redirects).toHaveLength(0);
   });
 
+  describe("the navigation scheme check", () => {
+    /** Apply a wire response whose step carries `url` and report what the page did. */
+    async function navigateWith(
+      kind: "provider" | "terminal",
+      url: string,
+    ): Promise<{ navigations: string[]; errors: string[] }> {
+      clearSsoProviders();
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const errors: string[] = [];
+      element.addEventListener("zitadel-flow-error", (e) =>
+        errors.push((e as CustomEvent).detail.message),
+      );
+      const navigations = await withStubbedNavigation(async () => {
+        await (element as unknown as { applyResponse(wire: unknown): Promise<void> }).applyResponse(
+          {
+            id: "flow_nav",
+            session_id: "sess",
+            session_token: "tok",
+            step:
+              kind === "provider"
+                ? { name: "idp", redirect_url: url, fields: [], actions: [], gates: {} }
+                : {
+                    name: "done",
+                    complete: "redirect",
+                    redirect_url: url,
+                    fields: [],
+                    actions: [],
+                    gates: {},
+                  },
+            ...(kind === "terminal" ? { redirect_uri: url } : {}),
+          },
+        );
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      return { navigations, errors };
+    }
+
+    it.each([
+      ["provider", "javascript:alert(1)"],
+      ["provider", "data:text/html,x"],
+      ["terminal", "javascript:alert(1)"],
+      ["terminal", "data:text/html,x"],
+    ] as const)("refuses a %s target of %s and reports it", async (kind, url) => {
+      const { navigations, errors } = await navigateWith(kind, url);
+
+      expect(navigations).toEqual([]);
+      expect(errors).toEqual(["Refused to navigate: the target URL must use http or https."]);
+    });
+
+    it.each([
+      ["provider", "//evil.example/cb"],
+      ["provider", "/home"],
+      ["provider", "https://rp.example.invalid/cb"],
+      ["terminal", "//evil.example/cb"],
+      ["terminal", "/home"],
+      ["terminal", "https://rp.example.invalid/cb"],
+    ] as const)("allows a %s target of %s", async (kind, url) => {
+      const { navigations, errors } = await navigateWith(kind, url);
+
+      expect(navigations).toEqual([url]);
+      expect(errors).toEqual([]);
+    });
+  });
+
   /**
    * The whole round trip against the mock, the way the engine runs it: the
    * provider button assigns `redirect_url`, the provider sends the browser to

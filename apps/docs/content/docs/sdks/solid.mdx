@@ -11,7 +11,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Solid SDK (`@zitadel/sdk-solid`) is the single-page-app wrapper for the shared Zitadel login and logout components. It exports `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` as Solid components.
 
 <Callout title="SPA proxy requirement" type="warn">
-  A Solid single-page app has no server of its own. In development, the CLI configures a Vite proxy for `/__nextgen/*`. Production needs a same-origin proxy for `/__nextgen/*` that adds the project secret to the session exchange, and to no other call. The session exchange is the call that turns a completed sign-in into a session. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
+  A Solid single-page app has no server of its own. In development, the CLI configures a Vite proxy for `/__nextgen/*`. Production needs a same-origin proxy for `/__nextgen/*` that adds the project secret to the session exchange, and to no other call, and only to a request from your own site. The session exchange is the call that turns a completed sign-in into a session. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
 </Callout>
 
 ## Prerequisites
@@ -90,7 +90,7 @@ Setup installs the SDK. To add it yourself, run:
 | `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle that `configureZitadel` returns. Wins over `projectId` and `proxyPath`. |
 | `projectId` | `string` | unset | Login, Logout, Session | The project ID. Read when you pass no `project` handle. |
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | The same-origin path the component calls. |
-| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | The purpose of the flow. |
+| `purpose` | `ZitadelFlowPurpose` | `"login"` | Login | The purpose of the flow. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`. Unset runs the project's default flow for the `purpose`. |
 | `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. If the page's `next` query parameter names a path on the same origin, the component goes there instead. The server SDKs' middleware sets `next` when a signed-out visitor requests a protected route. |
 | `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when `next` names a path. Use it on a page that uses `next` for something of its own. |

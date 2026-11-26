@@ -44,7 +44,7 @@ func (h *Harness) EnsureOAuthHandlers(t testing.TB) *oauth.Handlers {
 			Admission:       oauth.NewProjectAdmission(h.ensureProjectService(t), []string{ConsoleOrigin}),
 			Settings:        oauth.NewReleaseSettings(h.EnsureRuntimeResolver(t), h.EnsureOAuthSettingsService(t)),
 			Clients:         h.EnsureApplicationService(t),
-			AuthRequests:    service.NewAuthRequestService(h.EnsureServiceDB(t)),
+			AuthRequests:    service.NewAuthRequestService(h.EnsureServiceDB(t), h.EnsureKeyService(t)),
 		})
 	}
 	return h.oauthHandlers.value

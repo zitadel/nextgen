@@ -488,9 +488,9 @@ func (s *Server) handleAddProjectOriginRequest(args [1]string, argsEscaped bool,
 //
 // Building writes revisions, so besides `release.write` it needs the write scope of every kind the
 // bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
-// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
-// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
-// scope. An empty kind needs no scope.
+// `idp.write`, `application.write`, `policy.write` and `oauth_settings.write`, as the per-kind create
+// endpoints do. A missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a
+// token with that scope. An empty kind needs no scope.
 //
 // Building a release does not deploy it. A release is not tied to an origin, and the same release can
 // later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
@@ -696,9 +696,8 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 
 // handleCancelInvitationRequest handles cancelInvitation operation.
 //
-// Deletes a pending or rejected invitation. A pending invitation's link can no longer be redeemed; a
-// rejected one's row and metadata are removed. An accepted or expired invitation answers the same
-// opaque `404` as a miss. Expired invitations keep their row until a later cleanup job removes them.
+// Deletes a pending, expired or rejected invitation, with its metadata. A pending invitation's link
+// can no longer be redeemed. An accepted invitation answers the same opaque `404` as a miss.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 // Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -2673,13 +2672,13 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 //
 // Send `type` and the object named after it. `project_member` takes `relation` (`viewer`, `editor` or
 // `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
-// invitations ship. Optional `metadata.name` labels who the link is for. Optional
+// invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 // `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
 // and the original is deleted in the same transaction unless it was accepted.
 //
 // The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
 // can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-// platform project, and when the project's pending-invitation cap is reached.
+// platform project, and when the project already has 100 pending unexpired invitations.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 // Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -5862,6 +5861,220 @@ func (s *Server) handleGetApplicationRequest(args [1]string, argsEscaped bool, w
 	}
 }
 
+// handleGetApplicationRevisionRequest handles getApplicationRevision operation.
+//
+// Returns one revision of an application that authenticates its users via Zitadel, by its
+// `revision_id`, the value a release pins. A declared application is served at the revision its
+// deployment's release pins, so this is how to read what a release serves. It never returns a client
+// secret.
+//
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /applications/revisions/{revision_id}
+func (s *Server) handleGetApplicationRevisionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getApplicationRevision"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/applications/revisions/{revision_id}"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetApplicationRevisionOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: GetApplicationRevisionOperation,
+			ID:   "getApplicationRevision",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, GetApplicationRevisionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, GetApplicationRevisionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeGetApplicationRevisionParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response GetApplicationRevisionRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    GetApplicationRevisionOperation,
+			OperationSummary: "Get a revision of an application",
+			OperationID:      "getApplicationRevision",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "revision_id",
+					In:   "path",
+				}: params.RevisionID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = GetApplicationRevisionParams
+			Response = GetApplicationRevisionRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackGetApplicationRevisionParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.GetApplicationRevision(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.GetApplicationRevision(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeGetApplicationRevisionResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleGetAuthAttemptRequest handles getAuthAttempt operation.
 //
 // Returns the current state of an authentication attempt, one sign-in round.
@@ -7071,9 +7284,9 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 // `project_id` as well as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`),
 // owning-team (`relation=team`) rows and grants of another project all return `404`.
 //
-// `expand=principal` adds envelope fields on `user` or `team`. For project secrets it requires
-// `user.read` and `team.read` in addition to `project.read`. A user-bound console session that already
-// passed the project check may expand without those scopes.
+// `expand=principal` adds envelope fields on `user` or `team`. Expanding requires read access to the
+// principal's home project (the platform project when the server has one), for project secrets and for
+// console sessions alike. A caller without it gets `403` `user.permission_denied`.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 // requests follow that scheme's CSRF rules.
@@ -14732,47 +14945,52 @@ func (s *Server) handleListPolicyRevisionsRequest(args [1]string, argsEscaped bo
 	}
 }
 
-// handleListProjectAdminsRequest handles listProjectAdmins operation.
+// handleListProjectMembersRequest handles listProjectMembers operation.
 //
-// Lists the people who can administer a project, and how each of them holds that access.
+// Lists the people who have a role on a project, with each person's strongest role and how they hold
+// it.
 //
-// A person appears once, with one entry in `sources` per way they hold it:
+// A person appears once, with their strongest `relation` (`viewer`, `editor` or `admin`; a stronger
+// role includes the weaker ones) and one entry in `sources` per way they hold that role:
 //
 //   - `owning_team`: an active member of the team that owns the project, the team a claim attaches the
-//     project to. Removing a grant does not remove this access. It ends only when the person leaves the
-//     team or the project changes owner.
-//   - `grant`: an unexpired `admin` grant on the project, which is a role given to the person
-//     (`grant_id` only) or to a team they are an active member of (`grant_id` and `team`). Revoking
-//     that grant removes this source.
+//     project to. It holds `admin`. Removing a grant does not remove this access. It ends only when the
+//     person leaves the team or the project changes owner.
+//   - `grant`: an unexpired grant on the project, which is a role given to the person (`grant_id` only)
+//     or to a team they are an active member of (`grant_id` and `team`). Revoking that grant removes
+//     this source.
+//
+// Grants of a weaker role than the person's strongest are not in `sources`; they still show in the
+// project's grants (`queryGrants`, `POST /grants/query`).
+//
+// Pass `relation` to list only the people whose strongest role is at least that strong:
+// `relation=admin` lists the people who can administer the project.
 //
 // The list follows the authorization check. A person who left a team, or whose team or user was
-// deactivated, is not listed through it. Grants that expired or carry a lower role are left out. A
-// person whose only access is a `viewer` or `editor` grant is not an admin and is not listed. Like the
-// check, the list does not look at a person's user status beyond that, so a direct grant to a
-// suspended person is listed.
+// deactivated, is not listed through it. Expired grants are left out. Like the check, a direct user
+// grant requires an active user, so a suspended person's direct grant is not listed.
 //
-// A person whose access comes only through teams the caller is not a member of is left out. A team the
-// caller is not in is named by `team_id` only. The grant to such a team still shows in the project's
-// grants.
+// Every caller who passes the project read check sees every listed person and every team name on
+// `sources`. Co-membership no longer filters the roster.
 //
 // The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
 // (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
 // project.
 //
-// GET /projects/{project_id}/admins
-func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /projects/{project_id}/members
+func (s *Server) handleListProjectMembersRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listProjectAdmins"),
+		otelogen.OperationID("listProjectMembers"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}/admins"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/members"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), ListProjectAdminsOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ListProjectMembersOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -14827,15 +15045,15 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: ListProjectAdminsOperation,
-			ID:   "listProjectAdmins",
+			Name: ListProjectMembersOperation,
+			ID:   "listProjectMembers",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, ListProjectAdminsOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, ListProjectMembersOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -14852,7 +15070,7 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, ListProjectAdminsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListProjectMembersOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -14893,7 +15111,7 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 			return
 		}
 	}
-	params, err := decodeListProjectAdminsParams(args, argsEscaped, r)
+	params, err := decodeListProjectMembersParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -14906,13 +15124,13 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 
 	var rawBody []byte
 
-	var response ListProjectAdminsRes
+	var response ListProjectMembersRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    ListProjectAdminsOperation,
-			OperationSummary: "List the admins of a project",
-			OperationID:      "listProjectAdmins",
+			OperationName:    ListProjectMembersOperation,
+			OperationSummary: "List the members of a project",
+			OperationID:      "listProjectMembers",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -14928,14 +15146,18 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 					Name: "project_id",
 					In:   "path",
 				}: params.ProjectID,
+				{
+					Name: "relation",
+					In:   "query",
+				}: params.Relation,
 			},
 			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = ListProjectAdminsParams
-			Response = ListProjectAdminsRes
+			Params   = ListProjectMembersParams
+			Response = ListProjectMembersRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -14944,14 +15166,14 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 		](
 			m,
 			mreq,
-			unpackListProjectAdminsParams,
+			unpackListProjectMembersParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.ListProjectAdmins(ctx, params)
+				response, err = s.h.ListProjectMembers(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.ListProjectAdmins(ctx, params)
+		response, err = s.h.ListProjectMembers(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -14959,7 +15181,7 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 		return
 	}
 
-	if err := encodeListProjectAdminsResponse(response, w, span); err != nil {
+	if err := encodeListProjectMembersResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -16704,6 +16926,10 @@ func (s *Server) handleLookupInvitationRequest(args [0]string, argsEscaped bool,
 // rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
 // details identify the setting.
 //
+// An application a release declares has one writer, the release: a slug one holds is refused with
+// `app.declared`. Edit its file under `.zitadel/applications/` and deploy instead. A client here
+// leaves `secret` out, which only a release sets; one that sets it is refused with `app.invalid`.
+//
 // If the document is refused, no change is stored and an existing application keeps its current
 // revision.
 //
@@ -17994,9 +18220,9 @@ func (s *Server) handlePublishSchemaRequest(args [0]string, argsEscaped bool, w 
 // (`DELETE /grants/{grant_id}`) before it grants the same binding again. Project-secret setup
 // (`sk_proj`) and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
 //
-// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project secrets it
-// additionally requires `user.read` and `team.read`. A user-bound console session that already passed
-// the project check may expand without those scopes.
+// `expand: ["principal"]` adds envelope fields on `user` and `team`. Expanding requires read access to
+// the principal's home project (the platform project when the server has one), for project secrets and
+// for console sessions alike. A caller without it gets `403` `user.permission_denied`.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 // requests follow that scheme's CSRF rules.

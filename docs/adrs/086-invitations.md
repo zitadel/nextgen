@@ -320,6 +320,11 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   capture.
 - `sessionStorage` holds it only while the page needs it. It's cleared on
   accept, decline, an unknown token, and sign-out.
+- A session can end without sign-out (it expires, or is revoked elsewhere), so
+  the token belongs to the first signed-in account the page shows it to: for
+  any other account that signs in on the tab it is dropped unshown. The page
+  names the signed-in account and offers **Use another account**, the one
+  path that hands the token to the next sign-in.
 
 **Authority**
 - Creating, listing, reading and cancelling run the same project `admin` check
@@ -524,3 +529,19 @@ earlier amendment of this date.
     "responded_at": "2026-11-05T08:12:44Z"
   }
   ```
+
+## Amendment (2026-11-23): cancel removes an expired invitation
+
+This replaces the cancel rule in the 2026-11-11 and the first 2026-11-13
+amendments.
+
+- **Cancel deletes any invitation that wasn't accepted:** pending, expired or
+  rejected, the same rows replace deletes. An administrator removes an
+  expired invitation and its metadata without making a new link, before the
+  cleanup job exists.
+- An accepted invitation still answers the same `404` as an unknown id.
+- **Cancelling an expired invitation sends no product event
+  `invitation_cancelled`** (§9), as for a declined one: its journey already
+  counts as not accepted, and the 72-hour acceptance rate leaves out
+  cancelled journeys. The audit event `invitation.cancelled` (§5) is still
+  written for every cancel.

@@ -34,6 +34,7 @@ import {
   it,
   onTestFinished,
   vi,
+  type MockInstance,
 } from "vitest";
 
 import "./zitadel-login.js";
@@ -415,6 +416,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("explains a flow-name that matches no active flow definition", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     // The server envelope only says "not found" — the orchestrator owns
     // knowing the name came from its `flow-name` attribute.
     server.use(
@@ -440,9 +442,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="no-such-flow"');
     expect(text).toContain("zitadel deploy");
+    expect(logged).toHaveBeenCalledWith("[zitadel-login]", expect.any(Error));
+    logged.mockRestore();
   });
 
   it("explains a flow-name that does not serve the requested purpose", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     server.use(
       http.post(
         "*/flows",
@@ -466,9 +471,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="register-only"');
     expect(text).toContain('purpose "login"');
+    expect(logged).toHaveBeenCalledWith("[zitadel-login]", expect.any(Error));
+    logged.mockRestore();
   });
 
   describe("explains a misconfigured element from the server's envelope", () => {
+    let logged: MockInstance<typeof console.error>;
+
+    beforeEach(() => {
+      logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      logged.mockRestore();
+    });
+
     /** Mounts an element whose flow start the server answers with `body` and `status`. */
     const startRefused = async (
       body: Record<string, unknown>,
@@ -481,6 +498,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
       host.appendChild(element);
       await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+      expect(logged).toHaveBeenCalledWith("[zitadel-login]", expect.any(Error));
       return element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     };
     const invalid = (...fields: string[]) => ({
@@ -544,11 +562,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
 
     it("keeps the server's error as the cause it logs", async () => {
-      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
       await startRefused({ code: "proj.not_found", message: "project not found" }, 404);
       const [, error] = logged.mock.calls.find(([tag]) => tag === "[zitadel-login]") ?? [];
       expect((error as Error).cause).toBeInstanceOf(ApiError);
-      logged.mockRestore();
     });
 
     it("passes a req.invalid about any other field through", async () => {
@@ -665,6 +681,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // here would be the second confirmation of one sign-in.
       expect(element.shadowRoot?.querySelector("zl-card")).toBeNull();
       expect(element.shadowRoot?.querySelector('slot[name="loader"]')).not.toBeNull();
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+    }
+  });
+
+  it.each([
+    ["javascript:alert(1)", false],
+    ["data:text/html,x", false],
+    ["//evil.example/home", true],
+    ["/home", true],
+    ["https://app.example.invalid/home", true],
+  ])("checks the scheme of post-sign-in-url %s before navigating", async (url, allowed) => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = url;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const errors: string[] = [];
+      element.addEventListener("zitadel-flow-error", (e) =>
+        errors.push((e as CustomEvent).detail.message),
+      );
+
+      await advanceMockLoginFlow(element);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      expect(assign.mock.calls.map((call) => call[0])).toEqual(allowed ? [url] : []);
+      expect(errors).toEqual(
+        allowed ? [] : ["Refused to navigate: the target URL must use http or https."],
+      );
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: location });
     }
@@ -2753,7 +2807,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
                   required: false,
                 },
               ],
-              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              actions: [{ name: "submit", text_key: "register.action.submit", primary: true }],
               gates: {},
             },
             branding: {},
@@ -2843,7 +2897,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
                   required: true,
                 },
               ],
-              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              actions: [{ name: "submit", text_key: "register.action.submit", primary: true }],
               gates: {},
             },
             branding: {},
@@ -2926,7 +2980,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
                     value: prefilled,
                   },
                 ],
-                actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+                actions: [{ name: "submit", text_key: "register.action.submit", primary: true }],
                 gates: {},
               },
               branding: {},
@@ -2999,7 +3053,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
                   required: false,
                 },
               ],
-              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              actions: [{ name: "submit", text_key: "register.action.submit", primary: true }],
               gates: {},
             },
             branding: {},
@@ -3083,7 +3137,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
                   },
                 },
               ],
-              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              actions: [{ name: "submit", text_key: "register.action.submit", primary: true }],
               gates: {},
             },
             branding: {},
@@ -3138,6 +3192,23 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 });
 
+/**
+ * The heading of the server-failure banner. The default template looks the already localized
+ * heading and body up again, so the fixture maps each to itself and the lookup finds it.
+ */
+const SERVER_FAILURE_HEADING = "We couldn't complete your sign in.";
+
+/** The body of the server-failure banner, which the template looks up the same way. */
+const SERVER_FAILURE_BODY = String(en["error.sign_in_server.body"]);
+
+/** The locale that lets the server-failure banner's heading and body resolve to themselves. */
+const SERVER_FAILURE_LOCALES = {
+  en: {
+    [SERVER_FAILURE_HEADING]: SERVER_FAILURE_HEADING,
+    [SERVER_FAILURE_BODY]: SERVER_FAILURE_BODY,
+  },
+};
+
 describe("<zitadel-login preview-state>", () => {
   let host: HTMLDivElement;
 
@@ -3155,6 +3226,7 @@ describe("<zitadel-login preview-state>", () => {
     element.purpose = "login";
     element.project = testProject;
     element.previewState = state;
+    element.locales = SERVER_FAILURE_LOCALES;
     host.appendChild(element);
     await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
     return element;
@@ -3191,7 +3263,7 @@ describe("<zitadel-login preview-state>", () => {
     const alert = await waitFor(() =>
       element.shadowRoot?.querySelector<ZlAlert>("zl-alert[data-zl-step-error]"),
     );
-    expect(alert.getAttribute("heading")).toBe("We couldn't complete your sign in.");
+    expect(alert.getAttribute("heading")).toBe(SERVER_FAILURE_HEADING);
     expect(alert.textContent).toContain("Please try again in a few minutes");
     expect(element.shadowRoot?.querySelector("zl-field[invalid]")).toBeNull();
   });
@@ -3306,7 +3378,9 @@ describe("<zitadel-login preview-state>", () => {
     element.project = testProject;
     element.previewState = "success";
     element.previewSuccessStep = "welcome";
-    element.locales = { en: { "welcome.title": "Welcome aboard" } };
+    element.locales = {
+      en: { "welcome.title": "Welcome aboard", "welcome.description": "You are all set" },
+    };
     host.appendChild(element);
 
     await waitFor(() =>
@@ -3521,6 +3595,7 @@ describe("<zitadel-login preview-state> repaint", () => {
     element.purpose = "login";
     element.project = testProject;
     element.previewState = "default";
+    element.locales = SERVER_FAILURE_LOCALES;
     host.appendChild(element);
     await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]'));
     type(element, "email", "alice@acme.com");

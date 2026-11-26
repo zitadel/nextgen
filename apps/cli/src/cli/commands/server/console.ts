@@ -3,14 +3,17 @@ import { Flags } from "@oclif/core";
 import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
 import { AdminSession, LocalRuntime, ZitadelRuntime } from "@/lib/server";
-import { section, log } from "@/lib/ui";
-import { LocalServerCommand, ServerCommand } from "@/cli/commands/server-command";
-import type { Admitted, JsonEnvelope } from "@/lib/oclif";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-
+import { section } from "@/lib/ui";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { BaseCommand } from "@/lib/oclif";
 import { CommandGroups } from "@/cli/commands/groups";
+import { ServerCommand } from "@/cli/commands/server-command";
+import { Previewable } from "@/cli/core/previewable";
+import { LocalServerCommand } from "@/cli/commands/server-command";
+import { BaseCommand } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** How a directory with no local admin, and no parent holding one, is refused. */
 const NO_LOCAL_ADMIN_REFUSAL = {
@@ -27,16 +30,15 @@ const NO_LOCAL_ADMIN_REFUSAL = {
  * project on a cloud or self-hosted server, it is that server's console, where
  * you sign in yourself.
  */
-export default class Console extends LocalServerCommand(ServerCommand(BaseCommand)) {
-  static override group = CommandGroups.localServer;
+export default class Console extends Telemetered(
+  LocalServerCommand(Previewable(ServerCommand(BaseCommand))),
+) {
   static override description =
     "Open the console of the server the project uses.\n\nWhere a local server was started, the console opens signed in as the local admin the start command created: run this in the directory it ran in, or one inside it, since the local admin is read from the nearest .zitadel/local/ on the way up. Otherwise a project on a cloud or self-hosted server opens that server's console, where you sign in yourself.";
+  static override group = CommandGroups.localServer;
   static override groupOrder = 5;
 
-  static override examples = [
-    "<%= config.bin %> <%= command.id %>",
-    "<%= config.bin %> <%= command.id %> --no-open",
-  ];
+  static override examples = ["<%= config.bin %> console", "<%= config.bin %> console --no-open"];
   static override flags = {
     "no-open": Flags.boolean({
       description: "Print the link instead of opening a browser.",
@@ -52,12 +54,12 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
    * directory or a parent (its runtime metadata sits beside the admin it
    * created) is the one; only without it does `--server`, or else the project's
    * own server, decide. The environment is read once, here, from the process:
-   * the run has no context of its own yet.
+   * the run has no context of its own yet. A server that cannot be resolved is
+   * the run's error, not a missing local setup.
    */
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
     const found = await LocalRuntime.findAdminDir(cwd);
     if (found === undefined) {
-      // A server that cannot be resolved is the run's error, not a missing local setup.
       const environment = await Environment.resolve({
         servers: ZitadelRuntime,
         cwd,
@@ -75,99 +77,99 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
   }
 
   /**
-   * Before the flags are parsed this command names no server: the one it is
-   * about is read from the folder, by `sourceOf`, once they are.
+   * Says what the command would open, without opening it. A link is minted by
+   * running the real login flow, which burns a one-time handoff token on the
+   * server, a mutation, so a dry run only reports who it would sign in as.
    *
-   * @returns No server.
+   * @returns The result of the dry run.
    */
-  protected override async resolveServer(): Promise<string> {
-    return "";
+  protected async preview(): Promise<CommandResult> {
+    const target = await this.targeted();
+
+    if (target.kind === "remote") {
+      const dryRun = dryRunResult({
+        verb: "open",
+        topic: "console",
+        noun: "the console",
+        next: await this.realRun(),
+      });
+
+      return {
+        ...dryRun,
+        pretty: undefined,
+        data: { ...(dryRun.data as object), console_url: target.consoleUrl },
+        summary: {
+          ...dryRun.summary,
+          sections: [section(undefined, ["Console", escapeControlCharacters(target.consoleUrl)])],
+        },
+      };
+    }
+
+    const dryRun = dryRunResult({
+      verb: "mint",
+      topic: "console",
+      noun: "a console sign-in link",
+      next: await this.realRun(),
+    });
+
+    return {
+      ...dryRun,
+      pretty: undefined,
+      data: { ...(dryRun.data as object), signed_in_as: target.admin.email },
+      summary: {
+        ...dryRun.summary,
+        sections: [
+          section(undefined, ["Signed in as", escapeControlCharacters(target.admin.email)]),
+        ],
+      },
+    };
   }
 
-  protected async execute({ flags }: Admitted<typeof Console>): Promise<JsonEnvelope> {
-    // With no local server started here, the server `--server` or the project
-    // names, when it is not on this machine, has only its own console to open.
-    if (this.named !== undefined && !ZitadelRuntime.fromUrl(this.named).isLoopback()) {
-      const consoleUrl = ZitadelRuntime.fromUrl(this.named).consoleUrl();
+  /**
+   * Opens the console. With no local server started here, the server
+   * `--server` or the project names, when it is not on this machine, has only
+   * its own console to open.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The result of the run.
+   */
+  protected async apply({ flags }: Admitted<typeof Console>): Promise<CommandResult> {
+    const target = await this.targeted();
 
-      if (this.dryRun) {
-        const title = "Would open the console (dry run)";
-
-        return this.emit({
-          status: "ok",
-          data: {
-            title,
-            dry_run: true,
-            console_url: consoleUrl,
-          },
-          summary: {
-            title,
-            sections: [section(undefined, ["Console", escapeControlCharacters(consoleUrl)])],
-          },
-          next: { commands: [await this.realRun()] },
-        });
-      }
-
-      log.plain("The console of this project's server:");
-      log.plain(escapeControlCharacters(consoleUrl));
+    if (target.kind === "remote") {
+      this.debug("The console of this project's server:");
+      this.debug(escapeControlCharacters(target.consoleUrl));
       const skipLaunch = flags.noOpen || this.nonInteractive;
-      const opened = skipLaunch ? false : (await openInBrowser(consoleUrl)).opened;
+      const opened = skipLaunch ? false : (await openInBrowser(target.consoleUrl)).opened;
 
       const title = "Console";
 
-      return this.emit({
+      return {
         status: "ok",
         data: {
           title,
-          console_url: consoleUrl,
+          console_url: target.consoleUrl,
           browser_opened: opened,
         },
         summary: {
           title,
-          sections: [],
+          sections: [section(undefined, ["Console", escapeControlCharacters(target.consoleUrl)])],
         },
-      });
+      };
     }
 
-    const found = await LocalRuntime.findAdminDir(this.cwd);
-    const localDir = found ?? this.cwd;
-    const admin = await this.serverInThisFolder(localDir).admin();
-    if (admin === undefined) {
-      throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
-    }
-
-    // A link is minted by running the real login flow, which burns a one-time
-    // handoff token on the server — a mutation, so a dry run only reports who
-    // it would sign in as.
-    if (this.dryRun) {
-      const title = "Would mint a console sign-in link (dry run)";
-
-      return this.emit({
-        status: "ok",
-        data: {
-          title,
-          dry_run: true,
-          signed_in_as: admin.email,
-        },
-        summary: {
-          title,
-          sections: [section(undefined, ["Signed in as", escapeControlCharacters(admin.email)])],
-        },
-        next: { commands: [await this.realRun()] },
-      });
-    }
-
+    const { localDir, admin } = target;
     const serverUrl = await this.serverInThisFolder(localDir).runningUrl();
     const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
 
-    log.plain(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
-    log.plain(escapeControlCharacters(signInUrl));
+    this.debug(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
+    this.debug(escapeControlCharacters(signInUrl));
     const skipLaunch = flags.noOpen || this.nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
 
     const title = "Local console sign-in link";
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         title,
@@ -177,13 +179,46 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
       },
       summary: {
         title,
-        sections: [],
+        sections: [
+          section(undefined, ["Signed in as", escapeControlCharacters(admin.email)]),
+          section(undefined, ["Link", escapeControlCharacters(signInUrl)]),
+        ],
       },
       next: {
         actions: [
           `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
         ],
       },
-    });
+    };
+  }
+
+  /**
+   * What the console this run opens is: the one of a server that is not on
+   * this machine, when `--server` or the project names one, or the local
+   * server's, signed in as the admin this folder holds.
+   *
+   * @returns The console's URL, or the local folder and its admin.
+   * @throws {Error} When there is no local admin to sign in as.
+   */
+  private async targeted() {
+    if (this.named !== undefined && !ZitadelRuntime.fromUrl(this.named).isLoopback()) {
+      return {
+        kind: "remote" as const,
+        consoleUrl: ZitadelRuntime.fromUrl(this.named).consoleUrl(),
+      };
+    }
+
+    const found = await LocalRuntime.findAdminDir(this.cwd);
+    const localDir = found ?? this.cwd;
+    const admin = await this.serverInThisFolder(localDir).admin();
+    if (admin === undefined) {
+      throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
+    }
+
+    return {
+      kind: "local" as const,
+      localDir,
+      admin,
+    };
   }
 }

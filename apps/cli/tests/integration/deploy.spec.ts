@@ -567,7 +567,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 4 resources and deployed nothing (dry run)",
+            title: "Would deploy 4 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
@@ -595,7 +597,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 4 resources and deployed nothing (dry run)",
+            title: "Would deploy 4 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
@@ -623,7 +627,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 4 resources and deployed nothing (dry run)",
+            title: "Would deploy 4 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
@@ -649,7 +655,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 4 resources and deployed nothing (dry run)",
+            title: "Would deploy 4 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
@@ -679,7 +687,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 4 resources and deployed nothing (dry run)",
+            title: "Would deploy 4 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
@@ -705,7 +715,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 4 resources and deployed nothing (dry run)",
+            title: "Would deploy 4 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
@@ -731,7 +743,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 4 resources and deployed nothing (dry run)",
+            title: "Would deploy 4 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
@@ -967,7 +981,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 4 resources and deployed nothing (dry run)",
+            title: "Would deploy 4 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
@@ -1223,7 +1239,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 5 resources and deployed nothing (dry run)",
+            title: "Would deploy 5 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 5,
             targets: "primary",
             diff: NO_BASELINE,
@@ -1312,12 +1330,6 @@ describe("deploy", () => {
           code: "E_VALIDATION",
           message: "Nonexistent flag: --origin",
           next_commands: [expectedPublicCliCommand("deploy --help")],
-          details: {
-            original: {
-              name: "Error",
-              message: "Nonexistent flag: --origin\nSee more help with --help",
-            },
-          },
         });
       });
 
@@ -1486,7 +1498,9 @@ describe("deploy", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: "Validated 4 resources and deployed nothing (dry run)",
+              title: "Would deploy 4 resources (dry run)",
+              verb: "deploy",
+              topic: "release",
               resources: 4,
               targets: "primary",
               diff: NO_BASELINE,
@@ -1521,7 +1535,9 @@ describe("deploy", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: "Validated 4 resources and deployed nothing (dry run)",
+              title: "Would deploy 4 resources (dry run)",
+              verb: "deploy",
+              topic: "release",
               resources: 4,
               targets: "primary",
               diff: NO_BASELINE,
@@ -1547,7 +1563,9 @@ describe("deploy", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: "Validated 4 resources and deployed nothing (dry run)",
+              title: "Would deploy 4 resources (dry run)",
+              verb: "deploy",
+              topic: "release",
               resources: 4,
               targets: "primary",
               diff: NO_BASELINE,
@@ -1576,7 +1594,9 @@ describe("deploy", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: "Validated 4 resources and deployed nothing (dry run)",
+              title: "Would deploy 4 resources (dry run)",
+              verb: "deploy",
+              topic: "release",
               resources: 4,
               targets: "primary",
               diff: {
@@ -1864,7 +1884,9 @@ describe("deploy", () => {
               source: MOCK_SERVER_URL,
               data: {
                 dry_run: true,
-                title: "Validated 5 resources and deployed nothing (dry run)",
+                title: "Would deploy 5 resources (dry run)",
+                verb: "deploy",
+                topic: "release",
                 resources: 5,
                 targets: "primary",
                 diff: NO_BASELINE,
@@ -1893,7 +1915,9 @@ describe("deploy", () => {
             source: MOCK_SERVER_URL,
             data: {
               dry_run: true,
-              title: "Validated 5 resources and deployed nothing (dry run)",
+              title: "Would deploy 5 resources (dry run)",
+              verb: "deploy",
+              topic: "release",
               resources: 5,
               targets: "primary",
               diff: NO_BASELINE,
@@ -1925,7 +1949,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 5 resources and deployed nothing (dry run)",
+            title: "Would deploy 5 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 5,
             targets: "primary",
             diff: NO_BASELINE,
@@ -1933,7 +1959,7 @@ describe("deploy", () => {
               expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
             ],
           },
-          warnings: [],
+          warnings: [expect.stringContaining("staffNumber")],
         });
       });
 
@@ -1956,7 +1982,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 5 resources and deployed nothing (dry run)",
+            title: "Would deploy 5 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 5,
             targets: "primary",
             diff: NO_BASELINE,
@@ -1983,7 +2011,9 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           data: {
             dry_run: true,
-            title: "Validated 5 resources and deployed nothing (dry run)",
+            title: "Would deploy 5 resources (dry run)",
+            verb: "deploy",
+            topic: "release",
             resources: 5,
             targets: "primary",
             diff: NO_BASELINE,
@@ -2024,7 +2054,7 @@ describe("deploy", () => {
 
         const result = await offTerminal(() => app.deployRendered());
 
-        expect(result).toPrintExactly("resources\n\nRelease ");
+        expect(result).toPrintExactly("or the live release has no commit.\n\nRelease ");
       });
 
       it("suggests listing the deployments once", async () => {
@@ -2075,7 +2105,16 @@ describe("deploy", () => {
 
         const result = await app.run(["deploy", "--dry-run", "--non-interactive"]);
 
-        expect(result).toPrint("Validated 4 resources and deployed nothing (dry run)");
+        expect(result).toPrint("Would deploy 4 resources (dry run)");
+      });
+
+      it("prints what a dry run compares the release against", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        const result = await app.run(["deploy", "--dry-run", "--non-interactive"]);
+
+        expect(result).toPrint(NO_BASELINE.note);
       });
 
       it("suggests the real deploy after a dry run once", async () => {

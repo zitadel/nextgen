@@ -54,17 +54,17 @@ onMounted(() => {
 <template>
   <div
     v-if="path.startsWith('/profile')"
-    style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark"
+    style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark"
   >
     <ZitadelSession :project="project" postSignOutUrl="/login" />
   </div>
   <div
     v-else-if="path.startsWith('/register')"
-    style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark"
+    style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark"
   >
     <ZitadelLogin :project="project"${localesAttr} purpose="register" postSignInUrl="/profile" />
   </div>
-  <div v-else-if="path !== '/'" style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div v-else-if="path !== '/'" style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <ZitadelLogin :project="project"${localesAttr} purpose="login" postSignInUrl="/profile" />
   </div>
 </template>

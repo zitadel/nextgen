@@ -93,23 +93,24 @@ type gateRow struct {
 type gateCodes struct{ denied, readMiss, writeMiss string }
 
 var (
-	brandingCodes   = gateCodes{domain.ErrBrandingPermissionDenied().Code, domain.ErrBrandingNotFound().Code, domain.ErrBrandingInvalid("", nil).Code}
-	oauthSetCodes   = gateCodes{domain.ErrOAuthSettingsPermissionDenied().Code, domain.ErrOAuthSettingsNotFound().Code, domain.ErrOAuthSettingsNotFound().Code}
-	deploymentCodes = gateCodes{domain.ErrDeploymentPermissionDenied().Code, domain.ErrDeploymentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code}
-	eventCodes      = gateCodes{domain.ErrEventPermissionDenied().Code, domain.ErrEventNotFound().Code, domain.ErrEventNotFound().Code}
-	flowDefCodes    = gateCodes{domain.ErrFlowDefinitionPermissionDenied().Code, domain.ErrFlowDefinitionNotFound().Code, domain.ErrFlowDefinitionInvalid("", nil).Code}
-	grantCodes      = gateCodes{domain.ErrGrantPermissionDenied().Code, domain.ErrGrantNotFound().Code, domain.ErrGrantNotFound().Code}
-	idpCodes        = gateCodes{domain.ErrIDPConnectionPermissionDenied().Code, domain.ErrIDPConnectionNotFound().Code, domain.ErrIDPConnectionNotFound().Code}
-	invitationCodes = gateCodes{domain.ErrInvitationPermissionDenied().Code, domain.ErrInvitationNotFound().Code, domain.ErrInvitationNotFound().Code}
-	originCodes     = gateCodes{domain.ErrOriginPermissionDenied().Code, domain.ErrOriginNotFound().Code, domain.ErrOriginNotFound().Code}
-	policyCodes     = gateCodes{domain.ErrPolicyPermissionDenied().Code, domain.ErrPolicyNotFound().Code, domain.ErrPolicyInvalid(nil, nil).Code}
-	projectCodes    = gateCodes{domain.ErrProjectPermissionDenied().Code, domain.ErrProjectNotFound().Code, domain.ErrProjectNotFound().Code}
-	releaseCodes    = gateCodes{domain.ErrReleasePermissionDenied().Code, domain.ErrReleaseNotFound().Code, domain.ErrReleaseProjectNotFound().Code}
-	schemaCodes     = gateCodes{domain.ErrJSONSchemaPermissionDenied().Code, domain.ErrJSONSchemaNotFound().Code, domain.ErrJSONSchemaInvalid().Code}
-	sessionCodes    = gateCodes{domain.ErrSessionPermissionDenied().Code, domain.ErrSessionNotFound().Code, domain.ErrSessionNotFound().Code}
-	teamCodes       = gateCodes{domain.ErrTeamPermissionDenied().Code, domain.ErrTeamNotFound().Code, domain.ErrTeamProjectNotFound().Code}
-	userCodes       = gateCodes{domain.ErrUserPermissionDenied().Code, domain.ErrUserNotFound().Code, domain.ErrUserInvalid().Code}
-	variableCodes   = gateCodes{domain.ErrVariablePermissionDenied().Code, domain.ErrVariableNotFound().Code, domain.ErrVariableNotFound().Code}
+	brandingCodes    = gateCodes{domain.ErrBrandingPermissionDenied().Code, domain.ErrBrandingNotFound().Code, domain.ErrBrandingInvalid("", nil).Code}
+	deploymentCodes  = gateCodes{domain.ErrDeploymentPermissionDenied().Code, domain.ErrDeploymentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code}
+	eventCodes       = gateCodes{domain.ErrEventPermissionDenied().Code, domain.ErrEventNotFound().Code, domain.ErrEventNotFound().Code}
+	flowDefCodes     = gateCodes{domain.ErrFlowDefinitionPermissionDenied().Code, domain.ErrFlowDefinitionNotFound().Code, domain.ErrFlowDefinitionInvalid("", nil).Code}
+	grantCodes       = gateCodes{domain.ErrGrantPermissionDenied().Code, domain.ErrGrantNotFound().Code, domain.ErrGrantNotFound().Code}
+	applicationCodes = gateCodes{domain.ErrApplicationPermissionDenied().Code, domain.ErrApplicationNotFound().Code, domain.ErrApplicationNotFound().Code}
+	idpCodes         = gateCodes{domain.ErrIDPConnectionPermissionDenied().Code, domain.ErrIDPConnectionNotFound().Code, domain.ErrIDPConnectionNotFound().Code}
+	invitationCodes  = gateCodes{domain.ErrInvitationPermissionDenied().Code, domain.ErrInvitationNotFound().Code, domain.ErrInvitationNotFound().Code}
+	originCodes      = gateCodes{domain.ErrOriginPermissionDenied().Code, domain.ErrOriginNotFound().Code, domain.ErrOriginNotFound().Code}
+	policyCodes      = gateCodes{domain.ErrPolicyPermissionDenied().Code, domain.ErrPolicyNotFound().Code, domain.ErrPolicyInvalid(nil, nil).Code}
+	projectCodes     = gateCodes{domain.ErrProjectPermissionDenied().Code, domain.ErrProjectNotFound().Code, domain.ErrProjectNotFound().Code}
+	releaseCodes     = gateCodes{domain.ErrReleasePermissionDenied().Code, domain.ErrReleaseNotFound().Code, domain.ErrReleaseProjectNotFound().Code}
+	schemaCodes      = gateCodes{domain.ErrJSONSchemaPermissionDenied().Code, domain.ErrJSONSchemaNotFound().Code, domain.ErrJSONSchemaInvalid().Code}
+	sessionCodes     = gateCodes{domain.ErrSessionPermissionDenied().Code, domain.ErrSessionNotFound().Code, domain.ErrSessionNotFound().Code}
+	teamCodes        = gateCodes{domain.ErrTeamPermissionDenied().Code, domain.ErrTeamNotFound().Code, domain.ErrTeamProjectNotFound().Code}
+	userCodes        = gateCodes{domain.ErrUserPermissionDenied().Code, domain.ErrUserNotFound().Code, domain.ErrUserInvalid().Code}
+	variableCodes    = gateCodes{domain.ErrVariablePermissionDenied().Code, domain.ErrVariableNotFound().Code, domain.ErrVariableNotFound().Code}
+	oauthSetCodes    = gateCodes{domain.ErrOAuthSettingsPermissionDenied().Code, domain.ErrOAuthSettingsNotFound().Code, domain.ErrOAuthSettingsNotFound().Code}
 )
 
 // Open decisions: relations the catalog (docs/design/api/system-permission-catalog.md)
@@ -188,6 +189,24 @@ var gateRows = []gateRow{
 		},
 	},
 
+	// An application revision is gated on its application, an unknown one on
+	// its own id as the target (#2112).
+	{
+		op: "GetApplicationRevision", variant: "revision found", cookie: true, relation: viewer, target: onResource,
+		idField: "RevisionID", kind: domain.ResourceKindApplication, rsiID: "app_of_revision",
+		denied: applicationCodes.denied, miss: applicationCodes.readMiss,
+		setup: func(_ *testing.T, f *gateFixture, c gateCall) {
+			f.applications.EXPECT().GetRevision(gomock.Any(), c.project, c.id).Return(&domain.Application{ID: "app_of_revision"}, nil)
+		},
+	},
+	{
+		op: "GetApplicationRevision", variant: "revision unknown", cookie: true, relation: viewer, target: onTarget,
+		idField: "RevisionID", denied: applicationCodes.denied, miss: applicationCodes.readMiss,
+		setup: func(_ *testing.T, f *gateFixture, c gateCall) {
+			f.applications.EXPECT().GetRevision(gomock.Any(), c.project, c.id).Return(nil, domain.ErrApplicationNotFound())
+		},
+	},
+
 	// Invitations.
 	{op: "CreateInvitation", cookie: true, relation: admin, why: whyInvitationGrant, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss},
 	{op: "ListInvitations", cookie: true, relation: admin, why: whyInvitationRead, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss, open: openInvitationRead},
@@ -202,11 +221,11 @@ var gateRows = []gateRow{
 	{op: "GetPolicy", cookie: true, relation: viewer, target: onResource, idField: "PolicyID", kind: domain.ResourceKindPolicy, denied: policyCodes.denied, miss: policyCodes.readMiss},
 	{op: "ListPolicyRevisions", cookie: true, relation: viewer, target: onResource, idField: "PolicyID", kind: domain.ResourceKindPolicy, denied: policyCodes.denied, miss: policyCodes.readMiss},
 
-	// Projects, their admins, claim and origins.
+	// Projects, their members, claim and origins.
 	{op: "QueryProjects", relation: viewer, why: whyQuery, target: onOwnProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "GetProject", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "UpdateProject", cookie: true, relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
-	{op: "ListProjectAdmins", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
+	{op: "ListProjectMembers", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "CreateProjectClaim", relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "GetProjectClaimStatus", relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "AddProjectOrigin", cookie: true, relation: editor, target: onProject, denied: originCodes.denied, miss: originCodes.writeMiss},
@@ -376,12 +395,13 @@ func (s *recordingAuthzStmts) recordedChecks() []domain.AuthzCheckParams {
 // same statements. The services with none of these stay nil: reaching one
 // panics, which callOperation reports.
 type gateFixture struct {
-	handler  *Handler
-	stmts    *recordingAuthzStmts
-	idps     *servicemocks.MockIDPConnectionService
-	sessions *servicemocks.MockSessionService
-	users    *recordingUserService
-	attempts *recordingAuthAttempts
+	handler      *Handler
+	stmts        *recordingAuthzStmts
+	idps         *servicemocks.MockIDPConnectionService
+	applications *servicemocks.MockApplicationService
+	sessions     *servicemocks.MockSessionService
+	users        *recordingUserService
+	attempts     *recordingAuthAttempts
 }
 
 func newGateFixture(t *testing.T, foothold bool, answers ...bool) *gateFixture {
@@ -397,11 +417,12 @@ func newGateFixture(t *testing.T, foothold bool, answers ...bool) *gateFixture {
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	db := service.NewPool(pool)
 	f := &gateFixture{
-		stmts:    stmts,
-		idps:     servicemocks.NewMockIDPConnectionService(ctrl),
-		sessions: servicemocks.NewMockSessionService(ctrl),
-		users:    &recordingUserService{},
-		attempts: &recordingAuthAttempts{},
+		stmts:        stmts,
+		idps:         servicemocks.NewMockIDPConnectionService(ctrl),
+		applications: servicemocks.NewMockApplicationService(ctrl),
+		sessions:     servicemocks.NewMockSessionService(ctrl),
+		users:        &recordingUserService{},
+		attempts:     &recordingAuthAttempts{},
 	}
 	variables := servicemocks.NewMockVariableService(ctrl)
 	f.handler = &Handler{
@@ -413,6 +434,7 @@ func newGateFixture(t *testing.T, foothold bool, answers ...bool) *gateFixture {
 		releaseService:       servicemocks.NewMockReleaseService(ctrl),
 		variableService:      variables,
 		idpConnectionService: f.idps,
+		applicationService:   f.applications,
 		claimService:         servicemocks.NewMockClaimService(ctrl),
 		tokenService:         servicemocks.NewMockTokenService(ctrl),
 		keyService:           servicemocks.NewMockKeyService(ctrl),

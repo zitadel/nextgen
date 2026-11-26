@@ -2,29 +2,15 @@ import { Args } from "@oclif/core";
 
 import { Operation } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { ServerCommand } from "@/cli/commands/server-command";
+import { Tabulatable } from "@/cli/core/tabulatable";
+import { BaseCommand } from "@/cli/core";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
-
-/** One operation as `api ls` lists it. */
-function entryOf(operation: Operation) {
-  return {
-    id: operation.id,
-    method: operation.method,
-    path: operation.path,
-    summary: operation.summary,
-    tag: operation.tag,
-    auth: operation.auth,
-    callable: operation.uncallable === undefined,
-    parameters: operation.parameters,
-    body: operation.body,
-    paging: operation.paging,
-    command: operation.cli,
-  };
-}
 
 /**
  * `zitadel api ls` — the operations `zitadel api` can call, from the spec the
@@ -32,7 +18,7 @@ function entryOf(operation: Operation) {
  * offline. `--json` carries each one's parameters, body and paging, which is
  * what an agent needs to build the call.
  */
-export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
+export default class ApiLs extends Telemetered(Tabulatable(ServerCommand(BaseCommand))) {
   static override description =
     "List the operations of the Zitadel API that the api command calls.";
   static override group = CommandGroups.apiAndEvents;
@@ -53,6 +39,24 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
     tag: nonBlankString({
       description: "Only the operations of this part of the API (Users, Teams, …).",
     }),
+    fields: fieldsFlag({
+      shape: {
+        known: new Set([
+          "id",
+          "method",
+          "path",
+          "summary",
+          "tag",
+          "auth",
+          "callable",
+          "parameters",
+          "body",
+          "paging",
+          "command",
+        ]),
+        open: ["body", "paging"],
+      },
+    }),
     plain: plainFlag,
   };
 
@@ -65,44 +69,73 @@ export default class ApiLs extends Tabulatable(ServerCommand(BaseCommand)) {
     return "";
   }
 
-  protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<JsonEnvelope> {
+  /**
+   * Lists the operations the CLI can call, narrowed by a filter and a tag. Each
+   * is listed with its parameters, body and paging, which is what an agent
+   * needs to build the call.
+   *
+   * @param input - The flags and arguments the command accepts.
+   * @returns The operations as a list.
+   */
+  protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<CommandResult> {
     const items = Operation.all({
       filter: args.filter,
       tag: flags.tag,
     }).map((operation) => {
-      return entryOf(operation);
+      return {
+        id: operation.id,
+        method: operation.method,
+        path: operation.path,
+        summary: operation.summary,
+        tag: operation.tag,
+        auth: operation.auth,
+        callable: operation.uncallable === undefined,
+        parameters: operation.parameters,
+        body: operation.body,
+        paging: operation.paging,
+        command: operation.cli,
+      };
     });
 
-    const rows = items;
-    const columns = COLUMNS;
-    const empty = "No operations found";
-    const footer: string[] = [];
-    const page = null;
-    const extra = {};
-
-    const listed = await this.listResult(flags, {
-      columns,
-      rows,
+    const view = {
+      columns: COLUMNS,
+      rows: items,
       singular: "operation",
-      empty,
-      footer,
-      page,
-      extra,
-      data: {
-        operations: items,
-        count: items.length,
-      },
-    });
+      empty: "No operations found",
+      footer: [] as string[],
+      page: null,
+    };
 
-    return this.emit({
-      ...listed,
+    const result = await this.listed(
+      flags,
+      flags.fields === undefined
+        ? {
+            ...view,
+            extra: {},
+            data: {
+              operations: items,
+              count: items.length,
+            },
+          }
+        : {
+            ...view,
+            items,
+            extra: {},
+          },
+    );
+
+    return {
+      ...result,
       next: {
         commands: [
           items.length === 0
             ? this.suggest({ id: "api:ls" })
-            : this.suggest({ id: "api", args: { operation: "<operation-id>" } }),
+            : this.suggest({
+                id: "api",
+                args: { operation: "<operation-id>" },
+              }),
         ],
       },
-    });
+    };
   }
 }

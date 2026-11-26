@@ -297,9 +297,10 @@ type IDPConnectionStatements interface {
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 }
 
-// ApplicationStatements persists registered applications, their revisions,
-// their clients and the clients' secrets. Like an IdP connection, the newest
-// revision is the one with the greatest created_at (ADR 063 §7).
+// ApplicationStatements persists applications, declared and registered, their
+// revisions, their clients and the clients' secrets. Like an IdP connection,
+// the newest revision is the one with the greatest created_at (ADR 063 §7).
+// Declared is fixed when the application is created.
 //
 // Clients are rows of their own, never removed by a revision. Each gets a
 // minted client_* id; an empty ClientID takes a copy of it (ADR 047 §5).
@@ -328,6 +329,12 @@ type ApplicationStatements interface {
 	// GetApplication returns the application matching filter at its newest
 	// revision. No match returns *database.NoRowFoundError.
 	GetApplication(ctx context.Context, filter database.Filter[domain.ApplicationField]) (*domain.Application, error)
+	// GetApplicationRevision returns the application at revisionID, newest or
+	// not, as a release pins it. No match returns *database.NoRowFoundError.
+	GetApplicationRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error)
+	// ListApplicationRevisions returns at most limit of the application's
+	// revisions, newest first. An unknown application returns none.
+	ListApplicationRevisions(ctx context.Context, projectID, applicationID string, limit uint32) ([]*domain.Application, error)
 	// ListApplicationClients returns the application's clients ordered by
 	// slug. An unknown application returns none.
 	ListApplicationClients(ctx context.Context, projectID, applicationID string) ([]*domain.ApplicationClient, error)
@@ -339,6 +346,13 @@ type ApplicationStatements interface {
 	// creates the client, so a client is never stored without its secret. An
 	// unknown client returns *database.ForeignKeyError.
 	CreateApplicationClientSecret(ctx context.Context, secret *domain.ApplicationClientSecret) error
+	// GetApplicationSecretVariable returns the claim on the variable name. No
+	// claim returns *database.NoRowFoundError.
+	GetApplicationSecretVariable(ctx context.Context, projectID, name string) (*domain.ApplicationSecretVariable, error)
+	// CreateApplicationSecretVariable stores the claim and sets CreatedAt. A
+	// name already claimed in the project returns *database.UniqueError, and
+	// an unknown client *database.ForeignKeyError.
+	CreateApplicationSecretVariable(ctx context.Context, variable *domain.ApplicationSecretVariable) error
 	// ListApplicationClientSecrets returns the client's secrets, oldest first.
 	// applicationClientID is the client's row id. An unknown client returns
 	// none.
@@ -814,7 +828,8 @@ type VariableSetStatements interface {
 }
 
 // AuthRequestStatements persists the authorization requests the endpoint
-// hands to the login (ADR 081 §8). Rows are never updated.
+// hands to the login (ADR 081 §8). A row is updated once, when the login
+// issues its code, and deleted when the code is redeemed.
 type AuthRequestStatements interface {
 	Statements
 	// CreateAuthRequest inserts request, generates its id when empty, and sets
@@ -823,6 +838,14 @@ type AuthRequestStatements interface {
 	// GetAuthRequest returns the request, expired or not, or a
 	// [database.NoRowFoundError].
 	GetAuthRequest(ctx context.Context, projectID, id string) (*domain.AuthRequest, error)
+	// SetAuthRequestCode stores request's CodeHash, UserID, SessionID and
+	// CodeExpiresAt on the row of its ProjectID and ID. A row that is unknown,
+	// expired at now, or already has a code is left as it is, and returns a
+	// [database.NoRowFoundError].
+	SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest, now time.Time) error
+	// RedeemAuthRequestCode deletes the request whose code has codeHash and
+	// returns it, expired or not, or a [database.NoRowFoundError].
+	RedeemAuthRequestCode(ctx context.Context, projectID, codeHash string) (*domain.AuthRequest, error)
 }
 
 // InvitationStatements persists invitations (ADR 086). A pending invitation
@@ -845,11 +868,9 @@ type InvitationStatements interface {
 	// [database.NoRowFoundError].
 	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error)
 	// DeleteUnacceptedInvitation removes an invitation that was not accepted,
-	// as replace does. An accepted or absent one returns a [database.NoRowFoundError].
+	// as cancel and replace do. An accepted or absent one returns a
+	// [database.NoRowFoundError].
 	DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error
-	// DeleteCancellableInvitation removes a pending, unexpired invitation or
-	// a rejected one. Any other invitation returns a [database.NoRowFoundError].
-	DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error
 	// CountPendingInvitations counts the project's pending, unexpired
 	// invitations. The cap holds only when the count and the create run in
 	// one transaction under LockProject.
@@ -954,14 +975,13 @@ type AuthzAssignmentStatements interface {
 	// Keyed on the principal alone: a platform user's grants sit on the
 	// projects they were granted on, not on the user's own (ADR 053).
 	RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error)
-	// ListProjectAdmins returns a page of the people, by user id, who
-	// administer the project: as active members of the owning team, as active
-	// members of a team with an unexpired admin grant, or as existing users
-	// with an unexpired admin grant. Only people viewerUserID may see are
-	// listed: those with a grant of their own, or members of one of the
-	// project's admin teams that viewerUserID is also an active member of.
-	// Each carries every way they administer the project.
-	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
+	// ListProjectMembers returns a page of the people, by user id, who hold a
+	// role at least as strong as minRelation ("" for any) on the project: as
+	// active members of the owning team, which holds admin, as active members
+	// of a team with an unexpired grant, or as existing users with an
+	// unexpired grant. Each carries their strongest role and every way they
+	// hold it.
+	ListProjectMembers(ctx context.Context, projectID, minRelation string, page database.Page[domain.ProjectMemberField]) (*database.ListResult[*domain.ProjectMemberRecord], error)
 	// ListProjectsOwnedThroughMember returns the projects, ordered by project
 	// id, whose active owning team has userID as an active member (a
 	// membership edge). Admin grants, platform operators and the project

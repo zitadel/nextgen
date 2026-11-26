@@ -5,7 +5,6 @@ import type { SetupServer } from "msw/node";
 import { afterEach, describe, expect, vi } from "vitest";
 
 import InvitationCreate from "@/cli/commands/invitation/create";
-import { BaseCommand } from "@/lib/oclif/base";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { answering } from "@tests/helpers/keyboard";
@@ -241,10 +240,56 @@ describe("invitation create --dry-run", () => {
   });
 });
 
+/** The warning a person reads under the link. */
+const SHOWN_ONCE = "This link is shown only once. Copy it now.";
+
+describe("invitation create's output", () => {
+  it.for([
+    { invitation: "a new invitation", extra: [] },
+    { invitation: "a replacement", extra: ["--replaces", INVITATION] },
+  ])("says the link of $invitation is shown only once", async ({ extra }, { server }) => {
+    answeringReads(server, "pending");
+    const cwd = await anApp(dirs);
+
+    const result = await runCliForTest([
+      "invitation",
+      "create",
+      "--relation",
+      "viewer",
+      ...extra,
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(result.stdout).toContain(SHOWN_ONCE);
+  });
+
+  it("leaves the warning out of --json", async ({ server }) => {
+    answeringReads(server, "pending");
+    const cwd = await anApp(dirs);
+
+    const result = await runCliForTest([
+      "invitation",
+      "create",
+      "--relation",
+      "viewer",
+      "--json",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(result.stdout).not.toContain(SHOWN_ONCE);
+  });
+});
+
 /** Watches the product events the command sends. */
 function trackedEvents() {
   return vi.spyOn(
-    BaseCommand.prototype as unknown as { trackEvent: (...args: unknown[]) => void },
+    InvitationCreate.prototype as unknown as { trackEvent: (...args: unknown[]) => void },
     "trackEvent",
   );
 }

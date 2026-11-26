@@ -6,26 +6,23 @@ import {
   invitationRole,
   type InvitationStatus,
   type InvitationType,
+  UNACCEPTED_INVITATION_STATUSES,
 } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { reads, type Refused, whole } from "@/lib/oclif/flags";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
+import { reads, type Refused, whole } from "@/cli/core/flags";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { relatedFlags } from "@/lib/suggestion/relations";
-import { ListInvitationsQueryParams } from "@/lib/backend/schemas";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { ListInvitationsQueryParams, ListInvitationsResponse } from "@/lib/backend/schemas";
+import { fieldPaths } from "@/cli/core/crud";
+import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "name", "role", "status", "expires_at"] as const;
 
 /** The statuses `--status` narrows to, as the API declares them. */
 const STATUSES = ListInvitationsQueryParams.shape.status.unwrap().element.options;
-
-/**
- * What `list` shows without `--status`: every status but accepted, as the
- * console does. Whoever accepted is a member now, which `grant list` shows.
- */
-const OPEN_STATUSES: readonly InvitationStatus[] = ["pending", "expired", "rejected"];
 
 /** The types `--type` narrows to, as the API declares them. */
 const TYPES = ListInvitationsQueryParams.shape.type.unwrap().options;
@@ -52,10 +49,11 @@ const LIMIT = {
  * with their status and expiry. `--status` and `--type` narrow the page; like
  * every list verb it fetches one page and reports `next_page_token`.
  */
-export default class InvitationList extends Tabulatable(ServerCommand(EnvironmentCommand)) {
+export default class InvitationList extends Telemetered(ReadCommand) {
   static override description = "List the project's invitations, newest first.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 6;
+
   static override examples = [
     "<%= config.bin %> invitation list",
     "<%= config.bin %> invitation list --status pending",
@@ -88,18 +86,27 @@ export default class InvitationList extends Tabulatable(ServerCommand(Environmen
         char: "a",
         description: "Fetch every page instead of one.",
       }),
+      fields: fieldsFlag({
+        shape: fieldPaths(ListInvitationsResponse.shape.invitations.element),
+      }),
       plain: plainFlag,
     },
     { all: { exclusive: ["page-token"] } },
   );
 
-  protected async execute({ flags }: Admitted<typeof InvitationList>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-
-    const invitationService = new InvitationService(client, projectId);
+  /**
+   * Lists the project's invitations, the unaccepted ones unless a status is
+   * given. A list that found nothing drops the footer, so the default says here
+   * that accepted invitations are left out.
+   *
+   * @param input.flags - The filters and paging of the list.
+   * @returns The envelope of the run.
+   */
+  protected async execute({ flags }: Admitted<typeof InvitationList>): Promise<CommandResult> {
+    const invitationService = await this.service(InvitationService);
     const listed = await invitationService.page(
       {
-        status: [...(flags.status ?? OPEN_STATUSES)],
+        status: [...(flags.status ?? UNACCEPTED_INVITATION_STATUSES)],
         type: flags.type,
         limit: flags.limit,
         page_token: flags.pageToken,
@@ -120,7 +127,6 @@ export default class InvitationList extends Tabulatable(ServerCommand(Environmen
       };
     });
     const columns = COLUMNS;
-    // A list that found nothing drops the footer, so the default says it here.
     const empty =
       flags.status === undefined
         ? "No invitations found; accepted ones are left out, pass --status accepted to list them"
@@ -134,7 +140,7 @@ export default class InvitationList extends Tabulatable(ServerCommand(Environmen
     };
     const extra = {};
 
-    return this.emitList(flags, {
+    return this.listed(flags, {
       columns,
       rows,
       items,

@@ -1,7 +1,7 @@
 // zitadel-cli: managed-file v1
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
+import { ZitadelSession } from "@zitadel/sdk-tanstack-start/components";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 import { getAuth } from "@zitadel/sdk-tanstack-start/server";
 
@@ -29,7 +29,7 @@ export const Route = createFileRoute("/profile")({
 
 function ProfilePage() {
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelSession project={project} postSignOutUrl="/login" />
     </div>
   );

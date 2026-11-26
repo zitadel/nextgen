@@ -234,8 +234,10 @@ re-run. Each command that honours `--force` declares its own, rather than
 inheriting one. What it permits differs: on `setup` it overwrites a managed
 file, on a destructive verb it destroys a resource. A single global flag would
 let a habit formed on the harmless one carry into the destructive one.
-`--dry-run` and `--non-interactive` / `-n` are global, since their meaning does
-not change per command.
+`--non-interactive` / `-n` is global, since its meaning does not change per
+command. `--dry-run` is not: only a command that changes something takes it,
+so a read refuses it as an unknown flag (amended when `Previewable` made it a
+flag of the commands that preview).
 
 Declining the prompt is `status: "skipped"`, not an error: the user did what
 the prompt asked, and a non-zero exit would make a cancelled confirmation

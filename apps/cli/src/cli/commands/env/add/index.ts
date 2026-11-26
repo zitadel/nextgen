@@ -1,25 +1,29 @@
-import { SERVER } from "@/constants";
 import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
 import { z } from "zod";
 
+import { SERVER } from "@/constants";
 import { createZitadelClient, ProjectService } from "@/lib/backend";
 import { Environment, type InitialDeployment } from "@/lib/environment";
 import { toZitadelError } from "@/lib/errors";
-import { log, warnings } from "@/lib/ui";
+import { warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { projectEnvFile } from "@/lib/oclif/environment-flags";
-import { type Refused, reads, taken } from "@/lib/oclif/flags";
-import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Admitted, BaseCommand, type CommandResult, nonBlankString } from "@/cli/core";
+import { projectEnvFile } from "@/cli/core/environment-flags";
+import { type Refused, reads, taken } from "@/cli/core/flags";
+import { interpolate, type Refusal, refusalError } from "@/cli/core/refusal";
+import { Previewable } from "@/cli/core/previewable";
+import { Promptable } from "@/cli/core/promptable";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Runtime } from "@/lib/runtime";
 import { Project } from "@/lib/project";
 import { ChoosingServerCommand } from "@/cli/commands/server-command";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL = {
@@ -27,36 +31,6 @@ const FILE_EXISTS_REFUSAL = {
   message: "{file} already exists",
   hint: "Pass --force to overwrite it.",
 } as const satisfies Refusal;
-
-/**
- * The `.env.<name>.local` file this run writes. One that already exists is a
- * conflict unless `--force` says it may be overwritten.
- */
-async function environmentFile(
-  cwd: string,
-  name: string,
-  force: boolean,
-): Promise<{ file: string; path: string }> {
-  const file = Project.envFileName(name);
-  const path = join(cwd, file);
-  const exists = await stat(path).then(
-    () => {
-      return true;
-    },
-    () => {
-      return false;
-    },
-  );
-  if (exists && !force) {
-    throw refusalError(FILE_EXISTS_REFUSAL, {
-      file,
-    });
-  }
-  return {
-    file,
-    path,
-  };
-}
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
 type PlatformVariable = { name: string; value?: string; secret?: boolean };
@@ -125,7 +99,9 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
+export default class EnvAdd extends Telemetered(
+  Promptable(Previewable(ChoosingServerCommand(BaseCommand))),
+) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 2;
@@ -156,72 +132,113 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
     force: Flags.boolean({ description: "Overwrite an existing .env.<name>.local." }),
   };
 
-  protected async execute({ args, flags }: Admitted<typeof EnvAdd>): Promise<JsonEnvelope> {
-    const { cwd, env, nonInteractive, dryRun } = this.meta;
-    const environment = await environmentFile(cwd, args.name, flags.force);
-    // `--server` resolves to an origin as it does everywhere, before anything else
-    // is read; one that was not given is asked for below.
-    const givenServer = await this.givenServer();
-    const config = await Project.at(cwd).config();
-    const frameworkId = config.frameworkId;
-    const publicVariable =
-      typeof frameworkId === "string"
-        ? PUBLIC_PROJECT_ID_VARIABLE[frameworkId as keyof typeof PUBLIC_PROJECT_ID_VARIABLE]
-        : undefined;
+  /**
+   * Says what would be written and bound, without creating a project.
+   *
+   * @param input - The arguments and flags the command accepts.
+   * @returns The envelope of the dry run.
+   */
+  protected async preview({ args, flags }: Admitted<typeof EnvAdd>): Promise<CommandResult> {
+    const { environment, server, issuer } = await this.gathered({ args, flags });
+    const dryRun = dryRunResult({
+      verb: "add",
+      topic: "environment",
+      noun: `the ${args.name} environment`,
+      clause: `bound to ${flags.project ?? "a new project"}`,
+      next: await this.again("env:add", {
+        without: ["dryRun"],
+        with: { server },
+      }),
+    });
 
-    // The rerun keeps every choice this run made, so binding a project
-    // (`--project`) stays a bind rather than creating a new project.
-    const server =
-      givenServer ??
-      (await this.askServer(await this.again("env:add", { with: { server: SERVER } })));
+    return {
+      ...dryRun,
+      pretty: undefined,
+      data: {
+        ...(dryRun.data as object),
+        environment: args.name,
+        file: environment.file,
+        server,
+        project_id: flags.project,
+        issuer,
+      },
+      summary: {
+        ...dryRun.summary,
+        lines: [
+          escapeControlCharacters(
+            flags.project === undefined
+              ? `Would create a project on ${server}`
+              : `Would bind the existing project ${flags.project}`,
+          ),
+          escapeControlCharacters(`Would write ${environment.file}`),
+        ],
+      },
+    };
+  }
 
-    const appUrl =
-      flags.appUrl ??
-      (nonInteractive
-        ? undefined
-        : await this.ask.text({
-            name: "app URL",
-            message: "What URL is your app served from? You can leave this empty to skip it.",
-            flag: "--app-url",
-            placeholder: "https://app.acme.com",
-            parse: readAppUrl,
-          }));
-    const issuer = appUrl === undefined ? undefined : new URL(appUrl).origin;
+  /**
+   * Creates or binds the project and writes the environment's file.
+   *
+   * The file holds the origin the app serves from as ZITADEL_ISSUER, so a CLI
+   * run against this environment resolves the same issuer the deployed app
+   * registers. Only a secret actually written to the file can be copied from
+   * it: when `--project` binds an id with no ZITADEL_PROJECT_SECRET or
+   * ZITADEL_PREVIEW_TOKEN in the process environment, the file holds neither,
+   * so the platform listing points at the project's own secret instead.
+   *
+   * Follow-up commands act on the new environment by the file just written
+   * rather than by its name: `--env-file` outranks the process environment,
+   * which `--env` does not, so a follow-up run in a shell exporting another
+   * project's ZITADEL_* values still acts on the project this run bound. This
+   * run's own selection is not it either way.
+   *
+   * A created project already holds its app URL as a primary origin, which
+   * closes it; only a bound one (`--project`) still needs the pattern added,
+   * and a bound project admits no origin except a loopback origin until the
+   * first pattern is added. A deploy lands on the project's primary origins,
+   * and a created project holds one only when an app URL was given. Without it
+   * there is nowhere to land, so the server refuses the deploy however it is
+   * reached: offering it would ask for something that cannot work, and naming
+   * it would send the reader to a command that fails the same way.
+   *
+   * A project this run created has never had a release, so the environment
+   * serves the server's own defaults until something is deployed to it. The
+   * deploy is offered here, the one moment the project, its secret and its
+   * origin are all at hand. A bound project is someone else's and may already
+   * serve a release of its own, so it is never offered one, and a run with
+   * nobody to ask gets the suggestion in the envelope instead: there is no
+   * flag to deploy without being asked, because an agent that wants one runs
+   * `deploy` itself. `--force`, which permits overwriting the env file, never
+   * answers a `yes-no`. The warning that nothing is deployed is said even when
+   * nobody could be asked, because it is the one thing standing between this
+   * environment and a working app: until a release is deployed the project
+   * refuses sign-in, and the `.zitadel/` files in this directory are not
+   * served. With an origin the deploy is in the next steps.
+   *
+   * The runnable `origin add` is in the next steps, and `next_commands` is
+   * machine-readable, so the entry is included only when it is actually
+   * runnable: a concrete origin (without `--app-url` it would be a
+   * `<your-app-url>` placeholder the shell reads as redirection) and a project
+   * secret in the file for it to authenticate with. The renderer quotes the
+   * origin, since an IPv6 issuer like http://[::1]:3000 carries brackets a
+   * shell such as zsh would treat as a glob. When the entry is not runnable,
+   * the human-facing guidance spells it out instead: for a placeholder origin,
+   * or a file without the project secret it would authenticate with. The
+   * `deployment` in the data is the one this run made, and `null` whenever
+   * none was made: a `--project` bind, a run with nobody to ask, a declined
+   * prompt, or a deploy that failed.
+   *
+   * @param input - The arguments and flags the command accepts.
+   * @returns The envelope of the run.
+   */
+  protected async apply({ args, flags }: Admitted<typeof EnvAdd>): Promise<CommandResult> {
+    const { env, cwd, nonInteractive } = this.meta;
+    const { environment, server, issuer, frameworkId, publicVariable } = await this.gathered({
+      args,
+      flags,
+    });
 
-    if (dryRun) {
-      const title = escapeControlCharacters(
-        `Would add the ${args.name} environment, bound to ${flags.project ?? "a new project"} (dry run)`,
-      );
-
-      return this.emit({
-        status: "ok",
-        data: {
-          title,
-          dry_run: true,
-          environment: args.name,
-          file: environment.file,
-          server,
-          project_id: flags.project,
-          issuer,
-        },
-        summary: {
-          title,
-          sections: [],
-          lines: [
-            escapeControlCharacters(
-              flags.project === undefined
-                ? `Would create a project on ${server}`
-                : `Would bind the existing project ${flags.project}`,
-            ),
-            escapeControlCharacters(`Would write ${environment.file}`),
-          ],
-        },
-        next: {
-          commands: [await this.again("env:add", { without: ["dryRun"], with: { server } })],
-        },
-      });
-    }
-
+    this.info(`Adding the ${args.name} environment`);
     const project =
       flags.project === undefined
         ? await new ProjectService(
@@ -250,7 +267,7 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
     if (flags.project === undefined) {
-      log.done(`Created project ${escapeControlCharacters(project.id)}`);
+      this.debug(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
     this.ui.ranAgainst(projectId, server);
@@ -260,13 +277,11 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
       ZITADEL_PROJECT_ID: projectId,
       ...(projectSecret === undefined ? {} : { ZITADEL_PROJECT_SECRET: projectSecret }),
       ...(previewToken === undefined ? {} : { ZITADEL_PREVIEW_TOKEN: previewToken }),
-      // The origin the app serves from, so a CLI run against this environment
-      // resolves the same ZITADEL_ISSUER the deployed app registers.
       ...(issuer === undefined ? {} : { ZITADEL_ISSUER: issuer }),
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await Project.envFile(environment.path).write(values);
-    log.done(`Wrote ${escapeControlCharacters(environment.file)}`);
+    this.debug(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [
       {
@@ -349,44 +364,18 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
         },
       ],
     };
-    // Only a secret actually written to the file can be copied from it. When
-    // `--project` binds an id with no ZITADEL_PROJECT_SECRET / PREVIEW_TOKEN in
-    // the process environment, the file holds neither, so "copy it from <file>"
-    // would send the user to a value that is not there — point them at the
-    // project's own secret instead.
     const writtenKeys = new Set(Object.keys(values));
-    // The new environment, by the file just written rather than by its name:
-    // `--env-file` outranks the process environment, which `--env` does not, so
-    // a follow-up run in a shell exporting another project's ZITADEL_* values
-    // still acts on the project this run bound. This run's own selection is
-    // not it either way.
     const newEnvironment: Scope = {
       envFile: projectEnvFile(flags.cwd, environment.file),
       ...(flags.cwd === undefined ? {} : { cwd: flags.cwd }),
     };
     const suggestOnNew = this.suggestWith(newEnvironment);
-    // A created project already holds its app URL as a primary origin, which
-    // closes it; only a bound one (`--project`) still needs the pattern added.
     const needsOrigin = flags.project !== undefined;
     const createdProject = !needsOrigin;
-    // A deploy lands on the project's primary origins, and a created project
-    // holds one only when an app URL was given. Without it there is nowhere
-    // to land, so the deploy is refused by the server however it is reached:
-    // offering it would ask for something that cannot work, and naming it
-    // would send the reader to a command that fails the same way.
     const hasSomewhereToLand = createdProject && issuer !== undefined;
-    // A project this run created has never had a release, so the environment
-    // serves the server's own defaults until something is deployed to it.
-    // Offer that deploy here, the one moment the project, its secret and its
-    // origin are all at hand. A bound project (`--project`) is
-    // someone else's and may already serve a release of its own, so it is
-    // never offered one, and a run with nobody to ask gets the suggestion in
-    // the envelope instead — there is no flag to deploy without being asked,
-    // because an agent that wants one runs `deploy` itself. `--force`, which
-    // permits overwriting the env file, never answers a `yes-no`.
     const offerDeployment = hasSomewhereToLand && !nonInteractive && projectSecret !== undefined;
     if (offerDeployment) {
-      log.info(
+      this.info(
         "Nothing is deployed to this environment yet, so sign-in is refused until your .zitadel/ files are deployed.",
       );
     }
@@ -415,45 +404,55 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
       });
     };
 
-    // The runnable `origin add` is in the next steps; the line here is
-    // for the one they cannot hold: a placeholder origin, or a file
-    // without the project secret it would authenticate with.
     const awaitingProjectSecret = needsOrigin && !writtenKeys.has("ZITADEL_PROJECT_SECRET");
     const secretGuidance = awaitingProjectSecret
       ? [
-          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${suggestOnNew({ id: "origin:add", args: { pattern: issuer ?? "<your-app-url>" }, flags: { kind: "primary" } })}`,
+          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${suggestOnNew(
+            {
+              id: "origin:add",
+              args: { pattern: issuer ?? "<your-app-url>" },
+              flags: { kind: "primary" },
+            },
+          )}`,
         ]
       : [];
     const placeholderGuidance =
       needsOrigin && !awaitingProjectSecret && issuer === undefined
         ? [
-            `Allow this project's origin: ${suggestOnNew({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
+            `Allow this project's origin: ${suggestOnNew({
+              id: "origin:add",
+              args: { pattern: "<your-app-url>" },
+              flags: { kind: "primary" },
+            })}`,
           ]
         : [];
     const originGuidance = [...placeholderGuidance, ...secretGuidance];
-    // Said even when nobody could be asked, because it is the one thing
-    // standing between this environment and a working app: until a
-    // release is deployed the project refuses sign-in, and the `.zitadel/`
-    // files in this directory are not served.
     const undeployed = createdProject && deployment === undefined;
     const undeployedGuidance = undeployed
       ? [
           `Nothing is deployed to ${args.name} yet, so sign-in is refused until .zitadel/ is deployed.`,
         ]
       : [];
-    // With an origin, the deploy is in the next steps.
     const originFirstGuidance =
       undeployed && !hasSomewhereToLand
         ? [
-            `Give it an origin first: ${suggestOnNew({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
-            `Then deploy to it: ${suggestOnNew({ id: "deploy", flags: { message: WHAT_CHANGED } })}`,
+            `Give it an origin first: ${suggestOnNew({
+              id: "origin:add",
+              args: { pattern: "<your-app-url>" },
+              flags: { kind: "primary" },
+            })}`,
+            `Then deploy to it: ${suggestOnNew({
+              id: "deploy",
+              flags: { message: WHAT_CHANGED },
+            })}`,
           ]
         : [];
     const deployGuidance = [...undeployedGuidance, ...originFirstGuidance];
+    const guidance = [...originGuidance, ...deployGuidance];
 
     const title = `Added the ${args.name} environment, bound to ${projectId}`;
 
-    return this.emit({
+    return {
       status: "ok",
       data: {
         title,
@@ -463,11 +462,6 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
         project_id: projectId,
         keys: Object.keys(values),
         platform,
-        // The deployment this run made, so the environment serves the
-        // developer's `.zitadel/` rather than whatever the server serves a
-        // project with nothing deployed to it. `null` whenever none was made:
-        // a `--project` bind, a run with nobody to ask, a declined prompt, or
-        // a deploy that failed.
         deployment:
           deployment === undefined
             ? null
@@ -482,8 +476,15 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
         title: escapeControlCharacters(title),
         sections: [],
         lines: [
+          ...(createdProject ? [`Created project ${projectId}`] : []),
+          `Wrote ${environment.file}`,
+          ...(deployment === undefined
+            ? []
+            : [
+                `Deployed ${deployment.contentHash} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
+              ]),
           `${environment.file} holds ${Object.keys(values).join(", ")}.`,
-          ...guidanceBlock([...originGuidance, ...deployGuidance]),
+          ...(guidance.length === 0 ? [] : ["", ...guidance]),
           "",
           "The deployed app never reads that file. Set these where it is built and run.",
           "",
@@ -499,19 +500,10 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
           return escapeControlCharacters(line);
         }),
       },
-      // A bound project admits no origin except a loopback origin until the
-      // first pattern is added, so the first step is `origin add` before
-      // anything ships. `next_commands` is machine-readable, so the entry is
-      // included only when it is actually runnable: a concrete origin (without
-      // `--app-url` it would be a `<your-app-url>` placeholder the shell
-      // reads as redirection) and a project secret in the file for it to
-      // authenticate with (a `--project` bind with no secret cannot). When it
-      // is not runnable, the human-facing line below spells it out instead.
       next: {
         commands: [
           ...(needsOrigin && issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
             ? // The renderer quotes the origin: an IPv6 issuer like http://[::1]:3000
-              // carries brackets a shell such as zsh would treat as a glob.
               [
                 suggestOnNew({
                   id: "origin:add",
@@ -520,18 +512,86 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
                 }),
               ]
             : []),
-          // Only a created project is offered a deploy: it is this run's own,
-          // it has never had a release, and the file just written holds the
-          // secret the deploy authenticates with. A `--project` bind is a
-          // project someone else owns and may already serve a release of
-          // their own, so this run does not propose replacing it.
           ...(hasSomewhereToLand && deployment === undefined
-            ? [suggestOnNew({ id: "deploy", flags: { message: WHAT_CHANGED } })]
+            ? [
+                suggestOnNew({
+                  id: "deploy",
+                  flags: { message: WHAT_CHANGED },
+                }),
+              ]
             : []),
           suggestOnNew({ id: "env" }),
         ],
       },
-    });
+    };
+  }
+
+  /**
+   * What both a dry run and the real run settle before anything is written:
+   * the `.env.<name>.local` file this run writes, which is a conflict when it
+   * already exists unless `--force` says it may be overwritten, the server, the app URL and the names the project
+   * is bound with. `--server` resolves to an origin as it does everywhere,
+   * before anything else is read; one that was not given is asked for. The
+   * rerun suggested for the question keeps every choice this run made, so
+   * binding a project (`--project`) stays a bind rather than creating a new
+   * project.
+   *
+   * @param input - The arguments and flags the command accepts.
+   * @returns What the run settled.
+   */
+  private async gathered({ args, flags }: Pick<Admitted<typeof EnvAdd>, "args" | "flags">) {
+    const { cwd, nonInteractive } = this.meta;
+    const file = Project.envFileName(args.name);
+    const path = join(cwd, file);
+    const exists = await stat(path).then(
+      () => {
+        return true;
+      },
+      () => {
+        return false;
+      },
+    );
+    if (exists && !flags.force) {
+      throw refusalError(FILE_EXISTS_REFUSAL, {
+        file,
+      });
+    }
+    const environment = {
+      file,
+      path,
+    };
+    const givenServer = await this.givenServer();
+    const config = await Project.at(cwd).config();
+    const frameworkId = config.frameworkId;
+    const publicVariable =
+      typeof frameworkId === "string"
+        ? PUBLIC_PROJECT_ID_VARIABLE[frameworkId as keyof typeof PUBLIC_PROJECT_ID_VARIABLE]
+        : undefined;
+
+    const server =
+      givenServer ??
+      (await this.askServer(await this.again("env:add", { with: { server: SERVER } })));
+
+    const appUrl =
+      flags.appUrl ??
+      (nonInteractive
+        ? undefined
+        : await this.ask.text({
+            name: "app URL",
+            message: "What URL is your app served from? You can leave this empty to skip it.",
+            flag: "--app-url",
+            placeholder: "https://app.acme.com",
+            parse: readAppUrl,
+          }));
+    const issuer = appUrl === undefined ? undefined : new URL(appUrl).origin;
+
+    return {
+      environment,
+      server,
+      issuer,
+      frameworkId,
+      publicVariable,
+    };
   }
 
   /**
@@ -550,7 +610,7 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
     projectSecret: string;
     suggest: Suggest;
   }): Promise<InitialDeployment | undefined> {
-    log.start("Deploying .zitadel/ to the new environment");
+    this.info("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await Environment.deployInitialRelease({
         client: createZitadelClient({
@@ -562,27 +622,25 @@ export default class EnvAdd extends ChoosingServerCommand(BaseCommand) {
         projectId: opts.projectId,
         cwd: opts.cwd,
         env: this.env,
-        json: this.isJson,
-        color: this.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
         narrate: (notices) => {
           this.narrate(notices);
         },
       });
-      log.done(
+      this.debug(
         `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;
     } catch (error) {
       warnings.report(
-        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${opts.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })} to publish it.`,
+        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${opts.suggest(
+          {
+            id: "deploy",
+            flags: { message: WHAT_CHANGED },
+          },
+        )} to publish it.`,
       );
       return undefined;
     }
   }
-}
-
-/** Lines under a blank line that sets them apart, or nothing when there are none. */
-function guidanceBlock(lines: string[]): string[] {
-  return lines.length === 0 ? [] : ["", ...lines];
 }

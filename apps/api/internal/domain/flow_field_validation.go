@@ -74,7 +74,7 @@ func (r *SchemaFieldResolver) Validate(fields FlowResolvedFields, values map[str
 		errs = append(errs, applyValidationRules(name, str, field.Validation)...)
 	}
 	if len(errs) > 0 {
-		sortFlowFieldValidationErrors(errs)
+		SortFlowFieldValidationErrors(errs)
 		return errs
 	}
 	return nil
@@ -97,15 +97,15 @@ func (r *SchemaFieldResolver) MissingRequired(fields FlowResolvedFields, values 
 		}
 	}
 	if len(errs) > 0 {
-		sortFlowFieldValidationErrors(errs)
+		SortFlowFieldValidationErrors(errs)
 	}
 	return errs
 }
 
-// sortFlowFieldValidationErrors orders violations by (field, rule).
+// SortFlowFieldValidationErrors orders violations by (field, rule).
 // values is iterated as a map, so without this the wire (StepError) and
 // log (Error) output would differ per run.
-func sortFlowFieldValidationErrors(errs FlowFieldValidationErrors) {
+func SortFlowFieldValidationErrors(errs FlowFieldValidationErrors) {
 	slices.SortFunc(errs, func(a, b FlowFieldValidationError) int {
 		return cmp.Or(cmp.Compare(a.Field, b.Field), cmp.Compare(a.Rule, b.Rule))
 	})

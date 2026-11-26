@@ -26,7 +26,9 @@ type KeyService interface {
 	GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (op.Crypto, error)
 	SaveSigningKey(ctx context.Context, stmts AllStatements, key *domain.SigningKey) error
 	GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error)
-	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error)
+	// GetProjectSigner returns a signer of the project's active key for
+	// purpose. opts may be nil.
+	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, opts *jose.SignerOptions) (jose.Signer, error)
 	GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error)
 	MigrateToLatestMasterKey(ctx context.Context) error
 }
@@ -263,7 +265,7 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 	return key, nil
 }
 
-func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ jose.Signer, err error) {
+func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, opts *jose.SignerOptions) (_ jose.Signer, err error) {
 	ctx, end := startSpan(ctx, "KeyService.GetProjectSigner")
 	defer end(&err)
 
@@ -280,7 +282,7 @@ func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, pur
 	if err != nil {
 		return nil, err
 	}
-	return key.Signer(kek)
+	return key.Signer(kek, opts)
 }
 
 // ------------------------------------------------------

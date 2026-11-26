@@ -1,0 +1,5 @@
+type: string
+description: The identifier of one immutable revision of an application.
+pattern: '^apprev_[a-zA-Z0-9_-]+$'
+x-zitadel-pattern-message: "must be an application revision ID: apprev_ followed by letters, digits, _ or -"
+example: apprev_01KWH3B72K7M7F0N9WD3P2E4YN

@@ -100,7 +100,7 @@ nextgen.yaml
 /apps/api/nextgen
 /tools/oidc-mock/oidc-mock
 nextgen-data/
-.zitadel/local/
+**/.zitadel/local/
 
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the

@@ -16,7 +16,7 @@
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import type { VerifyJwtOptions } from "../../runtime/lib/jwt";
+import type { ZitadelVerifyJwtOptions } from "../../runtime/lib/jwt";
 
 import { base64UrlDecode, decodeJwt, verifyJwt, JWKS_TTL_MS } from "../../runtime/lib/jwt";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
@@ -78,7 +78,7 @@ function mockJwks(kid: string): ReturnType<typeof vi.fn> {
 }
 
 /** Base options suitable for most tests; override per test as needed. */
-function baseOpts(overrides: Partial<VerifyJwtOptions> = {}): VerifyJwtOptions {
+function baseOpts(overrides: Partial<ZitadelVerifyJwtOptions> = {}): ZitadelVerifyJwtOptions {
   return {
     issuerUrl: "http://localhost:4000",
     clockSkewMs: 0,
@@ -270,7 +270,7 @@ describe("verifyJwt", () => {
 
       expect(result).toBeNull();
       expect(spy).toHaveBeenCalledOnce();
-      expect(spy).toHaveBeenCalledWith("[nextgen] verifyJwt unexpected error:", networkError);
+      expect(spy).toHaveBeenCalledWith("[zitadel] verifyJwt unexpected error:", networkError);
     });
 
     it("uses the default 5-second timeout when jwksTimeoutMs is not set", async () => {

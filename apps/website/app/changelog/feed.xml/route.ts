@@ -1,3 +1,4 @@
+import { origin as ORIGIN } from "../../links";
 import { entryPath, readChangelog } from "../entries";
 
 // The changelog as an Atom feed, built with the site (entries.ts): each
@@ -6,8 +7,6 @@ import { entryPath, readChangelog } from "../entries";
 // Atom feed's links are absolute: the cloud's production host, which a
 // preview deployment's feed links to as well.
 export const dynamic = "force-static";
-
-const ORIGIN = "https://preview.zitadel.com";
 
 /** How many entries the feed carries, the newest. */
 const IN_FEED = 50;

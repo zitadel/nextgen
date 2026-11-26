@@ -18,39 +18,66 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
-  type WidgetTag,
-  type WidgetName,
+  type ZitadelWidgetTag,
+  type ZitadelWidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import type { Component } from "svelte";
 import { hydrate, unmount } from "svelte";
 import { createServer } from "vite";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
-import type {
-  ZitadelLoginSvelteProps,
-  ZitadelLogoutSvelteProps,
-  ZitadelSessionSvelteProps,
-} from "./lib/types";
+import type { ZitadelLoginProps, ZitadelLogoutProps, ZitadelSessionProps } from "./lib/types";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
 
-import { describeServerRenderCases } from "@zitadel/client-sdk-contract/server-render";
 import {
   type Attributes,
   cssProperties,
   describeStandardAttributes,
 } from "@zitadel/client-sdk-contract/standard-attributes";
+import type { ComponentProps } from "svelte";
+import { describeSharedConfigHelpers } from "@zitadel/client-sdk-contract/config-helpers";
+import * as sdk from "./lib/index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+function widgetIn<Tag extends ZitadelWidgetTag>(
+  root: ParentNode,
+  tag: Tag,
+): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
-  if (!element) throw new Error(`no <${tag}> was rendered`);
+  if (!element) {
+    throw new Error(`no <${tag}> was rendered`);
+  }
   return element;
 }
+
+describeSharedConfigHelpers(sdk);
+
+describe("the exported props types describe what the components accept", () => {
+  it("ZitadelLoginProps is accepted by ZitadelLogin", () => {
+    type Accepted = ComponentProps<typeof ZitadelLogin>;
+
+    expectTypeOf<keyof ZitadelLoginProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLoginProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelLogoutProps is accepted by ZitadelLogout", () => {
+    type Accepted = ComponentProps<typeof ZitadelLogout>;
+
+    expectTypeOf<keyof ZitadelLogoutProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLogoutProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelSessionProps is accepted by ZitadelSession", () => {
+    type Accepted = ComponentProps<typeof ZitadelSession>;
+
+    expectTypeOf<keyof ZitadelSessionProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelSessionProps>().toExtend<Accepted>();
+  });
+});
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
@@ -316,8 +343,12 @@ describe("package manifest", () => {
   };
 
   function targets(value: unknown): string[] {
-    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
-    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    if (typeof value === "string") {
+      return value.startsWith("./") ? [value] : [];
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(targets);
+    }
     return [];
   }
 
@@ -444,7 +475,9 @@ async function loadServerMarkup(): Promise<(props: Record<string, unknown>) => s
       try {
         return renderOnServer(Login, { props }).body;
       } finally {
-        if (document) Object.defineProperty(globalThis, "document", document);
+        if (document) {
+          Object.defineProperty(globalThis, "document", document);
+        }
       }
     };
   } finally {
@@ -539,24 +572,6 @@ describe("hydrating a server-rendered login", () => {
   });
 });
 
-const SDK = "svelte";
-
-/** The attributes on the widget's element once the component has rendered. */
-async function renderAttributes(
-  widget: "login" | "session" | "logout",
-  props: Readonly<Record<string, unknown>>,
-): Promise<Record<string, string>> {
-  const component = { login: ZitadelLogin, session: ZitadelSession, logout: ZitadelLogout }[
-    widget
-  ] as Component<Record<string, unknown>>;
-  const { container } = render(component, { props: { ...props } });
-  const el = container.querySelector(`zitadel-${widget}`);
-  expect(el, `<zitadel-${widget}> missing from the markup`).not.toBeNull();
-  return Object.fromEntries(el!.getAttributeNames().map((n) => [n, el!.getAttribute(n) ?? ""]));
-}
-
-describeServerRenderCases(SDK, renderAttributes);
-
 type ForwardedAttributes = {
   class: string;
   style: string;
@@ -570,9 +585,9 @@ type ForwardedAttributes = {
 };
 
 type WidgetProps = {
-  login: ZitadelLoginSvelteProps;
-  logout: ZitadelLogoutSvelteProps;
-  session: ZitadelSessionSvelteProps;
+  login: ZitadelLoginProps;
+  logout: ZitadelLogoutProps;
+  session: ZitadelSessionProps;
 };
 
 // Svelte assigns `title` to the element as a property and leaves "null" there when it is removed.
@@ -581,7 +596,8 @@ const staleOnRemoval: readonly string[] = ["title"];
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through the component's `getElement()`, the way a consumer
 // does after `bind:this`. `update` renders it again with other attributes.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
+async function mountWidget(widget: ZitadelWidgetName, attributes: Attributes) {
+  configureZitadel(project);
   const propsOf = ({ style, hidden, ...rest }: Attributes) => {
     // Svelte takes the style as a string.
     const declarations = typeof style === "string" ? Object.entries(cssProperties(style)) : [];
@@ -609,6 +625,10 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     },
   };
 }
+
+afterEach(() => {
+  _resetConfigForTesting();
+});
 
 describeStandardAttributes<ForwardedAttributes, WidgetProps>({
   mountWidget,

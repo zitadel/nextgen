@@ -6,12 +6,14 @@ import {
   LocalServerCommand,
   ServerCommand,
 } from "@/cli/commands/server-command";
-import { type Admitted, BaseCommand, EnvironmentCommand } from "@/lib/oclif";
-import { Destructive } from "@/lib/oclif/destructive";
+import { type Admitted, BaseCommand, EnvironmentCommand } from "@/cli/core";
+import { Destructive } from "@/cli/core/destructive";
+import { Previewable } from "@/cli/core/previewable";
 import { LocalRuntime, PsLocalServers, RealMachine, ZitadelRuntime } from "@/lib/server";
 import { shellCommand } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { CommandGroups } from "@/cli/commands/groups";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 import { ZitadelError } from "@/lib/errors";
 import { it } from "@tests/fixtures";
 import { aConfigAt } from "@tests/helpers/suggestions";
@@ -276,7 +278,7 @@ describe("the server a failure names", () => {
 });
 
 /** A command that reads an environment, and so a server, with its failure captured. */
-class CapturingEnvironment extends ServerCommand(EnvironmentCommand) {
+class CapturingEnvironment extends Telemetered(ServerCommand(EnvironmentCommand)) {
   public static override readonly id: string = "capturing-environment-test";
   public readonly json: Record<string, unknown>[] = [];
   public readonly events: { event: string; properties: Properties }[] = [];
@@ -369,10 +371,14 @@ describe("the types a server mixin gives a command", () => {
   });
 
   it("keep the group and the folder rule of a command that is also destructive", () => {
-    class Destroying extends Destructive(LocalServerCommand(BaseCommand, "exact")) {
+    class Destroying extends Destructive(Previewable(LocalServerCommand(BaseCommand, "exact"))) {
       static override group = CommandGroups.localServer;
 
-      protected async execute(): Promise<never> {
+      protected async preview(): Promise<never> {
+        throw new Error("unused");
+      }
+
+      protected async apply(): Promise<never> {
         throw new Error("unused");
       }
     }

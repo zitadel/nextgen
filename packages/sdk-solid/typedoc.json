@@ -1,0 +1,13 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": [
+    "../../typedoc.base.json"
+  ],
+  "name": "@zitadel/sdk-solid",
+  "entryPoints": [
+    "src/index.tsx"
+  ],
+  "tsconfig": "tsconfig.lib.json",
+  "readme": "docs/cover.md",
+  "out": "dist/api-docs"
+}

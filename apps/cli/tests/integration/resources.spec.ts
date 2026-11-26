@@ -76,6 +76,7 @@ describe("resources", () => {
             title: "Found 12 resources",
             items: expect.any(Array),
             count: expect.any(Number),
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -100,6 +101,7 @@ describe("resources", () => {
             title: "Found 12 resources",
             items: expect.any(Array),
             count: expect.any(Number),
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -124,6 +126,7 @@ describe("resources", () => {
             title: "Found 12 resources",
             items: expect.any(Array),
             count: expect.any(Number),
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -194,6 +197,24 @@ describe("resources", () => {
     });
 
     describe("--json", () => {
+      it("cuts each record to the fields named", async () => {
+        const app = await anApp();
+
+        const result = await app.run(["resources", "--fields", "topic", "--json"]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({
+          items: expect.arrayContaining([{ topic: expect.any(String) }]),
+        });
+      });
+
+      it("refuses a field the records do not carry", async () => {
+        const app = await anApp();
+
+        const result = await app.run(["resources", "--fields", "nope", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("lists what the CLI manages before the project is set up", async () => {
         const app = await anApp();
 
@@ -209,6 +230,7 @@ describe("resources", () => {
             title: "Found 12 resources",
             items: expect.any(Array),
             count: expect.any(Number),
+            truncated: false,
             next_page_token: null,
           },
           warnings: [],
@@ -471,6 +493,7 @@ describe("resources", () => {
             title: "Found 1 user",
             items: [{ id: "usr_1", attributes: {} }],
             count: 1,
+            truncated: true,
             next_page_token: cursor,
             next_commands: [
               expectedPublicCliCommand(
@@ -495,8 +518,9 @@ describe("resources", () => {
           status: "ok",
           data: {
             title: "Found 1 user",
-            items: [{ id: "usr_1", attributes: {} }],
+            items: [{ id: "usr_1" }],
             count: 1,
+            truncated: true,
             next_page_token: "cur-\u001b[2Jwiped",
             next_commands: [
               expectedPublicCliCommand(

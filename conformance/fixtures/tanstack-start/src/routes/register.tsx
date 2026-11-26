@@ -1,6 +1,6 @@
 // zitadel-cli: managed-file v1
 import { createFileRoute } from "@tanstack/react-router";
-import { ZitadelLogin } from "@zitadel/sdk-tanstack-start/react";
+import { ZitadelLogin } from "@zitadel/sdk-tanstack-start/components";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/register")({
 
 function RegisterPage() {
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelLogin project={project} purpose="register" postSignInUrl="/profile" />
     </div>
   );

@@ -142,7 +142,7 @@ describe("guidance content", () => {
 
   it("tells each framework how its own chrome reads session state", () => {
     // Next: the client helper (works on any page), plus the server-side
-    // auth(), which the every-route matcher lets read the session anywhere.
+    // getAuth(), which the every-route matcher lets read the session anywhere.
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain("@zitadel/sdk-next/session");
     expect(agents).toContain("`matcher` covers every route");
@@ -164,21 +164,33 @@ describe("guidance content", () => {
     expect(nuxtAgents).toContain("useAuth()");
     expect(nuxtAgents).not.toContain("@zitadel/sdk-next/session");
 
-    // SPA frameworks: no framework helper exists yet, so the guidance names
-    // the raw proxy read instead of a package that would not resolve.
+    // React: the sdk-react hook, which reads the same proxy route.
     const reactCtx = {
       ...ctx,
       framework: { id: "react", devPort: 5173, url: "http://localhost:5173" },
     } as PatchContext;
     const reactAgents = agentsGuidanceSection(reactCtx);
+    expect(reactAgents).toContain("`useSession({ project })` hook from `@zitadel/sdk-react`");
     expect(reactAgents).toContain("/__nextgen/api/v1/sessions/me?project_id=");
-    expect(reactAgents).toContain('cache: "no-store"');
-    expect(reactAgents).toContain("401/auth.unauthorized");
-    expect(reactAgents).toContain("403/sess.project_mismatch");
-    expect(reactAgents).toContain("404/sess.not_found");
-    expect(reactAgents).toContain("unknown/error, never signed-out");
+    expect(reactAgents).toContain("`error` is unknown, never signed-out");
     expect(reactAgents).not.toContain("@zitadel/sdk-next/session");
     expect(reactAgents).not.toContain("useAuth()");
+
+    // Other SPA frameworks: no framework helper exists yet, so the guidance
+    // names the raw proxy read instead of a package that would not resolve.
+    const vueCtx = {
+      ...ctx,
+      framework: { id: "vue", devPort: 5173, url: "http://localhost:5173" },
+    } as PatchContext;
+    const vueAgents = agentsGuidanceSection(vueCtx);
+    expect(vueAgents).toContain("/__nextgen/api/v1/sessions/me?project_id=");
+    expect(vueAgents).toContain('cache: "no-store"');
+    expect(vueAgents).toContain("401/auth.unauthorized");
+    expect(vueAgents).toContain("403/sess.project_mismatch");
+    expect(vueAgents).toContain("404/sess.not_found");
+    expect(vueAgents).toContain("unknown/error, never signed-out");
+    expect(vueAgents).not.toContain("@zitadel/sdk-next/session");
+    expect(vueAgents).not.toContain("useSession");
   });
 
   it("describes the emitted posture in the presentation paragraph (ADR 044)", () => {

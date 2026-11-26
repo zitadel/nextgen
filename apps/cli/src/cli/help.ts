@@ -1,4 +1,4 @@
-import { GroupedHelp } from "@/lib/oclif/help";
+import { GroupedHelp } from "@/cli/core/help";
 
 import { COMMAND_GROUPS } from "@/cli/commands/groups";
 

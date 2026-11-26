@@ -1,18 +1,18 @@
-import { Args, Flags } from "@oclif/core";
+import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import { ReleaseService } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { CommandGroups } from "@/cli/commands/groups";
-import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Destructive } from "@/lib/oclif/destructive";
-import { mutatedData } from "@/lib/oclif/envelope";
-import { type Refused, taken } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { dryRunResult } from "@/cli/core/crud/shared";
+import { mutatedData } from "@/cli/core/envelope";
+import { type Refused, taken } from "@/cli/core/flags";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { type Suggestion, WHAT_CHANGED } from "@/lib/suggestion";
-
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { ServerCommand } from "@/cli/commands/server-command";
+import { RemoveCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * The release `release revoke` revokes. The schema is the API spec's own, so a value that is not one is
@@ -62,7 +62,11 @@ const RELEASE_IN_USE_REFUSAL: Refusal = {
  * A release an origin still serves cannot be revoked; deploy another release
  * there or roll it back first. Revoking is idempotent and cannot be undone.
  */
-export default class ReleaseRevoke extends Destructive(ServerCommand(EnvironmentCommand)) {
+export default class ReleaseRevoke extends Telemetered(
+  RemoveCommand(
+    "Revoke the release without the confirmation prompt. Required when non-interactive.",
+  ),
+) {
   static override description = "Revoke a release so its content is never served again.";
   static override group = CommandGroups.releases;
   static override groupOrder = 4;
@@ -79,113 +83,107 @@ export default class ReleaseRevoke extends Destructive(ServerCommand(Environment
       description: "The release to revoke.",
     }),
   };
-  static override flags = {
-    force: Flags.boolean({
-      char: "f",
-      description:
-        "Revoke the release without the confirmation prompt. Required when non-interactive.",
-    }),
-  };
+  /**
+   * Says what revoking the release would do, without connecting or revoking.
+   *
+   * @param input - The flags and arguments of the run.
+   * @returns The dry run's envelope.
+   */
+  protected async preview({ args }: Admitted<typeof ReleaseRevoke>): Promise<CommandResult> {
+    const result = dryRunResult({
+      verb: "revoke",
+      topic: "release",
+      id: args.releaseId,
+      next: await this.realRun({ force: true }),
+    });
 
-  protected async execute({ args }: Admitted<typeof ReleaseRevoke>): Promise<JsonEnvelope> {
-    return this.emit(
-      await this.confirmed({
-        verb: "revoke",
-        name: `revoke ${args.releaseId}`,
-        message: async () => {
-          const { projectId, server } = await this.connect();
-          return `Revoke ${args.releaseId} in project ${projectId} on ${server.replace(/^https?:\/\//, "")} so its content can never be served again?`;
-        },
-        preview: () => {
-          const title = `Would revoke ${escapeControlCharacters(args.releaseId)} (dry run)`;
+    return {
+      ...result,
+      data: {
+        ...(result.data as object),
+        release_id: args.releaseId,
+      },
+    };
+  }
 
-          return {
-            status: "ok",
-            data: {
-              dry_run: true,
-              title,
-              release_id: args.releaseId,
-            },
-            summary: {
-              title,
-              sections: [],
-            },
-            next: {
-              commands: [
-                this.suggest({
-                  id: "release:revoke",
-                  args: { releaseId: args.releaseId },
-                  flags: { force: true },
-                }),
-              ],
-            },
-          };
-        },
-        prepare: () => {
-          return this.connect();
-        },
-        apply: async (consent, { client, projectId }) => {
-          const releaseService = new ReleaseService(consent.unlock(client), projectId);
-          const outcome = await releaseService.revoke(args.releaseId);
-          if (outcome.outcome === "in-use") {
-            const primaries = outcome.origins.filter((origin) => {
-              return origin.kind === "primary";
-            });
-            const previews = outcome.origins.filter((origin) => {
-              return origin.kind === "preview";
-            });
-            const steps: string[] = [];
-            const next: Suggestion[] = [];
-            if (primaries.length > 0) {
-              steps.push("put another release live on each primary origin");
-              next.push(
-                { id: "deploy", flags: { message: WHAT_CHANGED } },
-                { id: "deployment:rollback" },
-              );
-            }
-            if (previews.length > 0) {
-              steps.push("remove each preview");
-              next.push(
-                ...previews.slice(0, SERVED_NAMED).map((preview) => {
-                  return { id: "preview:rm", args: { url: preview.origin } } satisfies Suggestion;
-                }),
-              );
-            }
+  /**
+   * Revokes the release, once the person has agreed or forced it.
+   *
+   * @param input - The flags and arguments of the run.
+   * @returns The envelope of the revocation.
+   */
+  protected async apply({ args }: Admitted<typeof ReleaseRevoke>): Promise<CommandResult> {
+    return await this.confirmed({
+      verb: "revoke",
+      name: `revoke ${args.releaseId}`,
+      message: async () => {
+        return `Revoke ${args.releaseId} in ${await this.projectOnServer()} so its content can never be served again?`;
+      },
+      apply: async (consent) => {
+        const releaseService = await this.service(ReleaseService, consent);
+        const outcome = await releaseService.revoke(args.releaseId);
+        if (outcome.outcome === "in-use") {
+          const primaries = outcome.origins.filter((origin) => {
+            return origin.kind === "primary";
+          });
+          const previews = outcome.origins.filter((origin) => {
+            return origin.kind === "preview";
+          });
+          const steps = [
+            ...(primaries.length > 0 ? ["put another release live on each primary origin"] : []),
+            ...(previews.length > 0 ? ["remove each preview"] : []),
+          ];
+          const next: Suggestion[] = [
+            ...(primaries.length > 0
+              ? [
+                  {
+                    id: "deploy",
+                    flags: { message: WHAT_CHANGED },
+                  } satisfies Suggestion,
+                  { id: "deployment:rollback" } satisfies Suggestion,
+                ]
+              : []),
+            ...previews.slice(0, SERVED_NAMED).map((preview) => {
+              return {
+                id: "preview:rm",
+                args: { url: preview.origin },
+              } satisfies Suggestion;
+            }),
+          ];
 
-            const named = outcome.origins.slice(0, SERVED_NAMED).map((origin) => {
-              return `${origin.origin} (${origin.kind}, ${origin.deployment_id})`;
-            });
-            const rest = outcome.origins.length - named.length;
-            const served = rest > 0 ? `${named.join("; ")}; and ${rest} more` : named.join("; ");
+          const named = outcome.origins.slice(0, SERVED_NAMED).map((origin) => {
+            return `${origin.origin} (${origin.kind}, ${origin.deployment_id})`;
+          });
+          const rest = outcome.origins.length - named.length;
+          const served = rest > 0 ? `${named.join("; ")}; and ${rest} more` : named.join("; ");
 
-            throw refusalError(
-              RELEASE_IN_USE_REFUSAL,
-              {
-                served,
-                steps: steps.join(" and "),
-                release: args.releaseId,
-                origins: outcome.origins,
-              },
-              { next },
-            );
-          }
-          const { release } = outcome;
-          const title = `Revoked ${escapeControlCharacters(release.id)}`;
+          throw refusalError(
+            RELEASE_IN_USE_REFUSAL,
+            {
+              served,
+              steps: steps.join(" and "),
+              release: args.releaseId,
+              origins: outcome.origins,
+            },
+            { next },
+          );
+        }
+        const { release } = outcome;
+        const title = `Revoked ${escapeControlCharacters(release.id)}`;
 
-          return {
-            status: "ok",
-            data: {
-              title,
-              ...mutatedData({ release_id: release.id }, "revoked"),
-              revoked_at: release.revoked_at,
-            },
-            summary: {
-              title,
-              sections: [],
-            },
-          };
-        },
-      }),
-    );
+        return {
+          status: "ok",
+          data: {
+            title,
+            ...mutatedData({ release_id: release.id }, "revoked"),
+            revoked_at: release.revoked_at,
+          },
+          summary: {
+            title,
+            sections: [],
+          },
+        };
+      },
+    });
   }
 }

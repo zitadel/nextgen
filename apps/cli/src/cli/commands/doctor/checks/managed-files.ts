@@ -149,15 +149,15 @@ export class ManagedFilesCheck implements SanityCheck {
       );
     }
     if (unverifiable.length > 0) {
+      const eachReasonOnce = [
+        ...new Set(
+          unverifiable.map((s) => {
+            return s.reason ? `${s.path} (${s.reason})` : s.path;
+          }),
+        ),
+      ];
       warnings.push(
-        // Wirings in one file share its parse error: say each reason once.
-        `unverifiable managed config wiring (manual review required): ${[
-          ...new Set(
-            unverifiable.map((s) => {
-              return s.reason ? `${s.path} (${s.reason})` : s.path;
-            }),
-          ),
-        ].join(", ")}`,
+        `unverifiable managed config wiring (manual review required): ${eachReasonOnce.join(", ")}`,
       );
     }
     for (const leftover of removable) {
@@ -196,6 +196,20 @@ export class ManagedFilesCheck implements SanityCheck {
    * repair also materializes the manifest from the marker-bearing files now
    * on disk, completing the migration ADR 042 promises — adopted files stay
    * the user's and are not recorded.
+   *
+   * A pristine retired alternate request boundary (hash-proven CLI bytes, such
+   * as Next 15's middleware.ts after an upgrade) is removed so the current
+   * boundary can be installed without the framework rejecting the pair. A
+   * user-modified or adopted alternate is a conflict: it stays, and the current
+   * boundary is excluded from the repair, since creating proxy.ts beside an
+   * edited middleware.ts would break the build outright. A dry run deletes
+   * nothing and keeps the exclusion, so the preview stays safe. A conditional
+   * file (one the plan writes only on an app setup created) absent before the
+   * repair and present after it is one the repair wrote: a template added since
+   * this app's setup, such as the route layouts. In the manifest, a retired
+   * entry whose file stays absent is dropped, and a path the repair newly
+   * introduced is adopted with its class and on-disk hash, a conditional one
+   * only when this repair wrote it.
    */
   async fix(ctx: CheckContext): Promise<void> {
     const manifest = await Orca.readManifest(ctx.cwd);
@@ -206,13 +220,6 @@ export class ManagedFilesCheck implements SanityCheck {
       framework: patchCtx.framework,
       rendererId: patchCtx.rendererId,
     });
-    // Boundary migration: a *pristine* retired alternate (hash-proven CLI
-    // bytes, e.g. Next 15's middleware.ts after an upgrade) is removed so the
-    // current boundary can be installed without the framework rejecting the
-    // pair. A user-modified or adopted alternate is a conflict: it stays, and
-    // the current boundary is excluded from the repair — creating proxy.ts
-    // beside an edited middleware.ts would break the build outright. Dry-run
-    // deletes nothing and keeps the exclusion, so the preview stays safe.
     const boundaries = await detectBoundaryConflicts(actions, ctx.cwd, manifest);
     const excludePaths = boundaries
       .filter((b) => {
@@ -230,9 +237,6 @@ export class ManagedFilesCheck implements SanityCheck {
         }
       }
     }
-    // A conditional file (one the plan writes only on an app setup created)
-    // absent now and present after the repair is one the repair wrote: a
-    // template added since this app's setup, such as the route layouts.
     const conditional = new Set(actions.conditionalFiles ?? []);
     const conditionalAbsent: string[] = [];
     for (const path of conditional) {
@@ -263,15 +267,14 @@ export class ManagedFilesCheck implements SanityCheck {
     if (missingBefore.length === 0 && removed.length === 0 && conditionalWritten.size === 0) {
       return;
     }
-    // A retired entry whose file stays absent is dropped, and a path the repair
-    // newly introduced is adopted with its class and on-disk hash, a conditional
-    // one only when this repair wrote it.
     const current = new Set(actions.markedFiles);
     const files: Record<string, ScaffoldFileEntry> = {};
     for (const [path, entry] of Object.entries(manifest.files)) {
       const contents = await readIfReadable(join(ctx.cwd, path));
-      if (contents === undefined && (!current.has(path) || conditional.has(path))) {
-        continue; // retired by a template migration and gone from disk
+      const retiredAndGone =
+        contents === undefined && (!current.has(path) || conditional.has(path));
+      if (retiredAndGone) {
+        continue;
       }
       files[path] =
         contents !== undefined && missingBefore.includes(path)
@@ -409,7 +412,7 @@ async function materializeManifest(
       written: marked,
     });
   } catch {
-    // state.json unreadable or the write raced — stays in template mode.
+    return;
   }
 }
 

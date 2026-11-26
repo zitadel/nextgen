@@ -2,7 +2,7 @@
 
 Integrates Zitadel auth into an Angular app.
 
-The detector requires `@angular/core` 17 or newer; older versions are refused.
+The detector requires `@angular/core` 19 or newer; older versions are refused.
 
 ## What it patches
 

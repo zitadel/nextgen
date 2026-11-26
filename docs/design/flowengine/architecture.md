@@ -167,12 +167,19 @@ Interface every `on_success` mutation satisfies. One implementation today:
 ### `FlowAuthAttemptService` (`internal/domain/flow_auth_attempt.go`)
 
 A narrow interface over the auth-attempt service. The state machine sees
-`Start`, `SubmitIdentifier`, `SubmitPassword`, the two-phase passkey legs
-(`IssuePasskeyChallenge`/`SubmitPasskey`), the two-phase registration legs
-(`IssuePasskeyRegistrationChallenge`/`SubmitPasskeyRegistration`, ADR 056),
-and `Handoff`. Identifier no-match and password rejection both surface as
+`Start`, `SubmitIdentifier`, `SubmitPassword`, the two legs of every
+two-phase ceremony (`IssueChallenge`/`VerifyChallenge`), and `Handoff`.
+Identifier no-match and password rejection both surface as
 `ErrAuthAttemptProofRejected`, which the state machine routes
 (`user_not_found`) or re-renders (step error) accordingly.
+
+`IssueChallenge` takes a `FlowChallengeParams` value, one type per check
+(`FlowPasskeyChallengeParams`, `FlowPasskeyRegistrationChallengeParams`, ADR
+056); `VerifyChallenge` takes the check type and the client's proof bytes. A
+new ceremony adds a params type and an entry in the engine's
+`challengeMethods` table (`flowengine/challenge.go`), which declares the
+check, the step error of a rejected or stale proof, and whether the ceremony
+binds its user at issue, may create it, or cannot be backed out of.
 
 The registration verify leg is atomic in the attempt service: for a
 provisional ceremony it applies the create-user actions (built by a factory
