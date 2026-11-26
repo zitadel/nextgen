@@ -11,7 +11,7 @@
 >
 > **Amended 2026-11-25:** an agent is an application, and a client can act as
 > itself or for a user; there is no separate agent kind, and no impersonation
-> ([ADR 033 §3](../../adrs/033-internal-permission-management.md#3-delegation)).
+> ([ADR 082 §7](../../adrs/082-oauth-and-oidc-server.md#7-tokens)).
 >
 > 1. The authorization principal type `agent` becomes `client`. In the event
 >    `actor_type` and the three `*_by_type` enums, `agent` is removed and

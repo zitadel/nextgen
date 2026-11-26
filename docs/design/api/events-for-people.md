@@ -189,7 +189,8 @@ With it:
   what a key did, with no index on `token_id`.
 
 **LOCKED (2026-11-25): a call made for a user names who acts**
-([ADR 033 §3](../../adrs/033-internal-permission-management.md#3-delegation)).
+([ADR 082 §7](../../adrs/082-oauth-and-oidc-server.md#7-tokens);
+[ADR 033 §5](../../adrs/033-internal-permission-management.md#5-audit-trail-and-grant-provenance)).
 Its events map the delegation onto these fields:
 
 | Field | Holds |

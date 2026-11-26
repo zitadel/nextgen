@@ -4,12 +4,14 @@
 > **Date:** 2026-07-09
 > **Context:** Authorization for Zitadel-owned internal resources (projects, teams, users, apps, flows, policies) and agent delegation. Builds on [ADR 032](032-permission-catalogs.md).
 >
-> **Amended 2026-11-25** (§3, §5): every call made for a user names who acts,
-> and no token hides its actor. A delegation is a user's consent to a client,
-> a token exchange, or an operator's act-as that the user did not grant, with
-> one `delegation_id` that the consent, the tokens and every event share.
-> Consent is its own record, not an assignment. There is no impersonation. An
-> agent is an application, and its client is the principal.
+> **Amended 2026-11-25** (§3, §5): how the management API resolves and records
+> a call made for a user. The rule for the tokens themselves, that each names
+> who acts and none hides its actor, is
+> [ADR 082 §7](082-oauth-and-oidc-server.md#7-tokens)'s and holds for every
+> project. Here: consent is its own record, not an assignment; an acting
+> principal never gets a copy of the user's permissions; a delegated event
+> records the actor, the user, the grantor and the `delegation_id`. An agent
+> is an application, and its client is the principal.
 
 ## Introduction
 
@@ -150,15 +152,13 @@ storage/residency invariant, not bypass it.
 
 ### 3. Delegation
 
-**Amended 2026-11-25.** Every call made for a user names who acts: a token
-issued for a user on behalf of another principal carries `act`, and Zitadel
-issues no token that hides its actor. A delegation is a user's consent to a
-client, a token exchange, or an operator's act-as that the user did not
-grant. It has one `delegation_id`, which the consent record, the tokens and
-every event share.
-
-There is no impersonation. A support or admin act-as is a delegation the user
-did not grant, named and recorded as one.
+**Amended 2026-11-25.** What a delegation is, and what a token issued under
+one carries, is decided once for every project in
+[ADR 082 §7](082-oauth-and-oidc-server.md#7-tokens): the token names who acts
+in `act`, the delegation has one `delegation_id`, and there is no
+impersonation. This section says what the management API does with such a
+call. What a customer's API does with one is
+[ADR 034](034-external-permission-management.md#open-questions)'s.
 
 Consent is a record of its own per user, client and protected API, holding a
 set of scopes ([ADR 082 §8](082-oauth-and-oidc-server.md#8-consent)). It is
@@ -168,10 +168,6 @@ column cannot hold it. Assignment rows reference a `delegation_id` only for
 grants on Zitadel's own API; those are stored with an explicit grantor,
 expiry/revocation state, and scope (the general storage shape from
 [ADR 032 §3](032-permission-catalogs.md#3-canonical-relational-storage)).
-
-Whether a first-hop token, which a client obtains itself with the
-authorization code grant, carries `act` beside `client_id` is
-[ADR 082's open question 7](082-oauth-and-oidc-server.md#open-questions).
 
 An acting principal never receives permissions by copying all permissions
 from the user it acts for. The resolver must be able to explain which

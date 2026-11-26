@@ -125,3 +125,20 @@ they apply to both catalogs, not just this one.
    external permissions.
 2. Design relational migrations for app-group catalog tables and app
    grants.
+
+## Open questions
+
+Added 2026-11-25. This ADR binds users and teams to apps and predates the
+rule that a token issued for a user names who acts
+([ADR 082 §7](082-oauth-and-oidc-server.md#7-tokens)). It does not yet say
+what that rule means for a customer's app:
+
+1. Whether a client can hold an app grant, so that an agent acting as itself
+   gets permission claims, or app grants stay for users and teams.
+2. Which permission claims a token carries when a client acts for a user: the
+   user's app grants as they are, or those grants narrowed by the scopes the
+   user consented to
+   ([ADR 082 §8](082-oauth-and-oidc-server.md#8-consent)). On Zitadel's own
+   API an acting principal never gets a copy of the user's permissions
+   ([ADR 033 §3](033-internal-permission-management.md#3-delegation));
+   whether a customer's app gets the same guarantee is not decided.

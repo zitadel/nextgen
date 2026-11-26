@@ -100,7 +100,7 @@ How a permission check is framed and resolved. Long-form in [ADR 032](../adrs/03
 | **principal** | Whatever presents a credential to be checked in a permission decision: a user token, a client (an agent acts through its application's client), a service token (`sk_proj_…`, `sk_team_…`), or an origin-bound browser nonce. |
 | **scope** | The resolved project/team/resource boundary a permission check runs against, produced by `resource_scope_index` before authorization runs. |
 | **`resource_scope_index`** | A global lookup table mapping a globally-addressable resource id to its project/team scope, consulted by middleware before authorization runs. See [`api/url-architecture.md`](api/url-architecture.md). |
-| **delegation** | Authority to act for a user: the user's consent to a client, a token exchange, or an operator's act-as that the user did not grant. It has one `delegation_id` that the consent, the tokens and every event share, and no token hides who acts. Distinct from silently inheriting everything the user could do; there is no impersonation. See [ADR 033 §3](../adrs/033-internal-permission-management.md#3-delegation). |
+| **delegation** | Authority to act for a user: the user's consent to a client, a token exchange, or an operator's act-as that the user did not grant. It has one `delegation_id` that the consent, the tokens and every event share, and no token hides who acts. Distinct from silently inheriting everything the user could do; there is no impersonation. See [ADR 082 §7](../adrs/082-oauth-and-oidc-server.md#7-tokens) for the rule, and [ADR 033 §3](../adrs/033-internal-permission-management.md#3-delegation) for what the management API does with a delegated call. |
 
 ---
 
