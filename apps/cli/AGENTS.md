@@ -358,6 +358,12 @@
 - Use no lookup table for errors; duplicate the refusal instead.
 - Import file-system calls from `@/lib/fs`, never from `node:fs/promises`; catch
   `FsNotFoundError` etc. by class; only `src/lib/fs` reads a Node error's code.
+- The only other places that read a foreign error's `code` or `reason` are
+  boundaries that turn it into one of our classes in the same function:
+  `signalProcess` in `binary-launcher.ts`, `translateFailure` in
+  `src/lib/backend/client.ts`, the injected `FileSystem` in
+  `src/lib/zitadel/storage/backend/store.ts` and the docker spawn in
+  `src/cli/commands/doctor/checks/local-runtime.ts`.
 - Let an error nobody anticipated bubble up unwrapped.
 
 ## Telemetry
