@@ -184,7 +184,8 @@ stateDiagram-v2
   the project (amendment of 2026-11-25), then calls the grant service with
   the accepting user and the relation. Grants are unique per user and
   relation, so an expired grant of that relation still holds the binding:
-  the grant service revokes it before it writes the new one.
+  the grant service revokes it, without re-reading its expiry, before it
+  writes the new one.
 - **Provenance:** the grant row doesn't point back to the invitation (ADR 054
   §6 keeps provenance in events). The grant service emits `authz.granted`,
   and `authz.revoked` for a replaced expired grant. They share
@@ -423,11 +424,9 @@ This refines §3's lookup and §4's adapter and self-accept rules (#2853).
   opens its own transaction, and transactions don't nest, so the
   `project_member` adapter calls `WriteUserGrant`, which runs in the
   invitation's transaction.
-- **The leftover-grant rule lives in that method, not in the adapter.** On
-  Postgres a unique violation aborts the transaction, so a collision can't be
-  read as success afterwards. `WriteUserGrant` revokes a leftover grant of
-  the same relation before it writes, and the adapter only maps the
-  invitation's type to the call.
+- **§4's leftover-grant revoke lives in that method, not in the adapter,**
+  because on Postgres a unique violation aborts the transaction. The adapter
+  only maps the invitation's type to the call.
 - **Accept changes the status before it grants.** The guarded status change
   locks the row, so of two racing accepts the loser misses it and gets
   `404 inv.not_found`, before any grant is written.
@@ -550,15 +549,10 @@ This refines §4's `project_member` adapter for a user who already has access
   (ADR 075). An expired grant gives none, so accept still renews it.
 - **The check belongs to the type's adapter**, like the grant. For
   `project_member` it asks the resolver for the user's strongest project role,
-  the same question accept asks about the inviter (§10). The service reaches
-  the resolver through an injected check until #3362 lets it call the
-  resolver directly. `team_member` will ask about team membership. Accept and decline
-  run it after the project lock, so it sees a grant that a racing accept or
-  administrator wrote.
+  the same question accept asks about the inviter (§10). `team_member` will
+  ask about team membership. Accept and decline run it after the project
+  lock, so it sees a grant that a racing accept or administrator wrote.
 - **Lookup returns the same answer** as `membership: { relation }` on the
   `project_member` variant, or null, so the accept page can show it in place
   of Accept and Decline. Each type's variant carries its own, so access to a
   project never blocks a team invitation.
-- **The grant call only writes.** The redeemer holds no unexpired grant, so
-  `WriteUserGrant` revokes a leftover grant of the same relation without
-  re-reading its expiry against another clock.

@@ -34,9 +34,9 @@ type Request struct {
 	// default it to ProjectID (the target). SQL still falls back via
 	// AuthzCheckParams.HomeProjectID() when unset.
 	HomeProjectID string
-	// PlatformProjectID is the deployment's platform project, set by the
-	// gate when the credential is a user homed there (ADR 075). It adds the
-	// platform operator path; empty leaves it out.
+	// PlatformProjectID is the deployment's platform project (ADR 075). It
+	// adds the platform operator path, which applies only to a user homed
+	// there; empty leaves it out.
 	PlatformProjectID string
 }
 

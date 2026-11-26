@@ -409,7 +409,7 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
 			return domain.ErrInvitationSelfAccept()
 		}
-		now, err = s.lockUnheld(ctx, stmts, entity, userID)
+		now, err = s.lockForRedeem(ctx, stmts, entity, userID)
 		if err != nil {
 			return err
 		}
@@ -484,12 +484,9 @@ func (s *InvitationService) heldRole(ctx context.Context, stmts AllStatements, e
 	return s.projectRole(ctx, stmts, entity.ProjectID, userID)
 }
 
-// lockUnheld is what accept and decline run before the status change: it locks
-// the project, which serializes them with racing accepts and comes before the
-// row as in create, then refuses a user who already has access, so the
-// invitation stays pending for the person it was meant for. The lock can wait,
-// so it returns the time the guarded change rechecks expiry at.
-func (s *InvitationService) lockUnheld(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (time.Time, error) {
+// lockForRedeem locks the project, as create does, then refuses a user who
+// already has access. It returns the time read after the lock, which can wait.
+func (s *InvitationService) lockForRedeem(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (time.Time, error) {
 	if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
 		return time.Time{}, err
 	}
@@ -520,8 +517,7 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
 			return domain.ErrInvitationSelfReject()
 		}
-		// A member's decline would spend the link meant for someone else.
-		now, err = s.lockUnheld(ctx, stmts, entity, userID)
+		now, err = s.lockForRedeem(ctx, stmts, entity, userID)
 		if err != nil {
 			return err
 		}

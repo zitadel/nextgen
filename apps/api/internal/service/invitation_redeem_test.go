@@ -452,18 +452,11 @@ func TestInvitationService_Reject(t *testing.T) {
 			locked = time.Now()
 			return nil
 		})
-		s.EXPECT().ChangeInvitationStatus(gomock.Any(), invitationProjectID, entity.ID, domain.InvitationStatusRejected, "user_colleague", gomock.Any()).DoAndReturn(
-			func(_ context.Context, _, _ string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error) {
-				assert.False(t, now.Before(locked), "the status change got a time read before the lock")
-				changed := *entity
-				changed.Status = status
-				changed.RespondedBy = &respondedBy
-				changed.RespondedAt = &now
-				return &changed, nil
-			})
+		expectStatusChange(s, entity, domain.InvitationStatusRejected, "user_colleague")
 
-		_, err := svc.Reject(t.Context(), invitationToken, "user_colleague")
+		got, err := svc.Reject(t.Context(), invitationToken, "user_colleague")
 		require.NoError(t, err)
+		assert.False(t, got.RespondedAt.Before(locked), "the status change got a time read before the lock")
 	})
 
 	t.Run("the inviter declining their own invitation", func(t *testing.T) {

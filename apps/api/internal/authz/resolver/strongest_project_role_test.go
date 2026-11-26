@@ -3,6 +3,7 @@ package resolver_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,7 @@ func TestStrongestProjectRole(t *testing.T) {
 	t.Parallel()
 
 	boom := errors.New("boom")
+	viewer, editor, admin := domain.ProjectRoleViewer, domain.ProjectRoleEditor, domain.ProjectRoleAdmin
 	tests := []struct {
 		name     string
 		granted  []string
@@ -27,12 +29,12 @@ func TestStrongestProjectRole(t *testing.T) {
 		asked []string
 		want  string
 	}{
-		{name: "no access costs one check", asked: []string{"viewer"}},
-		{name: "viewer", granted: []string{"viewer"}, asked: []string{"viewer", "editor"}, want: "viewer"},
-		{name: "editor", granted: []string{"viewer", "editor"}, asked: []string{"viewer", "editor", "admin"}, want: "editor"},
-		{name: "admin", granted: []string{"viewer", "editor", "admin"}, asked: []string{"viewer", "editor", "admin"}, want: "admin"},
-		{name: "platform operator holds admin", operator: true, asked: []string{"viewer", "editor", "admin"}, want: "admin"},
-		{name: "check error", err: boom, asked: []string{"viewer"}},
+		{name: "no access costs one check", asked: []string{viewer}},
+		{name: "viewer", granted: []string{viewer}, asked: []string{viewer, editor}, want: viewer},
+		{name: "editor", granted: []string{viewer, editor}, asked: []string{viewer, editor, admin}, want: editor},
+		{name: "admin", granted: []string{viewer, editor, admin}, asked: []string{viewer, editor, admin}, want: admin},
+		{name: "platform operator holds admin", operator: true, asked: []string{viewer, editor, admin}, want: admin},
+		{name: "check error", err: boom, asked: []string{viewer}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -47,12 +49,8 @@ func TestStrongestProjectRole(t *testing.T) {
 					if tt.err != nil {
 						return false, false, tt.err
 					}
-					for _, role := range tt.granted {
-						if role == params.Relation {
-							return true, true, nil
-						}
-					}
-					return false, false, nil
+					granted := slices.Contains(tt.granted, params.Relation)
+					return granted, granted, nil
 				}).AnyTimes()
 			stmts.EXPECT().CheckPlatformOperator(gomock.Any(), gomock.Any()).Return(tt.operator, nil).AnyTimes()
 
