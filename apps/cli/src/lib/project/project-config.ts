@@ -1,8 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { isErrno } from "@/lib/errno";
-import { pathExistsStrict } from "@/lib/fs";
+import { FsNotFoundError, pathExistsStrict, readFile } from "@/lib/fs";
 import { isObject, parseJsonObject } from "@/lib/json";
 
 import { ProjectFileMissingError } from "./errors";
@@ -49,7 +47,7 @@ export class ProjectConfig {
         parseJsonObject(await readFile(join(cwd, "zitadel.json"), "utf8"), "zitadel.json"),
       );
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         throw new ProjectFileMissingError("zitadel.json was not found", error);
       }
       throw error;

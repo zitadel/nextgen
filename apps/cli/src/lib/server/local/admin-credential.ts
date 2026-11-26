@@ -1,12 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
-import { isErrno } from "@/lib/errno";
+import { FsNotFoundError, mkdir, readFile, rename, writeFile } from "@/lib/fs";
 import { errorMessage } from "@/lib/errors";
 import { LocalServerInvalidError } from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
@@ -81,7 +80,7 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     // Only a missing file means `start` never created the admin. A file that
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return undefined;
     }
     if (error instanceof SyntaxError) {

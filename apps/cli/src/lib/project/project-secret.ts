@@ -1,8 +1,6 @@
-import { mkdir, readFile, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { isErrno } from "@/lib/errno";
-import { pathExistsStrict } from "@/lib/fs";
+import { FsNotFoundError, mkdir, pathExistsStrict, readFile, rename } from "@/lib/fs";
 import { parseJsonObject, stableStringify } from "@/lib/json";
 
 import { ProjectFileMissingError, ProjectInvalidError } from "./errors";
@@ -99,7 +97,7 @@ export class ProjectSecret {
       }
       return new ProjectSecret(cwd, secret as ProjectSecretData);
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         throw new ProjectFileMissingError(".zitadel/secret was not found", error);
       }
       throw error;

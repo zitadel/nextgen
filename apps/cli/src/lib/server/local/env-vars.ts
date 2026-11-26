@@ -15,11 +15,10 @@
  * stays on disk. Values travel through the child's environment, never argv,
  * so they do not show up in `ps -ef`, and only names are recorded or printed.
  */
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
-import { isErrno } from "@/lib/errno";
+import { FsNotFoundError, readFile } from "@/lib/fs";
 import { errorMessage } from "@/lib/errors";
 import { LocalServerInvalidError } from "@/lib/server/errors";
 import { isObject } from "@/lib/json";
@@ -106,7 +105,7 @@ const readEnvFile = async (path: string): Promise<Readonly<Record<string, string
       ),
     );
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return {};
     }
     throw new LocalServerInvalidError(`Cannot read ${path}: ${errorMessage(error)}`, error);
