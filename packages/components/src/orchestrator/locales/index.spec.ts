@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { de } from "./de.js";
 import { en } from "./en.js";
 import { it as italian } from "./it.js";
-import { builtinLocales, isHidden, loadLocale, localeFor, mergeLocale } from "./index.js";
+import { builtinLocales } from "../../locales.js";
+import { isHidden, loadLocale, localeFor, mergeLocale } from "./index.js";
 
 describe("built-in locale dictionaries", () => {
   it("keeps translated locale keys aligned with English", () => {
@@ -133,7 +134,7 @@ describe("localeFor", () => {
   };
 
   it("puts the integrator's English over the built-in English", () => {
-    expect(localeFor("en-US", locales, en)["identifier.title"]).toBe("Welcome back");
+    expect(localeFor("en-US", locales)["identifier.title"]).toBe("Welcome back");
   });
 
   it("keeps a built-in language's translations and fills its gaps with the integrator's English", () => {
@@ -144,35 +145,27 @@ describe("localeFor", () => {
   });
 
   it("gives a language with no built-in dictionary the integrator's English", () => {
-    const locale = localeFor("fr", locales, undefined);
+    const locale = localeFor("fr", locales);
 
     expect(locale["identifier.title"]).toBe("Welcome back");
     expect(locale["identifier.description"]).toBe(en["identifier.description"]);
   });
 
   it("puts a language's own entries over the integrator's English", () => {
-    const locale = localeFor(
-      "fr",
-      { ...locales, fr: { "identifier.title": "Bon retour" } },
-      undefined,
-    );
+    const locale = localeFor("fr", { ...locales, fr: { "identifier.title": "Bon retour" } });
 
     expect(locale["identifier.title"]).toBe("Bon retour");
     expect(locale["company-details.title"]).toBe("About your company");
   });
 
   it("drops the integrator's English provider wording when a language rewrites the description", () => {
-    const locale = localeFor(
-      "fr",
-      {
-        en: {
-          "password.description": "Enter your Acme password",
-          "password.description.sso": "Use your Acme password or Acme SSO",
-        },
-        fr: { "password.description": "Saisissez votre mot de passe Acme" },
+    const locale = localeFor("fr", {
+      en: {
+        "password.description": "Enter your Acme password",
+        "password.description.sso": "Use your Acme password or Acme SSO",
       },
-      undefined,
-    );
+      fr: { "password.description": "Saisissez votre mot de passe Acme" },
+    });
 
     expect(locale).not.toHaveProperty("password.description.sso");
   });

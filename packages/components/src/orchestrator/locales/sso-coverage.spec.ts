@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createLiquidEngine } from "../liquid.js";
-import { builtinLocales } from "./index.js";
+import { builtinLocales } from "../../locales.js";
 
 /**
  * The steps `zitadel auth-method sso enable` adds to a login flow, as the

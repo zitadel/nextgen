@@ -56,10 +56,13 @@ The private `resolveLocale()` method determines the effective dictionary:
 
 ### Built-in locale registry
 
-`packages/components/src/orchestrator/locales/index.ts` exports a
-`builtinLocales` map (`{ en, de, it }`) and the individual dictionaries. New
-languages are added by creating a `<code>.ts` file in the `locales/`
-directory and registering it in the map.
+`packages/components/src/orchestrator/locales/index.ts` bundles `en` and
+loads every other built-in translation with a dynamic import when the page
+shows that language (`loadLocale`), so a page downloads only the translation
+it renders. New languages are added by creating a `<code>.ts` file in the
+`locales/` directory and registering its loader in `TRANSLATIONS`. The
+dictionaries as values, and the `builtinLocales` map, are exported from
+`@zitadel/components/locales` for an app that extends one.
 
 ### What the SDK does not do
 

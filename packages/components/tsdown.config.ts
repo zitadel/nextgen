@@ -73,10 +73,7 @@ export default defineConfig([
       avatar: "src/avatar.ts",
       "tokens/index": "src/tokens/index.ts",
       "orchestrator/index": "src/orchestrator/index.ts",
-      // Their own files, so a page loads only the translation it shows
-      // (`loadBuiltinLocale`) while the root still re-exports them.
-      "locales/de": "src/orchestrator/locales/de.ts",
-      "locales/it": "src/orchestrator/locales/it.ts",
+      locales: "src/locales.ts",
       // Not a public subpath. As its own entry it stays a separate file that
       // the entries import ahead of the chunks that load `lit`; inlined, it
       // would land below the hoisted `import "lit"` and run too late (see

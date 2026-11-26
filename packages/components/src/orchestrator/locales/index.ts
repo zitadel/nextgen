@@ -1,20 +1,15 @@
 /**
- * Built-in locale registry.
+ * Locale resolution for the login widgets.
  *
- * Re-exports the individual dictionaries and provides a `builtinLocales`
- * map so the orchestrator can resolve a BCP 47 language tag to the
- * matching dictionary at runtime.
+ * English is bundled and is the fallback for every language. The other
+ * built-in translations load on demand ({@link loadLocale}), so a page
+ * downloads only the one it shows. An app that wants a translation as a
+ * value, to extend it, imports it from `@zitadel/components/locales`.
  */
 export { en, type Locale } from "./en.js";
-export { de } from "./de.js";
-export { it } from "./it.js";
 export { businessLocales } from "./business.js";
 
 import { en, type Locale } from "./en.js";
-import { de } from "./de.js";
-import { it } from "./it.js";
-
-export const builtinLocales: Readonly<Record<string, Locale>> = { en, de, it };
 
 /**
  * The variant of a step's description or notice that the step asks for when
@@ -80,8 +75,8 @@ export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
  */
 export function localeFor(
   tag: string,
-  locales: Readonly<Record<string, Partial<Locale>>> | undefined,
-  builtin: Locale | undefined,
+  locales?: Readonly<Record<string, Partial<Locale>>>,
+  builtin?: Locale,
 ): Locale {
   const language = primaryLanguage(tag);
   const custom = locales?.[language];
@@ -113,8 +108,7 @@ export function isHidden(
 }
 
 /**
- * The built-in translations besides English, which is bundled. Each loads with
- * a dynamic import, so a page downloads only the one it shows.
+ * The built-in translations besides English, by primary language subtag.
  */
 const TRANSLATIONS: Readonly<Record<string, () => Promise<Locale>>> = {
   de: async () => (await import("./de.js")).de,

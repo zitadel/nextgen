@@ -29,9 +29,6 @@ export {
 export { TEMPLATE_NAMES } from "./orchestrator/template-names.js";
 export {
   en,
-  de,
-  it,
-  builtinLocales,
   businessLocales,
   type Locale,
 } from "./orchestrator/locales/index.js";

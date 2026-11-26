@@ -4899,30 +4899,6 @@
         },
         {
           "kind": "js",
-          "name": "de",
-          "declaration": {
-            "name": "de",
-            "module": "./orchestrator/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "./orchestrator/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "builtinLocales",
-          "declaration": {
-            "name": "builtinLocales",
-            "module": "./orchestrator/index.js"
-          }
-        },
-        {
-          "kind": "js",
           "name": "businessLocales",
           "declaration": {
             "name": "businessLocales",
@@ -5732,6 +5708,71 @@
           "declaration": {
             "name": "nextUid",
             "module": "src/internal/unique-id.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/locales.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "builtinLocales",
+          "type": {
+            "text": "Readonly<Record<string, Locale>>"
+          },
+          "default": "{ en, de, it }",
+          "description": "Every built-in dictionary, by primary language subtag."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "businessLocales",
+          "declaration": {
+            "name": "businessLocales",
+            "module": "./orchestrator/locales/business.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "de",
+          "declaration": {
+            "name": "de",
+            "module": "src/locales.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "en",
+          "declaration": {
+            "name": "en",
+            "module": "src/locales.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "it",
+          "declaration": {
+            "name": "it",
+            "module": "src/locales.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "Locale",
+          "declaration": {
+            "name": "Locale",
+            "module": "src/locales.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "builtinLocales",
+          "declaration": {
+            "name": "builtinLocales",
+            "module": "src/locales.ts"
           }
         }
       ]
@@ -6567,30 +6608,6 @@
         },
         {
           "kind": "js",
-          "name": "de",
-          "declaration": {
-            "name": "de",
-            "module": "./locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "./locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "builtinLocales",
-          "declaration": {
-            "name": "builtinLocales",
-            "module": "./locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
           "name": "businessLocales",
           "declaration": {
             "name": "businessLocales",
@@ -6968,14 +6985,6 @@
       "declarations": [
         {
           "kind": "variable",
-          "name": "builtinLocales",
-          "type": {
-            "text": "Readonly<Record<string, Locale>>"
-          },
-          "default": "{ en, de, it }"
-        },
-        {
-          "kind": "variable",
           "name": "CUSTOM_IDENTIFIER_SUFFIX",
           "type": {
             "text": "string"
@@ -7025,15 +7034,17 @@
             },
             {
               "name": "locales",
+              "optional": true,
               "type": {
-                "text": "Readonly<Record<string, Partial<Locale>>> | undefined"
+                "text": "Readonly<Record<string, Partial<Locale>>>"
               },
               "description": "The integrator's dictionaries, by primary subtag."
             },
             {
               "name": "builtin",
+              "optional": true,
               "type": {
-                "text": "Locale | undefined"
+                "text": "Locale"
               },
               "description": "The built-in dictionary for the tag's language, which the\n *   caller loads ({@link loadLocale}); `undefined` for English or a language with none.\n * "
             }
@@ -7116,34 +7127,10 @@
         },
         {
           "kind": "js",
-          "name": "de",
-          "declaration": {
-            "name": "de",
-            "module": "./de.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "./it.js"
-          }
-        },
-        {
-          "kind": "js",
           "name": "businessLocales",
           "declaration": {
             "name": "businessLocales",
             "module": "./business.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "builtinLocales",
-          "declaration": {
-            "name": "builtinLocales",
-            "module": "src/orchestrator/locales/index.ts"
           }
         },
         {
@@ -10815,30 +10802,6 @@
           "name": "en",
           "declaration": {
             "name": "en",
-            "module": "./orchestrator/locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "de",
-          "declaration": {
-            "name": "de",
-            "module": "./orchestrator/locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "./orchestrator/locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "builtinLocales",
-          "declaration": {
-            "name": "builtinLocales",
             "module": "./orchestrator/locales/index.js"
           }
         },

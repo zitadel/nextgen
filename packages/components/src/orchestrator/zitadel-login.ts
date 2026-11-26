@@ -597,9 +597,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * the `locales` map merged over the built-in copy ({@link localeFor}).
    */
   private resolveLocale(): Locale {
-    return (
-      this.rendering.value?.locale ?? localeFor(this.resolveLanguage(), this.locales, undefined)
-    );
+    return this.rendering.value?.locale ?? localeFor(this.resolveLanguage(), this.locales);
   }
 
   /**

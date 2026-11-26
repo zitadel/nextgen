@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createLiquidEngine } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
-import { builtinLocales } from "./locales/index.js";
+import { builtinLocales } from "../locales.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 

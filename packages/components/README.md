@@ -276,7 +276,7 @@ Do not build on server-rendered markup that carries an object-valued prop. React
 
 ### Edge runtimes
 
-Cloudflare Workers and Vercel Edge have no DOM, and bundlers target them with the `browser` condition next to `workerd`, `worker` or `edge-light`, so Lit's browser build throws `HTMLElement is not defined` as soon as it is imported. When one of those conditions is active together with `browser`, the package root therefore resolves to a build that never loads Lit and defines no element. It keeps what does not need one: `businessLocales` and the other locales, `tokens` and `cssVars`, the branding helpers, the attribution markup and the flow API client. The elements, their manifests, the sanitiser and `ThemeController` are not in it, so a bundle for those runtimes fails at build time if it imports one. The other entries (`./atoms`, `./manifests`, `./orchestrator`, `./standalone`) are unchanged and still need a DOM, as does the root under `browser` alone. Without `browser`, `workerd`, `worker` and `edge-light` resolve to the full root as before.
+Cloudflare Workers and Vercel Edge have no DOM, and bundlers target them with the `browser` condition next to `workerd`, `worker` or `edge-light`, so Lit's browser build throws `HTMLElement is not defined` as soon as it is imported. When one of those conditions is active together with `browser`, the package root therefore resolves to a build that never loads Lit and defines no element. It keeps what does not need one: `en` and `businessLocales`, `tokens` and `cssVars`, the branding helpers, the attribution markup and the flow API client. The elements, their manifests, the sanitiser and `ThemeController` are not in it, so a bundle for those runtimes fails at build time if it imports one. The other entries (`./atoms`, `./manifests`, `./orchestrator`, `./standalone`) are unchanged and still need a DOM, as does the root under `browser` alone. Without `browser`, `workerd`, `worker` and `edge-light` resolve to the full root as before.
 
 ## Element APIs
 
@@ -290,7 +290,7 @@ Cloudflare Workers and Vercel Edge have no DOM, and bundlers target them with th
 | `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
-| `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work. The `en` entries also fill whatever another language has no text for |
+| `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work. The `en` entries also fill whatever another language has no text for. The widget loads the built-in translation for the page's language itself; import one from `@zitadel/components/locales` only to extend it |
 | `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here, or back to the path in the page's `next` query parameter when that is a path on the page's origin: every server SDK's middleware sends a signed-out visit to a protected route to the login page with `?next=<path>`. A `next` that is a URL, starts with `//`, or holds a `\` or a control character is ignored |
 | `forcePostSignInUrl` / `force-post-sign-in-url` | `boolean` | Navigate to `post-sign-in-url` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh. Unset, `null` or `""` fall back to the `flow` query parameter. Every SDK's login wrapper takes it as `resumeFlowId` |
@@ -420,7 +420,7 @@ packages/components/
 │   │                       zl-sso-providers, zl-passkey + tests
 │   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, <zitadel-session>,
 │   │                       api-client, liquid, branding
-│   │   ├── locales/       bundled locales (en, de, it) + business copy
+│   │   ├── locales/       bundled en, on-demand de and it, business copy
 │   │   └── templates/     default.liquid (all steps) + layout-chrome.css
 │   ├── tokens/            re-export of @zitadel/design-tokens
 │   ├── styles/            shared host styles, focus ring, t() css-var bridge
