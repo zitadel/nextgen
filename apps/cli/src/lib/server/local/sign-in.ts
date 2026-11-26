@@ -131,7 +131,7 @@ async function signIn(
   });
   switch (identifier.outcome) {
     case "rejected":
-      throw adminNotFound();
+      throw new LocalServerDeniedError("The local server could not find the local admin");
     case "proved":
       break;
   }
@@ -149,16 +149,4 @@ async function signIn(
     handoffToken,
     publishableKey: runtime.publishable_key,
   };
-}
-
-/**
- * A rejected identifier usually means this server never imported the admin — a
- * data directory from before the local admin existed. But the server reports a
- * failed lookup with the same code, so the message names both causes, and the
- * command it suggests is the harmless one: the reset that fixes the first cause
- * deletes local data, so it stays a hint a person reads, never a next command
- * an agent runs.
- */
-function adminNotFound(): LocalServerDeniedError {
-  return new LocalServerDeniedError("The local server could not find the local admin");
 }

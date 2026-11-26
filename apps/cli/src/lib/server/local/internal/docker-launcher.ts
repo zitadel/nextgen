@@ -243,12 +243,24 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     try {
       result = await runDocker(args);
     } catch (error) {
-      throw dockerError(`Inspect Docker image ${image}`, error);
+      if (typeof error === "object" && error !== null && "stderr" in error) {
+        throw new LocalServerInvalidError(
+          `Inspect Docker image ${image} failed: ${String(error.stderr)}`,
+          error,
+        );
+      }
+      throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, error);
     }
     if (result.status === 0) {
       return "remote";
     }
-    throw dockerError(`Inspect Docker image ${image}`, result);
+    if (typeof result === "object" && result !== null && "stderr" in result) {
+      throw new LocalServerInvalidError(
+        `Inspect Docker image ${image} failed: ${String(result.stderr)}`,
+        result,
+      );
+    }
+    throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, result);
   }
 
   /**
@@ -433,10 +445,16 @@ async function requireDocker(
   try {
     result = await runDocker(args, env);
   } catch (error) {
-    throw dockerError(action, error);
+    if (typeof error === "object" && error !== null && "stderr" in error) {
+      throw new LocalServerInvalidError(`${action} failed: ${String(error.stderr)}`, error);
+    }
+    throw new LocalServerInvalidError(`${action} failed`, error);
   }
   if (result.status !== 0) {
-    throw dockerError(action, result);
+    if (typeof result === "object" && result !== null && "stderr" in result) {
+      throw new LocalServerInvalidError(`${action} failed: ${String(result.stderr)}`, result);
+    }
+    throw new LocalServerInvalidError(`${action} failed`, result);
   }
   return result;
 }
@@ -451,7 +469,13 @@ async function imageExists(image: string): Promise<boolean> {
   try {
     result = await runDocker(args);
   } catch (error) {
-    throw dockerError(`Inspect Docker image ${image}`, error);
+    if (typeof error === "object" && error !== null && "stderr" in error) {
+      throw new LocalServerInvalidError(
+        `Inspect Docker image ${image} failed: ${String(error.stderr)}`,
+        error,
+      );
+    }
+    throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, error);
   }
   return result.status === 0;
 }
@@ -465,18 +489,4 @@ async function ensureImage(image: string): Promise<"local" | "pulled"> {
   }
   await requireDocker(["pull", "--quiet", image], `Pull Docker image ${image}`);
   return "pulled";
-}
-
-/**
- * Wraps a failed `docker` call, keeping what it printed for whoever is debugging.
- */
-function dockerError(action: string, cause: unknown): LocalServerInvalidError {
-  if (cause && typeof cause === "object" && "stderr" in cause) {
-    return new LocalServerInvalidError(
-      `${action} failed: ${String((cause as { stderr?: unknown }).stderr)}`,
-      cause,
-    );
-  } else {
-    return new LocalServerInvalidError(`${action} failed`, cause);
-  }
 }

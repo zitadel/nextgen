@@ -94,9 +94,12 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     const parsed: unknown = JSON.parse(raw);
     if (isLocalAdmin(parsed)) return parsed;
   } catch (error) {
-    throw malformedAdminFile(cwd, error);
+    throw new LocalServerInvalidError(
+      `${join(cwd, LOCAL_ADMIN_FILE)} is malformed: ${errorMessage(error)}`,
+      error,
+    );
   }
-  throw malformedAdminFile(cwd);
+  throw new LocalServerInvalidError(`${join(cwd, LOCAL_ADMIN_FILE)} is malformed`);
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {
@@ -107,24 +110,6 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
     typeof value.user_id === "string" &&
     typeof value.team_id === "string"
   );
-}
-
-/**
- * Recovery needs both halves. `zitadel reset` clears the server's data but keeps
- * `admin.json`, so the next start would read the same broken file; deleting the
- * file alone leaves the server holding a hash of the old password, so the admin
- * could never sign in. Removing the file and resetting the data lets the next
- * start mint a fresh credential and import it.
- */
-function malformedAdminFile(cwd: string, cause?: unknown): LocalServerInvalidError {
-  if (cause) {
-    return new LocalServerInvalidError(
-      `${join(cwd, LOCAL_ADMIN_FILE)} is malformed: ${errorMessage(cause)}`,
-      cause,
-    );
-  } else {
-    return new LocalServerInvalidError(`${join(cwd, LOCAL_ADMIN_FILE)} is malformed`);
-  }
 }
 
 /**
