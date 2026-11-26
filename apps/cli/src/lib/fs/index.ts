@@ -46,6 +46,7 @@ import {
 import { isErrno } from "../errno";
 import {
   FsDeniedError,
+  FsError,
   FsExistsError,
   FsIsDirectoryError,
   FsNotDirectoryError,
@@ -453,12 +454,12 @@ export async function readIfReadable(path: string): Promise<string | undefined> 
  * @returns `true` when the path leads to a regular file.
  */
 export async function isFile(path: string): Promise<boolean> {
-  return stat(path).then(
-    (info) => {
-      return info.isFile();
-    },
-    () => {
+  try {
+    return (await stat(path)).isFile();
+  } catch (error) {
+    if (error instanceof FsError) {
       return false;
-    },
-  );
+    }
+    throw error;
+  }
 }
