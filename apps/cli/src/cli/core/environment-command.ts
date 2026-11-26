@@ -9,6 +9,7 @@ import {
 } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
 import {
+  LocalRuntime,
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
@@ -81,17 +82,7 @@ const RECORD_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
   hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
+  next: ["{reset}", "{start}"],
 } as const satisfies Refusal;
 
 /** How a run is refused when the runtime record of this folder cannot be read. */
@@ -219,10 +210,35 @@ export abstract class EnvironmentCommand extends BaseCommand {
         );
       }
       if (error instanceof LocalServerRecordMalformedError) {
-        throw refusalError(RECORD_MALFORMED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
+        const holder =
+          (await LocalRuntime.findUpward(resolveCwd(text(flags.cwd)), LocalRuntime.FILE)) ??
+          resolveCwd(text(flags.cwd));
+        const elsewhere =
+          holder === resolveCwd(text(flags.cwd))
+            ? {}
+            : {
+                cwd: holder,
+              };
+        throw refusalError(
+          RECORD_MALFORMED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            reset: {
+              id: "reset",
+              flags: {
+                force: true,
+                ...elsewhere,
+              },
+            },
+            start: {
+              id: "start",
+              flags: elsewhere,
+            },
+          },
+        );
       }
       if (error instanceof LocalServerRecordUnreadableError) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
