@@ -8,7 +8,6 @@ import {
   ZitadelConfigSchemaMissingError,
   ZitadelConfigFileBrokenError,
   ZitadelConfigEditBreaksFlowsError,
-  ZitadelConfigEditMethodInUseError,
   CONFIG_DIRECTORIES,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
@@ -109,13 +108,7 @@ function refusalOf(
   uses?: readonly FlowMethodUse[],
 ): ZitadelConfigError {
   const heading = "A login flow would stop validating after this change:";
-  if (uses === undefined) {
-    return new ZitadelConfigEditBreaksFlowsError({
-      heading,
-      issues,
-    });
-  }
-  return new ZitadelConfigEditMethodInUseError({
+  return new ZitadelConfigEditBreaksFlowsError({
     heading,
     issues,
     uses,
@@ -326,22 +319,6 @@ describe("ZitadelConfigError", () => {
   });
 });
 
-describe("ZitadelConfigEditMethodInUseError", () => {
-  it("is a validation failure that is not an edit that breaks flows", () => {
-    const error = new ZitadelConfigEditMethodInUseError({
-      heading: "Disabling passkey would break a login flow that still uses it:",
-      issues: [],
-      uses: [],
-    });
-
-    expect(error).not.toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
-    expect(error).toMatchObject({
-      category: "invalid",
-      code: "E_VALIDATION",
-    });
-  });
-});
-
 describe("ZitadelConfigResourceClashError", () => {
   it("is a conflict", () => {
     expect(new ZitadelConfigResourceClashError("two with one slug")).toMatchObject({
@@ -364,6 +341,7 @@ describe("ZitadelConfigSchemaMissingError", () => {
   it("is a missing failure that says no schema is named so", () => {
     const error = new ZitadelConfigSchemaMissingError("employees", []);
 
+    expect(error).toBeInstanceOf(ZitadelConfigResourceMissingError);
     expect(error).toMatchObject({
       category: "missing",
       code: "E_NOT_FOUND",

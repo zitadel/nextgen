@@ -96,7 +96,7 @@ export class ZitadelConfigResourceMissingError extends ZitadelConfigError {
  * A user schema asked for by a name no schema has, or asked for in a
  * configuration that has none.
  */
-export class ZitadelConfigSchemaMissingError extends ZitadelConfigError {
+export class ZitadelConfigSchemaMissingError extends ZitadelConfigResourceMissingError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
@@ -308,32 +308,10 @@ export class ZitadelConfigConnectionExistsError extends ZitadelConfigError {
 }
 
 /**
- * A change a login flow would no longer validate after.
+ * A change a login flow would no longer validate after, or that disables a
+ * sign-in method login flows still use.
  */
 export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * Make the failure for these issues.
-   *
-   * @param input - The heading and the issues.
-   * @param input.heading - The line the listed issues follow.
-   * @param input.issues - Every issue, as the server's flow rules word it.
-   */
-  constructor(input: { readonly heading: string; readonly issues: readonly FlowIssue[] }) {
-    const listed = input.issues.map((item) => {
-      return `  - ${item.path}: ${item.issue.message}`;
-    });
-    super([input.heading, ...listed].join("\n"));
-  }
-}
-
-/**
- * A change that disables a sign-in method login flows still use.
- */
-export class ZitadelConfigEditMethodInUseError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
@@ -344,25 +322,23 @@ export class ZitadelConfigEditMethodInUseError extends ZitadelConfigError {
    * @param input - The heading, the issues, and the steps that use the method.
    * @param input.heading - The line the listed issues follow.
    * @param input.issues - Every issue, as the server's flow rules word it.
-   * @param input.uses - The steps that use the method being disabled.
+   * @param input.uses - The steps that use the method being disabled, if one is.
    */
   constructor(input: {
     readonly heading: string;
     readonly issues: readonly FlowIssue[];
-    readonly uses: readonly FlowMethodUse[];
+    readonly uses?: readonly FlowMethodUse[];
   }) {
+    const uses = input.uses ?? [];
     const unexplained = input.issues.filter((item) => {
-      return !input.uses.some((use) => {
+      return !uses.some((use) => {
         return use.path === item.path && use.step === item.issue.step;
       });
     });
     const unexplainedLines = unexplained.map((item) => {
       return `${item.path}: ${item.issue.message}`;
     });
-    const lines = [
-      ...input.uses.map(ZitadelConfigEditMethodInUseError.useLine),
-      ...unexplainedLines,
-    ];
+    const lines = [...uses.map(ZitadelConfigEditBreaksFlowsError.useLine), ...unexplainedLines];
     const listed = lines.map((line) => {
       return `  - ${line}`;
     });

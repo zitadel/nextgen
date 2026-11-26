@@ -56,7 +56,6 @@ export {
   ZitadelConfigConnectionExistsError,
   ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditLockoutError,
-  ZitadelConfigEditMethodInUseError,
   ZitadelConfigError,
   ZitadelConfigFileBrokenError,
   ZitadelConfigFileExistsError,

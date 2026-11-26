@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ZitadelConfigEditBreaksFlowsError,
-  ZitadelConfigEditMethodInUseError,
-  type JsonObject,
-} from "@/lib/zitadel";
+import { ZitadelConfigEditBreaksFlowsError, type JsonObject } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
 import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
 import {
@@ -358,7 +354,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "passkey");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           `Disabling passkey in ${SCHEMA_PATH} would break a login flow that still uses it:`,
@@ -377,7 +373,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "passkey");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
       expect(error).toMatchObject({
         message: expect.stringContaining(`${FLOW_PATH}: step "identifier"`),
       });
@@ -396,7 +392,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
       expect(error).toMatchObject({
         message: expect.not.stringContaining("Targeted by first.submit"),
       });
@@ -429,7 +425,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
       expect(error).toMatchObject({
         message: expect.stringMatching(
           /b\.json: step "second"[^\n]*\n\s+Left with no field or sign-in method\. Targeted by first\.submit\./,
@@ -444,7 +440,7 @@ describe("assertMethodUnused", () => {
         assertMethodUnused(edit, "password");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
       expect(error).toMatchObject({
         message: expect.stringMatching(
           /a\.json: step "second"[^\n]*\n\s+Left with no field or sign-in method\.(\n|$)/,

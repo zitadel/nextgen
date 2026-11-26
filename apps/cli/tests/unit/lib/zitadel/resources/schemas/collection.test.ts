@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ZitadelConfigSchemaAmbiguousError,
-  ZitadelConfigEditMethodInUseError,
+  ZitadelConfigEditBreaksFlowsError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigError,
   ZitadelConfigSchemaMissingError,
@@ -276,7 +276,7 @@ describe("Schemas.disable", () => {
       return config.schemas.disable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
     expect(error).toMatchObject({
       message: expect.stringContaining(`${FLOW_PATH}: step "password"`),
     });
@@ -309,7 +309,7 @@ describe("Schemas.disable", () => {
       return config.schemas.disable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigEditMethodInUseError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditBreaksFlowsError);
   });
 
   it("turns off the last way to sign in when forced", () => {

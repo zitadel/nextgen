@@ -16,10 +16,7 @@
 
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
 
-import {
-  ZitadelConfigEditBreaksFlowsError,
-  ZitadelConfigEditMethodInUseError,
-} from "@/lib/zitadel/errors";
+import { ZitadelConfigEditBreaksFlowsError } from "@/lib/zitadel/errors";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
@@ -124,9 +121,8 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
  *
  * @param edit - The edit that turns the method off.
  * @param method - The method.
- * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow cannot be checked.
- * @throws {@link ZitadelConfigEditMethodInUseError} When a step still uses the method, naming every
- *   step that uses it.
+ * @throws {@link ZitadelConfigEditBreaksFlowsError} When a flow cannot be checked, or a step still
+ *   uses the method, naming every step that uses it.
  */
 export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): void {
   const introduced = checkedIssues(edit);
@@ -155,7 +151,7 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
     });
     return { ...use, staying };
   });
-  throw new ZitadelConfigEditMethodInUseError({
+  throw new ZitadelConfigEditBreaksFlowsError({
     heading: `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
     issues: introduced,
     uses,
