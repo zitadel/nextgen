@@ -11,6 +11,7 @@ import {
 
 import {
   access,
+  FsError,
   FsNotDirectoryError,
   FsNotFoundError,
   mkdir,
@@ -373,9 +374,25 @@ export async function peekRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
   }
 }
 
+/**
+ * The runtime record `start` left in a folder.
+ *
+ * @param cwd - The folder.
+ * @returns The record, or `undefined` when there is none.
+ * @throws {@link LocalServerRecordUnreadableError} When the record is there but cannot be read.
+ * @throws {@link LocalServerRecordMalformedError} When it is not in the shape it is written in.
+ */
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
   const paths = localRuntimePaths(cwd);
-  const raw = await readIfExists(paths.runtimeFile);
+  const raw = await readIfExists(paths.runtimeFile).catch((error: unknown) => {
+    if (error instanceof FsError) {
+      throw new LocalServerRecordUnreadableError(
+        `${paths.runtimeFile} cannot be read: ${error.message}`,
+        error,
+      );
+    }
+    throw error;
+  });
   if (raw === undefined) {
     return undefined;
   }

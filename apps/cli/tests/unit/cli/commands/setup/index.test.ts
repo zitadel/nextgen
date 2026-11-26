@@ -2201,6 +2201,22 @@ describe("setup", () => {
     });
   });
 
+  describe("with a local runtime record it cannot read", () => {
+    it("still sets up the app", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      await mkdir(join(dir, ".zitadel/local/runtime.json"), { recursive: true });
+      const platform = await aCapturingPlatform(serve);
+
+      const res = await runCliForTest(
+        scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT),
+      );
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        status: "ok",
+      });
+    });
+  });
+
   describe("against a server that refuses the sign-up evaluation for another reason", () => {
     it("still writes the sign-up policy", async ({ dir, serve }) => {
       await aNextApp(dir);

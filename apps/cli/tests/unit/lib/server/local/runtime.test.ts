@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 
 import { it, type Serve } from "@tests/fixtures";
 
-import { LocalServerRecordMalformedError } from "@/lib/server";
+import { LocalServerRecordMalformedError, LocalServerRecordUnreadableError } from "@/lib/server";
 import {
   LOCAL_RUNTIME_FILE,
   checkLocalServerHealth,
@@ -112,6 +112,13 @@ describe("local server runtime metadata", () => {
       code: "E_VALIDATION",
       message: `${LOCAL_RUNTIME_FILE} is malformed`,
     });
+  });
+
+  it("refuses a record it cannot read as unreadable", async ({ dir: cwd }) => {
+    const paths = await ensureLocalState(cwd);
+    await mkdir(paths.runtimeFile);
+
+    await expect(readRuntimeMetadata(cwd)).rejects.toBeInstanceOf(LocalServerRecordUnreadableError);
   });
 
   it("writes container identity files for host-user Docker runs", async ({ dir: cwd }) => {
