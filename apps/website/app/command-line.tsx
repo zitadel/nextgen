@@ -21,19 +21,23 @@ export function Words({ text }: { text: string }) {
  * A command at its prompt with its copy button, in every window that shows
  * one. A line too long for a phone wraps under its command, not its $.
  * `children` stands in for the command while it is typed out
- * (terminal-card.tsx); `end` adds a control before the copy button.
- * `placement` is where the line sits, which a copy reports (analytics.ts).
+ * (terminal-card.tsx); `end` adds a control before the copy button, and
+ * `pinned` shows the copy button always, for a list of steps to copy one by
+ * one. `placement` is where the line sits, which a copy reports
+ * (analytics.ts).
  */
 export function CommandLine({
   command,
   placement,
   children,
   end,
+  pinned = false,
 }: {
   command: string;
   placement: Placement;
   children?: ReactNode;
   end?: ReactNode;
+  pinned?: boolean;
 }) {
   const snippet = snippetOf(command);
   return (
@@ -51,7 +55,7 @@ export function CommandLine({
           text={command}
           label={command}
           event={snippet && { snippet, placement }}
-          className={LINE_COPY}
+          className={pinned ? "" : LINE_COPY}
         />
       </span>
     </div>

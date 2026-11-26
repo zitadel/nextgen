@@ -2,13 +2,20 @@ import { track } from "@vercel/analytics";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pageOf, snippetOf, trackEvent } from "./analytics";
-import { commands, deployCommand, dryRunCommand, skillsCommand } from "./commands";
+import * as offered from "./commands";
 
 vi.mock("@vercel/analytics", () => ({ track: vi.fn() }));
 
 describe("snippetOf", () => {
   it("names every command the website offers to copy", () => {
-    for (const command of [...commands, dryRunCommand, deployCommand, skillsCommand]) {
+    // Every exported command but the folder's, which only /llms.txt shows.
+    const commands = Object.entries(offered).flatMap(([name, value]) =>
+      name.endsWith("Command") && name !== "folderCommand" && typeof value === "string"
+        ? [value]
+        : [],
+    );
+    expect(commands.length).toBeGreaterThan(10);
+    for (const command of commands) {
       expect(snippetOf(command), command).toBeDefined();
     }
   });

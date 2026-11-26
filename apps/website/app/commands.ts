@@ -26,3 +26,18 @@ export const deployCommand = "npx @zitadel/cli@latest deploy";
 // (README.md): the router skill, the CLI's, and one per framework SDK and
 // component.
 export const skillsCommand = "npx skills add zitadel/nextgen --full-depth";
+
+// What the phase pages' Try it offers, as the docs and the CLI skill
+// (apps/cli/skills/zitadel-cli/SKILL.md) spell each command; a placeholder in
+// angle brackets is the reader's to fill.
+export const policyTestCommand = "npx @zitadel/cli@latest policy test";
+export const rollbackCommand = "npx @zitadel/cli@latest deployment rollback";
+export const grantListCommand = "npx @zitadel/cli@latest grant list";
+export const grantDeleteCommand = "npx @zitadel/cli@latest grant delete <grant_id>";
+export const userEventsCommand = "npx @zitadel/cli@latest event list --filter user_id=<user-id>";
+export const userSignInsCommand = `${userEventsCommand} --filter category=auth`;
+export const actorEventsCommand = "npx @zitadel/cli@latest event list --filter actor_id=<user-id>";
+export const correlationEventsCommand =
+  "npx @zitadel/cli@latest event list --filter correlation_id=<id>";
+export const failedRequestsCommand =
+  "npx @zitadel/cli@latest event list --filter status_class=4xx --filter status_class=5xx";

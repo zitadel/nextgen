@@ -101,13 +101,20 @@
 /* The page's own pieces: the hero (page.tsx), the logo (logo.tsx) and the
    steps' dots. */
 @layer components {
-  /* The hero takes the first screen under the header (h-16), its content
-     just above the middle and the cue to the steps at its foot (page.tsx).
-     Never shorter than its content needs, and on a very tall screen no
-     taller than 60rem, so the content does not float in a void and the
-     steps begin in view. */
+  /* The hero takes the first screen under the header (h-16, and below a
+     laptop's width the phases' row of 2.5rem under it; site-header.tsx), its
+     content just above the middle and the cue to what follows at its foot
+     (page.tsx). Never shorter than its content needs, and on a very tall
+     screen no taller than 60rem, so the content does not float in a void and
+     what follows begins in view. */
   .hero {
-    min-height: clamp(36rem, 100svh - 4rem, 60rem);
+    min-height: clamp(36rem, 100svh - 6.5rem, 60rem);
+  }
+
+  @media (min-width: 64rem) {
+    .hero {
+      min-height: clamp(36rem, 100svh - 4rem, 60rem);
+    }
   }
 
   /* The cue nods down now and then, once the hero has settled. */

@@ -25,6 +25,10 @@ describe("sitemapXml", () => {
     const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
     expect(locs).toEqual([
       "https://preview.zitadel.com/",
+      "https://preview.zitadel.com/get-started",
+      "https://preview.zitadel.com/operate",
+      "https://preview.zitadel.com/investigate",
+      "https://preview.zitadel.com/govern",
       "https://preview.zitadel.com/changelog",
       "https://preview.zitadel.com/choose-version",
       "https://preview.zitadel.com/changelog/newer",

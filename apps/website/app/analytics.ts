@@ -1,12 +1,21 @@
 import { track } from "@vercel/analytics";
 
 import {
+  actorEventsCommand,
+  correlationEventsCommand,
   deployCommand,
   devCommand,
   dryRunCommand,
+  failedRequestsCommand,
+  grantDeleteCommand,
+  grantListCommand,
+  policyTestCommand,
+  rollbackCommand,
   setupCommand,
   skillsCommand,
   startCommand,
+  userEventsCommand,
+  userSignInsCommand,
 } from "./commands";
 
 // The website's custom events in Vercel Web Analytics, as
@@ -17,13 +26,28 @@ import {
 // both and the ratios between them hold.
 
 /**
- * Where on its page a copy button or a call to action sits: `closing` is the
- * front page's last band, over the footer.
+ * Where on its page a copy button or a call to action sits: `try_it` is a
+ * phase page's Try it (phase-page.tsx), whose page the event's `page` names.
  */
-export type Placement = "hero" | "showcase" | "closing" | "footer";
+export type Placement = "hero" | "showcase" | "try_it" | "footer";
 
-/** What a copy button copied, never its text: `all` is the hero's whole block. */
-export type Snippet = "all" | "start" | "setup" | "dev" | "dry_run" | "deploy" | "skills";
+/**
+ * What a copy button copied, never its text: `all` is a whole block of
+ * commands, `event_list` any `event list` a page offers.
+ */
+export type Snippet =
+  | "all"
+  | "start"
+  | "setup"
+  | "dev"
+  | "dry_run"
+  | "deploy"
+  | "skills"
+  | "policy_test"
+  | "rollback"
+  | "grant_list"
+  | "grant_delete"
+  | "event_list";
 
 const SNIPPETS = new Map<string, Snippet>([
   [startCommand, "start"],
@@ -32,6 +56,15 @@ const SNIPPETS = new Map<string, Snippet>([
   [dryRunCommand, "dry_run"],
   [deployCommand, "deploy"],
   [skillsCommand, "skills"],
+  [policyTestCommand, "policy_test"],
+  [rollbackCommand, "rollback"],
+  [grantListCommand, "grant_list"],
+  [grantDeleteCommand, "grant_delete"],
+  [userEventsCommand, "event_list"],
+  [userSignInsCommand, "event_list"],
+  [actorEventsCommand, "event_list"],
+  [correlationEventsCommand, "event_list"],
+  [failedRequestsCommand, "event_list"],
 ]);
 
 /** The snippet `command` is, or `undefined` for a command the catalog has no name for. */

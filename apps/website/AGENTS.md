@@ -1,14 +1,21 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/`, its changelog at `/changelog`, with a
+The hosted cloud's front page at `/`, a page per phase (`/get-started`,
+`/operate`, `/investigate`, `/govern`), its changelog at `/changelog`, with a
 page per entry and a feed under it, and the guide to choosing it or Zitadel v4
 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
-- The front page says the benefit, then proves it, and nothing else: the
-  hero with the commands, then the showcase's steps, ending on the
-  quickstart. Feature lists, ways in and roadmaps belong on the docs and
+- The front page says how to start, and nothing else: the hero with the
+  commands as numbered steps and the quickstart, at most two lines on what is
+  different, the strip to the phase pages, and at most three questions, all
+  about starting. Feature lists and roadmaps belong on the docs and
   zitadel.com.
+- Every phase page (`app/phases.ts`) has the same seven parts
+  (`app/phase-page.tsx`): the title with what your agent does, Ask it, Under
+  the hood, You decide, Try it, Questions, and the phase after it.
+- Under the hood shows one real thing from this repo, taken from code or
+  docs; Try it only commands that work now (README, the CLI skill, `--help`).
 - It ports `zitadel/new-website`'s narrative redesign
   (`docs/narrative-ia-proposal.md` on that repo's
   `claude/zitadel-narrative-redesign-377a49` branch) and follows that repo's
@@ -75,11 +82,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## The commands and the showcase
 
-- `app/commands.ts` feeds the hero and `/llms.txt`. The commands follow the
-  README's quick start; never add `--force`. When that journey changes,
-  change the commands and the showcase, and run them once against the
-  published CLI.
-- Steps 1 to 4 replay a recorded session (`app/showcase/sessions.ts`).
+- `app/commands.ts` feeds the hero, the phase pages' Try it and `/llms.txt`.
+  The hero's follow the README's quick start; never add `--force`. When that
+  journey changes, change the commands and the showcase, and run them once
+  against the published CLI.
+- The showcase is `/get-started`'s Try it. Steps 1 to 4 replay a recorded
+  session (`app/showcase/sessions.ts`).
   Re-record rather than edit when what the CLI prints, the files setup writes
   or the flow format change.
 - `login-preview.tsx` draws each login screen from `@zitadel/components`'

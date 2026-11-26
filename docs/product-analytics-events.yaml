@@ -77,10 +77,10 @@ properties:
     description: The selected tab, on pages with tracked tabs.
   placement:
     type: string
-    values: [hero, showcase, closing, footer]
+    values: [hero, showcase, try_it, footer]
     description: >-
-      Where on its page a copy button or a call to action sits: `closing` is
-      the website's front page's last band, over the footer.
+      Where on its page a copy button or a call to action sits: `try_it` is
+      the Try it section of a website phase page, which `page` names.
   target:
     type: string
     values: [quickstart, github]
@@ -109,13 +109,15 @@ properties:
   # Calls to action
   snippet:
     type: string
-    values: [all, start, setup, dev, dry_run, deploy, skills]
+    values:
+      [all, start, setup, dev, dry_run, deploy, skills, policy_test, rollback, grant_list, grant_delete, event_list]
     description: >-
       What a copy button copied, never its text: the CLI command it runs
-      (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`), `dev` for
-      the app's dev server,
-      `skills` for the coding agents' skills, or `all` for the website's whole
-      block of commands.
+      (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`,
+      `policy_test`, `rollback` for `deployment rollback`, `grant_list`,
+      `grant_delete`, and `event_list` for any `event list`), `dev` for the
+      app's dev server, `skills` for the coding agents' skills, or `all` for
+      a whole block of commands.
 
   # Journeys and actions
   flow:
