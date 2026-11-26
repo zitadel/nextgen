@@ -138,7 +138,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
         },
         stdio: ["ignore", log.fd, log.fd],
       });
-      const pid = await spawned(child);
+      const pid = await spawned(child, command.command);
       return launched<BinaryRuntimeMetadata>({
         schema_version: 1,
         backend: "binary",
@@ -501,7 +501,7 @@ async function ps(args: string[]): Promise<string> {
  * unhandled it crashes the CLI with a stack trace, so it is awaited here and
  * turned into an error that says what to do.
  */
-async function spawned(child: ReturnType<typeof spawn>): Promise<number> {
+async function spawned(child: ReturnType<typeof spawn>, command: string): Promise<number> {
   try {
     const pid = await new Promise<number>((resolve, reject) => {
       child.once("error", reject);
@@ -521,7 +521,7 @@ async function spawned(child: ReturnType<typeof spawn>): Promise<number> {
     return pid;
   } catch (error) {
     throw new LocalServerInvalidError(
-      `The Zitadel server could not be started: ${errorMessage(error)}`,
+      `The Zitadel server (${command}) could not be started: ${errorMessage(error)}`,
       error,
     );
   }
