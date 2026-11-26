@@ -87,6 +87,7 @@ import {
   ZitadelConfigSignupPolicyInvalidError,
 } from "@/lib/zitadel";
 import { it } from "@tests/fixtures";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 /** A command that only exposes what the mixin gives it. */
@@ -116,6 +117,9 @@ class Wording extends ErrorSupport(Command) {
 async function aWordingCommand(): Promise<Wording> {
   return new Wording([], await Config.load(cliPackageRoot));
 }
+
+/** Renders the commands a refusal suggests, as a run does. */
+const suggest = aSuggest();
 
 /** The folder the sample run acts on. */
 const CWD = "/work/app";
@@ -400,7 +404,7 @@ describe("ErrorSupport", () => {
     it.each<[string, Error, { hint: string | undefined; nextCommands: unknown }]>([
       [
         "a variable with no preview value",
-        new BackendVariablePreviewMissingError("API_URL has no preview value", "rel_1", "abc"),
+        new BackendVariablePreviewMissingError("API_URL has no preview value"),
         {
           hint: "A name has a preview value only once one is set with `--preview`.",
           nextCommands: undefined,
@@ -408,7 +412,7 @@ describe("ErrorSupport", () => {
       ],
       [
         "a variable with no primary value",
-        new BackendVariablePrimaryMissingError("API_URL has no primary value", "rel_1", "abc"),
+        new BackendVariablePrimaryMissingError("API_URL has no primary value"),
         { hint: "Set one with `zitadel variable set`.", nextCommands: undefined },
       ],
       [
@@ -463,11 +467,11 @@ describe("ErrorSupport", () => {
         new ConsentRequiredError(
           "Cannot delete it without --force",
           "Delete?",
-          "zitadel reset --force",
+          suggest({ id: "reset", flags: { force: true } }),
         ),
         {
           hint: "Ask a person first: Delete? Pass --force only once they agree.",
-          nextCommands: ["zitadel reset --force"],
+          nextCommands: ["npx @zitadel/cli@0.1.0 reset --force"],
         },
       ],
       [
