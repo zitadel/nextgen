@@ -16,8 +16,8 @@ import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Output, warnings } from "@/lib/ui";
 import {
+  ZitadelConfigError,
   ZitadelConfigSchemaAmbiguousError,
-  ZitadelConfigFileBrokenError,
   type Change,
   CONFIG_DIRECTORIES,
   type ConfigStore,
@@ -166,7 +166,7 @@ const AMBIGUOUS_SCHEMA_REFUSAL = {
  * @returns What the run read.
  * @throws {@link ZitadelError} When no schema, or more than one, fits
  *   `--schema`, or the one that does points at an external schema.
- * @throws {@link ZitadelConfigFileBrokenError} Naming every file the contract rules refuse.
+ * @throws {@link ZitadelConfigError} Naming every file the contract rules refuse.
  */
 export async function readSchemaTarget(input: {
   cwd: string;
@@ -191,10 +191,16 @@ export async function readSchemaTarget(input: {
               return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
             });
       if (broken.length > 0) {
-        throw new ZitadelConfigFileBrokenError(
-          broken.flatMap((file) => {
-            return file.problems;
-          }),
+        const problems = broken.flatMap((file) => {
+          return file.problems;
+        });
+        throw new ZitadelConfigError(
+          [
+            "Configuration files are not valid:",
+            ...problems.map((entry) => {
+              return `  - ${entry.path}: ${entry.problem}`;
+            }),
+          ].join("\n"),
         );
       }
     }
