@@ -1,13 +1,19 @@
 import { dryRunResult } from "@/cli/core/crud/shared";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { LocalRuntime } from "@/lib/server";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
-import { pathExists } from "@/lib/fs";
+import {
+  FsDeniedError,
+  FsIsDirectoryError,
+  pathExists,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "@/lib/fs";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { createOrca, Orca, OrcaError } from "@/lib/orca";
@@ -115,7 +121,11 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
       }
       removed.push(rel);
     } catch (error) {
-      if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
+      if (error instanceof FsDeniedError) {
+        preserved.push(rel);
+        continue;
+      }
+      if (error instanceof FsIsDirectoryError) {
         preserved.push(rel);
         continue;
       }
@@ -184,7 +194,10 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
       }
       removed.push(husk ? rel : `${rel} (managed section)`);
     } catch (error) {
-      if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
+      if (error instanceof FsDeniedError) {
+        continue;
+      }
+      if (error instanceof FsIsDirectoryError) {
         continue;
       }
       throw error;
