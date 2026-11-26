@@ -1,4 +1,6 @@
 import type { Cache, CacheEntry } from "./cache";
+import { isObject } from "@/lib/json";
+
 import { Release } from "./release";
 
 /**
@@ -113,18 +115,19 @@ export class ReleaseChannel {
       }
       throw error;
     });
-    const tags: Record<string, unknown> = response?.ok
-      ? await (response.json() as Promise<Record<string, unknown>>).catch((error: unknown) => {
+    const parsed: unknown = response?.ok
+      ? await (response.json() as Promise<unknown>).catch((error: unknown) => {
           if (
             error instanceof SyntaxError ||
             error instanceof TypeError ||
             error instanceof DOMException
           ) {
-            return {};
+            return undefined;
           }
           throw error;
         })
-      : {};
+      : undefined;
+    const tags: Record<string, unknown> = isObject(parsed) ? parsed : {};
     const answered = Release.from(tags[distTag]);
 
     if (fresh && answered === undefined) {
