@@ -270,168 +270,166 @@ export default class Start extends Telemetered(
   protected async apply({ flags }: Admitted<typeof Start>): Promise<CommandResult> {
     const { server, request } = await this.planned(flags);
     const retry = await this.again("start", {});
-    const started = await (async () => {
-      try {
-        return await server.launch(request);
-      } catch (error) {
-        if (error instanceof LocalServerDockerMissingError) {
-          throw refusalError(
-            DOCKER_UNAVAILABLE_REFUSAL,
-            {
-              ...error,
-              message: error.message,
-            },
-            {
-              check: shellCommand("docker", "version"),
-              retry,
-            },
-          );
-        }
-        if (error instanceof LocalServerPortBusyError) {
-          const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
-            return port !== error.port;
-          });
+    try {
+      const started = await server.launch(request);
+      const { runtime: record, alreadyRunning } = started;
+      this.meta = { ...this.meta, source: record.server_url };
 
-          throw refusalError(
-            PORT_IN_USE_REFUSAL,
-            {
-              ...error,
-              message: error.message,
-              url: LocalRuntime.urlOf(error.port),
-              listeners: await this.machine().listeners(error.port, {
-                timeoutMs: 5000,
-              }),
+      const title = alreadyRunning
+        ? "Local Zitadel server is already running"
+        : "Local Zitadel server is ready";
+      const urls = {
+        api: record.server_url,
+        console: `${record.server_url}/ui/console/`,
+      };
+      const next: NextSteps<SuggestedCommand> = {
+        actions: [
+          "Create an app with authentication. Run setup in this directory or a subdirectory.",
+          "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
+          new Guidance(this.suggest).serverLog(),
+        ],
+        commands: [
+          this.suggest({
+            id: "setup",
+            flags: { server: "local" },
+          }),
+        ],
+      };
+
+      if (record.backend === "binary") {
+        return {
+          status: "ok",
+          data: {
+            title,
+            runtime: {
+              backend: "binary",
+              pid: record.pid,
+              log_path: record.log_path,
+              server_package: record.server_package,
+              server_version: record.server_version,
+              port: record.port,
+              data_dir: record.data_dir,
+              env: record.env ?? LocalRuntime.NO_ENV,
             },
-            {
-              alternate: this.suggest({
-                id: "start",
-                flags: {
-                  port: alternatePort,
-                },
-              }),
+            urls,
+          },
+          summary: {
+            title,
+            sections: [
+              section(
+                undefined,
+                ["Process", String(record.pid)],
+                ["API", urls.api],
+                ["Console", urls.console],
+                ["Data", record.data_dir],
+              ),
+            ],
+          },
+          next,
+        };
+      } else {
+        return {
+          status: "ok",
+          data: {
+            title,
+            runtime: {
+              backend: "docker",
+              container_name: record.container_name,
+              container_id: record.container_id,
+              image: record.image,
+              port: record.port,
+              data_dir: record.data_dir,
+              env: record.env ?? LocalRuntime.NO_ENV,
             },
-          );
-        }
-        if (error instanceof LocalServerPortFullError) {
-          throw refusalError(NO_FREE_PORT_REFUSAL, {
-            ...error,
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerStartCleanupFailedError) {
-          throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
-            ...error,
-            message: error.message,
-          });
-        }
-        if (error instanceof LocalServerStartExitedError) {
-          throw refusalError(SERVER_NOT_READY_REFUSAL, {
-            ...error,
-            message: error.message,
-            hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-          });
-        }
-        if (error instanceof LocalServerStartTimeoutError) {
-          throw refusalError(SERVER_NOT_READY_REFUSAL, {
-            ...error,
-            message: error.message,
-            hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
-          });
-        }
-        if (error instanceof LocalServerStopError) {
-          throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
-            ...error,
-            message: error.message,
-          });
-        }
-        throw error;
+            urls,
+          },
+          summary: {
+            title,
+            sections: [
+              section(
+                undefined,
+                ["Container", record.container_name],
+                ["API", urls.api],
+                ["Console", urls.console],
+                ["Data", record.data_dir],
+              ),
+            ],
+          },
+          next,
+        };
       }
-    })();
-    const { runtime: record, alreadyRunning } = started;
-    this.meta = { ...this.meta, source: record.server_url };
-
-    const title = alreadyRunning
-      ? "Local Zitadel server is already running"
-      : "Local Zitadel server is ready";
-    const urls = {
-      api: record.server_url,
-      console: `${record.server_url}/ui/console/`,
-    };
-    const next: NextSteps<SuggestedCommand> = {
-      actions: [
-        "Create an app with authentication. Run setup in this directory or a subdirectory.",
-        "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-        new Guidance(this.suggest).serverLog(),
-      ],
-      commands: [
-        this.suggest({
-          id: "setup",
-          flags: { server: "local" },
-        }),
-      ],
-    };
-
-    if (record.backend === "binary") {
-      return {
-        status: "ok",
-        data: {
-          title,
-          runtime: {
-            backend: "binary",
-            pid: record.pid,
-            log_path: record.log_path,
-            server_package: record.server_package,
-            server_version: record.server_version,
-            port: record.port,
-            data_dir: record.data_dir,
-            env: record.env ?? LocalRuntime.NO_ENV,
+    } catch (error) {
+      if (error instanceof LocalServerDockerMissingError) {
+        throw refusalError(
+          DOCKER_UNAVAILABLE_REFUSAL,
+          {
+            ...error,
+            message: error.message,
           },
-          urls,
-        },
-        summary: {
-          title,
-          sections: [
-            section(
-              undefined,
-              ["Process", String(record.pid)],
-              ["API", urls.api],
-              ["Console", urls.console],
-              ["Data", record.data_dir],
-            ),
-          ],
-        },
-        next,
-      };
-    } else {
-      return {
-        status: "ok",
-        data: {
-          title,
-          runtime: {
-            backend: "docker",
-            container_name: record.container_name,
-            container_id: record.container_id,
-            image: record.image,
-            port: record.port,
-            data_dir: record.data_dir,
-            env: record.env ?? LocalRuntime.NO_ENV,
+          {
+            check: shellCommand("docker", "version"),
+            retry,
           },
-          urls,
-        },
-        summary: {
-          title,
-          sections: [
-            section(
-              undefined,
-              ["Container", record.container_name],
-              ["API", urls.api],
-              ["Console", urls.console],
-              ["Data", record.data_dir],
-            ),
-          ],
-        },
-        next,
-      };
+        );
+      }
+      if (error instanceof LocalServerPortBusyError) {
+        const [alternatePort] = [LocalRuntime.DEFAULT_PORT, error.port + 1].filter((port) => {
+          return port !== error.port;
+        });
+
+        throw refusalError(
+          PORT_IN_USE_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            url: LocalRuntime.urlOf(error.port),
+            listeners: await this.machine().listeners(error.port, {
+              timeoutMs: 5000,
+            }),
+          },
+          {
+            alternate: this.suggest({
+              id: "start",
+              flags: {
+                port: alternatePort,
+              },
+            }),
+          },
+        );
+      }
+      if (error instanceof LocalServerPortFullError) {
+        throw refusalError(NO_FREE_PORT_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerStartCleanupFailedError) {
+        throw refusalError(SERVER_NOT_READY_AND_RUNNING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerStartExitedError) {
+        throw refusalError(SERVER_NOT_READY_REFUSAL, {
+          ...error,
+          message: error.message,
+          hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
+        });
+      }
+      if (error instanceof LocalServerStartTimeoutError) {
+        throw refusalError(SERVER_NOT_READY_REFUSAL, {
+          ...error,
+          message: error.message,
+          hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
+        });
+      }
+      if (error instanceof LocalServerStopError) {
+        throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
     }
   }
 

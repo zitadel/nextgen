@@ -25,25 +25,37 @@ export class EnvExampleCheck extends AbstractSanityCheck {
 
   override async fix(ctx: CheckContext): Promise<void> {
     const path = join(ctx.cwd, ".env.example");
-    const [read] = await Promise.allSettled([readFile(path, "utf8")]);
-    if (read.status === "rejected" && !isErrno(read.reason, "ENOENT")) {
-      throw read.reason;
+    try {
+      const existing = await readFile(path, "utf8");
+      const missing = REQUIRED_KEYS.filter((key) => {
+        return !existing.includes(`${key}=`);
+      });
+      if (missing.length === 0 || ctx.dryRun) {
+        return;
+      }
+      const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+      await writeFile(
+        path,
+        `${existing}${prefix}${missing
+          .map((key) => {
+            return `${key}=`;
+          })
+          .join("\n")}\n`,
+      );
+    } catch (error) {
+      if (isErrno(error, "ENOENT")) {
+        if (ctx.dryRun) {
+          return;
+        }
+        await writeFile(
+          path,
+          `${REQUIRED_KEYS.map((key) => {
+            return `${key}=`;
+          }).join("\n")}\n`,
+        );
+        return;
+      }
+      throw error;
     }
-    const existing = read.status === "fulfilled" ? read.value : "";
-    const missing = REQUIRED_KEYS.filter((key) => {
-      return !existing.includes(`${key}=`);
-    });
-    if (missing.length === 0 || ctx.dryRun) {
-      return;
-    }
-    const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
-    await writeFile(
-      path,
-      `${existing}${prefix}${missing
-        .map((key) => {
-          return `${key}=`;
-        })
-        .join("\n")}\n`,
-    );
   }
 }

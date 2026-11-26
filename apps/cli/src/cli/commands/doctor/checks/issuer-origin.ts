@@ -112,22 +112,24 @@ export class IssuerOriginCheck implements SanityCheck {
         }),
       })
       .write();
-    const [extension] = await Promise.allSettled([
-      new DeploymentService(client, held.project_id).extendPrimary(
+    try {
+      const extension = await new DeploymentService(client, held.project_id).extendPrimary(
         pattern,
         `Made ${pattern} a primary origin`,
-      ),
-    ]);
-    if (extension.status === "rejected" && !(extension.reason instanceof BackendError)) {
-      throw extension.reason;
-    }
-    const deployed =
-      extension.status === "fulfilled" &&
-      (extension.value.outcome === "deployed" || extension.value.outcome === "unchanged");
-    if (!deployed) {
-      warnings.report(
-        `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
       );
+      if (extension.outcome !== "deployed" && extension.outcome !== "unchanged") {
+        warnings.report(
+          `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof BackendError) {
+        warnings.report(
+          `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
+        );
+        return;
+      }
+      throw error;
     }
   }
 }

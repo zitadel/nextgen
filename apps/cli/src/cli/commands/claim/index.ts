@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 import pRetry, { AbortError } from "p-retry";
 import { z } from "zod";
 
-import { ClaimService } from "@/lib/backend";
+import { BackendError, ClaimService } from "@/lib/backend";
 import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
@@ -516,52 +516,53 @@ export default class Claim extends Telemetered(ChangeCommand) {
             throw new NotFinished(attempt - 1);
           }
 
-          const [status] = await Promise.allSettled([claimService.status(challengeId)]);
-          if (status.status === "rejected") {
-            this.annotate({ poll_count: attempt });
-            throw new AbortError(
-              status.reason instanceof Error ? status.reason : new Error(String(status.reason)),
-            );
-          }
-          const progress = status.value;
-          switch (progress.outcome) {
-            case "completed": {
+          try {
+            const progress = await claimService.status(challengeId);
+            switch (progress.outcome) {
+              case "completed": {
+                this.annotate({ poll_count: attempt });
+                return progress.claim;
+              }
+              case "window-expired": {
+                this.annotate({
+                  claim_outcome: "window_expired",
+                  poll_count: attempt,
+                });
+                throw new AbortError(refusalError(WINDOW_CLOSED_REFUSAL, {}));
+              }
+              case "expired": {
+                this.annotate({
+                  claim_outcome: "expired",
+                  poll_count: attempt,
+                });
+                throw new AbortError(refusalError(LINK_EXPIRED_REFUSAL, {}, { claim: startOver }));
+              }
+              case "not-found": {
+                this.annotate({
+                  claim_outcome: "not_found",
+                  poll_count: attempt,
+                });
+                throw new AbortError(
+                  new ZitadelError(
+                    "E_NOT_FOUND",
+                    "This project has no claim link with that challenge id.",
+                    {
+                      hint: "Start a new link.",
+                      nextCommands: [startOver],
+                    },
+                  ),
+                );
+              }
+              case "pending": {
+                throw new NotFinished(attempt);
+              }
+            }
+          } catch (error) {
+            if (error instanceof BackendError) {
               this.annotate({ poll_count: attempt });
-              return progress.claim;
+              throw new AbortError(error);
             }
-            case "window-expired": {
-              this.annotate({
-                claim_outcome: "window_expired",
-                poll_count: attempt,
-              });
-              throw new AbortError(refusalError(WINDOW_CLOSED_REFUSAL, {}));
-            }
-            case "expired": {
-              this.annotate({
-                claim_outcome: "expired",
-                poll_count: attempt,
-              });
-              throw new AbortError(refusalError(LINK_EXPIRED_REFUSAL, {}, { claim: startOver }));
-            }
-            case "not-found": {
-              this.annotate({
-                claim_outcome: "not_found",
-                poll_count: attempt,
-              });
-              throw new AbortError(
-                new ZitadelError(
-                  "E_NOT_FOUND",
-                  "This project has no claim link with that challenge id.",
-                  {
-                    hint: "Start a new link.",
-                    nextCommands: [startOver],
-                  },
-                ),
-              );
-            }
-            case "pending": {
-              throw new NotFinished(attempt);
-            }
+            throw error;
           }
         },
         {

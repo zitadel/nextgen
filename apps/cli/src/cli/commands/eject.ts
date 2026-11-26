@@ -104,24 +104,23 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    const contents = await (async () => {
-      try {
-        return await readFile(abs, "utf8");
-      } catch (error) {
-        if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
-          return "";
-        }
-        throw error;
+    try {
+      const contents = await readFile(abs, "utf8");
+      if (!Orca.isManaged(contents)) {
+        preserved.push(rel);
+        continue;
       }
-    })();
-    if (!Orca.isManaged(contents)) {
-      preserved.push(rel);
-      continue;
+      if (!dryRun) {
+        await rm(abs, { force: true });
+      }
+      removed.push(rel);
+    } catch (error) {
+      if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
+        preserved.push(rel);
+        continue;
+      }
+      throw error;
     }
-    if (!dryRun) {
-      await rm(abs, { force: true });
-    }
-    removed.push(rel);
   }
 
   for (const rel of actions.rootConfigFiles) {
@@ -169,29 +168,27 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    const contents = await (async () => {
-      try {
-        return await readFile(abs, "utf8");
-      } catch (error) {
-        if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
-          return "";
+    try {
+      const contents = await readFile(abs, "utf8");
+      const stripped = removeGuidanceSection(contents);
+      if (stripped === contents) {
+        continue;
+      }
+      const husk = stripped.trim() === "" || stripped.trim() === AGENTS_HEADER.trim();
+      if (!dryRun) {
+        if (husk) {
+          await rm(abs, { force: true });
+        } else {
+          await writeFile(abs, stripped);
         }
-        throw error;
       }
-    })();
-    const stripped = removeGuidanceSection(contents);
-    if (stripped === contents) {
-      continue;
-    }
-    const husk = stripped.trim() === "" || stripped.trim() === AGENTS_HEADER.trim();
-    if (!dryRun) {
-      if (husk) {
-        await rm(abs, { force: true });
-      } else {
-        await writeFile(abs, stripped);
+      removed.push(husk ? rel : `${rel} (managed section)`);
+    } catch (error) {
+      if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
+        continue;
       }
+      throw error;
     }
-    removed.push(husk ? rel : `${rel} (managed section)`);
   }
   return {
     actions,

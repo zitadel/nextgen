@@ -63,19 +63,7 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
-      const found = await (async () => {
-        try {
-          return await this.inspected(ctx);
-        } catch (error) {
-          if (error instanceof ZitadelConfigError) {
-            return undefined;
-          }
-          throw error;
-        }
-      })();
-      if (found === undefined) {
-        return await super.run(ctx);
-      }
+      const found = await this.inspected(ctx);
       const brokenSchemas = found.config.broken.filter((file) => {
         return file.kind === "schema";
       });
@@ -118,6 +106,11 @@ export class SchemaCheck extends AbstractSanityCheck {
         message: this.summary,
         path: this.path,
       };
+    } catch (error) {
+      if (error instanceof ZitadelConfigError) {
+        return await super.run(ctx);
+      }
+      throw error;
     } finally {
       this.inspections.delete(ctx);
     }
