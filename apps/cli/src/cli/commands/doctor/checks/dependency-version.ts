@@ -106,7 +106,14 @@ export class DependencyVersionCheck implements SanityCheck {
             : "No exactly-pinned Zitadel packages to compare",
       };
     } catch (error) {
-      if (error instanceof PmManifestInvalidError || error instanceof FsError) {
+      if (error instanceof PmManifestInvalidError) {
+        return {
+          ...base,
+          status: "pass",
+          message: "No readable package.json to compare pins against",
+        };
+      }
+      if (error instanceof FsError) {
         return {
           ...base,
           status: "pass",

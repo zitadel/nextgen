@@ -91,7 +91,15 @@ export class ClaimCheck implements SanityCheck {
         path: this.path,
       };
     } catch (error) {
-      if (error instanceof ProjectError || error instanceof FsError) {
+      if (error instanceof ProjectError) {
+        return {
+          name: this.name,
+          status: "pass",
+          message: "Skipped: could not read the project files that record the owning team",
+          path: this.path,
+        };
+      }
+      if (error instanceof FsError) {
         return {
           name: this.name,
           status: "pass",

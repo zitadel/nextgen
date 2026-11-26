@@ -355,7 +355,13 @@ async function probeConfigWiring(ctx: CheckContext): Promise<ReadonlyArray<Confi
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
     return await ctx.orca.patcherFor(patchCtx.framework.id).verify(patchCtx, { cwd: ctx.cwd });
   } catch (error) {
-    if (error instanceof ProjectError || error instanceof OrcaError || error instanceof FsError) {
+    if (error instanceof ProjectError) {
+      return [];
+    }
+    if (error instanceof OrcaError) {
+      return [];
+    }
+    if (error instanceof FsError) {
       return [];
     }
     throw error;
@@ -414,7 +420,13 @@ async function materializeManifest(
       written: marked,
     });
   } catch (error) {
-    if (error instanceof ProjectError || error instanceof OrcaError || error instanceof FsError) {
+    if (error instanceof ProjectError) {
+      return;
+    }
+    if (error instanceof OrcaError) {
+      return;
+    }
+    if (error instanceof FsError) {
       return;
     }
     throw error;
@@ -491,7 +503,13 @@ export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions 
       rendererId: config.rendererId,
     });
   } catch (error) {
-    if (error instanceof ProjectError || error instanceof OrcaError || error instanceof FsError) {
+    if (error instanceof ProjectError) {
+      return undefined;
+    }
+    if (error instanceof OrcaError) {
+      return undefined;
+    }
+    if (error instanceof FsError) {
       return undefined;
     }
     throw error;

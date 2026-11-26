@@ -1159,10 +1159,14 @@ export default class Doctor extends Telemetered(
           hostedServer,
         };
       } catch (error) {
-        if (
-          error instanceof LocalServerRecordUnreadableError ||
-          error instanceof LocalServerRecordMalformedError
-        ) {
+        if (error instanceof LocalServerRecordUnreadableError) {
+          return {
+            cwd,
+            port: flags.port ?? LocalRuntime.DEFAULT_PORT,
+            hostedServer,
+          };
+        }
+        if (error instanceof LocalServerRecordMalformedError) {
           return {
             cwd,
             port: flags.port ?? LocalRuntime.DEFAULT_PORT,

@@ -599,7 +599,10 @@ export default class Claim extends Telemetered(ChangeCommand) {
               }
             }
           } catch (error) {
-            if (error instanceof NotFinished || error instanceof AbortError) {
+            if (error instanceof NotFinished) {
+              throw error;
+            }
+            if (error instanceof AbortError) {
               throw error;
             }
             this.annotate({ poll_count: attempt });

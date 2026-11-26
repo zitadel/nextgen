@@ -219,7 +219,13 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
       throw error;
     }
   } catch (error) {
-    if (error instanceof ProjectError || error instanceof FsError) {
+    if (error instanceof ProjectError) {
+      return {
+        status: "pass",
+        message: "Skipped: could not read the project files that record its origins",
+      };
+    }
+    if (error instanceof FsError) {
       return {
         status: "pass",
         message: "Skipped: could not read the project files that record its origins",

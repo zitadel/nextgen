@@ -189,10 +189,10 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
           },
         };
       } catch (error) {
-        if (
-          error instanceof ZitadelConfigConnectionExistsError ||
-          error instanceof ZitadelConfigFileExistsError
-        ) {
+        if (error instanceof ZitadelConfigConnectionExistsError) {
+          throw setupRefusal(error, scaffold.connections);
+        }
+        if (error instanceof ZitadelConfigFileExistsError) {
           throw setupRefusal(error, scaffold.connections);
         }
         throw error;
