@@ -1,0 +1,10 @@
+language js
+
+// File-system calls come from `@/lib/fs`, which turns Node's failures into
+// typed classes (apps/cli/AGENTS.md, Errors). `skills/bundle.ts` is loaded by
+// the build with plain Node, which does not resolve `@/`.
+`import $_ from "node:fs/promises"` as $import where {
+  not $filename <: r".*/apps/cli/src/lib/(?:fs/index|skills/bundle)\.ts$",
+  not $import <: r"^import type[\s\S]*",
+  register_diagnostic(span=$import, message="Import file-system calls from @/lib/fs, not node:fs/promises.", severity="error")
+}

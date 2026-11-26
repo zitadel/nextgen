@@ -109,6 +109,17 @@
       ]
     },
     {
+      "includes": ["**/apps/cli/src/**", "!**/apps/cli/src/lib/orca/patchers/**"],
+      "plugins": [
+        "./biome-plugins/error-catch-shape.grit",
+        "./biome-plugins/error-promise-catch-shape.grit",
+        "./biome-plugins/error-instanceof-alone.grit",
+        "./biome-plugins/error-no-probing.grit",
+        "./biome-plugins/no-node-fs-promises.grit",
+        "./biome-plugins/error-no-generic-instanceof.grit"
+      ]
+    },
+    {
       "includes": [
         "**/apps/cli/src/**",
         "**/apps/cli/tests/**",

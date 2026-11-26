@@ -1,0 +1,8 @@
+language js
+
+// One flat `if (error instanceof X)` per class (apps/cli/AGENTS.md, Errors):
+// an `||` across classes hides which one a refusal is for.
+JsLogicalExpression() as $expr where {
+  $expr <: r"^[\s\S]*\binstanceof\b[\s\S]*\|\|[\s\S]*|^[\s\S]*\|\|[\s\S]*\binstanceof\b[\s\S]*",
+  register_diagnostic(span=$expr, message="Check one class per `if (error instanceof X)`; do not join instanceof checks with `||`.", severity="error")
+}

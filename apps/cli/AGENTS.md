@@ -371,6 +371,8 @@
   `src/lib/pm/package-command.ts`, `src/lib/git/git.ts` and
   `src/lib/orca/scaffolders/cli.ts`.
 - Let an error nobody anticipated bubble up unwrapped.
+- These rules are lint: `biome-plugins/error-*.grit` and `no-node-fs-promises.grit` fail
+  `biome check` on any catch that breaks them (`src/lib/orca/patchers` excepted).
 
 ## Telemetry
 

@@ -1,0 +1,16 @@
+language js
+
+// An error is recognised only by its class (apps/cli/AGENTS.md, Errors). Only
+// the documented boundaries read a foreign error's code, to turn it into one
+// of our classes.
+or {
+  `isErrno($error, $code)`,
+  `"code" in $error`,
+  `"syscall" in $error`,
+  `"stderr" in $error`,
+  `($error as NodeJS.ErrnoException).code`
+} as $probe where {
+  not $filename <: r".*/apps/cli/src/lib/(?:fs/index|errno|zitadel/storage/backend/store|server/local/internal/binary-launcher)\.ts$",
+  not $filename <: r".*/apps/cli/src/cli/commands/doctor/checks/local-runtime\.ts$",
+  register_diagnostic(span=$probe, message="Recognise an error by its class with instanceof, never by its code; only the documented boundaries read a Node error's code.", severity="error")
+}

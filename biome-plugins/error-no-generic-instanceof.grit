@@ -1,0 +1,12 @@
+language js
+
+// `error instanceof Error` matches nearly every error, so it is a catch-all
+// written as a class check (apps/cli/AGENTS.md, Errors). Name the classes the
+// call can throw; a foreign call that throws untyped errors is wrapped at its
+// boundary in one of our classes.
+`$error instanceof Error` as $check where {
+  // The CLI's last-resort normalisers in lib/errors.ts take whatever escaped
+  // every command, so they have no class to name.
+  not $filename <: r".*/apps/cli/src/lib/errors\.ts$",
+  register_diagnostic(span=$check, message="Do not recognise an error as `instanceof Error`: name the classes the call can throw, or wrap the foreign call at its boundary in one of our classes.", severity="error")
+}
