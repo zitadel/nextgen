@@ -2,6 +2,7 @@ import { Claim } from "@/lib/claim";
 import { ZitadelRuntime } from "@/lib/server";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { FsError } from "@/lib/fs";
 import { Project, ProjectError } from "@/lib/project";
 
 /**
@@ -90,7 +91,7 @@ export class ClaimCheck implements SanityCheck {
         path: this.path,
       };
     } catch (error) {
-      if (error instanceof ProjectError) {
+      if (error instanceof ProjectError || error instanceof FsError) {
         return {
           name: this.name,
           status: "pass",

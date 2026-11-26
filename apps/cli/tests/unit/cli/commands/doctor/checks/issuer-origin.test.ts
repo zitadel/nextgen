@@ -1,4 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
@@ -266,6 +266,15 @@ describe("IssuerOriginCheck.run", () => {
     it("skips, passing, when .zitadel/secret cannot be read", async ({ dir }) => {
       await aProject(dir, AS_PREVIEW);
       await rm(join(dir, ".zitadel/secret"));
+
+      const outcome = await check.run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
+    it("skips, passing, when .zitadel/secret is not JSON", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      await writeFile(join(dir, ".zitadel/secret"), "{not json");
 
       const outcome = await check.run(aCheckContext(dir));
 

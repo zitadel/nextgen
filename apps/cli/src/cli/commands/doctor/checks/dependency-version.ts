@@ -1,5 +1,6 @@
 import semver from "semver";
 
+import { FsError } from "@/lib/fs";
 import { PM, PmManifestInvalidError } from "@/lib/pm";
 import { suggestedCommandOf } from "@/lib/suggestion";
 import { Dependencies } from "@/lib/upgrade/dependencies";
@@ -105,7 +106,7 @@ export class DependencyVersionCheck implements SanityCheck {
             : "No exactly-pinned Zitadel packages to compare",
       };
     } catch (error) {
-      if (error instanceof PmManifestInvalidError) {
+      if (error instanceof PmManifestInvalidError || error instanceof FsError) {
         return {
           ...base,
           status: "pass",

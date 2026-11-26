@@ -13,6 +13,7 @@ import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { FsError } from "@/lib/fs";
 import { Project, ProjectError, type ProjectSecret } from "@/lib/project";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
@@ -215,7 +216,7 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
       throw error;
     }
   } catch (error) {
-    if (error instanceof ProjectError) {
+    if (error instanceof ProjectError || error instanceof FsError) {
       return {
         status: "pass",
         message: "Skipped: could not read the project files that record its origins",

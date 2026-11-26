@@ -1,8 +1,7 @@
-import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
-import { FsNotFoundError, readIfReadable } from "@/lib/fs";
+import { FsError, readIfReadable, rm } from "@/lib/fs";
 import type { ConfigWiringStatus, EjectActions } from "@/lib/orca/patchers/types";
 import { updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
@@ -356,7 +355,7 @@ async function probeConfigWiring(ctx: CheckContext): Promise<ReadonlyArray<Confi
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
     return await ctx.orca.patcherFor(patchCtx.framework.id).verify(patchCtx, { cwd: ctx.cwd });
   } catch (error) {
-    if (error instanceof ProjectError || error instanceof OrcaError) {
+    if (error instanceof ProjectError || error instanceof OrcaError || error instanceof FsError) {
       return [];
     }
     throw error;
@@ -415,11 +414,7 @@ async function materializeManifest(
       written: marked,
     });
   } catch (error) {
-    if (
-      error instanceof ProjectError ||
-      error instanceof OrcaError ||
-      error instanceof FsNotFoundError
-    ) {
+    if (error instanceof ProjectError || error instanceof OrcaError || error instanceof FsError) {
       return;
     }
     throw error;
@@ -496,7 +491,7 @@ export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions 
       rendererId: config.rendererId,
     });
   } catch (error) {
-    if (error instanceof ProjectError || error instanceof OrcaError) {
+    if (error instanceof ProjectError || error instanceof OrcaError || error instanceof FsError) {
       return undefined;
     }
     throw error;
