@@ -9,6 +9,8 @@ import {
   LocalServerDockerMissingError,
   LocalServerInvalidError,
   LocalServerNotRespondingElsewhereError,
+  LocalServerNotRespondingError,
+  LocalServerNotRunningError,
   LocalServerPortBusyError,
   LocalServerStopError,
 } from "@/lib/server/errors";
@@ -44,7 +46,6 @@ import {
   type LocalAdmin,
   localContainerName,
   localRuntimePaths,
-  localServerNotRunning,
   type LocalServers,
   localServerUrl,
   LOG_LEVELS,
@@ -769,7 +770,7 @@ export class LocalRuntime extends ZitadelRuntime {
   static async resolveUrl(cwd: string, fetcher: typeof fetch = fetch): Promise<string> {
     const nearest = await readNearestRuntimeMetadata(cwd);
     if (!nearest) {
-      throw localServerNotRunning();
+      throw new LocalServerNotRunningError("Local Zitadel server is not running");
     }
     // A record counts only for a server that runs, by identity and not by pid alone (see the
     // launchers), and answers.
@@ -798,7 +799,9 @@ export class LocalRuntime extends ZitadelRuntime {
         nearest.dir,
       );
     }
-    throw localServerNotRunning(runtime.server_url);
+    throw new LocalServerNotRespondingError(
+      `Local Zitadel server is not running; no healthy server responded at ${runtime.server_url}`,
+    );
   }
 
   /**

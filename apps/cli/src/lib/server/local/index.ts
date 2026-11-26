@@ -28,7 +28,6 @@ export {
   findUpward,
   localContainerName,
   localRuntimePaths,
-  localServerNotRunning,
   localServerUrl,
   loopbackReach,
   peekRuntimeMetadata,

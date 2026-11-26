@@ -6,8 +6,6 @@ import { dirname, join, resolve } from "node:path";
 
 import { errorMessage } from "@/lib/errors";
 import {
-  LocalServerNotRespondingError,
-  LocalServerNotRunningError,
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
 } from "@/lib/server/errors";
@@ -413,27 +411,6 @@ export async function checkLocalServerHealth(
   }
 }
 
-/**
- * The error for a directory with no running server of its own. With a
- * `serverUrl` there is a record whose server is not running; without one
- * there is no record in the directory or a parent. Nothing falls back to
- * another directory's server on its own.
- *
- * @param serverUrl - The address the record names, when there is a record.
- * @returns The error.
- */
-export function localServerNotRunning(
-  serverUrl?: string,
-): LocalServerNotRespondingError | LocalServerNotRunningError {
-  if (serverUrl) {
-    return new LocalServerNotRespondingError(
-      `Local Zitadel server is not running; no healthy server responded at ${serverUrl}`,
-    );
-  } else {
-    return new LocalServerNotRunningError("Local Zitadel server is not running");
-  }
-}
-
 async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   const path = join(cwd, ".gitignore");
   const existing = (await readIfExists(path)) ?? "";
@@ -462,7 +439,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
   ) {
-    throw malformedRuntime();
+    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
   }
 
   const backend = [input.backend, "docker"].find((value) => {
@@ -489,7 +466,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
       typeof input.server_package !== "string" ||
       typeof input.server_version !== "string"
     ) {
-      throw malformedRuntime();
+      throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
     }
     return {
       ...base,
@@ -508,7 +485,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.container_id !== "string" ||
     typeof input.image !== "string"
   ) {
-    throw malformedRuntime();
+    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
   }
   return {
     ...base,
@@ -598,8 +575,4 @@ function explicitUrlPort(value: string): number | undefined {
   } else {
     return undefined;
   }
-}
-
-function malformedRuntime(): LocalServerRecordMalformedError {
-  return new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
 }
