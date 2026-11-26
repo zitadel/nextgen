@@ -55,10 +55,6 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 	if v, ok := req.SchemaVersion.Get(); ok {
 		resolveReq.SchemaVersion = &v
 	}
-	if id, ok := req.AuthRequestID.Get(); ok {
-		resolveReq.AuthRequestID = &id
-	}
-
 	def, err := h.flowService.Resolve(ctx, resolveReq)
 	if err != nil {
 		return nil, err
@@ -803,12 +799,12 @@ func mapFlowGetError(ctx context.Context, err error) (api.GetFlowStepRes, error)
 	return res, nil
 }
 
-func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
+func buildResolveHint(opt api.OptFlowHint) flowengine.EntryHint {
 	h, ok := opt.Get()
 	if !ok {
-		return service.ResolveFlowHint{}
+		return flowengine.EntryHint{}
 	}
-	out := service.ResolveFlowHint{}
+	out := flowengine.EntryHint{}
 	if v, ok := h.AppID.Get(); ok {
 		out.AppID = &v
 	}

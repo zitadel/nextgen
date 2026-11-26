@@ -19,10 +19,8 @@ type OnSuccessInput struct {
 	GateProofs    map[string]string
 	ProjectID     string
 	UserSchemaURL string
-	Fields        map[string]any
 	Resolved      domain.FlowResolvedFields
 	State         *State
-	ResolvedFlow  *domain.FlowDefinition
 }
 
 // OnSuccessResult is what a handler returns. StepError keeps the

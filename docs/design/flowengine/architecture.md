@@ -20,7 +20,7 @@ graph TD
     OS["internal/flowengine/on_success_handler.go<br>OnSuccessHandler"]
     AA["internal/flowengine/auth_attempt.go<br>AuthAttemptService<br>(incl. passkey registration ceremony, ADR 056)"]
 
-    AAImpl["service: auth-attempt<br>(FlowAuthAttemptAdapter)"]
+    AAImpl["service: auth-attempt<br>(FlowAuthAttempts)"]
     Repo["repository: flow_definitions"]
     UserRepo["repository: users / passwords"]
     Schema["service: SchemaService"]
@@ -92,7 +92,7 @@ The use-case surface the HTTP handler depends on. Four methods:
 |---|---|
 | `Resolve` | Read the revisions the release pins and let the engine pick the `FlowDefinition` to run: `Name` → the one pinned under it, checked by `flowengine.EntryByName`; otherwise all of them, ranked by `flowengine.EntryByAudience` (`entry_definition.go`). |
 | `Start` | Mint the `flow_*` and `sess_*` ids and hand them, with the deployment and release the request resolved to, to `stateMachine.Start`, which builds the `flowengine.State`. |
-| `Submit` | Load the definition `state.DefinitionID` names, hand the request's `flowengine.Definitions` to `stateMachine.Process`. |
+| `Submit` | Hand the request's `flowengine.Definitions` to `stateMachine.Process`, which loads the definition the state names. |
 | `GetStep` | Hand the request's `flowengine.Definitions` to `stateMachine.Render` (no advancement). |
 
 The engine reads the running flow's definition through
@@ -241,7 +241,7 @@ Source of truth for the wire format. The ogen-generated types under `internal/ap
 
 ### auth-attempt service
 
-Wired in as `flowengine.AuthAttemptService` via `FlowAuthAttemptAdapter`
+Wired in as `flowengine.AuthAttemptService` via `FlowAuthAttempts`
 (`internal/service/flow_auth_attempt.go`). The state machine calls `Start` at
 `FlowService.Start`, `SubmitIdentifier` and `SubmitPassword` from
 `dispatchChallenges`, the passkey and passkey-registration issue/submit legs

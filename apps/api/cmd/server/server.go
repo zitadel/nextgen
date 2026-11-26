@@ -449,7 +449,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		Passwords:      passwordPolicy,
 		Protection:     signupProtection,
 		HTTPClient:     egressClient,
-		Now:            time.Now,
 	})
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 

@@ -289,15 +289,6 @@ func providerIDs(providers []domain.FlowSSOProvider) []string {
 	return ids
 }
 
-func hasAction(step *flowengine.Step, name string) bool {
-	for _, a := range step.Actions {
-		if a.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
 // After a provider's email collides, the conflict step names the account by
 // the address the provider verified, leaves out the provider that collided,
 // and offers a passkey only to an account that has one.
@@ -315,8 +306,10 @@ func TestFlowStateMachine_Render_SSOConflictNamesVerifiedAccountAndDropsCollidin
 	require.NotNil(t, result.Step.Identifier)
 	assert.Equal(t, "alice@example.com", result.Step.Identifier.Value)
 	assert.Equal(t, []string{"github"}, providerIDs(result.Step.SSOProviders), "the provider that collided is not offered again")
-	assert.False(t, hasAction(result.Step, flowengine.ActionPasskey), "an account without a passkey is not offered one")
-	assert.True(t, hasAction(result.Step, flowengine.ActionSubmit))
+	_, ok := findAction(result.Step.Actions, flowengine.ActionPasskey)
+	assert.False(t, ok, "an account without a passkey is not offered one")
+	_, ok = findAction(result.Step.Actions, flowengine.ActionSubmit)
+	assert.True(t, ok)
 	assert.Equal(t, "idp-1", result.State.CollectedData.SSOConflictConnectionID)
 }
 
@@ -335,7 +328,8 @@ func TestFlowStateMachine_Render_SSOConflictDoesNotNameUnverifiedAccount(t *test
 	require.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Nil(t, result.Step.Identifier)
 	assert.Equal(t, []string{"github"}, providerIDs(result.Step.SSOProviders))
-	assert.True(t, hasAction(result.Step, flowengine.ActionPasskey))
+	_, ok := findAction(result.Step.Actions, flowengine.ActionPasskey)
+	assert.True(t, ok)
 }
 
 // An address typed earlier on the flow that is not the one that collided

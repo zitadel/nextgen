@@ -2,7 +2,6 @@ package service
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/flowengine"
@@ -25,7 +24,6 @@ type FlowEngineDeps struct {
 	Protection     SignupProtection
 	// HTTPClient makes the IdP calls of an SSO redirect.
 	HTTPClient *http.Client
-	Now        func() time.Time
 }
 
 // NewFlowEngine builds the flow engine with the collaborators the service provides.
@@ -44,11 +42,10 @@ func NewFlowEngine(deps FlowEngineDeps) *flowengine.Runtime {
 			deps.SchemaStore,
 			deps.DB,
 			deps.Protection),
-		AuthAttempts:  NewFlowAuthAttemptAdapter(deps.AuthAttempts, deps.DB, deps.SchemaStore, deps.Protection),
+		AuthAttempts:  NewFlowAuthAttempts(deps.AuthAttempts, deps.DB, deps.SchemaStore, deps.Protection),
 		SSOProviders:  NewFlowSSOProviderResolver(deps.IDPConnections),
 		SSOIdentities: NewFlowSSOIdentityResolver(deps.DB, deps.IDPConnections, deps.Users, deps.SchemaStore, deps.Hashers, deps.Passwords),
 		SSORedirects:  NewFlowSSORedirectIssuer(deps.IDPConnections, deps.AuthAttempts, deps.Keys, deps.Variables, deps.HTTPClient),
 		Passwords:     deps.Passwords,
-		Now:           deps.Now,
 	})
 }

@@ -122,10 +122,6 @@ var purposeChangeNotices = map[string]string{
 // StateMachine drives a flow definition forward in response to
 // client submissions. The handler owns cookie I/O; the state machine
 // never touches cookies.
-//
-// MVP scope: single linear flow per `flow_id`, no pivot stack, no
-// challenges, no gates. `Pop` on [StepResult] stays reserved for
-// the deferred pivot work.
 type StateMachine interface {
 	Start(ctx context.Context, in StartInput) (StepResult, error)
 	// Process and Render read the flow's definition through
@@ -202,16 +198,14 @@ type SSOProviderRef struct {
 }
 
 // StepResult is what the state machine returns from [Start] and
-// [Process]. Pop is reserved for the deferred pivot stack. HandoffToken
-// + HandoffTokenExpiresAt are populated only on the terminal step;
-// SSOBindingNonce only on the [StepNameSSORedirect] step, where the
-// handler sets it as the browser-binding cookie. Reseal is set only by
-// [Render], when resolving a parked SSO identity changed the state: the
-// handler re-seals only such a render.
+// [Process]. HandoffToken + HandoffTokenExpiresAt are populated only on
+// the terminal step; SSOBindingNonce only on the [StepNameSSORedirect]
+// step, where the handler sets it as the browser-binding cookie. Reseal
+// is set only by [Render], when resolving a parked SSO identity changed
+// the state: the handler re-seals only such a render.
 type StepResult struct {
 	State                 *State
 	Step                  *Step
-	Pop                   bool
 	HandoffToken          string
 	HandoffTokenExpiresAt time.Time
 	SSOBindingNonce       string
@@ -467,6 +461,9 @@ func (r *Runtime) Process(ctx context.Context, defs Definitions, state *State, i
 	def, err := ActiveDefinition(ctx, defs, state)
 	if err != nil {
 		return StepResult{}, err
+	}
+	if r.authAttempts == nil {
+		return StepResult{}, fmt.Errorf("%w: auth-attempt service not wired", domain.ErrFlowIntegrity())
 	}
 	// A dead attempt fails every submission that reaches it, so the flow
 	// restarts here, as a render does. A handoff racing this read still ends

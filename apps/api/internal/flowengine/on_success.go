@@ -32,10 +32,8 @@ func (createUserHandler) run(r *Runtime, pc *processCtx, resolved domain.FlowRes
 		GateProofs:    pc.in.GateProofs,
 		ProjectID:     pc.state.ProjectID,
 		UserSchemaURL: pc.state.UserSchemaURL,
-		Fields:        pc.in.Fields,
 		Resolved:      visitedResolved,
 		State:         pc.state,
-		ResolvedFlow:  pc.def,
 	})
 	if err != nil {
 		return StepResult{}, err

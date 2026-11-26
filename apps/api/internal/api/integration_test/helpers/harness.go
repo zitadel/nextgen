@@ -13,7 +13,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
@@ -54,7 +53,6 @@ type Harness struct {
 	projectService        dependency[service.ProjectService]
 	flowDefinitionService dependency[service.FlowDefinitionService]
 	userService           dependency[service.UserService]
-	flowStateMachine      dependency[*flowengine.Runtime]
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]
 	oauthSettingsService  dependency[*service.OAuthSettingsService]

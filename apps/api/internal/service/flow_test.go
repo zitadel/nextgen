@@ -316,7 +316,7 @@ func TestResolve_ChoosesByTheRequestsCriteria(t *testing.T) {
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		SchemaVersion: new("1.0.0"),
-		Hint:          service.ResolveFlowHint{AppID: new("app-1")},
+		Hint:          flowengine.EntryHint{AppID: new("app-1")},
 	})
 	require.NoError(t, err)
 	assert.Same(t, byApp, got)

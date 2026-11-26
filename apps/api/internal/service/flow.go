@@ -20,8 +20,8 @@ type FlowService interface {
 	Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error)
 	// Start mints a fresh flow on the resolved definition.
 	Start(ctx context.Context, req StartFlowRequest) (flowengine.StepResult, error)
-	// Submit advances the state machine. Re-fetches the definition
-	// from flowengine.State.DefinitionID.
+	// Submit advances the flow; the engine reads the definition the state
+	// names.
 	Submit(ctx context.Context, req SubmitFlowRequest) (flowengine.StepResult, error)
 	// GetStep re-emits the current step without advancing.
 	GetStep(ctx context.Context, req GetFlowStepRequest) (flowengine.StepResult, error)
@@ -62,13 +62,10 @@ type ResolveFlowRequest struct {
 	Purpose       domain.FlowDefinitionPurpose
 	Name          *string // direct-lookup slug
 	SchemaVersion *string // nil = the revision the release pins
-	AuthRequestID *string
 	// Hint scopes audience resolution (ignored when Name is set); see
 	// [flowengine.EntryByAudience].
-	Hint ResolveFlowHint
+	Hint flowengine.EntryHint
 }
-
-type ResolveFlowHint = flowengine.EntryHint
 
 func NewFlowService(
 	v2Pool *DB,
@@ -224,7 +221,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 	if err != nil {
 		return flowengine.StepResult{}, err
 	}
-	return flowengine.StepResult{State: result.State, Step: result.Step}, nil
+	return result, nil
 }
 
 func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res flowengine.StepResult, err error) {
@@ -252,13 +249,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res fl
 	if err != nil {
 		return flowengine.StepResult{}, err
 	}
-	return flowengine.StepResult{
-		State:                 result.State,
-		Step:                  result.Step,
-		HandoffToken:          result.HandoffToken,
-		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
-		SSOBindingNonce:       result.SSOBindingNonce,
-	}, nil
+	return result, nil
 }
 
 func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res flowengine.StepResult, err error) {
@@ -284,18 +275,11 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 			return flowengine.StepResult{}, err
 		}
 	}
-	return flowengine.StepResult{
-		State:                 result.State,
-		Step:                  result.Step,
-		HandoffToken:          result.HandoffToken,
-		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
-		Reseal:                result.Reseal,
-	}, nil
+	return result, nil
 }
 
-// flowDefinitions loads one request's flow definitions by revision id. A
-// flow's state names a revision the release it started under pins, and every
-// later request runs under that sealed release.
+// flowDefinitions looks up a flow definition by id within the flow's
+// project.
 type flowDefinitions struct {
 	pool      *DB
 	projectID string
