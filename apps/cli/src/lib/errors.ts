@@ -1,6 +1,11 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import { BackendError, BackendUnavailableError, type UnavailableReason } from "./backend";
+import {
+  BackendError,
+  BackendTimeoutError,
+  BackendUnreachableError,
+  BackendUnreadableError,
+} from "./backend";
 import { isObject } from "./json";
 import type { Suggested } from "./suggestion";
 
@@ -209,15 +214,6 @@ export class PromptCancelled extends ZitadelError {
   }
 }
 
-/** What to do about a request that got no usable response, by its reason. */
-const NETWORK_HINTS: Record<UnavailableReason, string> = {
-  unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
-  timeout:
-    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
-  unreadable:
-    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
-};
-
 /**
  * oclif's footer under a command line it refused. It is oclif's own name for
  * what this CLI calls `Next:`, and finding it is the only way to tell one of
@@ -355,10 +351,22 @@ export function toZitadelError(error: unknown): ZitadelError {
  * its class, and its message as it was given.
  */
 function fromBackendError(error: BackendError): ZitadelError {
-  if (error instanceof BackendUnavailableError && error.reason !== undefined) {
+  if (error instanceof BackendUnreachableError) {
     return new ZitadelError("E_NETWORK", error.message, {
-      hint: NETWORK_HINTS[error.reason],
-      details: { url: error.url, reason: error.reason },
+      hint: "Check your connection and the server URL (ZITADEL_URL or --server).",
+      details: { url: error.url, reason: "unreachable" },
+    });
+  }
+  if (error instanceof BackendTimeoutError) {
+    return new ZitadelError("E_NETWORK", error.message, {
+      hint: "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+      details: { url: error.url, reason: "timeout" },
+    });
+  }
+  if (error instanceof BackendUnreadableError) {
+    return new ZitadelError("E_NETWORK", error.message, {
+      hint: "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+      details: { url: error.url, reason: "unreadable" },
     });
   }
   if (error.status === undefined || error.url === undefined) {

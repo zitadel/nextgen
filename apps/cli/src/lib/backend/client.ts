@@ -21,7 +21,10 @@ import {
   BackendRequestInvalidError,
   BackendTooManyRequestsError,
   BackendUnauthorizedError,
+  BackendTimeoutError,
   BackendUnavailableError,
+  BackendUnreachableError,
+  BackendUnreadableError,
 } from "./errors";
 
 /**
@@ -100,9 +103,20 @@ function refusalOf(error: ApiError): BackendError {
  */
 export function translateFailure(error: unknown): unknown {
   if (error instanceof NetworkError) {
-    return new BackendUnavailableError(error.message, {
+    if (error.reason === "timeout") {
+      return new BackendTimeoutError(error.message, {
+        url: error.url,
+        cause: error,
+      });
+    }
+    if (error.reason === "unreadable") {
+      return new BackendUnreadableError(error.message, {
+        url: error.url,
+        cause: error,
+      });
+    }
+    return new BackendUnreachableError(error.message, {
       url: error.url,
-      reason: error.reason,
       cause: error,
     });
   }

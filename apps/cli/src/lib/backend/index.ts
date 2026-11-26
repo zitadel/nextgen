@@ -35,8 +35,10 @@ export {
   BackendRequestInvalidError,
   BackendTooManyRequestsError,
   BackendUnauthorizedError,
+  BackendTimeoutError,
   BackendUnavailableError,
-  type UnavailableReason,
+  BackendUnreachableError,
+  BackendUnreadableError,
 } from "./errors";
 export {
   type AttemptFactor,

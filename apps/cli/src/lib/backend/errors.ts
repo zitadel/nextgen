@@ -162,28 +162,32 @@ export class BackendForbiddenError extends BackendError {
   override readonly code: ZitadelErrorCode = "E_AUTH";
 }
 
-/** Why a request got no usable response. */
-export type UnavailableReason = "unreachable" | "unreadable" | "timeout";
+/** Nothing answered the connection to the server. */
+export class BackendUnreachableError extends BackendError {
+  override readonly category: ErrorCategory = "unavailable";
+  override readonly retryable: boolean = true;
+  override readonly code: ZitadelErrorCode = "E_NETWORK";
+}
 
-/** What a {@link BackendUnavailableError} carries beyond a {@link BackendError}. */
-export type UnavailableErrorOptions = BackendErrorOptions &
-  Readonly<{
-    /** Why no response came, when none did. */
-    reason?: UnavailableReason | undefined;
-  }>;
+/** The server accepted the connection but did not answer in time. */
+export class BackendTimeoutError extends BackendError {
+  override readonly category: ErrorCategory = "unavailable";
+  override readonly retryable: boolean = true;
+  override readonly code: ZitadelErrorCode = "E_NETWORK";
+}
 
-/** The server could not be used: it did not answer, or it failed with a `5xx`. */
+/** The server answered, but its response could not be read. */
+export class BackendUnreadableError extends BackendError {
+  override readonly category: ErrorCategory = "unavailable";
+  override readonly retryable: boolean = true;
+  override readonly code: ZitadelErrorCode = "E_NETWORK";
+}
+
+/** The server could not be used: it failed with a `5xx`. */
 export class BackendUnavailableError extends BackendError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
-
-  readonly reason: UnavailableReason | undefined;
-
-  constructor(message: string, options: UnavailableErrorOptions = {}) {
-    super(message, options);
-    this.reason = options.reason;
-  }
 }
 
 /** The server asked the caller to come back later: a `429`. */
