@@ -590,8 +590,9 @@ describe("LocalRuntime", () => {
       await rejection.toBeInstanceOf(LocalServerNotRespondingElsewhereError);
       await rejection.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
-        message: expect.stringContaining(url),
+        message: "Local Zitadel server is not running",
         directory: cwd,
+        serverUrl: url,
       });
     });
 

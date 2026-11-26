@@ -1350,7 +1350,8 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_NOT_FOUND",
-        message: expect.stringContaining(".zitadel/flows/"),
+        message: "No login flow runs against default-human-user",
+        hint: expect.stringContaining(".zitadel/flows/"),
       });
     });
 

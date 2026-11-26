@@ -234,7 +234,7 @@ describe("deploy", () => {
         const app = await aSetUpApp();
         await app.holdsTwoBrandings();
 
-        const result = await app.run(["deploy", "--json"]);
+        const result = await app.run(["deploy", "-m", "two brandings", "--json"]);
 
         expect(app.envelopeOf(result)).toMatchObject({
           status: "error",

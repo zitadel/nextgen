@@ -629,8 +629,9 @@ describe("Orca.planScaffold", () => {
     const withoutPatchers = new Orca(detectors, scaffolders, [], LocalRuntime.DIR);
 
     await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
+      name: "OrcaPatcherMissingError",
       code: "E_VALIDATION",
-      message: 'No patcher supports "next"; Zitadel integration currently supports Next.js',
+      message: 'No patcher supports "next"',
     });
   });
 });

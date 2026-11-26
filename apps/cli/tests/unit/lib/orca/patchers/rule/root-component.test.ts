@@ -129,9 +129,13 @@ describe("assertMountsRootComponent", () => {
     });
 
     await expect(assertMountsRootComponent(cwd, "src/main.jsx", REACT_ROOT)).rejects.toMatchObject({
+      name: "OrcaRootComponentMountError",
       code: "E_CONFLICT",
-      message:
-        'src/main.jsx mounts src/App.jsx, not the src/App.tsx setup writes; import the root as `import App from "./App.tsx"` and mount that instead',
+      message: "src/main.jsx mounts src/App.jsx, not the src/App.tsx setup writes",
+      entry: "src/main.jsx",
+      mountedRoot: "src/App.jsx",
+      root: "src/App.tsx",
+      statement: 'import App from "./App.tsx"',
     });
   });
 
@@ -273,8 +277,10 @@ bootstrapApplication(AppComponent, appConfig)
     });
 
     await expect(assertMountsRootComponent(cwd, "src/main.ts", angular)).rejects.toMatchObject({
-      message:
-        'src/main.ts mounts src/app/app.component.ts, not the src/app/app.ts setup writes; import the root as `import { App } from "./app/app"` and mount that instead',
+      message: "src/main.ts mounts src/app/app.component.ts, not the src/app/app.ts setup writes",
+      mountedRoot: "src/app/app.component.ts",
+      root: "src/app/app.ts",
+      statement: 'import { App } from "./app/app"',
     });
   });
 

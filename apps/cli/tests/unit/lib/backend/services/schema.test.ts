@@ -97,7 +97,8 @@ describe("SchemaService.get", () => {
         listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
       }).get("typo"),
     ).rejects.toMatchObject({
-      name: "BackendNotFoundError",
+      name: "BackendNameUnknownError",
+      code: "E_NOT_FOUND",
       message: 'No schema named "typo"',
     });
   });

@@ -1,15 +1,6 @@
 import { providerOf, selectionName } from "@zitadel/config/idp";
 
 import { FLOW_UNCHECKED_REFUSAL } from "@/cli/commands/auth-method/command";
-import {
-  ACTION_CLASH_REFUSAL,
-  CONNECTION_DUPLICATED_REFUSAL,
-  CREDENTIALS_DOUBLED_REFUSAL,
-  PROVIDER_MISMATCH_REFUSAL,
-  ROUTE_LOSS_REFUSAL,
-  SLUG_DUPLICATED_REFUSAL,
-  VARIABLE_SHARED_REFUSAL,
-} from "@/cli/commands/auth-method/sso/enable/shared";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
@@ -38,6 +29,100 @@ import {
   ZitadelConfigFlowUncheckedError,
   ZitadelConfigProviderFileTakenError,
 } from "@/lib/zitadel";
+
+/**
+ * What more than one connection to the provider being enabled is refused for.
+ */
+const CONNECTION_DUPLICATED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Keep the one this project should use and remove the others, then run the command again.",
+  details: {
+    provider: "{provider}",
+    files: "{paths}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What more than one connection named by the slug being enabled is refused for.
+ */
+const SLUG_DUPLICATED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "A slug names one connection. Remove or rename all but one, then run the command again.",
+  details: {
+    slug: "{slug}",
+    files: "{paths}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a new connection's file that is a connection with its slug to another
+ * issuer is refused for.
+ */
+const PROVIDER_MISMATCH_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Point it at the provider if it is that connection. Otherwise change its slug, in the file and in the schemas and flows that name it, then run the command again.",
+  details: {
+    file: "{path}",
+    slug: "{slug}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a connection reading both credentials from one variable is refused for.
+ */
+const CREDENTIALS_DOUBLED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Give client_id and client_secret separate ${{ NAME }} references, then run the command again.",
+  details: {
+    slug: "{slug}",
+    variable: "{variable}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What two connections reading a credential from one variable are refused for.
+ */
+const VARIABLE_SHARED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Point one of them at a variable of its own, then run the command again.",
+  details: {
+    file: "{path}",
+    slug: "{slug}",
+    other_slug: "{otherSlug}",
+    variable: "{variable}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a step whose action is named like an outcome the edit writes is
+ * refused for.
+ */
+const ACTION_CLASH_REFUSAL = {
+  message: "{message}",
+  hint: 'Rename the action "{action}" on step "{step}" (and its transition), then run auth-method sso enable again.',
+  details: {
+    step: "{step}",
+    action: "{action}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a step whose legacy outcome declares a purpose or an action is refused
+ * for.
+ */
+const ROUTE_LOSS_REFUSAL = {
+  message: "{message}",
+  hint: 'Remove purpose and action from the transition "{transition}" on step "{step}", then run auth-method sso enable again.',
+  details: {
+    step: "{step}",
+    transition: "{transition}",
+  },
+} as const satisfies Refusal;
 
 /**
  * What a client id other than the one the connection file holds is refused for.

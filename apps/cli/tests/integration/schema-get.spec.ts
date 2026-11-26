@@ -23,7 +23,7 @@ describe("schema get", () => {
         expect(app.envelopeOf(result)).toMatchObject({
           status: "error",
           code: "E_NOT_FOUND",
-          hint: "Run `schema list` to see the object types this project has.",
+          hint: "Run schema list to see the object types this project has.",
         });
       });
     });

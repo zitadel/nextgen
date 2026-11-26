@@ -95,7 +95,8 @@ describe("FlowService.get", () => {
         },
       }).get("typo"),
     ).rejects.toMatchObject({
-      name: "BackendNotFoundError",
+      name: "BackendNameUnknownError",
+      code: "E_NOT_FOUND",
       message: 'No flow definition named "typo"',
     });
   });
