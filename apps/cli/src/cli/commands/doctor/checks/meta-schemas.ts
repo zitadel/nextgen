@@ -1,5 +1,6 @@
 import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
+import { isErrno } from "@/lib/errno";
 import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
@@ -141,10 +142,28 @@ async function drift(ctx: CheckContext): Promise<MetaSchemaDrift> {
         result[state].push(file);
       }
     } catch (error) {
-      result.unreadable.push({
-        path: file.path,
-        reason: error instanceof Error && "code" in error ? String(error.code) : String(error),
-      });
+      if (isErrno(error, "EACCES")) {
+        result.unreadable.push({
+          path: file.path,
+          reason: "EACCES",
+        });
+        continue;
+      }
+      if (isErrno(error, "EISDIR")) {
+        result.unreadable.push({
+          path: file.path,
+          reason: "EISDIR",
+        });
+        continue;
+      }
+      if (isErrno(error, "ENOTDIR")) {
+        result.unreadable.push({
+          path: file.path,
+          reason: "ENOTDIR",
+        });
+        continue;
+      }
+      throw error;
     }
   }
   return result;
