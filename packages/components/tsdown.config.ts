@@ -124,6 +124,8 @@ export default defineConfig([
     tsconfig: "tsconfig.lib.json",
     dts: false,
     sourcemap: false,
+    // Nothing minifies this file after us: it is loaded as is from a CDN.
+    minify: true,
     clean: false,
     target: "es2022",
     deps: {

@@ -19,7 +19,7 @@ import { gzipSync } from "node:zlib";
  * The gzip budgets, in bytes. Raise one only with the reason in the commit.
  */
 export const BUDGETS = {
-  standalone: 205_000,
+  standalone: 106_000,
   defaultPath: 142_000,
 };
 
