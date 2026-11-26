@@ -1,4 +1,4 @@
-import { DestroyPermit } from "@/lib/server";
+import { DestroyPermit, LocalServerInvalidError, LocalServerStopError } from "@/lib/server";
 import type { CommandResult } from "@/cli/core";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -7,6 +7,7 @@ import { Destructive } from "@/cli/core/destructive";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
@@ -16,6 +17,22 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 type ResetTarget =
   | Readonly<{ backend: "binary"; pid: number; log_path: string }>
   | Readonly<{ backend: "docker" | "missing"; container_name: string }>;
+
+/** How a reset is refused when a server on this folder's data would not stop. */
+const SERVER_DID_NOT_STOP_REFUSAL = {
+  message: "{message}",
+  hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
+} as const satisfies Refusal;
+
+/**
+ * How a reset is refused when it cannot tell what runs on the data: the record
+ * is damaged and the machine's processes cannot be listed, Docker failed to
+ * remove the container, or the permit names another folder.
+ */
+const RESET_REFUSED_REFUSAL = {
+  message: "{message}",
+  hint: "Stop the local Zitadel server yourself (its process or Docker container), then run `zitadel reset --force` again from the folder whose server you mean to reset.",
+} as const satisfies Refusal;
 
 /**
  * `zitadel reset`: stops and removes this folder's server and deletes its data.
@@ -83,20 +100,36 @@ export default class Reset extends Telemetered(
         `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
       ].join("\n"),
       apply: async () => {
-        await this.serverInThisFolder().reset(DestroyPermit.forFolder(this.cwd));
-        const title = "Local Zitadel server runtime reset";
+        try {
+          await this.serverInThisFolder().reset(DestroyPermit.forFolder(this.cwd));
+          const title = "Local Zitadel server runtime reset";
 
-        return {
-          status: "ok",
-          data: {
-            title,
-            runtime: { ...target, data_deleted: true },
-          },
-          summary: {
-            title,
-            sections: [facts],
-          },
-        };
+          return {
+            status: "ok",
+            data: {
+              title,
+              runtime: { ...target, data_deleted: true },
+            },
+            summary: {
+              title,
+              sections: [facts],
+            },
+          };
+        } catch (error) {
+          if (error instanceof LocalServerStopError) {
+            throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
+              ...error,
+              message: error.message,
+            });
+          }
+          if (error instanceof LocalServerInvalidError) {
+            throw refusalError(RESET_REFUSED_REFUSAL, {
+              ...error,
+              message: error.message,
+            });
+          }
+          throw error;
+        }
       },
     });
   }

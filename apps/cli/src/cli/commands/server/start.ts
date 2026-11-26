@@ -3,7 +3,9 @@ import { z } from "zod";
 
 import {
   LocalRuntime,
+  LocalServerBusyError,
   LocalServerDockerMissingError,
+  LocalServerInvalidError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
   LocalServerRecordMalformedError,
@@ -153,6 +155,23 @@ const RECORD_UNREADABLE_REFUSAL = {
 const SERVER_WOULD_NOT_STOP_REFUSAL = {
   message: "Existing local Zitadel server did not stop",
   hint: "Stop the existing local runtime manually, then rerun start.",
+} as const satisfies Refusal;
+
+/** How a start is refused when another start in the folder still holds its lock. */
+const START_IN_PROGRESS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Wait for it to finish, or delete the start lock if no start is running.",
+} as const satisfies Refusal;
+
+/**
+ * How a start is refused when what it needs is not usable: the server package
+ * is missing or cannot be launched, a local file it reads (the env file or the
+ * local admin) cannot be read or is malformed, or Docker failed.
+ */
+const CANNOT_START_REFUSAL = {
+  message: "{message}",
+  hint: "If the server package is missing or cannot be launched, reinstall @zitadel/cli. If a local file is named, fix its permissions, or delete a malformed one and run `zitadel reset --force`, then `zitadel start`. If Docker failed, check that it is running and reachable from this shell.",
 } as const satisfies Refusal;
 
 /**
@@ -465,6 +484,18 @@ export default class Start extends Telemetered(
       }
       if (error instanceof LocalServerStopError) {
         throw refusalError(SERVER_WOULD_NOT_STOP_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerBusyError) {
+        throw refusalError(START_IN_PROGRESS_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerInvalidError) {
+        throw refusalError(CANNOT_START_REFUSAL, {
           ...error,
           message: error.message,
         });

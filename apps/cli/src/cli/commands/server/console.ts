@@ -5,6 +5,11 @@ import { Environment } from "@/lib/environment";
 import {
   AdminSession,
   LocalRuntime,
+  LocalServerDeniedError,
+  LocalServerInvalidError,
+  LocalServerNotRespondingElsewhereError,
+  LocalServerNotRespondingError,
+  LocalServerNotRunningError,
   LocalServerPlatformMissingError,
   ZitadelRuntime,
 } from "@/lib/server";
@@ -39,6 +44,56 @@ const PLATFORM_MISSING_REFUSAL = {
       id: "start",
     },
   ],
+} as const satisfies Refusal;
+
+/** How a run is refused when no local server was started here or in a parent. */
+const NOT_RUNNING_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
+  next: [
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local server this folder started does not answer. */
+const NOT_RESPONDING_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "Run `zitadel start` to bring it back.",
+  next: [
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local server a parent folder started does not answer. */
+const NOT_RESPONDING_ELSEWHERE_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "It was started in another directory: run `zitadel start` there to bring it back.",
+  next: ["{start}"],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local server refused the local admin. */
+const ADMIN_DENIED_REFUSAL = {
+  code: "E_AUTH",
+  message: "{message}",
+  hint: "Check `zitadel logs` first: it shows why the local server refused the local admin. If the logs show no error, the local data directory predates the local admin, and `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
+  next: [
+    {
+      id: "logs",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a run is refused when the local admin file cannot be read or is malformed. */
+const ADMIN_FILE_UNUSABLE_REFUSAL = {
+  message: "{message}",
+  hint: "If the file cannot be read, check that it is readable by you; `zitadel start` writes it owner-only. If it is malformed, delete it and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
 } as const satisfies Refusal;
 
 /**
@@ -217,6 +272,41 @@ export default class Console extends Telemetered(
           message: error.message,
         });
       }
+      if (error instanceof LocalServerNotRunningError) {
+        throw refusalError(NOT_RUNNING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerNotRespondingError) {
+        throw refusalError(NOT_RESPONDING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerNotRespondingElsewhereError) {
+        throw refusalError(
+          NOT_RESPONDING_ELSEWHERE_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {
+                cwd: error.directory,
+              },
+            },
+          },
+        );
+      }
+      if (error instanceof LocalServerDeniedError) {
+        throw refusalError(ADMIN_DENIED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       throw error;
     }
   }
@@ -239,15 +329,25 @@ export default class Console extends Telemetered(
 
     const found = await LocalRuntime.findAdminDir(this.cwd);
     const localDir = found ?? this.cwd;
-    const admin = await this.serverInThisFolder(localDir).admin();
-    if (admin === undefined) {
-      throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
-    }
+    try {
+      const admin = await this.serverInThisFolder(localDir).admin();
+      if (admin === undefined) {
+        throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
+      }
 
-    return {
-      kind: "local" as const,
-      localDir,
-      admin,
-    };
+      return {
+        kind: "local" as const,
+        localDir,
+        admin,
+      };
+    } catch (error) {
+      if (error instanceof LocalServerInvalidError) {
+        throw refusalError(ADMIN_FILE_UNUSABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   }
 }

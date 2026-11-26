@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { LocalRuntime } from "@/lib/server";
+import { LocalRuntime, LocalServerInvalidError } from "@/lib/server";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
@@ -46,6 +46,20 @@ const NOT_STARTED_REFUSAL = {
   message: "Local Zitadel runtime has not been started",
   hint: "Start the local server first.",
   next: [{ id: "start" }],
+} as const satisfies Refusal;
+
+/**
+ * How reading the log is refused when the folder has no record of a start, or
+ * Docker could not read the container's log.
+ */
+const LOG_UNREADABLE_REFUSAL = {
+  message: "{message}",
+  hint: "Run `zitadel start` first if it never ran here; otherwise check that Docker is running and can read the local server's container.",
+  next: [
+    {
+      id: "start",
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -98,79 +112,89 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
       throw refusalError(NOT_STARTED_REFUSAL, {});
     }
 
-    if (flags.follow) {
-      await server.follow({
-        tail: flags.tail,
-        level: flags.level,
-        print: (lines) => {
-          if (!lines.isEmpty) {
-            process.stdout.write(`${lines.drawn(Output.color).join("\n")}\n`);
-          }
-        },
-        signal: this.signal,
-      });
-
-      const title = "Stopped following local Zitadel logs";
-      if (Output.screen) {
-        return {
-          status: "ok",
-          data: { title },
-          summary: {
-            title,
-            sections: [],
+    try {
+      if (flags.follow) {
+        await server.follow({
+          tail: flags.tail,
+          level: flags.level,
+          print: (lines) => {
+            if (!lines.isEmpty) {
+              process.stdout.write(`${lines.drawn(Output.color).join("\n")}\n`);
+            }
           },
-        };
-      } else {
-        return {
-          status: "ok",
-          data: { title },
-          pretty: prose(""),
-          summary: {
-            title,
-            sections: [],
-          },
-        };
-      }
-    } else {
-      const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
-      const shown = lines.drawn(Output.color);
-      const title = "Local Zitadel server logs";
+          signal: this.signal,
+        });
 
-      if (runtime.backend === "binary") {
-        return {
-          status: "ok",
-          data: {
-            title,
-            runtime: {
-              backend: runtime.backend,
-              pid: runtime.pid,
-              log_path: runtime.log_path,
+        const title = "Stopped following local Zitadel logs";
+        if (Output.screen) {
+          return {
+            status: "ok",
+            data: { title },
+            summary: {
+              title,
+              sections: [],
             },
-            logs: lines.text(),
-          },
-          pretty: painted(shown.join("\n")),
-          summary: {
-            title,
-            sections: [],
-            lines: shown,
-          },
-        };
+          };
+        } else {
+          return {
+            status: "ok",
+            data: { title },
+            pretty: prose(""),
+            summary: {
+              title,
+              sections: [],
+            },
+          };
+        }
       } else {
-        return {
-          status: "ok",
-          data: {
-            title,
-            runtime: { backend: runtime.backend, container_name: runtime.container_name },
-            logs: lines.text(),
-          },
-          pretty: painted(shown.join("\n")),
-          summary: {
-            title,
-            sections: [],
-            lines: shown,
-          },
-        };
+        const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
+        const shown = lines.drawn(Output.color);
+        const title = "Local Zitadel server logs";
+
+        if (runtime.backend === "binary") {
+          return {
+            status: "ok",
+            data: {
+              title,
+              runtime: {
+                backend: runtime.backend,
+                pid: runtime.pid,
+                log_path: runtime.log_path,
+              },
+              logs: lines.text(),
+            },
+            pretty: painted(shown.join("\n")),
+            summary: {
+              title,
+              sections: [],
+              lines: shown,
+            },
+          };
+        } else {
+          return {
+            status: "ok",
+            data: {
+              title,
+              runtime: { backend: runtime.backend, container_name: runtime.container_name },
+              logs: lines.text(),
+            },
+            pretty: painted(shown.join("\n")),
+            summary: {
+              title,
+              sections: [],
+              lines: shown,
+            },
+          };
+        }
       }
+    } catch (error) {
+      if (error instanceof LocalServerInvalidError) {
+        throw refusalError(LOG_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
     }
   }
 }
