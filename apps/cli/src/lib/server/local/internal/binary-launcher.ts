@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
-import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -11,6 +10,7 @@ import { ExecaError, execa } from "execa";
 import pWaitFor from "p-wait-for";
 
 import { errorMessage } from "@/lib/errors";
+import { FsNotFoundError, mkdir, open, readFile, stat } from "@/lib/fs";
 import { LocalServerInvalidError } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
@@ -334,7 +334,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return await readFile(logPath, "utf8");
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         return "";
       }
       throw error;
@@ -543,7 +543,7 @@ async function fileSize(path: string): Promise<number> {
   try {
     return (await stat(path)).size;
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return 0;
     }
     throw error;
