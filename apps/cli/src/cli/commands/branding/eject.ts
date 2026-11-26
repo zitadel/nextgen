@@ -1,5 +1,4 @@
 import { dryRunResult } from "@/cli/core/crud/shared";
-import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import {
@@ -13,8 +12,7 @@ import {
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
-import { isErrno } from "@/lib/errno";
-import { pathExists } from "@/lib/fs";
+import { FsExistsError, mkdir, pathExists, writeFile } from "@/lib/fs";
 import { MetaSchemas } from "@/lib/meta-schemas";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
@@ -287,7 +285,7 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
         await writeFile(dest, content, overwrite ? undefined : { flag: "wx" });
         filesWritten.push(relPath);
       } catch (error) {
-        if (isErrno(error, "EEXIST")) {
+        if (error instanceof FsExistsError) {
           return;
         }
         throw error;

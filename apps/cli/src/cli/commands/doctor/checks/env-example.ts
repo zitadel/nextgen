@@ -1,7 +1,6 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { isErrno } from "@/lib/errno";
+import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
 
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
@@ -43,7 +42,7 @@ export class EnvExampleCheck extends AbstractSanityCheck {
           .join("\n")}\n`,
       );
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         if (ctx.dryRun) {
           return;
         }
