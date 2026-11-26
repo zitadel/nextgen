@@ -159,7 +159,7 @@ describe("toZitadelError", () => {
     const result = toZitadelError(errno);
     expect(result.code).toBe("E_CONFLICT");
     expect(result.message).toBe("file exists");
-    expect(result.hint).toBe("A file already exists. Use --force to overwrite or remove it first.");
+    expect(result.hint).toBe("A file already exists. Remove it first.");
   });
 
   it("maps ENOENT errno errors to E_VALIDATION", () => {
