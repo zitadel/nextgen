@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { stat } from "@/lib/fs";
 import { join } from "node:path";
 
 import { SecretFile } from "@/lib/project/secret-file";

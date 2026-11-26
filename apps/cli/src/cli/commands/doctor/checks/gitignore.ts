@@ -2,8 +2,7 @@ import { join } from "node:path";
 import { parseEnv } from "node:util";
 
 import { errorMessage } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
-import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
+import { FsDeniedError, FsIsDirectoryError, FsNotFoundError, readFile, writeFile } from "@/lib/fs";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 import { Project, type GitignoreRule } from "@/lib/project";
@@ -28,7 +27,15 @@ export class GitignoreCheck implements SanityCheck {
     try {
       return await this.evaluate(ctx);
     } catch (error) {
-      if (isErrno(error, "EACCES") || isErrno(error, "EISDIR")) {
+      if (error instanceof FsDeniedError) {
+        return {
+          name: this.name,
+          path: this.path,
+          status: "fail",
+          message: errorMessage(error),
+        };
+      }
+      if (error instanceof FsIsDirectoryError) {
         return {
           name: this.name,
           path: this.path,

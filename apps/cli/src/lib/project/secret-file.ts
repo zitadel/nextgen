@@ -1,4 +1,6 @@
-import { chmod, rm, stat, writeFile } from "node:fs/promises";
+import { chmod } from "node:fs/promises";
+
+import { rm, stat, writeFile } from "@/lib/fs";
 import { dirname, join } from "node:path";
 
 import { warnings } from "@/lib/ui/warnings";

@@ -2,8 +2,14 @@ import { dirname, join } from "node:path";
 
 import semver from "semver";
 
-import { isErrno } from "@/lib/errno";
-import { mkdir, pathExists, writeFile } from "@/lib/fs";
+import {
+  FsDeniedError,
+  FsIsDirectoryError,
+  FsNotDirectoryError,
+  mkdir,
+  pathExists,
+  writeFile,
+} from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
 import { mapBounded } from "@/lib/map-bounded";
 import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
@@ -210,17 +216,14 @@ export class SchemaWriter {
    * @returns The reason.
    */
   private readErrorReason(error: unknown): string {
-    if (isErrno(error, "EACCES")) {
+    if (error instanceof FsDeniedError) {
       return "EACCES";
     }
-    if (isErrno(error, "EISDIR")) {
+    if (error instanceof FsIsDirectoryError) {
       return "EISDIR";
     }
-    if (isErrno(error, "ENOTDIR")) {
+    if (error instanceof FsNotDirectoryError) {
       return "ENOTDIR";
-    }
-    if (isErrno(error, "EPERM")) {
-      return "EPERM";
     }
     return String(error);
   }

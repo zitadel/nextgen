@@ -1,6 +1,6 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { isErrno } from "@/lib/errno";
 import { errorMessage, ZitadelError, ZitadelLibError, type ZitadelErrorCode } from "@/lib/errors";
+import { FsNotFoundError } from "@/lib/fs";
 import type { Orca } from "@/lib/orca";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 
@@ -155,7 +155,8 @@ export abstract class AbstractSanityCheck implements SanityCheck {
       return {
         name: this.name,
         status: "fail",
-        message: isErrno(error, "ENOENT") ? `${this.path} was not found` : errorMessage(error),
+        message:
+          error instanceof FsNotFoundError ? `${this.path} was not found` : errorMessage(error),
         path: this.path,
         ...(error instanceof ZitadelError
           ? {
