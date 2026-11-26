@@ -872,7 +872,7 @@ describe("ZitadelRuntime.resolve", () => {
         serverFlag: "ftp://flag.example.com",
       }),
     ).rejects;
-    await rejection.toBeInstanceOf(LocalServerInvalidError);
+    await rejection.toBeInstanceOf(LocalServerUrlInvalidError);
     await rejection.toMatchObject({
       code: "E_VALIDATION",
     });
@@ -885,7 +885,7 @@ describe("ZitadelRuntime.resolve", () => {
         serverFlag: "not a url",
       }),
     ).rejects;
-    await rejection.toBeInstanceOf(LocalServerInvalidError);
+    await rejection.toBeInstanceOf(LocalServerUrlInvalidError);
     await rejection.toMatchObject({
       code: "E_VALIDATION",
     });
