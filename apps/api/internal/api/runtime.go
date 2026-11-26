@@ -8,13 +8,13 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// resolveRuntime decides which release serves a request from Origin and puts
-// the answer on the context.
-func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin string) (context.Context, error) {
+// resolveRuntime decides which release serves a request from Origin and the
+// release it pins, if any, and puts the answer on the context.
+func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin, releaseID string) (context.Context, error) {
 	if h.runtime == nil {
 		return ctx, nil
 	}
-	resolution, err := h.runtime.Resolve(ctx, projectID, origin)
+	resolution, err := h.runtime.ResolvePinned(ctx, projectID, origin, releaseID)
 	if err != nil {
 		return ctx, err
 	}

@@ -421,10 +421,11 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	if o, ok := params.Origin.Get(); ok {
 		origin = o.String()
 	}
-	if _, err := releasePin(params.XZitadelRelease); err != nil {
+	pin, err := releasePin(params.XZitadelRelease)
+	if err != nil {
 		return nil, err
 	}
-	ctx, err = h.resolveRuntime(ctx, projectID, origin)
+	ctx, err = h.resolveRuntime(ctx, projectID, origin, pin)
 	if err != nil {
 		return nil, err
 	}
