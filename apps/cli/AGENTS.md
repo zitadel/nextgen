@@ -356,6 +356,8 @@
 - Spread the error into the refusal's values so no property is dropped.
 - Use no `as`, `!` or `any` on errors.
 - Use no lookup table for errors; duplicate the refusal instead.
+- Import file-system calls from `@/lib/fs`, never from `node:fs/promises`; catch
+  `FsNotFoundError` etc. by class; only `src/lib/fs` reads a Node error's code.
 - Let an error nobody anticipated bubble up unwrapped.
 
 ## Telemetry
