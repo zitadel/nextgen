@@ -3,6 +3,8 @@ import { copyFile, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
+import { isErrno } from "@/lib/errno";
+
 import { Git } from "./git";
 import type { Check } from "./operation";
 import { CurrentCommit } from "./operations/current-commit";
@@ -41,9 +43,13 @@ export class StagingArea {
     try {
       return await work(new StagingArea(git, join(scratch, "index")));
     } finally {
-      await rm(scratch, { recursive: true, force: true }).catch(() => {
-        return undefined;
-      });
+      try {
+        await rm(scratch, { recursive: true, force: true });
+      } catch (error) {
+        if (!isErrno(error, "EBUSY") && !isErrno(error, "EPERM") && !isErrno(error, "EACCES")) {
+          throw error;
+        }
+      }
     }
   }
 

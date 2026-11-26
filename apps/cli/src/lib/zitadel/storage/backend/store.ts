@@ -1,5 +1,6 @@
 import { stringify } from "safe-stable-stringify";
 
+import { isErrno } from "@/lib/errno";
 import {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
@@ -89,23 +90,28 @@ export abstract class Store implements ConfigStore {
    */
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
-    const names = await this.fs.promises
-      .readdir(this.root.resolve(directory).toString())
-      .catch((error: unknown) => {
-        // Only an absent directory means the project has none: a permission
-        // failure, or a file where the directory should be, reported as "no
-        // files" would hide what is there and let a later write fail instead.
-        const code = Store.errnoOf(error);
-        if (code === "ENOENT") {
-          return [];
+    // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
+    let names: readonly unknown[];
+    try {
+      names = await this.fs.promises.readdir(this.root.resolve(directory).toString());
+    } catch (error) {
+      // Only an absent directory means the project has none: a permission
+      // failure, or a file where the directory should be, reported as "no
+      // files" would hide what is there and let a later write fail instead.
+      if (!isErrno(error, "ENOENT")) {
+        if (isErrno(error, "EACCES")) {
+          throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EACCES)`);
         }
-        if (code === "EACCES" || code === "EPERM") {
-          throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (${code})`);
+        if (isErrno(error, "EPERM")) {
+          throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EPERM)`);
         }
-        throw new ZitadelConfigError(
-          `${directory} cannot be read${code === undefined ? "" : ` (${code})`}`,
-        );
-      });
+        if (isErrno(error, "ENOTDIR")) {
+          throw new ZitadelConfigError(`${directory} cannot be read (ENOTDIR)`);
+        }
+        throw new ZitadelConfigError(`${directory} cannot be read`);
+      }
+      names = [];
+    }
     // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
     const files = names
       .map((name) => {
@@ -140,18 +146,15 @@ export abstract class Store implements ConfigStore {
    *   directories being absent: a permission failure is not "absent".
    */
   async exists(path: string): Promise<boolean> {
-    return this.fs.promises.access(this.root.resolve(path).toString()).then(
-      () => {
-        return true;
-      },
-      (error: unknown) => {
-        const code = Store.errnoOf(error);
-        if (code === "ENOENT" || code === "ENOTDIR") {
-          return false;
-        }
-        throw error;
-      },
-    );
+    try {
+      await this.fs.promises.access(this.root.resolve(path).toString());
+      return true;
+    } catch (error) {
+      if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -201,14 +204,15 @@ export abstract class Store implements ConfigStore {
    *   a directory.
    */
   async remove(path: string): Promise<void> {
-    await this.fs.promises.unlink(this.removable(path)).catch((error: unknown) => {
+    try {
+      await this.fs.promises.unlink(this.removable(path));
+    } catch (error) {
       // A file that is not there, or a directory on the way that is a file,
       // is already removed.
-      const code = Store.errnoOf(error);
-      if (code !== "ENOENT" && code !== "ENOTDIR") {
+      if (!isErrno(error, "ENOENT") && !isErrno(error, "ENOTDIR")) {
         throw error;
       }
-    });
+    }
   }
 
   /**
@@ -227,14 +231,14 @@ export abstract class Store implements ConfigStore {
     const target = this.place(path);
     this.assertClear(path, target);
     await this.fs.promises.mkdir(target.parent.toString(), { recursive: true });
-    await this.fs.promises
-      .writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] })
-      .catch((error: unknown) => {
-        if (Store.errnoOf(error) === "EEXIST") {
-          throw new ZitadelConfigFileExistsError(path);
-        }
-        throw error;
-      });
+    try {
+      await this.fs.promises.writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] });
+    } catch (error) {
+      if (isErrno(error, "EEXIST")) {
+        throw new ZitadelConfigFileExistsError(path);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -258,12 +262,11 @@ export abstract class Store implements ConfigStore {
         } catch (error) {
           // Only a file that is not there may be omitted; one that is there
           // but unreadable is refused, so a deploy never drops it silently.
-          const code = Store.errnoOf(error);
-          if (code === "ENOENT" || code === "ENOTDIR") {
+          if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
             return undefined;
           }
           const message = `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`;
-          if (code === "EACCES" || code === "EPERM") {
+          if (isErrno(error, "EACCES") || isErrno(error, "EPERM")) {
             throw new ZitadelConfigFileUnreadableError(message, error);
           }
           throw new ZitadelConfigError(message, error);
@@ -387,36 +390,37 @@ export abstract class Store implements ConfigStore {
    *   code.
    */
   private async readFileAt(path: string): Promise<StoredFile> {
-    const text = await this.fs.promises
-      .readFile(this.root.resolve(path).toString(), "utf8")
-      .then((contents) => {
-        return contents.toString();
-      })
-      .catch((error: unknown) => {
-        const code = Store.errnoOf(error);
-        // A directory named like a file cannot be parsed, but it hides nothing
-        // else: it is reported as the broken entry it is.
-        if (code === "EISDIR") {
-          return undefined;
-        }
-        if (code === "EACCES" || code === "EPERM") {
-          throw new ZitadelConfigFileUnreadableError(`${path} cannot be read (${code})`);
-        }
-        throw new ZitadelConfigError(
-          `${path} cannot be read${code === undefined ? "" : ` (${code})`}`,
-        );
-      });
-    if (text === undefined) {
-      return UnparsedFile.directory(path);
+    // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
+    let text: string;
+    try {
+      const contents = await this.fs.promises.readFile(this.root.resolve(path).toString(), "utf8");
+      text = contents.toString();
+    } catch (error) {
+      // A directory named like a file cannot be parsed, but it hides nothing
+      // else: it is reported as the broken entry it is.
+      if (isErrno(error, "EISDIR")) {
+        return UnparsedFile.directory(path);
+      }
+      if (isErrno(error, "EACCES")) {
+        throw new ZitadelConfigFileUnreadableError(`${path} cannot be read (EACCES)`);
+      }
+      if (isErrno(error, "EPERM")) {
+        throw new ZitadelConfigFileUnreadableError(`${path} cannot be read (EPERM)`);
+      }
+      if (isErrno(error, "ENOTDIR")) {
+        throw new ZitadelConfigError(`${path} cannot be read (ENOTDIR)`);
+      }
+      throw new ZitadelConfigError(`${path} cannot be read`);
     }
-    // `JSON.parse` never returns `undefined`, so it marks the text that is not JSON.
-    const body: unknown = await Promise.resolve(text)
-      .then(JSON.parse)
-      .catch(() => {
-        return undefined;
-      });
-    if (body === undefined) {
-      return UnparsedFile.invalidJson(path, text);
+    // biome-ignore lint/plugin: assigned inside the try that guards the parse, used after it
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        return UnparsedFile.invalidJson(path, text);
+      }
+      throw error;
     }
     if (!isJsonValue(body) || !isJsonObject(body)) {
       return UnparsedFile.notAnObject(path);
@@ -460,21 +464,5 @@ export abstract class Store implements ConfigStore {
         `${path} cannot be written (ENOTDIR): ${blocker} is a file where a directory is needed`,
       );
     }
-  }
-
-  /**
-   * The error code of a failed file operation.
-   *
-   * @param error - What the operation threw.
-   * @returns Its code, such as `ENOENT`, or `undefined` when it has none.
-   */
-  private static errnoOf(error: unknown): string | undefined {
-    if (typeof error !== "object" || error === null || !("code" in error)) {
-      return undefined;
-    }
-    if (typeof error.code !== "string") {
-      return undefined;
-    }
-    return error.code;
   }
 }

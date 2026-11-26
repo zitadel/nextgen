@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
-import { lstat, realpath, rm } from "node:fs/promises";
+import { realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 
+import { entryExists } from "@/lib/fs";
 import { GitBinaryMissingError, GitCommandFailedError } from "./errors";
 import { Git } from "./git";
 import type { Operation } from "./operation";
@@ -61,25 +62,23 @@ export class Repository {
       return null;
     }
     const real = await realpath(dir);
-    const result = await new Git(real)
-      .with({ LC_ALL: "C" })
-      .run(["rev-parse", "--show-prefix"], [128])
-      .catch((error: unknown) => {
-        if (error instanceof GitBinaryMissingError) {
-          return null;
-        }
-        throw error;
-      });
-    if (result === null) {
-      return null;
+    try {
+      const result = await new Git(real)
+        .with({ LC_ALL: "C" })
+        .run(["rev-parse", "--show-prefix"], [128]);
+      if (/^fatal: not a git repository/m.test(result.stderr)) {
+        return null;
+      }
+      if (!result.succeeded()) {
+        throw new GitCommandFailedError(result.reason());
+      }
+      return new Repository(real, result.text());
+    } catch (error) {
+      if (error instanceof GitBinaryMissingError) {
+        return null;
+      }
+      throw error;
     }
-    if (/^fatal: not a git repository/m.test(result.stderr)) {
-      return null;
-    }
-    if (!result.succeeded()) {
-      throw new GitCommandFailedError(result.reason());
-    }
-    return new Repository(real, result.text());
   }
 
   /**
@@ -124,21 +123,16 @@ export class Repository {
   static async create(dir: string): Promise<Repository> {
     const real = await realpath(dir);
     const gitDir = join(real, ".git");
-    const hadOne = await lstat(gitDir).then(
-      () => {
-        return true;
-      },
-      () => {
-        return false;
-      },
-    );
+    const hadOne = await entryExists(gitDir);
     try {
       await new Git(real).run(["init", "--quiet"]);
     } catch (error) {
       if (!hadOne) {
-        await rm(gitDir, { recursive: true, force: true }).catch(() => {
-          return undefined;
-        });
+        try {
+          await rm(gitDir, { recursive: true, force: true });
+        } catch {
+          throw error;
+        }
       }
       throw error;
     }
