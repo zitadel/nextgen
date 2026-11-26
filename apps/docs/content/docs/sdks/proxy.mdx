@@ -43,6 +43,22 @@ The session cookies Zitadel used before, `__nextgen_session` and `__nextgen_sess
 
 The dev proxies the CLI writes for single-page apps keep the session the same way, reading the project from `ZITADEL_PROJECT_ID` in `.env.local`. `zitadel doctor --fix` adds this to a dev proxy an earlier setup wrote, and `zitadel doctor` warns until then; it says the hooks must be added by hand to a dev proxy changed since. A dev proxy whose hooks an earlier setup wrote for the `__nextgen_session` cookies fails `zitadel doctor` until `zitadel doctor --fix` replaces them. In production, an SPA's own proxy passes Zitadel's session cookie through, which is fine there: a production host serves one project.
 
+## OAuth issuer and metadata
+
+A project's [OAuth authorization server](/docs/guides/enable-oauth) is reached through the proxy, so its issuer is your app's own address: `{origin}/__nextgen/oauth/{project_id}`, such as `https://app.acme.com/__nextgen/oauth/<project-id>`. An OAuth client checks that the metadata it fetched names the issuer it asked for. So Zitadel must build that same URL from the request the proxy forwarded.
+
+- **The metadata path.** RFC 8414 puts the metadata at `/.well-known/oauth-authorization-server/__nextgen/oauth/{project_id}`, outside the proxy path. The proxy forwards that path to the server's `/.well-known/oauth-authorization-server/oauth/{project_id}`.
+- **The proxy's headers.** On every request it forwards, the proxy sets `X-Forwarded-Prefix` to its proxy path and `X-Zitadel-Login-Path` to the path of `loginPath`. It replaces any value the client sent. The server builds the issuer from the forwarded origin and `X-Forwarded-Prefix`. The authorization endpoint sends the user to the login path.
+- **Which origins get an issuer.** The server builds an issuer only on one of the project's primary origins, matched exactly. A preview origin, a forged `X-Forwarded-Host` and the Zitadel server's own origin get none, and the metadata answers `404`.
+- **Only the app's own project.** The proxy answers `404` itself, without calling the server, for an OAuth path of another project. It does the same for every project when the app has no project ID configured.
+- **Only `/__nextgen`.** The server accepts no `X-Forwarded-Prefix` but `/__nextgen`, so an app that sets another `proxyPath` has no issuer. Its server log says so, as it does when no project ID is configured.
+
+The endpoints a browser visits, such as `authorize`, sit under the issuer and go through the proxy. The ones a client calls from its own server, such as `token` and `jwks`, are on the Zitadel server's public URL: `{zitadel_url}/oauth/{project_id}/…`. No proxy sits in between, and the metadata names both kinds.
+
+OpenID Connect Discovery, `/.well-known/openid-configuration` under the issuer, answers `404`: the server issues no ID tokens yet.
+
+On a server with platform bootstrap, the platform project, which the console signs in to, has its own issuer: the Zitadel server's public URL followed by `/oauth`. It answers only there, never through an app.
+
 ## SPAs in production
 
 Single-page apps (React, Vue, Angular, Solid, Svelte, Qwik) have no server of their own. In local development the CLI scaffolds a dev-server proxy for `/__nextgen/*` that adds the project secret to the session exchange. The CLI scaffolds nothing for production yet. The generated app sends no credential of its own, so in production it needs a same-origin proxy that adds the project secret to the session exchange, and to no other call. Add it only when the browser says the request comes from your own site: the `Sec-Fetch-Site` header is `same-origin`, or, on an older browser that sends no such header, the `Origin` header names your own host. A page on another site can otherwise make a visitor's browser post to the proxy and sign them in as someone else. A plain rewrite cannot do that. The app's packages call `POST /api/v1/sessions/exchange`; have the proxy recognise that path, and `POST /sessions/exchange` for an app on an earlier SDK. A proxy that knows only the old path adds no secret to the exchange, and sign-in fails.

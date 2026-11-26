@@ -3,7 +3,7 @@ title: Deploy
 description: Build a release from your local Zitadel configuration, deploy it to your primary origins, check it is live, and roll it back.
 ---
 
-`.zitadel/schemas/*.json`, `.zitadel/flows/*.json`, `.zitadel/policies/*.json` and `.zitadel/branding/` are the source of truth for your project's user schemas, login flows, policies and branding. Edit them, then publish with `deploy`. It builds the files into one immutable release, a snapshot of `.zitadel/`, and makes it live on your project's primary origins.
+`.zitadel/schemas/*.json`, `.zitadel/flows/*.json`, `.zitadel/policies/*.json`, `.zitadel/branding/` and `.zitadel/oauth/` are the source of truth for your project's user schemas, login flows, policies, branding and [OAuth authorization server](/docs/guides/enable-oauth) switch. Edit them, then publish with `deploy`. It builds the files into one immutable release, a snapshot of `.zitadel/`, and makes it live on your project's primary origins.
 
 [Edit the login flow](/docs/guides/edit-login-flow) walks through the common edits: a new field, the order of fields, a new step, and a second flow selected by name.
 
