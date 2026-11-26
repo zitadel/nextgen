@@ -15,6 +15,7 @@ import {
 } from "@tests/helpers/config";
 import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
 import { holdingVariables, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
+import { aSchemaListing } from "@tests/helpers/schemas";
 import { aStepContext } from "@tests/helpers/step-context";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -264,6 +265,7 @@ describe("validateStep", () => {
 
     it("leaves out the subject-claim advice when the connections could not be listed", async () => {
       const config = aConfig({
+        schemas: { "staff.json": aSchemaListing(["acme"]) },
         connections: { "acme.json": anOidcConnection({ subject_claim: "email" }) },
       });
 
@@ -357,7 +359,10 @@ describe("validateStep", () => {
           userinfo_endpoint: "https://sso.acme.example/userinfo",
         },
       });
-      const config = aConfig({ connections: { "acme.json": complete } });
+      const config = aConfig({
+        schemas: { "staff.json": aSchemaListing(["acme"]) },
+        connections: { "acme.json": complete },
+      });
 
       const result = await validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
 

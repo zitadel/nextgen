@@ -44,9 +44,10 @@ type server struct {
 // page for a browser, at every endpoint not implemented yet.
 type opServer struct {
 	op.UnimplementedServer
-	settings     SettingsSource
-	clients      ClientResolver
-	authRequests AuthRequestStore
+	platformEnabled bool
+	settings        SettingsSource
+	clients         ClientResolver
+	authRequests    AuthRequestStore
 }
 
 // New builds the handlers. Both take the same tenant prefix and the same
@@ -60,7 +61,7 @@ func New(cfg Config) *Handlers {
 		op.WithHTTPMiddleware(httputil.WithForwardedNoStore, s.withIssuer),
 		op.WithServerCORSOptions(corsOptions()),
 	)
-	opHandler := op.RegisterServer(opServer{settings: cfg.Settings, clients: cfg.Clients, authRequests: cfg.AuthRequests}, opEndpoints(),
+	opHandler := op.RegisterServer(opServer{platformEnabled: cfg.PlatformEnabled, settings: cfg.Settings, clients: cfg.Clients, authRequests: cfg.AuthRequests}, opEndpoints(),
 		op.WithTenantPrefix(Prefix),
 		op.WithHTTPMiddleware(httputil.WithForwardedNoStore, withoutLoggedState, withErrorPages, s.withIssuer),
 		op.WithServerCORSOptions(corsOptions()),

@@ -36,7 +36,7 @@ import "../atoms/zl-icon.js";
  * and `{{initial}}` substituted (`{{name}}` and `{{email}}` fill as legacy
  * aliases of the first two). Any element with `data-action="logout"` inside
  * the cloned template triggers the sign-out flow. This mirrors the
- * placeholder `<nextgen-logout>`'s contract so existing markup keeps working.
+ * placeholder element's contract so existing markup keeps working.
  *
  * Default styles consume the `--zl-*` design tokens so tenant branding
  * applies automatically.
@@ -302,8 +302,35 @@ export class ZitadelLogout extends ZitadelConfigured {
     };
     if (!(await this.session.signOut(closeMenu))) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
-      window.location.href = this.postSignOutUrl;
+      this.navigateTo(this.postSignOutUrl, (url) => {
+        window.location.href = url;
+      });
     }
+  }
+
+  /**
+   * Navigates the browser to `target` when it resolves to an `http:` or
+   * `https:` URL against the document base; any other scheme (`javascript:`,
+   * `data:`, …) is refused and shown as the error message in the open menu.
+   *
+   * @param target - The app-supplied URL to navigate to.
+   * @param assign - Performs the navigation once the scheme is allowed.
+   */
+  private navigateTo(target: string, assign: (url: string) => void): void {
+    let allowed = false;
+    try {
+      const { protocol } = new URL(target, document.baseURI);
+      allowed = protocol === "http:" || protocol === "https:";
+    } catch {
+      allowed = false;
+    }
+    if (!allowed) {
+      this.session.errorMessage = "Refused to navigate: the target URL must use http or https.";
+      this.open = true;
+      this.requestUpdate();
+      return;
+    }
+    assign(target);
   }
 
   private handleSignOutClick(event: Event): void {

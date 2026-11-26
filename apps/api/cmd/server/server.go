@@ -355,7 +355,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	applicationService := service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator(), variableService, keyService)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
-	authRequestService := service.NewAuthRequestService(serviceDBPool)
+	authRequestService := service.NewAuthRequestService(serviceDBPool, keyService)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
 	// serves traffic. A project's published instance is resolved per password
@@ -519,7 +519,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 
 	// A webhook's URL is a customer's: deliveries go through the hardened
 	// egress client (ADR 061), built apart from the schema one because it
-	// follows no redirect and has the delivery's deadline (ADR 090 §4).
+	// follows no redirect and has the delivery's deadline (ADR 091 §4).
 	webhookClient, err := audit.WebhookClientConfig(cfg.HTTPClient).NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to build webhook http client: %w", err)
@@ -1187,7 +1187,7 @@ func buildHTTPMux(
 	// The triggers by path, each present when a scheduler outside the process
 	// runs its job: the event retention purge
 	// (events.retention.trigger_secret, ADR 049) and delivery to the
-	// projects' webhooks (events.webhooks.trigger_secret, ADR 090). They are
+	// projects' webhooks (events.webhooks.trigger_secret, ADR 091). They are
 	// the operator's, not the API's, so they take the request ID and the
 	// request line but none of the middleware a client's request passes.
 	for path, trigger := range triggers {

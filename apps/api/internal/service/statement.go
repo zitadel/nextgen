@@ -829,7 +829,8 @@ type VariableSetStatements interface {
 }
 
 // AuthRequestStatements persists the authorization requests the endpoint
-// hands to the login (ADR 081 §8). Rows are never updated.
+// hands to the login (ADR 081 §8). A row is updated once, when the login
+// issues its code, and deleted when the code is redeemed.
 type AuthRequestStatements interface {
 	Statements
 	// CreateAuthRequest inserts request, generates its id when empty, and sets
@@ -838,6 +839,14 @@ type AuthRequestStatements interface {
 	// GetAuthRequest returns the request, expired or not, or a
 	// [database.NoRowFoundError].
 	GetAuthRequest(ctx context.Context, projectID, id string) (*domain.AuthRequest, error)
+	// SetAuthRequestCode stores request's CodeHash, UserID, SessionID and
+	// CodeExpiresAt on the row of its ProjectID and ID. A row that is unknown,
+	// expired at now, or already has a code is left as it is, and returns a
+	// [database.NoRowFoundError].
+	SetAuthRequestCode(ctx context.Context, request *domain.AuthRequest, now time.Time) error
+	// RedeemAuthRequestCode deletes the request whose code has codeHash and
+	// returns it, expired or not, or a [database.NoRowFoundError].
+	RedeemAuthRequestCode(ctx context.Context, projectID, codeHash string) (*domain.AuthRequest, error)
 }
 
 // InvitationStatements persists invitations (ADR 086). A pending invitation
@@ -1124,7 +1133,7 @@ type EventStatements interface {
 	EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error)
 }
 
-// WebhookStatements persists a project's webhooks (ADR 090). A method that
+// WebhookStatements persists a project's webhooks (ADR 091). A method that
 // names a webhook returns *database.NoRowFoundError for an unknown id and for
 // another project's.
 //

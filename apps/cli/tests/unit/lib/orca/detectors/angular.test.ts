@@ -21,7 +21,7 @@ async function project(cwd: string, deps: Record<string, string>): Promise<strin
 describe("AngularDetector", () => {
   it("recognises an Angular app and reports appDir 'src/app'", async ({ dir }) => {
     const facts = await new AngularDetector().detect(
-      await project(dir, { "@angular/core": "^18" }),
+      await project(dir, { "@angular/core": "^19" }),
     );
     expect(facts?.id).toBe("angular");
     expect(facts?.appDir).toBe("src/app");
@@ -31,12 +31,12 @@ describe("AngularDetector", () => {
     expect(await new AngularDetector().detect(await project(dir, { react: "^18" }))).toBeNull();
   });
 
-  it("refuses Angular older than 17 (templates use @if)", async ({ dir }) => {
+  it("refuses Angular older than 19 (the SDK uses signal inputs)", async ({ dir }) => {
     await expect(
-      new AngularDetector().detect(await project(dir, { "@angular/core": "^16.2.0" })),
+      new AngularDetector().detect(await project(dir, { "@angular/core": "^18.2.0" })),
     ).rejects.toMatchObject({
       code: "E_UNSUPPORTED_PROJECT_SHAPE",
-      message: expect.stringContaining("Angular 17 and newer"),
+      message: expect.stringContaining("Angular 19 and newer"),
     });
   });
 

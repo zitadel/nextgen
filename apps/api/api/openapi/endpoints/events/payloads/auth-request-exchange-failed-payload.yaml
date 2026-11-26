@@ -1,0 +1,25 @@
+title: AuthRequestExchangeFailedPayload
+type: object
+description: |
+  Payload for `auth.request.exchange.failed` events. The code, the
+  `code_verifier` and the `redirect_uri` the client sent stay out.
+required:
+  - client_id
+  - reason
+properties:
+  client_id:
+    type: string
+    description: The client that presented the code.
+  reason:
+    type: string
+    description: The check that refused the code.
+    enum:
+      - client_mismatch
+      - code_expired
+      - redirect_uri_mismatch
+      - code_verifier_missing
+      - code_verifier_invalid
+      - code_verifier_unexpected
+      - release_revoked
+      - session_not_active
+      - user_not_active

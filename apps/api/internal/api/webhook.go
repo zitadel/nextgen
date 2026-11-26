@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// WithWebhookService wires the webhook endpoints (ADR 090). A chainable
+// WithWebhookService wires the webhook endpoints (ADR 091). A chainable
 // setter like WithPolicyService, so NewHandler's call sites stay unchanged;
 // without it the endpoints answer an internal error.
 func (h *Handler) WithWebhookService(s *service.WebhookService) *Handler {

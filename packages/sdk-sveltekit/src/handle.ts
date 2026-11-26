@@ -1,8 +1,9 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import type {
-  AuthResult,
-  NextgenMiddlewareOptions,
-  ResolveSessionOptions,
+  ZitadelAuthResult,
+  ZitadelMiddlewareOptions,
+  ZitadelProxyRoute,
+  ZitadelResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
 import { joinURL } from "ufo";
 
@@ -12,7 +13,9 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
@@ -20,53 +23,82 @@ import {
 } from "@zitadel/sdk-core/middleware";
 
 /**
- * `process` is undefined in some edge/serverless runtimes; read env defensively
- * so omitting `url`/`projectSecret` falls back to the default instead of throwing
- * a ReferenceError.
+ * The process environment, or an empty record where there is no `process`.
+ *
+ * Some edge and serverless runtimes define no `process`. Reading the environment defensively
+ * means that leaving out `url` or `projectSecret` falls back to the default instead of throwing
+ * a `ReferenceError`.
  */
 const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
 
 /**
- * A SvelteKit `handle` hook, typed structurally from `RequestEvent`. Kit 2
- * exports `Handle` from `@sveltejs/kit`; Kit 3 declares it only under
- * `@sveltejs/kit/hooks`, so importing it would type the hook as `any` there.
- * `RequestEvent` is exported from `@sveltejs/kit` on both majors, and this shape
- * is assignable to either `Handle` (it accepts a `resolve` with an options
- * argument, and never passes one).
+ * The type of the SvelteKit `handle` hook that {@link createZitadelHandle} returns.
+ *
+ * The type is declared structurally from `RequestEvent` instead of importing `Handle`. SvelteKit 2
+ * exports `Handle` from `@sveltejs/kit`, but SvelteKit 3 declares it only under
+ * `@sveltejs/kit/hooks`, so importing it from the main entry would silently type the hook as
+ * `any` on SvelteKit 3. `RequestEvent` is exported from `@sveltejs/kit` on both majors, and this
+ * shape is assignable to either `Handle`, because it accepts a `resolve` that takes no options
+ * argument and the hook never passes one.
+ *
+ * Use it to type a hook that you compose with {@link createZitadelHandle} through
+ * `sequence()` from `@sveltejs/kit/hooks`. The hook returns a `Promise` of a `Response` and
+ * always receives the request event and the downstream `resolve` function.
+ *
+ * @example
+ * ```ts
+ * import type { ZitadelHandle } from "@zitadel/sdk-sveltekit/server";
+ *
+ * export const logRequests: ZitadelHandle = async ({ event, resolve }) => {
+ *   console.log(event.request.method, event.url.pathname);
+ *   return resolve(event);
+ * };
+ * ```
  */
-export type NextgenHandle = (input: {
+export type ZitadelHandle = (input: {
   event: RequestEvent;
   resolve: (event: RequestEvent) => Promise<Response> | Response;
 }) => Promise<Response>;
 
 declare global {
-  // SvelteKit reads `App.Locals` to type `event.locals`. Declaring the
-  // interface here merges `nextgenAuth` into the consumer's own `App.Locals`
-  // (defined in their `src/app.d.ts`) so `getAuth(event)` and load functions
-  // see the typed auth result without any manual wiring.
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace App {
+    /**
+     * The shape of `event.locals`, which SvelteKit reads to type the request locals.
+     *
+     * Declaring the interface here merges {@link Locals.zitadelAuth} into your own `App.Locals`
+     * from `src/app.d.ts`, so {@link getAuth} and load functions see the typed auth result without
+     * any manual wiring.
+     */
     interface Locals {
-      nextgenAuth?: AuthResult;
+      /**
+       * The verified auth result of the current request.
+       *
+       * The hook from {@link createZitadelHandle} writes it on every request that is neither
+       * proxied nor ignored. It is `undefined` before the hook has run and on routes listed in
+       * {@link ZitadelMiddlewareOptions.ignoredRoutes}. Read it through {@link getAuth}, which
+       * turns the missing case into a signed-out result.
+       */
+      zitadelAuth?: ZitadelAuthResult;
     }
   }
 }
 
 /**
- * Builds the set of upstream request headers by copying all incoming headers,
- * dropping hop-by-hop and SDK-internal headers, and setting `X-Forwarded-*`
- * headers so the upstream auth server can see the real client origin.
+ * Builds the request headers that the proxy sends to the auth backend.
  *
- * All non-hop-by-hop headers from the incoming request are forwarded as-is,
- * including any `X-Forwarded-For` chain already set by an upstream CDN or load
- * balancer. When `X-Forwarded-For` is absent (direct connection with no upstream
- * proxy), it is initialised from `event.getClientAddress()` so the auth server
- * always receives origin information. `X-Forwarded-Host` and `X-Forwarded-Proto`
- * are set only when absent, preserving values injected by an upstream CDN.
+ * The function copies every incoming header except the hop-by-hop and SDK-internal ones, then
+ * sets the `x-forwarded-*` headers so the backend can see the real client origin. A
+ * `x-forwarded-for` chain that a CDN or load balancer already set is kept, and the direct client
+ * address from `event.getClientAddress()` is appended to it, so the backend sees the full proxy
+ * path. When no chain exists, the chain starts with that address. When the platform adapter
+ * cannot resolve a client address, the chain is left as received and the proxy does not fail.
+ * `x-forwarded-host` and `x-forwarded-proto` are set only when absent, which preserves the values
+ * that an upstream CDN injected.
  *
  * @param event - The current SvelteKit request event.
- * @returns A `Headers` instance safe to forward to the upstream service.
+ * @returns A `Headers` instance that is safe to forward to the backend.
  */
 function buildUpstreamHeaders(event: RequestEvent): Headers {
   const headers = new Headers();
@@ -107,29 +139,39 @@ function buildUpstreamHeaders(event: RequestEvent): Headers {
 }
 
 /**
- * Forwards a `/__nextgen/*` request to the upstream auth backend and returns
- * the upstream response, including its `Set-Cookie` headers. Hop-by-hop
- * headers are stripped in both directions, a `location` is kept only as a
- * redirect onto this app, and the session cookie travels under this project's
- * name in the browser and the server's name upstream
- * ({@link proxySessionCookies}).
+ * Forwards a request under the proxy path to the auth backend and returns the backend response.
  *
- * @param event     - The current SvelteKit request event.
- * @param authUrl   - Base URL of the auth backend.
- * @param proxyPath - The path prefix being proxied (e.g. `"/__nextgen"`).
- * @param projectId - The project this app signs its users in to.
- * @returns The proxied upstream `Response`.
+ * The proxy exists so the browser only ever talks to the app's own origin. The response keeps its
+ * `set-cookie` headers. Hop-by-hop headers are stripped in both directions, a `location` header
+ * is kept only as a redirect onto this app, and the session cookie travels under this project's
+ * own name in the browser and under the server's name upstream. The request body is read into a
+ * buffer first, because a streaming body would need the `duplex` option, which platform adapters
+ * do not support uniformly. The redirect mode is `manual`, so a backend redirect reaches the
+ * browser instead of being followed on the server. The project secret is attached as the bearer
+ * on the `POST /sessions/exchange` handoff alone, because on every operation it would turn this
+ * public boundary into an open relay with project authority. A credential that the caller
+ * supplied is preserved. A response that sets a session cookie is marked as not cacheable by a
+ * shared cache.
+ *
+ * @param event - The current SvelteKit request event.
+ * @param authUrl - The base URL of the auth backend.
+ * @param route - Where the request goes ({@link proxyRoute}).
+ * @param projectId - The project id this app signs its users in to.
+ * @param projectSecret - The project secret, or `undefined` when none is configured.
+ * @param proxyTimeoutMs - The time in milliseconds after which the backend request is aborted.
+ * @returns The proxied backend `Response`.
+ * @throws Error when the backend does not answer within `proxyTimeoutMs` or cannot be reached.
  */
 async function proxyRequest(
   event: RequestEvent,
   authUrl: string,
-  proxyPath: string,
+  route: ZitadelProxyRoute,
   projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const { url } = event;
-  const suffix = url.pathname.slice(proxyPath.length);
+  const suffix = route.path;
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = event.request.method;
@@ -137,9 +179,13 @@ async function proxyRequest(
   // Read the body eagerly so the upstream fetch receives a concrete buffer
   // rather than a streaming body (which would require the `duplex` option and
   // is not supported uniformly across platform adapters).
-  const body = hasBody ? await event.request.arrayBuffer() : undefined;
+  const buffered = hasBody ? await event.request.arrayBuffer() : undefined;
+  const body = buffered && buffered.byteLength > 0 ? buffered : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
+  for (const [name, value] of Object.entries(route.headers)) {
+    upstreamHeaders.set(name, value);
+  }
   const sessionCookies = proxySessionCookies(
     {
       method,
@@ -163,7 +209,7 @@ async function proxyRequest(
   // operation it would make this public boundary an open relay with project
   // authority. A caller-supplied credential is preserved.
   if (
-    requiresProjectSecret(method, suffix) &&
+    requiresProjectSecret(method, suffix, upstreamHeaders) &&
     !upstreamHeaders.has("authorization") &&
     projectSecret
   ) {
@@ -197,25 +243,42 @@ async function proxyRequest(
 }
 
 /**
- * Options passed internally to {@link handleAuth} after destructuring the
- * public-facing {@link NextgenMiddlewareOptions}: the route policy, plus what
- * the shared {@link resolveSession} judges the session by.
+ * The options that {@link createZitadelHandle} passes to the auth step.
+ *
+ * They are the route policy plus what the shared session resolver judges the session by, taken
+ * from the public {@link ZitadelMiddlewareOptions} after defaults are applied.
  */
-interface AuthHandlerOptions extends ResolveSessionOptions {
+interface AuthHandlerOptions extends ZitadelResolveSessionOptions {
+  /**
+   * The route patterns that require a session.
+   */
   readonly protectedRoutes: readonly string[];
+  /**
+   * The relative path that a signed-out visitor to a protected route is redirected to.
+   */
   readonly loginPath: string;
 }
 
 /**
- * Verifies the session token, writes the auth result to `event.locals`, and
- * either continues the request (`resolve`) or redirects to the login page on a
- * protected route with no valid session. Either way the response carries the
- * session cookies the judgement asks for. When the backend cannot say whether
- * the session is live, a protected route answers `503` instead.
+ * Verifies the session, records the result, and either continues the request or redirects.
  *
- * @param event   - The current SvelteKit request event.
+ * The function writes the auth result to `event.locals.zitadelAuth`, then continues the request
+ * through `resolve`, or redirects to the login page with status `302` on a protected route that
+ * has no valid session. Either way the response carries the session cookies that the verdict asks
+ * for. When the backend cannot say whether the session is live, a protected route answers `503`
+ * instead of redirecting, because the user may well be signed in.
+ *
+ * A cookie of a dead session is cleared so the browser stops replaying it, and a session of this
+ * project that is still under the shared cookie name is copied to the project's own cookie. A
+ * live session that signs no one in here, such as an anonymous one whose sign-in may still
+ * complete or one of another project, keeps its cookie, and so does a session the backend gave no
+ * verdict on. Cookie attributes are always given in full, because when one is left out SvelteKit
+ * adds `Secure` on its own, which Safari drops over plain http to `127.0.0.1` and `[::1]`.
+ * Responses that set a session cookie are marked as not cacheable by a shared cache.
+ *
+ * @param event - The current SvelteKit request event.
  * @param resolve - The downstream resolver from the `handle` hook.
- * @param opts    - Auth handler options.
+ * @param opts - The route policy and the session verification options.
  * @returns The response to send.
  */
 async function handleAuth(
@@ -243,7 +306,7 @@ async function handleAuth(
     verification,
   );
 
-  event.locals.nextgenAuth = auth;
+  event.locals.zitadelAuth = auth;
 
   // The backend could not say whether the session is live. The user may well
   // be signed in, so a protected route answers 503 rather than send them to
@@ -295,10 +358,14 @@ async function handleAuth(
 }
 
 /**
- * `response` with {@link SESSION_COOKIE_CACHE_CONTROL}, so a shared cache keeps
- * no session cookie it sets. It is set on the response, not through
- * `event.setHeaders`, which fails the request when a page sets the header too;
- * a response whose headers are immutable is copied.
+ * Marks a response as not cacheable by a shared cache.
+ *
+ * The header is set on the response and not through `event.setHeaders`, which fails the request
+ * when a page sets the same header too. A response whose headers are immutable is copied first,
+ * so the caller always receives a response that carries the header.
+ *
+ * @param response - The response to mark.
+ * @returns The same response, or a copy of it when its headers are immutable.
  */
 function withNoStore(response: Response): Response {
   try {
@@ -312,17 +379,75 @@ function withNoStore(response: Response): Response {
 }
 
 /**
- * Creates a SvelteKit {@link NextgenHandle} hook that handles proxying, JWT
- * verification, and route protection in a single pass.
+ * Creates the SvelteKit `handle` hook that proxies the auth backend, verifies sessions and
+ * protects routes.
  *
- * Place it in `src/hooks.server.ts`, reading its settings from
- * `$app/env/private` (declared in `src/env.ts` with `defineEnvVars`):
+ * The hook is the server half of Zitadel sign-in. It exists so the browser only ever talks to
+ * your own origin, so the project secret never leaves the server, and so every page request knows
+ * whether the visitor is signed in. Create it once per app in `src/hooks.server.ts` and compose it
+ * with your own hooks through `sequence()` from `@sveltejs/kit/hooks`.
  *
+ * For each request the hook, in order:
+ *
+ * 1. answers `400` to any request that carries `x-zitadel-auth-token`. The header is an internal
+ *    channel that only the SDK writes after verifying a session, so a client has no reason to send
+ *    it, and refusing it outright is safer than removing it, because no framework's header
+ *    mutability matters then. The check covers every route, including ignored routes and the
+ *    proxy path;
+ * 2. passes requests that match {@link ZitadelMiddlewareOptions.ignoredRoutes} straight to
+ *    `resolve`, without proxying, verification or `event.locals.zitadelAuth`;
+ * 3. proxies requests under {@link ZitadelMiddlewareOptions.proxyPath} to
+ *    {@link ZitadelMiddlewareOptions.url}, so the browser talks to the auth backend same-origin.
+ *    The project secret is attached as the bearer on the `POST /sessions/exchange` handoff alone
+ *    and never reaches the browser;
+ * 4. verifies the session token against the server's JWKS with Web Crypto, or asks the backend
+ *    about an opaque token, and stores the result in `event.locals.zitadelAuth`. On a protected
+ *    route with no session it redirects to {@link ZitadelMiddlewareOptions.loginPath} with the
+ *    requested path in `?next=`, so the user returns there after signing in. When the backend
+ *    cannot say whether the session is live, a protected route answers `503` instead of sending a
+ *    possibly signed-in user to the login page.
+ *
+ * A session counts only in the app's own project, so a session of another project on the same
+ * host does not sign anyone in. Protection covers full page loads only: client-side navigation
+ * does not reach the hook, so guard such pages with a load function that calls {@link getAuth}.
+ *
+ * Settings that are left out fall back to the environment. SvelteKit never fills `process.env`
+ * from `.env` files, so read the values from `$app/env/private` and pass them in, as in the
+ * example. An empty value counts as unset. The fallbacks are `ZITADEL_URL` for `url` (then
+ * `http://localhost:8080`), `ZITADEL_PROJECT_SECRET` for `projectSecret`, and `ZITADEL_PROJECT_ID`
+ * and then `VITE_ZITADEL_PROJECT_ID` for `projectId`. Without a `projectSecret` the session
+ * handoff cannot be exchanged. The values are read once, when the hook is created, so they do not
+ * change afterwards.
+ *
+ * The hook uses only Web APIs, which are `fetch`, Web Crypto and `AbortSignal.timeout`, and reads
+ * `process.env` only when `process` exists. It therefore runs on Cloudflare Workers and other
+ * edge adapters.
+ *
+ * Naming: SvelteKit calls this hook handle: it is the handle export of hooks.server.ts and is
+ * composed with sequence(), so the name ends in Handle and the call reads export const handle =
+ * createZitadelHandle(...). It is a factory, called once to return the hook, so it starts with
+ * create.
+ *
+ * A signed-out request for a protected route is redirected with an absolute URL on the origin of
+ * the request, such as `https://app.example.com/login?next=%2Fadmin`.
+ *
+ * The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them
+ * from the request only when the client sent none. It cannot tell a trusted CDN or load balancer
+ * from a client, and the server builds the OAuth issuer and the `Secure` decision for session
+ * cookies from those headers, so strip them at the edge when clients can reach the app directly.
+ *
+ * @param options - The middleware settings, which are all optional. `projectSecret` is the
+ *   project service key, sent as the bearer on the `POST /sessions/exchange` handoff only.
+ * @returns A SvelteKit `handle` hook of type {@link ZitadelHandle}.
+ * @throws Error when `loginPath` is not a relative path that starts with a single `/`, because an
+ *   absolute or protocol-relative URL would let the login redirect leave the app, which is an
+ *   open redirect.
+ * @example
  * ```ts
  * import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
- * import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
+ * import { createZitadelHandle } from "@zitadel/sdk-sveltekit/server";
  *
- * export const handle = createNextgenHandle({
+ * export const handle = createZitadelHandle({
  *   url: ZITADEL_URL,
  *   projectSecret: ZITADEL_PROJECT_SECRET,
  *   projectId: ZITADEL_PROJECT_ID,
@@ -330,22 +455,17 @@ function withNoStore(response: Response): Response {
  *   loginPath: "/login",
  * });
  * ```
+ * @example
+ * ```ts
+ * import { sequence } from "@sveltejs/kit/hooks";
+ * import { createZitadelHandle } from "@zitadel/sdk-sveltekit/server";
  *
- * Left out, `url` and `projectSecret` default to `ZITADEL_URL` /
- * `ZITADEL_PROJECT_SECRET` from `process.env`, which SvelteKit never fills from
- * `.env` files. A session counts only in the app's own project: `projectId`,
- * else `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
- * Compose it with other hooks via `sequence()` from `@sveltejs/kit/hooks`.
- *
- * @param options - Middleware configuration options. `projectSecret` is the
- *   project service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
- * @returns A SvelteKit `handle` hook.
+ * export const handle = sequence(createZitadelHandle({ protectedRoutes: ["/admin*"] }), myHook);
+ * ```
+ * @see {@link getAuth}
  */
-export function createNextgenHandle(
-  options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
-): NextgenHandle {
+export function createZitadelHandle(options: ZitadelMiddlewareOptions = {}): ZitadelHandle {
   const {
-    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -358,15 +478,16 @@ export function createNextgenHandle(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
   } = options;
+  const url = options.url || PROCESS_ENV.ZITADEL_URL || "http://localhost:8080";
+  const projectSecret = options.projectSecret || PROCESS_ENV.ZITADEL_PROJECT_SECRET;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
   // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//") || loginPath.includes("\\")) {
     throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+      `[zitadel] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
         `would allow open-redirect attacks.`,
     );
@@ -375,9 +496,9 @@ export function createNextgenHandle(
   return async ({ event, resolve }) => {
     const { pathname } = event.url;
 
-    // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+    // Clients never send x-zitadel-auth-token: it is an internal channel. Refuse any
     // request that carries it, on every route, before anything else runs.
-    if (event.request.headers.has("x-nextgen-auth-token")) {
+    if (event.request.headers.has("x-zitadel-auth-token")) {
       return new Response("Bad Request", { status: 400 });
     }
 
@@ -385,8 +506,14 @@ export function createNextgenHandle(
       return resolve(event);
     }
 
-    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url, proxyPath, projectId, projectSecret, proxyTimeoutMs);
+    const route = proxyRoute(pathname, { proxyPath, projectId, loginPath });
+    // An OAuth issuer that is not this app's project: the app answers, so its
+    // origin never serves another project's issuer.
+    if (route?.refused) {
+      return refusedProxyResponse();
+    }
+    if (route) {
+      return proxyRequest(event, url, route, projectId, projectSecret, proxyTimeoutMs);
     }
 
     return handleAuth(event, resolve, {
@@ -405,22 +532,39 @@ export function createNextgenHandle(
 }
 
 /**
- * Reads the auth state from a SvelteKit request event inside a load function,
- * endpoint, or action after the {@link createNextgenHandle} hook has run.
+ * Reads the auth state of a request inside a load function, endpoint or action.
  *
+ * Call it after the hook from {@link createZitadelHandle} has run. The function only reads
+ * `event.locals.zitadelAuth`, so it performs no verification and no network call. When the hook
+ * has not written a result, for example on a route in
+ * {@link ZitadelMiddlewareOptions.ignoredRoutes}, the function returns a signed-out result
+ * instead of `undefined`. The result carries the session token, so keep it on the server: return
+ * only the fields you need from a load function, because load data is serialized into the page.
+ * Client-side navigation does not reach the hook, so a page that must stay protected calls this
+ * function in its own load function.
+ *
+ * Naming: Takes the framework's own request event or context and returns the verified result
+ * that the handler stored on it. It reads and never creates, so it is called getAuth, and it is
+ * synchronous because the framework has already handed over the event.
+ *
+ * @param event - The current SvelteKit request event.
+ * @returns The current {@link ZitadelAuthResult}: signed in with a session, or signed out with a `null`
+ *   session.
+ * @example
  * ```ts
+ * import { redirect } from "@sveltejs/kit";
  * import { getAuth } from "@zitadel/sdk-sveltekit/server";
  *
  * export const load = (event) => {
  *   const auth = getAuth(event);
- *   if (!auth.isAuthenticated) throw redirect(302, "/login");
+ *   if (!auth.isAuthenticated) {
+ *     throw redirect(302, "/login");
+ *   }
  *   return { userId: auth.session.userId };
  * };
  * ```
- *
- * @param event - The current SvelteKit request event.
- * @returns The current {@link AuthResult}.
+ * @see {@link createZitadelHandle}
  */
-export function getAuth(event: RequestEvent): AuthResult {
-  return event.locals.nextgenAuth ?? { isAuthenticated: false, session: null };
+export function getAuth(event: RequestEvent): ZitadelAuthResult {
+  return event.locals.zitadelAuth ?? { isAuthenticated: false, session: null };
 }
