@@ -4,19 +4,11 @@ import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 import { CommandGroups } from "@/cli/commands/groups";
 import { BaseCommand, type CommandResult } from "@/cli/core";
 import { Previewable } from "@/cli/core/previewable";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { refuseOutsideProject } from "@/cli/core/not-a-project";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 import { MetaSchemas } from "@/lib/meta-schemas";
-import { Project } from "@/lib/project";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { CONFIG_DIRECTORIES, DiskStore, OAuthSettings, ZitadelConfig } from "@/lib/zitadel";
-
-/** How a directory that `setup` has not made a project is refused. */
-const NOT_A_PROJECT_REFUSAL = {
-  message: "This directory is not a Zitadel project",
-  hint: "Run setup first; the OAuth settings live under .zitadel/.",
-  next: [{ id: "setup" }],
-} as const satisfies Refusal;
 
 /** The headline of a run that found the switch already on. */
 const ALREADY_ENABLED = "The OAuth authorization server is already enabled";
@@ -129,9 +121,7 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
    *   settings file first, or `undefined` when the switch was already on.
    */
   private async enabled(dryRun: boolean): Promise<readonly [string, ...string[]] | undefined> {
-    if (!(await Project.at(this.cwd).hasConfig())) {
-      throw refusalError(NOT_A_PROJECT_REFUSAL, {});
-    }
+    await refuseOutsideProject(this.cwd, "the OAuth settings live under .zitadel/.");
     const store = new DiskStore(this.cwd);
     const config = (await ZitadelConfig.loadKinds(store, ["oauth"])).refuseBroken(store);
     const existing = config.oauth.all[0];

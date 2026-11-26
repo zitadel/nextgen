@@ -8209,7 +8209,7 @@
               "examples": {
                 "bundle": {
                   "summary": "Built from the files on disk",
-                  "description": "The CLI's form: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The schema's `metaSchema` is the one the server\npublishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
+                  "description": "A whole bundle: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
                   "value": {
                     "bundle": {
                       "schemas": [
