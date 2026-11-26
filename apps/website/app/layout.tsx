@@ -35,9 +35,9 @@ const apkFutural = localFont({
   display: "swap",
 });
 
-const title = "Zitadel preview — your login in one minute";
+const title = "Zitadel Next: identity you can just ask";
 const description =
-  "Open-source auth that lives in your repo: your user model, your flows, your look. For developers and the agents they work with.";
+  "Zitadel Next is open-source identity your agent can run, from the login screens to every policy, so you can just ask.";
 
 // The share image, rendered from scripts/og.html (AGENTS.md), imported so it
 // loads from /_next/; on Vercel, Next makes its URL absolute with the

@@ -77,8 +77,10 @@ properties:
     description: The selected tab, on pages with tracked tabs.
   placement:
     type: string
-    values: [hero, showcase, footer]
-    description: Where on its page a copy button or a call to action sits.
+    values: [hero, showcase, closing, footer]
+    description: >-
+      Where on its page a copy button or a call to action sits: `closing` is
+      the website's front page's last band, over the footer.
   target:
     type: string
     values: [quickstart, github]

@@ -16,8 +16,11 @@ import {
 // from the browser like the page views, so a blocker drops a visitor from
 // both and the ratios between them hold.
 
-/** Where on its page a copy button or a call to action sits. */
-export type Placement = "hero" | "showcase" | "footer";
+/**
+ * Where on its page a copy button or a call to action sits: `closing` is the
+ * front page's last band, over the footer.
+ */
+export type Placement = "hero" | "showcase" | "closing" | "footer";
 
 /** What a copy button copied, never its text: `all` is the hero's whole block. */
 export type Snippet = "all" | "start" | "setup" | "dev" | "dry_run" | "deploy" | "skills";
