@@ -346,21 +346,21 @@ async function findLockouts(ctx: StepContext): Promise<Found> {
   // One scan failing must not discard what the other found.
   const scans = await Promise.all([
     lookupWarnings(ctx, flows, share).catch((error: unknown) => {
-      if (error instanceof BackendError || isCancellation(error)) {
+      if (error instanceof Error) {
         return { ...NOTHING, failed: true };
       }
       throw error;
     }),
     ssoSkipped === undefined
       ? unservedWarnings(ctx, flows, names, share).catch((error: unknown) => {
-          if (error instanceof BackendError || isCancellation(error)) {
+          if (error instanceof Error) {
             return { ...NOTHING, failed: true };
           }
           throw error;
         })
       : NOTHING,
     credentialWarnings(ctx, disabling.changes, share).catch((error: unknown) => {
-      if (error instanceof BackendError || isCancellation(error)) {
+      if (error instanceof Error) {
         return { ...NOTHING, failed: true };
       }
       throw error;
