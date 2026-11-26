@@ -71,6 +71,36 @@ const cases: ReadonlyArray<[string, string, string]> = [
     `<zl-pill href="javascript:alert(1)">x</zl-pill><zl-field name="p" label="x" forgot-password-href=" java\tscript:alert(1)"></zl-field>`,
     `<zl-pill>x</zl-pill><zl-field name="p" label="x"></zl-field>`,
   ],
+  [
+    "strips data: links an atom would render, but keeps a data: image",
+    `<zl-pill href="data:text/html,x">x</zl-pill><img src="data:image/png;base64,AAAA" alt="">`,
+    `<zl-pill>x</zl-pill><img src="data:image/png;base64,AAAA" alt="">`,
+  ],
+  [
+    "keeps text that only looks like a script URL",
+    `<p title="javascript:void" data-x="javascript:1">x</p>`,
+    `<p title="javascript:void" data-x="javascript:1">x</p>`,
+  ],
+  [
+    "drops embedded content with its fallback text",
+    `<p>a</p><object data="https://evil.example/x"><embed src="https://evil.example/y">text</object>`,
+    `<p>a</p>`,
+  ],
+  ...[
+    `<svg><a href="javascript:alert(1)"><text>x</text></a></svg>`,
+    `<math><mtext><table><mglyph><style><img src=x onerror=alert(1)></style></mglyph></table></mtext></math>`,
+    `<noscript><p title="</noscript><img src=x onerror=alert(1)>"></noscript>`,
+    `<marquee>m</marquee>`,
+    `<details><summary>s</summary>d</details>`,
+    `<video src="https://evil.example/v"></video>`,
+    `<select><option>o</option></select>`,
+    `<template><p>t</p></template>`,
+    `<font>f</font><center>c</center>`,
+  ].map((input): [string, string, string] => [
+    `drops ${input.slice(0, input.indexOf(">") + 1)} with its content`,
+    `<p>a</p>${input}`,
+    `<p>a</p>`,
+  ]),
   ...["name", "title", "id", "action", "method", "length", "location", "body", "domain"].map(
     (value): [string, string, string] => [
       `keeps a field named "${value}" that collides with a DOM property (#2532)`,

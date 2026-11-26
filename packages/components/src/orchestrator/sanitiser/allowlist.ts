@@ -122,12 +122,57 @@ export const ATTRIBUTES: readonly string[] = [
 ].filter((attribute) => !attribute.startsWith("data-"));
 
 /**
- * Tags dropped together with their content.
+ * Tags dropped together with their content: scripts, styles and embedded
+ * content, plus the tags DOMPurify's HTML profile keeps but the browser's safe
+ * list leaves out (media, SVG, MathML, form widgets, obsolete tags), so a
+ * template renders the same in Safari as in Chrome and Firefox.
  */
-export const REMOVED_TAGS: readonly string[] = ["script", "style", "iframe"];
+export const REMOVED_TAGS: readonly string[] = [
+  "script",
+  "style",
+  "iframe",
+  "object",
+  "embed",
+  "noscript",
+  "template",
+  "svg",
+  "math",
+  "audio",
+  "video",
+  "source",
+  "track",
+  "picture",
+  "canvas",
+  "map",
+  "area",
+  "details",
+  "summary",
+  "dialog",
+  "select",
+  "option",
+  "optgroup",
+  "datalist",
+  "textarea",
+  "output",
+  "meter",
+  "progress",
+  "slot",
+  "acronym",
+  "big",
+  "blink",
+  "center",
+  "dir",
+  "font",
+  "marquee",
+  "menuitem",
+  "nobr",
+  "spacer",
+  "strike",
+  "tt",
+];
 
 /**
  * Tags dropped while their content stays: templates use `<zl-*>` atoms for
  * controls, and a stray `<button>Go</button>` keeps its text.
  */
-export const UNWRAPPED_TAGS: readonly string[] = ["object", "embed", "form", "input", "button"];
+export const UNWRAPPED_TAGS: readonly string[] = ["form", "input", "button"];

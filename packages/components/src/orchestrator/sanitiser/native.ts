@@ -1,8 +1,17 @@
 import { ATTRIBUTES, ELEMENTS, REMOVED_TAGS, UNWRAPPED_TAGS } from "./allowlist.js";
 import type { Sanitiser } from "./sanitiser.js";
 
-/** The URL schemes that run script when followed. */
-const SCRIPT_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:"]);
+/**
+ * The namespaces of the tags that are not HTML: the Sanitizer API matches a
+ * tag by name and namespace, and `<svg>` and `<math>` are not in the HTML one.
+ */
+const FOREIGN_NAMESPACES: Readonly<Record<string, string>> = {
+  svg: "http://www.w3.org/2000/svg",
+  math: "http://www.w3.org/1998/Math/MathML",
+};
+
+/** The URL schemes an atom's link may not use. */
+const UNSAFE_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:", "data:"]);
 
 /**
  * Sanitises with the browser's own HTML Sanitizer API, `Element.setHTML()`.
@@ -14,9 +23,10 @@ const SCRIPT_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:"]
  *
  * The browser strips `javascript:` only from its own link attributes, such as
  * `href` on `<a>`. An atom that renders a link from its own attribute
- * (`<zl-pill href>`, `<zl-field forgot-password-href>`) would still run it, so
- * every attribute that holds a script URL is dropped afterwards, as DOMPurify
- * does for every attribute.
+ * (`<zl-pill href>`, `<zl-field forgot-password-href>`) would still follow it,
+ * so afterwards a `javascript:`, `vbscript:` or `data:` URL is dropped from
+ * every `href` or `src` attribute and every `*-href` one, as DOMPurify does
+ * (which still allows a `data:` image).
  */
 export class NativeSanitiser implements Sanitiser {
   private readonly sanitizer: Sanitizer = NativeSanitiser.configure();
@@ -51,7 +61,8 @@ export class NativeSanitiser implements Sanitiser {
       sanitizer.allowAttribute(attribute);
     }
     for (const element of REMOVED_TAGS) {
-      sanitizer.removeElement(element);
+      const namespace = FOREIGN_NAMESPACES[element];
+      sanitizer.removeElement(namespace ? { name: element, namespace } : element);
     }
     for (const element of UNWRAPPED_TAGS) {
       sanitizer.replaceElementWithChildren(element);
@@ -62,14 +73,24 @@ export class NativeSanitiser implements Sanitiser {
   }
 
   /**
-   * Whether a value is a URL that runs script, read the way a browser reads a
-   * link, so `" java\tscript:"` counts too.
+   * Whether an attribute holds a link an atom may not follow, read the way a
+   * browser reads a link, so `" java\tscript:"` counts too.
    *
-   * @param value - An attribute value.
-   * @returns `true` for a `javascript:` or `vbscript:` URL.
+   * @param element - The element that carries it.
+   * @param attribute - The attribute.
+   * @returns `true` for a `javascript:`, `vbscript:` or `data:` URL in a link
+   *   attribute, other than a `data:` image.
    */
-  private static isScriptUrl(value: string): boolean {
-    return SCRIPT_SCHEMES.has(URL.parse(value, document.baseURI)?.protocol ?? "");
+  private static isUnsafeUrl(element: Element, attribute: Attr): boolean {
+    const { name, value } = attribute;
+    if (name !== "href" && name !== "src" && !name.endsWith("-href")) {
+      return false;
+    }
+    const scheme = URL.parse(value, document.baseURI)?.protocol ?? "";
+    if (scheme === "data:" && element.localName === "img" && name === "src") {
+      return false;
+    }
+    return UNSAFE_SCHEMES.has(scheme);
   }
 
   /**
@@ -81,7 +102,7 @@ export class NativeSanitiser implements Sanitiser {
     host.setHTML(html, { sanitizer: this.sanitizer });
     for (const element of host.querySelectorAll("*")) {
       for (const attribute of [...element.attributes]) {
-        if (NativeSanitiser.isScriptUrl(attribute.value)) {
+        if (NativeSanitiser.isUnsafeUrl(element, attribute)) {
           element.removeAttribute(attribute.name);
         }
       }
