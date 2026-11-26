@@ -214,8 +214,10 @@ function operationPath(path: string): string {
  * post to the proxy, and the proxy would add the secret to a handoff that the attacker obtained, so
  * that the visitor ends up signed in as the attacker. A browser states where a request comes from
  * in `Sec-Fetch-Site`, which a page cannot set, so the secret goes only to a request that is
- * `same-origin`. A request without that header comes from a client that is not a browser page, and
- * passes.
+ * `same-origin`. An older browser sends no `Sec-Fetch-Site` but does send `Origin` on a POST, and
+ * that origin must name the host that the request was made to, which the proxy takes from
+ * `X-Forwarded-Host`. A request with neither header comes from a client that is not a browser page,
+ * and passes.
  *
  * @param method - The HTTP method of the proxied request, in any case.
  * @param pathname - The path after the proxy prefix, for example `/sessions/exchange` or
@@ -235,12 +237,23 @@ export function requiresProjectSecret(
   pathname: string,
   headers: Pick<Headers, "get">,
 ): boolean {
+  if (method.toUpperCase() !== "POST" || operationPath(pathname) !== "/sessions/exchange") {
+    return false;
+  }
   const site = headers.get("sec-fetch-site");
-  return (
-    method.toUpperCase() === "POST" &&
-    operationPath(pathname) === "/sessions/exchange" &&
-    (site === null || site === "same-origin")
-  );
+  if (site !== null) {
+    return site === "same-origin";
+  }
+  const origin = headers.get("origin");
+  if (origin === null) {
+    return true;
+  }
+  const host = firstForwarded(headers.get("x-forwarded-host"));
+  try {
+    return host !== undefined && new URL(origin).host === host;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Proxy routing ───────────────────────────────────────────────────────────

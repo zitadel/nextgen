@@ -348,9 +348,11 @@ describe("a proxied redirect", () => {
 
 describe("a handoff exchange", () => {
   it.each([
-    ["same-origin", "Bearer secret"],
-    ["cross-site", null],
-  ])("sent as %s reaches the server with the authorization %s", async (site, expected) => {
+    [{ "sec-fetch-site": "same-origin" }, "Bearer secret"],
+    [{ "sec-fetch-site": "cross-site" }, null],
+    [{ origin: "http://localhost:3000" }, "Bearer secret"],
+    [{ origin: "http://evil.example" }, null],
+  ])("sent with %j reaches the server with the authorization %s", async (headers, expected) => {
     let authorization: string | null = null;
     const backend = createServer((request, response) => {
       authorization = request.headers.authorization ?? null;
@@ -362,7 +364,7 @@ describe("a handoff exchange", () => {
     try {
       await serve(
         "http://localhost:3000/__nextgen/sessions/exchange",
-        { method: "POST", headers: { "sec-fetch-site": site } },
+        { method: "POST", headers },
         { url: `http://127.0.0.1:${port}`, projectId: "project", projectSecret: "secret" },
       );
     } finally {

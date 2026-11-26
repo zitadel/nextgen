@@ -480,6 +480,28 @@ describe("requiresProjectSecret", () => {
     expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(true);
   });
 
+  it("allows the secret when an older browser sends the origin of the app", () => {
+    const headers = new Headers({
+      origin: "https://app.example",
+      "x-forwarded-host": "app.example",
+    });
+
+    expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(true);
+  });
+
+  it.each([
+    ["https://evil.example", "app.example"],
+    ["null", "app.example"],
+    ["https://app.example", undefined],
+  ])("withholds the secret when an older browser sends the origin %s to %s", (origin, host) => {
+    const headers = new Headers({ origin });
+    if (host !== undefined) {
+      headers.set("x-forwarded-host", host);
+    }
+
+    expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(false);
+  });
+
   it.each(["cross-site", "same-site", "none"])(
     "withholds the secret from a handoff exchange that the browser marks %s",
     (site) => {

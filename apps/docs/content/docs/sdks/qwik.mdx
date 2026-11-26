@@ -15,7 +15,7 @@ The Qwik SDK (`@zitadel/sdk-qwik`) is the single-page-app wrapper for the shared
 </Callout>
 
 <Callout title="SPA proxy requirement" type="warn">
-  A Qwik single-page app has no server of its own. In development, the CLI configures a Vite proxy for `/__nextgen/*`. Production needs a same-origin proxy for `/__nextgen/*` that adds the project secret to the session exchange, and to no other call. The session exchange is the call that turns a completed sign-in into a session. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
+  A Qwik single-page app has no server of its own. In development, the CLI configures a Vite proxy for `/__nextgen/*`. Production needs a same-origin proxy for `/__nextgen/*` that adds the project secret to the session exchange, and to no other call, and only to a request from your own site. The session exchange is the call that turns a completed sign-in into a session. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
 </Callout>
 
 ## Prerequisites
