@@ -8,48 +8,17 @@
 import { manifestRegistry } from "../../manifests.js";
 
 /**
- * Standard HTML tags that templates may use as structural chrome around
- * `<zl-*>` atoms. The sanitisers allow most of them already; listing them
- * keeps them allowed whatever a library default leaves out (such as `<img>`).
+ * Plain HTML tags templates use that the browser's safe list leaves out.
+ * Everything else plain (`<div>`, `<p>`, `<h1>`, `<b>`, `<table>`) is in
+ * both sanitisers' own lists already.
  */
-const STRUCTURAL_TAGS: readonly string[] = [
-  "div",
-  "span",
-  "p",
-  "small",
-  "strong",
-  "em",
-  "br",
-  "hr",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "ul",
-  "ol",
-  "li",
-  "a",
-  "img",
-  "section",
-  "header",
-  "footer",
-  "main",
-  "nav",
-  "aside",
-  "article",
-  "figure",
-  "figcaption",
-  "label",
-  "fieldset",
-  "legend",
-];
+const STRUCTURAL_TAGS: readonly string[] = ["img", "label", "fieldset", "legend"];
 
 /**
- * Attributes templates may carry on structural tags. Per-atom attributes are
- * derived from the manifest registry below — manifests are the single source
- * of truth for "what attributes does `<zl-field>` accept?".
+ * Attributes templates use that the browser's safe list leaves out on purpose
+ * (it cannot judge them): styling hooks, ids, slots and form names. Per-atom
+ * attributes come from the manifest registry below — manifests are the single
+ * source of truth for "what attributes does `<zl-field>` accept?".
  */
 const COMMON_ATTRS: readonly string[] = [
   "id",
@@ -77,8 +46,10 @@ const COMMON_ATTRS: readonly string[] = [
 ];
 
 /**
- * The `aria-*` attributes (WAI-ARIA 1.2). The Sanitizer API has no wildcard
- * for them, so both paths list them.
+ * The WAI-ARIA 1.2 attributes. The browser's safe list has none, and unlike
+ * `data-*` the Sanitizer API has no switch that allows them all, so they are
+ * named here; without them a template's `aria-*` would be stripped in Chrome
+ * and Firefox. The list is fixed by the specification.
  */
 const ARIA_ATTRS: readonly string[] = [
   "aria-activedescendant",
