@@ -71,7 +71,6 @@ class World {
       return this.alive.has(record.pid);
     },
     isLaunchedAlive: async (server) => this.alive.has(server.pid),
-    describe: (record) => ({ runtime: "fake", pid: record.pid }),
     logTail: async () => {
       if (this.logsGone) {
         throw new Error("no such container");

@@ -92,12 +92,6 @@ export interface Launcher<R extends ServerRecord> {
    * (this took down every journey lane once).
    */
   isLaunchedAlive(server: Launched<R>): Promise<boolean>;
-  /**
-   * What identifies the server in an error about it (its pid and log file, or its
-   * container). The launcher owns this because only it knows what a record holds,
-   * which keeps the error mapping from needing to know the backends.
-   */
-  describe(record: R): Readonly<Record<string, unknown>>;
   /** Stops it, `stale` when there was nothing left to stop. */
   terminate(record: R): Promise<StopOutcome>;
   /** The end of its own log, for explaining a failed start; read before it is cleaned up. */
@@ -294,40 +288,31 @@ export class Lifecycle<R extends ServerRecord> {
       preferred,
       this.options.firstPort,
     );
-    // biome-ignore lint/plugin: assigned inside the try that guards the launch, read after it
-    let record: Launched<R> | undefined;
     try {
-      record = await this.launchAndWait(claim.port);
+      return await this.launchAndWait(claim.port);
     } catch (error) {
       // Someone else took the port between claiming it and binding it (a
       // process outside our claims, or a Docker publish that failed). The
       // choice was automatic, so the next port is tried. A server that failed
       // with its port still free crashed, and says so instead of being retried.
       if (
-        !(
-          requested === undefined &&
-          attempt < PORT_RACE_RETRIES &&
-          !(error instanceof LocalServerStopError) &&
-          !(error instanceof LocalServerStartCleanupFailedError) &&
-          !(error instanceof LocalServerStartTimeoutError) &&
-          !(await this.deps.ports.isFree(claim.port))
-        )
+        requested === undefined &&
+        attempt < PORT_RACE_RETRIES &&
+        !(error instanceof LocalServerStopError) &&
+        !(error instanceof LocalServerStartCleanupFailedError) &&
+        !(error instanceof LocalServerStartTimeoutError) &&
+        !(await this.deps.ports.isFree(claim.port))
       ) {
-        throw error;
+        return this.launchOnFreePort(requested, claim.port + 1, attempt + 1);
       }
+      throw error;
     } finally {
       // A claim that cannot be removed is a file whose owner is gone, which
       // the next start takes over; it must not hide how this start ended.
-      try {
-        await claim.release();
-      } catch {
-        // Ignored on purpose, as above.
-      }
+      await claim.release().catch(() => {
+        return undefined;
+      });
     }
-    if (record === undefined) {
-      return this.launchOnFreePort(requested, claim.port + 1, attempt + 1);
-    }
-    return record;
   }
 
   /**
@@ -456,13 +441,9 @@ export class Lifecycle<R extends ServerRecord> {
     LocalServerStartExitedError | LocalServerStartTimeoutError | LocalServerStartCleanupFailedError
   > {
     // The log goes first: cleaning up may remove it with the server.
-    // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
-    let logTail: string | undefined;
-    try {
-      logTail = await this.deps.launcher.logTail?.(record, 40);
-    } catch {
-      logTail = undefined;
-    }
+    const logTail = await this.deps.launcher.logTail?.(record, 40).catch(() => {
+      return undefined;
+    });
     const outcome = await this.terminateQuietly(record);
     const logged = logTail ? `\nThe server logged:\n${logTail}` : "";
 
@@ -470,11 +451,11 @@ export class Lifecycle<R extends ServerRecord> {
       return new LocalServerStartCleanupFailedError(
         `The server did not become healthy and is still running${logged}`,
       );
-    } else if (reason === "exited") {
-      return new LocalServerStartExitedError(`The server exited before it became healthy${logged}`);
-    } else {
-      return new LocalServerStartTimeoutError(`The server did not become healthy in time${logged}`);
     }
+    if (reason === "exited") {
+      return new LocalServerStartExitedError(`The server exited before it became healthy${logged}`);
+    }
+    return new LocalServerStartTimeoutError(`The server did not become healthy in time${logged}`);
   }
 }
 

@@ -176,11 +176,6 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     return BinaryLauncher.isRunning(server.pid);
   }
 
-  /** The pid and log file, which is where to look when a start fails. */
-  describe(record: BinaryRuntimeMetadata): Readonly<Record<string, unknown>> {
-    return { runtime: "binary", pid: record.pid, log_path: record.log_path };
-  }
-
   /**
    * Stops the recorded server, leaving alone a pid that no longer belongs to it.
    */

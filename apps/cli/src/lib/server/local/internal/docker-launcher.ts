@@ -117,11 +117,6 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     return this.isAlive(server);
   }
 
-  /** The container, which is where to look when a start fails. */
-  describe(record: DockerRuntimeMetadata): Readonly<Record<string, unknown>> {
-    return { runtime: "docker", container_name: record.container_name };
-  }
-
   /**
    * The end of the container's log, read before a failed start removes the container.
    */
