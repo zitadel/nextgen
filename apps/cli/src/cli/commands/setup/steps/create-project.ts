@@ -1,11 +1,6 @@
 import { basename } from "node:path";
 
-import {
-  BackendError,
-  type CreatedProject,
-  createZitadelClient,
-  ProjectService,
-} from "@/lib/backend";
+import { BackendError, createZitadelClient, ProjectService } from "@/lib/backend";
 import { toZitadelError, ZitadelError } from "@/lib/errors";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Runtime } from "@/lib/runtime";
@@ -96,9 +91,10 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
     );
     try {
       const fromDirectory = basename(this.deps.cwd).trim();
-      const project: CreatedProject = await (async () => {
-        if (this.deps.dryRun) {
-          return {
+      if (this.deps.dryRun) {
+        creating.done("Would create a project (dry run)");
+        return {
+          project: {
             id: "dry-run-0000",
             name: "dry-run",
             project_secret: "sk_proj_dry_run_full",
@@ -110,57 +106,54 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
               },
             ],
             created_at: "2026-04-21T14:03:11.000Z",
-          };
-        }
-        try {
-          return await new ProjectService(
-            createZitadelClient({
-              userAgent: Runtime.current().userAgent(),
-              baseUrl: answers.server,
-              signal: this.deps.signal,
-            }),
-          ).create({
-            name: fromDirectory.length > 0 ? fromDirectory : `zitadel-${app.framework}-app`,
-            origins: [
-              {
-                pattern: issuer,
-                kind: "primary",
-              },
+          },
+          retry,
+        };
+      }
+      try {
+        const project = await new ProjectService(
+          createZitadelClient({
+            userAgent: Runtime.current().userAgent(),
+            baseUrl: answers.server,
+            signal: this.deps.signal,
+          }),
+        ).create({
+          name: fromDirectory.length > 0 ? fromDirectory : `zitadel-${app.framework}-app`,
+          origins: [
+            {
+              pattern: issuer,
+              kind: "primary",
+            },
+          ],
+          seed_defaults: false,
+        });
+        creating.done(`Created project ${escapeControlCharacters(project.id)}`);
+        return {
+          project,
+          retry,
+        };
+      } catch (error) {
+        if (error instanceof BackendError) {
+          const normalized = toZitadelError(error);
+          const sso = ssoRecovery(retry, this.deps.suggest);
+          throw new ZitadelError(normalized.code, normalized.message, {
+            hint: `${normalized.hint ? `${normalized.hint} ` : ""}If you meant to use a local Zitadel server, start it first and retry setup with the commands below. ${sso.hint}`.trimEnd(),
+            nextCommands: [
+              this.deps.suggest({ id: "start" }),
+              this.deps.suggest({
+                id: "setup",
+                flags: setupRetryFlags(retry),
+              }),
+              ...sso.commands,
             ],
-            seed_defaults: false,
+            details: {
+              server: answers.server,
+              original: normalized.details,
+            },
           });
-        } catch (error) {
-          if (error instanceof BackendError) {
-            const normalized = toZitadelError(error);
-            const sso = ssoRecovery(retry, this.deps.suggest);
-            throw new ZitadelError(normalized.code, normalized.message, {
-              hint: `${normalized.hint ? `${normalized.hint} ` : ""}If you meant to use a local Zitadel server, start it first and retry setup with the commands below. ${sso.hint}`.trimEnd(),
-              nextCommands: [
-                this.deps.suggest({ id: "start" }),
-                this.deps.suggest({
-                  id: "setup",
-                  flags: setupRetryFlags(retry),
-                }),
-                ...sso.commands,
-              ],
-              details: {
-                server: answers.server,
-                original: normalized.details,
-              },
-            });
-          }
-          throw error;
         }
-      })();
-      creating.done(
-        this.deps.dryRun
-          ? "Would create a project (dry run)"
-          : `Created project ${escapeControlCharacters(project.id)}`,
-      );
-      return {
-        project,
-        retry,
-      };
+        throw error;
+      }
     } catch (error) {
       creating.fail();
       throw error;

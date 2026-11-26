@@ -25,6 +25,7 @@ import {
   CONFIG_DIRECTORIES,
   Connection,
   DiskStore,
+  ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
   SignupPolicy,
 } from "@/lib/zitadel";
@@ -148,57 +149,58 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
         );
       }
       const store = new DiskStore(this.deps.cwd);
-      const saved = await scaffold.change
-        .save(store, {
+      try {
+        const saved = await scaffold.change.save(store, {
           overwrite: this.deps.force,
           createOnly: (document) => {
             return document instanceof Connection;
           },
-        })
-        .then(
-          (written) => {
-            return written;
-          },
-          (error: unknown) => {
-            throw setupRefusal(error, scaffold.connections);
-          },
-        );
-      const readmes = await Promise.all(
-        [
-          {
-            directory: CONFIG_DIRECTORIES.schemas,
-            text: schemasReadmeContent(),
-          },
-          {
-            directory: CONFIG_DIRECTORIES.flows,
-            text: flowsReadmeContent(),
-          },
-          {
-            directory: CONFIG_DIRECTORIES.policies,
-            text: policiesReadmeContent(),
-          },
-        ].map(async (readme): Promise<readonly string[]> => {
-          const path = `${readme.directory}/${README}`;
-          const text = Spelling.at(this.deps.cliVersion).normalizeProse(readme.text);
-          try {
-            await store.writeText(path, text, "create");
-            return [path];
-          } catch (error) {
-            if (error instanceof ZitadelConfigFileExistsError) {
-              return [];
+        });
+        const readmes = await Promise.all(
+          [
+            {
+              directory: CONFIG_DIRECTORIES.schemas,
+              text: schemasReadmeContent(),
+            },
+            {
+              directory: CONFIG_DIRECTORIES.flows,
+              text: flowsReadmeContent(),
+            },
+            {
+              directory: CONFIG_DIRECTORIES.policies,
+              text: policiesReadmeContent(),
+            },
+          ].map(async (readme): Promise<readonly string[]> => {
+            const path = `${readme.directory}/${README}`;
+            const text = Spelling.at(this.deps.cliVersion).normalizeProse(readme.text);
+            try {
+              await store.writeText(path, text, "create");
+              return [path];
+            } catch (error) {
+              if (error instanceof ZitadelConfigFileExistsError) {
+                return [];
+              }
+              throw error;
             }
-            throw error;
-          }
-        }),
-      );
-      return {
-        scaffolded: {
-          filesWritten: [...saved, ...readmes.flat()].map((path) => {
-            return join(this.deps.cwd, path);
           }),
-          passwordMinLength: scaffold.policy.minLength ?? null,
-        },
-      };
+        );
+        return {
+          scaffolded: {
+            filesWritten: [...saved, ...readmes.flat()].map((path) => {
+              return join(this.deps.cwd, path);
+            }),
+            passwordMinLength: scaffold.policy.minLength ?? null,
+          },
+        };
+      } catch (error) {
+        if (
+          error instanceof ZitadelConfigConnectionExistsError ||
+          error instanceof ZitadelConfigFileExistsError
+        ) {
+          throw setupRefusal(error, scaffold.connections);
+        }
+        throw error;
+      }
     } catch (error) {
       const cause = toZitadelError(error);
       const rerun = setupRetryFlags({

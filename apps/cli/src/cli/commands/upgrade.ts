@@ -186,103 +186,102 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
     });
     const { plan, breaking, notes } = await this.planned(upgrader);
 
-    const result = await upgrader.apply(plan).then(
-      (applied) => {
-        return applied;
-      },
-      async (error: unknown) => {
-        if (error instanceof UpgradeInstallFailedError) {
-          throw refusalError(
-            INSTALL_FAILED_REFUSAL,
-            {
-              ...error,
-              message: error.message,
-              reason: errorMessage(error.cause),
-            },
-            {
-              install: suggestedCommandOf(error.command),
-              again: await this.again("upgrade", {}),
-            },
-          );
-        }
-        throw error;
-      },
-    );
+    try {
+      const result = await upgrader.apply(plan);
 
-    const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
+      const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
 
-    const refreshed = {
-      done: [`  ${style.mark.pass} Refreshed generated files with doctor --fix`],
-      issues: [`  ${style.mark.warn} Refreshed generated files; doctor still reports issues`],
-      failed: [`  ${style.mark.warn} Could not refresh generated files`],
-    };
-    const rows = [
-      ...plan.packages.map((pkg) => {
-        return `  ${style.mark.pass} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
-      }),
-      ...(refresh === "done" || refresh === "issues" || refresh === "failed"
-        ? refreshed[refresh]
-        : []),
-      ...plan.leftAlone.map(({ name, specifier }) => {
-        const said = `- ${name} left at "${specifier}", not an exact version`;
-
-        return `  ${style.dim(escapeControlCharacters(said))}`;
-      }),
-    ];
-
-    const title = plan.upToDate
-      ? `Zitadel is up to date at ${plan.target}`
-      : `Zitadel upgraded to ${plan.target}`;
-
-    const atTarget = this.suggestWith(this.scope(), plan.target);
-    const commands: SuggestedCommand[] = [];
-    if (refresh === "failed") {
-      commands.push(
-        atTarget({
-          id: "doctor",
-          flags: { fix: true },
+      const refreshed = {
+        done: [`  ${style.mark.pass} Refreshed generated files with doctor --fix`],
+        issues: [`  ${style.mark.warn} Refreshed generated files; doctor still reports issues`],
+        failed: [`  ${style.mark.warn} Could not refresh generated files`],
+      };
+      const rows = [
+        ...plan.packages.map((pkg) => {
+          return `  ${style.mark.pass} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
         }),
-      );
-    }
-    if (refresh === "issues") {
-      commands.push(atTarget({ id: "doctor" }));
-    }
-    if (result.installed && existsSync(join(this.cwd, Skills.SHARED_DIR))) {
-      commands.push(atTarget({ id: "skills:add" }));
-    }
+        ...(refresh === "done" || refresh === "issues" || refresh === "failed"
+          ? refreshed[refresh]
+          : []),
+        ...plan.leftAlone.map(({ name, specifier }) => {
+          const said = `- ${name} left at "${specifier}", not an exact version`;
 
-    const actions = this.actions(plan);
-
-    return {
-      status: "ok",
-      data: {
-        title,
-        current_version: plan.cliVersion,
-        latest_version: plan.target,
-        up_to_date: plan.upToDate,
-        packages: plan.packages,
-        left_alone: plan.leftAlone.map(({ name, specifier }) => {
-          return {
-            name,
-            specifier,
-          };
+          return `  ${style.dim(escapeControlCharacters(said))}`;
         }),
-        breaking_changes: breaking,
-        release_notes_url: notes.url,
-        refresh,
-        ...(result.installCommand === undefined ? {} : { install_command: result.installCommand }),
-      },
-      pretty: painted([style.strong(title), ...rows].join("\n")),
-      summary: {
-        title,
-        sections: [],
-        lines: rows,
-      },
-      next: {
-        ...(actions.length > 0 ? { actions } : {}),
-        ...(commands.length > 0 ? { commands } : {}),
-      },
-    };
+      ];
+
+      const title = plan.upToDate
+        ? `Zitadel is up to date at ${plan.target}`
+        : `Zitadel upgraded to ${plan.target}`;
+
+      const atTarget = this.suggestWith(this.scope(), plan.target);
+      const commands: SuggestedCommand[] = [];
+      if (refresh === "failed") {
+        commands.push(
+          atTarget({
+            id: "doctor",
+            flags: { fix: true },
+          }),
+        );
+      }
+      if (refresh === "issues") {
+        commands.push(atTarget({ id: "doctor" }));
+      }
+      if (result.installed && existsSync(join(this.cwd, Skills.SHARED_DIR))) {
+        commands.push(atTarget({ id: "skills:add" }));
+      }
+
+      const actions = this.actions(plan);
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          current_version: plan.cliVersion,
+          latest_version: plan.target,
+          up_to_date: plan.upToDate,
+          packages: plan.packages,
+          left_alone: plan.leftAlone.map(({ name, specifier }) => {
+            return {
+              name,
+              specifier,
+            };
+          }),
+          breaking_changes: breaking,
+          release_notes_url: notes.url,
+          refresh,
+          ...(result.installCommand === undefined
+            ? {}
+            : { install_command: result.installCommand }),
+        },
+        pretty: painted([style.strong(title), ...rows].join("\n")),
+        summary: {
+          title,
+          sections: [],
+          lines: rows,
+        },
+        next: {
+          ...(actions.length > 0 ? { actions } : {}),
+          ...(commands.length > 0 ? { commands } : {}),
+        },
+      };
+    } catch (error) {
+      if (error instanceof UpgradeInstallFailedError) {
+        throw refusalError(
+          INSTALL_FAILED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            reason: errorMessage(error.cause),
+          },
+          {
+            install: suggestedCommandOf(error.command),
+            again: await this.again("upgrade", {}),
+          },
+        );
+      }
+      throw error;
+    }
   }
 
   /**
@@ -297,50 +296,47 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
   private async planned(
     upgrader: Upgrader,
   ): Promise<{ plan: Plan; breaking: readonly BreakingChange[]; notes: ReleaseNotes }> {
-    const plan: Plan = await upgrader.plan().then(
-      (looked) => {
-        return looked;
-      },
-      async (error: unknown) => {
-        if (error instanceof UpgradeReleaseLookupError) {
-          throw refusalError(
-            RELEASE_LOOKUP_REFUSAL,
-            {
-              ...error,
-              message: error.message,
-            },
-            {
-              again: await this.again("upgrade", {}),
-            },
-          );
-        }
-        throw error;
-      },
-    );
+    try {
+      const plan: Plan = await upgrader.plan();
 
-    const notes = new ReleaseNotes();
-    const breaking: readonly BreakingChange[] = plan.upToDate
-      ? []
-      : await notes.breakingBetween(plan.oldest, plan.target);
-    if (!plan.upToDate) {
-      const banner = [
-        ...(breaking.length > 0 ? [style.strong("Breaking changes on the way:")] : []),
-        ...breaking.map(({ version, note }) => {
-          const said = `${style.strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`;
+      const notes = new ReleaseNotes();
+      const breaking: readonly BreakingChange[] = plan.upToDate
+        ? []
+        : await notes.breakingBetween(plan.oldest, plan.target);
+      if (!plan.upToDate) {
+        const banner = [
+          ...(breaking.length > 0 ? [style.strong("Breaking changes on the way:")] : []),
+          ...breaking.map(({ version, note }) => {
+            const said = `${style.strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`;
 
-          return `  ${style.mark.warn} ${said}`;
-        }),
-        `Release notes: ${style.url(notes.url)}`,
-        "",
-      ];
-      this.log(banner.join("\n"));
+            return `  ${style.mark.warn} ${said}`;
+          }),
+          `Release notes: ${style.url(notes.url)}`,
+          "",
+        ];
+        this.log(banner.join("\n"));
+      }
+
+      return {
+        plan,
+        breaking,
+        notes,
+      };
+    } catch (error) {
+      if (error instanceof UpgradeReleaseLookupError) {
+        throw refusalError(
+          RELEASE_LOOKUP_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            again: await this.again("upgrade", {}),
+          },
+        );
+      }
+      throw error;
     }
-
-    return {
-      plan,
-      breaking,
-      notes,
-    };
   }
 
   /**

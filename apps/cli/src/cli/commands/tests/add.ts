@@ -334,45 +334,39 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
         throw refusalError(PLAYWRIGHT_CONFIG_REFUSAL, { config });
       }
     }
-    const packageJson: PackageJson = await PM.manifest(this.cwd).then(
-      (read) => {
-        return read;
-      },
-      (error: unknown) => {
-        if (isErrno(error, "ENOENT")) {
-          throw refusalError(MANIFEST_REFUSAL, {});
-        }
-        if (error instanceof PmManifestInvalidError) {
-          throw refusalError(MANIFEST_REFUSAL, {});
-        }
-        throw error;
-      },
-    );
-    const manifest: Manifest = {
-      dependencies: new Set(
-        [packageJson.dependencies, packageJson.devDependencies].flatMap((section) => {
-          return section === undefined ? [] : Object.keys(section);
-        }),
-      ),
-      scripts: isObject(packageJson.scripts) ? packageJson.scripts : {},
-    };
-    const plan = new TestKit(framework).plan({
-      cliVersion: this.cliVersion,
-      declared: manifest.dependencies,
-      scripts: new Set(Object.keys(manifest.scripts)),
-    });
-    const planned = await new FileWriter({
-      cwd: this.cwd,
-      dryRun: true,
-      force: this.force,
-    }).scaffold(plan);
+    try {
+      const packageJson: PackageJson = await PM.manifest(this.cwd);
+      const manifest: Manifest = {
+        dependencies: new Set(
+          [packageJson.dependencies, packageJson.devDependencies].flatMap((section) => {
+            return section === undefined ? [] : Object.keys(section);
+          }),
+        ),
+        scripts: isObject(packageJson.scripts) ? packageJson.scripts : {},
+      };
+      const plan = new TestKit(framework).plan({
+        cliVersion: this.cliVersion,
+        declared: manifest.dependencies,
+        scripts: new Set(Object.keys(manifest.scripts)),
+      });
+      const planned = await new FileWriter({
+        cwd: this.cwd,
+        dryRun: true,
+        force: this.force,
+      }).scaffold(plan);
 
-    return {
-      framework,
-      manifest,
-      plan,
-      planned,
-    };
+      return {
+        framework,
+        manifest,
+        plan,
+        planned,
+      };
+    } catch (error) {
+      if (isErrno(error, "ENOENT") || error instanceof PmManifestInvalidError) {
+        throw refusalError(MANIFEST_REFUSAL, {});
+      }
+      throw error;
+    }
   }
 
   /** A package manager command as the reader runs it, from the shell's directory. */
