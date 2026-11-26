@@ -75,7 +75,7 @@ describe("settings oauth enable", () => {
           status: "ok",
           data: {
             title: ENABLED,
-            file_written: OAUTH_FILE,
+            files_written: [OAUTH_FILE],
             next_actions: NEXT_ACTIONS,
             next_commands: [
               expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
@@ -102,14 +102,19 @@ describe("settings oauth enable", () => {
         });
       });
 
-      it("carries the switch into the next deploy as one more resource", async () => {
+      it("turns the settings the project already has on in place, whatever their name", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.enableOAuth();
+        const file = await app.writeOAuthSettings("settings.json", false);
 
-        const dryRun = await app.deployDryRunData();
+        const result = await app.enableOAuth();
 
-        expect(dryRun.resources).toBe(5);
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "ok",
+          data: {
+            title: `Enabled the OAuth authorization server in ${file}`,
+            files_written: [file],
+          },
+        });
       });
     });
 
@@ -129,7 +134,7 @@ describe("settings oauth enable", () => {
             title: `Would enable the OAuth authorization server in ${OAUTH_FILE} (dry run)`,
             verb: "enable",
             topic: "OAuth",
-            file_would_write: OAUTH_FILE,
+            files_would_write: [OAUTH_FILE],
             next_commands: [expectedPublicCliCommand(`settings oauth enable --cwd ${app.path}`)],
           },
           warnings: [],
@@ -143,6 +148,22 @@ describe("settings oauth enable", () => {
         await app.enableOAuth(["--dry-run"]);
 
         expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("answers ok when the switch is already on", async () => {
+        const app = await aSetUpApp();
+        await app.enableOAuth();
+
+        const result = await app.enableOAuth(["--dry-run"]);
+
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "settings:oauth:enable",
+          source: "",
+          status: "ok",
+          data: { title: `${ALREADY_ENABLED} (dry run)`, dry_run: true },
+          warnings: [],
+        });
       });
     });
 

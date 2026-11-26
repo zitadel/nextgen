@@ -1,10 +1,12 @@
 import { dryRunResult } from "@/cli/core/crud/shared";
+import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { CommandGroups } from "@/cli/commands/groups";
 import { BaseCommand, type CommandResult } from "@/cli/core";
 import { Previewable } from "@/cli/core/previewable";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Telemetered } from "@/cli/telemetry/telemetered";
+import { MetaSchemas } from "@/lib/meta-schemas";
 import { Project } from "@/lib/project";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { CONFIG_DIRECTORIES, DiskStore, OAuthSettings, ZitadelConfig } from "@/lib/zitadel";
@@ -16,9 +18,6 @@ const NOT_A_PROJECT_REFUSAL = {
   next: [{ id: "setup" }],
 } as const satisfies Refusal;
 
-/** The headline of a run that turned the switch on. */
-const ENABLED = `Enabled the OAuth authorization server in ${OAuthSettings.PATH}`;
-
 /** The headline of a run that found the switch already on. */
 const ALREADY_ENABLED = "The OAuth authorization server is already enabled";
 
@@ -27,9 +26,10 @@ const ALREADY_ENABLED = "The OAuth authorization server is already enabled";
  * server on in the release.
  *
  * Writes `enabled: true` into the one settings file under `.zitadel/oauth/`,
- * creating it when there is none. Purely local — nothing is uploaded; the next
- * `zitadel deploy` ships it, and a release without the file leaves the
- * authorization server off.
+ * creating it when there is none, and the dialect meta-schema its `$schema`
+ * points at when the project's copy is missing or outdated. Purely local —
+ * nothing is uploaded; the next `zitadel deploy` ships it, and a release
+ * without the file leaves the authorization server off.
  */
 export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCommand)) {
   static override description =
@@ -37,26 +37,37 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
   static override group = CommandGroups.projectSettings;
 
   /**
-   * Says whether enabling would write the settings file, without writing.
+   * Says which files enabling would write, without writing.
    *
    * @returns The dry run's envelope.
    */
   protected async preview(): Promise<CommandResult> {
     const written = await this.enabled(true);
     if (written === undefined) {
-      return this.alreadyEnabled();
+      const title = `${ALREADY_ENABLED} (dry run)`;
+      return {
+        status: "ok",
+        data: { title, dry_run: true },
+        summary: { title, sections: [], lines: [SettingsOauthEnable.NOTHING_TO_WRITE] },
+      };
     }
+    const [file] = written;
     const result = dryRunResult({
       verb: "enable",
       topic: "OAuth",
-      noun: `the OAuth authorization server in ${written}`,
+      noun: `the OAuth authorization server in ${file}`,
       next: await this.again("settings:oauth:enable", { without: ["dryRun"] }),
     });
     return {
       ...result,
       pretty: undefined,
-      data: { ...(result.data as object), file_would_write: written },
-      summary: { ...result.summary, lines: [`Would write ${written}`] },
+      data: { ...(result.data as object), files_would_write: written },
+      summary: {
+        ...result.summary,
+        lines: written.map((path) => {
+          return `Would write ${path}`;
+        }),
+      },
     };
   }
 
@@ -68,12 +79,29 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
   protected async apply(): Promise<CommandResult> {
     const written = await this.enabled(false);
     if (written === undefined) {
-      return this.alreadyEnabled();
+      return {
+        status: "skipped",
+        reason: "already-enabled",
+        data: { title: ALREADY_ENABLED },
+        summary: {
+          title: ALREADY_ENABLED,
+          sections: [],
+          lines: [SettingsOauthEnable.NOTHING_TO_WRITE],
+        },
+      };
     }
+    const [file] = written;
+    const title = `Enabled the OAuth authorization server in ${file}`;
     return {
       status: "ok",
-      data: { title: ENABLED, file_written: written },
-      summary: { title: ENABLED, sections: [], lines: [`Wrote ${written}`] },
+      data: { title, files_written: written },
+      summary: {
+        title,
+        sections: [],
+        lines: written.map((path) => {
+          return `Wrote ${path}`;
+        }),
+      },
       next: {
         actions: ["See the diff with a dry run, then publish the switch with the next release."],
         commands: [
@@ -84,17 +112,23 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
     };
   }
 
+  /** What a run that finds the switch on says it left alone. */
+  private static readonly NOTHING_TO_WRITE =
+    `${CONFIG_DIRECTORIES.oauth}/ already holds the switch, so nothing was written`;
+
   /**
-   * The checks and the write a dry run and the real run share: the settings
+   * The checks and the writes a dry run and the real run share: the settings
    * the project has get the switch set, keeping their path; a project without
    * any gets the one file. A broken settings file is refused as every command
-   * that reads the configuration refuses one.
+   * that reads the configuration refuses one. The settings' `$schema` must
+   * resolve to the dialect they were written in, so the CLI-owned meta-schema
+   * is written when missing or outdated, as `doctor --fix` does.
    *
-   * @param dryRun - Whether the file is only checked, never written.
-   * @returns The project-relative path written (or that would be), or
-   *   `undefined` when the switch was already on.
+   * @param dryRun - Whether the files are only checked, never written.
+   * @returns The project-relative paths written (or that would be), the
+   *   settings file first, or `undefined` when the switch was already on.
    */
-  private async enabled(dryRun: boolean): Promise<string | undefined> {
+  private async enabled(dryRun: boolean): Promise<readonly [string, ...string[]] | undefined> {
     if (!(await Project.at(this.cwd).hasConfig())) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
@@ -105,31 +139,20 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
     if (edit?.changed === false) {
       return undefined;
     }
-    const change = config.oauth.put(edit?.document ?? OAuthSettings.enabled());
+    const document = edit?.document ?? OAuthSettings.enabled();
+    const change = config.oauth.put(document);
     if (dryRun) {
       await change.check(store);
     } else {
       await change.save(store);
     }
-    return change.changedPaths[0];
-  }
-
-  /**
-   * The envelope of a run that found nothing to do, which `--json` reports as
-   * skipped.
-   *
-   * @returns The envelope.
-   */
-  private alreadyEnabled(): CommandResult {
-    return {
-      status: "skipped",
-      reason: "already-enabled",
-      data: { title: ALREADY_ENABLED },
-      summary: {
-        title: ALREADY_ENABLED,
-        sections: [],
-        lines: [`${CONFIG_DIRECTORIES.oauth}/ already holds the switch, so nothing was written`],
-      },
-    };
+    const meta = MetaSchemas.of(this.cliVersion).only((file) => {
+      return file.path === `${META_SCHEMA_DIR}/oauth-settings.json`;
+    });
+    const metaWrites = await meta.write(this.cwd, { dryRun });
+    const metaPaths = metaWrites.written.flatMap((artifact) => {
+      return artifact.kind === "file" ? [artifact.path] : [];
+    });
+    return [document.path, ...metaPaths];
   }
 }

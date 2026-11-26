@@ -506,7 +506,7 @@ export class ZitadelConfig {
       const directory = CONFIG_DIRECTORIES[kind];
       throw new ConfigError(
         `A release carries at most one ${what}, but ${directory}/ holds ${count}`,
-        { hint: `A project has a single ${what}; keep one file under ${directory}/.` },
+        { hint: `A project has a single ${what}; keep one descriptor under ${directory}/.` },
       );
     }
   }

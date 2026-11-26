@@ -382,10 +382,6 @@ describe("flowConfigSchema", () => {
   });
 });
 
-/**
- * The gate `zitadel policy test` runs on a `.zitadel/policies/*.test.json`
- * file before it sends a case: strict like the editor's `policy-test.json`.
- */
 describe("oauthConfigSchema", () => {
   const parses = (value: object): boolean => oauthConfigSchema.safeParse(value).success;
 
@@ -399,6 +395,10 @@ describe("oauthConfigSchema", () => {
   });
 });
 
+/**
+ * The gate `zitadel policy test` runs on a `.zitadel/policies/*.test.json`
+ * file before it sends a case: strict like the editor's `policy-test.json`.
+ */
 describe("policyTestFileSchema", () => {
   const testCase = {
     name: "too short",

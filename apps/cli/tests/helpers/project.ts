@@ -1270,6 +1270,21 @@ export class ScaffoldedApp {
     return this.cli(["settings", "oauth", "enable", "--json", ...extraArgs]);
   }
 
+  /**
+   * Writes OAuth settings under `.zitadel/oauth/` by hand, as a project set up
+   * before the command existed holds them.
+   *
+   * @param name - The file's name under `.zitadel/oauth/`.
+   * @param enabled - The switch as the file states it.
+   * @returns The file's project-relative path.
+   */
+  async writeOAuthSettings(name: string, enabled: boolean): Promise<string> {
+    const path = `.zitadel/oauth/${name}`;
+    await mkdir(join(this.path, ".zitadel/oauth"), { recursive: true });
+    await this.writeProjectFile(path, `${JSON.stringify({ enabled }, null, 2)}\n`);
+    return path;
+  }
+
   /** The kinds a release pins, as `release get` reports them. */
   async releasePointerKinds(releaseId: string): Promise<string[]> {
     const result = await this.cli(["release", "get", releaseId, "--json"]);
