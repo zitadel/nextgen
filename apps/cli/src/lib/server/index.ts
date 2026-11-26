@@ -14,7 +14,10 @@ export {
   LocalServerNotStartedError,
   LocalServerPackageMissingError,
   LocalServerPermitMismatchError,
+  LocalServerProcessDeniedError,
   LocalServerProcessesUnlistableError,
+  LocalServerProcessGoneError,
+  LocalServerProgramFailedError,
   LocalServerStopAllFailedError,
   LocalServerUrlInvalidError,
   LocalServerNotRespondingElsewhereError,
@@ -27,6 +30,7 @@ export {
   LocalServerRecordUnreadableError,
   LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
+  LocalServerStartFailedError,
   LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "./errors";

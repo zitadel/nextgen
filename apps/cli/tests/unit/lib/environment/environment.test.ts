@@ -447,17 +447,19 @@ describe("Environment.require", () => {
     const thrown = thrownBy(() => environment.require("ZITADEL_PROJECT_ID"));
 
     expect(thrown).toBeInstanceOf(EnvironmentValueUnboundError);
-    expect(thrown).toMatchObject({ code: "E_VALIDATION" });
-    const { message } = thrown as Error;
-    expect(message).toContain("ZITADEL_PROJECT_ID is not set for the production environment");
-    for (const source of [
-      "process environment",
-      ".env.production.local",
-      ".env.production",
-      ".env",
-    ]) {
-      expect(message).toContain(source);
-    }
+    expect(thrown).toMatchObject({
+      code: "E_VALIDATION",
+      message: "ZITADEL_PROJECT_ID is not set for the production environment",
+      environment: "production",
+      variable: "ZITADEL_PROJECT_ID",
+      consulted: expect.arrayContaining([
+        "process environment",
+        ".env.production.local",
+        ".env.production",
+        ".env",
+      ]),
+      file: ".env.production.local",
+    });
   });
 
   it("raises the unbound error for a development and any other environment with no project", async ({

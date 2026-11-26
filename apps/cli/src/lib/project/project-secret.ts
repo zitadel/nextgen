@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { FsNotFoundError, mkdir, pathExistsStrict, readFile, rename } from "@/lib/fs";
 import { isObject, parseJsonOrUndefined, stableStringify } from "@/lib/json";
 
-import { ProjectFileMissingError, ProjectInvalidError } from "./errors";
+import { ProjectSecretMissingError, ProjectInvalidError } from "./errors";
 import { SecretFile } from "./secret-file";
 
 /**
@@ -67,12 +67,12 @@ export class ProjectSecret {
 
   /**
    * Reads, parses and structurally validates `.zitadel/secret`. A missing file
-   * is a {@link ProjectFileMissingError}; a present-but-incomplete file is a
+   * is a {@link ProjectSecretMissingError}; a present-but-incomplete file is a
    * {@link ProjectInvalidError}.
    *
    * @param cwd - The project's directory.
    * @returns The secret.
-   * @throws {@link ProjectFileMissingError} When there is no secret.
+   * @throws {@link ProjectSecretMissingError} When there is no secret.
    * @throws {@link ProjectInvalidError} When the file lacks a required field.
    */
   static async read(cwd: string): Promise<ProjectSecret> {
@@ -101,7 +101,7 @@ export class ProjectSecret {
       return new ProjectSecret(cwd, secret as ProjectSecretData);
     } catch (error) {
       if (error instanceof FsNotFoundError) {
-        throw new ProjectFileMissingError(".zitadel/secret was not found", error);
+        throw new ProjectSecretMissingError(".zitadel/secret was not found", error);
       }
       throw error;
     }

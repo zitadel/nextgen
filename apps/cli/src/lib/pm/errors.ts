@@ -34,6 +34,13 @@ export class PmCommandFailedError extends PmError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
   /**
+   * How it failed, as the system said it: the errno it could not start with
+   * (`ENOENT` for a package manager that is not installed), or the exit code
+   * or signal it ended with.
+   */
+  readonly status: string | number;
+
+  /**
    * What the command printed, when its output was captured.
    */
   readonly output: string | undefined;
@@ -42,19 +49,21 @@ export class PmCommandFailedError extends PmError {
    * Make the failure.
    *
    * @param message - What went wrong.
+   * @param status - The errno it could not start with, or the exit code or signal it ended with.
    * @param output - What the command printed, when its output was captured.
    */
-  constructor(message: string, output?: string) {
+  constructor(message: string, status: string | number, output?: string) {
     super(message);
+    this.status = status;
     this.output = output;
   }
 }
 
 /**
  * A package manager command that could not start because the operating system
- * refused to run it.
+ * refused to run it. Its `status` is the errno it was refused with (`EACCES`, `EPERM`).
  */
-export class PmCommandNotPermittedError extends PmError {
+export class PmCommandNotPermittedError extends PmCommandFailedError {
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";

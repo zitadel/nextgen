@@ -53,7 +53,7 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
     return;
   }
   for (const connection of connections) {
-    checkCredentialVariables(connection, held);
+    checkCredentialVariables(connection, held, ctx.mode === "preview");
   }
 }
 
@@ -88,6 +88,7 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  *
  * @param connection - The connection.
  * @param held - The project's variables, and whether each is a secret.
+ * @param preview - Whether they are the preview values, for a preview.
  * @throws {@link PublishConnectionVariableSharedError} When the client id and secret name
  *   one variable.
  * @throws {@link PublishConnectionVariableKindError} When the client secret names a
@@ -98,6 +99,7 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
 function checkCredentialVariables(
   connection: Connection,
   held: ReadonlyMap<string, boolean>,
+  preview: boolean,
 ): void {
   const file = connection.path;
   const credentials = connection.credentials;
@@ -122,6 +124,8 @@ function checkCredentialVariables(
   if (idVariable !== undefined && idVariable === secretVariable) {
     throw new PublishConnectionVariableSharedError(
       `${file}: client_id and client_secret both name the variable ${idVariable}`,
+      idVariable,
+      file,
     );
   }
   for (const use of uses) {
@@ -132,16 +136,26 @@ function checkCredentialVariables(
     if (isSecret === undefined) {
       throw new PublishConnectionVariableMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
-        variable,
-        wantsSecret,
+        {
+          variable,
+          field,
+          file,
+          secret: wantsSecret,
+          preview,
+        },
       );
     }
     if (isSecret !== wantsSecret) {
       const kind = isSecret ? "a secret" : "not a secret";
       throw new PublishConnectionVariableKindError(
         `${file}: ${field} names the variable ${variable}, which is ${kind}`,
-        variable,
-        wantsSecret,
+        {
+          variable,
+          field,
+          file,
+          secret: wantsSecret,
+          preview,
+        },
       );
     }
   }

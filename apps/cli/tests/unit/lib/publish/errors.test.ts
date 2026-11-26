@@ -10,30 +10,39 @@ import {
   PublishError,
 } from "@/lib/publish";
 
+/** How a connection names its client secret, for the errors about its variable. */
+const SECRET_USE = {
+  variable: "GOOGLE_CLIENT_SECRET",
+  field: "client_secret",
+  file: ".zitadel/idps/google.json",
+  secret: true,
+  preview: false,
+} as const;
+
 describe("the publish errors", () => {
   it.each([
-    ["config", new PublishConfigInvalidError("bad"), "invalid", "E_VALIDATION"],
+    ["config", new PublishConfigInvalidError("bad", []), "invalid", "E_VALIDATION"],
     [
       "missing variable",
-      new PublishConnectionVariableMissingError("missing", "GOOGLE_CLIENT_SECRET", true),
+      new PublishConnectionVariableMissingError("missing", SECRET_USE),
       "missing",
       "E_CREDENTIAL_MISSING",
     ],
     [
       "variable of the wrong kind",
-      new PublishConnectionVariableKindError("kind", "GOOGLE_CLIENT_ID", false),
+      new PublishConnectionVariableKindError("kind", SECRET_USE),
       "invalid",
       "E_VALIDATION",
     ],
     [
       "shared variable",
-      new PublishConnectionVariableSharedError("shared"),
+      new PublishConnectionVariableSharedError("shared", "GOOGLE_CLIENT", SECRET_USE.file),
       "invalid",
       "E_VALIDATION",
     ],
     [
       "literal secret",
-      new PublishConnectionSecretLiteralError("literal"),
+      new PublishConnectionSecretLiteralError("literal", []),
       "invalid",
       "E_VALIDATION",
     ],

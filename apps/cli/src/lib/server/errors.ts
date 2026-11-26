@@ -230,6 +230,20 @@ export class LocalServerPlatformMissingError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The server that does not host it. */
+  readonly serverUrl: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param serverUrl - The server that does not host it.
+   */
+  constructor(message: string, serverUrl: string) {
+    super(message);
+    this.serverUrl = serverUrl;
+  }
 }
 
 /** Another start is running in the folder, and still holds its lock. */
@@ -241,15 +255,20 @@ export class LocalServerBusyError extends LocalServerError {
   /** The lock file, which the refusal says to delete when no start runs. */
   readonly lockFile: string;
 
+  /** The process the lock names as its owner, when it names one. */
+  readonly ownerPid: number | undefined;
+
   /**
    * Creates the error.
    *
    * @param message - What went wrong, with the facts it is about.
    * @param lockFile - The lock file the other start holds.
+   * @param ownerPid - The process the lock names as its owner, when it names one.
    */
-  constructor(message: string, lockFile: string) {
+  constructor(message: string, lockFile: string, ownerPid: number | undefined) {
     super(message);
     this.lockFile = lockFile;
+    this.ownerPid = ownerPid;
   }
 }
 
@@ -331,6 +350,20 @@ export class LocalServerPortFullError extends LocalServerError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_PORT_IN_USE";
+
+  /** The first port of the range searched. */
+  readonly firstPort: number;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param firstPort - The first port of the range searched.
+   */
+  constructor(message: string, firstPort: number) {
+    super(message);
+    this.firstPort = firstPort;
+  }
 }
 
 /** The runtime record is not in the shape it is written in. */
@@ -338,6 +371,20 @@ export class LocalServerRecordMalformedError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The folder that holds the record, which a reset and a start must run in to replace it. */
+  readonly directory: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param directory - The folder that holds the record.
+   */
+  constructor(message: string, directory: string) {
+    super(message);
+    this.directory = directory;
+  }
 }
 
 /** A server that had to be stopped was still running afterwards. */
@@ -345,6 +392,35 @@ export class LocalServerStopError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The record of the server that did not stop, when one server was stopped. */
+  readonly runtime: unknown;
+
+  /** What stopping that server did. */
+  readonly stopResult: unknown;
+
+  /** What stopping each process did, when several were stopped. */
+  readonly stopResults: unknown;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param stopped - The server's record and what stopping it did, or what stopping each process did.
+   */
+  constructor(
+    message: string,
+    stopped: Readonly<{
+      runtime?: unknown;
+      stopResult?: unknown;
+      stopResults?: unknown;
+    }>,
+  ) {
+    super(message);
+    this.runtime = stopped.runtime;
+    this.stopResult = stopped.stopResult;
+    this.stopResults = stopped.stopResults;
+  }
 }
 
 /** The runtime record exists but cannot be read. */
@@ -389,22 +465,49 @@ export class LocalServerPortBusyError extends LocalServerError {
   }
 }
 
+/**
+ * A server was launched and did not become ready. The message carries what it
+ * logged.
+ */
+export abstract class LocalServerStartFailedError extends LocalServerError {
+  /** The address the server was to answer on. */
+  readonly serverUrl: string;
+
+  /** The last lines the server logged, when there were any to read. */
+  readonly logTail: string | undefined;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param started - The address it was to answer on and what it last logged.
+   */
+  constructor(
+    message: string,
+    started: Readonly<{ serverUrl: string; logTail?: string | undefined }>,
+  ) {
+    super(message);
+    this.serverUrl = started.serverUrl;
+    this.logTail = started.logTail;
+  }
+}
+
 /** A server was launched and exited before it became ready. The message carries what it logged. */
-export class LocalServerStartExitedError extends LocalServerError {
+export class LocalServerStartExitedError extends LocalServerStartFailedError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 }
 
 /** A server was launched and did not become ready in time. The message carries what it logged. */
-export class LocalServerStartTimeoutError extends LocalServerError {
+export class LocalServerStartTimeoutError extends LocalServerStartFailedError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 }
 
 /** A server was launched and did not become ready, and stopping it failed, so it may still be running. The message carries what it logged. */
-export class LocalServerStartCleanupFailedError extends LocalServerError {
+export class LocalServerStartCleanupFailedError extends LocalServerStartFailedError {
   override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NETWORK";

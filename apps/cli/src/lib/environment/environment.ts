@@ -238,11 +238,6 @@ export class Environment {
       return resolved.value;
     }
     const name = this.name.value;
-    const consulted = `Consulted, in order: ${this.consulted
-      .map((entry) => {
-        return entry.source;
-      })
-      .join(", ")}.`;
     // The file to set the value in. An --env-file run reads that file; an
     // environment already bound by `env add` has its `.env.<name>.local`. Only
     // an environment with no project at all is pointed at `env add` (or
@@ -255,14 +250,23 @@ export class Environment {
       return entry.source === boundFile && entry.present;
     });
     const file = this.envFile ?? (bound ? boundFile : undefined);
-    const unbound = file === undefined && this.values.ZITADEL_PROJECT_ID === undefined;
-    if (unbound) {
+    const missing = {
+      environment: name,
+      variable: key,
+      consulted: this.consulted.map((entry) => {
+        return entry.source;
+      }),
+      file: file ?? boundFile,
+    };
+    if (file === undefined && this.values.ZITADEL_PROJECT_ID === undefined) {
       throw new EnvironmentValueUnboundError(
-        `${key} is not set for the ${name} environment. ${consulted} Set ${key} in ${boundFile} or the process environment.`,
+        `${key} is not set for the ${name} environment`,
+        missing,
       );
     }
     throw new EnvironmentValueMissingError(
-      `${key} is not set for the ${name} environment. ${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.`,
+      `${key} is not set for the ${name} environment`,
+      missing,
     );
   }
 

@@ -3,7 +3,9 @@ export {
   ProjectEnvValueMultilineError,
   ProjectEnvValueUnquotableError,
   ProjectError,
+  ProjectConfigMissingError,
   ProjectFileMissingError,
+  ProjectSecretMissingError,
   ProjectInvalidError,
 } from "./errors";
 export type { Gitignore, GitignoreRule } from "./gitignore";

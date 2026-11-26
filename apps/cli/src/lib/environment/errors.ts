@@ -28,6 +28,20 @@ export class EnvironmentNameInvalidError extends EnvironmentError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** What named the environment (`--env`, `ZITADEL_ENV`), which the refusal says may not name it so. */
+  readonly source: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param source - What named the environment.
+   */
+  constructor(message: string, source: string) {
+    super(message);
+    this.source = source;
+  }
 }
 
 /**
@@ -46,6 +60,40 @@ export class EnvironmentValueMissingError extends EnvironmentError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The environment the value is missing from (`development`, `production`). */
+  readonly environment: string;
+
+  /** The value that is missing (`ZITADEL_PROJECT_ID`). */
+  readonly variable: string;
+
+  /** Every source the chain looked in, in the order it looked. */
+  readonly consulted: readonly string[];
+
+  /** The file to set the value in, beside the process environment. */
+  readonly file: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param missing - The environment, the value, the sources consulted and the file to set it in.
+   */
+  constructor(
+    message: string,
+    missing: Readonly<{
+      environment: string;
+      variable: string;
+      consulted: readonly string[];
+      file: string;
+    }>,
+  ) {
+    super(message);
+    this.environment = missing.environment;
+    this.variable = missing.variable;
+    this.consulted = missing.consulted;
+    this.file = missing.file;
+  }
 }
 
 /**
@@ -80,7 +128,7 @@ export class EnvironmentValueInvalidError extends EnvironmentError {
  * A value the command cannot run without is set in no source, and the
  * environment has no project at all, so there is nothing to add it to yet.
  */
-export class EnvironmentValueUnboundError extends EnvironmentError {
+export class EnvironmentValueUnboundError extends EnvironmentValueMissingError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";

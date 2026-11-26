@@ -10,8 +10,8 @@ import {
   BackendMethodMismatchError,
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
+  BackendPageMalformedError,
   BackendPathUnknownError,
-  BackendRequestInvalidError,
 } from "@/lib/backend/errors";
 import { request as fetchWithPolicy } from "@/lib/backend/transport";
 
@@ -355,11 +355,7 @@ export class Operation {
       .map((candidate) => {
         return candidate.id;
       });
-    throw new BackendOperationUnknownError(
-      near.length > 0
-        ? `No operation is called ${ref}; did you mean ${near.slice(0, 5).join(", ")}?`
-        : `No operation is called ${ref}`,
-    );
+    throw new BackendOperationUnknownError(`No operation is called ${ref}`, near.slice(0, 5));
   }
 
   /**
@@ -402,15 +398,14 @@ export class Operation {
     });
     const record = Operation.pick(methods, method);
     if (record === undefined) {
-      const offered = methods
-        .map((candidate) => {
-          return candidate.method;
-        })
-        .join(", ");
+      const offered = methods.map((candidate) => {
+        return candidate.method;
+      });
       throw new BackendOperationAmbiguousError(
         method === undefined
-          ? `${template.record.path} takes ${offered}; say which with -X`
-          : `${template.record.path} takes ${offered}, not ${method}`,
+          ? `${template.record.path} takes ${offered.join(", ")}; say which with -X`
+          : `${template.record.path} takes ${offered.join(", ")}, not ${method}`,
+        offered,
       );
     }
     return {
@@ -481,7 +476,7 @@ export class OperationService extends ApiService {
    *
    * @param request - The request.
    * @returns The last page's status and body, with the page field holding every page's items.
-   * @throws BackendRequestInvalidError when a page lacks its list.
+   * @throws BackendPageMalformedError when a page lacks its list.
    */
   async callAll(request: ApiRequest): Promise<ApiResponse> {
     const shape = request.operation.paging;
@@ -495,7 +490,7 @@ export class OperationService extends ApiService {
           return fields.items(response.raw);
         } catch (error) {
           if (error instanceof TypeError) {
-            throw new BackendRequestInvalidError(error.message);
+            throw new BackendPageMalformedError(error.message, response.raw);
           }
           throw error;
         }

@@ -459,6 +459,7 @@ export class Publisher {
     });
     throw new PublishConfigInvalidError(
       `The release body does not match what the API takes, so nothing was sent:\n${lines.join("\n")}`,
+      issues,
     );
   }
 }

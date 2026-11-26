@@ -341,7 +341,10 @@ export class Lifecycle<R extends ServerRecord> {
     } catch (error) {
       const outcome = await this.terminateQuietly(record);
       if (outcome.status === "failed") {
-        throw new LocalServerStopError("The server did not stop");
+        throw new LocalServerStopError("The server did not stop", {
+          runtime: record,
+          stopResult: outcome,
+        });
       }
       throw error;
     }
@@ -415,7 +418,10 @@ export class Lifecycle<R extends ServerRecord> {
   private async terminate(record: R): Promise<StopOutcome> {
     const outcome = await this.deps.launcher.terminate(record);
     if (outcome.status === "failed") {
-      throw new LocalServerStopError("The server did not stop");
+      throw new LocalServerStopError("The server did not stop", {
+        runtime: record,
+        stopResult: outcome,
+      });
     }
     return outcome;
   }
@@ -470,15 +476,26 @@ export class Lifecycle<R extends ServerRecord> {
     const outcome = await this.terminateQuietly(record);
     const logged = logTail ? `\nThe server logged:\n${logTail}` : "";
 
+    const started = {
+      serverUrl: record.server_url,
+      logTail,
+    };
     if (outcome.status === "failed") {
       return new LocalServerStartCleanupFailedError(
         `The server did not become healthy and is still running${logged}`,
+        started,
       );
     }
     if (reason === "exited") {
-      return new LocalServerStartExitedError(`The server exited before it became healthy${logged}`);
+      return new LocalServerStartExitedError(
+        `The server exited before it became healthy${logged}`,
+        started,
+      );
     }
-    return new LocalServerStartTimeoutError(`The server did not become healthy in time${logged}`);
+    return new LocalServerStartTimeoutError(
+      `The server did not become healthy in time${logged}`,
+      started,
+    );
   }
 }
 
@@ -528,6 +545,7 @@ export async function claimFreePort(
   }
   throw new LocalServerPortFullError(
     `No free port from ${String(first)} to ${String(Math.min(first + PORT_SEARCH_RANGE - 1, MAX_PORT))}`,
+    first,
   );
 }
 

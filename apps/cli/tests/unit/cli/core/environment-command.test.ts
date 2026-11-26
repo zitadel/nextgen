@@ -49,7 +49,9 @@ class MalformedRecordProbe extends ServerCommand(EnvironmentCommand) {
   protected override servers(): ServerAddresses {
     return {
       resolve: () => {
-        return Promise.reject(new LocalServerRecordMalformedError("the record is malformed"));
+        return Promise.reject(
+          new LocalServerRecordMalformedError("the record is malformed", "/work"),
+        );
       },
       parse: (value) => {
         return ZitadelRuntime.parse(value);
@@ -423,10 +425,7 @@ describe("EnvironmentCommand.connect", () => {
     await expect(
       new ProjectProbe(["--cwd", dir, "--env-file", join(dir, "ci.env")], config).probe(),
     ).rejects.toSatisfy((error: unknown) => {
-      return (
-        error instanceof EnvironmentValueMissingError &&
-        error.message.includes("Set ZITADEL_PROJECT_ID in")
-      );
+      return error instanceof EnvironmentValueMissingError && error.file === join(dir, "ci.env");
     });
   });
 
@@ -440,8 +439,7 @@ describe("EnvironmentCommand.connect", () => {
       new ProjectProbe(["--cwd", dir, "--env", "production"], config).probe(),
     ).rejects.toSatisfy((error: unknown) => {
       return (
-        error instanceof EnvironmentValueMissingError &&
-        error.message.includes("Set ZITADEL_PROJECT_SECRET in .env.production.local")
+        error instanceof EnvironmentValueMissingError && error.file === ".env.production.local"
       );
     });
   });

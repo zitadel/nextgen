@@ -428,9 +428,9 @@ export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
 
   const parsed = parseJsonOrUndefined(raw);
   if (!isObject(parsed)) {
-    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
+    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`, cwd);
   }
-  return normalizeRuntimeMetadata(parsed);
+  return normalizeRuntimeMetadata(parsed, cwd);
 }
 
 export async function writeRuntimeMetadata(cwd: string, metadata: RuntimeMetadata): Promise<void> {
@@ -495,7 +495,10 @@ async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   }
 }
 
-function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetadata {
+function normalizeRuntimeMetadata(
+  input: Record<string, unknown>,
+  directory: string,
+): RuntimeMetadata {
   if (
     input.schema_version !== 1 ||
     typeof input.port !== "number" ||
@@ -506,7 +509,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
   ) {
-    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
+    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`, directory);
   }
 
   const backend = [input.backend, "docker"].find((value) => {
@@ -533,7 +536,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
       typeof input.server_package !== "string" ||
       typeof input.server_version !== "string"
     ) {
-      throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
+      throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`, directory);
     }
     return {
       ...base,
@@ -552,7 +555,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.container_id !== "string" ||
     typeof input.image !== "string"
   ) {
-    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`);
+    throw new LocalServerRecordMalformedError(`${LOCAL_RUNTIME_FILE} is malformed`, directory);
   }
   return {
     ...base,

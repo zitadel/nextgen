@@ -1392,7 +1392,9 @@ export class LocalRuntime extends ZitadelRuntime {
           return orphan.stop_result.status === "failed";
         })
       ) {
-        throw new LocalServerStopError("Local Zitadel server did not stop");
+        throw new LocalServerStopError("Local Zitadel server did not stop", {
+          stopResults: orphans,
+        });
       }
     }
     await removeLocalData(this.cwd);
@@ -1486,7 +1488,10 @@ export class LocalRuntime extends ZitadelRuntime {
     if (runtime?.backend === "binary") {
       const outcome = await this.directory.processes.stopRecord(runtime);
       if (outcome.status === "failed") {
-        throw new LocalServerStopError("Local Zitadel server did not stop");
+        throw new LocalServerStopError("Local Zitadel server did not stop", {
+          runtime,
+          stopResult: outcome,
+        });
       }
       return { runtime, stopped: outcome.status !== "stale", outcome };
     }

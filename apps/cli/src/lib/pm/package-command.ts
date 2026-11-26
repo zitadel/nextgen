@@ -154,9 +154,9 @@ export class PackageCommand {
     if (result.code !== undefined && result.exitCode === undefined) {
       const message = result.originalMessage ?? result.message ?? "";
       if (result.code === "EACCES" || result.code === "EPERM") {
-        throw new PmCommandNotPermittedError(`Permission denied: ${message}`);
+        throw new PmCommandNotPermittedError(`Permission denied: ${message}`, result.code);
       }
-      throw new PmCommandFailedError(message);
+      throw new PmCommandFailedError(message, result.code);
     }
     if (result.failed) {
       const detail = result.signal
@@ -164,6 +164,7 @@ export class PackageCommand {
         : `exit ${String(result.exitCode ?? 1)}`;
       throw new PmCommandFailedError(
         `${this.display} failed with ${detail}`,
+        result.signal ?? result.exitCode ?? 1,
         capture ? String(result.all ?? "") : undefined,
       );
     }

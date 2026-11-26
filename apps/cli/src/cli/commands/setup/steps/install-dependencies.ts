@@ -143,11 +143,11 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
       log,
       failed: (error, installCommand) => {
         const original =
-          error instanceof PmError
+          error instanceof PmCommandFailedError
             ? {
                 name: error.name,
                 message: error.message,
-                code: error.code,
+                code: error.status,
               }
             : error instanceof ZitadelLibError
               ? {

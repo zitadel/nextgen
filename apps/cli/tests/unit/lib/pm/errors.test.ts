@@ -20,7 +20,7 @@ describe("the package manager errors", () => {
   });
 
   it("reports a failed command as unknown, with its message and captured output", () => {
-    const error = new PmCommandFailedError("npm install failed with exit 1", "boom");
+    const error = new PmCommandFailedError("npm install failed with exit 1", 1, "boom");
 
     expect(error).toBeInstanceOf(PmError);
     expect(error.category).toBe("unknown");
@@ -30,11 +30,31 @@ describe("the package manager errors", () => {
   });
 
   it("reports a command that printed nothing captured without output", () => {
-    expect(new PmCommandFailedError("spawn npm ENOENT").output).toBeUndefined();
+    expect(new PmCommandFailedError("spawn npm ENOENT", "ENOENT").output).toBeUndefined();
+  });
+
+  it.each([
+    [
+      "exit code a failed command ended with",
+      new PmCommandFailedError("npm install failed with exit 1", 1),
+      1,
+    ],
+    [
+      "errno a command that never started failed with",
+      new PmCommandFailedError("spawn npm ENOENT", "ENOENT"),
+      "ENOENT",
+    ],
+    [
+      "errno a refused command was refused with",
+      new PmCommandNotPermittedError("Permission denied", "EACCES"),
+      "EACCES",
+    ],
+  ] as const)("keeps the %s", (_name, error, status) => {
+    expect(error.status).toBe(status);
   });
 
   it("reports a refused command as denied", () => {
-    const error = new PmCommandNotPermittedError("Permission denied: spawn npm EACCES");
+    const error = new PmCommandNotPermittedError("Permission denied: spawn npm EACCES", "EACCES");
 
     expect(error).toBeInstanceOf(PmError);
     expect(error.category).toBe("denied");

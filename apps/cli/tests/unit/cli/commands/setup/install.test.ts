@@ -98,7 +98,7 @@ function aFailingRunner() {
 function aRunnerFailingAfterInstall(output = "") {
   return vi.fn<Runner>(async (command) => {
     if (command.verb === "run") {
-      throw new PmCommandFailedError(`${command.display} failed with exit 1`, output);
+      throw new PmCommandFailedError(`${command.display} failed with exit 1`, 1, output);
     }
   });
 }

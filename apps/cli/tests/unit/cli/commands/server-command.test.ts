@@ -102,7 +102,7 @@ class AboutAMalformedServer extends LocalServerCommand(BaseCommand, "nearest") {
   }
 
   protected override serverInNearestFolder(): Promise<LocalRuntime | undefined> {
-    return Promise.reject(new LocalServerRecordMalformedError("the record is malformed"));
+    return Promise.reject(new LocalServerRecordMalformedError("the record is malformed", "/work"));
   }
 
   public sourceIn(cwd: string) {

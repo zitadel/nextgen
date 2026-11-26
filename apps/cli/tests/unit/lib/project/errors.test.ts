@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { ProjectError, ProjectFileMissingError, ProjectInvalidError } from "@/lib/project";
+import {
+  ProjectConfigMissingError,
+  ProjectError,
+  ProjectFileMissingError,
+  ProjectInvalidError,
+  ProjectSecretMissingError,
+} from "@/lib/project";
 
 describe("the project errors", () => {
   it.each([
     [
-      "missing file",
-      new ProjectFileMissingError("zitadel.json was not found"),
+      "missing zitadel.json",
+      new ProjectConfigMissingError("zitadel.json was not found"),
+      "missing",
+      "E_VALIDATION",
+    ],
+    [
+      "missing secret",
+      new ProjectSecretMissingError(".zitadel/secret was not found"),
       "missing",
       "E_VALIDATION",
     ],
@@ -19,7 +31,7 @@ describe("the project errors", () => {
   });
 
   it("reports the message it was given", () => {
-    expect(new ProjectFileMissingError("zitadel.json was not found").message).toBe(
+    expect(new ProjectConfigMissingError("zitadel.json was not found").message).toBe(
       "zitadel.json was not found",
     );
   });
@@ -27,6 +39,13 @@ describe("the project errors", () => {
   it("keeps the cause of a missing file", () => {
     const cause = new Error("ENOENT");
 
-    expect(new ProjectFileMissingError(".zitadel/secret was not found", cause).cause).toBe(cause);
+    expect(new ProjectSecretMissingError(".zitadel/secret was not found", cause).cause).toBe(cause);
+  });
+
+  it.each([
+    ["zitadel.json", new ProjectConfigMissingError("zitadel.json was not found")],
+    ["the secret", new ProjectSecretMissingError(".zitadel/secret was not found")],
+  ] as const)("reports missing %s as a missing project file", (_name, error) => {
+    expect(error).toBeInstanceOf(ProjectFileMissingError);
   });
 });

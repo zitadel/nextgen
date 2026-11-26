@@ -206,11 +206,46 @@ export class BackendRequestInvalidError extends BackendError {
  */
 export class BackendRequestMalformedError extends BackendRequestInvalidError {}
 
+/** A page of a paged answer that does not hold the list the operation pages through. */
+export class BackendPageMalformedError extends BackendRequestInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The page as the server answered it, which the refusal reports. */
+  readonly response: unknown;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param response - The page as the server answered it.
+   */
+  constructor(message: string, response: unknown) {
+    super(message);
+    this.response = response;
+  }
+}
+
 /** The operation or path asked for names nothing the API has. */
 export class BackendOperationUnknownError extends BackendError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The operation ids closest to the one asked for, nearest first; none for a path. */
+  readonly near: readonly string[];
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param near - The operation ids closest to the one asked for.
+   */
+  constructor(message: string, near: readonly string[] = []) {
+    super(message);
+    this.near = near;
+  }
 }
 
 /** A path that matches no operation's template. */
@@ -225,6 +260,20 @@ export class BackendOperationAmbiguousError extends BackendError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The methods the path takes, which the refusal says to pick from. */
+  readonly methods: readonly string[];
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param methods - The methods the path takes.
+   */
+  constructor(message: string, methods: readonly string[] = []) {
+    super(message);
+    this.methods = methods;
+  }
 }
 
 /** An operation named by its id was given a method that is not its own. */
@@ -243,7 +292,7 @@ export class BackendMethodMismatchError extends BackendOperationAmbiguousError {
    * @param method - The operation's own method.
    */
   constructor(message: string, method: string) {
-    super(message);
+    super(message, [method]);
     this.method = method;
   }
 }

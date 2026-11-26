@@ -117,6 +117,7 @@ async function signIn(
   if (!runtime) {
     throw new LocalServerPlatformMissingError(
       `The local server at ${serverUrl} does not host the platform project, so the local admin cannot sign in`,
+      serverUrl,
     );
   }
   const client = createZitadelClient({

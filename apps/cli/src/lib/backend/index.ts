@@ -32,6 +32,7 @@ export {
   BackendNotFoundError,
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
+  BackendPageMalformedError,
   BackendPathUnknownError,
   BackendProofRejectedError,
   BackendReleaseInUseError,

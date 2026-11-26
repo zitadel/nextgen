@@ -19,6 +19,20 @@ export class PublishConfigInvalidError extends PublishError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** Each finding the refusal is about, as `--json` lists it: its rule, file and message. */
+  readonly issues: readonly unknown[];
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param issues - Each finding it is about.
+   */
+  constructor(message: string, issues: readonly unknown[]) {
+    super(message);
+    this.issues = issues;
+  }
 }
 
 /**
@@ -28,6 +42,20 @@ export class PublishConnectionSecretLiteralError extends PublishError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** Each finding the refusal is about, as `--json` lists it: its rule, file and message. */
+  readonly issues: readonly unknown[];
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param issues - Each finding it is about.
+   */
+  constructor(message: string, issues: readonly unknown[]) {
+    super(message);
+    this.issues = issues;
+  }
 }
 
 /**
@@ -37,7 +65,40 @@ export class PublishConnectionVariableSharedError extends PublishError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The variable both name. */
+  readonly variable: string;
+
+  /** The connection file that names it twice. */
+  readonly file: string;
+
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param variable - The variable both name.
+   * @param file - The connection file that names it twice.
+   */
+  constructor(message: string, variable: string, file: string) {
+    super(message);
+    this.variable = variable;
+    this.file = file;
+  }
 }
+
+/** How a connection names one of its credentials' variables, and what the run needs of it. */
+export type ConnectionVariableUse = Readonly<{
+  /** The variable the connection names. */
+  variable: string;
+  /** The credential that names it (`client_id`, `client_secret`). */
+  field: string;
+  /** The connection file. */
+  file: string;
+  /** Whether the connection needs it to be a secret. */
+  secret: boolean;
+  /** Whether the run looked it up among the preview values, for a preview. */
+  preview: boolean;
+}>;
 
 /**
  * A connection names a variable the project does not have.
@@ -47,27 +108,34 @@ export class PublishConnectionVariableMissingError extends PublishError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CREDENTIAL_MISSING";
 
-  /**
-   * The variable the connection names.
-   */
+  /** The variable the connection names. */
   readonly variable: string;
 
-  /**
-   * Whether the connection needs it to be a secret.
-   */
+  /** The credential that names it. */
+  readonly field: string;
+
+  /** The connection file. */
+  readonly file: string;
+
+  /** Whether the connection needs it to be a secret. */
   readonly secret: boolean;
+
+  /** Whether the run looked it up among the preview values. */
+  readonly preview: boolean;
 
   /**
    * Make the failure.
    *
    * @param message - What went wrong, with the facts it is about.
-   * @param variable - The variable the connection names.
-   * @param secret - Whether the connection needs it to be a secret.
+   * @param use - How the connection names the variable.
    */
-  constructor(message: string, variable: string, secret: boolean) {
+  constructor(message: string, use: ConnectionVariableUse) {
     super(message);
-    this.variable = variable;
-    this.secret = secret;
+    this.variable = use.variable;
+    this.field = use.field;
+    this.file = use.file;
+    this.secret = use.secret;
+    this.preview = use.preview;
   }
 }
 
@@ -79,27 +147,34 @@ export class PublishConnectionVariableKindError extends PublishError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 
-  /**
-   * The variable the connection names.
-   */
+  /** The variable the connection names. */
   readonly variable: string;
 
-  /**
-   * Whether the connection needs it to be a secret.
-   */
+  /** The credential that names it. */
+  readonly field: string;
+
+  /** The connection file. */
+  readonly file: string;
+
+  /** Whether the connection needs it to be a secret. */
   readonly secret: boolean;
+
+  /** Whether the run looked it up among the preview values. */
+  readonly preview: boolean;
 
   /**
    * Make the failure.
    *
    * @param message - What went wrong, with the facts it is about.
-   * @param variable - The variable the connection names.
-   * @param secret - Whether the connection needs it to be a secret.
+   * @param use - How the connection names the variable.
    */
-  constructor(message: string, variable: string, secret: boolean) {
+  constructor(message: string, use: ConnectionVariableUse) {
     super(message);
-    this.variable = variable;
-    this.secret = secret;
+    this.variable = use.variable;
+    this.field = use.field;
+    this.file = use.file;
+    this.secret = use.secret;
+    this.preview = use.preview;
   }
 }
 

@@ -32,6 +32,11 @@ import {
   LocalServerStopError,
 } from "@/lib/server/errors";
 
+/** The server a failed start was to answer on, for the start failures. */
+const STARTED = {
+  serverUrl: "http://localhost:8080",
+} as const;
+
 describe("the local server errors", () => {
   it.each([
     [
@@ -52,7 +57,12 @@ describe("the local server errors", () => {
       "conflict",
       "E_LOCAL_SERVER_NOT_RUNNING",
     ],
-    ["record malformed", new LocalServerRecordMalformedError("bad"), "invalid", "E_VALIDATION"],
+    [
+      "record malformed",
+      new LocalServerRecordMalformedError("bad", "/work"),
+      "invalid",
+      "E_VALIDATION",
+    ],
     [
       "unreadable record",
       new LocalServerRecordUnreadableError("bad", "/r"),
@@ -81,24 +91,34 @@ describe("the local server errors", () => {
     ["stop all failed", new LocalServerStopAllFailedError("no", []), "invalid", "E_VALIDATION"],
     [
       "platform missing",
-      new LocalServerPlatformMissingError("no platform"),
+      new LocalServerPlatformMissingError("no platform", "http://localhost:8080"),
       "invalid",
       "E_VALIDATION",
     ],
-    ["busy", new LocalServerBusyError("busy", "/lock"), "conflict", "E_CONFLICT"],
-    ["stop", new LocalServerStopError("stuck"), "invalid", "E_VALIDATION"],
+    ["busy", new LocalServerBusyError("busy", "/lock", 4242), "conflict", "E_CONFLICT"],
+    ["stop", new LocalServerStopError("stuck", {}), "invalid", "E_VALIDATION"],
     ["port busy", new LocalServerPortBusyError(8080), "unavailable", "E_PORT_IN_USE"],
-    ["port full", new LocalServerPortFullError("full"), "unavailable", "E_PORT_IN_USE"],
+    ["port full", new LocalServerPortFullError("full", 8080), "unavailable", "E_PORT_IN_USE"],
     ["docker", new LocalServerDockerMissingError("no daemon"), "unavailable", "E_NETWORK"],
     ["admin not found", new LocalServerAdminNotFoundError("no"), "denied", "E_AUTH"],
     ["session refused", new LocalServerSessionRefusedError("no", 401), "denied", "E_AUTH"],
     ["process gone", new LocalServerProcessGoneError("gone"), "unavailable", "E_NETWORK"],
     ["process denied", new LocalServerProcessDeniedError("no"), "denied", "E_AUTH"],
-    ["start exited", new LocalServerStartExitedError("exited"), "unavailable", "E_NETWORK"],
-    ["start timeout", new LocalServerStartTimeoutError("late"), "unavailable", "E_NETWORK"],
+    [
+      "start exited",
+      new LocalServerStartExitedError("exited", STARTED),
+      "unavailable",
+      "E_NETWORK",
+    ],
+    [
+      "start timeout",
+      new LocalServerStartTimeoutError("late", STARTED),
+      "unavailable",
+      "E_NETWORK",
+    ],
     [
       "start cleanup failed",
-      new LocalServerStartCleanupFailedError("stuck"),
+      new LocalServerStartCleanupFailedError("stuck", STARTED),
       "unavailable",
       "E_NETWORK",
     ],
@@ -109,7 +129,7 @@ describe("the local server errors", () => {
   });
 
   it("is retryable only while another start holds the lock", () => {
-    expect(new LocalServerBusyError("busy", "/lock").retryable).toBe(true);
+    expect(new LocalServerBusyError("busy", "/lock", 4242).retryable).toBe(true);
     expect(new LocalServerPortBusyError(8080).retryable).toBe(false);
     expect(new LocalServerDockerMissingError("no daemon").retryable).toBe(false);
   });

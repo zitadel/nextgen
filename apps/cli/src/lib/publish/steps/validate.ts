@@ -86,10 +86,22 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const literalSecret = errors.some((finding) => {
     return finding.rule === "connection/literal-secret";
   });
+  const issues = errors.map((finding) => {
+    return {
+      rule: finding.rule,
+      path: finding.file,
+      ...("steps" in finding && finding.steps !== undefined
+        ? {
+            steps: finding.steps,
+          }
+        : {}),
+      message: finding.message,
+    };
+  });
   if (literalSecret) {
-    throw new PublishConnectionSecretLiteralError(message);
+    throw new PublishConnectionSecretLiteralError(message, issues);
   }
-  throw new PublishConfigInvalidError(message);
+  throw new PublishConfigInvalidError(message, issues);
 }
 
 /**

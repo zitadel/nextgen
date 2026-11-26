@@ -82,7 +82,8 @@ export class EnvironmentName implements Resolved {
     const name = new EnvironmentName(EnvironmentName.detect(env, flag));
     if (!EnvironmentName.isValid(name.value)) {
       throw new EnvironmentNameInvalidError(
-        `${name.value} is not a valid environment name; the ${name.source} environment name may use only letters, digits, dot, dash and underscore, may not contain "..", and may not be \`local\` or end in \`.local\``,
+        `${name.value} is not a valid environment name`,
+        name.source,
       );
     }
     return name;

@@ -15,7 +15,17 @@ export abstract class ProjectError extends ZitadelLibError {}
 /**
  * A file the project needs is not there: `zitadel.json` or `.zitadel/secret`.
  */
-export class ProjectFileMissingError extends ProjectError {
+export abstract class ProjectFileMissingError extends ProjectError {}
+
+/** The project has no `zitadel.json`: it was never set up. */
+export class ProjectConfigMissingError extends ProjectFileMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** The project has no `.zitadel/secret`. */
+export class ProjectSecretMissingError extends ProjectFileMissingError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
