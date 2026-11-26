@@ -11,6 +11,8 @@ import {
 } from "@/lib/environment";
 import { LocalServerUrlInvalidError } from "@/lib/server";
 
+import * as classes from "@/lib/environment/errors";
+
 /** What a value missing from the production environment names. */
 const MISSING = {
   environment: "production",
@@ -79,5 +81,115 @@ describe("what an environment error states", () => {
       hint: "Fix or remove ZITADEL_URL in .env.ci.local; it must be a URL such as https://preview.zitadel.com.",
       details: { cause: "Invalid server" },
     });
+  });
+});
+
+describe("what each environment error states", () => {
+  it.each([
+    [
+      "EnvironmentSourcesConflictError",
+      new classes.EnvironmentSourcesConflictError("both --env and ZITADEL_ENV are set"),
+      {
+        message: "both --env and ZITADEL_ENV are set",
+        hint: undefined,
+        details: {},
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+    [
+      "EnvironmentNameInvalidError",
+      new classes.EnvironmentNameInvalidError("staging! is not a name", "--env"),
+      {
+        message: "staging! is not a name",
+        hint: undefined,
+        details: { source: "--env" },
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+    [
+      "EnvironmentFileMissingError",
+      new classes.EnvironmentFileMissingError(".env.staging is missing"),
+      {
+        message: ".env.staging is missing",
+        hint: undefined,
+        details: {},
+        code: "E_VALIDATION",
+        category: "missing",
+        retryable: false,
+      },
+    ],
+    [
+      "EnvironmentValueMissingError",
+      new classes.EnvironmentValueMissingError("GOOGLE_ID is not set", {
+        environment: "staging",
+        variable: "GOOGLE_ID",
+        consulted: [".env.staging", "process"],
+        file: ".env.staging",
+      }),
+      {
+        message: "GOOGLE_ID is not set",
+        hint: undefined,
+        details: {
+          environment: "staging",
+          variable: "GOOGLE_ID",
+          consulted: [".env.staging", "process"],
+          file: ".env.staging",
+        },
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+    [
+      "EnvironmentValueInvalidError",
+      new classes.EnvironmentValueInvalidError(
+        "ZITADEL_ENV is invalid",
+        "ZITADEL_ENV",
+        new classes.EnvironmentFileMissingError("missing"),
+      ),
+      {
+        message: "ZITADEL_ENV is invalid",
+        hint: "Fix or remove ZITADEL_URL in ZITADEL_ENV; it must be a URL such as https://preview.zitadel.com.",
+        details: { cause: "missing" },
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+    [
+      "EnvironmentValueUnboundError",
+      new classes.EnvironmentValueUnboundError("GOOGLE_ID is not bound", {
+        environment: "staging",
+        variable: "GOOGLE_ID",
+        consulted: [],
+        file: ".env.staging",
+      }),
+      {
+        message: "GOOGLE_ID is not bound",
+        hint: undefined,
+        details: {
+          environment: "staging",
+          variable: "GOOGLE_ID",
+          consulted: [],
+          file: ".env.staging",
+        },
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+  ])("states what a %s says and reports", (_name, error, expected) => {
+    expect({
+      message: error.message,
+      hint: error.hint,
+      details: error.details,
+      code: error.code,
+      category: error.category,
+      retryable: error.retryable,
+    }).toEqual(expected);
   });
 });
