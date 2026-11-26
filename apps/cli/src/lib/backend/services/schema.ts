@@ -9,7 +9,11 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { BackendGoneError, BackendNotFoundError } from "@/lib/backend/errors";
+import {
+  BackendGoneError,
+  BackendNameUnknownError,
+  BackendNotFoundError,
+} from "@/lib/backend/errors";
 
 /** What narrows and pages a list of schemas. */
 export type SchemaQuery = Readonly<Omit<ListSchemasParams, "project_id">>;
@@ -130,7 +134,7 @@ export class SchemaService extends ApiService {
     });
     const current = first.items[0];
     if (current === undefined) {
-      throw new BackendNotFoundError(`No schema named "${reference}"`);
+      throw new BackendNameUnknownError(`No schema named "${reference}"`);
     }
     return current;
   }

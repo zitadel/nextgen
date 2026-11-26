@@ -9,8 +9,13 @@ import {
   fsFailure,
 } from "@/lib/fs";
 import {
+  ZitadelConfigDirectoryInTheWayError,
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
+  ZitadelConfigPathBlockedError,
+  ZitadelConfigPathOutsideError,
+  ZitadelConfigReferenceBrokenError,
+  ZitadelConfigReferenceOutsideError,
   ZitadelConfigFileUnreadableError,
   ZitadelConfigPathUnreadableError,
   ZitadelConfigReferenceUnreadableError,
@@ -306,8 +311,10 @@ export abstract class Store implements ConfigStore {
             throw new ZitadelConfigReferenceUnreadableError(file.path, ref, "EPERM", error);
           }
           if (failure instanceof FsError) {
-            throw new ZitadelConfigError(
-              `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`,
+            throw new ZitadelConfigReferenceBrokenError(
+              file.path,
+              ref,
+              Store.errnoOf(error),
               error,
             );
           }
@@ -366,9 +373,7 @@ export abstract class Store implements ConfigStore {
       realTarget === undefined ||
       !realDirectory.contains(realTarget)
     ) {
-      throw new ZitadelConfigError(
-        `${path} points outside .zitadel/; files are only written and removed inside it`,
-      );
+      throw new ZitadelConfigPathOutsideError(path);
     }
     return target;
   }
@@ -384,9 +389,7 @@ export abstract class Store implements ConfigStore {
   private removable(path: string): string {
     const target = this.place(path).toString();
     if (this.fs.existsSync(target) && this.fs.lstatSync(target).isDirectory()) {
-      throw new ZitadelConfigError(
-        `${path} cannot be removed (EISDIR): it is a directory where a file is expected`,
-      );
+      throw new ZitadelConfigDirectoryInTheWayError(path);
     }
     return target;
   }
@@ -415,9 +418,7 @@ export abstract class Store implements ConfigStore {
       realTarget === undefined ||
       !realRoot.contains(realTarget)
     ) {
-      throw new ZitadelConfigError(
-        `$file ${JSON.stringify(ref)} points outside the project; keep referenced files inside the project, next to the file that references them`,
-      );
+      throw new ZitadelConfigReferenceOutsideError(ref);
     }
     return target;
   }
@@ -514,9 +515,7 @@ export abstract class Store implements ConfigStore {
   private assertClear(path: string, target: Path): void {
     const blocker = this.blockerOf(target);
     if (blocker !== undefined) {
-      throw new ZitadelConfigError(
-        `${path} cannot be written (ENOTDIR): ${blocker} is a file where a directory is needed`,
-      );
+      throw new ZitadelConfigPathBlockedError(path, blocker);
     }
   }
 }

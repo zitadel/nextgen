@@ -413,6 +413,30 @@ describe("api", () => {
         });
       });
 
+      it("refuses a path that no operation has, and says how to list the paths", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["api", "/no/such/path", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: `List the paths with ${expectedPublicCliCommand("api ls")}.`,
+        });
+      });
+
+      it("refuses a method that is not the operation's own, and names its own", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["api", "listVariables", "-X", "DELETE", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "Leave out -X, or pass -X GET.",
+        });
+      });
+
       it("carries an operation name holding a control character raw", async () => {
         const app = await aSetUpApp();
 

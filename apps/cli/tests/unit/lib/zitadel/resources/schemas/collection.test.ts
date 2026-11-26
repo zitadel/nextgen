@@ -228,7 +228,7 @@ describe("Schemas.enable", () => {
 
     expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
-      message: `${SCHEMA_PATH} has no x-identifier for password: set "x-identifier" to the property users sign in with, e.g. "email"`,
+      message: `${SCHEMA_PATH} has no x-identifier for password`,
     });
   });
 });

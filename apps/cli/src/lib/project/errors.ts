@@ -31,3 +31,17 @@ export class ProjectInvalidError extends ProjectError {
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
+
+/** A value a `.env` file cannot hold, because it has a line break. */
+export class ProjectEnvValueMultilineError extends ProjectInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** A value a `.env` file cannot hold, because no quoting reads it back unchanged. */
+export class ProjectEnvValueUnquotableError extends ProjectInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}

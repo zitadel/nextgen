@@ -1,3 +1,4 @@
+import { Cmd } from "@/lib/cmd";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import {
@@ -32,7 +33,7 @@ const NO_LOCAL_SERVER_REFUSAL = {
 const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "Run `zitadel start` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "No healthy local server responded at {serverUrl}. Run `zitadel start` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
@@ -40,7 +41,7 @@ const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
 const LOCAL_SERVER_ELSEWHERE_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "It was started in another directory: run `zitadel start` there, or with --cwd, to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "No healthy local server responded at {serverUrl}. It was started in {folder}, so run `zitadel start --cwd {folder}` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
@@ -299,6 +300,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
           {
             ...error,
             message: error.message,
+            folder: Cmd.quote(error.directory),
             scripting,
             recovery: recovered,
           },

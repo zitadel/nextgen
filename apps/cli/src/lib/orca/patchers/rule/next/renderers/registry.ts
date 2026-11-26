@@ -1,4 +1,4 @@
-import { OrcaInvalidError, OrcaRendererPendingError } from "@/lib/orca/errors";
+import { OrcaRendererPendingError, OrcaRendererUnknownError } from "@/lib/orca/errors";
 import { litRenderer } from "./lit";
 import { reactRenderer } from "./react";
 import type { RendererId, RendererSpec } from "./types";
@@ -50,8 +50,9 @@ export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter((id) => 
  */
 export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
-    throw new OrcaInvalidError(
-      `Unknown renderer "${id}"; available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}`,
+    throw new OrcaRendererUnknownError(
+      `Unknown renderer "${id}"`,
+      AVAILABLE_RENDERER_IDS.join(", "),
     );
   }
   const renderer = RENDERERS[id];

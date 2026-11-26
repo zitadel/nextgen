@@ -14,7 +14,7 @@ import {
   type DocumentStatus,
   type Edit,
 } from "@/lib/zitadel/resources/document";
-import { ZitadelConfigError } from "@/lib/zitadel/errors";
+import { ZitadelConfigError, ZitadelConfigIdentifierMissingError } from "@/lib/zitadel/errors";
 import {
   type ObjectType,
   objectType,
@@ -493,9 +493,7 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
       return { document: this, changed: false, skipped: [] };
     }
     if (method === "password" && !this.hasIdentifier) {
-      throw new ZitadelConfigError(
-        `${this.path} has no x-identifier for password: set "x-identifier" to the property users sign in with, e.g. "email"`,
-      );
+      throw new ZitadelConfigIdentifierMissingError(this.path);
     }
     const next = { ...this.writtenMethod(method), enabled: true };
     return {

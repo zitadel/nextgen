@@ -1,4 +1,8 @@
-import { OrcaInvalidError, OrcaPatchFileMissingError } from "@/lib/orca/errors";
+import {
+  OrcaAngularJsonMissingError,
+  OrcaAngularProjectAmbiguousError,
+  OrcaInvalidError,
+} from "@/lib/orca/errors";
 import { isObject, parseJsonObject } from "@/lib/json";
 
 /**
@@ -19,9 +23,7 @@ export function angularProxyEdit(opts: {
 }): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new OrcaPatchFileMissingError(
-        "Cannot wire Angular proxy: angular.json not found; run it from an Angular project",
-      );
+      throw new OrcaAngularJsonMissingError("Cannot wire Angular proxy: angular.json not found");
     }
     const root = parseJsonObject(source, "angular.json");
     const projects = isObject(root.projects)
@@ -29,8 +31,9 @@ export function angularProxyEdit(opts: {
       : undefined;
     const projectNames = Object.keys(projects ?? {});
     if (typeof root.defaultProject !== "string" && projectNames.length > 1) {
-      throw new OrcaInvalidError(
-        `angular.json has multiple projects and no defaultProject to choose from; projects: ${projectNames.join(", ")}`,
+      throw new OrcaAngularProjectAmbiguousError(
+        "angular.json has multiple projects and no defaultProject to choose from",
+        projectNames.join(", "),
       );
     }
     const projectName =

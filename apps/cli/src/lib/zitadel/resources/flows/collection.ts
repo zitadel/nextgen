@@ -1,6 +1,6 @@
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import { ZitadelConfigResourceMissingError } from "@/lib/zitadel/errors";
+import { ZitadelConfigFlowMissingError } from "@/lib/zitadel/errors";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Offer, PinnedOffer } from "@/lib/zitadel/resources/flows/types";
@@ -138,9 +138,7 @@ export class Flows extends PinnedCollection<Flow> {
   resolveForSso(schema: UserSchema, slug?: ConnectionSlug): readonly Flow[] {
     const flows = this.findForSchema(schema);
     if (flows.length === 0) {
-      throw new ZitadelConfigResourceMissingError(
-        `No login flow runs against ${schema.name}: none of the files under .zitadel/flows/ names this schema; check that the flow's user_schema names the schema's objectType`,
-      );
+      throw new ZitadelConfigFlowMissingError(schema.name, schema.path);
     }
     for (const flow of flows) {
       flow.assertProviderEditable();

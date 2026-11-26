@@ -213,11 +213,46 @@ export class BackendOperationUnknownError extends BackendError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
+/** A path that matches no operation's template. */
+export class BackendPathUnknownError extends BackendOperationUnknownError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
 /** The path names several operations and the method does not pick one, or picks none. */
 export class BackendOperationAmbiguousError extends BackendError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** An operation named by its id was given a method that is not its own. */
+export class BackendMethodMismatchError extends BackendOperationAmbiguousError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The operation's own method, which the refusal says to pass instead. */
+  readonly method: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param method - The operation's own method.
+   */
+  constructor(message: string, method: string) {
+    super(message);
+    this.method = method;
+  }
+}
+
+/** A flow or schema named by its name, which no record carries. */
+export class BackendNameUnknownError extends BackendNotFoundError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
 }
 
 /** A bug in the backend's own code: something that cannot happen unless the code is wrong. */

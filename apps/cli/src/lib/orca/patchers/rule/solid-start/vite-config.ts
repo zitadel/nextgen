@@ -1,4 +1,8 @@
-import { OrcaInvalidError, OrcaPatchFileMissingError } from "@/lib/orca/errors";
+import {
+  OrcaInvalidError,
+  OrcaSolidStartConfigMissingError,
+  OrcaSolidStartPluginMissingError,
+} from "@/lib/orca/errors";
 
 const MIDDLEWARE_PATH = "./src/middleware.ts";
 
@@ -21,12 +25,14 @@ const MIDDLEWARE_PATH = "./src/middleware.ts";
 export function solidStartConfigEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new OrcaPatchFileMissingError("Cannot edit the SolidStart Vite config: file not found");
+      throw new OrcaSolidStartConfigMissingError(
+        "Cannot edit the SolidStart Vite config: file not found",
+      );
     }
 
     const callIndex = source.indexOf("solidStart(");
     if (callIndex === -1) {
-      throw new OrcaInvalidError(
+      throw new OrcaSolidStartPluginMissingError(
         "Cannot wire middleware: no solidStart() plugin call found in the Vite config",
       );
     }

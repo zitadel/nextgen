@@ -427,6 +427,9 @@ export class ScaffoldedApp {
   readonly path: string;
   readonly committed: CommittedFiles;
 
+  /** The address the last stopped server record names. */
+  private stoppedServer: string | undefined;
+
   constructor(path: string) {
     this.path = path;
     this.committed = new CommittedFiles(path);
@@ -993,11 +996,40 @@ export class ScaffoldedApp {
 
   /** Leaves this directory with the record of a local server that is not running. */
   async writeStoppedServerRecord(): Promise<void> {
+    const record = aBinaryRecord({ port: nextPort() });
     await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
-    await writeFile(
-      join(this.path, ".zitadel/local/runtime.json"),
-      JSON.stringify(aBinaryRecord({ port: nextPort() })),
-    );
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), JSON.stringify(record));
+    this.stoppedServer = record.server_url;
+  }
+
+  /** Starts this directory's local server and stops it, leaving its admin and the record of a server that does not run. */
+  async leaveAStoppedServerWithItsAdmin(): Promise<void> {
+    await this.startLocalServer();
+    await this.run(["stop", "--json"]);
+    await this.writeStoppedServerRecord();
+  }
+
+  /** The address the record {@link writeStoppedServerRecord} left names, which refusals about it name. */
+  get stoppedServerUrl(): string {
+    if (this.stoppedServer === undefined) {
+      throw new Error("No stopped server record was written");
+    }
+    return this.stoppedServer;
+  }
+
+  /** Leaves this directory's `.env.development.local` naming a server that is not a URL. */
+  async writeInvalidServerToEnvFile(): Promise<void> {
+    const file = join(this.path, ".env.development.local");
+    const kept = (
+      await readFile(file, "utf8").catch(() => {
+        return "";
+      })
+    )
+      .split("\n")
+      .filter((line) => {
+        return !line.startsWith("ZITADEL_URL=");
+      });
+    await writeFile(file, ["ZITADEL_URL=not-a-url", ...kept].join("\n"));
   }
 
   /** Leaves this directory with a record of its local server that is JSON but not a record. */
@@ -1087,6 +1119,93 @@ export class ScaffoldedApp {
   async writeMalformedLocalAdmin(): Promise<void> {
     await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
     await writeFile(join(this.path, ".zitadel/local/admin.json"), "{ truncated");
+  }
+
+  /** Leaves the app with a login page of its own where setup writes one. */
+  async writeOwnLoginPage(): Promise<void> {
+    await mkdir(join(this.path, "app/login"), { recursive: true });
+    await writeFile(
+      join(this.path, "app/login/page.tsx"),
+      "export default function Login() {\n  return null;\n}\n",
+    );
+  }
+
+  /** Leaves the Next.js app with a `proxy.ts` of its own in `src/`, beside the one setup writes. */
+  async writeOwnProxyInSrc(): Promise<void> {
+    await mkdir(join(this.path, "src"), { recursive: true });
+    await writeFile(join(this.path, "src/proxy.ts"), "export function proxy() {}\n");
+  }
+
+  /** Leaves the Next.js app with a `middleware.ts` of its own, beside the `proxy.ts` setup writes. */
+  async writeOwnMiddleware(): Promise<void> {
+    await writeFile(join(this.path, "middleware.ts"), "export function middleware() {}\n");
+  }
+
+  /** Leaves the Next.js app on a tag that names no version, with a `proxy.ts` of its own. */
+  async writeOwnProxyUnderAnUnpinnedNext(): Promise<void> {
+    await this.editPackageJson((pkg) => {
+      pkg.dependencies = { ...pkg.dependencies, next: "latest" };
+    });
+    await writeFile(join(this.path, "proxy.ts"), "export function proxy() {}\n");
+  }
+
+  /** Takes the framework out of the app's dependencies, so nothing detects it. */
+  async removeTheFramework(): Promise<void> {
+    await this.editPackageJson((pkg) => {
+      pkg.dependencies = {};
+    });
+  }
+
+  /** Leaves the app with a Vite config written as CommonJS. */
+  async writeCommonJsViteConfig(): Promise<void> {
+    await writeFile(join(this.path, "vite.config.ts"), "module.exports = {};\n");
+  }
+
+  /** Leaves the app with a Vite config that does not parse. */
+  async writeUnparseableViteConfig(): Promise<void> {
+    await writeFile(join(this.path, "vite.config.ts"), "export default {\n");
+  }
+
+  /** Leaves the app with a Vite config that exports a variable, not an object literal. */
+  async writeViteConfigExportingAVariable(): Promise<void> {
+    await writeFile(
+      join(this.path, "vite.config.ts"),
+      "const config = {};\n\nexport default config;\n",
+    );
+  }
+
+  /** Leaves the app with a Vite config whose `server` is a variable, not an object literal. */
+  async writeViteConfigWithAServerVariable(): Promise<void> {
+    await writeFile(
+      join(this.path, "vite.config.ts"),
+      "const server = {};\n\nexport default { server };\n",
+    );
+  }
+
+  /** Takes `angular.json` out of the Angular app. */
+  async removeAngularJson(): Promise<void> {
+    await rm(join(this.path, "angular.json"), { force: true });
+  }
+
+  /** Leaves the Angular app with two projects in `angular.json` and no default between them. */
+  async writeAngularJsonWithTwoProjects(): Promise<void> {
+    await writeFile(
+      join(this.path, "angular.json"),
+      `${JSON.stringify({ projects: { admin: {}, shop: {} } }, null, 2)}\n`,
+    );
+  }
+
+  /** Leaves the Angular app with routes built by a function call, not an inline array. */
+  async writeAngularRoutesFromAFunction(): Promise<void> {
+    await writeFile(
+      join(this.path, "src/app/app.routes.ts"),
+      "import { makeRoutes } from './make-routes';\n\nexport const routes = makeRoutes();\n",
+    );
+  }
+
+  /** Leaves the SolidStart app with a Vite config that registers no `solidStart()` plugin. */
+  async writeViteConfigWithoutSolidStart(): Promise<void> {
+    await writeFile(join(this.path, "vite.config.ts"), "export default {};\n");
   }
 
   /** The local admin file of this directory, which refusals about it name. */
@@ -1916,6 +2035,50 @@ export class ScaffoldedApp {
     return this.editDocument(SCHEMA_FILE, AnyObjectSchema, (schema) => {
       delete schema["x-identifier"];
     });
+  }
+
+  /** Leaves this project with a record of what was synced that is not JSON. */
+  writeMalformedSyncState(): Promise<void> {
+    return this.writeProjectFile(".zitadel/state.json", "{ truncated");
+  }
+
+  /** Removes the committed login flow, so no flow runs against the user schema. */
+  losesItsLoginFlow(): Promise<void> {
+    return this.deleteProjectFile(FLOW_FILE);
+  }
+
+  /** Ejects the login's branding and copies its descriptor, so a release would carry two. */
+  async holdsTwoBrandings(): Promise<void> {
+    const result = await this.run(["branding", "eject", "--non-interactive", "--json"]);
+    expect(result, "arranging branding eject should have succeeded").toSucceed();
+    await this.writeProjectFile(
+      ".zitadel/branding/second.json",
+      await this.readProjectFile(".zitadel/branding/branding.json"),
+    );
+  }
+
+  /** Leaves a file where branding eject writes its directory. */
+  async blocksTheBrandingDirectory(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel"), { recursive: true });
+    await this.writeProjectFile(".zitadel/branding", "not a directory\n");
+  }
+
+  /** Writes, at the password policy's path, a policy for another operation. */
+  async writeInvalidPasswordPolicy(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(PASSWORD_POLICY),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: "auth.factor.other" }, null, 2)}\n`,
+    );
+  }
+
+  /** Writes a sign-up policy file with no config. */
+  async writeInvalidSignupPolicy(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: DEFAULT_SIGNUP_POLICY.operation }, null, 2)}\n`,
+    );
   }
 
   /**
@@ -2990,6 +3153,68 @@ export async function aReactApp(): Promise<ScaffoldedApp> {
       'import { createRoot } from "react-dom/client";\nimport App from "./App.tsx";\n\ncreateRoot(document.getElementById("root")!).render(<App />);\n',
     "src/App.tsx": "export default function App() {\n  return null;\n}\n",
     [VITE_CONFIG]: BARE_VITE_CONFIG,
+  };
+  for (const [relativePath, contents] of Object.entries(files)) {
+    await writeFile(join(path, relativePath), contents);
+  }
+  return new ScaffoldedApp(path);
+}
+
+/** An Angular app as `ng new` leaves it, with one project and its routes, before setup. */
+export async function anAngularApp(): Promise<ScaffoldedApp> {
+  const path = await scratchDir("zitadel-angular-");
+  await mkdir(join(path, "src/app"), { recursive: true });
+  const files = {
+    "package.json": JSON.stringify(
+      {
+        name: "demo-angular-app",
+        private: true,
+        scripts: { start: "ng serve" },
+        dependencies: { "@angular/core": "^20.0.0", "@angular/router": "^20.0.0" },
+      },
+      null,
+      2,
+    ),
+    ".gitignore": "node_modules\n",
+    "angular.json": JSON.stringify(
+      {
+        projects: {
+          "demo-angular-app": {
+            architect: { serve: { builder: "@angular/build:dev-server", options: {} } },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+    "src/app/app.routes.ts":
+      "import { Routes } from '@angular/router';\n\nexport const routes: Routes = [];\n",
+  };
+  for (const [relativePath, contents] of Object.entries(files)) {
+    await writeFile(join(path, relativePath), contents);
+  }
+  return new ScaffoldedApp(path);
+}
+
+/** A SolidStart app as its template leaves it, before setup. */
+export async function aSolidStartApp(): Promise<ScaffoldedApp> {
+  const path = await scratchDir("zitadel-solid-start-");
+  await mkdir(join(path, "src/routes"), { recursive: true });
+  const files = {
+    "package.json": JSON.stringify(
+      {
+        name: "demo-solid-start-app",
+        private: true,
+        type: "module",
+        scripts: { dev: "vite dev" },
+        dependencies: { "solid-js": "^1.9.0", "@solidjs/start": "^2.0.0", vite: "^7.0.0" },
+      },
+      null,
+      2,
+    ),
+    ".gitignore": "node_modules\n",
+    "vite.config.ts":
+      'import { defineConfig } from "vite";\nimport { solidStart } from "@solidjs/start/config";\n\nexport default defineConfig({\n  plugins: [solidStart()],\n});\n',
   };
   for (const [relativePath, contents] of Object.entries(files)) {
     await writeFile(join(path, relativePath), contents);

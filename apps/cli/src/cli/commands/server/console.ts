@@ -1,15 +1,17 @@
 import { Flags } from "@oclif/core";
 
+import { SERVER } from "@/constants";
 import { openInBrowser } from "@/lib/browser";
 import {
   Environment,
   EnvironmentNameInvalidError,
   EnvironmentSourcesConflictError,
+  EnvironmentValueInvalidError,
 } from "@/lib/environment";
 import {
   AdminSession,
   LocalRuntime,
-  LocalServerDeniedError,
+  LocalServerAdminNotFoundError,
   LocalServerAdminMalformedError,
   LocalServerAdminUnreadableError,
   LocalServerNotRespondingElsewhereError,
@@ -67,6 +69,16 @@ const NAME_INVALID_REFUSAL = {
   hint: "Pass a safe --env or set ZITADEL_ENV.",
 } as const satisfies Refusal;
 
+/** How a run is refused when a source names a server that is not an http(s) URL. */
+const SERVER_INVALID_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Fix or remove ZITADEL_URL in {source}; it must be a URL such as {example}.",
+  details: {
+    cause: "{reason}",
+  },
+} as const satisfies Refusal;
+
 /** How a run is refused when the runtime record is not in the shape it is written in. */
 const RECORD_MALFORMED_REFUSAL = {
   code: "E_VALIDATION",
@@ -98,27 +110,34 @@ const NOT_RUNNING_REFUSAL = {
 const NOT_RESPONDING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "Run `zitadel start` to bring it back.",
+  hint: "No healthy local server responded at {serverUrl}. Run `zitadel start` to bring it back.",
   next: [
     {
       id: "start",
     },
   ],
+  details: {
+    server_url: "{serverUrl}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the local server a parent folder started does not answer. */
 const NOT_RESPONDING_ELSEWHERE_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "It was started in another directory: run `zitadel start` there to bring it back.",
+  hint: "No healthy local server responded at {serverUrl}. It was started in {folder}, so run `zitadel start --cwd {folder}` to bring it back.",
   next: ["{start}"],
+  details: {
+    server_url: "{serverUrl}",
+    suggested_args: "{suggestedArgs}",
+  },
 } as const satisfies Refusal;
 
-/** How a run is refused when the local server refused the local admin. */
-const ADMIN_DENIED_REFUSAL = {
+/** How a run is refused when the local server does not know the local admin. */
+const ADMIN_NOT_FOUND_REFUSAL = {
   code: "E_AUTH",
   message: "{message}",
-  hint: "Check `zitadel logs` first: it shows why the local server refused the local admin. If the logs show no error, the local data directory predates the local admin, and `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
+  hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
   next: [
     {
       id: "logs",
@@ -216,6 +235,13 @@ export default class Console extends Telemetered(
           message: error.message,
         });
       }
+      if (error instanceof EnvironmentValueInvalidError) {
+        throw refusalError(SERVER_INVALID_REFUSAL, {
+          ...error,
+          message: error.message,
+          example: SERVER,
+        });
+      }
       if (error instanceof LocalServerNotRunningError) {
         throw refusalError(NOT_RUNNING_REFUSAL, {
           ...error,
@@ -234,6 +260,8 @@ export default class Console extends Telemetered(
           {
             ...error,
             message: error.message,
+            folder: Cmd.quote(error.directory),
+            suggestedArgs: [["start", "--cwd", error.directory]],
           },
           {
             start: {
@@ -431,6 +459,8 @@ export default class Console extends Telemetered(
           {
             ...error,
             message: error.message,
+            folder: Cmd.quote(error.directory),
+            suggestedArgs: [["start", "--cwd", error.directory]],
           },
           {
             start: {
@@ -442,8 +472,8 @@ export default class Console extends Telemetered(
           },
         );
       }
-      if (error instanceof LocalServerDeniedError) {
-        throw refusalError(ADMIN_DENIED_REFUSAL, {
+      if (error instanceof LocalServerAdminNotFoundError) {
+        throw refusalError(ADMIN_NOT_FOUND_REFUSAL, {
           ...error,
           message: error.message,
         });

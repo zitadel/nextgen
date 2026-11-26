@@ -4,7 +4,7 @@ import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { LocalServerDeniedError, LocalServerPlatformMissingError } from "@/lib/server";
+import { LocalServerAdminNotFoundError, LocalServerPlatformMissingError } from "@/lib/server";
 import type { LocalAdmin } from "@/lib/server/local/admin-credential";
 import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";
 import { adminSessionCookie, consoleSignInUrl } from "@/lib/server/local/sign-in";
@@ -243,7 +243,7 @@ describe("local admin sign-in", () => {
 
     const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
-    expect(error).toBeInstanceOf(LocalServerDeniedError);
+    expect(error).toBeInstanceOf(LocalServerAdminNotFoundError);
     expect(error).toMatchObject({
       code: "E_AUTH",
       message: "The local server could not find the local admin",

@@ -76,6 +76,30 @@ describe("auth-method passkey enable", () => {
     });
 
     describe("--json", () => {
+      it("refuses a record of what was synced that is not JSON", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run(["auth-method", "passkey", "enable", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
+        });
+      });
+
+      it("refuses a record of what was synced that is not JSON, naming the file", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run(["auth-method", "passkey", "enable", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: { file: ".zitadel/state.json" },
+        });
+      });
+
       it("turns passkey on", async () => {
         const app = await anAppWithoutPasskey();
 

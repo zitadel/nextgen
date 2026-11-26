@@ -13,7 +13,6 @@ import AuthMethodPasswordEnable from "@/cli/commands/auth-method/password/enable
 import AuthMethodSsoDisable from "@/cli/commands/auth-method/sso/disable";
 import { Consent, ConsentInternalError } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
-import { SyncStateMalformedError } from "@/lib/sync";
 
 import { type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
@@ -1178,8 +1177,12 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(SyncStateMalformedError);
-      expect(error).toMatchObject({ code: "E_VALIDATION" });
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
+        details: { file: ".zitadel/state.json" },
+      });
     });
   });
 });

@@ -9,7 +9,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { BackendNotFoundError } from "@/lib/backend/errors";
+import { BackendNameUnknownError } from "@/lib/backend/errors";
 
 /** What narrows and pages a list of flow definitions. */
 export type FlowQuery = Readonly<Omit<ListFlowDefinitionsParams, "project_id">>;
@@ -107,7 +107,7 @@ export class FlowService extends ApiService {
     });
     const current = first.items[0];
     if (current === undefined) {
-      throw new BackendNotFoundError(`No flow definition named "${reference}"`);
+      throw new BackendNameUnknownError(`No flow definition named "${reference}"`);
     }
     return current;
   }

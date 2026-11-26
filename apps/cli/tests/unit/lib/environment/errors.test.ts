@@ -9,6 +9,7 @@ import {
   EnvironmentValueMissingError,
   EnvironmentValueUnboundError,
 } from "@/lib/environment";
+import { LocalServerUrlInvalidError } from "@/lib/server";
 
 describe("the environment errors", () => {
   it.each([
@@ -16,7 +17,15 @@ describe("the environment errors", () => {
     ["name", new EnvironmentNameInvalidError("bad"), "invalid"],
     ["file", new EnvironmentFileMissingError("gone"), "missing"],
     ["missing value", new EnvironmentValueMissingError("not set"), "invalid"],
-    ["invalid value", new EnvironmentValueInvalidError("not a URL"), "invalid"],
+    [
+      "invalid value",
+      new EnvironmentValueInvalidError(
+        "not a URL",
+        ".env.local",
+        new LocalServerUrlInvalidError("not http"),
+      ),
+      "invalid",
+    ],
     ["unbound value", new EnvironmentValueUnboundError("not set"), "invalid"],
   ] as const)("reports a %s failure by its category", (_name, error, category) => {
     expect(error).toBeInstanceOf(EnvironmentError);

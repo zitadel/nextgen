@@ -23,6 +23,8 @@ import {
   type Schemas,
   ZitadelConfig,
   ZitadelConfigFileUnreadableError,
+  ZitadelConfigHandleClashError,
+  ZitadelConfigHandleInvalidError,
   ZitadelConfigPathUnreadableError,
 } from "@/lib/zitadel";
 import { ChangeCommand } from "@/cli/commands/bases";
@@ -130,6 +132,30 @@ const PATH_UNREADABLE_REFUSAL = {
   details: {
     file: "{path}",
     code: "{errno}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a handle the server gave that cannot name a file is refused for.
+ */
+const HANDLE_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "A handle must be a single name, without slashes or dots that climb out of its directory.",
+  details: {
+    handle: "{handle}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What several broken files holding the handle a release pins are refused for.
+ */
+const HANDLE_CLASH_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Remove or fix all but one of them, then run the command again.",
+  details: {
+    handle: "{handle}",
+    paths: "{paths}",
   },
 } as const satisfies Refusal;
 
@@ -481,6 +507,18 @@ export default class Pull extends Telemetered(ChangeCommand) {
         outcomes,
       };
     } catch (error) {
+      if (error instanceof ZitadelConfigHandleInvalidError) {
+        throw refusalError(HANDLE_INVALID_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigHandleClashError) {
+        throw refusalError(HANDLE_CLASH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigFileUnreadableError) {
         throw refusalError(FILE_UNREADABLE_REFUSAL, {
           ...error,

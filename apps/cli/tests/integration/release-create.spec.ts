@@ -114,6 +114,19 @@ describe("release create", () => {
     });
 
     describe("--json", () => {
+      it("refuses a release that would carry two brandings", async () => {
+        const app = await aSetUpApp();
+        await app.holdsTwoBrandings();
+
+        const result = await app.run(["release", "create", "--non-interactive", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",
+        });
+      });
+
       it("builds a release from the config without deploying it", async () => {
         const app = await aSetUpApp();
 

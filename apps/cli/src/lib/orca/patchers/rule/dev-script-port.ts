@@ -1,4 +1,4 @@
-import { OrcaPatchFileMissingError } from "@/lib/orca/errors";
+import { OrcaPackageJsonMissingError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import { extractPort, portFromIssuer, withDevPort } from "@/lib/orca/detectors/port";
 import type { FileOp } from "./file-writer/types";
@@ -54,7 +54,7 @@ export function devScriptPortEdit(
 ): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new OrcaPatchFileMissingError("package.json is required to pin the dev port");
+      throw new OrcaPackageJsonMissingError("package.json is required to pin the dev port");
     }
     const devPort = portFromIssuer(issuer);
     if (devPort === undefined) {

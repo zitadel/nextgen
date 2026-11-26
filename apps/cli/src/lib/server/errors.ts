@@ -28,6 +28,20 @@ export class LocalServerNotRespondingError extends LocalServerError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_LOCAL_SERVER_NOT_RUNNING";
+
+  /** The address the record names, at which nothing healthy answered. */
+  readonly serverUrl: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param serverUrl - The address the record names.
+   */
+  constructor(message: string, serverUrl: string) {
+    super(message);
+    this.serverUrl = serverUrl;
+  }
 }
 
 /**
@@ -42,15 +56,20 @@ export class LocalServerNotRespondingElsewhereError extends LocalServerError {
   /** The folder that holds the record, which the commands point `--cwd` at. */
   readonly directory: string;
 
+  /** The address the record names, at which nothing healthy answered. */
+  readonly serverUrl: string;
+
   /**
    * Creates the error.
    *
    * @param message - What went wrong, with the facts it is about.
    * @param directory - The folder that holds the record.
+   * @param serverUrl - The address the record names.
    */
-  constructor(message: string, directory: string) {
+  constructor(message: string, directory: string, serverUrl: string) {
     super(message);
     this.directory = directory;
+    this.serverUrl = serverUrl;
   }
 }
 
@@ -270,10 +289,41 @@ export class LocalServerProcessDeniedError extends LocalServerError {
 }
 
 /** The server does not know the local admin, or refused its session. */
-export class LocalServerDeniedError extends LocalServerError {
+export abstract class LocalServerDeniedError extends LocalServerError {
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";
+}
+
+/**
+ * The server rejected the local admin's identifier: it never imported the
+ * admin, or its lookup failed, which it reports the same way.
+ */
+export class LocalServerAdminNotFoundError extends LocalServerDeniedError {
+  override readonly category: ErrorCategory = "denied";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_AUTH";
+}
+
+/** The server refused to exchange the local admin's handoff token for a session. */
+export class LocalServerSessionRefusedError extends LocalServerDeniedError {
+  override readonly category: ErrorCategory = "denied";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_AUTH";
+
+  /** The HTTP status the exchange answered with, which the refusal reports. */
+  readonly status: number;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param status - The HTTP status the exchange answered with.
+   */
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
 }
 
 /** Every port in the search range was taken. */

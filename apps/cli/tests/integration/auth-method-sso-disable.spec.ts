@@ -168,6 +168,44 @@ describe("auth-method sso disable", () => {
     });
 
     describe("--json", () => {
+      it("refuses a record of what was synced that is not JSON", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "disable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
+        });
+      });
+
+      it("refuses a record of what was synced that is not JSON, naming the file", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "disable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: { file: ".zitadel/state.json" },
+        });
+      });
+
       it("removes the provider", async () => {
         const app = await anAppServingGoogle();
 
@@ -525,8 +563,13 @@ describe("auth-method sso disable", () => {
             command: "auth-method:sso:disable",
             source: "",
             code: "E_NOT_FOUND",
-            message:
-              "default-human-user has no provider named gogle; it offers: google; connections under .zitadel/idps/: google",
+            message: "default-human-user has no provider named gogle",
+            hint: "default-human-user offers: google. Connections under .zitadel/idps/: google.",
+            details: {
+              requested: UNKNOWN_PROVIDER,
+              offered: [GOOGLE],
+              connections: [GOOGLE],
+            },
           });
         });
 
@@ -541,7 +584,13 @@ describe("auth-method sso disable", () => {
             command: "auth-method:sso:disable",
             source: "",
             code: "E_NOT_FOUND",
-            message: `default-human-user has no provider named ${HOSTILE_PROVIDER}; it offers: google; connections under .zitadel/idps/: google`,
+            message: `default-human-user has no provider named ${HOSTILE_PROVIDER}`,
+            hint: "default-human-user offers: google. Connections under .zitadel/idps/: google.",
+            details: {
+              requested: HOSTILE_PROVIDER,
+              offered: [GOOGLE],
+              connections: [GOOGLE],
+            },
           });
         });
 

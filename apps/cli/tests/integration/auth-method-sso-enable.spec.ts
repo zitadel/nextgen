@@ -360,6 +360,121 @@ describe("auth-method sso enable", () => {
     });
 
     describe("--json", () => {
+      it("refuses a provider two connections are to", async () => {
+        const app = await anAppWith(CATALOG);
+        await app.addUnlistedConnection("google-work");
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_CONFLICT",
+          hint: "Keep the one this project should use and remove the others, then run the command again.",
+        });
+      });
+
+      it("refuses a provider two connections are to, naming the provider", async () => {
+        const app = await anAppWith(CATALOG);
+        await app.addUnlistedConnection("google-work");
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: { provider: "google" },
+        });
+      });
+
+      it("refuses a schema no login flow runs against", async () => {
+        const app = await aSetUpApp();
+        await app.losesItsLoginFlow();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_NOT_FOUND",
+          hint: "The provider is offered by a flow, and none of the files under .zitadel/flows/ names this schema. Check that the flow's user_schema names the schema's objectType.",
+        });
+      });
+
+      it("refuses a schema no login flow runs against, naming the schema", async () => {
+        const app = await aSetUpApp();
+        await app.losesItsLoginFlow();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          message: "No login flow runs against default-human-user",
+          details: { schema: ".zitadel/schemas/default-human-user.json" },
+        });
+      });
+
+      it("refuses a record of what was synced that is not JSON", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
+        });
+      });
+
+      it("refuses a record of what was synced that is not JSON, naming the file", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: { file: ".zitadel/state.json" },
+        });
+      });
+
       describe.each(PROVIDERS)("with $name", (provider) => {
         it("publishes the client id as a readable project variable", async () => {
           const app = await aSetUpApp();
@@ -1020,8 +1135,14 @@ describe("auth-method sso enable", () => {
             command: "auth-method:sso:enable",
             source: MOCK_SERVER_URL,
             code: "E_CONFLICT",
-            message:
-              ".zitadel/idps/acme-sso.json and acme_sso both use ACME_SSO_CLIENT_ID; point one of them at a variable of its own",
+            message: ".zitadel/idps/acme-sso.json and acme_sso both use ACME_SSO_CLIENT_ID",
+            hint: "Point one of them at a variable of its own, then run the command again.",
+            details: {
+              file: ".zitadel/idps/acme-sso.json",
+              slug: "acme_sso",
+              other_slug: "acme-sso",
+              variable: "ACME_SSO_CLIENT_ID",
+            },
           });
         });
       });

@@ -379,3 +379,522 @@ export class OrcaCommandFailedError extends OrcaInternalError {
     this.output = run.output;
   }
 }
+
+/**
+ * A framework asked for that orca has no detector for.
+ */
+export class OrcaFrameworkUnknownError extends OrcaFrameworkMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly code: ZitadelErrorCode = "E_FRAMEWORK_NOT_DETECTED";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The framework ids orca has a detector for, joined with commas.
+   */
+  readonly supported: string;
+
+  /**
+   * Make the failure for a framework orca has no detector for.
+   *
+   * @param message - Which framework was asked for.
+   * @param supported - The framework ids orca has a detector for, joined with commas.
+   */
+  constructor(message: string, supported: string) {
+    super(message);
+    this.supported = supported;
+  }
+}
+
+/**
+ * A framework orca can scaffold, and has no patcher to integrate.
+ */
+export class OrcaPatcherMissingError extends OrcaInternalError {
+  override readonly category: ErrorCategory = "fault";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A plan with an op that names no path to write: a bug in a patcher.
+ */
+export class OrcaPatchOpEmptyError extends OrcaInternalError {
+  override readonly category: ErrorCategory = "fault";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * An Angular app with no `angular.json` to wire the dev proxy into.
+ */
+export class OrcaAngularJsonMissingError extends OrcaPatchFileMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * An `angular.json` with several projects and no `defaultProject` to pick one.
+ */
+export class OrcaAngularProjectAmbiguousError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The projects `angular.json` names, joined with commas.
+   */
+  readonly projects: string;
+
+  /**
+   * Make the failure for an `angular.json` with no project to choose.
+   *
+   * @param message - That there are several projects and no default.
+   * @param projects - The projects `angular.json` names, joined with commas.
+   */
+  constructor(message: string, projects: string) {
+    super(message);
+    this.projects = projects;
+  }
+}
+
+/**
+ * An Angular routes file whose `routes` is not an inline array.
+ */
+export class OrcaAngularRoutesNotInlineError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The routes file, as the patch names it.
+   */
+  readonly label: string;
+
+  /**
+   * Make the failure for routes the patch cannot extend.
+   *
+   * @param message - That the auth routes cannot be wired.
+   * @param label - The routes file, as the patch names it.
+   */
+  constructor(message: string, label: string) {
+    super(message);
+    this.label = label;
+  }
+}
+
+/**
+ * A project with no `package.json` for a patch that edits its scripts.
+ */
+export class OrcaPackageJsonMissingError extends OrcaPatchFileMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A project with no `zitadel.json` for a patch that moves its issuer.
+ */
+export class OrcaZitadelConfigMissingError extends OrcaPatchFileMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A file the patch would write that holds something else, without `force`.
+ */
+export class OrcaFileOverwriteError extends OrcaConflictError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The file that would be overwritten.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for a file the patch refuses to overwrite.
+   *
+   * @param message - Which file would be overwritten.
+   * @param path - The file that would be overwritten.
+   */
+  constructor(message: string, path: string) {
+    super(message);
+    this.path = path;
+  }
+}
+
+/**
+ * A Next.js request boundary of the app's that would sit beside the one setup
+ * writes: the base of the three ways it conflicts.
+ */
+export abstract class OrcaBoundaryConflictError extends OrcaConflictError {
+  /**
+   * The app's own boundary file.
+   */
+  readonly existing: string;
+
+  /**
+   * The boundary file setup writes.
+   */
+  readonly target: string;
+
+  /**
+   * Make the failure for a boundary that conflicts with the one setup writes.
+   *
+   * @param message - Which two files conflict.
+   * @param existing - The app's own boundary file.
+   * @param target - The boundary file setup writes.
+   */
+  constructor(message: string, existing: string, target: string) {
+    super(message);
+    this.existing = existing;
+    this.target = target;
+  }
+}
+
+/**
+ * A boundary of the app's under the same name as the one setup writes, so one
+ * of the two would never run.
+ */
+export class OrcaBoundaryDuplicateError extends OrcaBoundaryConflictError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A `middleware.*` of the app's beside the `proxy.ts` setup writes for Next 16.
+ */
+export class OrcaBoundaryRenamedError extends OrcaBoundaryConflictError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A boundary of the app's beside the one setup writes, in an app whose Next.js
+ * version setup cannot read.
+ */
+export class OrcaBoundaryVersionUnknownError extends OrcaBoundaryConflictError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A renderer id the registry does not declare.
+ */
+export class OrcaRendererUnknownError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The renderer ids that can be used, joined with commas.
+   */
+  readonly renderers: string;
+
+  /**
+   * Make the failure for a renderer id that names none.
+   *
+   * @param message - Which renderer id was given.
+   * @param renderers - The renderer ids that can be used, joined with commas.
+   */
+  constructor(message: string, renderers: string) {
+    super(message);
+    this.renderers = renderers;
+  }
+}
+
+/**
+ * A proxy of the app's that may forward the project secret beyond the
+ * session exchange.
+ */
+export class OrcaProxyCredentialLeakError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The exchange path with the auth prefix, which the bearer may also reach.
+   */
+  readonly exchangePath: string;
+
+  /**
+   * Make the failure for a proxy that may leak the project secret.
+   *
+   * @param message - Which proxy may forward the secret.
+   * @param exchangePath - The exchange path with the auth prefix.
+   */
+  constructor(message: string, exchangePath: string) {
+    super(message);
+    this.exchangePath = exchangePath;
+  }
+}
+
+/**
+ * An app entry that mounts a root component other than the one setup writes.
+ */
+export class OrcaRootComponentMountError extends OrcaConflictError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The entry module that mounts the root.
+   */
+  readonly entry: string;
+
+  /**
+   * The root component the entry mounts.
+   */
+  readonly mountedRoot: string;
+
+  /**
+   * The root component setup writes.
+   */
+  readonly root: string;
+
+  /**
+   * The import that would mount the root setup writes.
+   */
+  readonly statement: string;
+
+  /**
+   * Make the failure for an entry that mounts another root.
+   *
+   * @param message - Which entry mounts which root.
+   * @param mount - The entry, the root it mounts, the root setup writes and its import.
+   * @param mount.entry - The entry module that mounts the root.
+   * @param mount.mountedRoot - The root component the entry mounts.
+   * @param mount.root - The root component setup writes.
+   * @param mount.statement - The import that would mount the root setup writes.
+   */
+  constructor(
+    message: string,
+    mount: {
+      readonly entry: string;
+      readonly mountedRoot: string;
+      readonly root: string;
+      readonly statement: string;
+    },
+  ) {
+    super(message);
+    this.entry = mount.entry;
+    this.mountedRoot = mount.mountedRoot;
+    this.root = mount.root;
+    this.statement = mount.statement;
+  }
+}
+
+/**
+ * A SolidStart app with no Vite config to wire the middleware into.
+ */
+export class OrcaSolidStartConfigMissingError extends OrcaPatchFileMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A SolidStart Vite config that registers no `solidStart()` plugin.
+ */
+export class OrcaSolidStartPluginMissingError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A SvelteKit env module that declares its variables in no shape the patch reads.
+ */
+export class OrcaSvelteKitEnvVarsError extends OrcaInvalidError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The env module, as the patch names it.
+   */
+  readonly label: string;
+
+  /**
+   * The variables the hooks need, joined with commas.
+   */
+  readonly variables: string;
+
+  /**
+   * Make the failure for env variables the patch cannot find.
+   *
+   * @param message - Which module declares no variables it can read.
+   * @param label - The env module, as the patch names it.
+   * @param variables - The variables the hooks need, joined with commas.
+   */
+  constructor(message: string, label: string, variables: string) {
+    super(message);
+    this.label = label;
+    this.variables = variables;
+  }
+}
+
+/**
+ * A config module a patch edits that the project does not have.
+ */
+export class OrcaConfigFileMissingError extends OrcaPatchFileMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * The config module, as the patch names it.
+   */
+  readonly filename: string;
+
+  /**
+   * Make the failure for a config module that is not there.
+   *
+   * @param message - Which config module is missing.
+   * @param filename - The config module, as the patch names it.
+   */
+  constructor(message: string, filename: string) {
+    super(message);
+    this.filename = filename;
+  }
+}
+
+/**
+ * A config module a patch edits, and why it cannot: the base of each shape it
+ * does not handle.
+ */
+export abstract class OrcaConfigShapeError extends OrcaInvalidError {
+  /**
+   * The config module, as the patch names it.
+   */
+  readonly filename: string;
+
+  /**
+   * Make the failure for a config module the patch cannot edit.
+   *
+   * @param message - Which config module, and what is wrong with it.
+   * @param filename - The config module, as the patch names it.
+   * @param cause - The parser's failure, when there is one.
+   */
+  constructor(message: string, filename: string, cause?: unknown) {
+    super(message, cause);
+    this.filename = filename;
+  }
+}
+
+/**
+ * A config module that does not parse.
+ */
+export class OrcaConfigUnparseableError extends OrcaConfigShapeError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * What the parser said.
+   */
+  readonly parseError: string;
+
+  /**
+   * Make the failure for a config module that does not parse.
+   *
+   * @param message - Which config module does not parse.
+   * @param filename - The config module, as the patch names it.
+   * @param parseError - What the parser said.
+   * @param cause - The parser's failure.
+   */
+  constructor(message: string, filename: string, parseError: string, cause: unknown) {
+    super(message, filename, cause);
+    this.parseError = parseError;
+  }
+}
+
+/**
+ * A config module written as CommonJS, which the ESM edits cannot extend.
+ */
+export class OrcaConfigCommonJsError extends OrcaConfigShapeError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A config module with no default-exported object literal.
+ */
+export class OrcaConfigObjectMissingError extends OrcaConfigShapeError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A config module the edit left unparseable.
+ */
+export class OrcaConfigUnwritableError extends OrcaConfigShapeError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+
+  /**
+   * What the parser said about the edited code.
+   */
+  readonly parseError: string;
+
+  /**
+   * Make the failure for an edit that would leave the config unparseable.
+   *
+   * @param message - Which config module could not be written.
+   * @param filename - The config module, as the patch names it.
+   * @param parseError - What the parser said about the edited code.
+   * @param cause - The parser's failure.
+   */
+  constructor(message: string, filename: string, parseError: string, cause: unknown) {
+    super(message, filename, cause);
+    this.parseError = parseError;
+  }
+}
+
+/**
+ * A config key the patch edits that holds something other than an inline
+ * literal: the base of the object and array shapes.
+ */
+export abstract class OrcaConfigKeyError extends OrcaInvalidError {
+  /**
+   * The key that holds no inline literal.
+   */
+  readonly key: string;
+
+  /**
+   * Make the failure for a key the patch cannot edit.
+   *
+   * @param message - Which key could not be edited.
+   * @param key - The key that holds no inline literal.
+   */
+  constructor(message: string, key: string) {
+    super(message);
+    this.key = key;
+  }
+}
+
+/**
+ * A config key that should hold an inline object literal.
+ */
+export class OrcaConfigObjectExpectedError extends OrcaConfigKeyError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}
+
+/**
+ * A config key that should hold an inline array literal.
+ */
+export class OrcaConfigArrayExpectedError extends OrcaConfigKeyError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly retryable: boolean = false;
+}

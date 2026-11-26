@@ -125,6 +125,19 @@ describe("preview", () => {
     });
 
     describe("--json", () => {
+      it("refuses a release that would carry two brandings", async () => {
+        const app = await aSetUpApp();
+        await app.holdsTwoBrandings();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",
+        });
+      });
+
       it("deploys to the preview URL it is given", async () => {
         const app = await anAppAdmittingPreviews();
 

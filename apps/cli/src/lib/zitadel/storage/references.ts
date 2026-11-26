@@ -1,4 +1,4 @@
-import { ZitadelConfigError } from "@/lib/zitadel/errors";
+import { ZitadelConfigReferenceMissingError } from "@/lib/zitadel/errors";
 import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 import type { MissingReference } from "@/lib/zitadel/storage/types";
 import { isJsonArray, isJsonObject } from "@/lib/zitadel/utils/json";
@@ -129,9 +129,7 @@ export function inlineFileReferences(
       if (missing === "omit") {
         return omitted;
       }
-      throw new ZitadelConfigError(
-        `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`,
-      );
+      throw new ZitadelConfigReferenceMissingError(ref);
     }
     if (isJsonArray(node)) {
       return node.map(inline).filter((item): item is JsonValue => {

@@ -13,8 +13,11 @@ import { Brandings } from "@/lib/zitadel/resources/branding/collection";
 import { Connection } from "@/lib/zitadel/resources/connections/connection";
 import { Connections } from "@/lib/zitadel/resources/connections/collection";
 import {
+  ZitadelConfigBrandingDuplicatedError,
   ZitadelConfigError,
   ZitadelConfigConnectionExistsError,
+  ZitadelConfigPasswordPolicyInvalidError,
+  ZitadelConfigSignupPolicyInvalidError,
   ZitadelConfigFileExistsError,
   ZitadelConfigFilesBrokenError,
   ZitadelConfigNothingToDeployError,
@@ -419,9 +422,7 @@ export class ZitadelConfig {
     // below would not catch a second descriptor, so it is refused here, before
     // anything is inlined or sent.
     if (brandingCount > 1) {
-      throw new ZitadelConfigError(
-        `A release carries at most one branding, but .zitadel/branding/ holds ${brandingCount}; keep one descriptor under .zitadel/branding/`,
-      );
+      throw new ZitadelConfigBrandingDuplicatedError(brandingCount);
     }
     const branding = this.branding.all[0]?.toWireBody(store);
     const policyBodies = this.policies.all.map((policy) => {
@@ -750,9 +751,7 @@ export class ZitadelConfig {
       return PasswordPolicy.initial(options.passwordMinLength);
     }
     if (kept === undefined) {
-      throw new ZitadelConfigError(
-        `${PasswordPolicy.PATH} is not a valid password policy; fix it against .zitadel/meta/policy.json or move it aside`,
-      );
+      throw new ZitadelConfigPasswordPolicyInvalidError(PasswordPolicy.PATH);
     }
     return kept.withMinLength(options.passwordMinLength).document;
   }
@@ -777,9 +776,7 @@ export class ZitadelConfig {
     }
     const kept = this.policies.signup;
     if (kept === undefined) {
-      throw new ZitadelConfigError(
-        `${SignupPolicy.PATH} is not a valid sign-up policy; fix it against .zitadel/meta/policy.json or move it aside`,
-      );
+      throw new ZitadelConfigSignupPolicyInvalidError(SignupPolicy.PATH);
     }
     return kept;
   }

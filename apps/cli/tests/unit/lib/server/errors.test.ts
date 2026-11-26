@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   LocalServerBusyError,
-  LocalServerDeniedError,
+  LocalServerAdminNotFoundError,
   LocalServerDockerMissingError,
   LocalServerError,
   LocalServerAdminMalformedError,
@@ -27,6 +27,7 @@ import {
   LocalServerRecordUnreadableError,
   LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
+  LocalServerSessionRefusedError,
   LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server/errors";
@@ -41,13 +42,13 @@ describe("the local server errors", () => {
     ],
     [
       "not responding",
-      new LocalServerNotRespondingError("no answer"),
+      new LocalServerNotRespondingError("no answer", "http://localhost:8080"),
       "conflict",
       "E_LOCAL_SERVER_NOT_RUNNING",
     ],
     [
       "not responding elsewhere",
-      new LocalServerNotRespondingElsewhereError("no answer", "/work"),
+      new LocalServerNotRespondingElsewhereError("no answer", "/work", "http://localhost:8080"),
       "conflict",
       "E_LOCAL_SERVER_NOT_RUNNING",
     ],
@@ -89,7 +90,8 @@ describe("the local server errors", () => {
     ["port busy", new LocalServerPortBusyError(8080), "unavailable", "E_PORT_IN_USE"],
     ["port full", new LocalServerPortFullError("full"), "unavailable", "E_PORT_IN_USE"],
     ["docker", new LocalServerDockerMissingError("no daemon"), "unavailable", "E_NETWORK"],
-    ["denied", new LocalServerDeniedError("no"), "denied", "E_AUTH"],
+    ["admin not found", new LocalServerAdminNotFoundError("no"), "denied", "E_AUTH"],
+    ["session refused", new LocalServerSessionRefusedError("no", 401), "denied", "E_AUTH"],
     ["process gone", new LocalServerProcessGoneError("gone"), "unavailable", "E_NETWORK"],
     ["process denied", new LocalServerProcessDeniedError("no"), "denied", "E_AUTH"],
     ["start exited", new LocalServerStartExitedError("exited"), "unavailable", "E_NETWORK"],
@@ -122,7 +124,9 @@ describe("the local server errors", () => {
   });
 
   it("keeps the facts a command words its advice from", () => {
-    expect(new LocalServerNotRespondingElsewhereError("no answer", "/work")).toMatchObject({
+    expect(
+      new LocalServerNotRespondingElsewhereError("no answer", "/work", "http://localhost:8080"),
+    ).toMatchObject({
       directory: "/work",
     });
     expect(new LocalServerPortBusyError(8080)).toMatchObject({

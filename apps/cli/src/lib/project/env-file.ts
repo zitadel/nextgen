@@ -2,7 +2,7 @@ import { parseEnv } from "node:util";
 
 import { readIfExists } from "@/lib/fs";
 
-import { ProjectInvalidError } from "./errors";
+import { ProjectEnvValueMultilineError, ProjectEnvValueUnquotableError } from "./errors";
 import { SecretFile } from "./secret-file";
 
 /**
@@ -65,7 +65,9 @@ export class EnvFile {
    */
   static line(key: string, value: string): string {
     if (/[\n\r]/.test(value)) {
-      throw new ProjectInvalidError(`Cannot persist ${key}: its value contains a line break.`);
+      throw new ProjectEnvValueMultilineError(
+        `Cannot persist ${key}: its value contains a line break.`,
+      );
     }
     // Written as the first form the reader gives back unchanged: bare, then
     // single- then double-quoted. A bare `#` starts a comment and a bare quote
@@ -83,7 +85,7 @@ export class EnvFile {
       );
     });
     if (faithful === undefined) {
-      throw new ProjectInvalidError(
+      throw new ProjectEnvValueUnquotableError(
         `Cannot persist ${key}: no .env quoting reads its value back unchanged.`,
       );
     }

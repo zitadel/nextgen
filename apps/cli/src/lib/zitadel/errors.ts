@@ -716,12 +716,7 @@ export class ZitadelConfigReferenceUnreadableError extends ZitadelConfigFileUnre
    * @param cause - The failure that stopped the read.
    */
   constructor(path: string, ref: string, errno: string, cause?: unknown) {
-    super(
-      path,
-      errno,
-      cause,
-      `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`,
-    );
+    super(path, errno, cause, `$file ${JSON.stringify(ref)} cannot be read`);
     this.ref = ref;
   }
 }
@@ -731,4 +726,708 @@ export class ZitadelConfigInternalError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
+ * A release that would carry more than one branding.
+ */
+export class ZitadelConfigBrandingDuplicatedError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * How many branding descriptors `.zitadel/branding/` holds.
+   */
+  readonly count: number;
+
+  /**
+   * Make the failure for this many descriptors.
+   *
+   * @param count - How many branding descriptors `.zitadel/branding/` holds.
+   */
+  constructor(count: number) {
+    super(`A release carries at most one branding, but .zitadel/branding/ holds ${count}`);
+    this.count = count;
+  }
+}
+
+/**
+ * A password policy file a scaffold was told to keep that is not a sound
+ * password policy.
+ */
+export class ZitadelConfigPasswordPolicyInvalidError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path of the policy file.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this file.
+   *
+   * @param path - The project-relative path of the policy file.
+   */
+  constructor(path: string) {
+    super(`${path} is not a valid password policy`);
+    this.path = path;
+  }
+}
+
+/**
+ * A sign-up policy file a scaffold was told to keep that is not a sound
+ * sign-up policy.
+ */
+export class ZitadelConfigSignupPolicyInvalidError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path of the policy file.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this file.
+   *
+   * @param path - The project-relative path of the policy file.
+   */
+  constructor(path: string) {
+    super(`${path} is not a valid sign-up policy`);
+    this.path = path;
+  }
+}
+
+/**
+ * A handle the server gave that cannot name a file: one named after it would
+ * land outside its kind's directory or be one a read never loads.
+ */
+export class ZitadelConfigHandleInvalidError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The handle, as the server gave it.
+   */
+  readonly handle: string;
+
+  /**
+   * Make the failure for this handle.
+   *
+   * @param handle - The handle, as the server gave it.
+   */
+  constructor(handle: string) {
+    super(`${JSON.stringify(handle)} cannot be the name of a file`);
+    this.handle = handle;
+  }
+}
+
+/**
+ * Several files that do not read as configuration and all hold one handle.
+ */
+export class ZitadelConfigHandleClashError extends ZitadelConfigResourceClashError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+
+  /**
+   * The handle they hold.
+   */
+  readonly handle: string;
+
+  /**
+   * The project-relative paths of the files.
+   */
+  readonly paths: readonly string[];
+
+  /**
+   * Make the failure for these files.
+   *
+   * @param handle - The handle they hold.
+   * @param paths - The project-relative paths of the files.
+   */
+  constructor(handle: string, paths: readonly string[]) {
+    super(
+      `${new Intl.ListFormat("en", { type: "conjunction" }).format(paths)} both hold ${handle}`,
+    );
+    this.handle = handle;
+    this.paths = paths;
+  }
+}
+
+/**
+ * More than one connection to the provider a run enables.
+ */
+export class ZitadelConfigConnectionDuplicatedError extends ZitadelConfigResourceClashError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+
+  /**
+   * The provider's slug.
+   */
+  readonly provider: string;
+
+  /**
+   * The project-relative paths of the connections.
+   */
+  readonly paths: readonly string[];
+
+  /**
+   * Make the failure for these connections.
+   *
+   * @param provider - The provider's slug.
+   * @param displayName - The provider's name, as a person reads it.
+   * @param paths - The project-relative paths of the connections.
+   */
+  constructor(provider: string, displayName: string, paths: readonly string[]) {
+    super(`More than one ${displayName} connection exists: ${paths.join(", ")}`);
+    this.provider = provider;
+    this.paths = paths;
+  }
+}
+
+/**
+ * More than one connection named by one slug.
+ */
+export class ZitadelConfigSlugDuplicatedError extends ZitadelConfigResourceClashError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+
+  /**
+   * The slug.
+   */
+  readonly slug: string;
+
+  /**
+   * The project-relative paths of the connections.
+   */
+  readonly paths: readonly string[];
+
+  /**
+   * Make the failure for these connections.
+   *
+   * @param slug - The slug.
+   * @param paths - The project-relative paths of the connections.
+   */
+  constructor(slug: string, paths: readonly string[]) {
+    super(`More than one connection is named ${slug}: ${paths.join(", ")}`);
+    this.slug = slug;
+    this.paths = paths;
+  }
+}
+
+/**
+ * A provider to stop offering that nothing knows: no schema offers it, and no
+ * connection or catalog entry has its name.
+ */
+export class ZitadelConfigProviderUnknownError extends ZitadelConfigResourceMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+
+  /**
+   * The schema's name.
+   */
+  readonly schema: string;
+
+  /**
+   * The provider, as it was asked for.
+   */
+  readonly requested: string;
+
+  /**
+   * The providers the schema offers.
+   */
+  readonly offered: readonly string[];
+
+  /**
+   * The slugs of the project's connections.
+   */
+  readonly connections: readonly string[];
+
+  /**
+   * Make the failure for this provider.
+   *
+   * @param schema - The schema's name.
+   * @param requested - The provider, as it was asked for.
+   * @param offered - The providers the schema offers.
+   * @param connections - The slugs of the project's connections.
+   */
+  constructor(
+    schema: string,
+    requested: string,
+    offered: readonly string[],
+    connections: readonly string[],
+  ) {
+    super(`${schema} has no provider named ${requested}`);
+    this.schema = schema;
+    this.requested = requested;
+    this.offered = offered;
+    this.connections = connections;
+  }
+}
+
+/**
+ * A new connection whose file is already a connection with its slug, to
+ * another issuer.
+ */
+export class ZitadelConfigConnectionProviderMismatchError extends ZitadelConfigResourceClashError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+
+  /**
+   * The project-relative path of the connection.
+   */
+  readonly path: string;
+
+  /**
+   * The slug it is named.
+   */
+  readonly slug: string;
+
+  /**
+   * Make the failure for this connection.
+   *
+   * @param path - The project-relative path of the connection.
+   * @param slug - The slug it is named.
+   * @param displayName - The provider's name, as a person reads it.
+   * @param issuer - The issuer it was wanted for, or `the same`.
+   */
+  constructor(path: string, slug: string, displayName: string, issuer: string) {
+    super(
+      `${path} is a connection called ${slug}, but not to ${displayName}: its issuer is not ${issuer}`,
+    );
+    this.path = path;
+    this.slug = slug;
+  }
+}
+
+/**
+ * A connection whose client id and client secret are read from one variable.
+ */
+export class ZitadelConfigCredentialsDoubledError extends ZitadelConfigResourceClashError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+
+  /**
+   * The connection's slug.
+   */
+  readonly slug: string;
+
+  /**
+   * The variable both credentials point at.
+   */
+  readonly variable: string;
+
+  /**
+   * Make the failure for this connection.
+   *
+   * @param slug - The connection's slug.
+   * @param variable - The variable both credentials point at.
+   */
+  constructor(slug: string, variable: string) {
+    super(`This connection points both credentials at ${variable}`);
+    this.slug = slug;
+    this.variable = variable;
+  }
+}
+
+/**
+ * Two connections whose credentials are read from one variable.
+ */
+export class ZitadelConfigVariableSharedError extends ZitadelConfigResourceClashError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CONFLICT";
+
+  /**
+   * The project-relative path of the other connection.
+   */
+  readonly path: string;
+
+  /**
+   * This connection's slug.
+   */
+  readonly slug: string;
+
+  /**
+   * The other connection's slug.
+   */
+  readonly otherSlug: string;
+
+  /**
+   * The variable both read.
+   */
+  readonly variable: string;
+
+  /**
+   * Make the failure for these connections.
+   *
+   * @param path - The project-relative path of the other connection.
+   * @param slug - This connection's slug.
+   * @param otherSlug - The other connection's slug.
+   * @param variable - The variable both read.
+   */
+  constructor(path: string, slug: string, otherSlug: string, variable: string) {
+    super(`${path} and ${slug} both use ${variable}`);
+    this.path = path;
+    this.slug = slug;
+    this.otherSlug = otherSlug;
+    this.variable = variable;
+  }
+}
+
+/**
+ * A region of a file an edit writes that is not the shape it writes, so
+ * rewriting it would discard what was written by hand.
+ */
+export class ZitadelConfigRegionUneditableError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path of the file.
+   */
+  readonly path: string;
+
+  /**
+   * What is wrong with the region.
+   */
+  readonly region: string;
+
+  /**
+   * Make the failure for this region.
+   *
+   * @param path - The project-relative path of the file.
+   * @param region - What is wrong with the region.
+   */
+  constructor(path: string, region: string) {
+    super(`${path}: ${region}`);
+    this.path = path;
+    this.region = region;
+  }
+}
+
+/**
+ * A user schema no login flow runs against, so no flow can offer a provider.
+ */
+export class ZitadelConfigFlowMissingError extends ZitadelConfigResourceMissingError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+
+  /**
+   * The project-relative path of the schema.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this schema.
+   *
+   * @param name - The schema's name.
+   * @param path - The project-relative path of the schema.
+   */
+  constructor(name: string, path: string) {
+    super(`No login flow runs against ${name}`);
+    this.path = path;
+  }
+}
+
+/**
+ * A step whose legacy outcome would be renamed to the name of one of its
+ * actions.
+ */
+export class ZitadelConfigRenameActionClashError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The step's name.
+   */
+  readonly step: string;
+
+  /**
+   * The action the outcome would be renamed to.
+   */
+  readonly action: string;
+
+  /**
+   * Make the failure for this step.
+   *
+   * @param step - The step's name.
+   * @param old - The outcome the previous CLI wrote.
+   * @param action - The action the outcome would be renamed to.
+   */
+  constructor(step: string, old: string, action: string) {
+    super(
+      `steps.${step}: transition "${old}" is renamed to "${action}", which is an action on this step`,
+    );
+    this.step = step;
+    this.action = action;
+  }
+}
+
+/**
+ * A step whose legacy outcome declares a purpose or an action, which the key
+ * it is renamed to cannot.
+ */
+export class ZitadelConfigRenameRouteLossError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The step's name.
+   */
+  readonly step: string;
+
+  /**
+   * The outcome the previous CLI wrote.
+   */
+  readonly transition: string;
+
+  /**
+   * Make the failure for this step.
+   *
+   * @param step - The step's name.
+   * @param transition - The outcome the previous CLI wrote.
+   * @param next - The key it is renamed to.
+   */
+  constructor(step: string, transition: string, next: string) {
+    super(
+      `steps.${step}: transition "${transition}" declares purpose or action, which "${next}" cannot`,
+    );
+    this.step = step;
+    this.transition = transition;
+  }
+}
+
+/**
+ * A step that declares an action named like an outcome an edit offering a
+ * provider writes on it.
+ */
+export class ZitadelConfigOutcomeActionClashError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The step's name.
+   */
+  readonly step: string;
+
+  /**
+   * The action's name.
+   */
+  readonly action: string;
+
+  /**
+   * Make the failure for this step.
+   *
+   * @param step - The step's name.
+   * @param action - The action's name.
+   */
+  constructor(step: string, action: string) {
+    super(
+      `steps.${step}: action "${action}" uses a name auth-method sso enable writes as an outcome on this step`,
+    );
+    this.step = step;
+    this.action = action;
+  }
+}
+
+/**
+ * A user schema asked to take passwords with no identifier to check one
+ * against.
+ */
+export class ZitadelConfigIdentifierMissingError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path of the schema.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this schema.
+   *
+   * @param path - The project-relative path of the schema.
+   */
+  constructor(path: string) {
+    super(`${path} has no x-identifier for password`);
+    this.path = path;
+  }
+}
+
+/**
+ * A `$file` reference whose file cannot be read: it is not there, or is not
+ * a file.
+ */
+export class ZitadelConfigReferenceMissingError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The reference, as it was written.
+   */
+  readonly ref: string;
+
+  /**
+   * Make the failure for this reference.
+   *
+   * @param ref - The reference, as it was written.
+   * @param cause - The failure that stopped the read, if one did.
+   */
+  constructor(ref: string, cause?: unknown) {
+    super(`$file ${JSON.stringify(ref)} cannot be read`, cause);
+    this.ref = ref;
+  }
+}
+
+/**
+ * A `$file` reference whose file is there but cannot be read for a reason
+ * other than permissions.
+ */
+export class ZitadelConfigReferenceBrokenError extends ZitadelConfigReferenceMissingError {
+  /**
+   * The project-relative path of the file holding the reference.
+   */
+  readonly path: string;
+
+  /**
+   * The operating system's error code, when it gave one.
+   */
+  readonly errno: string | undefined;
+
+  /**
+   * Make the failure for this reference.
+   *
+   * @param path - The project-relative path of the file holding the reference.
+   * @param ref - The reference, as that file wrote it.
+   * @param errno - The operating system's error code, when it gave one.
+   * @param cause - The failure that stopped the read.
+   */
+  constructor(path: string, ref: string, errno: string | undefined, cause?: unknown) {
+    super(ref, cause);
+    this.path = path;
+    this.errno = errno;
+  }
+}
+
+/**
+ * A `$file` reference that leads outside the project.
+ */
+export class ZitadelConfigReferenceOutsideError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The reference, as it was written.
+   */
+  readonly ref: string;
+
+  /**
+   * Make the failure for this reference.
+   *
+   * @param ref - The reference, as it was written.
+   */
+  constructor(ref: string) {
+    super(`$file ${JSON.stringify(ref)} points outside the project`);
+    this.ref = ref;
+  }
+}
+
+/**
+ * A file to write or remove that leads outside `.zitadel/`.
+ */
+export class ZitadelConfigPathOutsideError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path, as it was given.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this path.
+   *
+   * @param path - The project-relative path, as it was given.
+   */
+  constructor(path: string) {
+    super(`${path} points outside .zitadel/`);
+    this.path = path;
+  }
+}
+
+/**
+ * A file to write under a directory that is a file.
+ */
+export class ZitadelConfigPathBlockedError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path being written.
+   */
+  readonly path: string;
+
+  /**
+   * The project-relative path of the file where a directory is needed.
+   */
+  readonly blocker: string;
+
+  /**
+   * Make the failure for this path.
+   *
+   * @param path - The project-relative path being written.
+   * @param blocker - The project-relative path of the file where a directory
+   *   is needed.
+   */
+  constructor(path: string, blocker: string) {
+    super(`${path} cannot be written (ENOTDIR)`);
+    this.path = path;
+    this.blocker = blocker;
+  }
+}
+
+/**
+ * A file to remove that is a directory.
+ */
+export class ZitadelConfigDirectoryInTheWayError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /**
+   * The project-relative path.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this path.
+   *
+   * @param path - The project-relative path.
+   */
+  constructor(path: string) {
+    super(`${path} cannot be removed (EISDIR)`);
+    this.path = path;
+  }
 }

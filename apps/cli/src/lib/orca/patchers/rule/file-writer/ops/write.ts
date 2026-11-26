@@ -1,4 +1,4 @@
-import { OrcaConflictError } from "@/lib/orca/errors";
+import { OrcaFileOverwriteError } from "@/lib/orca/errors";
 import {
   type Change,
   Operation,
@@ -30,7 +30,7 @@ export class WriteOp extends Operation<"write"> {
       source.before !== undefined && source.before !== this.op.contents && !source.force;
 
     if (isConflict) {
-      throw new OrcaConflictError(`Refusing to overwrite ${source.path}`);
+      throw new OrcaFileOverwriteError(`Refusing to overwrite ${source.path}`, source.path);
     }
 
     return this.file(source, this.op.contents, {

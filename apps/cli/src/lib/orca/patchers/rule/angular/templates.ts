@@ -1,6 +1,6 @@
 import { posix } from "node:path";
 
-import { OrcaPatchFileMissingError } from "@/lib/orca/errors";
+import { OrcaPackageJsonMissingError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import { ManagedFile } from "@/lib/orca/managed-file";
 import type { PatchContext } from "@/lib/orca/patchers/types";
@@ -186,7 +186,7 @@ function packageJson(source: string | undefined): {
   scripts: Record<string, unknown>;
 } {
   if (source === undefined) {
-    throw new OrcaPatchFileMissingError("package.json is required to add the dev script");
+    throw new OrcaPackageJsonMissingError("package.json is required to add the dev script");
   }
   const pkg = parseJsonObject(source, "package.json");
   return { source, scripts: isObject(pkg.scripts) ? pkg.scripts : {} };

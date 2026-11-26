@@ -18,8 +18,12 @@ import {
   ZitadelConfigConnectionFileTakenError,
   ZitadelConfigConnectionIssuerClashError,
   ZitadelConfigProviderFileTakenError,
-  ZitadelConfigResourceClashError,
-  ZitadelConfigResourceMissingError,
+  ZitadelConfigConnectionDuplicatedError,
+  ZitadelConfigConnectionProviderMismatchError,
+  ZitadelConfigCredentialsDoubledError,
+  ZitadelConfigProviderUnknownError,
+  ZitadelConfigSlugDuplicatedError,
+  ZitadelConfigVariableSharedError,
 } from "@/lib/zitadel/errors";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
@@ -89,8 +93,10 @@ export class Connections extends Collection<Connection> {
       return connection.slug === candidate.slug && connection.issuer === candidate.issuer;
     });
     if (matches.all.length > 1) {
-      throw new ZitadelConfigResourceClashError(
-        `More than one ${candidate.displayName} connection exists: ${matches.paths.join(", ")}; keep the one this project should use and remove the others`,
+      throw new ZitadelConfigConnectionDuplicatedError(
+        candidate.slug,
+        candidate.displayName,
+        matches.paths,
       );
     }
     const match = matches.all[0];
@@ -125,9 +131,7 @@ export class Connections extends Collection<Connection> {
       return connection.slug === slug;
     });
     if (holders.all.length > 1) {
-      throw new ZitadelConfigResourceClashError(
-        `More than one connection is named ${slug}: ${holders.paths.join(", ")}; remove or rename all but one`,
-      );
+      throw new ZitadelConfigSlugDuplicatedError(slug, holders.paths);
     }
     const match = holders.all[0];
     if (match === undefined) {
@@ -528,12 +532,7 @@ export class Connections extends Collection<Connection> {
     if (inCatalog || connections.includes(slug)) {
       return;
     }
-    const offered = schema.providers;
-    const offeredList = offered.join(", ") || "none";
-    const connectionList = connections.join(", ") || "none";
-    throw new ZitadelConfigResourceMissingError(
-      `${schema.name} has no provider named ${slug}; it offers: ${offeredList}; connections under ${CONFIG_DIRECTORIES.connections}/: ${connectionList}`,
-    );
+    throw new ZitadelConfigProviderUnknownError(schema.name, slug, schema.providers, connections);
   }
 
   /**
@@ -619,8 +618,11 @@ export class Connections extends Collection<Connection> {
     }
     if (occupied.slug === candidate.slug) {
       const issuer = candidate.issuer ?? "the same";
-      throw new ZitadelConfigResourceClashError(
-        `${candidate.path} is a connection called ${candidate.slug}, but not to ${candidate.displayName}: its issuer is not ${issuer}`,
+      throw new ZitadelConfigConnectionProviderMismatchError(
+        candidate.path,
+        candidate.slug,
+        candidate.displayName,
+        issuer,
       );
     }
     Connections.refuseFileTaken(candidate.path, candidate.slug, occupied.slug);
@@ -691,9 +693,7 @@ export class Connections extends Collection<Connection> {
       return ours.indexOf(name) !== index;
     });
     if (doubled !== undefined) {
-      throw new ZitadelConfigResourceClashError(
-        `This connection points both credentials at ${doubled}; give client_id and client_secret separate \${{NAME}} references`,
-      );
+      throw new ZitadelConfigCredentialsDoubledError(slug, doubled);
     }
     const others = this.all.filter((connection) => {
       return connection !== except;
@@ -704,9 +704,7 @@ export class Connections extends Collection<Connection> {
         return theirs.includes(name);
       });
       if (shared !== undefined) {
-        throw new ZitadelConfigResourceClashError(
-          `${connection.path} and ${slug} both use ${shared}; point one of them at a variable of its own`,
-        );
+        throw new ZitadelConfigVariableSharedError(connection.path, slug, connection.slug, shared);
       }
     }
   }

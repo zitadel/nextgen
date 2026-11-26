@@ -2,7 +2,10 @@ import { isDeepStrictEqual } from "node:util";
 
 import { Change } from "@/lib/zitadel/change";
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
-import { ZitadelConfigError, ZitadelConfigResourceClashError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigHandleClashError,
+  ZitadelConfigHandleInvalidError,
+} from "@/lib/zitadel/errors";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { DocumentKind } from "@/lib/zitadel/resources/document";
 import { CONFIG_DIRECTORIES, type ConfigDirectory, type JsonObject } from "@/lib/zitadel/types";
@@ -238,18 +241,14 @@ export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
       const paths = holders.map((file) => {
         return file.path;
       });
-      throw new ZitadelConfigResourceClashError(
-        `${new Intl.ListFormat("en", {
-          type: "conjunction",
-        }).format(paths)} both hold ${handle}; remove or fix all but one of them`,
-      );
+      throw new ZitadelConfigHandleClashError(handle, paths);
     }
     const holder = holders[0];
     if (holder !== undefined) {
       return holder.path;
     }
     if (!SAFE_HANDLE.test(handle) || handle === "." || handle === "..") {
-      throw new ZitadelConfigError(`${JSON.stringify(handle)} cannot be the name of a file`);
+      throw new ZitadelConfigHandleInvalidError(handle);
     }
     return `${this.directory}/${handle}.json`;
   }

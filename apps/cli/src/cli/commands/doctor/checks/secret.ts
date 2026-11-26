@@ -2,7 +2,8 @@ import { join } from "node:path";
 
 import { createZitadelClient, Origins, ProjectService } from "@/lib/backend";
 import { Dotenv } from "@/lib/environment";
-import { Project } from "@/lib/project";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { Project, ProjectFileMissingError } from "@/lib/project";
 import { ZitadelRuntime } from "@/lib/server";
 import { Runtime } from "@/lib/runtime";
 
@@ -14,6 +15,16 @@ import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 const DEVELOPMENT_ENV_FILE = ".env.development.local";
 
 /**
+ * How the check fails when there is no `.zitadel/secret`: `doctor --fix`
+ * rebuilds it from the env file setup filled.
+ */
+const SECRET_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+} as const satisfies Refusal;
+
+/**
  * Verifies `.zitadel/secret` exists and parses. A missing file is rebuilt from
  * the credentials `.env.development.local` holds and the origins the server
  * reports for the project.
@@ -23,8 +34,22 @@ export class SecretCheck extends AbstractSanityCheck {
   readonly path = ".zitadel/secret";
   protected readonly summary = ".zitadel/secret parses";
 
+  /**
+   * Reads `.zitadel/secret`, which parses it.
+   *
+   * @param ctx - The project to check.
+   * @returns Once the secret parses.
+   * @throws {ZitadelError} When there is no secret, pointing at `doctor --fix`.
+   */
   protected async verify(ctx: CheckContext): Promise<void> {
-    await Project.at(ctx.cwd).secret();
+    try {
+      await Project.at(ctx.cwd).secret();
+    } catch (error) {
+      if (error instanceof ProjectFileMissingError) {
+        throw refusalError(SECRET_MISSING_REFUSAL, { ...error, message: error.message });
+      }
+      throw error;
+    }
   }
 
   /**

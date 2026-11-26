@@ -455,7 +455,7 @@ describe("Store.remove", () => {
       });
 
       expect(error).toMatchObject({
-        message: `${IDP_A} cannot be removed (EISDIR): it is a directory where a file is expected`,
+        message: `${IDP_A} cannot be removed (EISDIR)`,
       });
     });
 
@@ -532,7 +532,7 @@ describe("Store.assertRemovable", () => {
       });
 
       expect(error).toMatchObject({
-        message: `${IDP_A} cannot be removed (EISDIR): it is a directory where a file is expected`,
+        message: `${IDP_A} cannot be removed (EISDIR)`,
       });
     });
 
@@ -582,7 +582,8 @@ describe("Store.writeText", () => {
 
         expect(error).toBeInstanceOf(ZitadelConfigError);
         expect(error).toMatchObject({
-          message: `${path} cannot be written (ENOTDIR): ${TEMPLATE} is a file where a directory is needed`,
+          message: `${path} cannot be written (ENOTDIR)`,
+          blocker: TEMPLATE,
         });
       },
     );

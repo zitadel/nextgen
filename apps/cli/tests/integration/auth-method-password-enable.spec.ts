@@ -59,6 +59,30 @@ describe("auth-method password enable", () => {
     });
 
     describe("--json", () => {
+      it("refuses a record of what was synced that is not JSON", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run(["auth-method", "password", "enable", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
+        });
+      });
+
+      it("refuses a record of what was synced that is not JSON, naming the file", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run(["auth-method", "password", "enable", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: { file: ".zitadel/state.json" },
+        });
+      });
+
       it("turns password on after it was switched off by hand", async () => {
         const app = await aSetUpApp();
         await app.hasTurnedOffByHand("password");
@@ -109,15 +133,25 @@ describe("auth-method password enable", () => {
         await app.lacksAnIdentifier();
         await app.hasTurnedOffByHand("password");
 
-        const result = await app.enableMethod("password");
+        const result = await app.run(["auth-method", "password", "enable", "--json"]);
 
-        expect(JSON.parse(result.stdout)).toEqual({
+        expect(app.envelopeOf(result)).toMatchObject({
           status: "error",
-          cli_version: cliVersion.version,
-          command: "auth-method:password:enable",
-          source: "",
           code: "E_VALIDATION",
-          message: `${SCHEMA_FILE} has no x-identifier for password: set "x-identifier" to the property users sign in with, e.g. "email"`,
+          hint: 'A password is checked against the user found by the schema\'s identifier. Set "x-identifier" to the property users sign in with, e.g. "email", then run the command again.',
+        });
+      });
+
+      it("refuses a schema with no x-identifier, naming the schema and the method", async () => {
+        const app = await aSetUpApp();
+        await app.lacksAnIdentifier();
+        await app.hasTurnedOffByHand("password");
+
+        const result = await app.run(["auth-method", "password", "enable", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          message: `${SCHEMA_FILE} has no x-identifier for password`,
+          details: { file: SCHEMA_FILE, method: "password" },
         });
       });
 

@@ -494,6 +494,36 @@ describe("doctor", () => {
         });
       });
 
+      it("refuses an app whose framework it cannot detect", async () => {
+        const app = await aSetUpApp();
+        await app.removeTheFramework();
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_FRAMEWORK_NOT_DETECTED",
+          hint: expect.stringContaining(
+            "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
+          ),
+        });
+      });
+
+      it("refuses a project whose secret the developer deleted", async () => {
+        const app = await aSetUpApp();
+        await app.losesItsLocalSecret();
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: expect.stringContaining(
+            `Run ${expectedPublicCliCommand("doctor --fix")} to restore the project secret from .env.development.local.`,
+          ),
+        });
+      });
+
       it("reports an unsupported framework version, pointing at the upgrade and offering no repair", async () => {
         const app = await aSetUpApp();
         await downgradeTheFramework(app);

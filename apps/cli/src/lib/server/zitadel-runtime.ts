@@ -814,12 +814,14 @@ export class LocalRuntime extends ZitadelRuntime {
     }
     if (resolve(nearest.dir) !== resolve(cwd)) {
       throw new LocalServerNotRespondingElsewhereError(
-        `Local Zitadel server is not running; no healthy server responded at ${runtime.server_url}`,
+        "Local Zitadel server is not running",
         nearest.dir,
+        runtime.server_url,
       );
     }
     throw new LocalServerNotRespondingError(
-      `Local Zitadel server is not running; no healthy server responded at ${runtime.server_url}`,
+      "Local Zitadel server is not running",
+      runtime.server_url,
     );
   }
 

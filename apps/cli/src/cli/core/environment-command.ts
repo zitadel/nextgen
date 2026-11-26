@@ -1,9 +1,12 @@
+import { SERVER } from "@/constants";
 import { createZitadelClient } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import type { Consent } from "@/lib/consent";
 import {
   Environment,
   EnvironmentNameInvalidError,
   EnvironmentSourcesConflictError,
+  EnvironmentValueInvalidError,
   EnvironmentValueUnboundError,
   type ServerAddresses,
 } from "@/lib/environment";
@@ -61,20 +64,37 @@ const LOCAL_SERVER_NOT_RUNNING_REFUSAL = {
 const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "Run `zitadel start` to bring it back.",
+  hint: "No healthy local server responded at {serverUrl}. Run `zitadel start` to bring it back.",
   next: [
     {
       id: "start",
     },
   ],
+  details: {
+    server_url: "{serverUrl}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the local server a parent folder started does not answer. */
 const LOCAL_SERVER_NOT_RESPONDING_ELSEWHERE_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "{message}",
-  hint: "It was started in another directory: run `zitadel start` there to bring it back.",
+  hint: "No healthy local server responded at {serverUrl}. It was started in {folder}, so run `zitadel start --cwd {folder}` to bring it back.",
   next: ["{start}"],
+  details: {
+    server_url: "{serverUrl}",
+    suggested_args: "{suggestedArgs}",
+  },
+} as const satisfies Refusal;
+
+/** How a run is refused when a source names a server that is not an http(s) URL. */
+const SERVER_INVALID_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Fix or remove ZITADEL_URL in {source}; it must be a URL such as {example}.",
+  details: {
+    cause: "{reason}",
+  },
 } as const satisfies Refusal;
 
 /** How a run is refused when the runtime record of this folder is not in the shape it is written in. */
@@ -180,6 +200,13 @@ export abstract class EnvironmentCommand extends BaseCommand {
           message: error.message,
         });
       }
+      if (error instanceof EnvironmentValueInvalidError) {
+        throw refusalError(SERVER_INVALID_REFUSAL, {
+          ...error,
+          message: error.message,
+          example: SERVER,
+        });
+      }
       if (error instanceof LocalServerNotRunningError) {
         throw refusalError(LOCAL_SERVER_NOT_RUNNING_REFUSAL, {
           ...error,
@@ -198,6 +225,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
           {
             ...error,
             message: error.message,
+            folder: Cmd.quote(error.directory),
+            suggestedArgs: [["start", "--cwd", error.directory]],
           },
           {
             start: {

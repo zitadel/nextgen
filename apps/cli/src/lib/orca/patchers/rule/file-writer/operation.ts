@@ -1,4 +1,4 @@
-import { OrcaInternalError, OrcaInvalidError } from "@/lib/orca/errors";
+import { OrcaInvalidError, OrcaPatchOpEmptyError } from "@/lib/orca/errors";
 import type { FileOp } from "./types";
 import type { Entry, Workspace } from "./workspace";
 
@@ -103,9 +103,7 @@ export abstract class Operation<Kind extends FileOp["kind"]> {
     const located = await workspace.locate(candidates);
 
     if (preferred === undefined) {
-      throw new OrcaInternalError(
-        "An op needs at least one candidate path (internal patcher error)",
-      );
+      throw new OrcaPatchOpEmptyError("An op needs at least one candidate path");
     }
 
     const path = located?.path ?? preferred;

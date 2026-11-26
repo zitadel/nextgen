@@ -3,7 +3,7 @@ import { join, posix } from "node:path";
 
 import { parseModule } from "magicast";
 
-import { OrcaConflictError } from "@/lib/orca/errors";
+import { OrcaRootComponentMountError } from "@/lib/orca/errors";
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
 import { isFile } from "@/lib/fs";
 
@@ -101,8 +101,14 @@ export async function assertMountsRootComponent(
     return;
   }
   const statement = importStatement(entry, root);
-  throw new OrcaConflictError(
-    `${entry} mounts ${mountedRoot}, not the ${root.path} setup writes; import the root as \`${statement}\` and mount that instead`,
+  throw new OrcaRootComponentMountError(
+    `${entry} mounts ${mountedRoot}, not the ${root.path} setup writes`,
+    {
+      entry,
+      mountedRoot,
+      root: root.path,
+      statement,
+    },
   );
 }
 

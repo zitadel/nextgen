@@ -19,8 +19,10 @@ import {
   OrcaDirectoryNotEmptyError,
   OrcaFrameworkMismatchError,
   OrcaFrameworkMissingError,
+  OrcaFrameworkUnknownError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
+  OrcaPatcherMissingError,
 } from "./errors";
 import { ManagedFile } from "./managed-file";
 import { patchers } from "./patchers";
@@ -33,22 +35,50 @@ import type { Scaffolder } from "./scaffolders/types";
 
 export { issuerFromPort } from "./detectors/port";
 export {
+  OrcaAngularJsonMissingError,
+  OrcaAngularProjectAmbiguousError,
+  OrcaAngularRoutesNotInlineError,
+  OrcaBoundaryConflictError,
+  OrcaBoundaryDuplicateError,
+  OrcaBoundaryRenamedError,
+  OrcaBoundaryVersionUnknownError,
   OrcaCommandFailedError,
   OrcaCommandNotFoundError,
   OrcaCommandSpawnFailedError,
+  OrcaConfigArrayExpectedError,
+  OrcaConfigCommonJsError,
+  OrcaConfigFileMissingError,
+  OrcaConfigKeyError,
+  OrcaConfigObjectExpectedError,
+  OrcaConfigObjectMissingError,
+  OrcaConfigShapeError,
+  OrcaConfigUnparseableError,
+  OrcaConfigUnwritableError,
   OrcaConflictError,
   OrcaDirectoryNotEmptyError,
   OrcaError,
+  OrcaFileOverwriteError,
   OrcaFrameworkMismatchError,
   OrcaFrameworkMissingError,
+  OrcaFrameworkUnknownError,
   OrcaFrameworkUnsupportedError,
   OrcaInternalError,
   OrcaInvalidError,
   OrcaNodeUnsupportedError,
+  OrcaPackageJsonMissingError,
   OrcaPagesRouterError,
   OrcaPatchFileMissingError,
+  OrcaPatchOpEmptyError,
+  OrcaPatcherMissingError,
+  OrcaProxyCredentialLeakError,
   OrcaRendererPendingError,
+  OrcaRendererUnknownError,
+  OrcaRootComponentMountError,
+  OrcaSolidStartConfigMissingError,
+  OrcaSolidStartPluginMissingError,
+  OrcaSvelteKitEnvVarsError,
   OrcaVersionBelowFloorError,
+  OrcaZitadelConfigMissingError,
 } from "./errors";
 export type { Detector, FrameworkFacts } from "./detectors/types";
 
@@ -185,8 +215,9 @@ export class Orca {
         })
       : this.detectors;
     if (requested && candidates.length === 0) {
-      throw new OrcaFrameworkMissingError(
-        `Unsupported framework "${requested}"; supported frameworks: ${this.frameworkIds().join(", ")}`,
+      throw new OrcaFrameworkUnknownError(
+        `Unsupported framework "${requested}"`,
+        this.frameworkIds().join(", "),
       );
     }
     for (const detector of candidates) {
@@ -350,9 +381,7 @@ export class Orca {
       return candidate.canPatch(framework);
     });
     if (!patcher) {
-      throw new OrcaInternalError(
-        `No patcher supports "${framework}"; Zitadel integration currently supports Next.js`,
-      );
+      throw new OrcaPatcherMissingError(`No patcher supports "${framework}"`);
     }
     return patcher;
   }

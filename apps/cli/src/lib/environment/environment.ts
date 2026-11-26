@@ -1,4 +1,3 @@
-import { SERVER } from "@/constants";
 import { readdir } from "@/lib/fs";
 import { join, resolve } from "node:path";
 
@@ -338,7 +337,8 @@ export class Environment {
     } catch (error) {
       if (error instanceof LocalServerUrlInvalidError) {
         throw new EnvironmentValueInvalidError(
-          `ZITADEL_URL from ${source} is not a valid server: ${value}; it must be a URL such as ${SERVER}`,
+          `ZITADEL_URL from ${source} is not a valid server: ${value}`,
+          source,
           error,
         );
       }

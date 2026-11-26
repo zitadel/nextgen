@@ -1,6 +1,6 @@
 import { builders } from "magicast";
 
-import { OrcaInvalidError } from "@/lib/orca/errors";
+import { OrcaAngularRoutesNotInlineError } from "@/lib/orca/errors";
 import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 const AUTH_ROUTE_PATHS = ["login", "register", "profile"] as const;
@@ -40,9 +40,7 @@ export function angularRoutesEdit(): (source: string | undefined) => string {
         ? Reflect.get(moduleExports, "routes")
         : undefined;
     if (!isProxifiedArray(routes)) {
-      throw new OrcaInvalidError(
-        `Cannot wire Angular auth routes: set "routes" in ${label} to an inline Routes array`,
-      );
+      throw new OrcaAngularRoutesNotInlineError("Cannot wire Angular auth routes", label);
     }
 
     const present = new Set(

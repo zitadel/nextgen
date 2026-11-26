@@ -125,6 +125,30 @@ describe("branding eject", () => {
     });
 
     describe("--json", () => {
+      it("refuses a file where its directory goes", async () => {
+        const app = await aSetUpApp();
+        await app.blocksTheBrandingDirectory();
+
+        const result = await app.run(["branding", "eject", "--non-interactive", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "Remove .zitadel/branding, which is a file where a directory is needed, then run the command again.",
+        });
+      });
+
+      it("refuses a file where its directory goes, naming the file in the way", async () => {
+        const app = await aSetUpApp();
+        await app.blocksTheBrandingDirectory();
+
+        const result = await app.run(["branding", "eject", "--non-interactive", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: { code: "ENOTDIR", blocker: ".zitadel/branding" },
+        });
+      });
+
       it("reports the files it wrote and what to do next", async () => {
         const app = await aSetUpApp();
 

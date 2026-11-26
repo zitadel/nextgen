@@ -1,7 +1,11 @@
 import { apiBaseUrl, request } from "@/lib/backend/transport";
 
 import { createZitadelClient, AuthAttemptService } from "@/lib/backend";
-import { LocalServerDeniedError, LocalServerPlatformMissingError } from "@/lib/server/errors";
+import {
+  LocalServerAdminNotFoundError,
+  LocalServerPlatformMissingError,
+  LocalServerSessionRefusedError,
+} from "@/lib/server/errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 
@@ -92,7 +96,10 @@ export async function adminSessionCookie(
       });
     });
   if (!res.ok || !cookie) {
-    throw new LocalServerDeniedError(`Local admin session exchange failed (${String(res.status)})`);
+    throw new LocalServerSessionRefusedError(
+      `Local admin session exchange failed (${String(res.status)})`,
+      res.status,
+    );
   }
   return cookie;
 }
@@ -131,7 +138,7 @@ async function signIn(
   });
   switch (identifier.outcome) {
     case "rejected":
-      throw new LocalServerDeniedError("The local server could not find the local admin");
+      throw new LocalServerAdminNotFoundError("The local server could not find the local admin");
     case "proved":
       break;
   }

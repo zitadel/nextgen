@@ -19,7 +19,11 @@ import { isDeepStrictEqual } from "node:util";
 import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import { ZitadelConfigError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigOutcomeActionClashError,
+  ZitadelConfigRenameActionClashError,
+  ZitadelConfigRenameRouteLossError,
+} from "@/lib/zitadel/errors";
 import { type StepName, stepName } from "@/lib/zitadel/names";
 import type { Edit, SkippedRegion } from "@/lib/zitadel/resources/document";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
@@ -964,9 +968,7 @@ export class SsoGenerator {
     next: string,
   ): void {
     if (actionNames.has(next)) {
-      throw new ZitadelConfigError(
-        `steps.${step}: transition "${old}" is renamed to "${next}", which is an action on this step; rename the action "${next}" on step "${step}" (and its transition)`,
-      );
+      throw new ZitadelConfigRenameActionClashError(step, old, next);
     }
     if (next in transitions) {
       return;
@@ -978,9 +980,7 @@ export class SsoGenerator {
     const purpose = transition.purpose ?? null;
     const action = transition.action ?? null;
     if (purpose !== null || action !== null) {
-      throw new ZitadelConfigError(
-        `steps.${step}: transition "${old}" declares purpose or action, which "${next}" cannot; remove purpose and action from the transition "${old}" on step "${step}"`,
-      );
+      throw new ZitadelConfigRenameRouteLossError(step, old, next);
     }
   }
 
@@ -1027,9 +1027,7 @@ export class SsoGenerator {
       for (const action of actions) {
         const actionName = action.name;
         if (keys.has(actionName)) {
-          throw new ZitadelConfigError(
-            `steps.${name}: action "${actionName}" uses a name auth-method sso enable writes as an outcome on this step; rename the action "${actionName}" on step "${name}" (and its transition)`,
-          );
+          throw new ZitadelConfigOutcomeActionClashError(name, String(actionName));
         }
       }
     }

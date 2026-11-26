@@ -1,6 +1,6 @@
 import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import { OrcaVersionBelowFloorError } from "@/lib/orca";
+import { OrcaFrameworkMissingError, OrcaVersionBelowFloorError } from "@/lib/orca";
 import { Project } from "@/lib/project";
 
 /**
@@ -10,6 +10,15 @@ import { Project } from "@/lib/project";
 const VERSION_BELOW_FLOOR_REFUSAL = {
   code: "E_UNSUPPORTED_PROJECT_SHAPE",
   message: "{message}. Upgrade the app to {displayName} {versionFloor} or later and rerun.{note}",
+} as const satisfies Refusal;
+
+/**
+ * How the check fails for a directory with no app of a framework the CLI knows.
+ */
+const FRAMEWORK_MISSING_REFUSAL = {
+  code: "E_FRAMEWORK_NOT_DETECTED",
+  message: "{message}",
+  hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
 } as const satisfies Refusal;
 
 /** Verifies the framework detected on disk matches the one recorded in config. */
@@ -41,6 +50,12 @@ export class FrameworkCheck extends AbstractSanityCheck {
           displayName: error.displayName,
           versionFloor: error.versionFloor,
           note: error.note === undefined ? "" : ` ${error.note}`,
+        });
+      }
+      if (error instanceof OrcaFrameworkMissingError) {
+        throw refusalError(FRAMEWORK_MISSING_REFUSAL, {
+          ...error,
+          message: error.message,
         });
       }
       throw error;

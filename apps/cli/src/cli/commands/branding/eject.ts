@@ -26,6 +26,7 @@ import {
   CONFIG_DIRECTORIES,
   DiskStore,
   ZitadelConfigFileExistsError,
+  ZitadelConfigPathBlockedError,
   PAGE_LAYOUT_HINT,
   RETIRED_BRANDING_DESIGNS,
   ZitadelConfig,
@@ -78,6 +79,17 @@ const FILE_EXISTS_REFUSAL = {
   message: "{message}",
   hint: "Rerun with --force to replace it, or edit the existing file directly.",
   next: ["{again}"],
+} as const satisfies Refusal;
+
+/** How a branding file under a directory that is a file is refused. */
+const PATH_BLOCKED_REFUSAL = {
+  message: "{message}",
+  hint: "Remove {blocker}, which is a file where a directory is needed, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "ENOTDIR",
+    blocker: "{blocker}",
+  },
 } as const satisfies Refusal;
 
 /** Whether `value` names a design the CLI ships. */
@@ -312,6 +324,12 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
         );
       }
     } catch (error) {
+      if (error instanceof ZitadelConfigPathBlockedError) {
+        throw refusalError(PATH_BLOCKED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigFileExistsError) {
         throw refusalError(
           FILE_EXISTS_REFUSAL,

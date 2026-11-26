@@ -49,6 +49,34 @@ import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
+import {
+  OrcaAngularJsonMissingError,
+  OrcaAngularProjectAmbiguousError,
+  OrcaAngularRoutesNotInlineError,
+  OrcaBoundaryDuplicateError,
+  OrcaBoundaryRenamedError,
+  OrcaBoundaryVersionUnknownError,
+  OrcaConfigArrayExpectedError,
+  OrcaConfigCommonJsError,
+  OrcaConfigFileMissingError,
+  OrcaConfigObjectExpectedError,
+  OrcaConfigObjectMissingError,
+  OrcaConfigUnparseableError,
+  OrcaConfigUnwritableError,
+  OrcaFileOverwriteError,
+  OrcaFrameworkUnknownError,
+  OrcaPackageJsonMissingError,
+  OrcaPatcherMissingError,
+  OrcaPatchOpEmptyError,
+  OrcaProxyCredentialLeakError,
+  OrcaRendererPendingError,
+  OrcaRendererUnknownError,
+  OrcaRootComponentMountError,
+  OrcaSolidStartConfigMissingError,
+  OrcaSolidStartPluginMissingError,
+  OrcaSvelteKitEnvVarsError,
+  OrcaZitadelConfigMissingError,
+} from "@/lib/orca";
 import type { Facts } from "@/cli/core/base";
 import {
   LocalRuntime,
@@ -67,6 +95,8 @@ import {
   ZitadelConfigConnectionExistsError,
   DiskStore,
   ZitadelConfigFileExistsError,
+  ZitadelConfigPasswordPolicyInvalidError,
+  ZitadelConfigSignupPolicyInvalidError,
   PasswordPolicy,
   type PasswordMinLength,
   type Scaffold,
@@ -863,6 +893,24 @@ const SIGNUP_POLICY_EXISTS_REFUSAL = {
   },
 } as const satisfies Refusal;
 
+/** How setup refuses to keep, under --force, a password policy file that is not a sound one. */
+const PASSWORD_POLICY_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
+  details: {
+    file: "{path}",
+  },
+} as const satisfies Refusal;
+
+/** How setup refuses to keep, under --force, a sign-up policy file that is not a sound one. */
+const SIGNUP_POLICY_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from the default.",
+  details: {
+    file: "{path}",
+  },
+} as const satisfies Refusal;
+
 /** How setup refuses to replace any other file that is already there. */
 const FILE_EXISTS_REFUSAL = {
   code: "E_CONFLICT",
@@ -892,6 +940,18 @@ export function setupRefusal(
   error: unknown,
   connections: readonly ScaffoldedConnection[],
 ): unknown {
+  if (error instanceof ZitadelConfigPasswordPolicyInvalidError) {
+    return refusalError(PASSWORD_POLICY_INVALID_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof ZitadelConfigSignupPolicyInvalidError) {
+    return refusalError(SIGNUP_POLICY_INVALID_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
   if (error instanceof ZitadelConfigConnectionExistsError) {
     return connectionRefusal(error.path, error.selection);
   }
@@ -1776,4 +1836,437 @@ export function onboardingStep(
       return undefined;
     }
   }
+}
+
+/**
+ * How a framework orca has no detector for is refused.
+ */
+const FRAMEWORK_UNKNOWN_REFUSAL = {
+  code: "E_FRAMEWORK_NOT_DETECTED",
+  message: "{message}",
+  hint: "Supported frameworks: {supported}.",
+} as const satisfies Refusal;
+
+/**
+ * How a framework that can be scaffolded and not integrated is refused.
+ */
+const PATCHER_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Zitadel integration currently supports Next.js.",
+} as const satisfies Refusal;
+
+/**
+ * How a patcher bug, an op with no path, is refused.
+ */
+const PATCH_OP_EMPTY_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "This is an internal patcher error — please report it if you hit it.",
+} as const satisfies Refusal;
+
+/**
+ * How an Angular app with no `angular.json` is refused.
+ */
+const ANGULAR_JSON_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run setup from an Angular project.",
+} as const satisfies Refusal;
+
+/**
+ * How an `angular.json` with no project to choose is refused.
+ */
+const ANGULAR_PROJECT_AMBIGUOUS_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: {projects}.`,
+} as const satisfies Refusal;
+
+/**
+ * How Angular routes the patch cannot extend are refused.
+ */
+const ANGULAR_ROUTES_NOT_INLINE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: 'Set "routes" in {label} to an inline Routes array, or add /login, /register, and /profile manually.',
+} as const satisfies Refusal;
+
+/**
+ * How a project with no `package.json` to edit is refused.
+ */
+const PACKAGE_JSON_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run setup from a project that has a package.json.",
+} as const satisfies Refusal;
+
+/**
+ * How a project with no `zitadel.json` to move the issuer in is refused.
+ */
+const ZITADEL_CONFIG_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel setup` first.",
+} as const satisfies Refusal;
+
+/**
+ * How a file the patch would overwrite is refused.
+ */
+const FILE_OVERWRITE_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun with --force if you want the CLI to replace this file.",
+  details: {
+    path: "{path}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How a request boundary under the name setup writes is refused.
+ */
+const BOUNDARY_DUPLICATE_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Setup writes {target}, and one of the two would never run. Move {existing} aside and rerun setup, then merge it into {target}. --force can't fix this: it only replaces files at the paths setup writes.",
+  details: {
+    path: "{existing}",
+    writes: "{target}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How a `middleware.*` beside the `proxy.ts` setup writes is refused.
+ */
+const BOUNDARY_RENAMED_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Next.js 16 renamed middleware.ts to proxy.ts. Move {existing} aside and rerun setup, then merge it into {target}. --force can't fix this: it only replaces files at the paths setup writes.",
+  details: {
+    path: "{existing}",
+    writes: "{target}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How a second request boundary in an app of unknown Next.js version is refused.
+ */
+const BOUNDARY_VERSION_UNKNOWN_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: 'Setup reads no Next.js version from package.json (a tag such as "latest" names none), so it writes the {target} of Next 15. Pin next to the version range the app runs, such as "^16.0.0", and rerun setup: on Next 16 it then writes proxy.ts, and on Next 15 it leaves your {existing} alone. --force can\'t fix this: it only replaces files at the paths setup writes.',
+  details: {
+    path: "{existing}",
+    writes: "{target}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How a renderer id that names none is refused.
+ */
+const RENDERER_UNKNOWN_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Available renderers: {renderers}.",
+} as const satisfies Refusal;
+
+/**
+ * How a renderer that is declared and not published is refused.
+ */
+const RENDERER_PENDING_REFUSAL = {
+  code: "E_NOT_IMPLEMENTED",
+  message: "{message}",
+  hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
+} as const satisfies Refusal;
+
+/**
+ * How a proxy that may forward the project secret is refused.
+ */
+const PROXY_CREDENTIAL_LEAK_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Review the proxy manually: restrict the bearer to the exact POST /sessions/exchange or {exchangePath} pathname and preserve caller-provided authorization.",
+} as const satisfies Refusal;
+
+/**
+ * How an entry that mounts a root other than the one setup writes is refused.
+ */
+const ROOT_COMPONENT_MOUNT_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Your app would keep loading {mountedRoot}, and the root component setup writes would never run. In {entry}, import the root as `{statement}` and mount that instead, then rerun setup and move what you need from {mountedRoot} into {root}. --force can't fix this: it only replaces files at the paths setup writes.",
+  details: {
+    path: "{mountedRoot}",
+    entry: "{entry}",
+    writes: "{root}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How a SolidStart app with no Vite config is refused.
+ */
+const SOLID_START_CONFIG_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run setup from a SolidStart project that has a vite.config.ts.",
+} as const satisfies Refusal;
+
+/**
+ * How a SolidStart Vite config with no `solidStart()` plugin is refused.
+ */
+const SOLID_START_PLUGIN_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config.",
+} as const satisfies Refusal;
+
+/**
+ * How a SvelteKit env module with no variables the patch reads is refused.
+ */
+const SVELTEKIT_ENV_VARS_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Export them as `export const variables = defineEnvVars({ ... })` from @sveltejs/kit/env, or declare {variables} there by hand.",
+} as const satisfies Refusal;
+
+/**
+ * How a config module that is not there is refused.
+ */
+const CONFIG_FILE_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run setup from a project that has {filename}.",
+} as const satisfies Refusal;
+
+/**
+ * How a config module that does not parse is refused.
+ */
+const CONFIG_UNPARSEABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Ensure {filename} is valid, or apply the Zitadel changes manually.",
+  details: {
+    cause: "{parseError}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How a CommonJS config module is refused.
+ */
+const CONFIG_COMMON_JS_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: 'The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.',
+} as const satisfies Refusal;
+
+/**
+ * How a config module with no exported object is refused.
+ */
+const CONFIG_OBJECT_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Add the Zitadel configuration to {filename} manually (see the SDK README).",
+} as const satisfies Refusal;
+
+/**
+ * How a config key that holds no inline object is refused.
+ */
+const CONFIG_OBJECT_EXPECTED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: 'Set "{key}" to an inline object literal, or add the Zitadel settings manually.',
+} as const satisfies Refusal;
+
+/**
+ * How a config key that holds no inline array is refused.
+ */
+const CONFIG_ARRAY_EXPECTED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: 'Set "{key}" to an inline array literal, or add the Zitadel settings manually.',
+} as const satisfies Refusal;
+
+/**
+ * How an edit that would leave a config module unparseable is refused.
+ */
+const CONFIG_UNWRITABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "The edit left {filename} unparseable, so apply the Zitadel changes manually.",
+  details: {
+    cause: "{parseError}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * The refusal setup words an orca failure with, for each failure setup's
+ * steps share: a framework orca cannot detect or integrate, and every file a
+ * patch cannot write.
+ *
+ * @remarks
+ * The steps that detect, scaffold, check and apply the patch, and move the dev
+ * port, all reach these, so they share one wording rather than each repeating
+ * it.
+ *
+ * @param error - What orca threw.
+ * @returns The refusal to throw, or `error` itself when it is none of these.
+ */
+export function orcaRefusal(error: unknown): unknown {
+  if (error instanceof OrcaFrameworkUnknownError) {
+    return refusalError(FRAMEWORK_UNKNOWN_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaPatcherMissingError) {
+    return refusalError(PATCHER_MISSING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaPatchOpEmptyError) {
+    return refusalError(PATCH_OP_EMPTY_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaAngularJsonMissingError) {
+    return refusalError(ANGULAR_JSON_MISSING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaAngularProjectAmbiguousError) {
+    return refusalError(ANGULAR_PROJECT_AMBIGUOUS_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaAngularRoutesNotInlineError) {
+    return refusalError(ANGULAR_ROUTES_NOT_INLINE_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaPackageJsonMissingError) {
+    return refusalError(PACKAGE_JSON_MISSING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaZitadelConfigMissingError) {
+    return refusalError(ZITADEL_CONFIG_MISSING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaFileOverwriteError) {
+    return refusalError(FILE_OVERWRITE_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaBoundaryDuplicateError) {
+    return refusalError(BOUNDARY_DUPLICATE_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaBoundaryRenamedError) {
+    return refusalError(BOUNDARY_RENAMED_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaBoundaryVersionUnknownError) {
+    return refusalError(BOUNDARY_VERSION_UNKNOWN_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaRendererUnknownError) {
+    return refusalError(RENDERER_UNKNOWN_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaRendererPendingError) {
+    return refusalError(RENDERER_PENDING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaProxyCredentialLeakError) {
+    return refusalError(PROXY_CREDENTIAL_LEAK_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaRootComponentMountError) {
+    return refusalError(ROOT_COMPONENT_MOUNT_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaSolidStartConfigMissingError) {
+    return refusalError(SOLID_START_CONFIG_MISSING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaSolidStartPluginMissingError) {
+    return refusalError(SOLID_START_PLUGIN_MISSING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaSvelteKitEnvVarsError) {
+    return refusalError(SVELTEKIT_ENV_VARS_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaConfigFileMissingError) {
+    return refusalError(CONFIG_FILE_MISSING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaConfigUnparseableError) {
+    return refusalError(CONFIG_UNPARSEABLE_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaConfigCommonJsError) {
+    return refusalError(CONFIG_COMMON_JS_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaConfigObjectMissingError) {
+    return refusalError(CONFIG_OBJECT_MISSING_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaConfigObjectExpectedError) {
+    return refusalError(CONFIG_OBJECT_EXPECTED_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaConfigArrayExpectedError) {
+    return refusalError(CONFIG_ARRAY_EXPECTED_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  if (error instanceof OrcaConfigUnwritableError) {
+    return refusalError(CONFIG_UNWRITABLE_REFUSAL, {
+      ...error,
+      message: error.message,
+    });
+  }
+  return error;
 }

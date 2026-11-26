@@ -55,6 +55,25 @@ export class EnvironmentValueInvalidError extends EnvironmentError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** Where the address came from, which the refusal says to fix it in. */
+  readonly source: string;
+
+  /** Why the address is not a server, which the refusal reports. */
+  readonly reason: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param source - Where the address came from.
+   * @param cause - The failure that reading the address raised.
+   */
+  constructor(message: string, source: string, cause: ZitadelLibError) {
+    super(message, cause);
+    this.source = source;
+    this.reason = cause.message;
+  }
 }
 
 /**

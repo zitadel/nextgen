@@ -855,16 +855,18 @@ describe("Connections.disable", () => {
           connections: { "github.json": anOidcConnection({ slug: "github" }) },
         }),
         {
-          message:
-            "customers has no provider named gogle; it offers: github; connections under .zitadel/idps/: github",
+          message: "customers has no provider named gogle",
+          offered: ["github"],
+          connections: ["github"],
         },
       ],
       [
         "says so when the schema offers none and no connection exists",
         aConfig(CUSTOMERS_PROJECT),
         {
-          message:
-            "customers has no provider named gogle; it offers: none; connections under .zitadel/idps/: none",
+          message: "customers has no provider named gogle",
+          offered: [],
+          connections: [],
         },
       ],
     ])("%s", (_claim, config, fields) => {

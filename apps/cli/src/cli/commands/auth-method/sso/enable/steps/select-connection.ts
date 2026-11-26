@@ -1,6 +1,12 @@
 import { providerOf } from "@zitadel/config/idp";
 
-import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import {
+  ACTION_CLASH_REFUSAL,
+  type EnableServices,
+  type Fact,
+  ROUTE_LOSS_REFUSAL,
+  SLUG_DUPLICATED_REFUSAL,
+} from "@/cli/commands/auth-method/sso/enable/shared";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { WizardStep } from "@/lib/wizard";
 import {
@@ -10,6 +16,10 @@ import {
   ZitadelConfigFlowBrokenError,
   ZitadelConfigProviderFileTakenError,
   ZitadelConfigSettingUnusableError,
+  ZitadelConfigSlugDuplicatedError,
+  ZitadelConfigOutcomeActionClashError,
+  ZitadelConfigRenameActionClashError,
+  ZitadelConfigRenameRouteLossError,
 } from "@/lib/zitadel";
 
 /**
@@ -145,6 +155,30 @@ export class SelectConnection extends WizardStep<
         },
       };
     } catch (error) {
+      if (error instanceof ZitadelConfigSlugDuplicatedError) {
+        throw refusalError(SLUG_DUPLICATED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigRenameActionClashError) {
+        throw refusalError(ACTION_CLASH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigOutcomeActionClashError) {
+        throw refusalError(ACTION_CLASH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigRenameRouteLossError) {
+        throw refusalError(ROUTE_LOSS_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigConnectionNotOidcError) {
         throw refusalError(NOT_OIDC_REFUSAL, {
           ...error,

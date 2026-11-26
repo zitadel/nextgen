@@ -1,5 +1,7 @@
 export type { EnvFile } from "./env-file";
 export {
+  ProjectEnvValueMultilineError,
+  ProjectEnvValueUnquotableError,
   ProjectError,
   ProjectFileMissingError,
   ProjectInvalidError,

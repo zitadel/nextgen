@@ -1,4 +1,5 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
+import { orcaRefusal } from "@/cli/commands/setup/shared";
 import { ZitadelLibError } from "@/lib/errors";
 import {
   OrcaCommandFailedError,
@@ -214,7 +215,7 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
           },
         );
       }
-      throw error;
+      throw orcaRefusal(error);
     }
   }
 

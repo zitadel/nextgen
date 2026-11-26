@@ -5,7 +5,11 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { type UserSchema, ZitadelConfigFlowBrokenError } from "@/lib/zitadel";
+import {
+  type UserSchema,
+  ZitadelConfigFlowBrokenError,
+  ZitadelConfigProviderUnknownError,
+} from "@/lib/zitadel";
 import { dryRunResult } from "@/cli/core/crud/shared";
 
 /**
@@ -25,6 +29,20 @@ const NAME_PROVIDER_REFUSAL = {
 const FLOW_BROKEN_REFUSAL = {
   message: "{message}",
   hint: "Fix the steps named above, then run the command again.",
+} as const satisfies Refusal;
+
+/**
+ * What a provider nothing knows is refused for, such as a typo.
+ */
+const PROVIDER_UNKNOWN_REFUSAL = {
+  code: "E_NOT_FOUND",
+  message: "{message}",
+  hint: "{schema} offers: {offeredList}. Connections under .zitadel/idps/: {connectionList}.",
+  details: {
+    requested: "{requested}",
+    offered: "{offered}",
+    connections: "{connections}",
+  },
 } as const satisfies Refusal;
 
 /**
@@ -73,6 +91,14 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
         try {
           return config.connections.disable(schema, provider, options);
         } catch (error) {
+          if (error instanceof ZitadelConfigProviderUnknownError) {
+            throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
+              ...error,
+              message: error.message,
+              offeredList: error.offered.join(", ") || "none",
+              connectionList: error.connections.join(", ") || "none",
+            });
+          }
           if (error instanceof ZitadelConfigFlowBrokenError) {
             throw refusalError(FLOW_BROKEN_REFUSAL, {
               ...error,
@@ -160,6 +186,14 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
         try {
           return config.connections.disable(schema, provider, options);
         } catch (error) {
+          if (error instanceof ZitadelConfigProviderUnknownError) {
+            throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
+              ...error,
+              message: error.message,
+              offeredList: error.offered.join(", ") || "none",
+              connectionList: error.connections.join(", ") || "none",
+            });
+          }
           if (error instanceof ZitadelConfigFlowBrokenError) {
             throw refusalError(FLOW_BROKEN_REFUSAL, {
               ...error,

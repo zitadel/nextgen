@@ -5,8 +5,10 @@ import { ApiCall, type PathValues } from "@/cli/core/crud/api-call";
 import {
   type ApiRequest,
   createZitadelClient,
+  BackendMethodMismatchError,
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
+  BackendPathUnknownError,
   Operation,
   OperationService,
   type Target,
@@ -94,6 +96,18 @@ const OPERATION_AMBIGUOUS_REFUSAL = {
   ],
 } as const satisfies Refusal;
 
+/** How a path that matches no operation's template is refused. */
+const PATH_UNKNOWN_REFUSAL = {
+  message: "{message}",
+  hint: "List the paths with `zitadel api ls`.",
+} as const satisfies Refusal;
+
+/** How an operation id given a method that is not its own is refused. */
+const METHOD_MISMATCH_REFUSAL = {
+  message: "{message}",
+  hint: "Leave out -X, or pass -X {method}.",
+} as const satisfies Refusal;
+
 /** How a call the server did not authenticate is refused. */
 const UNAUTHORIZED_SECRET_REFUSAL = {
   code: "E_AUTH",
@@ -112,6 +126,18 @@ function resolveTarget(ref: string, method?: string): Target {
   try {
     return Operation.named(ref, method);
   } catch (error) {
+    if (error instanceof BackendPathUnknownError) {
+      throw refusalError(PATH_UNKNOWN_REFUSAL, {
+        ...error,
+        message: error.message,
+      });
+    }
+    if (error instanceof BackendMethodMismatchError) {
+      throw refusalError(METHOD_MISMATCH_REFUSAL, {
+        ...error,
+        message: error.message,
+      });
+    }
     if (error instanceof BackendOperationUnknownError) {
       throw refusalError(OPERATION_UNKNOWN_REFUSAL, {
         ...error,

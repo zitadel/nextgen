@@ -1,7 +1,10 @@
 import type { ReadonlyDeep } from "type-fest";
 import type { ZodType, z } from "zod";
 
-import { ZitadelConfigError, ZitadelConfigFilesBrokenError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigFilesBrokenError,
+  ZitadelConfigRegionUneditableError,
+} from "@/lib/zitadel/errors";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { Issue, RuleId, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
@@ -493,8 +496,6 @@ export abstract class ConfigDocument<Value = unknown> {
     if (region === undefined) {
       return;
     }
-    throw new ZitadelConfigError(
-      `${this.path}: ${region}; fix it against the dialect in .zitadel/meta/`,
-    );
+    throw new ZitadelConfigRegionUneditableError(this.path, region);
   }
 }

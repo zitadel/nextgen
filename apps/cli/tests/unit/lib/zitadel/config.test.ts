@@ -6,7 +6,9 @@ import {
   ZitadelConfigError,
   Branding,
   CONFIG_DIRECTORIES,
+  ZitadelConfigPasswordPolicyInvalidError,
   ZitadelConfigResourceClashError,
+  ZitadelConfigSignupPolicyInvalidError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
   ZitadelConfigNothingToDeployError,
@@ -750,9 +752,10 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, force: true });
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigPasswordPolicyInvalidError);
       expect(error).toMatchObject({
-        message: expect.stringContaining(PasswordPolicy.PATH),
+        message: `${PasswordPolicy.PATH} is not a valid password policy`,
+        path: PasswordPolicy.PATH,
       });
     });
   });
@@ -793,9 +796,10 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, force: true });
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigSignupPolicyInvalidError);
       expect(error).toMatchObject({
-        message: expect.stringContaining(SignupPolicy.PATH),
+        message: `${SignupPolicy.PATH} is not a valid sign-up policy`,
+        path: SignupPolicy.PATH,
       });
     });
   });

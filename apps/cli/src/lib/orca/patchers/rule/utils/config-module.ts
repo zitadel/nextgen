@@ -3,7 +3,15 @@ import { getDefaultExportOptions } from "magicast/helpers";
 import type { ProxifiedArray, ProxifiedModule, ProxifiedObject } from "magicast";
 
 import { errorMessage } from "@/lib/errors";
-import { OrcaInvalidError, OrcaPatchFileMissingError } from "@/lib/orca/errors";
+import {
+  OrcaConfigArrayExpectedError,
+  OrcaConfigCommonJsError,
+  OrcaConfigFileMissingError,
+  OrcaConfigObjectExpectedError,
+  OrcaConfigObjectMissingError,
+  OrcaConfigUnparseableError,
+  OrcaConfigUnwritableError,
+} from "@/lib/orca/errors";
 
 /**
  * A magicast object literal edited by dynamic key. magicast's own types don't
@@ -55,7 +63,7 @@ export class ConfigModule {
     const isMissing = source === undefined;
 
     if (isMissing) {
-      throw new OrcaPatchFileMissingError(`Cannot edit ${filename}: file not found`);
+      throw new OrcaConfigFileMissingError(`Cannot edit ${filename}: file not found`, filename);
     }
 
     let module: ProxifiedModule;
@@ -63,7 +71,12 @@ export class ConfigModule {
     try {
       module = parseModule(source, options);
     } catch (error) {
-      throw new OrcaInvalidError(`Could not parse ${filename}: ${errorMessage(error)}`, error);
+      throw new OrcaConfigUnparseableError(
+        `Could not parse ${filename}`,
+        filename,
+        errorMessage(error),
+        error,
+      );
     }
 
     const ast = module.$ast as { program?: { body?: AstStatement[] }; body?: AstStatement[] };
@@ -79,8 +92,9 @@ export class ConfigModule {
     });
 
     if (isCommonJs) {
-      throw new OrcaInvalidError(
-        `${filename} is a CommonJS module, which cannot be edited; convert it to ESM or add the Zitadel block manually`,
+      throw new OrcaConfigCommonJsError(
+        `${filename} is a CommonJS module, which cannot be edited`,
+        filename,
       );
     }
 
@@ -95,7 +109,10 @@ export class ConfigModule {
     const value = this.module.exports.default ? getDefaultExportOptions(this.module) : undefined;
 
     if (value?.$type !== "object") {
-      throw new OrcaInvalidError(`Could not locate the config object in ${this.filename}`);
+      throw new OrcaConfigObjectMissingError(
+        `Could not locate the config object in ${this.filename}`,
+        this.filename,
+      );
     }
 
     return value;
@@ -106,9 +123,7 @@ export class ConfigModule {
     const value = parent[key] as EditableObject | undefined;
 
     if (value?.$type !== "object") {
-      throw new OrcaInvalidError(
-        `Could not edit "${key}" in the config: set it to an inline object literal`,
-      );
+      throw new OrcaConfigObjectExpectedError(`Could not edit "${key}" in the config`, key);
     }
 
     return value;
@@ -119,9 +134,7 @@ export class ConfigModule {
     const value = parent[key] as ProxifiedArray<string[]> | undefined;
 
     if (value?.$type !== "array") {
-      throw new OrcaInvalidError(
-        `Could not edit "${key}" in the config: set it to an inline array literal`,
-      );
+      throw new OrcaConfigArrayExpectedError(`Could not edit "${key}" in the config`, key);
     }
 
     return value;
@@ -142,7 +155,12 @@ export class ConfigModule {
     try {
       parseModule(value);
     } catch (error) {
-      throw new OrcaInvalidError(`Could not write ${this.filename}: ${errorMessage(error)}`, error);
+      throw new OrcaConfigUnwritableError(
+        `Could not write ${this.filename}`,
+        this.filename,
+        errorMessage(error),
+        error,
+      );
     }
 
     return value;

@@ -1,5 +1,32 @@
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { WizardStep } from "@/lib/wizard";
+import { ZitadelConfigFlowMissingError, ZitadelConfigRegionUneditableError } from "@/lib/zitadel";
+
+/**
+ * What a schema no login flow runs against is refused for.
+ */
+const FLOW_MISSING_REFUSAL = {
+  code: "E_NOT_FOUND",
+  message: "{message}",
+  hint: "The provider is offered by a flow, and none of the files under .zitadel/flows/ names this schema. Check that the flow's user_schema names the schema's objectType.",
+  details: {
+    schema: "{path}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a flow region the edit writes, and that is not the shape it writes, is
+ * refused for.
+ */
+const REGION_UNEDITABLE_REFUSAL = {
+  message: "{message}",
+  hint: "This command edits that region, and it is not the shape it edits. Fix it against the dialect in .zitadel/meta/, then run the command again.",
+  details: {
+    file: "{path}",
+    region: "{region}",
+  },
+} as const satisfies Refusal;
 
 /**
  * What the step is given by the command.
@@ -43,7 +70,23 @@ export class LoadSchema extends WizardStep<"target", Fact<"target">, Fact<"flags
    */
   async run(needs: Fact<"flags">): Promise<Fact<"target">> {
     const target = await this.deps.loadSchemaTarget(needs.flags);
-    target.config.flows.resolveForSso(target.schema);
+    try {
+      target.config.flows.resolveForSso(target.schema);
+    } catch (error) {
+      if (error instanceof ZitadelConfigFlowMissingError) {
+        throw refusalError(FLOW_MISSING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigRegionUneditableError) {
+        throw refusalError(REGION_UNEDITABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
     return {
       target,
     };

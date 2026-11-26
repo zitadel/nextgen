@@ -7,8 +7,10 @@ import { ApiService } from "@/lib/backend/api-service";
 import { connectionOf, responseFailure } from "@/lib/backend/client";
 import {
   BackendInternalError,
+  BackendMethodMismatchError,
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
+  BackendPathUnknownError,
   BackendRequestInvalidError,
 } from "@/lib/backend/errors";
 import { request as fetchWithPolicy } from "@/lib/backend/transport";
@@ -257,8 +259,9 @@ export class Operation {
     if (!ref.startsWith("/")) {
       const operation = Operation.byId(ref);
       if (wanted !== undefined && wanted !== operation.method) {
-        throw new BackendOperationAmbiguousError(
-          `${operation.id} is ${operation.method} ${operation.path}, not ${wanted}; it takes ${operation.method}`,
+        throw new BackendMethodMismatchError(
+          `${operation.id} is ${operation.method} ${operation.path}, not ${wanted}`,
+          operation.method,
         );
       }
       return {
@@ -392,7 +395,7 @@ export class Operation {
       return candidate.match?.literals === best;
     });
     if (template?.match === undefined) {
-      throw new BackendOperationUnknownError(`No operation has the path ${path}`);
+      throw new BackendPathUnknownError(`No operation has the path ${path}`);
     }
     const methods = operations.filter((record) => {
       return record.path === template.record.path;

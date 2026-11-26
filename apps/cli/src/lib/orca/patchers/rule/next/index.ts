@@ -1,6 +1,10 @@
 import { basename, join } from "node:path";
 
-import { OrcaConflictError } from "@/lib/orca/errors";
+import {
+  OrcaBoundaryDuplicateError,
+  OrcaBoundaryRenamedError,
+  OrcaBoundaryVersionUnknownError,
+} from "@/lib/orca/errors";
 import { isFile } from "@/lib/fs";
 import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
@@ -80,10 +84,24 @@ export class NextPatcher extends AbstractRulePatcher {
         for (const extension of BOUNDARY_EXTENSIONS) {
           const path = join(dir, `${name}.${extension}`);
           if (path !== target && (await isFile(join(cwd, path)))) {
-            throw new OrcaConflictError(
-              basename(path).split(".")[0] === basename(target, ".ts")
-                ? `Next.js runs one ${basename(target, ".ts")} file, and this app already has ${path}`
-                : `Next.js 16 will not start with both ${path} and the ${target} setup writes`,
+            if (basename(path).split(".")[0] === basename(target, ".ts")) {
+              throw new OrcaBoundaryDuplicateError(
+                `Next.js runs one ${basename(target, ".ts")} file, and this app already has ${path}`,
+                path,
+                target,
+              );
+            }
+            if (unknownVersion) {
+              throw new OrcaBoundaryVersionUnknownError(
+                `Next.js 16 will not start with both ${path} and the ${target} setup writes`,
+                path,
+                target,
+              );
+            }
+            throw new OrcaBoundaryRenamedError(
+              `Next.js 16 will not start with both ${path} and the ${target} setup writes`,
+              path,
+              target,
             );
           }
         }

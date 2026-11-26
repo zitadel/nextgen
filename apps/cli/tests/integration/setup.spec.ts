@@ -6,7 +6,10 @@ import {
   aCommittedApp,
   aMissingAppDirectory,
   aNewAppDirectory,
+  anAngularApp,
   anApp,
+  aReactApp,
+  aSolidStartApp,
   type CliResult,
   type Credentials,
   type CustomConnection,
@@ -558,6 +561,33 @@ describe("setup", () => {
     });
 
     describe("--json", () => {
+      it.each([
+        [
+          "a password policy",
+          (app: ScaffoldedApp) => app.writeInvalidPasswordPolicy(),
+          "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
+        ],
+        [
+          "a sign-up policy",
+          (app: ScaffoldedApp) => app.writeInvalidSignupPolicy(),
+          "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from the default.",
+        ],
+      ])(
+        "refuses to keep %s under --force that is not a sound one",
+        async (_policy, arrange, hint) => {
+          const app = await anApp();
+          await arrange(app);
+
+          const result = await app.setup(["--force"]);
+
+          expect(app.envelopeOf(result)).toMatchObject({
+            status: "error",
+            code: "E_VALIDATION",
+            hint,
+          });
+        },
+      );
+
       it("reports what it wrote, deployed and suggests next", async () => {
         const app = await anApp();
 
@@ -1049,6 +1079,21 @@ describe("setup", () => {
             expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
             expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
+        });
+
+        it("refuses a local server that does not answer, naming the address it tried", async () => {
+          const app = await anApp();
+          await app.writeStoppedServerRecord();
+
+          const result = await app.runWithoutServer(["setup", "--server", "local", "--json"]);
+
+          expect(app.envelopeOf(result)).toMatchObject({
+            status: "error",
+            code: "E_LOCAL_SERVER_NOT_RUNNING",
+            hint: expect.stringContaining(
+              `No healthy local server responded at ${app.stoppedServerUrl}. Run ${expectedPublicCliCommand("start")} to bring it back. Start local Zitadel first, then rerun setup.`,
+            ),
+          });
         });
 
         it("refuses a minimum length outside the bounds before creating anything", async () => {
@@ -2352,6 +2397,228 @@ describe("setup", () => {
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
         expect(result).toPrint("To change which claim fills an attribute, edit claim_mapping in");
+      });
+    });
+
+    describe("in a project it cannot patch", () => {
+      it.each<
+        [
+          string,
+          () => Promise<ScaffoldedApp>,
+          (app: ScaffoldedApp) => Promise<void>,
+          string[],
+          object,
+        ]
+      >([
+        [
+          "a login page of the app's own where it writes one",
+          anApp,
+          (app) => {
+            return app.writeOwnLoginPage();
+          },
+          [],
+          {
+            status: "error",
+            code: "E_CONFLICT",
+            hint: "Rerun with --force if you want the CLI to replace this file.",
+          },
+        ],
+        [
+          "a proxy.ts of the app's own beside the one it writes",
+          anApp,
+          (app) => {
+            return app.writeOwnProxyInSrc();
+          },
+          [],
+          {
+            status: "error",
+            code: "E_CONFLICT",
+            hint: "Setup writes proxy.ts, and one of the two would never run. Move src/proxy.ts aside and rerun setup, then merge it into proxy.ts. --force can't fix this: it only replaces files at the paths setup writes.",
+          },
+        ],
+        [
+          "a middleware.ts of the app's own beside the proxy.ts it writes",
+          anApp,
+          (app) => {
+            return app.writeOwnMiddleware();
+          },
+          [],
+          {
+            status: "error",
+            code: "E_CONFLICT",
+            hint: "Next.js 16 renamed middleware.ts to proxy.ts. Move middleware.ts aside and rerun setup, then merge it into proxy.ts. --force can't fix this: it only replaces files at the paths setup writes.",
+          },
+        ],
+        [
+          "a proxy.ts of the app's own under a Next.js tag that names no version",
+          anApp,
+          (app) => {
+            return app.writeOwnProxyUnderAnUnpinnedNext();
+          },
+          [],
+          {
+            status: "error",
+            code: "E_CONFLICT",
+            hint: 'Setup reads no Next.js version from package.json (a tag such as "latest" names none), so it writes the middleware.ts of Next 15. Pin next to the version range the app runs, such as "^16.0.0", and rerun setup: on Next 16 it then writes proxy.ts, and on Next 15 it leaves your proxy.ts alone. --force can\'t fix this: it only replaces files at the paths setup writes.',
+          },
+        ],
+        [
+          "a Vite config written as CommonJS",
+          aReactApp,
+          (app) => {
+            return app.writeCommonJsViteConfig();
+          },
+          ["--force"],
+          {
+            status: "error",
+            code: "E_VALIDATION",
+            hint: 'The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.',
+          },
+        ],
+        [
+          "a Vite config that does not parse",
+          aReactApp,
+          (app) => {
+            return app.writeUnparseableViteConfig();
+          },
+          ["--force"],
+          {
+            status: "error",
+            code: "E_VALIDATION",
+            hint: "Ensure the Vite config (vite.config.*) is valid, or apply the Zitadel changes manually.",
+          },
+        ],
+        [
+          "a Vite config that exports no object literal",
+          aReactApp,
+          (app) => {
+            return app.writeViteConfigExportingAVariable();
+          },
+          ["--force"],
+          {
+            status: "error",
+            code: "E_VALIDATION",
+            hint: "Add the Zitadel configuration to the Vite config (vite.config.*) manually (see the SDK README).",
+          },
+        ],
+        [
+          "a Vite config whose server is no object literal",
+          aReactApp,
+          (app) => {
+            return app.writeViteConfigWithAServerVariable();
+          },
+          ["--force"],
+          {
+            status: "error",
+            code: "E_VALIDATION",
+            hint: 'Set "server" to an inline object literal, or add the Zitadel settings manually.',
+          },
+        ],
+        [
+          "an Angular app with no angular.json",
+          anAngularApp,
+          (app) => {
+            return app.removeAngularJson();
+          },
+          [],
+          {
+            status: "error",
+            code: "E_VALIDATION",
+            hint: "Run setup from an Angular project.",
+          },
+        ],
+        [
+          "an angular.json with two projects and no default between them",
+          anAngularApp,
+          (app) => {
+            return app.writeAngularJsonWithTwoProjects();
+          },
+          [],
+          {
+            status: "error",
+            code: "E_VALIDATION",
+            hint: 'Set "defaultProject" in angular.json, or add "proxyConfig" to the right project\'s serve target manually. Projects: admin, shop.',
+          },
+        ],
+        [
+          "Angular routes that are no inline array",
+          anAngularApp,
+          (app) => {
+            return app.writeAngularRoutesFromAFunction();
+          },
+          [],
+          {
+            status: "error",
+            code: "E_VALIDATION",
+            hint: 'Set "routes" in src/app/app.routes.ts to an inline Routes array, or add /login, /register, and /profile manually.',
+          },
+        ],
+        [
+          "a SolidStart Vite config with no solidStart() plugin",
+          aSolidStartApp,
+          (app) => {
+            return app.writeViteConfigWithoutSolidStart();
+          },
+          [],
+          {
+            status: "error",
+            code: "E_VALIDATION",
+            hint: "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config.",
+          },
+        ],
+      ])("refuses %s", async (_situation, anAppOfItsKind, arrange, args, envelope) => {
+        const app = await anAppOfItsKind();
+        await arrange(app);
+
+        const result = await app.setup(args);
+
+        expect(app.envelopeOf(result)).toMatchObject(envelope);
+      });
+
+      it.each<[string, (app: ScaffoldedApp) => Promise<void>, object]>([
+        [
+          "a proxy.ts of the app's own beside the one it writes",
+          (app) => {
+            return app.writeOwnProxyInSrc();
+          },
+          {
+            details: { path: "src/proxy.ts", writes: "proxy.ts" },
+          },
+        ],
+        [
+          "a middleware.ts of the app's own beside the proxy.ts it writes",
+          (app) => {
+            return app.writeOwnMiddleware();
+          },
+          {
+            details: { path: "middleware.ts", writes: "proxy.ts" },
+          },
+        ],
+        [
+          "a proxy.ts of the app's own under a Next.js tag that names no version",
+          (app) => {
+            return app.writeOwnProxyUnderAnUnpinnedNext();
+          },
+          {
+            details: { path: "proxy.ts", writes: "middleware.ts" },
+          },
+        ],
+        [
+          "a login page of the app's own where it writes one",
+          (app) => {
+            return app.writeOwnLoginPage();
+          },
+          {
+            details: { path: expect.stringContaining("app/login/page.tsx") },
+          },
+        ],
+      ])("refuses %s, naming the files", async (_situation, arrange, envelope) => {
+        const app = await anApp();
+        await arrange(app);
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf(result)).toMatchObject(envelope);
       });
     });
   });

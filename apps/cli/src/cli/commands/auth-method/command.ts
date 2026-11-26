@@ -12,6 +12,7 @@ import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import type { Facts } from "@/cli/core/base";
 import { type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
+import { SyncStateMalformedError } from "@/lib/sync";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Output, warnings } from "@/lib/ui";
@@ -30,6 +31,11 @@ import {
   ZitadelConfigFlowMethodInUseError,
   ZitadelConfigFlowBrokenError,
   ZitadelConfigFlowUncheckedError,
+  ZitadelConfigDirectoryInTheWayError,
+  ZitadelConfigFileExistsError,
+  ZitadelConfigIdentifierMissingError,
+  ZitadelConfigPathBlockedError,
+  ZitadelConfigPathOutsideError,
   ZitadelConfigSchemaMissingError,
   type JsonObject,
   PASSWORD_FIELD,
@@ -265,6 +271,77 @@ export const FLOW_UNCHECKED_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
+ * What a record of what was synced that does not read as one is refused for.
+ */
+const STATE_MALFORMED_REFUSAL = {
+  message: "{message}",
+  hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
+  details: {
+    file: ".zitadel/state.json",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What turning passwords on for a schema with no identifier is refused for.
+ */
+const IDENTIFIER_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: 'A password is checked against the user found by the schema\'s identifier. Set "x-identifier" to the property users sign in with, e.g. "email", then run the command again.',
+  details: {
+    file: "{path}",
+    method: "password",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a file a change creates that is already there is refused for.
+ */
+const FILE_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Move or rename the file that is already there, then run the command again.",
+  details: {
+    file: "{path}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a file a change writes under a directory that is a file is refused for.
+ */
+const PATH_BLOCKED_REFUSAL = {
+  message: "{message}",
+  hint: "Remove {blocker}, which is a file where a directory is needed, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "ENOTDIR",
+    blocker: "{blocker}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a file a change removes that is a directory is refused for.
+ */
+const DIRECTORY_IN_THE_WAY_REFUSAL = {
+  message: "{message}",
+  hint: "Remove {path}, which is a directory where a file is expected, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "EISDIR",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a file a change writes or removes outside `.zitadel/` is refused for.
+ */
+const PATH_OUTSIDE_REFUSAL = {
+  message: "{message}",
+  hint: "Files are only written and removed inside .zitadel/.",
+  details: {
+    file: "{path}",
+  },
+} as const satisfies Refusal;
+
+/**
  * What a schema pointing at an external URL is refused for.
  */
 const EXTERNAL_SCHEMA_REFUSAL = {
@@ -384,6 +461,12 @@ export async function readSchemaTarget(input: {
       schemaGiven: input.schema === undefined ? undefined : schemaFlag,
     };
   } catch (error) {
+    if (error instanceof SyncStateMalformedError) {
+      throw refusalError(STATE_MALFORMED_REFUSAL, {
+        ...error,
+        message: error.message,
+      });
+    }
     if (error instanceof ZitadelConfigFilesBrokenError) {
       throw refusalError(FILES_BROKEN_REFUSAL, {
         ...error,
@@ -742,7 +825,33 @@ export abstract class AuthMethodCommand extends Telemetered(Promptable(ChangeCom
     if (change.changed) {
       this.info("Updating the project's files");
     }
-    const written = await change.save(target.store);
+    const written = await change.save(target.store).catch((error: unknown) => {
+      if (error instanceof ZitadelConfigFileExistsError) {
+        throw refusalError(FILE_EXISTS_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigPathBlockedError) {
+        throw refusalError(PATH_BLOCKED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigDirectoryInTheWayError) {
+        throw refusalError(DIRECTORY_IN_THE_WAY_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigPathOutsideError) {
+        throw refusalError(PATH_OUTSIDE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    });
     for (const path of written) {
       if (change.createdPaths.includes(path)) {
         this.debug(`Wrote ${escapeControlCharacters(path)}`);
@@ -1205,6 +1314,12 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
         true,
       );
     } catch (error) {
+      if (error instanceof ZitadelConfigIdentifierMissingError) {
+        throw refusalError(IDENTIFIER_MISSING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigFlowBrokenError) {
         throw refusalError(FLOW_BROKEN_REFUSAL, {
           ...error,
@@ -1238,6 +1353,12 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
         true,
       );
     } catch (error) {
+      if (error instanceof ZitadelConfigIdentifierMissingError) {
+        throw refusalError(IDENTIFIER_MISSING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigFlowBrokenError) {
         throw refusalError(FLOW_BROKEN_REFUSAL, {
           ...error,

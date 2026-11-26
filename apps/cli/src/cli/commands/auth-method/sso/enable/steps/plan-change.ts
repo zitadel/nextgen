@@ -1,6 +1,15 @@
 import { providerOf, selectionName } from "@zitadel/config/idp";
 
 import { FLOW_UNCHECKED_REFUSAL } from "@/cli/commands/auth-method/command";
+import {
+  ACTION_CLASH_REFUSAL,
+  CONNECTION_DUPLICATED_REFUSAL,
+  CREDENTIALS_DOUBLED_REFUSAL,
+  PROVIDER_MISMATCH_REFUSAL,
+  ROUTE_LOSS_REFUSAL,
+  SLUG_DUPLICATED_REFUSAL,
+  VARIABLE_SHARED_REFUSAL,
+} from "@/cli/commands/auth-method/sso/enable/shared";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
@@ -15,6 +24,14 @@ import { WizardStep } from "@/lib/wizard";
 import {
   Connection,
   ZitadelConfigClientIdMismatchError,
+  ZitadelConfigConnectionDuplicatedError,
+  ZitadelConfigConnectionProviderMismatchError,
+  ZitadelConfigCredentialsDoubledError,
+  ZitadelConfigSlugDuplicatedError,
+  ZitadelConfigVariableSharedError,
+  ZitadelConfigOutcomeActionClashError,
+  ZitadelConfigRenameActionClashError,
+  ZitadelConfigRenameRouteLossError,
   ZitadelConfigConnectionFileTakenError,
   ZitadelConfigConnectionIssuerClashError,
   ZitadelConfigFlowBrokenError,
@@ -229,6 +246,54 @@ export class PlanChange extends WizardStep<
         },
       };
     } catch (error) {
+      if (error instanceof ZitadelConfigSlugDuplicatedError) {
+        throw refusalError(SLUG_DUPLICATED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigConnectionDuplicatedError) {
+        throw refusalError(CONNECTION_DUPLICATED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigConnectionProviderMismatchError) {
+        throw refusalError(PROVIDER_MISMATCH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigCredentialsDoubledError) {
+        throw refusalError(CREDENTIALS_DOUBLED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigVariableSharedError) {
+        throw refusalError(VARIABLE_SHARED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigRenameActionClashError) {
+        throw refusalError(ACTION_CLASH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigOutcomeActionClashError) {
+        throw refusalError(ACTION_CLASH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigRenameRouteLossError) {
+        throw refusalError(ROUTE_LOSS_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigClientIdMismatchError) {
         throw refusalError(CLIENT_ID_MISMATCH_REFUSAL, {
           ...error,

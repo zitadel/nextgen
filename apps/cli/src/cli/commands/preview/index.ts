@@ -26,7 +26,12 @@ import {
   PublishConnectionVariableSharedError,
 } from "@/lib/publish";
 import {
+  ZitadelConfigBrandingDuplicatedError,
   ZitadelConfigFileUnreadableError,
+  ZitadelConfigReferenceBrokenError,
+  ZitadelConfigReferenceMissingError,
+  ZitadelConfigReferenceOutsideError,
+  ZitadelConfigReferenceUnreadableError,
   ZitadelConfigNothingToDeployError,
   ZitadelConfigPathUnreadableError,
 } from "@/lib/zitadel";
@@ -64,6 +69,35 @@ const RELEASE_REVOKED_REFUSAL = {
     release_id: "{release_id}",
     content_hash: "{content_hash}",
   },
+} as const satisfies Refusal;
+
+/** How a release that would carry more than one branding is refused. */
+const BRANDING_DUPLICATED_REFUSAL = {
+  message: "{message}",
+  hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",
+} as const satisfies Refusal;
+
+/** How a `$file` reference whose file is there but cannot be read is refused. */
+const REFERENCE_UNREADABLE_REFUSAL = {
+  message: "{message}",
+  hint: "Create the referenced file or fix the path.",
+  details: {
+    file: "{path}",
+    ref: "{ref}",
+    code: "{errno}",
+  },
+} as const satisfies Refusal;
+
+/** How a `$file` reference whose file is not there is refused. */
+const REFERENCE_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: "Create the referenced file or fix the path.",
+} as const satisfies Refusal;
+
+/** How a `$file` reference that leads outside the project is refused. */
+const REFERENCE_OUTSIDE_REFUSAL = {
+  message: "{message}",
+  hint: "Keep referenced files inside the project, next to the file that references them; a symlink on the way must resolve inside the project too.",
 } as const satisfies Refusal;
 
 /** How a configuration with nothing in `.zitadel/` to publish is refused. */
@@ -664,6 +698,37 @@ export default class Preview extends Telemetered(Previewable(ServerCommand(Previ
             },
           },
         );
+      }
+      if (error instanceof ZitadelConfigBrandingDuplicatedError) {
+        throw refusalError(BRANDING_DUPLICATED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigReferenceUnreadableError) {
+        throw refusalError(REFERENCE_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigReferenceBrokenError) {
+        throw refusalError(REFERENCE_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+          errno: error.errno ?? null,
+        });
+      }
+      if (error instanceof ZitadelConfigReferenceMissingError) {
+        throw refusalError(REFERENCE_MISSING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigReferenceOutsideError) {
+        throw refusalError(REFERENCE_OUTSIDE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
       }
       if (error instanceof ZitadelConfigNothingToDeployError) {
         throw refusalError(NOTHING_TO_DEPLOY_REFUSAL, {

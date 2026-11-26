@@ -1,7 +1,9 @@
 export { AdminSession } from "./admin-session";
 export {
   LocalServerBusyError,
+  LocalServerAdminNotFoundError,
   LocalServerDeniedError,
+  LocalServerSessionRefusedError,
   LocalServerDockerMissingError,
   LocalServerError,
   LocalServerAdminMalformedError,

@@ -1,6 +1,6 @@
 import { API_PREFIX } from "@/lib/backend/transport";
 
-import { OrcaInvalidError } from "@/lib/orca/errors";
+import { OrcaProxyCredentialLeakError } from "@/lib/orca/errors";
 import { PROXY_PATH } from "./proxy";
 
 /**
@@ -58,8 +58,9 @@ export function assertNoUnreviewedProjectSecretProxy(source: string, label: stri
     return;
   }
 
-  throw new OrcaInvalidError(
-    `${label} may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange; restrict the bearer to the exact POST /sessions/exchange or ${PREFIXED_EXCHANGE_PATH} pathname`,
+  throw new OrcaProxyCredentialLeakError(
+    `${label} may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange`,
+    PREFIXED_EXCHANGE_PATH,
   );
 }
 
