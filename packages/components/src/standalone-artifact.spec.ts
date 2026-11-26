@@ -11,6 +11,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { BUDGETS, bundleReport, formatReport } from "../scripts/bundle-size.mjs";
 import { findArtifactViolations } from "../scripts/check-standalone-artifact.mjs";
 
 // Resolved from the package cwd, not `import.meta.url` — vite rewrites module
@@ -37,5 +38,33 @@ describe("standalone artifact", () => {
         `import { x } from "./chunk.mjs";\nimport "/abs.mjs";\nconst d = await import("./lazy.mjs");\n`,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("bundle size", () => {
+  const report = bundleReport(join(process.cwd(), "dist"));
+
+  it("prints the report", () => {
+    console.log(formatReport(report));
+
+    expect(report.defaultPath.files.length).toBeGreaterThan(0);
+  });
+
+  it("keeps standalone.mjs within its gzip budget", () => {
+    expect(report.standalone.gzip).toBeLessThanOrEqual(BUDGETS.standalone);
+  });
+
+  it("keeps the default path within its gzip budget", () => {
+    expect(report.defaultPath.gzip).toBeLessThanOrEqual(BUDGETS.defaultPath);
+  });
+
+  it("imports only these packages on the default path", () => {
+    expect(report.defaultPath.packages).toEqual([
+      "@zitadel/config",
+      "dompurify",
+      "liquidjs",
+      "lit",
+      "lucide",
+    ]);
   });
 });
