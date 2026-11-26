@@ -15,13 +15,7 @@ import { Consent, ConsentInternalError } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import { SyncStateMalformedError } from "@/lib/sync";
 
-import {
-  ZitadelConfigFileBrokenError,
-  type Change,
-  DiskStore,
-  Schemas,
-  UserSchema,
-} from "@/lib/zitadel";
+import { type Change, ZitadelConfigError, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
 import { recordLog } from "@tests/fixtures/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
@@ -1000,7 +994,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.stringContaining(".zitadel/schemas/customers.json:"),
       });
@@ -1015,7 +1009,7 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees" });
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.stringContaining(".zitadel/schemas/employees.json:"),
       });
@@ -1036,7 +1030,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).not.toBeInstanceOf(ZitadelConfigFileBrokenError);
+      expect(error).not.toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: "This project has more than one user schema",
       });
@@ -1055,7 +1049,7 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees.json" });
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
     });
 
     it("refuses a name no schema has as unknown, not as the broken file", async ({ dir }) => {
@@ -1101,7 +1095,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigFileBrokenError);
+      expect(error).toBeInstanceOf(ZitadelConfigError);
       expect(error).toMatchObject({
         message: expect.stringContaining(".zitadel/idps/broken.json:"),
       });

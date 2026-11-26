@@ -191,15 +191,16 @@ export async function readSchemaTarget(input: {
               return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
             });
       if (broken.length > 0) {
-        const problems = broken.flatMap((file) => {
-          return file.problems;
-        });
         throw new ZitadelConfigError(
           [
             "Configuration files are not valid:",
-            ...problems.map((entry) => {
-              return `  - ${entry.path}: ${entry.problem}`;
-            }),
+            ...broken
+              .flatMap((file) => {
+                return file.problems;
+              })
+              .map((entry) => {
+                return `  - ${entry.path}: ${entry.problem}`;
+              }),
           ].join("\n"),
         );
       }
