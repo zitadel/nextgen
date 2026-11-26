@@ -8209,7 +8209,7 @@
               "examples": {
                 "bundle": {
                   "summary": "Built from the files on disk",
-                  "description": "A whole bundle: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
+                  "description": "The CLI's form: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The schema's `metaSchema` is the one the server\npublishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
                   "value": {
                     "bundle": {
                       "schemas": [
@@ -19864,7 +19864,7 @@
       "oauth-settings": {
         "x-meta-schema": true,
         "type": "object",
-        "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettings` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
+        "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettings` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns. Locally it is the `.zitadel/oauth/` descriptor that\n`zitadel deploy` publishes with the rest of the bundle.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
         "additionalProperties": false,
         "required": [
           "enabled"

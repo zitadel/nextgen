@@ -59,10 +59,10 @@ post:
           bundle:
             summary: Built from the files on disk
             description: |
-              A whole bundle: the schemas, flow definitions, branding and
+              The CLI's form: the schemas, flow definitions, branding and
               OAuth settings as authored, the flow naming its schema by
-              `objectType`. The
-              schema's `metaSchema` is the one the server publishes at
+              `objectType`. The schema's `metaSchema` is the one the server
+              publishes at
               `/user-schema.json`. The server reuses whichever revisions
               already match and allocates the rest.
             value:

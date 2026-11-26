@@ -60385,7 +60385,8 @@ func (s *OAuth2) SetScopes(val []string) {
 // The OAuth settings of a project: whether the project's OAuth authorization server answers. It has
 // one shape in two places: the `oauth` resource of the bundle `buildRelease` (`POST /releases/build`)
 // takes, which publishes it as a new immutable revision, and the read-only revision `getOAuthSettings`
-// (`GET /oauth_settings/{oauth_settings_id}`) returns.
+// (`GET /oauth_settings/{oauth_settings_id}`) returns. Locally it is the `.zitadel/oauth/` descriptor
+// that `zitadel deploy` publishes with the rest of the bundle.
 //
 // A release is the only writer: there is no operation that publishes OAuth settings on their own. A
 // release without `oauth` leaves the authorization server off.
