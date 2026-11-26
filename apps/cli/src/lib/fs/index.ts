@@ -2,34 +2,28 @@
  * The file-system calls of the CLI, throwing typed errors.
  *
  * @remarks
- * Every function here has the name and call signature of its `node:fs/promises`
- * namesake. It calls Node and turns a failure with a known `errno` code into the
- * matching class of `./errors`, naming the operation and the path and keeping
- * Node's error as `cause`. Any other error is rethrown as Node raised it.
+ * Every function here has the name of its `node:fs/promises` namesake and the
+ * part of its signature the CLI uses. It calls Node and turns a failure of the
+ * system call into the matching class of `./errors`, naming the operation and
+ * the path and keeping Node's error as `cause`. Node's own argument errors
+ * (`ERR_*`) are bugs in the caller and are rethrown as Node raised them.
  *
  * This is the one place that reads the `code` of a Node error. Everything else
  * imports file-system calls from here, never from `node:fs/promises`, and
  * catches {@link FsNotFoundError} and its siblings by class.
  */
-import type { BufferView, NonSharedBuffer } from "node:buffer";
 import type {
-  BigIntStats,
-  BufferEncodingOption,
   CopyOptions,
   Dirent,
   GlobOptionsWithoutFileTypes,
   MakeDirectoryOptions,
   Mode,
-  ObjectEncodingOptions,
   PathLike,
-  ReadFileOptions,
-  ReadFileOptionsWithBuffer,
-  ReadFileOptionsWithBufferEncoding,
-  ReadFileOptionsWithStringEncoding,
   RmDirOptions,
-  StatOptions,
+  RmOptions,
   Stats,
   TimeLike,
+  WriteFileOptions,
 } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
 import {
@@ -70,6 +64,7 @@ export * from "./errors";
 /**
  * The error to throw for a failure of a file-system call.
  *
+ * @remarks
  * Every wrapper in this module uses it, and it is the only reader of a Node
  * error's `code` in the CLI.
  *
@@ -77,14 +72,17 @@ export * from "./errors";
  * @param operation - What the call was doing, as a verb, for the message.
  * @param path - What it was doing it to.
  * @returns The typed error for a known code, {@link FsFailedError} for any other
- *   errno code, otherwise `error` itself.
+ *   failure of the system call, otherwise `error` itself.
  */
-function fsFailure(error: unknown, operation: string, path: unknown): unknown {
+function fsFailure(error: unknown, operation: string, path: PathLike): unknown {
   const message = `Cannot ${operation} ${String(path)}`;
   if (isErrno(error, "ENOENT")) {
     return new FsNotFoundError(message, error);
   }
-  if (isErrno(error, "EACCES") || isErrno(error, "EPERM")) {
+  if (isErrno(error, "EACCES")) {
+    return new FsDeniedError(message, error);
+  }
+  if (isErrno(error, "EPERM")) {
     return new FsDeniedError(message, error);
   }
   if (isErrno(error, "ENOTDIR")) {
@@ -109,176 +107,181 @@ function fsFailure(error: unknown, operation: string, path: unknown): unknown {
   return error;
 }
 
-/** `readFile` of `node:fs/promises`, throwing typed errors. */
-export function readFile<T extends NodeJS.ArrayBufferView>(
-  path: PathLike | FileHandle,
-  options: ReadFileOptionsWithBuffer<T>,
-): Promise<BufferView<T>>;
-export function readFile(
-  path: PathLike | FileHandle,
-  options?: ReadFileOptionsWithBufferEncoding | null,
-): Promise<NonSharedBuffer>;
-export function readFile(
-  path: PathLike | FileHandle,
-  options: ReadFileOptionsWithStringEncoding | BufferEncoding,
-): Promise<string>;
-export function readFile(
-  path: PathLike | FileHandle,
-  options: ReadFileOptions | BufferEncoding | null,
-): Promise<string | NonSharedBuffer>;
-export async function readFile(path: PathLike | FileHandle, options?: unknown): Promise<unknown> {
+/**
+ * Reads a file as text.
+ *
+ * @param path - The file to read.
+ * @param encoding - How its bytes are decoded.
+ * @returns The file's text.
+ * @throws {@link FsError} When the file cannot be read.
+ */
+export function readFile(path: PathLike, encoding: BufferEncoding): Promise<string>;
+/**
+ * Reads a file as bytes.
+ *
+ * @param path - The file to read.
+ * @returns The file's bytes.
+ * @throws {@link FsError} When the file cannot be read.
+ */
+export function readFile(path: PathLike): Promise<Buffer>;
+/**
+ * Reads a file, as text when an encoding is given and as bytes otherwise.
+ *
+ * @param path - The file to read.
+ * @param encoding - How its bytes are decoded, if they are.
+ * @returns The file's text or bytes.
+ * @throws {@link FsError} When the file cannot be read.
+ */
+export async function readFile(
+  path: PathLike,
+  encoding?: BufferEncoding,
+): Promise<string | Buffer> {
   try {
-    return await nodeReadFile(path, options as never);
+    return encoding === undefined ? await nodeReadFile(path) : await nodeReadFile(path, encoding);
   } catch (error) {
     throw fsFailure(error, "read", path);
   }
 }
 
-/** `writeFile` of `node:fs/promises`, throwing typed errors. */
-export async function writeFile(...args: Parameters<typeof nodeWriteFile>): Promise<void> {
+/**
+ * Writes a file, replacing what it held unless `options.flag` says otherwise.
+ *
+ * @param path - The file to write.
+ * @param data - What it holds.
+ * @param options - Its encoding, mode and open flag.
+ * @throws {@link FsError} When the file cannot be written.
+ */
+export async function writeFile(
+  path: PathLike,
+  data: string | Uint8Array,
+  options?: WriteFileOptions,
+): Promise<void> {
   try {
-    await nodeWriteFile(...args);
+    await nodeWriteFile(path, data, options);
   } catch (error) {
-    throw fsFailure(error, "write", args[0]);
+    throw fsFailure(error, "write", path);
   }
 }
 
-/** `rm` of `node:fs/promises`, throwing typed errors. */
-export async function rm(...args: Parameters<typeof nodeRm>): Promise<void> {
+/**
+ * Removes a file or, with `recursive`, a directory and everything in it.
+ *
+ * @param path - What to remove.
+ * @param options - Whether to recurse, and whether a missing path is fine (`force`).
+ * @throws {@link FsError} When it cannot be removed.
+ */
+export async function rm(path: PathLike, options?: RmOptions): Promise<void> {
   try {
-    await nodeRm(...args);
+    await nodeRm(path, options);
   } catch (error) {
-    throw fsFailure(error, "remove", args[0]);
+    throw fsFailure(error, "remove", path);
   }
 }
 
-/** `mkdir` of `node:fs/promises`, throwing typed errors. */
-export function mkdir(
+/**
+ * Creates a directory.
+ *
+ * @param path - The directory to create.
+ * @param options - Whether to create its parents too (`recursive`), and its mode.
+ * @returns With `recursive`, the first directory it created, or `undefined`
+ *   when every one was already there; otherwise `undefined`.
+ * @throws {@link FsError} When it cannot be created.
+ */
+export async function mkdir(
   path: PathLike,
-  options: MakeDirectoryOptions & {
-    recursive: true;
-  },
-): Promise<string | undefined>;
-export function mkdir(
-  path: PathLike,
-  options?:
-    | Mode
-    | (MakeDirectoryOptions & {
-        recursive?: false | undefined;
-      })
-    | null,
-): Promise<void>;
-export function mkdir(
-  path: PathLike,
-  options?: Mode | MakeDirectoryOptions | null,
-): Promise<string | undefined>;
-export async function mkdir(path: PathLike, options?: unknown): Promise<unknown> {
+  options?: MakeDirectoryOptions,
+): Promise<string | undefined> {
   try {
-    return await nodeMkdir(path, options as never);
+    return await nodeMkdir(path, options);
   } catch (error) {
     throw fsFailure(error, "create directory", path);
   }
 }
 
-/** `stat` of `node:fs/promises`, throwing typed errors. */
-export function stat(
-  path: PathLike,
-  options?: StatOptions & {
-    bigint?: false | undefined;
-  },
-): Promise<Stats>;
-export function stat(
-  path: PathLike,
-  options: StatOptions & {
-    bigint: true;
-  },
-): Promise<BigIntStats>;
-export function stat(path: PathLike, options?: StatOptions): Promise<Stats | BigIntStats>;
-export async function stat(path: PathLike, options?: StatOptions): Promise<Stats | BigIntStats> {
+/**
+ * What is at a path, following symbolic links.
+ *
+ * @param path - The path to look at.
+ * @returns Its stats.
+ * @throws {@link FsError} When it cannot be looked at.
+ */
+export async function stat(path: PathLike): Promise<Stats> {
   try {
-    return await nodeStat(path, options);
+    return await nodeStat(path);
   } catch (error) {
     throw fsFailure(error, "inspect", path);
   }
 }
 
-/** `lstat` of `node:fs/promises`, throwing typed errors. */
-export function lstat(
-  path: PathLike,
-  options?: StatOptions & {
-    bigint?: false | undefined;
-  },
-): Promise<Stats>;
-export function lstat(
-  path: PathLike,
-  options: StatOptions & {
-    bigint: true;
-  },
-): Promise<BigIntStats>;
-export function lstat(path: PathLike, options?: StatOptions): Promise<Stats | BigIntStats>;
-export async function lstat(path: PathLike, options?: StatOptions): Promise<Stats | BigIntStats> {
+/**
+ * What is at a path, without following a symbolic link there.
+ *
+ * @param path - The path to look at.
+ * @returns Its stats; a link's own, not its target's.
+ * @throws {@link FsError} When it cannot be looked at.
+ */
+export async function lstat(path: PathLike): Promise<Stats> {
   try {
-    return await nodeLstat(path, options);
+    return await nodeLstat(path);
   } catch (error) {
     throw fsFailure(error, "inspect", path);
   }
 }
 
-/** `readdir` of `node:fs/promises`, throwing typed errors. */
-export function readdir(
-  path: PathLike,
-  options?:
-    | (ObjectEncodingOptions & {
-        withFileTypes?: false | undefined;
-        recursive?: boolean | undefined;
-      })
-    | BufferEncoding
-    | null,
-): Promise<string[]>;
-export function readdir(
-  path: PathLike,
-  options:
-    | {
-        encoding: "buffer";
-        withFileTypes?: false | undefined;
-        recursive?: boolean | undefined;
-      }
-    | "buffer",
-): Promise<NonSharedBuffer[]>;
-export function readdir(
-  path: PathLike,
-  options?:
-    | (ObjectEncodingOptions & {
-        withFileTypes?: false | undefined;
-        recursive?: boolean | undefined;
-      })
-    | BufferEncoding
-    | null,
-): Promise<string[] | NonSharedBuffer[]>;
-export function readdir(
-  path: PathLike,
-  options: ObjectEncodingOptions & {
-    withFileTypes: true;
-    recursive?: boolean | undefined;
-  },
-): Promise<Dirent[]>;
+/**
+ * Lists the names in a directory.
+ *
+ * @param path - The directory to list.
+ * @returns The entry names, in no guaranteed order.
+ * @throws {@link FsError} When it cannot be listed.
+ */
+export function readdir(path: PathLike): Promise<string[]>;
+/**
+ * Lists the entries of a directory, each with its type.
+ *
+ * @param path - The directory to list.
+ * @param options - Asks for the entries with their types.
+ * @returns The entries, in no guaranteed order.
+ * @throws {@link FsError} When it cannot be listed.
+ */
 export function readdir(
   path: PathLike,
   options: {
-    encoding: "buffer";
-    withFileTypes: true;
-    recursive?: boolean | undefined;
+    readonly withFileTypes: true;
   },
-): Promise<Dirent<NonSharedBuffer>[]>;
-export async function readdir(path: PathLike, options?: unknown): Promise<unknown> {
+): Promise<Dirent[]>;
+/**
+ * Lists a directory, as names or, with `withFileTypes`, as typed entries.
+ *
+ * @param path - The directory to list.
+ * @param options - Asks for the entries with their types.
+ * @returns The names or the entries, in no guaranteed order.
+ * @throws {@link FsError} When it cannot be listed.
+ */
+export async function readdir(
+  path: PathLike,
+  options?: {
+    readonly withFileTypes: true;
+  },
+): Promise<string[] | Dirent[]> {
   try {
-    return await nodeReaddir(path, options as never);
+    return options === undefined
+      ? await nodeReaddir(path)
+      : await nodeReaddir(path, {
+          withFileTypes: true,
+        });
   } catch (error) {
     throw fsFailure(error, "list", path);
   }
 }
 
-/** `rename` of `node:fs/promises`, throwing typed errors. */
+/**
+ * Moves or renames a file or directory.
+ *
+ * @param oldPath - Where it is.
+ * @param newPath - Where it goes; an existing file there is replaced.
+ * @throws {@link FsError} When it cannot be moved.
+ */
 export async function rename(oldPath: PathLike, newPath: PathLike): Promise<void> {
   try {
     await nodeRename(oldPath, newPath);
@@ -287,25 +290,30 @@ export async function rename(oldPath: PathLike, newPath: PathLike): Promise<void
   }
 }
 
-/** `realpath` of `node:fs/promises`, throwing typed errors. */
-export function realpath(
-  path: PathLike,
-  options?: ObjectEncodingOptions | BufferEncoding | null,
-): Promise<string>;
-export function realpath(path: PathLike, options: BufferEncodingOption): Promise<NonSharedBuffer>;
-export function realpath(
-  path: PathLike,
-  options?: ObjectEncodingOptions | BufferEncoding | null,
-): Promise<string | NonSharedBuffer>;
-export async function realpath(path: PathLike, options?: unknown): Promise<unknown> {
+/**
+ * The canonical path of a path, with every symbolic link resolved.
+ *
+ * @param path - The path to resolve.
+ * @returns The resolved path.
+ * @throws {@link FsError} When it cannot be resolved, for example because it is missing.
+ */
+export async function realpath(path: PathLike): Promise<string> {
   try {
-    return await nodeRealpath(path, options as never);
+    return await nodeRealpath(path);
   } catch (error) {
     throw fsFailure(error, "resolve", path);
   }
 }
 
-/** `open` of `node:fs/promises`, throwing typed errors. */
+/**
+ * Opens a file.
+ *
+ * @param path - The file to open.
+ * @param flags - How it is opened, such as `"r"`.
+ * @param mode - Its mode, when it is created.
+ * @returns The open file; the caller closes it.
+ * @throws {@link FsError} When it cannot be opened.
+ */
 export async function open(
   path: PathLike,
   flags?: string | number,
@@ -318,7 +326,12 @@ export async function open(
   }
 }
 
-/** `unlink` of `node:fs/promises`, throwing typed errors. */
+/**
+ * Removes a file.
+ *
+ * @param path - The file to remove.
+ * @throws {@link FsError} When it cannot be removed.
+ */
 export async function unlink(path: PathLike): Promise<void> {
   try {
     await nodeUnlink(path);
@@ -327,7 +340,13 @@ export async function unlink(path: PathLike): Promise<void> {
   }
 }
 
-/** `access` of `node:fs/promises`, throwing typed errors. */
+/**
+ * Checks that a path can be reached, and with `mode` what it allows.
+ *
+ * @param path - The path to check.
+ * @param mode - The access to check, from `node:fs` `constants`; existence by default.
+ * @throws {@link FsError} When it cannot be reached or does not allow `mode`.
+ */
 export async function access(path: PathLike, mode?: number): Promise<void> {
   try {
     await nodeAccess(path, mode);
@@ -336,7 +355,13 @@ export async function access(path: PathLike, mode?: number): Promise<void> {
   }
 }
 
-/** `chmod` of `node:fs/promises`, throwing typed errors. */
+/**
+ * Changes the mode of a file.
+ *
+ * @param path - The file.
+ * @param mode - Its new mode, such as `0o600`.
+ * @throws {@link FsError} When its mode cannot be changed.
+ */
 export async function chmod(path: PathLike, mode: Mode): Promise<void> {
   try {
     await nodeChmod(path, mode);
@@ -345,7 +370,14 @@ export async function chmod(path: PathLike, mode: Mode): Promise<void> {
   }
 }
 
-/** `cp` of `node:fs/promises`, throwing typed errors. */
+/**
+ * Copies a file or, with `recursive`, a directory tree.
+ *
+ * @param source - What to copy.
+ * @param destination - Where the copy goes.
+ * @param options - Whether to recurse and how to treat what is already there.
+ * @throws {@link FsError} When it cannot be copied.
+ */
 export async function cp(
   source: string | URL,
   destination: string | URL,
@@ -358,28 +390,49 @@ export async function cp(
   }
 }
 
-/** `copyFile` of `node:fs/promises`, throwing typed errors. */
-export async function copyFile(src: PathLike, dest: PathLike, mode?: number): Promise<void> {
+/**
+ * Copies one file.
+ *
+ * @param source - The file to copy.
+ * @param destination - Where the copy goes.
+ * @param mode - Copy flags from `node:fs` `constants`, such as `COPYFILE_EXCL`.
+ * @throws {@link FsError} When it cannot be copied.
+ */
+export async function copyFile(
+  source: PathLike,
+  destination: PathLike,
+  mode?: number,
+): Promise<void> {
   try {
-    await nodeCopyFile(src, dest, mode);
+    await nodeCopyFile(source, destination, mode);
   } catch (error) {
-    throw fsFailure(error, "copy", src);
+    throw fsFailure(error, "copy", source);
   }
 }
 
-/** `mkdtemp` of `node:fs/promises`, throwing typed errors. */
-export async function mkdtemp(
-  prefix: string,
-  options?: ObjectEncodingOptions | BufferEncoding | null,
-): Promise<string> {
+/**
+ * Creates a new, empty directory with a unique name.
+ *
+ * @param prefix - The path the name starts with; six random characters follow.
+ * @returns The directory created.
+ * @throws {@link FsError} When it cannot be created.
+ */
+export async function mkdtemp(prefix: string): Promise<string> {
   try {
-    return await nodeMkdtemp(prefix, options);
+    return await nodeMkdtemp(prefix);
   } catch (error) {
     throw fsFailure(error, "create a directory at", prefix);
   }
 }
 
-/** `utimes` of `node:fs/promises`, throwing typed errors. */
+/**
+ * Sets when a file was last read and changed.
+ *
+ * @param path - The file.
+ * @param atime - When it was last read.
+ * @param mtime - When it was last changed.
+ * @throws {@link FsError} When its times cannot be set.
+ */
 export async function utimes(path: PathLike, atime: TimeLike, mtime: TimeLike): Promise<void> {
   try {
     await nodeUtimes(path, atime, mtime);
@@ -388,7 +441,13 @@ export async function utimes(path: PathLike, atime: TimeLike, mtime: TimeLike): 
   }
 }
 
-/** `rmdir` of `node:fs/promises`, throwing typed errors. */
+/**
+ * Removes an empty directory.
+ *
+ * @param path - The directory.
+ * @param options - Node's options for the removal.
+ * @throws {@link FsError} When it cannot be removed, for example because it is not empty.
+ */
 export async function rmdir(path: PathLike, options?: RmDirOptions): Promise<void> {
   try {
     await nodeRmdir(path, options);
@@ -397,7 +456,14 @@ export async function rmdir(path: PathLike, options?: RmDirOptions): Promise<voi
   }
 }
 
-/** `glob` of `node:fs/promises` yielding path strings, throwing typed errors. */
+/**
+ * The paths that match a glob pattern.
+ *
+ * @param pattern - The pattern, or several.
+ * @param options - Where to search from and what to leave out.
+ * @returns The matching paths, as they are found.
+ * @throws {@link FsError} When the search cannot read a directory.
+ */
 export async function* glob(
   pattern: string | readonly string[],
   options: GlobOptionsWithoutFileTypes = {},
@@ -405,21 +471,29 @@ export async function* glob(
   try {
     yield* nodeGlob(pattern, options);
   } catch (error) {
-    throw fsFailure(error, "search", options.cwd ?? pattern);
+    throw fsFailure(error, "search", options.cwd ?? String(pattern));
   }
 }
 
 /**
- * Whether anything exists at `path`. Any failure to look, not only a missing
- * path, reads as "no": use it to choose between two ways forward, not to
- * decide that a path is safe to touch.
+ * Whether anything exists at `path`.
+ *
+ * @remarks
+ * Any failure to look, not only a missing path, reads as "no": use it to choose
+ * between two ways forward, not to decide that a path is safe to touch.
+ *
+ * @param path - The path to look for.
+ * @returns Whether it could be reached.
  */
 export async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return false;
+    }
+    throw error;
   }
 }
 
@@ -427,15 +501,14 @@ export async function pathExists(path: string): Promise<boolean> {
  * Reads a UTF-8 text file, treating a file that does not exist as "no text"
  * rather than as an error.
  *
- * It spares every optional-file read a hand-written
- * `try { await readFile(...) } catch` to recognise `ENOENT`. Only a missing file
- * gives `undefined`. A file that exists but cannot be read, such as one without
- * read permission or a directory, still throws, so it is not mistaken for an
- * absent one.
+ * @remarks
+ * Only a missing file gives `undefined`. A file that exists but cannot be read,
+ * such as one without read permission or a directory, still throws, so it is
+ * not mistaken for an absent one.
  *
- * @param path The file to read.
+ * @param path - The file to read.
  * @returns The file's contents, or `undefined` when it does not exist.
- * @throws Any error from reading the file other than it not existing.
+ * @throws {@link FsError} When the file exists but cannot be read.
  *
  * @example
  * const text = await readIfExists(join(cwd, ".env"));
@@ -458,20 +531,17 @@ export async function readIfExists(path: string): Promise<string | undefined> {
  * Lists the names in a directory, treating a directory that does not exist as an
  * empty one.
  *
+ * @remarks
  * Some directories the CLI lists may not exist yet, such as the directory
  * `setup` is about to scaffold an app into, so "no such folder" and "no files in
- * the folder" mean the same thing to the caller. Only a missing directory
- * (`ENOENT`) is treated that way. A directory
- * that exists but cannot be listed, such as one without read permission, or a
- * file where a directory should be (`ENOTDIR`), still throws, so a broken layout
- * is reported and not mistaken for an empty folder.
+ * the folder" mean the same thing to the caller. A directory that exists but
+ * cannot be listed, or a file where a directory should be, still throws, so a
+ * broken layout is reported and not mistaken for an empty folder.
  *
- * The names are returned as `readdir` gives them: file and folder names only,
- * not full paths, in no guaranteed order. Sort them if the order matters.
- *
- * @param path The directory to list.
- * @returns The entry names, or `[]` when the directory does not exist.
- * @throws Any error from reading the directory other than it not existing.
+ * @param path - The directory to list.
+ * @returns The entry names, in no guaranteed order, or `[]` when the directory
+ *   does not exist.
+ * @throws {@link FsError} When the directory exists but cannot be listed.
  */
 export async function readDirIfExists(path: string): Promise<string[]> {
   try {
@@ -485,9 +555,15 @@ export async function readDirIfExists(path: string): Promise<string[]> {
 }
 
 /**
- * Whether anything exists at `path`, false only when it is missing. A path that
- * cannot be looked at for another reason (permissions, a file where a directory
- * should be) throws, so it is not mistaken for an absent one.
+ * Whether anything exists at `path`, false only when it is missing.
+ *
+ * @remarks
+ * A path that cannot be looked at for another reason (permissions, a file where
+ * a directory should be) throws, so it is not mistaken for an absent one.
+ *
+ * @param path - The path to look for.
+ * @returns Whether it exists.
+ * @throws {@link FsError} When it cannot be looked at for a reason other than being missing.
  */
 export async function pathExistsStrict(path: string): Promise<boolean> {
   try {
@@ -503,12 +579,11 @@ export async function pathExistsStrict(path: string): Promise<boolean> {
 
 /**
  * Whether an entry exists at `path`, a link counting as an entry even when what
- * it points at is missing. False only when nothing is there; any other failure
- * to look throws.
+ * it points at is missing.
  *
  * @param path - What to look for.
  * @returns Whether an entry is there.
- * @throws Any `lstat` error other than the entry being missing.
+ * @throws {@link FsError} When it cannot be looked at for a reason other than being missing.
  */
 export async function entryExists(path: string): Promise<boolean> {
   try {
@@ -523,30 +598,37 @@ export async function entryExists(path: string): Promise<boolean> {
 }
 
 /**
- * A file's text, or `undefined` when it is absent or cannot be read. For a
- * report on the state of files, where one that cannot be read is shown as
+ * A file's text, or `undefined` when it is absent or cannot be read.
+ *
+ * @remarks
+ * For a report on the state of files, where one that cannot be read is shown as
  * missing instead of aborting the rest.
+ *
+ * @param path - The file to read.
+ * @returns Its text, or `undefined`.
  */
 export async function readIfReadable(path: string): Promise<string | undefined> {
   try {
     return await readIfExists(path);
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 
 /**
  * Whether `path` is a regular file.
  *
+ * @remarks
  * Answers `false` for anything else: a directory, a socket, a path that does
- * not exist, or a path that cannot be looked at (for example because of
- * permissions). This is the lenient check, for "is there a file here I can use"
- * decisions where every kind of no is the same no. Use {@link pathExistsStrict}
- * when a path that cannot be inspected should be an error and not a "no".
+ * not exist, or a path that cannot be looked at. This is the lenient check, for
+ * "is there a file here I can use" decisions where every kind of no is the same
+ * no. Use {@link pathExistsStrict} when a path that cannot be inspected should
+ * be an error. Symbolic links are followed, so a link to a file counts as a file.
  *
- * Symbolic links are followed, so a link to a file counts as a file.
- *
- * @param path The path to check.
+ * @param path - The path to check.
  * @returns `true` when the path leads to a regular file.
  */
 export async function isFile(path: string): Promise<boolean> {
