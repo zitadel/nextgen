@@ -30,10 +30,14 @@ export class StartedServer<T> {
     // Only an answer is worth keeping: a read that failed may have failed on
     // a half-written file or a busy machine, and the next caller deserves
     // its own attempt rather than this one's failure.
-    const reading = this.read(cwd).catch((error: unknown) => {
-      this.found.delete(cwd);
-      throw error;
-    });
+    const reading = (async (): Promise<T | undefined> => {
+      try {
+        return await this.read(cwd);
+      } catch (error) {
+        this.found.delete(cwd);
+        throw error;
+      }
+    })();
     this.found.set(cwd, reading);
     return reading;
   }

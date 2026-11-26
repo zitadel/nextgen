@@ -7,7 +7,7 @@ import { StringDecoder } from "node:string_decoder";
 import { buffer } from "node:stream/consumers";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
-import { execa } from "execa";
+import { ExecaError, execa } from "execa";
 import pWaitFor from "p-wait-for";
 
 import { errorMessage } from "@/lib/errors";
@@ -438,11 +438,15 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   const programs = [started, SERVER_PROGRAM];
   // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
   // such as pnpm export), and the server's long path is cut before its name.
-  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => {
-    return undefined;
-  });
-  if (listing === undefined) {
-    return true;
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let listing: string;
+  try {
+    listing = await ps(["axww", "-o", "pid=,pgid=,command="]);
+  } catch (error) {
+    if (error instanceof ExecaError) {
+      return true;
+    }
+    throw error;
   }
   const candidates = listing.split(/\r?\n/).flatMap((line) => {
     const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
@@ -471,11 +475,15 @@ const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
 
 /** Whether a process serves a data directory, or its environment does not say. */
 async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
-  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => {
-    return undefined;
-  });
-  if (command === undefined) {
-    return true;
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let command: string;
+  try {
+    command = await ps(["eww", "-p", String(pid), "-o", "command="]);
+  } catch (error) {
+    if (error instanceof ExecaError) {
+      return true;
+    }
+    throw error;
   }
   const at = command.indexOf(DATA_DIR_VARIABLE);
   if (at === -1) {

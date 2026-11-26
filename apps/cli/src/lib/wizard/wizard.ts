@@ -243,11 +243,14 @@ export class Wizard<Initial extends object, State extends object, Result> {
           undo,
         };
       };
-      const finished = await attempt().catch(async (error: unknown) => {
+      let finished: Progress<State & Out, Result>;
+      try {
+        finished = await attempt();
+      } catch (error) {
         told(() => options.watch?.failed?.(step.key, error));
         await before.undo();
         throw error;
-      });
+      }
       if (finished.kind === "continue") {
         told(() => options.watch?.finished?.(step.key, finished.state));
         try {
@@ -295,11 +298,13 @@ export class Wizard<Initial extends object, State extends object, Result> {
           undo: before.undo,
         };
       };
-      return attempt().catch(async (error: unknown) => {
+      try {
+        return await attempt();
+      } catch (error) {
         told(() => options.watch?.failed?.(step.key, error));
         await before.undo();
         throw error;
-      });
+      }
     };
     return new Wizard(this.name, keys, runner);
   }

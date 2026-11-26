@@ -79,17 +79,25 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     await DockerLauncher.remove(spec.containerName);
     await ensureImage(spec.image);
     const env = spec.env ?? EMPTY_ENV;
-    const result = await requireDocker(
-      DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
-      "Start local Zitadel container",
-      env.values,
-    ).catch(async (error: unknown) => {
-      // A run that failed after the container was created leaves it behind.
-      await DockerLauncher.remove(spec.containerName).catch(() => {
-        return false;
-      });
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let result: DockerResult;
+    try {
+      result = await requireDocker(
+        DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
+        "Start local Zitadel container",
+        env.values,
+      );
+    } catch (error) {
+      try {
+        await DockerLauncher.remove(spec.containerName);
+      } catch (cleanup) {
+        if (cleanup instanceof LocalServerInvalidError) {
+          throw error;
+        }
+        throw cleanup;
+      }
       throw error;
-    });
+    }
     return launched(
       DockerLauncher.metadata({
         cwdDataDir: spec.dataDir,
@@ -293,14 +301,17 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * a container must not fail for want of a `docker` to ask.
    */
   static async remove(containerName: string): Promise<boolean> {
-    const inspect = await DockerLauncher.inspect(containerName).catch((error: unknown) => {
-      // No `docker` on PATH: Docker is not installed, so it runs no container.
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let inspect: Awaited<ReturnType<typeof DockerLauncher.inspect>>;
+    try {
+      inspect = await DockerLauncher.inspect(containerName);
+    } catch (error) {
       if (isErrno(error, "ENOENT")) {
-        return undefined;
+        return false;
       }
       throw error;
-    });
-    if (!inspect?.exists) {
+    }
+    if (!inspect.exists) {
       return false;
     }
     if (inspect.running) {

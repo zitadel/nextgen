@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
+import { isErrno } from "@/lib/errno";
 import { errorMessage } from "@/lib/errors";
 import { LocalServerInvalidError } from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
@@ -14,7 +15,7 @@ import {
   findUpward,
   LOCAL_RUNTIME_DIR,
   PLATFORM_PROJECT_ID,
-  readRuntimeMetadata,
+  peekRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
 import { SecretFile } from "@/lib/project/secret-file";
@@ -62,9 +63,7 @@ export async function findLocalAdminFor(
 ): Promise<LocalAdmin | undefined> {
   for (const dir of ancestors(cwd, homedir())) {
     if ((await findLocalAdminDir(dir)) !== dir) continue;
-    const runtime = await readRuntimeMetadata(dir).catch(() => {
-      return undefined;
-    });
+    const runtime = await peekRuntimeMetadata(dir);
     if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
       return readLocalAdmin(dir);
     }
@@ -82,7 +81,9 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     // Only a missing file means `start` never created the admin. A file that
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    if (isErrno(error, "ENOENT")) {
+      return undefined;
+    }
     throw new LocalServerInvalidError(
       `${join(cwd, LOCAL_ADMIN_FILE)} cannot be read: ${errorMessage(error)}`,
       error,

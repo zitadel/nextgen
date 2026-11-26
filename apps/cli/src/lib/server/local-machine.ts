@@ -143,8 +143,10 @@ export class RealMachine implements LocalMachine {
  * @param folder - The folder.
  * @returns Its real path.
  */
-function resolved(folder: string): Promise<string> {
-  return realpath(folder).catch(() => {
+async function resolved(folder: string): Promise<string> {
+  try {
+    return await realpath(folder);
+  } catch {
     return resolve(folder);
-  });
+  }
 }

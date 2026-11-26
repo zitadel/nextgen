@@ -313,9 +313,13 @@ export async function loopbackReach(
   cwd: string,
   serverUrl: string,
 ): Promise<"allowed" | "container" | "unknown"> {
-  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => {
-    return undefined;
-  });
+  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+  let nearest: Awaited<ReturnType<typeof readNearestRuntimeMetadata>>;
+  try {
+    nearest = await readNearestRuntimeMetadata(cwd);
+  } catch {
+    return "unknown";
+  }
   if (!nearest || !sameLocalServer(nearest.runtime.server_url, serverUrl)) {
     return "unknown";
   }
@@ -498,14 +502,14 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
 
 async function nearestExistingDirectory(path: string): Promise<string> {
   for (const current of ancestors(path)) {
-    const info = await stat(current).catch((error: unknown) => {
-      // Missing is the only miss to walk past, and the root has nothing above it.
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let info: Awaited<ReturnType<typeof stat>>;
+    try {
+      info = await stat(current);
+    } catch (error) {
       if (!isErrno(error, "ENOENT") || dirname(current) === current) {
         throw error;
       }
-      return undefined;
-    });
-    if (info === undefined) {
       continue;
     }
     if (!info.isDirectory()) {

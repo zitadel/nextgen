@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { SERVER } from "@/constants";
 import type { Parsed } from "@zitadel/config/idp";
 
+import { isErrno } from "@/lib/errno";
 import { errorMessage } from "@/lib/errors";
 import {
   LocalServerDockerMissingError,
@@ -783,14 +784,18 @@ export class LocalRuntime extends ZitadelRuntime {
         return runtime.server_url;
       }
     } else {
-      const container = await DockerLauncher.inspect(runtime.container_name).catch(() => {
-        return undefined;
-      });
-      if (
-        container?.running === true &&
-        (await checkLocalServerHealth(runtime.server_url, undefined, fetcher))
-      ) {
-        return runtime.server_url;
+      try {
+        const container = await DockerLauncher.inspect(runtime.container_name);
+        if (
+          container.running &&
+          (await checkLocalServerHealth(runtime.server_url, undefined, fetcher))
+        ) {
+          return runtime.server_url;
+        }
+      } catch (error) {
+        if (!isErrno(error, "ENOENT")) {
+          throw error;
+        }
       }
     }
     if (resolve(nearest.dir) !== resolve(cwd)) {
@@ -1298,10 +1303,12 @@ export class LocalRuntime extends ZitadelRuntime {
           );
         }
       }
-      const realPath = (path: string): Promise<string> => {
-        return realpath(path).catch(() => {
+      const realPath = async (path: string): Promise<string> => {
+        try {
+          return await realpath(path);
+        } catch {
           return resolve(path);
-        });
+        }
       };
       const dataDir = await realPath(localRuntimePaths(this.cwd).dataDir);
       const listed = await Promise.all(

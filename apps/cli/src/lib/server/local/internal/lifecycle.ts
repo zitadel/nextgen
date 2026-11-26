@@ -11,6 +11,7 @@
  * change stop being able to cover it.
  */
 import {
+  LocalServerInvalidError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
   LocalServerStartCleanupFailedError,
@@ -18,6 +19,7 @@ import {
   LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server/errors";
+import { isErrno } from "@/lib/errno";
 import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/server/local/runtime";
 import { type Clock, SystemClock } from "@/lib/clock";
 
@@ -443,9 +445,15 @@ export class Lifecycle<R extends ServerRecord> {
     LocalServerStartExitedError | LocalServerStartTimeoutError | LocalServerStartCleanupFailedError
   > {
     // The log goes first: cleaning up may remove it with the server.
-    const logTail = await this.deps.launcher.logTail?.(record, 40).catch(() => {
-      return undefined;
-    });
+    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
+    let logTail: string | undefined;
+    try {
+      logTail = await this.deps.launcher.logTail?.(record, 40);
+    } catch (error) {
+      if (!(error instanceof LocalServerInvalidError || isErrno(error, "EACCES"))) {
+        throw error;
+      }
+    }
     const outcome = await this.terminateQuietly(record);
     const logged = logTail ? `\nThe server logged:\n${logTail}` : "";
 

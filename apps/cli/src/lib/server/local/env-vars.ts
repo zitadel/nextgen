@@ -19,6 +19,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
+import { isErrno } from "@/lib/errno";
 import { errorMessage } from "@/lib/errors";
 import { LocalServerInvalidError } from "@/lib/server/errors";
 import { isObject } from "@/lib/json";
@@ -99,7 +100,7 @@ const readEnvFile = async (path: string): Promise<Readonly<Record<string, string
   try {
     contents = await readFile(path, "utf8");
   } catch (error) {
-    if (isObject(error) && error.code === "ENOENT") {
+    if (isErrno(error, "ENOENT")) {
       return {};
     }
     throw new LocalServerInvalidError(`Cannot read ${path}: ${errorMessage(error)}`, error);
