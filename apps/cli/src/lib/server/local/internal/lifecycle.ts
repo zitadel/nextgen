@@ -309,9 +309,11 @@ export class Lifecycle<R extends ServerRecord> {
     } finally {
       // A claim that cannot be removed is a file whose owner is gone, which
       // the next start takes over; it must not hide how this start ended.
-      await claim.release().catch(() => {
-        return undefined;
-      });
+      try {
+        await claim.release();
+      } catch {
+        // The claim stays; the next start takes it over.
+      }
     }
   }
 
