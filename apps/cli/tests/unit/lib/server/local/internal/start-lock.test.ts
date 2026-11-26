@@ -295,6 +295,7 @@ describe("withStartLock", () => {
       code: "E_CONFLICT",
       retryable: true,
       message: expect.stringContaining(lock),
+      lockFile: lock,
     });
     await release?.();
   });

@@ -14,7 +14,9 @@ import {
 } from "@/lib/server/local/runtime";
 import {
   LocalServerDockerMissingError,
-  LocalServerInvalidError,
+  LocalServerNotStartedError,
+  LocalServerPermitMismatchError,
+  LocalServerProcessesUnlistableError,
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
@@ -326,7 +328,7 @@ describe("LocalRuntime", () => {
           servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
         }).reset(DestroyPermit.forFolder(cwd)),
       ).rejects;
-      await rejection.toBeInstanceOf(LocalServerInvalidError);
+      await rejection.toBeInstanceOf(LocalServerProcessesUnlistableError);
       await rejection.toMatchObject({
         code: "E_VALIDATION",
       });
@@ -397,9 +399,9 @@ describe("LocalRuntime", () => {
     it("refuses a permit for another folder, and deletes nothing", async ({ dir: cwd, other }) => {
       await directoryWithAGoneServer(cwd);
 
-      await expect(at(cwd).reset(DestroyPermit.forFolder(other))).rejects.toThrow(
-        "The permit is for",
-      );
+      const rejection = expect(at(cwd).reset(DestroyPermit.forFolder(other))).rejects;
+      await rejection.toBeInstanceOf(LocalServerPermitMismatchError);
+      await rejection.toThrow("The permit is for");
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
     });
   });
@@ -420,7 +422,7 @@ describe("LocalRuntime", () => {
           tail: 10,
         }),
       ).rejects;
-      await rejection.toBeInstanceOf(LocalServerInvalidError);
+      await rejection.toBeInstanceOf(LocalServerNotStartedError);
       await rejection.toMatchObject({
         code: "E_VALIDATION",
         message: "Local Zitadel runtime has not been started",

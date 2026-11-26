@@ -292,6 +292,7 @@ async function isOwnFile(path: string): Promise<boolean> {
     }
     throw new LocalServerRecordUnreadableError(
       `${path} cannot be read: ${errorMessage(error)}`,
+      path,
       error,
     );
   }
@@ -388,6 +389,7 @@ export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
     if (error instanceof FsError) {
       throw new LocalServerRecordUnreadableError(
         `${paths.runtimeFile} cannot be read: ${error.message}`,
+        paths.runtimeFile,
         error,
       );
     }

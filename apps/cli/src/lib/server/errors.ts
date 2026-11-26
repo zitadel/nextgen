@@ -1,5 +1,7 @@
 import { ZitadelLibError } from "@/lib/errors";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
+import type { StopBinaryRuntimeResult } from "@/lib/server/local/internal/binary-launcher";
+import type { ManagedRuntimeProcess } from "@/lib/server/local/processes";
 
 /**
  * Anything the local server package fails with on purpose.
@@ -52,11 +54,149 @@ export class LocalServerNotRespondingElsewhereError extends LocalServerError {
   }
 }
 
-/** The request or a local file is not usable as given; the message says which and why. */
-export class LocalServerInvalidError extends LocalServerError {
+/** The folder has no record of a start, so there is no server whose log to read. */
+export class LocalServerNotStartedError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** The `@zitadel/server` npm package, or its platform package, cannot be found. */
+export class LocalServerPackageMissingError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** The server binary was found but could not be launched. */
+export class LocalServerLaunchFailedError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** Docker answered, but a command the CLI ran with it failed. The message says what Docker said. */
+export class LocalServerDockerFailedError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** The folder's env file exists but cannot be read. */
+export class LocalServerEnvUnreadableError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The env file, which the refusal names. */
+  readonly path: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param path - The env file.
+   * @param cause - The failure that reading it raised.
+   */
+  constructor(message: string, path: string, cause?: unknown) {
+    super(message, cause);
+    this.path = path;
+  }
+}
+
+/** The local admin file exists but cannot be read. */
+export class LocalServerAdminUnreadableError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The admin file, which the refusal names. */
+  readonly path: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param path - The admin file.
+   * @param cause - The failure that reading it raised.
+   */
+  constructor(message: string, path: string, cause?: unknown) {
+    super(message, cause);
+    this.path = path;
+  }
+}
+
+/** The local admin file is not in the shape it is written in. */
+export class LocalServerAdminMalformedError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The admin file, which the refusal says to delete. */
+  readonly path: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param path - The admin file.
+   * @param cause - The parse failure, when there is one.
+   */
+  constructor(message: string, path: string, cause?: unknown) {
+    super(message, cause);
+    this.path = path;
+  }
+}
+
+/** A reset was handed a permit for another folder than the one it acts on. */
+export class LocalServerPermitMismatchError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
+ * The runtime record cannot be read and the machine's processes cannot be
+ * listed, so nothing says whether a server still runs on the data.
+ */
+export class LocalServerProcessesUnlistableError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** Stopping every managed server left at least one process running. */
+export class LocalServerStopAllFailedError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** What stopping each process came to, which the refusal reports. */
+  readonly results: ReadonlyArray<
+    Readonly<{
+      process: ManagedRuntimeProcess;
+      stop_result: StopBinaryRuntimeResult;
+    }>
+  >;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param results - What stopping each process came to.
+   */
+  constructor(
+    message: string,
+    results: ReadonlyArray<
+      Readonly<{
+        process: ManagedRuntimeProcess;
+        stop_result: StopBinaryRuntimeResult;
+      }>
+    >,
+  ) {
+    super(message);
+    this.results = results;
+  }
 }
 
 /** A server address that is not an http(s) URL. */
@@ -78,6 +218,20 @@ export class LocalServerBusyError extends LocalServerError {
   override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
+
+  /** The lock file, which the refusal says to delete when no start runs. */
+  readonly lockFile: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param lockFile - The lock file the other start holds.
+   */
+  constructor(message: string, lockFile: string) {
+    super(message);
+    this.lockFile = lockFile;
+  }
 }
 
 /**
@@ -137,6 +291,21 @@ export class LocalServerRecordUnreadableError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** The record, which the refusal names. */
+  readonly path: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param message - What went wrong, with the facts it is about.
+   * @param path - The record that cannot be read.
+   * @param cause - The failure that reading it raised.
+   */
+  constructor(message: string, path: string, cause?: unknown) {
+    super(message, cause);
+    this.path = path;
+  }
 }
 
 /** A port that was explicitly asked for is held, so the start is refused rather than moved. */

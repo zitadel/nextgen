@@ -7,7 +7,10 @@ import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
 import { FsExistsError, FsNotFoundError, mkdir, readFile, rename, writeFile } from "@/lib/fs";
 import { errorMessage } from "@/lib/errors";
-import { LocalServerInvalidError } from "@/lib/server/errors";
+import {
+  LocalServerAdminMalformedError,
+  LocalServerAdminUnreadableError,
+} from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
 import {
@@ -84,17 +87,22 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
       return undefined;
     }
     if (error instanceof SyntaxError) {
-      throw new LocalServerInvalidError(
+      throw new LocalServerAdminMalformedError(
         `${join(cwd, LOCAL_ADMIN_FILE)} is malformed: ${errorMessage(error)}`,
+        join(cwd, LOCAL_ADMIN_FILE),
         error,
       );
     }
-    throw new LocalServerInvalidError(
+    throw new LocalServerAdminUnreadableError(
       `${join(cwd, LOCAL_ADMIN_FILE)} cannot be read: ${errorMessage(error)}`,
+      join(cwd, LOCAL_ADMIN_FILE),
       error,
     );
   }
-  throw new LocalServerInvalidError(`${join(cwd, LOCAL_ADMIN_FILE)} is malformed`);
+  throw new LocalServerAdminMalformedError(
+    `${join(cwd, LOCAL_ADMIN_FILE)} is malformed`,
+    join(cwd, LOCAL_ADMIN_FILE),
+  );
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {

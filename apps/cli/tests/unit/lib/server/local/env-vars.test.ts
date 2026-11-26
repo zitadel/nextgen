@@ -1,8 +1,9 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { LocalServerEnvUnreadableError } from "@/lib/server";
 import {
   EMPTY_ENV,
   isEnvSummary,
@@ -86,6 +87,17 @@ describe("dev-runtime env", () => {
     await expect(loadProjectEnv(cwd, NO_DEFAULTS)).resolves.toEqual({
       values: { NEXTGEN_SET: "x" },
       injected: ["NEXTGEN_SET"],
+    });
+  });
+
+  it("refuses an env file that exists but cannot be read, naming it", async ({ dir: cwd }) => {
+    await mkdir(join(cwd, ".env"));
+
+    const rejection = expect(loadEnvFiles(cwd)).rejects;
+
+    await rejection.toBeInstanceOf(LocalServerEnvUnreadableError);
+    await rejection.toMatchObject({
+      path: join(cwd, ".env"),
     });
   });
 

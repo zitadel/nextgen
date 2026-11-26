@@ -5,7 +5,16 @@ import {
   LocalServerDeniedError,
   LocalServerDockerMissingError,
   LocalServerError,
-  LocalServerInvalidError,
+  LocalServerAdminMalformedError,
+  LocalServerAdminUnreadableError,
+  LocalServerDockerFailedError,
+  LocalServerEnvUnreadableError,
+  LocalServerLaunchFailedError,
+  LocalServerNotStartedError,
+  LocalServerPackageMissingError,
+  LocalServerPermitMismatchError,
+  LocalServerProcessesUnlistableError,
+  LocalServerStopAllFailedError,
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
@@ -43,15 +52,39 @@ describe("the local server errors", () => {
       "E_LOCAL_SERVER_NOT_RUNNING",
     ],
     ["record malformed", new LocalServerRecordMalformedError("bad"), "invalid", "E_VALIDATION"],
-    ["unreadable record", new LocalServerRecordUnreadableError("bad"), "invalid", "E_VALIDATION"],
-    ["invalid", new LocalServerInvalidError("bad"), "invalid", "E_VALIDATION"],
+    [
+      "unreadable record",
+      new LocalServerRecordUnreadableError("bad", "/r"),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    ["not started", new LocalServerNotStartedError("none"), "invalid", "E_VALIDATION"],
+    ["package missing", new LocalServerPackageMissingError("none"), "invalid", "E_VALIDATION"],
+    ["launch failed", new LocalServerLaunchFailedError("no"), "invalid", "E_VALIDATION"],
+    ["docker failed", new LocalServerDockerFailedError("no"), "invalid", "E_VALIDATION"],
+    ["env unreadable", new LocalServerEnvUnreadableError("no", "/e"), "invalid", "E_VALIDATION"],
+    [
+      "admin unreadable",
+      new LocalServerAdminUnreadableError("no", "/a"),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    ["admin malformed", new LocalServerAdminMalformedError("no", "/a"), "invalid", "E_VALIDATION"],
+    ["permit mismatch", new LocalServerPermitMismatchError("no"), "invalid", "E_VALIDATION"],
+    [
+      "processes unlistable",
+      new LocalServerProcessesUnlistableError("no"),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    ["stop all failed", new LocalServerStopAllFailedError("no", []), "invalid", "E_VALIDATION"],
     [
       "platform missing",
       new LocalServerPlatformMissingError("no platform"),
       "invalid",
       "E_VALIDATION",
     ],
-    ["busy", new LocalServerBusyError("busy"), "conflict", "E_CONFLICT"],
+    ["busy", new LocalServerBusyError("busy", "/lock"), "conflict", "E_CONFLICT"],
     ["stop", new LocalServerStopError("stuck"), "invalid", "E_VALIDATION"],
     ["port busy", new LocalServerPortBusyError(8080), "unavailable", "E_PORT_IN_USE"],
     ["port full", new LocalServerPortFullError("full"), "unavailable", "E_PORT_IN_USE"],
@@ -74,7 +107,7 @@ describe("the local server errors", () => {
   });
 
   it("is retryable only while another start holds the lock", () => {
-    expect(new LocalServerBusyError("busy").retryable).toBe(true);
+    expect(new LocalServerBusyError("busy", "/lock").retryable).toBe(true);
     expect(new LocalServerPortBusyError(8080).retryable).toBe(false);
     expect(new LocalServerDockerMissingError("no daemon").retryable).toBe(false);
   });

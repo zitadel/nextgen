@@ -11,7 +11,8 @@ import pWaitFor from "p-wait-for";
 import { errorMessage } from "@/lib/errors";
 import { FsNotFoundError, mkdir, open, readFile, stat } from "@/lib/fs";
 import {
-  LocalServerInvalidError,
+  LocalServerLaunchFailedError,
+  LocalServerPackageMissingError,
   LocalServerProcessDeniedError,
   LocalServerProcessGoneError,
 } from "@/lib/server/errors";
@@ -238,7 +239,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     }
   }
 
-  /** The bundled server version, or a `LocalServerInvalidError`. */
+  /** The bundled server version, or a `LocalServerPackageMissingError`. */
   static assertAvailable(): string {
     return BinaryLauncher.available(() => {
       if (!process.env[COMMAND_ENV]) {
@@ -253,7 +254,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return find();
     } catch (error) {
-      throw new LocalServerInvalidError(
+      throw new LocalServerPackageMissingError(
         `Zitadel server npm package is not available: ${errorMessage(error)}`,
         error,
       );
@@ -527,7 +528,7 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
     child.unref();
     return pid;
   } catch (error) {
-    throw new LocalServerInvalidError(
+    throw new LocalServerLaunchFailedError(
       `The Zitadel server (${command}) could not be started: ${errorMessage(error)}`,
       error,
     );

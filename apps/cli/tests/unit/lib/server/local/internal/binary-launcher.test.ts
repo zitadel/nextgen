@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, vi } from "vitest";
 
-import { LocalServerInvalidError } from "@/lib/server";
+import { LocalServerLaunchFailedError, LocalServerPackageMissingError } from "@/lib/server";
 import { AppendedLog, BinaryLauncher } from "@/lib/server/local/internal/binary-launcher";
 import { launched } from "@/lib/server/local/internal/lifecycle";
 import { ManualClock } from "@tests/fixtures/clock";
@@ -146,7 +146,7 @@ describe("local server binary helpers", () => {
     }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     const rejection = expect(launching).rejects;
-    await rejection.toBeInstanceOf(LocalServerInvalidError);
+    await rejection.toBeInstanceOf(LocalServerLaunchFailedError);
     await rejection.toMatchObject({
       code: "E_VALIDATION",
     });
@@ -181,7 +181,7 @@ describe("local server binary helpers", () => {
     }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     const rejection = expect(launching).rejects;
-    await rejection.toBeInstanceOf(LocalServerInvalidError);
+    await rejection.toBeInstanceOf(LocalServerPackageMissingError);
     await rejection.toMatchObject({
       code: "E_VALIDATION",
     });

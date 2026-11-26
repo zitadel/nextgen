@@ -7,7 +7,10 @@ import { errorMessage } from "@/lib/errors";
 import { FsError, readFile, realpath } from "@/lib/fs";
 import {
   LocalServerDockerMissingError,
-  LocalServerInvalidError,
+  LocalServerNotStartedError,
+  LocalServerPermitMismatchError,
+  LocalServerProcessesUnlistableError,
+  LocalServerStopAllFailedError,
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
@@ -839,7 +842,7 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param servers - The processes of this machine.
    * @returns What was stopped, or that the processes cannot be listed here.
-   * @throws {LocalServerStopError} when a process did not stop.
+   * @throws {LocalServerStopAllFailedError} when a process did not stop.
    */
   static async stopAll(servers: LocalServers): Promise<SweepResult> {
     const discovery = await servers.current();
@@ -859,7 +862,10 @@ export class LocalRuntime extends ZitadelRuntime {
         return result.stop_result.status === "failed";
       })
     ) {
-      throw new LocalServerStopError("Some managed local runtime processes did not stop");
+      throw new LocalServerStopAllFailedError(
+        "Some managed local runtime processes did not stop",
+        results,
+      );
     }
     return { supported: true, results };
   }
@@ -1274,12 +1280,15 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param permit - The caller's proof that deleting is meant.
    * @returns What stopping the server did.
-   * @throws {LocalServerInvalidError} when the permit is for another folder, or the record cannot be read and the machine's processes cannot be listed.
+   * @throws {LocalServerPermitMismatchError} when the permit is for another folder.
+   * @throws {LocalServerProcessesUnlistableError} when the record cannot be read and the machine's processes cannot be listed.
    * @throws {LocalServerStopError} when a process on this folder's data would not stop.
    */
   async reset(permit: DestroyPermit): Promise<StopReport> {
     if (resolve(permit.folder) !== resolve(this.cwd)) {
-      throw new LocalServerInvalidError(`The permit is for ${permit.folder}, not ${this.cwd}`);
+      throw new LocalServerPermitMismatchError(
+        `The permit is for ${permit.folder}, not ${this.cwd}`,
+      );
     }
     // A record that cannot be read must not stop the reset that is its way out.
     const record = await peekRuntimeMetadata(this.cwd);
@@ -1296,7 +1305,7 @@ export class LocalRuntime extends ZitadelRuntime {
       if (!discovery.supported) {
         try {
           await readFile(localRuntimePaths(this.cwd).runtimeFile, "utf8");
-          throw new LocalServerInvalidError(
+          throw new LocalServerProcessesUnlistableError(
             "The local runtime record cannot be read and the machine's processes cannot be listed",
           );
         } catch (error) {
@@ -1413,7 +1422,7 @@ export class LocalRuntime extends ZitadelRuntime {
   private async recordedRuntime(): Promise<RuntimeMetadata> {
     const runtime = await readRuntimeMetadata(this.cwd);
     if (!runtime) {
-      throw new LocalServerInvalidError("Local Zitadel runtime has not been started");
+      throw new LocalServerNotStartedError("Local Zitadel runtime has not been started");
     }
     return runtime;
   }

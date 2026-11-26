@@ -10,7 +10,8 @@ import {
   AdminSession,
   LocalRuntime,
   LocalServerDeniedError,
-  LocalServerInvalidError,
+  LocalServerAdminMalformedError,
+  LocalServerAdminUnreadableError,
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
@@ -19,6 +20,8 @@ import {
   LocalServerRecordUnreadableError,
   ZitadelRuntime,
 } from "@/lib/server";
+import { Cmd } from "@/lib/cmd";
+import { shellCommand } from "@/lib/suggestion";
 import { section } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -76,7 +79,7 @@ const RECORD_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
+  hint: "Check that {path} and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /** How a run is refused when no local server was started here or in a parent. */
@@ -123,10 +126,28 @@ const ADMIN_DENIED_REFUSAL = {
   ],
 } as const satisfies Refusal;
 
-/** How a run is refused when the local admin file cannot be read or is malformed. */
-const ADMIN_FILE_UNUSABLE_REFUSAL = {
+/** How a run is refused when the local admin file exists but cannot be read. */
+const ADMIN_UNREADABLE_REFUSAL = {
   message: "{message}",
-  hint: "If the file cannot be read, check that it is readable by you; `zitadel start` writes it owner-only. If it is malformed, delete it and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
+  hint: "Check that {path} is readable by you; `zitadel start` writes it owner-only.",
+} as const satisfies Refusal;
+
+/** How a run is refused when the local admin file is not in the shape it is written in. */
+const ADMIN_MALFORMED_REFUSAL = {
+  message: "{message}",
+  hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
+  next: [
+    "{remove}",
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -263,6 +284,7 @@ export default class Console extends Telemetered(
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           ...error,
           message: error.message,
+          path: Cmd.quote(error.path),
         });
       }
       throw error;
@@ -465,6 +487,7 @@ export default class Console extends Telemetered(
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           ...error,
           message: error.message,
+          path: Cmd.quote(error.path),
         });
       }
       throw error;
@@ -501,11 +524,25 @@ export default class Console extends Telemetered(
         admin,
       };
     } catch (error) {
-      if (error instanceof LocalServerInvalidError) {
-        throw refusalError(ADMIN_FILE_UNUSABLE_REFUSAL, {
+      if (error instanceof LocalServerAdminUnreadableError) {
+        throw refusalError(ADMIN_UNREADABLE_REFUSAL, {
           ...error,
           message: error.message,
+          path: Cmd.quote(error.path),
         });
+      }
+      if (error instanceof LocalServerAdminMalformedError) {
+        throw refusalError(
+          ADMIN_MALFORMED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            path: Cmd.quote(error.path),
+          },
+          {
+            remove: shellCommand("rm", Cmd.quote(error.path)),
+          },
+        );
       }
       throw error;
     }

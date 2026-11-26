@@ -8,6 +8,8 @@ import {
   BackendForbiddenError,
   BackendNotFoundError,
   BackendUnauthorizedError,
+  BackendVariablePreviewMissingError,
+  BackendVariablePrimaryMissingError,
 } from "@/lib/backend";
 import {
   Variable,
@@ -155,12 +157,25 @@ describe("VariableService.get", () => {
     expect(variable.value).toBe("999-prod");
   });
 
-  it("refuses a name that holds no value of that kind", async () => {
-    await expect(
+  it("refuses a name that holds no preview value", async () => {
+    const rejection = expect(
       service({ getVariable: async () => ({}) }).get("CLIENT_ID", "preview"),
-    ).rejects.toMatchObject({
-      name: "BackendNotFoundError",
+    ).rejects;
+
+    await rejection.toBeInstanceOf(BackendVariablePreviewMissingError);
+    await rejection.toMatchObject({
       message: "Variable CLIENT_ID has no preview value.",
+    });
+  });
+
+  it("refuses a name that holds no primary value", async () => {
+    const rejection = expect(
+      service({ getVariable: async () => ({}) }).get("CLIENT_ID", "primary"),
+    ).rejects;
+
+    await rejection.toBeInstanceOf(BackendVariablePrimaryMissingError);
+    await rejection.toMatchObject({
+      message: "Variable CLIENT_ID has no primary value.",
     });
   });
 });

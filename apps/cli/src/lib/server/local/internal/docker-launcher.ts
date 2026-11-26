@@ -1,7 +1,7 @@
 import { ExecaError, execa } from "execa";
 
 import { errorMessage } from "@/lib/errors";
-import { LocalServerDockerMissingError, LocalServerInvalidError } from "@/lib/server/errors";
+import { LocalServerDockerMissingError, LocalServerDockerFailedError } from "@/lib/server/errors";
 
 import {
   EMPTY_ENV,
@@ -247,21 +247,21 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       if (result.status === 0) {
         return "remote";
       }
-      throw new LocalServerInvalidError(
+      throw new LocalServerDockerFailedError(
         `Inspect Docker image ${image} failed: ${result.stderr}`,
         result,
       );
     } catch (error) {
-      if (error instanceof LocalServerInvalidError) {
+      if (error instanceof LocalServerDockerFailedError) {
         throw error;
       }
       if (error instanceof ExecaError) {
-        throw new LocalServerInvalidError(
+        throw new LocalServerDockerFailedError(
           `Inspect Docker image ${image} failed: ${String(error.stderr)}`,
           error,
         );
       }
-      throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, error);
+      throw new LocalServerDockerFailedError(`Inspect Docker image ${image} failed`, error);
     }
   }
 
@@ -452,17 +452,17 @@ async function requireDocker(
   try {
     const result = await runDocker(args, env);
     if (result.status !== 0) {
-      throw new LocalServerInvalidError(`${action} failed: ${result.stderr}`, result);
+      throw new LocalServerDockerFailedError(`${action} failed: ${result.stderr}`, result);
     }
     return result;
   } catch (error) {
-    if (error instanceof LocalServerInvalidError) {
+    if (error instanceof LocalServerDockerFailedError) {
       throw error;
     }
     if (error instanceof ExecaError) {
-      throw new LocalServerInvalidError(`${action} failed: ${String(error.stderr)}`, error);
+      throw new LocalServerDockerFailedError(`${action} failed: ${String(error.stderr)}`, error);
     }
-    throw new LocalServerInvalidError(`${action} failed`, error);
+    throw new LocalServerDockerFailedError(`${action} failed`, error);
   }
 }
 
@@ -476,12 +476,12 @@ async function imageExists(image: string): Promise<boolean> {
     return result.status === 0;
   } catch (error) {
     if (error instanceof ExecaError) {
-      throw new LocalServerInvalidError(
+      throw new LocalServerDockerFailedError(
         `Inspect Docker image ${image} failed: ${String(error.stderr)}`,
         error,
       );
     }
-    throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, error);
+    throw new LocalServerDockerFailedError(`Inspect Docker image ${image} failed`, error);
   }
 }
 

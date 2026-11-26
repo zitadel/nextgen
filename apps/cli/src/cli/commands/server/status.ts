@@ -9,6 +9,7 @@ import {
   LocalServerRecordUnreadableError,
   ZitadelRuntime,
 } from "@/lib/server";
+import { Cmd } from "@/lib/cmd";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { CommandResult, Connection, MetaOptions } from "@/cli/core";
 import type { GlobalOptions } from "@/cli/core/types";
@@ -167,7 +168,7 @@ const RECORD_MALFORMED_REFUSAL = {
 /** How a status is refused when the runtime record of this folder cannot be read. */
 const RECORD_UNREADABLE_REFUSAL = {
   message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
+  hint: "Check that {path} and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /**
@@ -513,6 +514,7 @@ export default class Status extends Telemetered(ProjectCommand) {
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           ...error,
           message: error.message,
+          path: Cmd.quote(error.path),
         });
       }
       throw error;

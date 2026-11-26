@@ -144,6 +144,34 @@ describe("console", () => {
         });
       });
 
+      it("refuses a malformed local admin with the hint that names it", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedLocalAdmin();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: `Delete ${app.localAdminFile} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.`,
+        });
+      });
+
+      it("refuses a malformed local admin with the removal, reset and start that repair it", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedLocalAdmin();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          next_commands: [
+            `rm ${app.localAdminFile}`,
+            expectedPublicCliCommand(app.againAsRun("reset --force")),
+            expectedPublicCliCommand(app.againAsRun("start")),
+          ],
+        });
+      });
+
       it("refuses when the recorded server does not answer, and says to start it", async () => {
         const app = await aSetUpApp();
         await app.startLocalServer();

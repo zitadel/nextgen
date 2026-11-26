@@ -118,7 +118,11 @@ describe("local server runtime metadata", () => {
     const paths = await ensureLocalState(cwd);
     await mkdir(paths.runtimeFile);
 
-    await expect(readRuntimeMetadata(cwd)).rejects.toBeInstanceOf(LocalServerRecordUnreadableError);
+    const rejection = expect(readRuntimeMetadata(cwd)).rejects;
+    await rejection.toBeInstanceOf(LocalServerRecordUnreadableError);
+    await rejection.toMatchObject({
+      path: paths.runtimeFile,
+    });
   });
 
   it("writes container identity files for host-user Docker runs", async ({ dir: cwd }) => {

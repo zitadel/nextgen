@@ -37,6 +37,8 @@ export {
   BackendRequestMalformedError,
   BackendTooManyRequestsError,
   BackendUnauthorizedError,
+  BackendVariablePreviewMissingError,
+  BackendVariablePrimaryMissingError,
   BackendTimeoutError,
   BackendUnavailableError,
   BackendUnreachableError,

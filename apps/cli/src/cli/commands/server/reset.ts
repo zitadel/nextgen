@@ -1,4 +1,10 @@
-import { DestroyPermit, LocalServerInvalidError, LocalServerStopError } from "@/lib/server";
+import {
+  DestroyPermit,
+  LocalServerDockerFailedError,
+  LocalServerPermitMismatchError,
+  LocalServerProcessesUnlistableError,
+  LocalServerStopError,
+} from "@/lib/server";
 import type { CommandResult } from "@/cli/core";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -24,14 +30,31 @@ const SERVER_DID_NOT_STOP_REFUSAL = {
   hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
 } as const satisfies Refusal;
 
-/**
- * How a reset is refused when it cannot tell what runs on the data: the record
- * is damaged and the machine's processes cannot be listed, Docker failed to
- * remove the container, or the permit names another folder.
- */
-const RESET_REFUSED_REFUSAL = {
+/** How a reset is refused when the permit it was handed names another folder. */
+const PERMIT_MISMATCH_REFUSAL = {
   message: "{message}",
-  hint: "Stop the local Zitadel server yourself (its process or Docker container), then run `zitadel reset --force` again from the folder whose server you mean to reset.",
+  hint: "A reset acts on one folder only. Run it from the folder whose server you mean to reset.",
+} as const satisfies Refusal;
+
+/**
+ * How a reset is refused when the record is damaged and the machine's
+ * processes cannot be listed, so nothing says whether a server still runs on
+ * the data.
+ */
+const PROCESSES_UNLISTABLE_REFUSAL = {
+  message: "{message}",
+  hint: "The local runtime record is damaged and this machine cannot list its processes, so reset cannot tell whether a server still runs on the data. Stop the local Zitadel server yourself, then run `zitadel reset --force` again.",
+} as const satisfies Refusal;
+
+/** How a reset is refused when Docker failed to remove the container. */
+const DOCKER_FAILED_REFUSAL = {
+  message: "{message}",
+  hint: "Check that Docker is installed, running, and reachable from this shell.",
+  next: [
+    {
+      id: "doctor",
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -122,8 +145,20 @@ export default class Reset extends Telemetered(
               message: error.message,
             });
           }
-          if (error instanceof LocalServerInvalidError) {
-            throw refusalError(RESET_REFUSED_REFUSAL, {
+          if (error instanceof LocalServerPermitMismatchError) {
+            throw refusalError(PERMIT_MISMATCH_REFUSAL, {
+              ...error,
+              message: error.message,
+            });
+          }
+          if (error instanceof LocalServerProcessesUnlistableError) {
+            throw refusalError(PROCESSES_UNLISTABLE_REFUSAL, {
+              ...error,
+              message: error.message,
+            });
+          }
+          if (error instanceof LocalServerDockerFailedError) {
+            throw refusalError(DOCKER_FAILED_REFUSAL, {
               ...error,
               message: error.message,
             });

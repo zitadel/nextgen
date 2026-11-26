@@ -5,7 +5,12 @@ import {
   LocalRuntime,
   LocalServerBusyError,
   LocalServerDockerMissingError,
-  LocalServerInvalidError,
+  LocalServerAdminMalformedError,
+  LocalServerAdminUnreadableError,
+  LocalServerDockerFailedError,
+  LocalServerEnvUnreadableError,
+  LocalServerLaunchFailedError,
+  LocalServerPackageMissingError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
   LocalServerRecordMalformedError,
@@ -19,7 +24,15 @@ import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
 import type { NextSteps } from "@/cli/core/next-steps";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import { Guidance, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { Cmd } from "@/lib/cmd";
+import { PM } from "@/lib/pm";
+import {
+  Guidance,
+  shellCommand,
+  type SuggestedCommand,
+  suggestedCommandOf,
+} from "@/lib/suggestion";
+import { CliPackage } from "@/lib/upgrade";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -148,7 +161,7 @@ const RECORD_MALFORMED_REFUSAL = {
 const RECORD_UNREADABLE_REFUSAL = {
   code: "E_VALIDATION",
   message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
+  hint: "Check that {path} and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /** How a start is refused when the server it had to replace would not stop. */
@@ -161,17 +174,62 @@ const SERVER_WOULD_NOT_STOP_REFUSAL = {
 const START_IN_PROGRESS_REFUSAL = {
   code: "E_CONFLICT",
   message: "{message}",
-  hint: "Wait for it to finish, or delete the start lock if no start is running.",
+  hint: "Wait for it to finish, or delete {lockFile} if no start is running.",
 } as const satisfies Refusal;
 
-/**
- * How a start is refused when what it needs is not usable: the server package
- * is missing or cannot be launched, a local file it reads (the env file or the
- * local admin) cannot be read or is malformed, or Docker failed.
- */
-const CANNOT_START_REFUSAL = {
+/** How a start is refused when the server npm package cannot be found. */
+const PACKAGE_MISSING_REFUSAL = {
   message: "{message}",
-  hint: "If the server package is missing or cannot be launched, reinstall @zitadel/cli. If a local file is named, fix its permissions, or delete a malformed one and run `zitadel reset --force`, then `zitadel start`. If Docker failed, check that it is running and reachable from this shell.",
+  hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
+  next: ["{reinstall}"],
+} as const satisfies Refusal;
+
+/** How a start is refused when the server binary was found but could not be launched. */
+const LAUNCH_FAILED_REFUSAL = {
+  message: "{message}",
+  hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
+  next: ["{reinstall}"],
+} as const satisfies Refusal;
+
+/** How a start is refused when a command it ran with Docker failed. */
+const DOCKER_FAILED_REFUSAL = {
+  message: "{message}",
+  hint: "Check that Docker is installed, running, and reachable from this shell.",
+  next: [
+    {
+      id: "doctor",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a start is refused when the folder's env file exists but cannot be read. */
+const ENV_UNREADABLE_REFUSAL = {
+  message: "{message}",
+  hint: "The file {path} exists but could not be read; fix its permissions or remove it.",
+} as const satisfies Refusal;
+
+/** How a start is refused when the local admin file exists but cannot be read. */
+const ADMIN_UNREADABLE_REFUSAL = {
+  message: "{message}",
+  hint: "Check that {path} is readable by you; `zitadel start` writes it owner-only.",
+} as const satisfies Refusal;
+
+/** How a start is refused when the local admin file is not in the shape it is written in. */
+const ADMIN_MALFORMED_REFUSAL = {
+  message: "{message}",
+  hint: "Delete {path} and run `zitadel reset --force`, then `zitadel start`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.",
+  next: [
+    "{remove}",
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -415,6 +473,7 @@ export default class Start extends Telemetered(
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           ...error,
           message: error.message,
+          path: Cmd.quote(error.path),
         });
       }
       if (error instanceof LocalServerDockerMissingError) {
@@ -492,13 +551,65 @@ export default class Start extends Telemetered(
         throw refusalError(START_IN_PROGRESS_REFUSAL, {
           ...error,
           message: error.message,
+          lockFile: Cmd.quote(error.lockFile),
         });
       }
-      if (error instanceof LocalServerInvalidError) {
-        throw refusalError(CANNOT_START_REFUSAL, {
+      if (error instanceof LocalServerPackageMissingError) {
+        throw refusalError(
+          PACKAGE_MISSING_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            reinstall: suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`])),
+          },
+        );
+      }
+      if (error instanceof LocalServerLaunchFailedError) {
+        throw refusalError(
+          LAUNCH_FAILED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            reinstall: suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`])),
+          },
+        );
+      }
+      if (error instanceof LocalServerDockerFailedError) {
+        throw refusalError(DOCKER_FAILED_REFUSAL, {
           ...error,
           message: error.message,
         });
+      }
+      if (error instanceof LocalServerEnvUnreadableError) {
+        throw refusalError(ENV_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+          path: Cmd.quote(error.path),
+        });
+      }
+      if (error instanceof LocalServerAdminUnreadableError) {
+        throw refusalError(ADMIN_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+          path: Cmd.quote(error.path),
+        });
+      }
+      if (error instanceof LocalServerAdminMalformedError) {
+        throw refusalError(
+          ADMIN_MALFORMED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            path: Cmd.quote(error.path),
+          },
+          {
+            remove: shellCommand("rm", Cmd.quote(error.path)),
+          },
+        );
       }
       throw error;
     }

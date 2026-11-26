@@ -107,6 +107,30 @@ export class BackendClaimChallengeNotFoundError extends BackendNotFoundError {
 }
 
 /**
+ * A variable that holds no primary value.
+ *
+ * @remarks
+ * A {@link BackendNotFoundError}, so a caller that catches that kind catches this one too.
+ */
+export class BackendVariablePrimaryMissingError extends BackendNotFoundError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+}
+
+/**
+ * A variable that holds no preview value.
+ *
+ * @remarks
+ * A {@link BackendNotFoundError}, so a caller that catches that kind catches this one too.
+ */
+export class BackendVariablePreviewMissingError extends BackendNotFoundError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+}
+
+/**
  * The content built back to a release that was revoked: the server dedupes on
  * content, so the same tree always builds to that release, which can never be
  * served. A {@link BackendConflictError} like any other conflict.

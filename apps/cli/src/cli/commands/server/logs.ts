@@ -1,7 +1,11 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { LocalRuntime, LocalServerInvalidError } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerDockerFailedError,
+  LocalServerNotStartedError,
+} from "@/lib/server";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
@@ -48,16 +52,24 @@ const NOT_STARTED_REFUSAL = {
   next: [{ id: "start" }],
 } as const satisfies Refusal;
 
-/**
- * How reading the log is refused when the folder has no record of a start, or
- * Docker could not read the container's log.
- */
-const LOG_UNREADABLE_REFUSAL = {
+/** How reading the log is refused when the folder has no record of a start. */
+const NO_RECORD_REFUSAL = {
   message: "{message}",
-  hint: "Run `zitadel start` first if it never ran here; otherwise check that Docker is running and can read the local server's container.",
+  hint: "Run `zitadel start` first.",
   next: [
     {
       id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How reading the log is refused when Docker could not read the container's log. */
+const DOCKER_FAILED_REFUSAL = {
+  message: "{message}",
+  hint: "Check that Docker is installed, running, and reachable from this shell.",
+  next: [
+    {
+      id: "doctor",
     },
   ],
 } as const satisfies Refusal;
@@ -188,8 +200,14 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
         }
       }
     } catch (error) {
-      if (error instanceof LocalServerInvalidError) {
-        throw refusalError(LOG_UNREADABLE_REFUSAL, {
+      if (error instanceof LocalServerNotStartedError) {
+        throw refusalError(NO_RECORD_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerDockerFailedError) {
+        throw refusalError(DOCKER_FAILED_REFUSAL, {
           ...error,
           message: error.message,
         });

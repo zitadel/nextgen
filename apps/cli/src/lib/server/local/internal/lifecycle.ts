@@ -11,7 +11,7 @@
  * change stop being able to cover it.
  */
 import {
-  LocalServerInvalidError,
+  LocalServerDockerFailedError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
   LocalServerStartCleanupFailedError,
@@ -446,7 +446,7 @@ export class Lifecycle<R extends ServerRecord> {
   > {
     // The log goes first: cleaning up may remove it with the server.
     const logTail = await this.deps.launcher.logTail?.(record, 40)?.catch((error: unknown) => {
-      if (error instanceof LocalServerInvalidError) {
+      if (error instanceof LocalServerDockerFailedError) {
         return undefined;
       }
       if (error instanceof FsError) {

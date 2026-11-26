@@ -7,7 +7,7 @@ import {
   LocalServerPortFullError,
   LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
-  LocalServerInvalidError,
+  LocalServerDockerFailedError,
   LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server";
@@ -74,7 +74,7 @@ class World {
     isLaunchedAlive: async (server) => this.alive.has(server.pid),
     logTail: async () => {
       if (this.logsGone) {
-        throw new LocalServerInvalidError("no such container");
+        throw new LocalServerDockerFailedError("no such container");
       }
       return this.logs;
     },

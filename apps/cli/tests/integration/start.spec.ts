@@ -186,6 +186,47 @@ describe("start", () => {
         });
       });
 
+      it("refuses a malformed local admin with the hint that names it", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedLocalAdmin();
+
+        const result = await app.run(["start", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: `Delete ${app.localAdminFile} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.`,
+        });
+      });
+
+      it("refuses a malformed local admin with the removal, reset and start that repair it", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedLocalAdmin();
+
+        const result = await app.run(["start", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          next_commands: [
+            `rm ${app.localAdminFile}`,
+            expectedPublicCliCommand(app.againAsRun("reset --force")),
+            expectedPublicCliCommand(app.againAsRun("start")),
+          ],
+        });
+      });
+
+      it("refuses an env file it cannot read with the hint that names it", async () => {
+        const app = await aSetUpApp();
+        await app.makeLocalEnvFileUnreadable();
+
+        const result = await app.run(["start", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: `The file ${app.localEnvFile} exists but could not be read; fix its permissions or remove it.`,
+        });
+      });
+
       it("refuses a port outside the usable range", async () => {
         const app = await aSetUpApp();
 

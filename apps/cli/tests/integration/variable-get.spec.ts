@@ -368,6 +368,32 @@ describe("variable get", () => {
         });
       });
 
+      it("says how a name comes to hold a preview value when it holds none", async () => {
+        const app = await aSetUpApp();
+        platform.holdsAVariableWithNoValue();
+
+        const result = await app.getVariable("API_URL", { preview: true });
+
+        expect(JSON.parse(result.stdout)).toMatchObject({
+          code: "E_NOT_FOUND",
+          message: "Variable API_URL has no preview value.",
+          hint: "A name has a preview value only once one is set with `--preview`.",
+        });
+      });
+
+      it("says to set a primary value when the name holds none", async () => {
+        const app = await aSetUpApp();
+        platform.holdsAVariableWithNoValue();
+
+        const result = await app.getVariable("API_URL");
+
+        expect(JSON.parse(result.stdout)).toMatchObject({
+          code: "E_NOT_FOUND",
+          message: "Variable API_URL has no primary value.",
+          hint: "Set one with `variable set`.",
+        });
+      });
+
       it("withholds a secret's value", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("TOKEN", "s3cret", { secret: true })).toSucceed();

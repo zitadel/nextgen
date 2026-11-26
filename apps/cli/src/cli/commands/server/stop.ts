@@ -2,11 +2,13 @@ import { Flags } from "@oclif/core";
 
 import {
   LocalRuntime,
-  LocalServerInvalidError,
+  LocalServerDockerFailedError,
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
+  LocalServerStopAllFailedError,
   LocalServerStopError,
 } from "@/lib/server";
+import { Cmd } from "@/lib/cmd";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -21,6 +23,16 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 const SERVER_DID_NOT_STOP_REFUSAL = {
   message: "{message}",
   hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
+} as const satisfies Refusal;
+
+/** How `stop --all` is refused when at least one managed process would not stop. */
+const PROCESSES_DID_NOT_STOP_REFUSAL = {
+  message: "{message}",
+  hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
+  details: {
+    supported: true,
+    results: "{results}",
+  },
 } as const satisfies Refusal;
 
 /** How a stop is refused when the runtime record of this folder is not in the shape it is written in. */
@@ -43,7 +55,7 @@ const RECORD_MALFORMED_REFUSAL = {
 /** How a stop is refused when the runtime record of this folder cannot be read. */
 const RECORD_UNREADABLE_REFUSAL = {
   message: "{message}",
-  hint: "Check that the runtime record and its directory are readable by you.",
+  hint: "Check that {path} and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /** How a stop is refused when Docker failed to stop or remove the container. */
@@ -377,6 +389,12 @@ export default class Stop extends Telemetered(
         };
       }
     } catch (error) {
+      if (error instanceof LocalServerStopAllFailedError) {
+        throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof LocalServerStopError) {
         throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
           ...error,
@@ -393,9 +411,10 @@ export default class Stop extends Telemetered(
         throw refusalError(RECORD_UNREADABLE_REFUSAL, {
           ...error,
           message: error.message,
+          path: Cmd.quote(error.path),
         });
       }
-      if (error instanceof LocalServerInvalidError) {
+      if (error instanceof LocalServerDockerFailedError) {
         throw refusalError(DOCKER_FAILED_REFUSAL, {
           ...error,
           message: error.message,

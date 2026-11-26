@@ -2,7 +2,12 @@ import type { GetVariable200, ListVariables200 } from "@zitadel/api/generated/mo
 
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
-import { BackendForbiddenError, BackendNotFoundError } from "@/lib/backend/errors";
+import {
+  BackendForbiddenError,
+  BackendNotFoundError,
+  BackendVariablePreviewMissingError,
+  BackendVariablePrimaryMissingError,
+} from "@/lib/backend/errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -394,7 +399,8 @@ export class VariableService extends ApiService {
    * @param name - The variable to read.
    * @param kind - The kind to read it in.
    * @returns The variable. A secret is found but not disclosed.
-   * @throws BackendNotFoundError when the name holds no value of that kind.
+   * @throws BackendVariablePreviewMissingError when the name holds no preview value.
+   * @throws BackendVariablePrimaryMissingError when the name holds no primary value.
    */
   async get(name: string, kind: VariableKind): Promise<Variable> {
     const response = await this.client.getVariable(name, {
@@ -402,8 +408,11 @@ export class VariableService extends ApiService {
       kind,
     });
     const value = response[kind];
+    if (value === undefined && kind === "preview") {
+      throw new BackendVariablePreviewMissingError(`Variable ${name} has no ${kind} value.`);
+    }
     if (value === undefined) {
-      throw new BackendNotFoundError(`Variable ${name} has no ${kind} value.`);
+      throw new BackendVariablePrimaryMissingError(`Variable ${name} has no ${kind} value.`);
     }
     return Variable.of(name, value);
   }
