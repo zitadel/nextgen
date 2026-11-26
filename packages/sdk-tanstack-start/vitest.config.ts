@@ -6,7 +6,7 @@ import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
  * Two projects in one config:
  *
  * - `server` (node): the request middleware and the rest of the server code.
- * - `react` (jsdom): the `/react` widgets, server-rendered and then hydrated.
+ * - `react` (jsdom): the `/components` widgets, server-rendered and then hydrated.
  *   `resolve.conditions: ['browser']` resolves the browser build of
  *   `@lit/react`, which binds props and listeners on the client the way a real
  *   app's bundle does; its default Node build only renders.
@@ -25,7 +25,7 @@ export default defineConfig({
           globals: true,
           environment: "node",
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/react.test.tsx", edgeSpecs],
+          exclude: ["src/**/components.test.tsx", edgeSpecs],
         },
       },
       {
@@ -35,7 +35,7 @@ export default defineConfig({
           name: "react",
           globals: true,
           environment: "jsdom",
-          include: ["src/**/react.test.tsx"],
+          include: ["src/**/components.test.tsx"],
         },
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.

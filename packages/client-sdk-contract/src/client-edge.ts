@@ -1,4 +1,4 @@
-import type { WidgetName } from "@zitadel/sdk-core/types";
+import type { ZitadelWidgetName } from "@zitadel/sdk-core/types";
 
 import { describe, expect, it } from "vitest";
 
@@ -27,7 +27,7 @@ export function describeEdgeEntry(businessLocales: object): void {
  * framework renders on a server, and returns the markup.
  */
 export type EdgeRender = (
-  widget: WidgetName,
+  widget: ZitadelWidgetName,
   props: Readonly<Record<string, string>>,
 ) => Promise<string>;
 

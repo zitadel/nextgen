@@ -1,0 +1,9 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/lib/index.ts",
+      "kind": "ui",
+      "extras": []
+    }
+  }
+}

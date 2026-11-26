@@ -1,4 +1,4 @@
-import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
+import { type ZitadelWidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
 import { describe, expect, it } from "vitest";
 
@@ -19,8 +19,8 @@ export interface MountedWidget {
  * Per widget, the forwarded attributes its props do not accept as the SDK's
  * attribute type spells them: a key the props lack, or one they type otherwise.
  */
-type Unaccepted<Forwarded, Props extends Record<WidgetName, object>> = {
-  [W in WidgetName]: {
+type Unaccepted<Forwarded, Props extends Record<ZitadelWidgetName, object>> = {
+  [W in ZitadelWidgetName]: {
     [K in keyof Forwarded]-?: [Forwarded[K]] extends [
       K extends keyof Props[W] ? Props[W][K] : never,
     ]
@@ -30,19 +30,21 @@ type Unaccepted<Forwarded, Props extends Record<WidgetName, object>> = {
 };
 
 /** Per widget, the props it takes that no wrapper forwards as a standard attribute. */
-type Unforwarded<Props extends Record<WidgetName, object>> = {
-  [W in WidgetName]: Extract<"dir" | "classList" | "onClick", keyof Props[W]>;
+type Unforwarded<Props extends Record<ZitadelWidgetName, object>> = {
+  [W in ZitadelWidgetName]: Extract<"dir" | "classList" | "onClick", keyof Props[W]>;
 };
 
 /**
  * `true` when no widget has an offending key; otherwise the widgets that do,
  * each with its keys, so the SDK's type error names both.
  */
-type NoneOf<Offending extends Record<WidgetName, PropertyKey>> = [Offending[WidgetName]] extends [
-  never,
-]
+type NoneOf<Offending extends Record<ZitadelWidgetName, PropertyKey>> = [
+  Offending[ZitadelWidgetName],
+] extends [never]
   ? true
-  : { readonly [W in WidgetName as [Offending[W]] extends [never] ? never : W]: Offending[W] };
+  : {
+      readonly [W in ZitadelWidgetName as [Offending[W]] extends [never] ? never : W]: Offending[W];
+    };
 
 /**
  * `T` once the caller named the types, `never` when it left them to inference
@@ -51,9 +53,9 @@ type NoneOf<Offending extends Record<WidgetName, PropertyKey>> = [Offending[Widg
  */
 type Named<Forwarded, T> = unknown extends Forwarded ? never : T;
 
-export interface StandardAttributeGlue<Forwarded, Props extends Record<WidgetName, object>> {
+export interface StandardAttributeGlue<Forwarded, Props extends Record<ZitadelWidgetName, object>> {
   /** Mounts a widget with `attributes`, named as the markup names them. */
-  mountWidget(widget: WidgetName, attributes: Attributes): Promise<MountedWidget>;
+  mountWidget(widget: ZitadelWidgetName, attributes: Attributes): Promise<MountedWidget>;
   /**
    * The attributes this SDK leaves on the element when their prop is removed;
    * the case checks they stay, so an SDK that fixes one must drop it here.
@@ -75,9 +77,10 @@ export function cssProperties(style: string): Record<string, string> {
  * the SDK's own attribute and props types named: `Forwarded` as the SDK's props
  * spell the attributes, `Props` each widget's props.
  */
-export function describeStandardAttributes<Forwarded, Props extends Record<WidgetName, object>>(
-  glue: StandardAttributeGlue<Forwarded, Props>,
-): void {
+export function describeStandardAttributes<
+  Forwarded,
+  Props extends Record<ZitadelWidgetName, object>,
+>(glue: StandardAttributeGlue<Forwarded, Props>): void {
   const { mountWidget, staleOnRemoval } = glue;
 
   describe.each(widgetNames)("%s standard attributes", (widget) => {
