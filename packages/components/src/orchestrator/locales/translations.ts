@@ -45,10 +45,14 @@ const VARIANT_SUFFIXES = [".sso", CUSTOM_IDENTIFIER_SUFFIX];
 export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
   const merged: Locale = { ...builtin };
   for (const [key, value] of Object.entries(custom)) {
-    if (value !== undefined) merged[key] = value;
+    if (value !== undefined) {
+      merged[key] = value;
+    }
   }
   for (const [key, value] of Object.entries(custom)) {
-    if (value === undefined || value === builtin[key]) continue;
+    if (value === undefined || value === builtin[key]) {
+      continue;
+    }
     for (const suffix of VARIANT_SUFFIXES) {
       // A dictionary built by spreading a built-in one carries the built-in
       // variants too, so a copied value counts as not written.
@@ -66,8 +70,14 @@ export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
  * loads with a dynamic import, so a page downloads only the one it shows.
  */
 const BUILTIN: Readonly<Record<string, () => Promise<Locale>>> = {
-  de: async () => (await import("./de.js")).de,
-  it: async () => (await import("./it.js")).it,
+  de: async () => {
+    const { de } = await import("./de.js");
+    return de;
+  },
+  it: async () => {
+    const { it } = await import("./it.js");
+    return it;
+  },
 };
 
 /**
