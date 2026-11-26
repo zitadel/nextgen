@@ -20,8 +20,7 @@ import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import {
-  ZitadelConfigOutcomeActionClashError,
-  ZitadelConfigRenameActionClashError,
+  ZitadelConfigActionClashError,
   ZitadelConfigRenameRouteLossError,
 } from "@/lib/zitadel/errors";
 import { type StepName, stepName } from "@/lib/zitadel/names";
@@ -968,7 +967,11 @@ export class SsoGenerator {
     next: string,
   ): void {
     if (actionNames.has(next)) {
-      throw new ZitadelConfigRenameActionClashError(step, old, next);
+      throw new ZitadelConfigActionClashError(
+        `steps.${step}: transition "${old}" is renamed to "${next}", which is an action on this step`,
+        step,
+        next,
+      );
     }
     if (next in transitions) {
       return;
@@ -1027,7 +1030,11 @@ export class SsoGenerator {
       for (const action of actions) {
         const actionName = action.name;
         if (keys.has(actionName)) {
-          throw new ZitadelConfigOutcomeActionClashError(name, String(actionName));
+          throw new ZitadelConfigActionClashError(
+            `steps.${name}: action "${String(actionName)}" uses a name auth-method sso enable writes as an outcome on this step`,
+            name,
+            String(actionName),
+          );
         }
       }
     }

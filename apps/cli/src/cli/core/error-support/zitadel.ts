@@ -5,9 +5,8 @@ import {
   ZitadelConfigFlowMethodInUseError,
   ZitadelConfigFlowUncheckedError,
   ZitadelConfigNothingToDeployError,
-  ZitadelConfigOutcomeActionClashError,
   ZitadelConfigPasswordPolicyInvalidError,
-  ZitadelConfigRenameActionClashError,
+  ZitadelConfigActionClashError,
   ZitadelConfigRenameRouteLossError,
   ZitadelConfigSignupPolicyInvalidError,
 } from "@/lib/zitadel";
@@ -55,19 +54,14 @@ const SIGNUP_POLICY_INVALID_ADVICE = {
   hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from the default.",
 } as const satisfies Advice;
 
-/** How {@link ZitadelConfigRenameActionClashError} is refused. */
-const RENAME_ACTION_CLASH_ADVICE = {
+/** How {@link ZitadelConfigActionClashError} is refused. */
+const ACTION_CLASH_ADVICE = {
   hint: 'Rename the action "{action}" on step "{step}" (and its transition), then run auth-method sso enable again.',
 } as const satisfies Advice;
 
 /** How {@link ZitadelConfigRenameRouteLossError} is refused. */
 const RENAME_ROUTE_LOSS_ADVICE = {
   hint: 'Remove purpose and action from the transition "{transition}" on step "{step}", then run auth-method sso enable again.',
-} as const satisfies Advice;
-
-/** How {@link ZitadelConfigOutcomeActionClashError} is refused. */
-const OUTCOME_ACTION_CLASH_ADVICE = {
-  hint: 'Rename the action "{action}" on step "{step}" (and its transition), then run auth-method sso enable again.',
 } as const satisfies Advice;
 
 /**
@@ -133,7 +127,6 @@ export const ZITADEL_WORDINGS: readonly Wording[] = [
   [ZitadelConfigNothingToDeployError, NOTHING_TO_DEPLOY_ADVICE],
   [ZitadelConfigPasswordPolicyInvalidError, PASSWORD_POLICY_INVALID_ADVICE],
   [ZitadelConfigSignupPolicyInvalidError, SIGNUP_POLICY_INVALID_ADVICE],
-  [ZitadelConfigRenameActionClashError, RENAME_ACTION_CLASH_ADVICE],
+  [ZitadelConfigActionClashError, ACTION_CLASH_ADVICE],
   [ZitadelConfigRenameRouteLossError, RENAME_ROUTE_LOSS_ADVICE],
-  [ZitadelConfigOutcomeActionClashError, OUTCOME_ACTION_CLASH_ADVICE],
 ];

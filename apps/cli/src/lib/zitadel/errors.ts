@@ -1401,10 +1401,10 @@ export class ZitadelConfigFlowMissingError extends ZitadelConfigResourceMissingE
 }
 
 /**
- * A step whose legacy outcome would be renamed to the name of one of its
- * actions.
+ * A step with an action named like an outcome an edit offering a provider
+ * writes on it: a legacy outcome it would rename, or one it would add.
  */
-export class ZitadelConfigRenameActionClashError extends ZitadelConfigError {
+export class ZitadelConfigActionClashError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
@@ -1415,21 +1415,19 @@ export class ZitadelConfigRenameActionClashError extends ZitadelConfigError {
   readonly step: string;
 
   /**
-   * The action the outcome would be renamed to.
+   * The action whose name the outcome would take.
    */
   readonly action: string;
 
   /**
    * Make the failure for this step.
    *
+   * @param message - What the edit would do, naming the step and the action.
    * @param step - The step's name.
-   * @param old - The outcome the previous CLI wrote.
-   * @param action - The action the outcome would be renamed to.
+   * @param action - The action whose name the outcome would take.
    */
-  constructor(step: string, old: string, action: string) {
-    super(
-      `steps.${step}: transition "${old}" is renamed to "${action}", which is an action on this step`,
-    );
+  constructor(message: string, step: string, action: string) {
+    super(message);
     this.step = step;
     this.action = action;
   }
@@ -1467,40 +1465,6 @@ export class ZitadelConfigRenameRouteLossError extends ZitadelConfigError {
     );
     this.step = step;
     this.transition = transition;
-  }
-}
-
-/**
- * A step that declares an action named like an outcome an edit offering a
- * provider writes on it.
- */
-export class ZitadelConfigOutcomeActionClashError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-
-  /**
-   * The step's name.
-   */
-  readonly step: string;
-
-  /**
-   * The action's name.
-   */
-  readonly action: string;
-
-  /**
-   * Make the failure for this step.
-   *
-   * @param step - The step's name.
-   * @param action - The action's name.
-   */
-  constructor(step: string, action: string) {
-    super(
-      `steps.${step}: action "${action}" uses a name auth-method sso enable writes as an outcome on this step`,
-    );
-    this.step = step;
-    this.action = action;
   }
 }
 

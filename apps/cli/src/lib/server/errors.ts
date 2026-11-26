@@ -451,25 +451,18 @@ export class LocalServerProcessDeniedError extends LocalServerError {
   }
 }
 
-/** The server does not know the local admin, or refused its session. */
-export abstract class LocalServerDeniedError extends LocalServerError {
-  override readonly category: ErrorCategory = "denied";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_AUTH";
-}
-
 /**
  * The server rejected the local admin's identifier: it never imported the
  * admin, or its lookup failed, which it reports the same way.
  */
-export class LocalServerAdminNotFoundError extends LocalServerDeniedError {
+export class LocalServerAdminNotFoundError extends LocalServerError {
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";
 }
 
 /** The server refused to exchange the local admin's handoff token for a session. */
-export class LocalServerSessionRefusedError extends LocalServerDeniedError {
+export class LocalServerSessionRefusedError extends LocalServerError {
   override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";

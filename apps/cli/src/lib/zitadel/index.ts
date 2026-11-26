@@ -53,6 +53,7 @@ export type {
   SkippedRegion,
 } from "@/lib/zitadel/resources/document";
 export {
+  ZitadelConfigActionClashError,
   ZitadelConfigBrandingDuplicatedError,
   ZitadelConfigClientIdMismatchError,
   ZitadelConfigConnectionDuplicatedError,
@@ -63,7 +64,6 @@ export {
   ZitadelConfigHandleClashError,
   ZitadelConfigHandleInvalidError,
   ZitadelConfigIdentifierMissingError,
-  ZitadelConfigOutcomeActionClashError,
   ZitadelConfigPasswordPolicyInvalidError,
   ZitadelConfigPathBlockedError,
   ZitadelConfigPathOutsideError,
@@ -72,7 +72,6 @@ export {
   ZitadelConfigReferenceMissingError,
   ZitadelConfigReferenceOutsideError,
   ZitadelConfigRegionUneditableError,
-  ZitadelConfigRenameActionClashError,
   ZitadelConfigRenameRouteLossError,
   ZitadelConfigSignupPolicyInvalidError,
   ZitadelConfigSlugDuplicatedError,
