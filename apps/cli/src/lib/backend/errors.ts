@@ -70,13 +70,6 @@ export class BackendConflictError extends BackendError {
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
-/** The server rejected the request as wrong: a `400` or `422`, or an origin it refuses. */
-export class BackendRejectedError extends BackendError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
 /** The server answered that what was asked for is gone: a `410`. */
 export class BackendGoneError extends BackendError {
   override readonly category: ErrorCategory = "missing";
@@ -119,7 +112,7 @@ export class BackendProofRejectedError extends BackendError {
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
-/** The request did not say what it must: a rejection naming `req.invalid`. */
+/** The server rejected the request as wrong: a `400` or `422` (`req.invalid` or otherwise), or an origin it refuses. */
 export class BackendRequestInvalidError extends BackendError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   allowDestructive,
-  BackendRejectedError,
+  BackendRequestInvalidError,
   createZitadelClient,
   responseFailure,
   type ZitadelClient,
@@ -48,7 +48,7 @@ describe("createZitadelClient", () => {
       .getProject("p1")
       .catch((err: unknown) => err);
 
-    expect(error).toBeInstanceOf(BackendRejectedError);
+    expect(error).toBeInstanceOf(BackendRequestInvalidError);
     expect(error).toMatchObject({
       status: 400,
       body: {
@@ -146,8 +146,8 @@ describe("responseFailure", () => {
     [409, "BackendConflictError"],
     [401, "BackendUnauthorizedError"],
     [403, "BackendForbiddenError"],
-    [400, "BackendRejectedError"],
-    [422, "BackendRejectedError"],
+    [400, "BackendRequestInvalidError"],
+    [422, "BackendRequestInvalidError"],
     [429, "BackendTooManyRequestsError"],
     [500, "BackendUnavailableError"],
     [503, "BackendUnavailableError"],
@@ -190,7 +190,7 @@ describe("responseFailure", () => {
         "refused",
       ),
     ).toMatchObject({
-      name: "BackendRejectedError",
+      name: "BackendRequestInvalidError",
     });
   });
 

@@ -9,7 +9,7 @@ import {
   BackendInternalError,
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
-  BackendRejectedError,
+  BackendRequestInvalidError,
 } from "@/lib/backend/errors";
 import { request as fetchWithPolicy } from "@/lib/backend/transport";
 
@@ -472,7 +472,7 @@ export class OperationService extends ApiService {
    *
    * @param request - The request.
    * @returns The last page's status and body, with the page field holding every page's items.
-   * @throws BackendRejectedError when a page lacks its list.
+   * @throws BackendRequestInvalidError when a page lacks its list.
    */
   async callAll(request: ApiRequest): Promise<ApiResponse> {
     const shape = request.operation.paging;
@@ -485,7 +485,7 @@ export class OperationService extends ApiService {
         try {
           return fields.items(response.raw);
         } catch (problem) {
-          throw new BackendRejectedError(
+          throw new BackendRequestInvalidError(
             problem instanceof Error ? problem.message : String(problem),
           );
         }

@@ -16,7 +16,6 @@ import {
   BackendInternalError,
   BackendNotFoundError,
   BackendProofRejectedError,
-  BackendRejectedError,
   BackendReleaseInUseError,
   BackendReleaseRevokedError,
   BackendRequestInvalidError,
@@ -88,10 +87,7 @@ function refusalOf(error: ApiError): BackendError {
   if (error.status >= 500) {
     return new BackendUnavailableError(message, options);
   }
-  if (code === "req.invalid") {
-    return new BackendRequestInvalidError(message, options);
-  }
-  return new BackendRejectedError(message, options);
+  return new BackendRequestInvalidError(message, options);
 }
 
 /**

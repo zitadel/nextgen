@@ -12,7 +12,6 @@ import {
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
   BackendProofRejectedError,
-  BackendRejectedError,
   BackendReleaseInUseError,
   BackendReleaseRevokedError,
   BackendRequestInvalidError,
@@ -25,7 +24,6 @@ describe("the backend errors", () => {
   it.each([
     ["not found", new BackendNotFoundError("why"), "missing", false],
     ["conflict", new BackendConflictError("why"), "conflict", false],
-    ["rejected", new BackendRejectedError("why"), "invalid", false],
     ["unknown operation", new BackendOperationUnknownError("why"), "missing", false],
     ["ambiguous operation", new BackendOperationAmbiguousError("why"), "invalid", false],
     ["fault", new BackendInternalError("why"), "fault", false],

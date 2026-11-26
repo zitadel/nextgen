@@ -30,7 +30,6 @@ export {
   BackendOperationAmbiguousError,
   BackendOperationUnknownError,
   BackendProofRejectedError,
-  BackendRejectedError,
   BackendReleaseInUseError,
   BackendReleaseRevokedError,
   BackendRequestInvalidError,
