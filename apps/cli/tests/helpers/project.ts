@@ -2145,28 +2145,6 @@ export class ScaffoldedApp {
     return this.deleteProjectFile(".zitadel/secret");
   }
 
-  /** Leaves `.zitadel/secret` holding text that is not JSON. */
-  corruptsItsLocalSecret(): Promise<void> {
-    return this.writeProjectFile(".zitadel/secret", "{not json");
-  }
-
-  /** Leaves a directory where `.zitadel/secret` should be, so reading it fails. */
-  async cannotReadItsLocalSecret(): Promise<void> {
-    await this.deleteProjectFile(".zitadel/secret");
-    await mkdir(join(this.path, ".zitadel/secret"));
-  }
-
-  /** Leaves `package.json` holding text that is not JSON. */
-  corruptsItsPackageJson(): Promise<void> {
-    return this.writeProjectFile("package.json", "{not json");
-  }
-
-  /** Leaves a directory where `package.json` should be, so reading it fails. */
-  async cannotReadItsPackageJson(): Promise<void> {
-    await this.deleteProjectFile("package.json");
-    await mkdir(join(this.path, "package.json"));
-  }
-
   /** Removes a committed connection file, as the developer owning it would. */
   removeConnection(slug: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
