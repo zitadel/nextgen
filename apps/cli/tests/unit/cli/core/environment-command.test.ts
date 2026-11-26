@@ -398,21 +398,24 @@ describe("EnvironmentCommand.connect", () => {
     });
   });
 
-  it("refuses a malformed record even when no folder above can be read", async ({ dir }) => {
-    const locked = join(dir, "locked");
-    await mkdir(join(locked, "inner"), { recursive: true });
-    await chmod(locked, 0o000);
-    onTestFinished(async () => {
-      await chmod(locked, 0o700);
-    });
+  it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
+    "refuses a malformed record even when no folder above can be read",
+    async ({ dir }) => {
+      const locked = join(dir, "locked");
+      await mkdir(join(locked, "inner"), { recursive: true });
+      await chmod(locked, 0o000);
+      onTestFinished(async () => {
+        await chmod(locked, 0o700);
+      });
 
-    await expect(
-      new MalformedRecordProbe(
-        ["--cwd", join(locked, "inner"), "--server", "local"],
-        config,
-      ).probe(),
-    ).rejects.toBeInstanceOf(ZitadelError);
-  });
+      await expect(
+        new MalformedRecordProbe(
+          ["--cwd", join(locked, "inner"), "--server", "local"],
+          config,
+        ).probe(),
+      ).rejects.toBeInstanceOf(ZitadelError);
+    },
+  );
 
   it("points an --env-file run at that file and never at setup", async ({ dir }) => {
     await writeFile(join(dir, "ci.env"), "ZITADEL_URL=https://ci.example\n");

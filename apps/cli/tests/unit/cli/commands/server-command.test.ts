@@ -201,20 +201,23 @@ describe("LocalServerCommand", () => {
     expect(command.theServers).toBeInstanceOf(PsLocalServers);
   });
 
-  it("refuses a malformed record even when no folder above can be read", async ({ dir }) => {
-    const locked = join(dir, "locked");
-    await mkdir(join(locked, "inner"), { recursive: true });
-    await chmod(locked, 0o000);
-    onTestFinished(async () => {
-      await chmod(locked, 0o700);
-    });
+  it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
+    "refuses a malformed record even when no folder above can be read",
+    async ({ dir }) => {
+      const locked = join(dir, "locked");
+      await mkdir(join(locked, "inner"), { recursive: true });
+      await chmod(locked, 0o000);
+      onTestFinished(async () => {
+        await chmod(locked, 0o700);
+      });
 
-    const error = await rejectionOf(() => {
-      return new AboutAMalformedServer([], aConfigAt(VERSION)).sourceIn(join(locked, "inner"));
-    });
+      const error = await rejectionOf(() => {
+        return new AboutAMalformedServer([], aConfigAt(VERSION)).sourceIn(join(locked, "inner"));
+      });
 
-    expect(error).toBeInstanceOf(ZitadelError);
-  });
+      expect(error).toBeInstanceOf(ZitadelError);
+    },
+  );
 
   it("names the default server for a folder that started none, in either rule", async ({
     dir: folder,

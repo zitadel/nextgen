@@ -334,19 +334,20 @@ describe("LocalRuntime", () => {
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
     });
 
-    it("resets a folder whose record it may not read on a machine whose processes cannot be listed", async ({
-      dir: cwd,
-    }) => {
-      await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
-      await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{}");
-      await chmod(join(cwd, LOCAL_RUNTIME_FILE), 0o000);
+    it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
+      "resets a folder whose record it may not read on a machine whose processes cannot be listed",
+      async ({ dir: cwd }) => {
+        await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+        await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{}");
+        await chmod(join(cwd, LOCAL_RUNTIME_FILE), 0o000);
 
-      await at(cwd, {
-        servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
-      }).reset(DestroyPermit.forFolder(cwd));
+        await at(cwd, {
+          servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
+        }).reset(DestroyPermit.forFolder(cwd));
 
-      await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
-    });
+        await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
+      },
+    );
 
     it("resets a folder that never started a server on a machine whose processes cannot be listed", async ({
       dir: cwd,
