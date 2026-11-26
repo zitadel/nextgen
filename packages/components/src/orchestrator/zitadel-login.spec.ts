@@ -557,6 +557,64 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  describe("pins the release the bundle was built against", () => {
+    /** Mounts an element whose project pins `release`, and its first flow error. */
+    const mountPinned = async (release: string) => {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.project = { ...testProject, release };
+      const failed = new Promise<CustomEvent<{ message: string; code?: string }>>((resolve) =>
+        element.addEventListener("zitadel-flow-error", (event) => resolve(event as CustomEvent), {
+          once: true,
+        }),
+      );
+      host.appendChild(element);
+      return { element, failed };
+    };
+
+    it("sends X-Zitadel-Release when the flow starts", async () => {
+      const { element } = await mountPinned("rel_01KB3F7Y4Q2M8XVN");
+      await waitFor(() => element.shadowRoot?.querySelector("form"));
+      const start = mock.getCaptured().find((request) => request.kind === "createFlow");
+      expect(start).toMatchObject({ release: "rel_01KB3F7Y4Q2M8XVN" });
+    });
+
+    it("sends no header for a project that pins nothing", async () => {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.project = testProject;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("form"));
+      const start = mock.getCaptured().find((request) => request.kind === "createFlow");
+      expect(start).not.toHaveProperty("release");
+    });
+
+    it("says to rebuild when the pinned release was never deployed here, and names the code", async () => {
+      mock.refuseNextPin("rel.not_deployed");
+      const { element, failed } = await mountPinned("rel_01KB3F7Y4Q2M8XVN");
+      const event = await failed;
+      expect(event.detail.code).toBe("rel.not_deployed");
+      await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+      const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+      expect(text).toContain('release="rel_01KB3F7Y4Q2M8XVN" was never deployed');
+    });
+
+    it("says to reload when the pinned release was revoked", async () => {
+      mock.refuseNextPin("rel.revoked");
+      const { element, failed } = await mountPinned("rel_01KB3F7Y4Q2M8XVN");
+      expect((await failed).detail.code).toBe("rel.revoked");
+      await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+      expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(
+        "Reload the page",
+      );
+    });
+
+    it("names a pin that is not a release id", async () => {
+      const { failed } = await mountPinned("main");
+      const event = await failed;
+      expect(event.detail.code).toBe("rel.reference_invalid");
+      expect(event.detail.message).toContain('release="main" is not a release id');
+    });
+  });
+
   it("submits with {session_token, action, fields} and applies the next step", async () => {
     const element = await mount(host);
 

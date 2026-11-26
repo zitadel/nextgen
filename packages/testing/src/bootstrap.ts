@@ -26,6 +26,11 @@ export interface BootstrappedProject {
   previewSecret: string;
   schemaId: string;
   flowId: string;
+  /**
+   * The release deployed to the primary origins, which a build pins by
+   * sending it as `X-Zitadel-Release`.
+   */
+  releaseId: string;
 }
 
 const DEFAULT_PROJECT_NAME = "zitadel-testing";
@@ -95,5 +100,6 @@ export async function bootstrapProject(
     previewSecret: project.preview_secret,
     schemaId: schema.id,
     flowId: flow.id,
+    releaseId: release.id,
   };
 }

@@ -14,6 +14,8 @@ export interface ZitadelProject {
   readonly proxyPath: string;
   readonly projectId: string;
   readonly url?: string;
+  /** The release a flow start pins, sent as `X-Zitadel-Release` when set. */
+  readonly release?: string;
 }
 
 /** Input options for {@link configureZitadel}. */
@@ -24,6 +26,12 @@ export interface ZitadelConfig {
   projectId: string;
   /** Full backend URL (server-side only; optional for client SPAs). */
   url?: string;
+  /**
+   * The release this build was made against, as `zitadel deploy` or
+   * `zitadel preview` printed it. The widget sends it as `X-Zitadel-Release`
+   * when a flow starts; empty pins nothing.
+   */
+  release?: string;
 }
 
 /**
@@ -38,5 +46,6 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
     proxyPath: config.proxyPath ?? "/__nextgen",
     projectId: config.projectId,
     url: config.url,
+    release: config.release || undefined,
   });
 }

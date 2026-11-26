@@ -140,7 +140,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -163,7 +163,7 @@ describe("preview", () => {
             content_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
             deployment_id: expect.stringMatching(/^dep_/),
             previews: [{ url: PREVIEW_URL, expires_at: null }],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [expect.stringContaining("Could not read when the previews expire")],
         });
@@ -195,7 +195,7 @@ describe("preview", () => {
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
               { url: OTHER_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -206,7 +206,7 @@ describe("preview", () => {
 
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
 
-        const { data } = app.envelopeOf<{ content_hash: string; release_env: string }>(result);
+        const { data } = app.envelopeOf<{ content_hash: string; release_id: string }>(result);
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
           cli_version: expect.any(String),
@@ -220,7 +220,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${data.content_hash}`,
+            release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${data.release_id}`,
           },
           warnings: [],
         });
@@ -255,7 +255,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -334,7 +334,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -360,7 +360,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -522,7 +522,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -636,7 +636,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -664,7 +664,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -705,7 +705,7 @@ describe("preview", () => {
             previews: [
               { url: PREVIEW_URL, expires_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
             ],
-            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/),
           },
           warnings: [],
         });
@@ -880,7 +880,7 @@ describe("preview", () => {
         const result = await app.run(["preview", "--origin", PREVIEW_URL]);
 
         expect(result.stdout.trimEnd().split("\n").at(-1)).toMatch(
-          /^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/,
+          /^NEXT_PUBLIC_ZITADEL_RELEASE=rel_[a-zA-Z0-9_-]+$/,
         );
       });
 

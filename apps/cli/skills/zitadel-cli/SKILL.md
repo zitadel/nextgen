@@ -424,10 +424,19 @@ Each invocation prints one JSON object:
   and still carry `next_page_token`: the server matches some filters over a
   bounded number of events per request. Follow the token, or pass `--all`,
   before you report that nothing matched.
-- `deploy` emits `data.content_hash` (the release digest), `data.origins`
-  (the origins it went live on) and `data.resources` (how many it pinned). A
-  re-run on unchanged config returns the same digest. Use it to confirm what
-  went live.
+- `deploy` emits `data.release_id`, `data.content_hash` (the release digest),
+  `data.origins` (the origins it went live on), `data.resources` (how many it
+  pinned) and `data.release_env`, the `NEXT_PUBLIC_ZITADEL_RELEASE=rel_…` line
+  a build bakes in to pin this release. A re-run on unchanged config returns
+  the same release. Use it to confirm what went live.
+- A pinned build sends that release id as `X-Zitadel-Release` when a flow
+  starts, and keeps getting that release's configuration after later deploys,
+  as long as the release was deployed to the page's origin and is not revoked.
+  The header is not a credential: anyone can name any release once deployed to
+  an origin. After a deploy that tightens security (a stricter password
+  policy, MFA, a removed provider), suggest `release revoke` for the superseded
+  releases deployed to the same origins (`deployment list --origin <origin>`);
+  revoking also stops them being deployed or rolled back to.
 - When the server refuses a release, `deploy` fails with `E_VALIDATION` and
   the `hint` lists each refused resource as `<kind> <handle>: <reason>`, such
   as `schema human-user: …` or `flow default-login: …`. A connection's line
@@ -472,8 +481,8 @@ Each invocation prints one JSON object:
   incomplete, not that users are locked out, and it never stops the deploy.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
-  `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
-  line to pin). Each `data.previews[]` entry is `{ url, expires_at }`, where
+  `data.previews` plus `data.release_env` (the
+  `NEXT_PUBLIC_ZITADEL_RELEASE=rel_…` line to pin). Each `data.previews[]` entry is `{ url, expires_at }`, where
   `expires_at` is the live preview's expiry read after the deploy; a later
   deploy to the URL renews it (`preview list` reads it again). Every preview
   expires, so `expires_at: null` means that read failed: the run still answers

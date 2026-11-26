@@ -3,6 +3,19 @@ import { describe, expect, it } from "vitest";
 import { resolveZitadelRuntime, resolveZitadelRuntimeEnv } from "./index.js";
 
 describe("resolveZitadelRuntimeEnv", () => {
+  it("reads the release a build pins, the public name first", () => {
+    expect(
+      resolveZitadelRuntimeEnv({
+        ZITADEL_PROJECT_ID: "proj_123",
+        ZITADEL_RELEASE: "rel_server",
+        NEXT_PUBLIC_ZITADEL_RELEASE: "rel_browser",
+      }).release,
+    ).toBe("rel_browser");
+    expect(resolveZitadelRuntimeEnv({ ZITADEL_PROJECT_ID: "proj_123" })).not.toHaveProperty(
+      "release",
+    );
+  });
+
   it("uses public project metadata in development", () => {
     const runtime = resolveZitadelRuntimeEnv({
       ZITADEL_PROJECT_ID: "proj_123",

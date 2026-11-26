@@ -37,6 +37,7 @@ declare module "react" {
           "proxy-path"?: string;
           "publishable-key"?: string;
           url?: string;
+          release?: string;
           "post-sign-in-url"?: string;
           forcePostSignInUrl?: ZitadelLogin["forcePostSignInUrl"];
           "force-post-sign-in-url"?: boolean;

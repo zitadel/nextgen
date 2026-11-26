@@ -415,12 +415,19 @@ export default class Deploy extends Telemetered(
         deployment_id: deployment.id,
         resources: resourceCount,
         origins: servedOrigins,
+        // What a build bakes in to pin this release (X-Zitadel-Release).
+        release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.id}`,
         ...prepared.report,
       },
       summary: {
         title,
         sections: [],
-        lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
+        lines: [
+          ...diff,
+          ...(diff.length === 0 ? [] : [""]),
+          live,
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.id)}`,
+        ],
       },
       next: {
         commands: [

@@ -133,6 +133,10 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       // when empty, so `NUXT_PUBLIC_ZITADEL_PROJECT_ID` can still fill it at
       // runtime.
       publicConfig.zitadelProjectId ||= setting("NUXT_PUBLIC_ZITADEL_PROJECT_ID") ?? "";
+      // The release this build pins, as `zitadel deploy` printed it; empty
+      // pins nothing. Kept even when empty so `NUXT_PUBLIC_ZITADEL_RELEASE` can
+      // fill it at runtime.
+      publicConfig.zitadelRelease ||= setting("NUXT_PUBLIC_ZITADEL_RELEASE") ?? "";
 
       addPlugin(resolve("./runtime/plugin"));
       // Loads the widget elements in the browser, so the app does not depend on

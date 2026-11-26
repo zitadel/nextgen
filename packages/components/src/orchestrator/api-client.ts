@@ -43,8 +43,20 @@ const apiRequestInit: RequestInit = { credentials: "include" };
  */
 export type SessionIdentity = GetMySession200;
 
-export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise<CreateFlow201> {
-  return api.createFlow(input, apiRequestInit);
+/**
+ * Starts a flow. `release` pins it to the release the bundle was built
+ * against (`X-Zitadel-Release`), sent as given: the server judges the value
+ * and serves it only when it was deployed to the page's origin.
+ */
+export async function startFlow(
+  api: ZitadelApi,
+  input: CreateFlowBody,
+  release?: string,
+): Promise<CreateFlow201> {
+  if (!release) {
+    return api.createFlow(input, apiRequestInit);
+  }
+  return api.createFlow(input, { ...apiRequestInit, headers: { "X-Zitadel-Release": release } });
 }
 
 // Field validation errors come back as 400 with the step echoed and
