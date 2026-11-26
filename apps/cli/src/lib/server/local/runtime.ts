@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -9,9 +8,17 @@ import {
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
 } from "@/lib/server/errors";
-import { isErrno } from "@/lib/errno";
 
-import { readIfExists } from "@/lib/fs";
+import {
+  access,
+  FsNotDirectoryError,
+  FsNotFoundError,
+  mkdir,
+  readIfExists,
+  rm,
+  stat,
+  writeFile,
+} from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
 import { ancestors } from "@/lib/paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
@@ -276,7 +283,10 @@ async function isOwnFile(path: string): Promise<boolean> {
     // Only a missing path means "not here". Local state that exists but
     // cannot be read is still the nearest one, and walking past it would
     // pick a parent's server or credential instead.
-    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+    if (error instanceof FsNotFoundError) {
+      return false;
+    }
+    if (error instanceof FsNotDirectoryError) {
       return false;
     }
     throw new LocalServerRecordUnreadableError(
@@ -507,7 +517,7 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       }
       return current;
     } catch (error) {
-      if (!isErrno(error, "ENOENT") || dirname(current) === current) {
+      if (!(error instanceof FsNotFoundError) || dirname(current) === current) {
         throw error;
       }
     }
