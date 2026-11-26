@@ -97,5 +97,5 @@ The answer is the same whatever the cause: `{"error":"invalid_request","error_de
 - **The switch is not live.** Run `deploy`, and check that the release went live on the origin you fetched.
 - **The origin is not a primary origin.** Add it with `origin add <url> --kind primary`, then deploy. A preview URL never serves an issuer.
 - **The project ID is another project's.** The proxy serves only its own project's issuer. Use the `ZITADEL_PROJECT_ID` from `.env.local`, and check that the app has one configured.
-- **The proxy path is not `/__nextgen`.** Through a proxy, the server builds issuers only under `/__nextgen`, so an app that sets another `proxyPath` has none ([why](/docs/sdks/proxy#oauth-issuer-and-metadata)).
+- **The proxy path is not `/__nextgen`.** Through a [proxy](/docs/sdks/proxy#oauth-issuer-and-metadata), the server builds issuers only under `/__nextgen`, so an app that sets another `proxyPath` has none.
 - **A Next.js app narrowed its middleware's `matcher`.** Add `/.well-known/oauth-authorization-server/:path*` to it, so the middleware sees the metadata request.

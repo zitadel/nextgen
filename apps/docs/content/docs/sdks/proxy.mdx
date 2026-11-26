@@ -57,15 +57,6 @@ The endpoints a browser visits, such as `authorize`, sit under the issuer and go
 
 On a server with platform bootstrap, the platform project, which the console signs in to, has its own issuer: the Zitadel server's public URL followed by `/oauth`. It answers only there, never through an app.
 
-### Your own proxy
-
-You do not need the SDKs' proxy. A proxy of your own gets an issuer when it forwards to Zitadel in one of these two ways:
-
-- **Under `/__nextgen`, as the SDKs do.** Forward `/__nextgen/*` with that prefix stripped, and map the metadata path above as the SDKs do. Send `X-Forwarded-Prefix: /__nextgen`. The issuer is `{origin}/__nextgen/oauth/{project_id}`.
-- **At the origin's root.** Forward `/oauth/{project_id}/*` and `/.well-known/oauth-authorization-server/oauth/{project_id}` unchanged, with no `X-Forwarded-Prefix`. The issuer is `{origin}/oauth/{project_id}`.
-
-Either way, send `X-Forwarded-Host` and `X-Forwarded-Proto` with your app's origin, replacing any value the client sent. Send `X-Zitadel-Login-Path` when your login page is not at `/login`. Forward your own project's OAuth paths only, and answer `404` for any other project's. The server trusts a primary origin's proxy with this, and does not check that no other project lists the same origin.
-
 ## OAuth metadata URLs
 
 A client finds an authorization server from its issuer by fetching a metadata document at a well-known URL. The standards place that URL in different ways for an issuer with a path, such as `https://app.acme.com/__nextgen/oauth/<project-id>`. Zitadel serves one of them today.
