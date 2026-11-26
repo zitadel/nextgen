@@ -293,12 +293,7 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
         return super.sourceOf(flags, cwd);
       } else if (folderRule === "nearest") {
         try {
-          const server = await this.serverInNearestFolder(cwd);
-          if (server === undefined) {
-            return LocalRuntime.DEFAULT_URL;
-          } else {
-            return server.url();
-          }
+          return (await this.serverInNearestFolder(cwd))?.url() ?? LocalRuntime.DEFAULT_URL;
         } catch (error) {
           if (error instanceof LocalServerRecordMalformedError) {
             throw refusalError(RECORD_MALFORMED_REFUSAL, {
