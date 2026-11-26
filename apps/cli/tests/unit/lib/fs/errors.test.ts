@@ -9,6 +9,8 @@ import {
   FsNotFoundError,
 } from "@/lib/fs/errors";
 
+import * as classes from "@/lib/fs/errors";
+
 describe("a file-system error's cause", () => {
   it("is kept", () => {
     const cause = new Error("underneath");
@@ -138,5 +140,91 @@ describe("what a file-system error states", () => {
     expect(error.details).toEqual({
       original: { name: "Error", message: "ENOENT: no such file", code: "ENOENT" },
     });
+  });
+});
+
+describe("what each file-system error states", () => {
+  it.each([
+    [
+      "FsNotFoundError",
+      new classes.FsNotFoundError("cannot read a.json", new Error("boom"), "ENOENT"),
+      {
+        message: "cannot read a.json",
+        hint: "A required file or directory is missing.",
+        details: { original: { name: "Error", message: "boom", code: undefined } },
+        code: "E_VALIDATION",
+        category: "missing",
+        retryable: false,
+      },
+    ],
+    [
+      "FsDeniedError",
+      new classes.FsDeniedError("cannot read a.json", new Error("boom"), "EACCES"),
+      {
+        message: "cannot read a.json",
+        hint: "Check file permissions or run with the right user.",
+        details: { original: { name: "Error", message: "boom", code: undefined } },
+        code: "E_AUTH",
+        category: "denied",
+        retryable: false,
+      },
+    ],
+    [
+      "FsNotDirectoryError",
+      new classes.FsNotDirectoryError("cannot list a.json", new Error("boom"), "ENOTDIR"),
+      {
+        message: "cannot list a.json",
+        hint: undefined,
+        details: { original: { name: "Error", message: "boom", code: undefined } },
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+    [
+      "FsIsDirectoryError",
+      new classes.FsIsDirectoryError("cannot read src", new Error("boom"), "EISDIR"),
+      {
+        message: "cannot read src",
+        hint: undefined,
+        details: { original: { name: "Error", message: "boom", code: undefined } },
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+    [
+      "FsExistsError",
+      new classes.FsExistsError("cannot create a.json", new Error("boom"), "EEXIST"),
+      {
+        message: "cannot create a.json",
+        hint: undefined,
+        details: { original: { name: "Error", message: "boom", code: undefined } },
+        code: "E_CONFLICT",
+        category: "conflict",
+        retryable: false,
+      },
+    ],
+    [
+      "FsFailedError",
+      new classes.FsFailedError("cannot write a.json", "ENOSPC", new Error("boom")),
+      {
+        message: "cannot write a.json",
+        hint: undefined,
+        details: { original: { name: "Error", message: "boom", code: undefined } },
+        code: "E_VALIDATION",
+        category: "unknown",
+        retryable: false,
+      },
+    ],
+  ])("states what a %s says and reports", (_name, error, expected) => {
+    expect({
+      message: error.message,
+      hint: error.hint,
+      details: error.details,
+      code: error.code,
+      category: error.category,
+      retryable: error.retryable,
+    }).toEqual(expected);
   });
 });
