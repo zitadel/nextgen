@@ -67,6 +67,11 @@
       "types": "./dist/runtime/fetch.d.mts",
       "import": "./dist/runtime/fetch.mjs"
     },
+    "./runtime/call": {
+      "@zitadel/source": "./src/runtime/call.ts",
+      "types": "./dist/runtime/call.d.mts",
+      "import": "./dist/runtime/call.mjs"
+    },
     "./client": {
       "@zitadel/source": "./src/runtime/api-factory.ts",
       "types": "./dist/runtime/api-factory.d.mts",

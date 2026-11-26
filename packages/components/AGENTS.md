@@ -122,7 +122,8 @@ Everything the package root reaches lands in every SDK app's main chunk.
   them in every bundle; their home is `@zitadel/components/locales`.
 - Add a language as `locales/<code>.ts` plus one loader in `BUILTIN`
   (`locales/translations.ts`); resolve texts only through `Translations`.
-- Import an API endpoint by name in `api-client.ts`; never through
-  `createZitadelClient`, whose `Proxy` defeats tree-shaking.
+- Import an API endpoint by name in `api-client.ts` and call it through
+  `callWith` (`@zitadel/api/runtime/call`); never through `createZitadelClient`,
+  whose `Proxy` defeats tree-shaking, nor by writing the per-call slots yourself.
 - Allow a tag or attribute in `sanitiser/allowlist.ts`, for both sanitisers; never list a
   `data-*` attribute or one twice: `setHTML()` rejects the whole configuration.
