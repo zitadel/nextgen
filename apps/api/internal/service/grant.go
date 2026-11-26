@@ -186,10 +186,11 @@ func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, inpu
 }
 
 // WriteUserGrant gives userID relation on the project inside the caller's
-// transaction, for invitation acceptance (ADR 086 §4), which has refused a
-// user with any access already. A leftover grant of the same relation, which
-// for such a user can only be expired, is revoked first: it still holds the
-// unique binding, and a unique violation would abort a Postgres transaction.
+// transaction. Its one caller is invitation acceptance (ADR 086 §4), after it
+// refused a user with any access; it is not a general ensure. It revokes any
+// leftover managed direct grant of the same relation first, which for such a
+// user can only be expired: the row still holds the unique binding, and a
+// unique violation would abort a Postgres transaction.
 func (s *GrantService) WriteUserGrant(ctx context.Context, stmts AllStatements, projectID, userID, relation string) (err error) {
 	ctx, end := startSpan(ctx, "GrantService.WriteUserGrant")
 	defer end(&err)

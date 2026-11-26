@@ -439,6 +439,33 @@ func TestInvitationService_Reject(t *testing.T) {
 		assert.Equal(t, domain.InvitationRejectedPayload{JourneyID: "journey_1", UserID: "user_colleague"}, rejected)
 	})
 
+	t.Run("rechecks expiry at the time the lock was taken", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		expectActiveUserPrincipal(s, "user_colleague")
+		entity := pendingInvitation(new("user_admin"))
+		expectInvitationByToken(s, entity)
+		var locked time.Time
+		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).DoAndReturn(func(context.Context, string) error {
+			// The lock waits on a racing accept.
+			time.Sleep(time.Millisecond)
+			locked = time.Now()
+			return nil
+		})
+		s.EXPECT().ChangeInvitationStatus(gomock.Any(), invitationProjectID, entity.ID, domain.InvitationStatusRejected, "user_colleague", gomock.Any()).DoAndReturn(
+			func(_ context.Context, _, _ string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error) {
+				assert.False(t, now.Before(locked), "the status change got a time read before the lock")
+				changed := *entity
+				changed.Status = status
+				changed.RespondedBy = &respondedBy
+				changed.RespondedAt = &now
+				return &changed, nil
+			})
+
+		_, err := svc.Reject(t.Context(), invitationToken, "user_colleague")
+		require.NoError(t, err)
+	})
+
 	t.Run("the inviter declining their own invitation", func(t *testing.T) {
 		t.Parallel()
 		svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)

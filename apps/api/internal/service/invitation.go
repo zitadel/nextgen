@@ -409,16 +409,10 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
 			return domain.ErrInvitationSelfAccept()
 		}
-		// Serializes the grant writes of accepts racing on other links, and
-		// locks the project before the row, as create does.
-		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
+		now, err = s.lockUnheld(ctx, stmts, entity, userID)
+		if err != nil {
 			return err
 		}
-		if err := s.refuseHeldRole(ctx, stmts, entity, userID); err != nil {
-			return err
-		}
-		// The lock can wait; the guarded change rechecks expiry at this time.
-		now = time.Now().UTC()
 		claimed, err := projectIsClaimedOrExempt(ctx, stmts, s.platformProjectID, entity.ProjectID)
 		if err != nil {
 			return err
@@ -432,7 +426,7 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_
 			if err != nil {
 				return err
 			}
-			if role != "admin" {
+			if role != domain.ProjectRoleAdmin {
 				return domain.ErrInvitationInviterNotAdmin()
 			}
 		}
@@ -490,17 +484,23 @@ func (s *InvitationService) heldRole(ctx context.Context, stmts AllStatements, e
 	return s.projectRole(ctx, stmts, entity.ProjectID, userID)
 }
 
-// refuseHeldRole refuses redeeming for a user who already has access, so the
-// invitation stays pending for the person it was meant for.
-func (s *InvitationService) refuseHeldRole(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) error {
+// lockUnheld is what accept and decline run before the status change: it locks
+// the project, which serializes them with racing accepts and comes before the
+// row as in create, then refuses a user who already has access, so the
+// invitation stays pending for the person it was meant for. The lock can wait,
+// so it returns the time the guarded change rechecks expiry at.
+func (s *InvitationService) lockUnheld(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string) (time.Time, error) {
+	if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
+		return time.Time{}, err
+	}
 	held, err := s.heldRole(ctx, stmts, entity, userID)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 	if held != "" {
-		return domain.ErrInvitationAlreadyMember(held)
+		return time.Time{}, domain.ErrInvitationAlreadyMember(held)
 	}
-	return nil
+	return time.Now().UTC(), nil
 }
 
 // Reject declines a pending invitation for userID.
@@ -520,12 +520,9 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
 			return domain.ErrInvitationSelfReject()
 		}
-		// A member's decline would spend the link meant for someone else. The
-		// lock, as in accept, waits out a grant a racing accept is writing.
-		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
-			return err
-		}
-		if err := s.refuseHeldRole(ctx, stmts, entity, userID); err != nil {
+		// A member's decline would spend the link meant for someone else.
+		now, err = s.lockUnheld(ctx, stmts, entity, userID)
+		if err != nil {
 			return err
 		}
 		rejected, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusRejected, userID, now)
