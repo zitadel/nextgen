@@ -324,7 +324,9 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
             ...error,
             message: error.message,
           },
-          { again: await this.again("branding:eject", { with: { design, force: true } }) },
+          {
+            again: await this.again("branding:eject", { with: { design, force: true } }),
+          },
         );
       }
       throw error;

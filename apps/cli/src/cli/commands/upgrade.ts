@@ -308,7 +308,9 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
             ...error,
             message: error.message,
           },
-          { again: await this.again("upgrade", {}) },
+          {
+            again: await this.again("upgrade", {}),
+          },
         );
       }
       throw error;
