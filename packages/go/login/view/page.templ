@@ -1,0 +1,23 @@
+// Package view holds the login's templ components; *_templ.go is generated output.
+package view
+
+// Page is the document shell around a step: the stylesheet is inlined so a
+// host app serves nothing but the login route, and the step renders into
+// main as the children.
+templ Page(lang, title, css string) {
+	<!doctype html>
+	<html lang={ lang }>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title }</title>
+			// templ treats a style body as raw text, so the element is written whole.
+			@templ.Raw("<style>" + css + "</style>")
+		</head>
+		<body>
+			<main>
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
