@@ -98,6 +98,8 @@ export class Translations {
 
   /**
    * Loads the texts for a BCP 47 language tag, with its built-in translation.
+   * A translation that fails to load is left out, as for a language without
+   * one: the app's `locales` and the bundled English still apply.
    *
    * @param tag - The BCP 47 language tag.
    * @param locales - The app's dictionaries.
@@ -105,7 +107,14 @@ export class Translations {
    */
   static async load(tag: string, locales?: AppLocales): Promise<Translations> {
     const language = Translations.languageOf(tag);
-    const builtin = Object.hasOwn(BUILTIN, language) ? await BUILTIN[language]?.() : undefined;
+    const builtin = Object.hasOwn(BUILTIN, language)
+      ? await BUILTIN[language]?.().catch((error: unknown) => {
+          // A translation that cannot be fetched costs the page its language,
+          // not the sign-in: the bundled English renders instead.
+          console.warn(`[zitadel-login] could not load the "${language}" translation`, error);
+          return undefined;
+        })
+      : undefined;
     return new Translations(language, locales, builtin);
   }
 

@@ -19,9 +19,7 @@
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
 import { paging } from "../generated/paging";
 
-import { setApiAuthToken } from "./auth";
-import { setProxyPath } from "./base-url";
-import { setRequestPolicy } from "./fetch";
+import { type CallOptions, callWith } from "./call";
 import { paged } from "./paged";
 
 /**
@@ -70,32 +68,7 @@ export type ZitadelClient = {
 export type ZitadelApi = ZitadelClient;
 
 /** Options for {@link createZitadelClient}. */
-export type ZitadelClientOptions = {
-  /** Base URL of the Zitadel server. Trailing slashes are stripped. */
-  baseUrl: string;
-  /**
-   * Bearer token sent on every request. Optional — omit for the
-   * unauthenticated `POST /projects` call; set it (typically to the
-   * project secret returned by that call) before any subsequent
-   * mutation.
-   */
-  token?: string;
-  /**
-   * Aborts every request this client makes. A request it cuts off rejects
-   * with the signal's reason rather than a {@link NetworkError}.
-   */
-  signal?: AbortSignal;
-  /**
-   * Deadline for each request, response body included. A request that runs
-   * past it rejects with a {@link NetworkError} whose reason is `timeout`.
-   * Unset by default: no deadline beyond the runtime's own.
-   */
-  timeoutMs?: number;
-  /**
-   * The `User-Agent` every request this client makes carries, so a server and
-   * its logs can tell one caller from another. Unset: the runtime's own.
-   */
-  userAgent?: string;
+export type ZitadelClientOptions = CallOptions & {
   /**
    * Applied to every response this client resolves with, each page of a
    * paged function's included, before the caller sees it. A paged function
@@ -147,16 +120,8 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
       }
       // Every request, each page included, sets this client's base URL and
       // token again: another client may have run in between.
-      const send = (...args: unknown[]) => {
-        setProxyPath(baseUrl);
-        setApiAuthToken(opts.token);
-        setRequestPolicy({
-          signal: opts.signal,
-          timeoutMs: opts.timeoutMs,
-          userAgent: opts.userAgent,
-        });
-        return (value as (...a: unknown[]) => unknown)(...args);
-      };
+      const send = (...args: unknown[]) =>
+        callWith({ ...opts, baseUrl }, value as (...a: unknown[]) => unknown, ...args);
       // The URL builders orval exports beside the requests return strings, so
       // only a pending result is hooked. A then-check rather than `instanceof`,
       // which a replaced global `Promise` (zone.js) would fail.

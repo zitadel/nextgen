@@ -7265,7 +7265,7 @@
                   "description": "The app's dictionaries."
                 }
               ],
-              "description": "Loads the texts for a BCP 47 language tag, with its built-in translation."
+              "description": "Loads the texts for a BCP 47 language tag, with its built-in translation.\nA translation that fails to load is left out, as for a language without\none: the app's `locales` and the bundled English still apply."
             },
             {
               "kind": "method",
@@ -7759,7 +7759,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "Sanitises with the browser's own HTML Sanitizer API, `Element.setHTML()`.\n\nIt starts from the browser's default configuration, which already allows\nsafe HTML such as `<b>` and `<table>`, and adds the atoms and attributes in\n`allowlist.ts`. The markup is parsed into an inert document, so nothing in\nit loads or runs and no custom element upgrades while it is sanitised.",
+          "description": "",
           "name": "NativeSanitiser",
           "members": [
             {
@@ -7780,7 +7780,7 @@
                   "text": ""
                 }
               },
-              "description": "Whether this browser has the HTML Sanitizer API."
+              "description": "Whether this browser has the HTML Sanitizer API as specified today.\n\n`Element.setHTML()` alone does not say so: Chrome 105 to 118 shipped an\nearlier draft with that method and a `Sanitizer` that has none of the\nmethods configure calls. So every one of them is checked."
             },
             {
               "kind": "method",
