@@ -459,7 +459,7 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Resolves the update paused while detached; `null` when none is.
    */
-  private resumeUpdate: (() => void) | null = null;
+  private readonly heldChanges = new Map<PropertyKey, unknown>();
 
   /**
    * What a step renders with: the dictionary for the page's language, the
@@ -566,12 +566,14 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Resumes the update paused while detached ({@link scheduleUpdate}).
+   * Updates with what changed while detached ({@link shouldUpdate}).
    */
   override connectedCallback(): void {
     super.connectedCallback();
-    this.resumeUpdate?.();
-    this.resumeUpdate = null;
+    for (const [name, oldValue] of this.heldChanges) {
+      this.requestUpdate(name, oldValue);
+    }
+    this.heldChanges.clear();
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", this.handlePopState);
     }
@@ -647,20 +649,25 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Pauses an update while the element is detached and runs it on the next
-   * attach, with every property that changed meanwhile: what the element loads
-   * on demand can finish after it left the page, and `updated` needs to see
-   * the step or value that changed then.
+   * Skips an update while the element is detached and holds what changed, so
+   * the next attach updates with every property that changed meanwhile: what
+   * the element loads on demand can finish after it left the page, and
+   * `updated` needs to see the step or value that changed then. Skipping,
+   * rather than pausing, keeps `updateComplete` settling while detached.
    *
-   * @returns Once the update has run.
+   * @param changed - The properties that changed, with their old values.
+   * @returns Whether to update now.
    */
-  protected override async scheduleUpdate(): Promise<void> {
-    if (!this.isConnected) {
-      await new Promise<void>((resolve) => {
-        this.resumeUpdate = resolve;
-      });
+  protected override shouldUpdate(changed: PropertyValues<this>): boolean {
+    if (this.isConnected) {
+      return super.shouldUpdate(changed);
     }
-    super.scheduleUpdate();
+    for (const [name, oldValue] of changed) {
+      if (!this.heldChanges.has(name)) {
+        this.heldChanges.set(name, oldValue);
+      }
+    }
+    return false;
   }
 
   override willUpdate(changed: PropertyValues<this>): void {

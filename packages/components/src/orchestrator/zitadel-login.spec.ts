@@ -938,13 +938,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
-  it("holds an update while detached", async () => {
+  it("settles updateComplete but does not render while detached", async () => {
     const element = await mount(host);
     element.remove();
     element.lang = "de";
-    await Promise.resolve();
+    await element.updateComplete;
 
-    expect(element.isUpdatePending).toBe(true);
     expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
       en["identifier.title"],
     );
