@@ -1,19 +1,18 @@
-import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
+import type { ZitadelStandardAttributeProps } from "@zitadel/sdk-core/types";
 import type * as React from "react";
 
 /**
- * Re-exports the shared SPA widget types from `@zitadel/sdk-core`.
+ * The standard HTML attributes a widget wrapper accepts besides its own props.
  *
- * `export type *` keeps this surface in lockstep with the core SPA contract: a
- * type added there is re-exported here automatically, and none can be dropped by
- * hand. The server-middleware types live in a separate core module and stay out
- * of the browser SDK surface.
+ * They are `className`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabIndex`, `data-*` and
+ * `aria-*`, and they are passed to the widget element. Use them to position, style and label the
+ * widget without an extra wrapper element.
+ *
+ * Nothing else reaches the element: the type admits only these, so a prop the type accepts is
+ * never silently dropped, and any other prop is ignored.
+ *
+ * @internal
  */
-export type * from "@zitadel/sdk-core/types";
-
-/**
- * The standard HTML attributes a widget wrapper accepts besides its own props,
- * and nothing else, so no prop the type accepts is dropped. They are passed to
- * the widget element.
- */
-export type ZitadelWidgetAttributes = StandardAttributeProps<React.HTMLAttributes<HTMLElement>>;
+export type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
+  React.HTMLAttributes<HTMLElement>
+>;

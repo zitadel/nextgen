@@ -6,12 +6,7 @@ import { DOCUMENT } from "@angular/common";
 import { createComponent } from "@angular/core";
 import { createApplication } from "@angular/platform-browser";
 import { provideServerRendering, renderApplication } from "@angular/platform-server";
-import {
-  businessLocales,
-  ZitadelLoginComponent as ZitadelLogin,
-  ZitadelLogoutComponent as ZitadelLogout,
-  ZitadelSessionComponent as ZitadelSession,
-} from "@zitadel/sdk-angular";
+import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/sdk-angular";
 
 const render = async <Component>(
   component: Type<Component>,
@@ -26,7 +21,9 @@ const render = async <Component>(
         environmentInjector: app.injector,
         hostElement: host,
       });
-      for (const [name, value] of Object.entries(inputs)) ref.setInput(name, value);
+      for (const [name, value] of Object.entries(inputs)) {
+        ref.setInput(name, value);
+      }
       app.attachView(ref.hostView);
       return app;
     },

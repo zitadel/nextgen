@@ -4,7 +4,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@zitadel/sdk-nuxt/module'],
 
-  nextgen: {
+  zitadel: {
     loginPath: '/login',
     protectedRoutes: ['/profile']
   },

@@ -5,7 +5,7 @@ Qwik Router request handler and helpers for Zitadel.
 > **Qwik 2 required.** This SDK peers Qwik 2 — `@qwik.dev/core` and
 > `@qwik.dev/router` (Qwik Router, which Qwik 2 renamed from Qwik City,
 > `@builder.io/qwik-city`), which run on Vite 8. A Qwik 1 app (`@builder.io/qwik`) is not
-> supported: the login widget comes from `@zitadel/sdk-qwik`, which requires
+> supported: the login widget is built on `@zitadel/sdk-qwik`, which requires
 > Qwik 2. Migrate the app to `@qwik.dev/*` first.
 
 ## Installation
@@ -29,12 +29,12 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 
 ### 1. Request handler
 
-Add a root plugin, e.g. `src/routes/plugin@nextgen.ts`:
+Add a root plugin, e.g. `src/routes/plugin@zitadel.ts`:
 
 ```ts
-import { createNextgenOnRequest } from '@zitadel/sdk-qwik-router/server';
+import { createZitadelOnRequest } from '@zitadel/sdk-qwik-router/server';
 
-export const onRequest = createNextgenOnRequest({
+export const onRequest = createZitadelOnRequest({
   protectedRoutes: ['/admin', '/dashboard*'],
   loginPath: '/login',
 });
@@ -58,7 +58,7 @@ To run alongside your own `onRequest`, export an array — Qwik Router runs them
 order:
 
 ```ts
-export const onRequest = [createNextgenOnRequest({ /* … */ }), myOnRequest];
+export const onRequest = [createZitadelOnRequest({ /* … */ }), myOnRequest];
 ```
 
 ### 2. Reading auth in a loader, action, or endpoint
@@ -105,17 +105,12 @@ export default component$(() => {
 
 ### 3. Render the login widget
 
-Install the Qwik component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-qwik-router` is server-only; the widget comes from `@zitadel/sdk-qwik`.
-Qwik bundles ecosystem packages, so install it as a dev dependency:
-
-```bash
-pnpm add -D @zitadel/sdk-qwik@latest
-```
+Render `ZitadelLogin` from `@zitadel/sdk-qwik-router/components`. It re-exports the widgets of
+`@zitadel/sdk-qwik`, so this one dev dependency is all the app installs.
 
 ```tsx
 import { component$ } from '@qwik.dev/core';
-import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik';
+import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik-router/components';
 
 const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
@@ -129,7 +124,7 @@ button, and `ZitadelLogout` a sign-out control on its own:
 
 ```tsx
 import { component$ } from '@qwik.dev/core';
-import { ZitadelSession, configureZitadel } from '@zitadel/sdk-qwik';
+import { ZitadelSession, configureZitadel } from '@zitadel/sdk-qwik-router/components';
 
 const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
@@ -141,10 +136,12 @@ export default component$(() => {
 The widgets' events surface as optional QRL callbacks: `onFlowStep$`,
 `onFlowInput$`, `onFlowComplete$`, `onFlowRedirect$` and `onFlowError$` on
 `ZitadelLogin`, and `onSignout$` on `ZitadelLogout` and `ZitadelSession`. Pass
-`locales={businessLocales}` (exported from `@zitadel/sdk-qwik`) to show
+`locales={businessLocales}` (exported from `@zitadel/sdk-qwik-router/components`) to show
 work-email copy for a business audience.
 
 ## Handler options
+
+An empty `url` or `projectSecret`, whether in the options or in the environment, counts as unset and falls back to the next source and then to the default (`http://localhost:8080` for `url`). `projectSecret` is a plain option of every server SDK. A route in `protectedRoutes` matches the raw path and the percent-decoded path, so `/%61dmin` is protected like `/admin`.
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
@@ -161,6 +158,8 @@ work-email copy for a business audience.
 | `jwksTimeoutMs`     | `number`             | `5000`                       | Timeout in ms for JWKS endpoint requests                            |
 | `proxyTimeoutMs`    | `number`             | `5000`                       | Timeout in ms for upstream proxy requests                           |
 | `audience`          | `string \| string[]` | not validated                | Expected `aud` claim value(s)                                       |
+
+A signed-out request for a protected route is redirected with an absolute URL on the origin of the request, such as `https://app.example.com/login?next=%2Fadmin`, as in every server SDK. The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them from the request only when the client sent none. It cannot tell a trusted CDN or load balancer from a client, and the server builds the OAuth issuer and the `Secure` decision for session cookies from those headers, so strip them at the edge when clients can reach the app directly.
 
 ## Testing
 

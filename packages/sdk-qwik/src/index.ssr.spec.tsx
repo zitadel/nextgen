@@ -2,7 +2,7 @@ import { renderToString } from "@qwik.dev/core/server";
 import { describe, expect, it } from "vitest";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
-import { type WidgetName, widgetTags } from "@zitadel/sdk-core/types";
+import { type ZitadelWidgetName, widgetTags } from "@zitadel/sdk-core/types";
 
 import {
   describeServerRenderCases,
@@ -129,7 +129,7 @@ describe("server-rendered qwik attribute serialization", () => {
 
 /** The attributes on the widget's element in the markup a server would send. */
 async function renderAttributes(
-  widget: WidgetName,
+  widget: ZitadelWidgetName,
   props: Readonly<Record<string, unknown>>,
 ): Promise<Record<string, string>> {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];

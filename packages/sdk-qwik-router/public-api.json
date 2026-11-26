@@ -1,0 +1,56 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.ts",
+      "kind": "other",
+      "extras": [
+        "ZitadelAuthResult",
+        "ZitadelAuthState",
+        "ZitadelClientAuthResult",
+        "ZitadelQwikCookieOptions",
+        "ZitadelQwikCookieValue",
+        "ZitadelQwikRequestEvent",
+        "ZitadelUnauthState",
+        "ZitadelAuthSession",
+        "ZitadelConfig",
+        "ZitadelMiddlewareOptions",
+        "ZitadelProject",
+        "configureZitadel",
+        "createZitadelOnRequest",
+        "getApi",
+        "getAuth",
+        "getZitadelConfig"
+      ]
+    },
+    "./server": {
+      "source": "src/server.ts",
+      "kind": "server",
+      "handler": {
+        "name": "createZitadelOnRequest",
+        "why": "A Qwik Router route file exports its server hook as onRequest, so the name ends in OnRequest and the call reads export const onRequest = createZitadelOnRequest(...). It is a factory, called once to return the handler, so it starts with create."
+      },
+      "authReader": {
+        "name": "getAuth",
+        "why": "Takes the framework's own request event or context and returns the verified result that the handler stored on it. It reads and never creates, so it is called getAuth, and it is synchronous because the framework has already handed over the event."
+      },
+      "extras": [
+        "ZitadelQwikCookieOptions",
+        "ZitadelQwikCookieValue",
+        "ZitadelQwikRequestEvent"
+      ]
+    },
+    "./client": {
+      "source": "src/client.ts",
+      "kind": "client",
+      "extras": []
+    },
+    "./components": {
+      "source": "src/components.ts",
+      "kind": "widgets",
+      "extras": [
+        "businessLocales",
+        "configureZitadel"
+      ]
+    }
+  }
+}

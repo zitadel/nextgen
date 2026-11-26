@@ -1,5 +1,9 @@
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ZitadelGetSessionOptions as CoreGetSessionOptions } from "@zitadel/sdk-core/session";
+
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+
+import type { ZitadelGetSessionOptions } from "../session";
 
 import { getSession } from "../session";
 
@@ -84,6 +88,13 @@ describe("getSession()", () => {
     vi.stubGlobal("window", undefined);
 
     await expect(getSession()).rejects.toThrow(/auth\(\)/);
+    await expect(getSession()).rejects.toMatchObject({ code: "E_ZITADEL_SESSION_NO_BROWSER" });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("ZitadelGetSessionOptions", () => {
+  it("is the type of @zitadel/sdk-core", () => {
+    expectTypeOf<ZitadelGetSessionOptions>().toEqualTypeOf<CoreGetSessionOptions>();
   });
 });

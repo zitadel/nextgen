@@ -5,7 +5,12 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import * as client from "../client";
 import * as index from "../index";
 import * as server from "../server";
-import type { AuthResult, AuthState, NextgenSession, UnauthState } from "../index";
+import type {
+  ZitadelAuthResult,
+  ZitadelAuthState,
+  ZitadelAuthSession,
+  ZitadelUnauthState,
+} from "../index";
 
 // The package ships only what its build emits, so an `exports` target the build
 // misses breaks every consumer that imports it. `test` runs after `build`.
@@ -20,8 +25,12 @@ describe("package manifest", () => {
   };
 
   function targets(value: unknown): string[] {
-    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
-    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    if (typeof value === "string") {
+      return value.startsWith("./") ? [value] : [];
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(targets);
+    }
     return [];
   }
 
@@ -40,9 +49,9 @@ describe("package manifest", () => {
 });
 
 /**
- * `@zitadel/sdk-qwik-router` is server-only: the `<zitadel-*>` widgets come from
- * `@zitadel/sdk-qwik`, whose specs check every config key against the element.
- * If an entry here ever exports a widget wrapper, it needs the same
+ * The root, `/client` and `/server` entries export no widget: the `<zitadel-*>` widgets come
+ * from `@zitadel/sdk-qwik` through `/components`, and its specs check every config key against
+ * the element. If an entry here ever exports a widget wrapper, it needs the same
  * "wrapper config parity" checks, so this fails until they are added.
  */
 describe("wrapper config parity", () => {
@@ -60,8 +69,8 @@ describe("index entry", () => {
   // A server route imports its helpers and their types from one place, as it
   // does with every other server SDK.
   it("exports the types its helpers answer with", () => {
-    expectTypeOf(index.getAuth).returns.toEqualTypeOf<AuthResult>();
-    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
-    expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
+    expectTypeOf(index.getAuth).returns.toEqualTypeOf<ZitadelAuthResult>();
+    expectTypeOf<ZitadelAuthState["session"]>().toEqualTypeOf<ZitadelAuthSession>();
+    expectTypeOf<ZitadelUnauthState["session"]>().toEqualTypeOf<null>();
   });
 });
