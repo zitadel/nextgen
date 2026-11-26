@@ -1,11 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  LocalRuntime,
-  LocalServerDockerFailedError,
-  LocalServerNotStartedError,
-} from "@/lib/server";
+import { LocalRuntime } from "@/lib/server";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { reads, type Refused, whole } from "@/cli/core/flags";
@@ -52,28 +48,6 @@ const NOT_STARTED_REFUSAL = {
   next: [{ id: "start" }],
 } as const satisfies Refusal;
 
-/** How reading the log is refused when the folder has no record of a start. */
-const NO_RECORD_REFUSAL = {
-  message: "{message}",
-  hint: "Run `zitadel start` first.",
-  next: [
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How reading the log is refused when Docker could not read the container's log. */
-const DOCKER_FAILED_REFUSAL = {
-  message: "{message}",
-  hint: "Check that Docker is installed, running, and reachable from this shell.",
-  next: [
-    {
-      id: "doctor",
-    },
-  ],
-} as const satisfies Refusal;
-
 /**
  * `zitadel logs`: shows the end of the nearest server's log, or follows it as
  * the server writes. On a terminal, warnings are yellow and errors red. Run it
@@ -113,6 +87,7 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
    * @param input.flags - The run's `--follow`, `--level` and `--tail`.
    * @returns The lines shown.
    * @throws {ZitadelError} When following under `--json`, or when no server was started here.
+   * @throws {LocalServerError} When the record names no start, or Docker cannot read the log.
    */
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<CommandResult> {
     if (flags.follow && Output.json) {
@@ -124,95 +99,79 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
       throw refusalError(NOT_STARTED_REFUSAL, {});
     }
 
-    try {
-      if (flags.follow) {
-        await server.follow({
-          tail: flags.tail,
-          level: flags.level,
-          print: (lines) => {
-            if (!lines.isEmpty) {
-              process.stdout.write(`${lines.drawn(Output.color).join("\n")}\n`);
-            }
+    if (flags.follow) {
+      await server.follow({
+        tail: flags.tail,
+        level: flags.level,
+        print: (lines) => {
+          if (!lines.isEmpty) {
+            process.stdout.write(`${lines.drawn(Output.color).join("\n")}\n`);
+          }
+        },
+        signal: this.signal,
+      });
+
+      const title = "Stopped following local Zitadel logs";
+      if (Output.screen) {
+        return {
+          status: "ok",
+          data: { title },
+          summary: {
+            title,
+            sections: [],
           },
-          signal: this.signal,
-        });
-
-        const title = "Stopped following local Zitadel logs";
-        if (Output.screen) {
-          return {
-            status: "ok",
-            data: { title },
-            summary: {
-              title,
-              sections: [],
-            },
-          };
-        } else {
-          return {
-            status: "ok",
-            data: { title },
-            pretty: prose(""),
-            summary: {
-              title,
-              sections: [],
-            },
-          };
-        }
+        };
       } else {
-        const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
-        const shown = lines.drawn(Output.color);
-        const title = "Local Zitadel server logs";
+        return {
+          status: "ok",
+          data: { title },
+          pretty: prose(""),
+          summary: {
+            title,
+            sections: [],
+          },
+        };
+      }
+    } else {
+      const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
+      const shown = lines.drawn(Output.color);
+      const title = "Local Zitadel server logs";
 
-        if (runtime.backend === "binary") {
-          return {
-            status: "ok",
-            data: {
-              title,
-              runtime: {
-                backend: runtime.backend,
-                pid: runtime.pid,
-                log_path: runtime.log_path,
-              },
-              logs: lines.text(),
+      if (runtime.backend === "binary") {
+        return {
+          status: "ok",
+          data: {
+            title,
+            runtime: {
+              backend: runtime.backend,
+              pid: runtime.pid,
+              log_path: runtime.log_path,
             },
-            pretty: painted(shown.join("\n")),
-            summary: {
-              title,
-              sections: [],
-              lines: shown,
-            },
-          };
-        } else {
-          return {
-            status: "ok",
-            data: {
-              title,
-              runtime: { backend: runtime.backend, container_name: runtime.container_name },
-              logs: lines.text(),
-            },
-            pretty: painted(shown.join("\n")),
-            summary: {
-              title,
-              sections: [],
-              lines: shown,
-            },
-          };
-        }
+            logs: lines.text(),
+          },
+          pretty: painted(shown.join("\n")),
+          summary: {
+            title,
+            sections: [],
+            lines: shown,
+          },
+        };
+      } else {
+        return {
+          status: "ok",
+          data: {
+            title,
+            runtime: { backend: runtime.backend, container_name: runtime.container_name },
+            logs: lines.text(),
+          },
+          pretty: painted(shown.join("\n")),
+          summary: {
+            title,
+            sections: [],
+            lines: shown,
+          },
+        };
       }
-    } catch (error) {
-      if (error instanceof LocalServerNotStartedError) {
-        throw refusalError(NO_RECORD_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerDockerFailedError) {
-        throw refusalError(DOCKER_FAILED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      throw error;
     }
   }
 }

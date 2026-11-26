@@ -1,13 +1,8 @@
 import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 
 import { askCustomSettings, type Fact, type SetupServices } from "@/cli/commands/setup/shared";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import {
   customExample,
-  IdpProviderUnknownError,
-  IdpSettingsInvalidError,
-  IdpSettingsMissingError,
-  IdpSettingsUnusedError,
   customFlagValues,
   loopbackIssuerWarning,
   selectionFromFlags,
@@ -29,50 +24,6 @@ const ID_TO_FILL_IN = "<id>";
  * What a command line describing a custom connection looks like, for an error to show.
  */
 const SSO_CUSTOM_EXAMPLE = customExample(SETUP_FLAG_NAMES);
-
-/**
- * What a custom connection's setting the platform refuses is refused for.
- */
-const SETTING_INVALID_REFUSAL = {
-  message: "{message}",
-  hint: "Fix {flag} and run the command again.",
-  details: {
-    flag: "{flag}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What custom connection settings given beside a catalog provider are refused
- * for.
- */
-const SETTINGS_UNUSED_REFUSAL = {
-  message: "{message}",
-  hint: "Add {providerFlag} custom, or remove {pronoun}.",
-  details: {
-    flags: "{flags}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a custom connection described without every setting it needs is
- * refused for.
- */
-const SETTINGS_MISSING_REFUSAL = {
-  message: "{message}",
-  hint: "Describe the connection, e.g. {example}",
-  details: {
-    missing: "{missing}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a provider that is neither in the catalog nor a custom connection is
- * refused for.
- */
-const PROVIDER_UNKNOWN_REFUSAL = {
-  message: "{message}",
-  hint: "Use one of {list}.",
-} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -148,8 +99,11 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
    * @param needs - The flags.
    * @returns The provider and the credentials collected so far, or `undefined` when none was asked
    *   for.
-   * @throws {@link ZitadelError} When the provider is unknown, or the custom
-   *   settings are refused, left out or given beside a catalog provider.
+   * @throws {@link IdpProviderUnknownError} When the provider is unknown.
+   * @throws {@link IdpSettingsInvalidError} When a custom setting is refused.
+   * @throws {@link IdpSettingsMissingError} When a custom setting is left out.
+   * @throws {@link IdpSettingsUnusedError} When custom settings are given beside
+   *   a catalog provider.
    */
   async run(needs: Needs): Promise<Fact<"ssoFromCommandLine">> {
     const { flags } = needs;
@@ -159,89 +113,59 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: undefined,
       };
     }
-    try {
-      const selection = selectionFromFlags(
-        flags.sso,
-        flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
-          ? await askCustomSettings(customValues, this.deps.ask)
-          : customValues,
-        SETUP_FLAG_NAMES,
-        SSO_CUSTOM_EXAMPLE,
-      );
-      const loopback = loopbackIssuerWarning(selection);
-      if (loopback !== undefined) {
-        warnings.report(loopback);
-      }
-      if (flags.ssoClientId === undefined) {
-        return {
-          ssoFromCommandLine: {
-            selection,
-            credentials: {},
-          },
-        };
-      }
-      if (!this.deps.nonInteractive || this.deps.dryRun) {
-        return {
-          ssoFromCommandLine: {
-            selection,
-            credentials: { clientId: flags.ssoClientId },
-          },
-        };
-      }
+    const selection = selectionFromFlags(
+      flags.sso,
+      flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
+        ? await askCustomSettings(customValues, this.deps.ask)
+        : customValues,
+      SETUP_FLAG_NAMES,
+      SSO_CUSTOM_EXAMPLE,
+    );
+    const loopback = loopbackIssuerWarning(selection);
+    if (loopback !== undefined) {
+      warnings.report(loopback);
+    }
+    if (flags.ssoClientId === undefined) {
       return {
         ssoFromCommandLine: {
           selection,
-          credentials: {
-            clientId: flags.ssoClientId,
-            secret: await this.deps.ask.secret({
-              name: "client secret",
-              message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
-              parse: parseClientSecret,
-              stdin: true,
-              retry: pipedFrom(
-                "CLIENT_SECRET",
-                andTheRest(
-                  this.deps.suggest({
-                    id: "setup",
-                    flags: {
-                      sso: flags.sso,
-                      ssoClientId: ID_TO_FILL_IN,
-                    },
-                  }),
-                ),
-              ),
-            }),
-          },
+          credentials: {},
         },
       };
-    } catch (error) {
-      if (error instanceof IdpSettingsInvalidError) {
-        throw refusalError(SETTING_INVALID_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof IdpSettingsUnusedError) {
-        throw refusalError(SETTINGS_UNUSED_REFUSAL, {
-          ...error,
-          message: error.message,
-          pronoun: new Intl.PluralRules("en").select(error.flags.length) === "one" ? "it" : "them",
-        });
-      }
-      if (error instanceof IdpSettingsMissingError) {
-        throw refusalError(SETTINGS_MISSING_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof IdpProviderUnknownError) {
-        throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
-          ...error,
-          message: error.message,
-          list: error.known.join(", "),
-        });
-      }
-      throw error;
     }
+    if (!this.deps.nonInteractive || this.deps.dryRun) {
+      return {
+        ssoFromCommandLine: {
+          selection,
+          credentials: { clientId: flags.ssoClientId },
+        },
+      };
+    }
+    return {
+      ssoFromCommandLine: {
+        selection,
+        credentials: {
+          clientId: flags.ssoClientId,
+          secret: await this.deps.ask.secret({
+            name: "client secret",
+            message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
+            parse: parseClientSecret,
+            stdin: true,
+            retry: pipedFrom(
+              "CLIENT_SECRET",
+              andTheRest(
+                this.deps.suggest({
+                  id: "setup",
+                  flags: {
+                    sso: flags.sso,
+                    ssoClientId: ID_TO_FILL_IN,
+                  },
+                }),
+              ),
+            ),
+          }),
+        },
+      },
+    };
   }
 }

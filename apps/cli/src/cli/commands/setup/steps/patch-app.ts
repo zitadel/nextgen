@@ -6,7 +6,6 @@ import {
   relativeDisplayPath as relativeDisplay,
   type SetupServices,
 } from "@/cli/commands/setup/shared";
-import { orcaRefusal } from "@/cli/commands/setup/shared";
 import { FsError, FsNotFoundError, readFile, rm, writeFile } from "@/lib/fs";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
@@ -130,7 +129,7 @@ export class PatchApp extends WizardStep<
       .catch(async (error: unknown) => {
         await this.rollBack(envFilesBefore);
         patching.fail();
-        throw orcaRefusal(error);
+        throw error;
       });
     for (const file of patched.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.deps.cwd, file), this.deps.dryRun);

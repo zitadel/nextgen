@@ -5,11 +5,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import {
-  type UserSchema,
-  ZitadelConfigFlowBrokenError,
-  ZitadelConfigProviderUnknownError,
-} from "@/lib/zitadel";
+import type { UserSchema } from "@/lib/zitadel";
 import { dryRunResult } from "@/cli/core/crud/shared";
 
 /**
@@ -21,28 +17,6 @@ import { dryRunResult } from "@/cli/core/crud/shared";
 const NAME_PROVIDER_REFUSAL = {
   message: "Name the provider to remove",
   hint: "Pass --provider, e.g. --provider {example}. {schema} offers: {offered}.",
-} as const satisfies Refusal;
-
-/**
- * What a change is refused for when it would make a login flow stop validating.
- */
-const FLOW_BROKEN_REFUSAL = {
-  message: "{message}",
-  hint: "Fix the steps named above, then run the command again.",
-} as const satisfies Refusal;
-
-/**
- * What a provider nothing knows is refused for, such as a typo.
- */
-const PROVIDER_UNKNOWN_REFUSAL = {
-  code: "E_NOT_FOUND",
-  message: "{message}",
-  hint: "{schema} offers: {offeredList}. Connections under .zitadel/idps/: {connectionList}.",
-  details: {
-    requested: "{requested}",
-    offered: "{offered}",
-    connections: "{connections}",
-  },
 } as const satisfies Refusal;
 
 /**
@@ -88,25 +62,7 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
     const change = await this.previewIfNoSignInLeft(
       target,
       (options) => {
-        try {
-          return config.connections.disable(schema, provider, options);
-        } catch (error) {
-          if (error instanceof ZitadelConfigProviderUnknownError) {
-            throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
-              ...error,
-              message: error.message,
-              offeredList: error.offered.join(", ") || "none",
-              connectionList: error.connections.join(", ") || "none",
-            });
-          }
-          if (error instanceof ZitadelConfigFlowBrokenError) {
-            throw refusalError(FLOW_BROKEN_REFUSAL, {
-              ...error,
-              message: error.message,
-            });
-          }
-          throw error;
-        }
+        return config.connections.disable(schema, provider, options);
       },
       { provider },
     );
@@ -183,25 +139,7 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
     const confirmed = await this.confirmIfNoSignInLeft(
       target,
       (options) => {
-        try {
-          return config.connections.disable(schema, provider, options);
-        } catch (error) {
-          if (error instanceof ZitadelConfigProviderUnknownError) {
-            throw refusalError(PROVIDER_UNKNOWN_REFUSAL, {
-              ...error,
-              message: error.message,
-              offeredList: error.offered.join(", ") || "none",
-              connectionList: error.connections.join(", ") || "none",
-            });
-          }
-          if (error instanceof ZitadelConfigFlowBrokenError) {
-            throw refusalError(FLOW_BROKEN_REFUSAL, {
-              ...error,
-              message: error.message,
-            });
-          }
-          throw error;
-        }
+        return config.connections.disable(schema, provider, options);
       },
       { provider },
     );

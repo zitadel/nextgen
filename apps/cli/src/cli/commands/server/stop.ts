@@ -1,14 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import {
-  LocalRuntime,
-  LocalServerDockerFailedError,
-  LocalServerRecordMalformedError,
-  LocalServerRecordUnreadableError,
-  LocalServerStopAllFailedError,
-  LocalServerStopError,
-} from "@/lib/server";
-import { Cmd } from "@/lib/cmd";
+import { LocalRuntime } from "@/lib/server";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Fact, section } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -16,58 +8,7 @@ import { Previewable } from "@/cli/core/previewable";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-
-/** How a stop is refused when a server it had to stop was still running afterwards. */
-const SERVER_DID_NOT_STOP_REFUSAL = {
-  message: "{message}",
-  hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
-} as const satisfies Refusal;
-
-/** How `stop --all` is refused when at least one managed process would not stop. */
-const PROCESSES_DID_NOT_STOP_REFUSAL = {
-  message: "{message}",
-  hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
-  details: {
-    supported: true,
-    results: "{results}",
-  },
-} as const satisfies Refusal;
-
-/** How a stop is refused when the runtime record of this folder is not in the shape it is written in. */
-const RECORD_MALFORMED_REFUSAL = {
-  message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a stop is refused when the runtime record of this folder cannot be read. */
-const RECORD_UNREADABLE_REFUSAL = {
-  message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-} as const satisfies Refusal;
-
-/** How a stop is refused when Docker failed to stop or remove the container. */
-const DOCKER_FAILED_REFUSAL = {
-  message: "{message}",
-  hint: "Check that Docker is installed, running, and reachable from this shell.",
-  next: [
-    {
-      id: "doctor",
-    },
-  ],
-} as const satisfies Refusal;
 
 /**
  * `zitadel stop`: stops this folder's server and keeps its data, or, with
@@ -242,185 +183,150 @@ export default class Stop extends Telemetered(
    * @returns The result of the run.
    */
   protected async apply({ flags }: Admitted<typeof Stop>): Promise<CommandResult> {
-    try {
-      if (flags.all) {
-        const sweep = await LocalRuntime.stopAll(this.localServers());
-        if (!sweep.supported) {
-          const title = "Managed local runtime process discovery is unavailable";
+    if (flags.all) {
+      const sweep = await LocalRuntime.stopAll(this.localServers());
+      if (!sweep.supported) {
+        const title = "Managed local runtime process discovery is unavailable";
 
-          return {
-            status: "ok",
-            data: {
-              title,
-              sweep: {
-                supported: false,
-                error: sweep.error,
-                stopped: [],
-              },
+        return {
+          status: "ok",
+          data: {
+            title,
+            sweep: {
+              supported: false,
+              error: sweep.error,
+              stopped: [],
             },
-            summary: {
-              title,
-              sections: [section(undefined, ["Error", sweep.error ?? "unknown"])],
-            },
-            warnings: ["managed-runtime-processes: discovery unavailable"],
-          };
-        }
-
-        if (sweep.results.length === 0) {
-          return {
-            status: "ok",
-            data: {
-              title: "No host-wide managed local runtime processes found",
-              sweep: {
-                supported: true,
-                scope: "host",
-                count: 0,
-                results: sweep.results,
-              },
-            },
-            summary: {
-              title: "No host-wide managed local runtime processes found",
-              sections: [section(undefined)],
-            },
-          };
-        } else {
-          const stopped: Fact[] = sweep.results.map((result): Fact => {
-            return ["Process", String(result.process.pid)];
-          });
-
-          return {
-            status: "ok",
-            data: {
-              title: "Host-wide managed local runtime processes stopped",
-              sweep: {
-                supported: true,
-                scope: "host",
-                count: sweep.results.length,
-                results: sweep.results,
-              },
-            },
-            summary: {
-              title: "Host-wide managed local runtime processes stopped",
-              sections: [section(undefined, ...stopped)],
-            },
-          };
-        }
+          },
+          summary: {
+            title,
+            sections: [section(undefined, ["Error", sweep.error ?? "unknown"])],
+          },
+          warnings: ["managed-runtime-processes: discovery unavailable"],
+        };
       }
 
-      const server = this.serverInThisFolder();
-      const record = await server.record();
-
-      if (record !== undefined && record.backend === "binary") {
-        const facts: Fact[] = [
-          ["Runtime", "binary"],
-          ["Process", String(record.pid)],
-          ["Data", record.data_dir],
-        ];
-        const { stopped, outcome } = await server.stop();
-        const title = this.stoppedTitle(stopped);
-
+      if (sweep.results.length === 0) {
         return {
           status: "ok",
           data: {
-            title,
-            runtime: {
-              backend: "binary",
-              pid: record.pid,
-              log_path: record.log_path,
-              stop_result: outcome,
-              data_preserved: true,
-              data_dir: record.data_dir,
+            title: "No host-wide managed local runtime processes found",
+            sweep: {
+              supported: true,
+              scope: "host",
+              count: 0,
+              results: sweep.results,
             },
           },
           summary: {
-            title,
-            sections: [section(undefined, ...facts)],
-          },
-        };
-      } else if (record !== undefined) {
-        const facts: Fact[] = [
-          ["Runtime", "docker"],
-          ["Container", record.container_name],
-          ["Data", record.data_dir],
-        ];
-        const { stopped } = await server.stop();
-        const title = this.stoppedTitle(stopped);
-
-        return {
-          status: "ok",
-          data: {
-            title,
-            runtime: {
-              backend: "docker",
-              container_name: record.container_name,
-              data_preserved: true,
-              data_dir: record.data_dir,
-            },
-          },
-          summary: {
-            title,
-            sections: [section(undefined, ...facts)],
+            title: "No host-wide managed local runtime processes found",
+            sections: [section(undefined)],
           },
         };
       } else {
-        const containerName = server.containerName();
-        const facts: Fact[] = [
-          ["Runtime", "missing"],
-          ["Container", containerName],
-        ];
-        const { stopped } = await server.stop();
-        const title = this.stoppedTitle(stopped);
+        const stopped: Fact[] = sweep.results.map((result): Fact => {
+          return ["Process", String(result.process.pid)];
+        });
 
         return {
           status: "ok",
           data: {
-            title,
-            runtime: {
-              backend: "missing",
-              container_name: containerName,
-              data_preserved: true,
-              data_dir: undefined,
+            title: "Host-wide managed local runtime processes stopped",
+            sweep: {
+              supported: true,
+              scope: "host",
+              count: sweep.results.length,
+              results: sweep.results,
             },
           },
           summary: {
-            title,
-            sections: [section(undefined, ...facts)],
+            title: "Host-wide managed local runtime processes stopped",
+            sections: [section(undefined, ...stopped)],
           },
         };
       }
-    } catch (error) {
-      if (error instanceof LocalServerStopAllFailedError) {
-        throw refusalError(PROCESSES_DID_NOT_STOP_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerStopError) {
-        throw refusalError(SERVER_DID_NOT_STOP_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordMalformedError) {
-        throw refusalError(RECORD_MALFORMED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordUnreadableError) {
-        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-          path: Cmd.quote(error.path),
-        });
-      }
-      if (error instanceof LocalServerDockerFailedError) {
-        throw refusalError(DOCKER_FAILED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      throw error;
+    }
+
+    const server = this.serverInThisFolder();
+    const record = await server.record();
+
+    if (record !== undefined && record.backend === "binary") {
+      const facts: Fact[] = [
+        ["Runtime", "binary"],
+        ["Process", String(record.pid)],
+        ["Data", record.data_dir],
+      ];
+      const { stopped, outcome } = await server.stop();
+      const title = this.stoppedTitle(stopped);
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "binary",
+            pid: record.pid,
+            log_path: record.log_path,
+            stop_result: outcome,
+            data_preserved: true,
+            data_dir: record.data_dir,
+          },
+        },
+        summary: {
+          title,
+          sections: [section(undefined, ...facts)],
+        },
+      };
+    } else if (record !== undefined) {
+      const facts: Fact[] = [
+        ["Runtime", "docker"],
+        ["Container", record.container_name],
+        ["Data", record.data_dir],
+      ];
+      const { stopped } = await server.stop();
+      const title = this.stoppedTitle(stopped);
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "docker",
+            container_name: record.container_name,
+            data_preserved: true,
+            data_dir: record.data_dir,
+          },
+        },
+        summary: {
+          title,
+          sections: [section(undefined, ...facts)],
+        },
+      };
+    } else {
+      const containerName = server.containerName();
+      const facts: Fact[] = [
+        ["Runtime", "missing"],
+        ["Container", containerName],
+      ];
+      const { stopped } = await server.stop();
+      const title = this.stoppedTitle(stopped);
+
+      return {
+        status: "ok",
+        data: {
+          title,
+          runtime: {
+            backend: "missing",
+            container_name: containerName,
+            data_preserved: true,
+            data_dir: undefined,
+          },
+        },
+        summary: {
+          title,
+          sections: [section(undefined, ...facts)],
+        },
+      };
     }
   }
 

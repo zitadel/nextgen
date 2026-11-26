@@ -1,7 +1,6 @@
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { orcaRefusal } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -50,35 +49,31 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
    *
    * @param needs - The patcher, the app and the issuer.
    * @returns Nothing is added.
-   * @throws {@link ZitadelError} With `E_CONFLICT` for a file it would refuse.
+   * @throws {@link OrcaError} For a file the patch would refuse to write.
    */
   async run(needs: Needs): Promise<object> {
     const { framework, issuer, patchContext, patcher } = needs;
     if (framework !== undefined && !this.deps.dryRun) {
-      await patcher
-        .patch(
-          patchContext(framework, {
-            id: "dry-run-0000",
-            name: "dry-run",
-            project_secret: "sk_proj_dry_run_full",
-            preview_secret: "sk_proj_dry_run_preview",
-            origins: [
-              {
-                pattern: issuer,
-                kind: "primary",
-              },
-            ],
-            created_at: "2026-04-21T14:03:11.000Z",
-          }),
-          {
-            cwd: this.deps.cwd,
-            dryRun: true,
-            force: this.deps.force,
-          },
-        )
-        .catch((error: unknown) => {
-          throw orcaRefusal(error);
-        });
+      await patcher.patch(
+        patchContext(framework, {
+          id: "dry-run-0000",
+          name: "dry-run",
+          project_secret: "sk_proj_dry_run_full",
+          preview_secret: "sk_proj_dry_run_preview",
+          origins: [
+            {
+              pattern: issuer,
+              kind: "primary",
+            },
+          ],
+          created_at: "2026-04-21T14:03:11.000Z",
+        }),
+        {
+          cwd: this.deps.cwd,
+          dryRun: true,
+          force: this.deps.force,
+        },
+      );
     }
     return {};
   }

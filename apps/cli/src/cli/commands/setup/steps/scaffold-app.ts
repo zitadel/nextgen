@@ -1,70 +1,11 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { orcaRefusal } from "@/cli/commands/setup/shared";
 import { ZitadelLibError } from "@/lib/errors";
-import {
-  OrcaCommandFailedError,
-  OrcaCommandNotFoundError,
-  OrcaCommandSpawnFailedError,
-  OrcaDirectoryNotEmptyError,
-  OrcaNodeUnsupportedError,
-} from "@/lib/orca";
+import { OrcaCommandFailedError } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-
-/**
- * How a scaffold into a directory that already holds files is refused.
- */
-const DIRECTORY_NOT_EMPTY_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "{reason}Pass --force to scaffold into a non-empty directory, or run setup from an existing supported app project.",
-  details: {
-    entries: "{entries}",
-  },
-} as const satisfies Refusal;
-
-/**
- * How a scaffold on a Node the framework's tool refuses is refused.
- */
-const NODE_UNSUPPORTED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Switch to Node {accepted} and rerun, or create the {displayName} app with that Node and run setup inside it.",
-  details: {
-    node: "{node}",
-    required: "{required}",
-  },
-} as const satisfies Refusal;
-
-/**
- * How a scaffold whose command is not on the `PATH` is refused.
- */
-const COMMAND_NOT_FOUND_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Ensure '{command}' is installed and on PATH.",
-  details: {
-    command: "{command}",
-    args: "{args}",
-    code: "{spawnCode}",
-  },
-} as const satisfies Refusal;
-
-/**
- * How a scaffold whose command could not be spawned is refused.
- */
-const COMMAND_SPAWN_FAILED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  details: {
-    command: "{command}",
-    args: "{args}",
-    code: "{spawnCode}",
-  },
-} as const satisfies Refusal;
 
 /**
  * How a scaffold whose command exited non-zero, and wrote something, is refused.
@@ -181,31 +122,6 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
       };
     } catch (error) {
       current?.fail();
-      if (error instanceof OrcaDirectoryNotEmptyError) {
-        throw refusalError(DIRECTORY_NOT_EMPTY_REFUSAL, {
-          ...error,
-          message: error.message,
-          reason: error.reason === undefined ? "" : `${error.reason} `,
-        });
-      }
-      if (error instanceof OrcaNodeUnsupportedError) {
-        throw refusalError(NODE_UNSUPPORTED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof OrcaCommandNotFoundError) {
-        throw refusalError(COMMAND_NOT_FOUND_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof OrcaCommandSpawnFailedError) {
-        throw refusalError(COMMAND_SPAWN_FAILED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
       if (error instanceof OrcaCommandFailedError) {
         throw refusalError(
           error.output === "" ? COMMAND_FAILED_SILENTLY_REFUSAL : COMMAND_FAILED_REFUSAL,
@@ -215,7 +131,7 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
           },
         );
       }
-      throw orcaRefusal(error);
+      throw error;
     }
   }
 

@@ -1,33 +1,14 @@
 import { Flags } from "@oclif/core";
 
-import {
-  BackendVariablePreviewMissingError,
-  BackendVariablePrimaryMissingError,
-  VariableService,
-} from "@/lib/backend";
+import { VariableService } from "@/lib/backend";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { fieldsFlag } from "@/cli/core/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { VariableView } from "@/lib/variable";
 import { ReadCommand } from "@/cli/commands/bases";
 import { variableNameArg } from "./name";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-
-/** How a read is refused when the name holds no preview value. */
-const NO_PREVIEW_VALUE_REFUSAL = {
-  code: "E_NOT_FOUND",
-  message: "{message}",
-  hint: "A name has a preview value only once one is set with `--preview`.",
-} as const satisfies Refusal;
-
-/** How a read is refused when the name holds no primary value. */
-const NO_PRIMARY_VALUE_REFUSAL = {
-  code: "E_NOT_FOUND",
-  message: "{message}",
-  hint: "Set one with `variable set`.",
-} as const satisfies Refusal;
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -76,47 +57,32 @@ export default class VariableGet extends Telemetered(ReadCommand) {
    *
    * @param input - The flags and arguments the command accepts.
    * @returns The variable, as a record.
-   * @throws {ZitadelError} When the name holds no value of the kind asked for.
+   * @throws {BackendVariablePreviewMissingError} When `--preview` and the name holds no preview value.
+   * @throws {BackendVariablePrimaryMissingError} When the name holds no primary value.
    */
   protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<CommandResult> {
     const variableService = await this.service(VariableService);
-    try {
-      const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
-      this.annotate({
-        is_secret: variable.secret,
-      });
+    const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
+    this.annotate({
+      is_secret: variable.secret,
+    });
 
-      const title = `Read ${escapeControlCharacters(args.name)}`;
-      const cell = VariableView.of(variable).cell();
-      const view = this.viewRecord(variable, flags.fields, ["value"]);
+    const title = `Read ${escapeControlCharacters(args.name)}`;
+    const cell = VariableView.of(variable).cell();
+    const view = this.viewRecord(variable, flags.fields, ["value"]);
 
-      return {
-        status: "ok",
-        data: view.data,
-        summary: {
-          title,
-          sections: [],
-          lines: this.tabulateDetail(undefined, view.columns, {
-            name: variable.name,
-            secret: variable.secret,
-            value: cell.value === "" ? '""' : cell.value,
-          }).split("\n"),
-        },
-      };
-    } catch (error) {
-      if (error instanceof BackendVariablePreviewMissingError) {
-        throw refusalError(NO_PREVIEW_VALUE_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof BackendVariablePrimaryMissingError) {
-        throw refusalError(NO_PRIMARY_VALUE_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    return {
+      status: "ok",
+      data: view.data,
+      summary: {
+        title,
+        sections: [],
+        lines: this.tabulateDetail(undefined, view.columns, {
+          name: variable.name,
+          secret: variable.secret,
+          value: cell.value === "" ? '""' : cell.value,
+        }).split("\n"),
+      },
+    };
   }
 }

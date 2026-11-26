@@ -3,18 +3,11 @@ import pTimeout from "p-timeout";
 import { UserService } from "@/lib/backend";
 import { Claim, type ClaimState } from "@/lib/claim";
 import { isCancellation, ZitadelError, ZitadelLibError } from "@/lib/errors";
-import {
-  LocalRuntime,
-  LocalServerRecordMalformedError,
-  LocalServerRecordUnreadableError,
-  ZitadelRuntime,
-} from "@/lib/server";
-import { Cmd } from "@/lib/cmd";
+import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { CommandResult, Connection, MetaOptions } from "@/cli/core";
 import type { GlobalOptions } from "@/cli/core/types";
 import { resolveCwd } from "@/lib/paths";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import {
   Guidance,
   Spelling,
@@ -147,29 +140,6 @@ async function projectStatus(
 type UserPresence = "none" | "some" | "unknown";
 
 const PRESENCE_PROBE_TIMEOUT_MS = 1500;
-
-/** How a status is refused when the runtime record of this folder is not in the shape it is written in. */
-const RECORD_MALFORMED_REFUSAL = {
-  message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  next: [
-    {
-      id: "reset",
-      flags: {
-        force: true,
-      },
-    },
-    {
-      id: "start",
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a status is refused when the runtime record of this folder cannot be read. */
-const RECORD_UNREADABLE_REFUSAL = {
-  message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-} as const satisfies Refusal;
 
 /**
  * Whether the project has any users yet — the journey signal that stages the
@@ -410,120 +380,101 @@ export default class Status extends Telemetered(ProjectCommand) {
    * @returns The summary of both, and what to do next.
    */
   protected async execute(): Promise<CommandResult> {
-    try {
-      const server = await LocalRuntime.forFolder(this.cwd, {
-        cliVersion: this.cliVersion,
-      }).status();
-      const serverLifecycle = server.lifecycle;
+    const server = await LocalRuntime.forFolder(this.cwd, {
+      cliVersion: this.cliVersion,
+    }).status();
+    const serverLifecycle = server.lifecycle;
 
-      const project = await projectStatus(
-        this.cwd,
-        this.environment.values.ZITADEL_ISSUER?.value,
-        this.environment.values.ZITADEL_PROJECT_ID?.value,
-        this.environment.envFile !== undefined || this.environment.name.value !== "development"
-          ? {
-              name: this.environment.name.value,
-              envFile: this.environment.envFile,
-            }
-          : undefined,
-      );
-      this.ui.ranAgainst(
-        project.lifecycle === "configured" ? project.project_id : undefined,
-        this.environment.values.ZITADEL_URL?.value ?? this.meta.source,
-      );
-      const users =
-        project.lifecycle === "configured"
-          ? await detectUserPresence(() => {
-              return this.connect({
-                prompt: false,
-                timeoutMs: PRESENCE_PROBE_TIMEOUT_MS,
-              });
-            })
-          : "unknown";
-      const serverUrl =
-        server.runtime === undefined
-          ? undefined
-          : escapeControlCharacters(server.runtime.server_url);
-      const backend = server.runtime?.backend;
-      const how =
-        server.runtime?.backend === "binary" && server.process !== undefined
-          ? `${backend}, pid ${server.process.pid}`
-          : backend;
-      const dockerSaid =
-        backend === "docker" && !server.docker.available
-          ? `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`
-          : "";
+    const project = await projectStatus(
+      this.cwd,
+      this.environment.values.ZITADEL_ISSUER?.value,
+      this.environment.values.ZITADEL_PROJECT_ID?.value,
+      this.environment.envFile !== undefined || this.environment.name.value !== "development"
+        ? {
+            name: this.environment.name.value,
+            envFile: this.environment.envFile,
+          }
+        : undefined,
+    );
+    this.ui.ranAgainst(
+      project.lifecycle === "configured" ? project.project_id : undefined,
+      this.environment.values.ZITADEL_URL?.value ?? this.meta.source,
+    );
+    const users =
+      project.lifecycle === "configured"
+        ? await detectUserPresence(() => {
+            return this.connect({
+              prompt: false,
+              timeoutMs: PRESENCE_PROBE_TIMEOUT_MS,
+            });
+          })
+        : "unknown";
+    const serverUrl =
+      server.runtime === undefined ? undefined : escapeControlCharacters(server.runtime.server_url);
+    const backend = server.runtime?.backend;
+    const how =
+      server.runtime?.backend === "binary" && server.process !== undefined
+        ? `${backend}, pid ${server.process.pid}`
+        : backend;
+    const dockerSaid =
+      backend === "docker" && !server.docker.available
+        ? `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`
+        : "";
 
-      const title = "Checked the status of the project";
+    const title = "Checked the status of the project";
 
-      const framework =
-        project.lifecycle === "configured"
-          ? (await Project.at(this.cwd).configOrEmpty()).frameworkId
-          : undefined;
-      const offersTests = framework !== undefined && new TestKit(framework).supported();
+    const framework =
+      project.lifecycle === "configured"
+        ? (await Project.at(this.cwd).configOrEmpty()).frameworkId
+        : undefined;
+    const offersTests = framework !== undefined && new TestKit(framework).supported();
 
-      return {
-        status: "ok",
-        data: {
-          title,
-          server: {
-            lifecycle: serverLifecycle,
-            runtime: LocalRuntime.summary(server.runtime),
-            docker: server.docker,
-            process: server.process,
-            health: {
-              healthy: server.healthy,
-              url: server.runtime?.server_url,
-            },
+    return {
+      status: "ok",
+      data: {
+        title,
+        server: {
+          lifecycle: serverLifecycle,
+          runtime: LocalRuntime.summary(server.runtime),
+          docker: server.docker,
+          process: server.process,
+          health: {
+            healthy: server.healthy,
+            url: server.runtime?.server_url,
           },
-          project,
         },
-        summary: {
-          title,
-          sections: [],
-          lines: [
-            `${
-              {
-                missing: "No local server was started in this directory",
-                stopped: `The local server is stopped, and last ran at ${serverUrl} (${how})`,
-                unhealthy: `The local server is running at ${serverUrl} (${how}) but does not answer`,
-                running: `The local server is running and healthy at ${serverUrl} (${how})`,
-              }[server.lifecycle]
-            }${dockerSaid}.`,
-            escapeControlCharacters(
-              `${[
-                ...("project_id" in project && project.project_id !== undefined
-                  ? [`Project ${project.project_id}`]
-                  : []),
-                `lifecycle ${project.lifecycle}`,
-                ...("issuer" in project && project.issuer !== undefined
-                  ? [`issuer ${project.issuer}`]
-                  : []),
-              ].join(", ")}.`,
-            ),
-          ],
-          overview: Spelling.at(this.cliVersion).exploreAllCommands(),
-        },
-        next: {
-          actions: nextActionsFor(project, users, offersTests, this.suggest),
-          commands: nextCommandsFor(serverLifecycle, project, users, this.suggest),
-        },
-      };
-    } catch (error) {
-      if (error instanceof LocalServerRecordMalformedError) {
-        throw refusalError(RECORD_MALFORMED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof LocalServerRecordUnreadableError) {
-        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-          path: Cmd.quote(error.path),
-        });
-      }
-      throw error;
-    }
+        project,
+      },
+      summary: {
+        title,
+        sections: [],
+        lines: [
+          `${
+            {
+              missing: "No local server was started in this directory",
+              stopped: `The local server is stopped, and last ran at ${serverUrl} (${how})`,
+              unhealthy: `The local server is running at ${serverUrl} (${how}) but does not answer`,
+              running: `The local server is running and healthy at ${serverUrl} (${how})`,
+            }[server.lifecycle]
+          }${dockerSaid}.`,
+          escapeControlCharacters(
+            `${[
+              ...("project_id" in project && project.project_id !== undefined
+                ? [`Project ${project.project_id}`]
+                : []),
+              `lifecycle ${project.lifecycle}`,
+              ...("issuer" in project && project.issuer !== undefined
+                ? [`issuer ${project.issuer}`]
+                : []),
+            ].join(", ")}.`,
+          ),
+        ],
+        overview: Spelling.at(this.cliVersion).exploreAllCommands(),
+      },
+      next: {
+        actions: nextActionsFor(project, users, offersTests, this.suggest),
+        commands: nextCommandsFor(serverLifecycle, project, users, this.suggest),
+      },
+    };
   }
 }

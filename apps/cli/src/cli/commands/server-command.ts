@@ -1,34 +1,16 @@
 import type { ServerAddresses } from "@/lib/environment";
 import { serverFlag } from "@/cli/core/flags";
 import type { BaseCommand } from "@/cli/core";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import {
   LocalRuntime,
   type LocalMachine,
-  LocalServerRecordMalformedError,
-  LocalServerRecordUnreadableError,
   type LocalServers,
   PsLocalServers,
   RealMachine,
   ZitadelRuntime,
 } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
-
-/** How a run is refused when the runtime record of this folder is not in the shape it is written in. */
-const RECORD_MALFORMED_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Run `zitadel reset --force`, then `zitadel start`.",
-  next: ["{reset}", "{start}"],
-} as const satisfies Refusal;
-
-/** How a run is refused when the runtime record of this folder cannot be read. */
-const RECORD_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-} as const satisfies Refusal;
 
 /**
  * `--server`: the one flag every {@link ServerCommand} takes, declared once so
@@ -274,6 +256,8 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
      * @param cwd - The folder the command runs in.
      * @returns The server's address, or the default one when none was started;
      *   with no rule, what the command itself says.
+     * @throws {LocalServerRecordMalformedError} When the nearest record is not in its shape.
+     * @throws {LocalServerRecordUnreadableError} When the nearest record cannot be read.
      */
     protected override async sourceOf(
       flags: Record<string, unknown>,
@@ -282,52 +266,7 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
       if (folderRule === undefined) {
         return super.sourceOf(flags, cwd);
       } else if (folderRule === "nearest") {
-        try {
-          return (await (await this.serverInNearestFolder(cwd))?.url()) ?? LocalRuntime.DEFAULT_URL;
-        } catch (error) {
-          if (error instanceof LocalServerRecordMalformedError) {
-            const holder =
-              (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE).catch((error: unknown) => {
-                if (error instanceof LocalServerRecordUnreadableError) {
-                  return undefined;
-                }
-                throw error;
-              })) ?? cwd;
-            const elsewhere =
-              holder === cwd
-                ? {}
-                : {
-                    cwd: holder,
-                  };
-            throw refusalError(
-              RECORD_MALFORMED_REFUSAL,
-              {
-                ...error,
-                message: error.message,
-              },
-              {
-                reset: {
-                  id: "reset",
-                  flags: {
-                    force: true,
-                    ...elsewhere,
-                  },
-                },
-                start: {
-                  id: "start",
-                  flags: elsewhere,
-                },
-              },
-            );
-          }
-          if (error instanceof LocalServerRecordUnreadableError) {
-            throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-              ...error,
-              message: error.message,
-            });
-          }
-          throw error;
-        }
+        return (await (await this.serverInNearestFolder(cwd))?.url()) ?? LocalRuntime.DEFAULT_URL;
       } else {
         return this.serverInThisFolder(cwd).url();
       }

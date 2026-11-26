@@ -10,9 +10,12 @@ import { it } from "@tests/fixtures";
 import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import type { ZitadelClient } from "@/lib/backend";
 import { Consent } from "@/lib/consent";
-import { EnvironmentValueMissingError, type ServerAddresses } from "@/lib/environment";
+import {
+  EnvironmentValueMissingError,
+  EnvironmentValueUnboundError,
+  type ServerAddresses,
+} from "@/lib/environment";
 import { LocalServerRecordMalformedError, ZitadelRuntime } from "@/lib/server";
-import { ZitadelError } from "@/lib/errors";
 import { CREDENTIALS } from "@/cli/core/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/cli/core/environment-command";
 import type { ConnectOptions } from "@/cli/core/types";
@@ -367,37 +370,16 @@ describe("EnvironmentCommand.connect", () => {
     });
   });
 
-  it("points a development environment with no project at setup", async ({ dir }) => {
-    await expect(new ProjectProbe(["--cwd", dir], config).probe()).rejects.toMatchObject({
-      nextCommands: [
-        {
-          id: "setup",
-          flags: {
-            cwd: dir,
-          },
-        },
-      ],
-    });
+  it("refuses a development environment with no project as unbound", async ({ dir }) => {
+    await expect(new ProjectProbe(["--cwd", dir], config).probe()).rejects.toBeInstanceOf(
+      EnvironmentValueUnboundError,
+    );
   });
 
-  it("points any other environment with no project at env add, run in the directory it addressed", async ({
-    dir,
-  }) => {
+  it("refuses any other environment with no project as unbound", async ({ dir }) => {
     await expect(
       new ProjectProbe(["--cwd", dir, "--env", "staging"], config).probe(),
-    ).rejects.toMatchObject({
-      nextCommands: [
-        {
-          id: "env:add",
-          args: {
-            name: "staging",
-          },
-          flags: {
-            cwd: dir,
-          },
-        },
-      ],
-    });
+    ).rejects.toBeInstanceOf(EnvironmentValueUnboundError);
   });
 
   it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
@@ -415,7 +397,7 @@ describe("EnvironmentCommand.connect", () => {
           ["--cwd", join(locked, "inner"), "--server", "local"],
           config,
         ).probe(),
-      ).rejects.toBeInstanceOf(ZitadelError);
+      ).rejects.toBeInstanceOf(LocalServerRecordMalformedError);
     },
   );
 

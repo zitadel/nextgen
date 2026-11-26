@@ -2,7 +2,6 @@ import { basename, join } from "node:path";
 import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
-import { orcaRefusal } from "@/cli/commands/setup/shared";
 import {
   type Fact,
   relativeDisplayPath as relativeDisplay,
@@ -390,7 +389,7 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       };
     } catch (error) {
       moving.fail();
-      throw orcaRefusal(error);
+      throw error;
     }
   }
 }

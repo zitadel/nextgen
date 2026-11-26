@@ -20,11 +20,7 @@ import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-proj
 import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Runtime } from "@/lib/runtime";
-import {
-  Project,
-  ProjectEnvValueMultilineError,
-  ProjectEnvValueUnquotableError,
-} from "@/lib/project";
+import { Project } from "@/lib/project";
 import { ChoosingServerCommand } from "@/cli/commands/server-command";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { Telemetered } from "@/cli/telemetry/telemetered";
@@ -44,20 +40,6 @@ const SERVER_RENDERED = ["next", "nuxt"];
 
 /** The message the release this command publishes carries. */
 const INITIAL_DEPLOY_MESSAGE = "Initial deployment from env add";
-
-/** How a value with a line break, which a `.env` file cannot hold, is refused. */
-const VALUE_MULTILINE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "A .env value is a single line; remove the newline or store the value another way.",
-} as const satisfies Refusal;
-
-/** How a value no `.env` quoting reads back unchanged is refused. */
-const VALUE_UNQUOTABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Set it in the process environment instead of a .env file.",
-} as const satisfies Refusal;
 
 /** What an app URL is refused for: it must be an http(s) URL. */
 const APP_URL_REFUSAL = {
@@ -298,23 +280,7 @@ export default class EnvAdd extends Telemetered(
       ...(issuer === undefined ? {} : { ZITADEL_ISSUER: issuer }),
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
-    await Project.envFile(environment.path)
-      .write(values)
-      .catch((error: unknown) => {
-        if (error instanceof ProjectEnvValueMultilineError) {
-          throw refusalError(VALUE_MULTILINE_REFUSAL, {
-            ...error,
-            message: error.message,
-          });
-        }
-        if (error instanceof ProjectEnvValueUnquotableError) {
-          throw refusalError(VALUE_UNQUOTABLE_REFUSAL, {
-            ...error,
-            message: error.message,
-          });
-        }
-        throw error;
-      });
+    await Project.envFile(environment.path).write(values);
     this.debug(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [

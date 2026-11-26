@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { BackendReleaseContentRevokedError, Origins } from "@/lib/backend";
+import { Origins } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
 import { confirmationHint, ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -17,22 +17,7 @@ import {
   type Lockout,
   messageTooLong,
   Publisher,
-  PublishConfigInvalidError,
-  PublishConnectionSecretLiteralError,
-  PublishConnectionVariableKindError,
-  PublishConnectionVariableMissingError,
-  PublishConnectionVariableSharedError,
 } from "@/lib/publish";
-import {
-  ZitadelConfigBrandingDuplicatedError,
-  ZitadelConfigFileUnreadableError,
-  ZitadelConfigReferenceBrokenError,
-  ZitadelConfigReferenceMissingError,
-  ZitadelConfigReferenceOutsideError,
-  ZitadelConfigReferenceUnreadableError,
-  ZitadelConfigNothingToDeployError,
-  ZitadelConfigPathUnreadableError,
-} from "@/lib/zitadel";
 import {
   type NextOf,
   type Suggested,
@@ -47,117 +32,6 @@ import { FsError } from "@/lib/fs";
 import { Project, ProjectError } from "@/lib/project";
 import { RemoveCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-
-/** How a release that would carry more than one branding is refused. */
-const BRANDING_DUPLICATED_REFUSAL = {
-  message: "{message}",
-  hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",
-} as const satisfies Refusal;
-
-/** How a `$file` reference whose file is there but cannot be read is refused. */
-const REFERENCE_UNREADABLE_REFUSAL = {
-  message: "{message}",
-  hint: "Create the referenced file or fix the path.",
-  details: {
-    file: "{path}",
-    ref: "{ref}",
-    code: "{errno}",
-  },
-} as const satisfies Refusal;
-
-/** How a `$file` reference whose file is not there is refused. */
-const REFERENCE_MISSING_REFUSAL = {
-  message: "{message}",
-  hint: "Create the referenced file or fix the path.",
-} as const satisfies Refusal;
-
-/** How a `$file` reference that leads outside the project is refused. */
-const REFERENCE_OUTSIDE_REFUSAL = {
-  message: "{message}",
-  hint: "Keep referenced files inside the project, next to the file that references them; a symlink on the way must resolve inside the project too.",
-} as const satisfies Refusal;
-
-/** How a configuration with nothing in `.zitadel/` to publish is refused. */
-const NOTHING_TO_DEPLOY_REFUSAL = {
-  message: "{message}",
-  hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
-} as const satisfies Refusal;
-
-/** How a configuration file the operating system refuses to let this process read is refused. */
-const FILE_UNREADABLE_REFUSAL = {
-  code: "E_AUTH",
-  message: "{message}",
-  hint: "Check that the file is readable, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "{errno}",
-  },
-} as const satisfies Refusal;
-
-/** How a configuration file that cannot be read for another reason is refused. */
-const PATH_UNREADABLE_REFUSAL = {
-  message: "{message}",
-  hint: "Check that the file is readable, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "{errno}",
-  },
-} as const satisfies Refusal;
-
-/** How a configuration with errors is refused. */
-const CONFIG_INVALID_REFUSAL = {
-  message: "{message}",
-  hint: "Fix the files named above and rerun; no changes were made.",
-} as const satisfies Refusal;
-
-/** How a deploy is refused when its content builds back to a revoked release. */
-const RELEASE_REVOKED_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
-  details: {
-    release_id: "{release_id}",
-    content_hash: "{content_hash}",
-  },
-} as const satisfies Refusal;
-
-/** How a connection that holds its secret itself is refused. */
-const SECRET_LITERAL_REFUSAL = {
-  message: "{message}",
-  hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
-  next: [
-    {
-      id: "variable:set",
-      args: {
-        name: "NAME",
-      },
-      flags: {
-        secret: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
-
-/** How a connection whose client id and secret name one variable is refused. */
-const VARIABLE_SHARED_REFUSAL = {
-  message: "{message}",
-  hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-} as const satisfies Refusal;
-
-/** How a connection that names a variable the project does not have is refused. */
-const VARIABLE_MISSING_REFUSAL = {
-  code: "E_CREDENTIAL_MISSING",
-  message: "{message}",
-  hint: "Publish it with the command below, then deploy again.",
-  next: ["{set}"],
-} as const satisfies Refusal;
-
-/** How a connection that names a variable of the wrong kind is refused. */
-const VARIABLE_KIND_REFUSAL = {
-  message: "{message}",
-  hint: "{hint}",
-  next: ["{set}"],
-} as const satisfies Refusal;
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -347,7 +221,7 @@ export default class Deploy extends Telemetered(
   protected async preview({ flags }: Admitted<typeof Deploy>): Promise<CommandResult> {
     const publisher = await this.service(Publisher);
     this.annotate({ stage: "validation" });
-    const prepared = await this.prepare(publisher, {
+    const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
       mode: "deploy",
@@ -432,7 +306,7 @@ export default class Deploy extends Telemetered(
     const publisher = new Publisher(client, projectId);
     await this.requirePrimaryOrigin(publisher, projectId, environment);
     this.annotate({ stage: "validation" });
-    const prepared = await this.prepare(publisher, {
+    const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
       mode: "deploy",
@@ -462,112 +336,100 @@ export default class Deploy extends Telemetered(
       );
     }
 
-    try {
-      const { release, publication } = await publisher.deploy(
-        {
-          prepared,
-          message,
-        },
-        (stage) => {
-          this.annotate({ stage });
-        },
-      );
-      switch (publication.outcome) {
-        case "revoked": {
-          throw new ZitadelError(
-            "E_CONFLICT",
-            `This content was already released as ${release.id}, which is revoked`,
-            {
-              hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-              details: {
-                release_id: release.id,
-                content_hash: release.content_hash,
-              },
+    const { release, publication } = await publisher.deploy(
+      {
+        prepared,
+        message,
+      },
+      (stage) => {
+        this.annotate({ stage });
+      },
+    );
+    switch (publication.outcome) {
+      case "revoked": {
+        throw new ZitadelError(
+          "E_CONFLICT",
+          `This content was already released as ${release.id}, which is revoked`,
+          {
+            hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
+            details: {
+              release_id: release.id,
+              content_hash: release.content_hash,
             },
-          );
-        }
-        case "raced": {
-          const again = await this.again("deploy", {
-            without: ["dryRun"],
-            with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
-          });
-
-          throw new ZitadelError(
-            "E_CONFLICT",
-            "Another deploy changed the targets since this one was prepared",
-            {
-              hint: `Rerun ${again}; it will build and deploy against the current state.`,
-              details:
-                publication.current === undefined
-                  ? undefined
-                  : { current_deployment: publication.current },
-              nextCommands: [
-                this.suggest({
-                  id: "deployment:list",
-                  flags: { live: true },
-                }),
-              ],
-            },
-          );
-        }
-        case "deployed": {
-          break;
-        }
+          },
+        );
       }
-      const { deployment } = publication;
-      this.annotate({
-        stage: undefined,
-        changed_configuration_types: prepared.changedConfiguration,
-      });
-
-      const servedOrigins = deployment.origins;
-      this.annotate({ origin_count: servedOrigins.length });
-
-      const title = `Deployed ${resources}`;
-      const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
-      const live =
-        servedOrigins.length > 0
-          ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
-              servedOrigins.map((origin) => {
-                return escapeControlCharacters(origin);
-              }),
-            )}.`
-          : `${released}.`;
-
-      return {
-        status: "ok",
-        data: {
-          title,
-          release_id: release.id,
-          content_hash: release.content_hash,
-          deployment_id: deployment.id,
-          resources: resourceCount,
-          origins: servedOrigins,
-          ...prepared.report,
-        },
-        summary: {
-          title,
-          sections: [],
-          lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
-        },
-        next: {
-          commands: [
-            this.suggest({ id: "deployment:list" }),
-            ...(prepared.gitDirty ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
-          ],
-        },
-      };
-    } catch (error) {
-      if (error instanceof BackendReleaseContentRevokedError) {
-        throw refusalError(RELEASE_REVOKED_REFUSAL, {
-          ...error,
-          message: error.message,
-          release_id: error.releaseId,
-          content_hash: error.contentHash,
+      case "raced": {
+        const again = await this.again("deploy", {
+          without: ["dryRun"],
+          with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
         });
+
+        throw new ZitadelError(
+          "E_CONFLICT",
+          "Another deploy changed the targets since this one was prepared",
+          {
+            hint: `Rerun ${again}; it will build and deploy against the current state.`,
+            details:
+              publication.current === undefined
+                ? undefined
+                : { current_deployment: publication.current },
+            nextCommands: [
+              this.suggest({
+                id: "deployment:list",
+                flags: { live: true },
+              }),
+            ],
+          },
+        );
       }
-      throw error;
+      case "deployed": {
+        break;
+      }
     }
+    const { deployment } = publication;
+    this.annotate({
+      stage: undefined,
+      changed_configuration_types: prepared.changedConfiguration,
+    });
+
+    const servedOrigins = deployment.origins;
+    this.annotate({ origin_count: servedOrigins.length });
+
+    const title = `Deployed ${resources}`;
+    const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
+    const live =
+      servedOrigins.length > 0
+        ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
+            servedOrigins.map((origin) => {
+              return escapeControlCharacters(origin);
+            }),
+          )}.`
+        : `${released}.`;
+
+    return {
+      status: "ok",
+      data: {
+        title,
+        release_id: release.id,
+        content_hash: release.content_hash,
+        deployment_id: deployment.id,
+        resources: resourceCount,
+        origins: servedOrigins,
+        ...prepared.report,
+      },
+      summary: {
+        title,
+        sections: [],
+        lines: [...diff, ...(diff.length === 0 ? [] : [""]), live],
+      },
+      next: {
+        commands: [
+          this.suggest({ id: "deployment:list" }),
+          ...(prepared.gitDirty ? [commitConfig(this.cwd, message, prepared.referenced)] : []),
+        ],
+      },
+    };
   }
 
   /**
@@ -586,137 +448,6 @@ export default class Deploy extends Telemetered(
     return prepared.notices.flatMap((notice, at) => {
       return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
     });
-  }
-
-  /**
-   * Prepares what is published, refusing a configuration that cannot be
-   * published and saying how to fix it.
-   *
-   * @param publisher - The publisher.
-   * @param input - What to prepare.
-   * @returns What was prepared.
-   * @throws {@link ZitadelError} The refusal for the condition publishing stopped on; an
-   *   error nobody anticipated is thrown as it was.
-   */
-  private async prepare(publisher: Publisher, input: Parameters<Publisher["prepare"]>[0]) {
-    try {
-      return await publisher.prepare(input);
-    } catch (error) {
-      if (error instanceof PublishConnectionSecretLiteralError) {
-        throw refusalError(SECRET_LITERAL_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof PublishConnectionVariableSharedError) {
-        throw refusalError(VARIABLE_SHARED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof PublishConnectionVariableMissingError) {
-        throw refusalError(
-          VARIABLE_MISSING_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-          },
-          {
-            set: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: error.secret,
-                preview: input.mode === "preview",
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof PublishConnectionVariableKindError) {
-        throw refusalError(
-          VARIABLE_KIND_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-            hint: error.secret
-              ? "The client secret must be a secret variable: publish it with the command below."
-              : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-          },
-          {
-            set: {
-              id: "variable:set",
-              args: {
-                name: error.variable,
-              },
-              flags: {
-                secret: error.secret,
-                preview: input.mode === "preview",
-              },
-            },
-          },
-        );
-      }
-      if (error instanceof ZitadelConfigBrandingDuplicatedError) {
-        throw refusalError(BRANDING_DUPLICATED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigReferenceUnreadableError) {
-        throw refusalError(REFERENCE_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigReferenceBrokenError) {
-        throw refusalError(REFERENCE_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-          errno: error.errno ?? null,
-        });
-      }
-      if (error instanceof ZitadelConfigReferenceMissingError) {
-        throw refusalError(REFERENCE_MISSING_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigReferenceOutsideError) {
-        throw refusalError(REFERENCE_OUTSIDE_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigNothingToDeployError) {
-        throw refusalError(NOTHING_TO_DEPLOY_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigFileUnreadableError) {
-        throw refusalError(FILE_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigPathUnreadableError) {
-        throw refusalError(PATH_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-          errno: error.errno ?? null,
-        });
-      }
-      if (error instanceof PublishConfigInvalidError) {
-        throw refusalError(CONFIG_INVALID_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      throw error;
-    }
   }
 
   /**

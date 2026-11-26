@@ -14,7 +14,14 @@ import AuthMethodSsoDisable from "@/cli/commands/auth-method/sso/disable";
 import { Consent, ConsentInternalError } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 
-import { type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
+import { SyncStateMalformedError } from "@/lib/sync";
+import {
+  type Change,
+  DiskStore,
+  Schemas,
+  UserSchema,
+  ZitadelConfigFilesBrokenError,
+} from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
 import { recordLog } from "@tests/fixtures/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
@@ -993,15 +1000,13 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(ZitadelConfigFilesBrokenError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/schemas/customers.json:"),
-        details: {
-          problems: expect.arrayContaining([
-            expect.objectContaining({ path: ".zitadel/schemas/customers.json" }),
-          ]),
-        },
+        problems: expect.arrayContaining([
+          expect.objectContaining({ path: ".zitadel/schemas/customers.json" }),
+        ]),
       });
     });
 
@@ -1014,15 +1019,13 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees" });
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(ZitadelConfigFilesBrokenError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/schemas/employees.json:"),
-        details: {
-          problems: expect.arrayContaining([
-            expect.objectContaining({ path: ".zitadel/schemas/employees.json" }),
-          ]),
-        },
+        problems: expect.arrayContaining([
+          expect.objectContaining({ path: ".zitadel/schemas/employees.json" }),
+        ]),
       });
     });
   });
@@ -1060,12 +1063,10 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees.json" });
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(ZitadelConfigFilesBrokenError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        details: {
-          problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
-        },
+        problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
       });
     });
 
@@ -1112,15 +1113,13 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(ZitadelConfigFilesBrokenError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/idps/broken.json:"),
-        details: {
-          problems: expect.arrayContaining([
-            expect.objectContaining({ path: ".zitadel/idps/broken.json" }),
-          ]),
-        },
+        problems: expect.arrayContaining([
+          expect.objectContaining({ path: ".zitadel/idps/broken.json" }),
+        ]),
       });
     });
   });
@@ -1177,11 +1176,9 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(SyncStateMalformedError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
-        details: { file: ".zitadel/state.json" },
       });
     });
   });

@@ -215,7 +215,7 @@ describe("LocalServerCommand", () => {
         return new AboutAMalformedServer([], aConfigAt(VERSION)).sourceIn(join(locked, "inner"));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(LocalServerRecordMalformedError);
     },
   );
 

@@ -12,15 +12,12 @@ import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import type { Facts } from "@/cli/core/base";
 import { type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
-import { SyncStateMalformedError } from "@/lib/sync";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Output, warnings } from "@/lib/ui";
 import {
   type BrokenFile,
   ZitadelConfigFilesBrokenError,
-  ZitadelConfigFileUnreadableError,
-  ZitadelConfigPathUnreadableError,
   ZitadelConfigSchemaAmbiguousError,
   type Change,
   CONFIG_DIRECTORIES,
@@ -29,13 +26,6 @@ import {
   type ForceOptions,
   ZitadelConfigEditLockoutError,
   ZitadelConfigFlowMethodInUseError,
-  ZitadelConfigFlowBrokenError,
-  ZitadelConfigFlowUncheckedError,
-  ZitadelConfigDirectoryInTheWayError,
-  ZitadelConfigFileExistsError,
-  ZitadelConfigIdentifierMissingError,
-  ZitadelConfigPathBlockedError,
-  ZitadelConfigPathOutsideError,
   ZitadelConfigSchemaMissingError,
   type JsonObject,
   PASSWORD_FIELD,
@@ -208,140 +198,6 @@ function methodInUseFacts(error: ZitadelConfigFlowMethodInUseError): {
 }
 
 /**
- * What configuration files their contract rules refuse are refused for.
- */
-const FILES_BROKEN_REFUSAL = {
-  message: "{message}",
-  hint: "Fix the files named above, then run the command again; nothing was changed.",
-  details: {
-    problems: "{problems}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a configuration file the operating system refuses to let this process
- * read is refused for.
- */
-const FILE_UNREADABLE_REFUSAL = {
-  code: "E_AUTH",
-  message: "{message}",
-  hint: "Check that the file is readable, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "{errno}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a configuration file that cannot be read for another reason is
- * refused for.
- */
-const PATH_UNREADABLE_REFUSAL = {
-  message: "{message}",
-  hint: "Check that the file is readable, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "{errno}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a change is refused for when it would make a login flow stop validating.
- */
-const FLOW_BROKEN_REFUSAL = {
-  message: "{message}",
-  hint: "Fix the steps named above, then run the command again.",
-} as const satisfies Refusal;
-
-/**
- * What a change is refused for when a login flow has errors that keep it from
- * being checked against the changed schema.
- */
-export const FLOW_UNCHECKED_REFUSAL = {
-  message: "{message}",
-  hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
-  next: [
-    {
-      id: "deploy",
-      flags: {
-        dryRun: true,
-      },
-    },
-  ],
-} as const satisfies Refusal;
-
-/**
- * What a record of what was synced that does not read as one is refused for.
- */
-const STATE_MALFORMED_REFUSAL = {
-  message: "{message}",
-  hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
-  details: {
-    file: ".zitadel/state.json",
-  },
-} as const satisfies Refusal;
-
-/**
- * What turning passwords on for a schema with no identifier is refused for.
- */
-const IDENTIFIER_MISSING_REFUSAL = {
-  message: "{message}",
-  hint: 'A password is checked against the user found by the schema\'s identifier. Set "x-identifier" to the property users sign in with, e.g. "email", then run the command again.',
-  details: {
-    file: "{path}",
-    method: "password",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a file a change creates that is already there is refused for.
- */
-const FILE_EXISTS_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "{message}",
-  hint: "Move or rename the file that is already there, then run the command again.",
-  details: {
-    file: "{path}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a file a change writes under a directory that is a file is refused for.
- */
-const PATH_BLOCKED_REFUSAL = {
-  message: "{message}",
-  hint: "Remove {blocker}, which is a file where a directory is needed, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "ENOTDIR",
-    blocker: "{blocker}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a file a change removes that is a directory is refused for.
- */
-const DIRECTORY_IN_THE_WAY_REFUSAL = {
-  message: "{message}",
-  hint: "Remove {path}, which is a directory where a file is expected, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "EISDIR",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a file a change writes or removes outside `.zitadel/` is refused for.
- */
-const PATH_OUTSIDE_REFUSAL = {
-  message: "{message}",
-  hint: "Files are only written and removed inside .zitadel/.",
-  details: {
-    file: "{path}",
-  },
-} as const satisfies Refusal;
-
-/**
  * What a schema pointing at an external URL is refused for.
  */
 const EXTERNAL_SCHEMA_REFUSAL = {
@@ -432,62 +288,37 @@ const AMBIGUOUS_SCHEMA_REFUSAL = {
  * @returns What the run read.
  * @throws {@link ZitadelError} When no schema, or more than one, fits
  *   `--schema`, or the one that does points at an external schema.
- * @throws {@link ZitadelError} Naming every file the contract rules refuse, or
- *   a configuration file that cannot be read.
+ * @throws {@link ZitadelConfigFilesBrokenError} Naming every file the contract
+ *   rules refuse.
+ * @throws {@link ZitadelConfigPathUnreadableError} When a configuration file
+ *   cannot be read.
+ * @throws {@link SyncStateMalformedError} When `.zitadel/state.json` does not
+ *   read as a record of what was synced.
  */
 export async function readSchemaTarget(input: {
   cwd: string;
   schema: string | undefined;
 }): Promise<SchemaTarget> {
-  try {
-    const store = new DiskStore(input.cwd);
-    const loaded = await ZitadelConfig.loadUnchecked(store);
-    const schema = chosenSchema(loaded.schemas, input.schema, loaded.broken);
-    if (schema.isExternal) {
-      throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
-        file: schema.path,
-        url: String(schema.body.url),
-      });
-    }
-    const published = await publishedIds(input.cwd, [schema.path]);
-    const config = loaded.withOptions({ published }).refuseBroken(store);
-    const schemaFlag = config.schemas.nameUniquely(schema);
-    return {
-      cwd: input.cwd,
-      config,
-      store,
-      schema,
-      schemaFlag,
-      schemaGiven: input.schema === undefined ? undefined : schemaFlag,
-    };
-  } catch (error) {
-    if (error instanceof SyncStateMalformedError) {
-      throw refusalError(STATE_MALFORMED_REFUSAL, {
-        ...error,
-        message: error.message,
-      });
-    }
-    if (error instanceof ZitadelConfigFilesBrokenError) {
-      throw refusalError(FILES_BROKEN_REFUSAL, {
-        ...error,
-        message: error.message,
-      });
-    }
-    if (error instanceof ZitadelConfigFileUnreadableError) {
-      throw refusalError(FILE_UNREADABLE_REFUSAL, {
-        ...error,
-        message: error.message,
-      });
-    }
-    if (error instanceof ZitadelConfigPathUnreadableError) {
-      throw refusalError(PATH_UNREADABLE_REFUSAL, {
-        ...error,
-        message: error.message,
-        errno: error.errno ?? null,
-      });
-    }
-    throw error;
+  const store = new DiskStore(input.cwd);
+  const loaded = await ZitadelConfig.loadUnchecked(store);
+  const schema = chosenSchema(loaded.schemas, input.schema, loaded.broken);
+  if (schema.isExternal) {
+    throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
+      file: schema.path,
+      url: String(schema.body.url),
+    });
   }
+  const published = await publishedIds(input.cwd, [schema.path]);
+  const config = loaded.withOptions({ published }).refuseBroken(store);
+  const schemaFlag = config.schemas.nameUniquely(schema);
+  return {
+    cwd: input.cwd,
+    config,
+    store,
+    schema,
+    schemaFlag,
+    schemaGiven: input.schema === undefined ? undefined : schemaFlag,
+  };
 }
 
 /**
@@ -825,33 +656,7 @@ export abstract class AuthMethodCommand extends Telemetered(Promptable(ChangeCom
     if (change.changed) {
       this.info("Updating the project's files");
     }
-    const written = await change.save(target.store).catch((error: unknown) => {
-      if (error instanceof ZitadelConfigFileExistsError) {
-        throw refusalError(FILE_EXISTS_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigPathBlockedError) {
-        throw refusalError(PATH_BLOCKED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigDirectoryInTheWayError) {
-        throw refusalError(DIRECTORY_IN_THE_WAY_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigPathOutsideError) {
-        throw refusalError(PATH_OUTSIDE_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      throw error;
-    });
+    const written = await change.save(target.store);
     for (const path of written) {
       if (change.createdPaths.includes(path)) {
         this.debug(`Wrote ${escapeControlCharacters(path)}`);
@@ -1126,12 +931,6 @@ export abstract class AuthMethodDisableCommand extends Destructive(
           ...methodInUseFacts(error),
         });
       }
-      if (error instanceof ZitadelConfigFlowUncheckedError) {
-        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
       if (error instanceof ZitadelConfigEditLockoutError) {
         if (this.nonInteractive && !this.force) {
           refuseNoSignInLeft((await this.refusalOf(error, target, naming)).refusal);
@@ -1185,12 +984,6 @@ export abstract class AuthMethodDisableCommand extends Destructive(
           ...error,
           message: error.message,
           ...methodInUseFacts(error),
-        });
-      }
-      if (error instanceof ZitadelConfigFlowUncheckedError) {
-        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
-          ...error,
-          message: error.message,
         });
       }
       if (error instanceof ZitadelConfigEditLockoutError) {
@@ -1306,34 +1099,12 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
   protected async preview({ flags }: Admitted<typeof MethodEnableCommand>): Promise<CommandResult> {
     const target = await this.loadSchemaTarget(flags);
 
-    try {
-      return await this.previewToggle(
-        target,
-        target.config.schemas.enable(target.schema, this.method),
-        this.method,
-        true,
-      );
-    } catch (error) {
-      if (error instanceof ZitadelConfigIdentifierMissingError) {
-        throw refusalError(IDENTIFIER_MISSING_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigFlowBrokenError) {
-        throw refusalError(FLOW_BROKEN_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigFlowUncheckedError) {
-        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    return await this.previewToggle(
+      target,
+      target.config.schemas.enable(target.schema, this.method),
+      this.method,
+      true,
+    );
   }
 
   /**
@@ -1345,34 +1116,12 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
   protected async apply({ flags }: Admitted<typeof MethodEnableCommand>): Promise<CommandResult> {
     const target = await this.loadSchemaTarget(flags);
 
-    try {
-      return await this.applyToggle(
-        target,
-        target.config.schemas.enable(target.schema, this.method),
-        this.method,
-        true,
-      );
-    } catch (error) {
-      if (error instanceof ZitadelConfigIdentifierMissingError) {
-        throw refusalError(IDENTIFIER_MISSING_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigFlowBrokenError) {
-        throw refusalError(FLOW_BROKEN_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigFlowUncheckedError) {
-        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      throw error;
-    }
+    return await this.applyToggle(
+      target,
+      target.config.schemas.enable(target.schema, this.method),
+      this.method,
+      true,
+    );
   }
 }
 

@@ -2,7 +2,6 @@ import { Args } from "@oclif/core";
 
 import { type PolicyEvaluation, PolicyService, ReleaseService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { mapBounded } from "@/lib/map-bounded";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
@@ -20,38 +19,9 @@ import {
   PolicyTest,
   USER_CREATE_POLICY_OPERATION,
   ZitadelConfig,
-  ZitadelConfigFileUnreadableError,
-  ZitadelConfigPathUnreadableError,
 } from "@/lib/zitadel";
 import { ProjectCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-
-/**
- * What a configuration file the operating system refuses to let this process
- * read is refused for.
- */
-const FILE_UNREADABLE_REFUSAL = {
-  code: "E_AUTH",
-  message: "{message}",
-  hint: "Check that the file is readable, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "{errno}",
-  },
-} as const satisfies Refusal;
-
-/**
- * What a configuration file that cannot be read for another reason is
- * refused for.
- */
-const PATH_UNREADABLE_REFUSAL = {
-  message: "{message}",
-  hint: "Check that the file is readable, then run the command again.",
-  details: {
-    file: "{path}",
-    code: "{errno}",
-  },
-} as const satisfies Refusal;
 
 /**
  * Where a tested config came from: a policy file, a release's revision, or
@@ -197,123 +167,106 @@ The server evaluates every case, so the command needs a connection to it. By def
     flags,
   }: Admitted<typeof PolicyTestCommand>): Promise<CommandResult> {
     const operations = args.operation === undefined ? [] : [args.operation];
-    try {
-      const config = await ZitadelConfig.loadKinds(new DiskStore(this.cwd), ["policies"]);
-      const selected = config.policies.selectTests(operations);
-      const tests = selected.documents;
-      if (selected.issues.length > 0) {
-        throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
-          details: { issues: selected.issues },
-          hint: selected.issues.join("\n"),
-        });
-      }
-      if (tests.length === 0) {
-        const directory = CONFIG_DIRECTORIES.policies;
-
-        return {
-          status: "skipped",
-          reason: "no-policy-tests",
-          pretty: prose(
-            `No policy test files in ${directory}/. Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`,
-          ),
-          summary: {
-            title: `No policy test files in ${directory}`,
-            sections: [],
-            lines: [`Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`],
-          },
-        };
-      }
-
-      const policyService = await this.service(PolicyService);
-      const releaseService = await this.service(ReleaseService);
-      const policyFiles =
-        flags.release === undefined ? config.policies.selectPolicies(operations) : undefined;
-      if (policyFiles !== undefined && policyFiles.issues.length > 0) {
-        throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
-          details: { issues: policyFiles.issues },
-          hint: policyFiles.issues.join("\n"),
-        });
-      }
-      const fromRelease =
-        flags.release === undefined
-          ? undefined
-          : await this.policiesFromRelease(releaseService, policyService, flags.release);
-      if (fromRelease?.revoked) {
-        warnings.report(`Release ${flags.release} is revoked, so no origin serves its policies.`);
-      }
-      const policies: ReadonlyMap<string, PolicyUnderTest> =
-        fromRelease?.policies ??
-        new Map(
-          (policyFiles?.documents ?? []).map((policy): readonly [string, PolicyUnderTest] => {
-            const underTest: PolicyUnderTest = {
-              config: policy.config,
-              source: { file: policy.path },
-            };
-            return [policy.operation, underTest];
-          }),
-        );
-
-      const results = await this.runPolicyTests(policyService, tests, policies);
-      const cases = results.flatMap((result) => {
-        return result.cases;
+    const config = await ZitadelConfig.loadKinds(new DiskStore(this.cwd), ["policies"]);
+    const selected = config.policies.selectTests(operations);
+    const tests = selected.documents;
+    if (selected.issues.length > 0) {
+      throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
+        details: { issues: selected.issues },
+        hint: selected.issues.join("\n"),
       });
-      const failed = cases.filter((testCase) => {
-        return !testCase.passed;
-      }).length;
-      const source = flags.release === undefined ? "files" : "release";
-      this.annotate({
-        policy_source: source,
-        case_count: cases.length,
-        failed_count: failed,
-      });
-
-      const data = {
-        source,
-        release_id: flags.release,
-        operations: results,
-        passed: cases.length - failed,
-        failed,
-      };
-      const pretty = this.renderPolicyTestResults(results, flags.release);
-      if (failed > 0) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `${failed} of ${cases.length} policy test cases failed`,
-          {
-            details: data,
-            hint: pretty,
-          },
-        );
-      }
-
-      const title = `${cases.length} passed`;
+    }
+    if (tests.length === 0) {
+      const directory = CONFIG_DIRECTORIES.policies;
 
       return {
-        status: "ok",
-        data: { title, ...data },
-        pretty: prose(pretty),
+        status: "skipped",
+        reason: "no-policy-tests",
+        pretty: prose(
+          `No policy test files in ${directory}/. Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`,
+        ),
         summary: {
-          title,
+          title: `No policy test files in ${directory}`,
           sections: [],
-          lines: escapeControlCharacters(pretty).split("\n").slice(0, -2),
+          lines: [`Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`],
         },
       };
-    } catch (error) {
-      if (error instanceof ZitadelConfigFileUnreadableError) {
-        throw refusalError(FILE_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
-      }
-      if (error instanceof ZitadelConfigPathUnreadableError) {
-        throw refusalError(PATH_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-          errno: error.errno ?? null,
-        });
-      }
-      throw error;
     }
+
+    const policyService = await this.service(PolicyService);
+    const releaseService = await this.service(ReleaseService);
+    const policyFiles =
+      flags.release === undefined ? config.policies.selectPolicies(operations) : undefined;
+    if (policyFiles !== undefined && policyFiles.issues.length > 0) {
+      throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
+        details: { issues: policyFiles.issues },
+        hint: policyFiles.issues.join("\n"),
+      });
+    }
+    const fromRelease =
+      flags.release === undefined
+        ? undefined
+        : await this.policiesFromRelease(releaseService, policyService, flags.release);
+    if (fromRelease?.revoked) {
+      warnings.report(`Release ${flags.release} is revoked, so no origin serves its policies.`);
+    }
+    const policies: ReadonlyMap<string, PolicyUnderTest> =
+      fromRelease?.policies ??
+      new Map(
+        (policyFiles?.documents ?? []).map((policy): readonly [string, PolicyUnderTest] => {
+          const underTest: PolicyUnderTest = {
+            config: policy.config,
+            source: { file: policy.path },
+          };
+          return [policy.operation, underTest];
+        }),
+      );
+
+    const results = await this.runPolicyTests(policyService, tests, policies);
+    const cases = results.flatMap((result) => {
+      return result.cases;
+    });
+    const failed = cases.filter((testCase) => {
+      return !testCase.passed;
+    }).length;
+    const source = flags.release === undefined ? "files" : "release";
+    this.annotate({
+      policy_source: source,
+      case_count: cases.length,
+      failed_count: failed,
+    });
+
+    const data = {
+      source,
+      release_id: flags.release,
+      operations: results,
+      passed: cases.length - failed,
+      failed,
+    };
+    const pretty = this.renderPolicyTestResults(results, flags.release);
+    if (failed > 0) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `${failed} of ${cases.length} policy test cases failed`,
+        {
+          details: data,
+          hint: pretty,
+        },
+      );
+    }
+
+    const title = `${cases.length} passed`;
+
+    return {
+      status: "ok",
+      data: { title, ...data },
+      pretty: prose(pretty),
+      summary: {
+        title,
+        sections: [],
+        lines: escapeControlCharacters(pretty).split("\n").slice(0, -2),
+      },
+    };
   }
 
   /**

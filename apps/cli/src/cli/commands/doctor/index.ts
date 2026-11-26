@@ -109,13 +109,6 @@ const RECORD_MALFORMED_REFUSAL = {
   next: ["{reset}", "{start}"],
 } as const satisfies Refusal;
 
-/** How a run is refused when the runtime record of the folder it checks cannot be read. */
-const RECORD_UNREADABLE_REFUSAL = {
-  code: "E_VALIDATION",
-  message: "{message}",
-  hint: "Check that {path} and its directory are readable by you.",
-} as const satisfies Refusal;
-
 /** What doctor is about, worked out once however many times it is asked for. */
 /** What a doctor run found, for the report that tells it. */
 type Examination = Readonly<{
@@ -800,12 +793,6 @@ export default class Doctor extends Telemetered(
             },
           },
         );
-      }
-      if (error instanceof LocalServerRecordUnreadableError) {
-        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
-          ...error,
-          message: error.message,
-        });
       }
       throw error;
     });
