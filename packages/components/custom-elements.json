@@ -7092,6 +7092,85 @@
     {
       "kind": "javascript-module",
       "path": "src/orchestrator/locales/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "businessLocales",
+          "declaration": {
+            "name": "businessLocales",
+            "module": "./business.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "en",
+          "declaration": {
+            "name": "en",
+            "module": "./en.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "Locale",
+          "declaration": {
+            "name": "Locale",
+            "module": "./en.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "AppLocales",
+          "declaration": {
+            "name": "AppLocales",
+            "module": "./translations.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "CUSTOM_IDENTIFIER_SUFFIX",
+          "declaration": {
+            "name": "CUSTOM_IDENTIFIER_SUFFIX",
+            "module": "./translations.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "Translations",
+          "declaration": {
+            "name": "Translations",
+            "module": "./translations.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/locales/it.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "it",
+          "type": {
+            "text": "Locale"
+          },
+          "default": "{ // ═══════════════════════════════════════════════════════════════════════════ // Step: identifier (inserimento e-mail — prima schermata) // ═══════════════════════════════════════════════════════════════════════════ \"identifier.title\": \"Accedi\", \"identifier.description\": \"Inserisci la tua e-mail per continuare\", \"identifier.description.custom_identifier\": \"Inserisci i tuoi dati per continuare\", \"identifier.field.email\": \"E-mail\", \"identifier.field.email.placeholder\": \"tu@esempio.com\", \"identifier.field.password\": \"Password\", \"identifier.action.submit\": \"Accedi\", \"identifier.action.continue\": \"Continua\", \"identifier.action.passkey\": \"Accedi con passkey\", \"identifier.action.register.lead\": \"Non hai un account? \", \"identifier.action.register.link\": \"Registrati\", // ═══════════════════════════════════════════════════════════════════════════ // Step: authenticate (inserimento password — flusso di accesso) // ═══════════════════════════════════════════════════════════════════════════ \"authenticate.title\": \"Accedi\", \"authenticate.description\": \"Inserisci la tua password\", \"authenticate.field.password\": \"Password\", \"authenticate.action.submit\": \"Accedi\", // ═══════════════════════════════════════════════════════════════════════════ // Step: choose-register (scelta del percorso di registrazione — nessun campo) // ═══════════════════════════════════════════════════════════════════════════ \"choose-register.title\": \"Crea il tuo account\", \"choose-register.description\": \"Scegli come registrarti\", \"choose-register.action.register-with-password\": \"Registrati con password\", \"choose-register.action.register-with-passkey\": \"Registrati con passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-credentials (e-mail + password — registrazione con password) // ═══════════════════════════════════════════════════════════════════════════ \"collect-credentials.title\": \"Crea il tuo account\", \"collect-credentials.description\": \"Configura e-mail e password\", \"collect-credentials.field.email\": \"E-mail\", \"collect-credentials.field.email.placeholder\": \"tu@esempio.com\", \"collect-credentials.field.password\": \"Password\", \"collect-credentials.action.submit\": \"Registrati\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-password (inserimento password — percorso di registrazione) // Flusso login predefinito: register → register-password → passkey-upsell → done // ═══════════════════════════════════════════════════════════════════════════ \"register-password.title\": \"Crea la tua password\", \"register-password.description\": \"Scegli una password sicura per il tuo account\", \"register-password.field.password\": \"Password\", \"register-password.action.submit\": \"Registrati\", \"register-password.action.back\": \"Indietro\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-upsell (proposta passkey — dopo la registrazione) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-upsell.title\": \"Accedi più velocemente la prossima volta\", \"passkey-upsell.description\": \"Nessuna password necessaria.\", \"passkey-upsell.description.line1\": \"Nessuna password necessaria.\", \"passkey-upsell.description.line2\": \"Accedi con Face ID, Touch ID o PIN.\", \"passkey-upsell.action.passkey_register\": \"Configura passkey\", \"passkey-upsell.action.skip\": \"Salta per ora\", \"passkey-upsell.action.setup\": \"Configura passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-passkey-email (solo e-mail — registrazione solo passkey) // ═══════════════════════════════════════════════════════════════════════════ \"collect-passkey-email.title\": \"Crea il tuo account\", \"collect-passkey-email.description\": \"Inserisci la tua e-mail per configurare una passkey\", \"collect-passkey-email.field.email\": \"E-mail\", \"collect-passkey-email.field.email.placeholder\": \"tu@esempio.com\", \"collect-passkey-email.action.submit\": \"Continua\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-enroll (cerimonia passkey — percorso solo passkey) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-enroll.title\": \"Configura la tua passkey\", \"passkey-enroll.description\": \"Usa Face ID, Touch ID o il PIN del dispositivo per creare una passkey.\", \"passkey-enroll.action.passkey_register\": \"Configura passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: done (terminale — conferma accesso) // ═══════════════════════════════════════════════════════════════════════════ \"done.title\": \"Sei connesso\", \"done.description\": \"\", // --- Alias dei nomi step per il flusso login predefinito --- \"password.title\": \"Accedi\", \"password.description\": \"Inserisci la tua password\", \"password.description.sso\": \"Inserisci la tua password o continua con il tuo provider di accesso\", \"password.field.password\": \"Password\", \"password.action.signin\": \"Accedi\", \"password.action.passkey\": \"Accedi con passkey\", \"password.action.back\": \"Indietro\", \"password.action.register.lead\": \"Non hai un account? \", \"password.action.register.link\": \"Registrati\", \"register.title\": \"Crea il tuo account\", // Vuoto per design — la scheda di registrazione non ha sottotitolo. \"register.description\": \"Inserisci i tuoi dati per iniziare\", \"register.field.email\": \"E-mail\", \"register.field.email.placeholder\": \"tu@esempio.com\", \"register.field.password\": \"Password\", \"register.field.givenName\": \"Nome\", \"register.field.familyName\": \"Cognome\", \"register.field.companyName\": \"Nome azienda\", // L'<input type=\"date\"> nativo localizza il proprio formato di visualizzazione in base // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario. \"register.field.dateOfBirth\": \"Data di nascita\", \"register.field.country\": \"Paese\", \"register.field.country.placeholder\": \"Seleziona il tuo paese\", \"register.field.terms\": \"Accetto i termini di servizio\", \"register.action.password\": \"Continua con password\", \"register.action.passkey\": \"Continua con passkey\", \"register.action.submit\": \"Registrati\", \"register.action.back\": \"Indietro\", \"register.action.sign_in.lead\": \"Hai già un account? \", \"register.action.sign_in.link\": \"Accedi\", \"complete.title\": \"Sei connesso\", \"signed-in.continue\": \"Continua\", \"signed-in.logout\": \"Esci\", // --- Accesso con passkey --- \"passkey-login.title\": \"Accedi con la tua passkey\", // --- Step: passkey-first (passo iniziale del preset passkey-first) --- \"passkey-first.title\": \"Accedi\", \"passkey-first.description\": \"Usa la tua passkey per continuare\", \"passkey-first.action.passkey\": \"Continua con passkey\", \"passkey-first.action.email_fallback\": \"Accedi in un altro modo\", // --- Recupero password --- \"recover.title\": \"Controlla la tua e-mail\", \"recover.description\": \"Abbiamo inviato un link per reimpostare la password al tuo indirizzo e-mail.\", \"recover.action.back\": \"Torna all'accesso\", // --- Azioni condivise --- \"submit.continue\": \"Continua\", \"submit.signin\": \"Accedi\", \"action.forgot_password\": \"Password dimenticata?\", \"action.show_password\": \"Mostra password\", \"action.cancel\": \"Annulla\", // Fallback generico per la chiave `<step>.action.back` iniettata dal motore // (vedi INJECTED_KEY_FALLBACKS in liquid.ts). \"action.back\": \"Indietro\", \"action.use_another_account\": \"Usa un altro account\", // --- SSO --- \"sso.continue_with\": \"Continua con {name}\", \"sso.divider\": \"oppure\", \"register-sso.title\": \"Completa la creazione del tuo account\", \"register-sso.description\": \"Ci servono ancora pochi dati\", \"register-sso.field.email\": \"Email\", \"register-sso.action.submit\": \"Crea account\", \"sso-conflict.title\": \"Hai già un account\", \"sso-conflict.description\": \"Accedi come fai di solito per continuare\", \"sso-conflict.field.password\": \"Password\", \"sso-conflict.action.submit\": \"Accedi\", \"sso-conflict.action.passkey\": \"Usa una passkey\", \"sso-conflict.action.sign_in\": \"Torna all'accesso\", \"sso.redirect.title\": \"Reindirizzamento al provider…\", // --- Cerimonia passkey --- \"passkey.pending.status\": \"In attesa della tua passkey…\", // --- Errori passkey --- \"error.passkey_cancelled\": \"La richiesta della passkey è stata chiusa prima del completamento.\", \"error.passkey_timeout\": \"La richiesta della passkey è scaduta. Riprova.\", \"error.passkey_not_registered\": \"Questa passkey non è registrata. Accedi in un altro modo.\", \"error.passkey_setup_failed\": \"La registrazione della passkey non è stata completata. Riprova.\", \"error.passkey_unsupported\": \"Questo dispositivo non supporta le passkey\", \"error.passkey_failed\": \"Qualcosa è andato storto. Riprova.\", \"error.passkey_invalid\": \"Non è stato possibile verificare questa passkey. Riprova.\", \"error.sso_creation_disabled\": \"Non esiste un account per questo accesso e con questo provider non è possibile creare nuovi account.\", \"error.flow_restart_required\": \"Non è stato possibile proseguire l'accesso. Ricomincia da capo.\", \"error.passkey_registration_invalid\": \"Non è stato possibile verificare la nuova passkey. Riprova a registrarla.\", \"error.sso_user_schema_mismatch\": \"Questo account non può accedere con questo provider. Prova un altro metodo di accesso o contatta l'amministratore.\", \"error.sso_unavailable\": \"Questo provider di accesso non è disponibile al momento. Prova un altro metodo di accesso.\", \"error.sso_verified_unique_value_changed\": \"Il tuo provider di accesso ha confermato questo valore, quindi non può essere modificato qui.\", \"error.sso_user_invalid\": \"Alcuni dati non sono coerenti tra loro. Controllali e riprova.\", \"error.sso_user_cannot_be_created\": \"Non possiamo creare il tuo account con questo metodo di accesso. Contatta l'assistenza.\", \"error.user_already_exists\": \"Esiste già un account con questi dati.\", \"error.user_not_found\": \"Non abbiamo trovato un account con questi dati.\", \"error.sso_user_not_found\": \"Non esiste ancora un account per questo accesso.\", \"error.outcome_unhandled\": \"Non è stato possibile proseguire questo passaggio. Riprova.\", \"error.sign_in_first\": \"Accedi prima al tuo account.\", \"error.signup_check_failed\": \"Non è stato possibile creare il tuo account. Riprova.\", \"error.signup_rate_limited\": \"Troppi tentativi. Attendi un minuto e riprova.\", \"error.signup_secure_connection\": \"Per creare un account serve una connessione sicura. Apri questa pagina con https://.\", // --- Avvisi: perché il flusso passa da solo tra accesso e registrazione --- \"notice.user_not_found\": \"Non abbiamo trovato un account per questo indirizzo e-mail: puoi crearne uno ora. Hai sbagliato a scriverlo? Correggilo nel campo E-mail qui sotto.\", \"notice.user_not_found.custom_identifier\": \"Non abbiamo trovato un account con questi dati: puoi crearne uno ora. Hai sbagliato a scriverli? Correggili qui sotto.\", \"notice.user_already_exists\": \"Esiste già un account con questi dati. Accedi per continuare.\", \"notice.sso_user_not_found\": \"Non esiste ancora un account per questo accesso: puoi crearne uno ora.\", // --- Errori campo / modulo --- \"error.email_required\": \"Inserisci un indirizzo e-mail\", \"error.email_invalid\": \"Inserisci un indirizzo e-mail valido\", \"error.password_required\": \"Inserisci una password\", \"error.password_incorrect\": \"Password errata.\", \"error.email_exists\": \"Esiste già un account con questo indirizzo e-mail.\", \"error.invalid_credentials\": \"Password errata.\", \"error.required\": \"Questo campo è obbligatorio.\", // --- Fallback generici per regole di campo ({0} = etichetta del campo) --- \"error.field_required\": \"{0} è obbligatorio.\", \"error.field_format\": \"Inserisci un valore valido per {0}.\", \"error.field_min_length\": \"{0} è troppo corto.\", \"error.field_max_length\": \"{0} è troppo lungo.\", \"error.field_min_length_value\": \"{0} deve contenere almeno {1} caratteri.\", \"error.field_max_length_value\": \"{0} può contenere al massimo {1} caratteri.\", \"error.field_invalid\": \"Controlla {0}.\", // --- Suggerimenti dalle regole di validazione ({0} = limite della regola) --- \"hint.field_min_length\": \"Almeno {0} caratteri.\", // --- Alert a livello di modulo --- \"error.sign_in_server.title\": \"Non è stato possibile completare l'accesso.\", \"error.sign_in_server.body\": \"Riprova tra qualche minuto\", \"error.sso_cancelled.title\": \"Accesso annullato\", \"error.sso_cancelled.body\": \"Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.\", \"error.sso_failed.title\": \"Accesso non riuscito\", \"error.sso_failed.body\": \"Non è stato possibile completare l'accesso. Riprova.\", \"error.more_info\": \"Maggiori informazioni\", }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "it",
+          "declaration": {
+            "name": "it",
+            "module": "src/orchestrator/locales/it.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/locales/translations.ts",
       "declarations": [
         {
           "kind": "variable",
@@ -7127,121 +7206,181 @@
           "description": "A built-in dictionary with an integrator's `locales` entries on top.\n\nEntries are partial: they merge key by key, and an explicit `undefined` is\nskipped rather than shadowing the built-in copy.\n\nA step can ask for a variant of a key (a step that offers sign-in providers\nasks for `<step>.description.sso`), and falls back to the plain key only\nwhen the variant is missing. So when the integrator wrote their own text\nfor a key but not a variant of their own (absent, or the built-in one copied\nin by spreading a built-in dictionary), the built-in variant is dropped:\ntheirs is what shows, rather than built-in copy, possibly in another\nlanguage, that they never saw."
         },
         {
-          "kind": "function",
-          "name": "localeFor",
-          "return": {
-            "type": {
-              "text": ""
-            }
-          },
-          "parameters": [
+          "kind": "class",
+          "description": "The texts for one language tag. Their layers, strongest first: the app's\n`locales` entries for the tag's primary subtag, the built-in translation\nfor it, the app's `en` entries, and the built-in English.\n\nThe app's English is thus the fallback for every language: a key a language\nhas no text for, such as one for a step the app added, shows the app's\nEnglish rather than the raw key, while a built-in translation still beats it.",
+          "name": "Translations",
+          "members": [
             {
-              "name": "tag",
-              "type": {
-                "text": "string"
-              },
-              "description": "The BCP 47 language tag."
-            },
-            {
-              "name": "locales",
-              "optional": true,
-              "type": {
-                "text": "Readonly<Record<string, Partial<Locale>>>"
-              },
-              "description": "The integrator's dictionaries, by primary subtag."
-            },
-            {
-              "name": "builtin",
-              "optional": true,
+              "kind": "field",
+              "name": "texts",
               "type": {
                 "text": "Locale"
               },
-              "description": "The built-in dictionary for the tag's language, which the\ncaller loads (`loadLocale`); `undefined` for English or a language with none."
-            }
-          ],
-          "description": "The dictionary for a BCP 47 language tag. Its layers, strongest first: the\nintegrator's `locales` entries for the tag's primary subtag, the built-in\ndictionary for it, their `en` entries, and the built-in English.\n\nThe integrator's English is thus the fallback for every language: a key a\nlanguage has no text for, such as one for a step they added, shows their\nEnglish rather than the raw key, while a built-in translation still beats it."
-        },
-        {
-          "kind": "function",
-          "name": "isHidden",
-          "return": {
-            "type": {
-              "text": "boolean"
-            }
-          },
-          "parameters": [
-            {
-              "name": "tag",
-              "type": {
-                "text": "string"
-              }
+              "readonly": true,
+              "description": "The merged texts, by key."
             },
             {
-              "name": "locales",
-              "type": {
-                "text": "Readonly<Record<string, Partial<Locale>>> | undefined"
-              }
-            },
-            {
-              "name": "key",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Whether the integrator hid a key's text by setting it to `\"\"`: for the tag's\nlanguage or, when they wrote no text of their own for it there, in `en`.\nUnlike localeFor, a built-in translation does not override an\nEnglish `\"\"`, so one entry hides the text in every language."
-        },
-        {
-          "kind": "function",
-          "name": "primaryLanguage",
-          "return": {
-            "type": {
-              "text": ""
-            }
-          },
-          "parameters": [
-            {
-              "name": "tag",
+              "kind": "field",
+              "name": "language",
               "type": {
                 "text": "string"
               },
-              "description": "The BCP 47 language tag."
+              "privacy": "private",
+              "readonly": true,
+              "default": "language"
+            },
+            {
+              "kind": "field",
+              "name": "locales",
+              "type": {
+                "text": "AppLocales | undefined"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "default": "locales"
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "tag",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The BCP 47 language tag."
+                },
+                {
+                  "name": "locales",
+                  "optional": true,
+                  "type": {
+                    "text": "AppLocales"
+                  },
+                  "description": "The app's dictionaries."
+                }
+              ],
+              "description": "Loads the texts for a BCP 47 language tag, with its built-in translation."
+            },
+            {
+              "kind": "method",
+              "name": "english",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "tag",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The BCP 47 language tag."
+                },
+                {
+                  "name": "locales",
+                  "optional": true,
+                  "type": {
+                    "text": "AppLocales"
+                  },
+                  "description": "The app's dictionaries."
+                }
+              ],
+              "description": "The texts for a BCP 47 language tag from the bundled English only, for\nuse before load has finished."
+            },
+            {
+              "kind": "method",
+              "name": "isHidden",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "key",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The text key."
+                }
+              ],
+              "description": "Whether the app hid a key's text by setting it to `\"\"`: for this\nlanguage or, when it wrote no text of its own for it there, in `en`. A\nbuilt-in translation does not override an English `\"\"`, so one entry\nhides the text in every language."
+            },
+            {
+              "kind": "method",
+              "name": "merge",
+              "privacy": "private",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "language",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The primary language subtag."
+                },
+                {
+                  "name": "locales",
+                  "type": {
+                    "text": "AppLocales | undefined"
+                  },
+                  "description": "The app's dictionaries."
+                },
+                {
+                  "name": "builtin",
+                  "optional": true,
+                  "type": {
+                    "text": "Locale"
+                  },
+                  "description": "The built-in translation, if any."
+                }
+              ],
+              "description": "Merges the layers for a language."
+            },
+            {
+              "kind": "method",
+              "name": "languageOf",
+              "privacy": "private",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "tag",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The BCP 47 language tag."
+                }
+              ],
+              "description": "The primary subtag of a language tag, lowercased."
             }
-          ],
-          "description": "The primary subtag of a language tag, lowercased."
+          ]
         }
       ],
       "exports": [
         {
           "kind": "js",
-          "name": "en",
-          "declaration": {
-            "name": "en",
-            "module": "./en.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "Locale",
-          "declaration": {
-            "name": "Locale",
-            "module": "./en.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "businessLocales",
-          "declaration": {
-            "name": "businessLocales",
-            "module": "./business.js"
-          }
-        },
-        {
-          "kind": "js",
           "name": "CUSTOM_IDENTIFIER_SUFFIX",
           "declaration": {
             "name": "CUSTOM_IDENTIFIER_SUFFIX",
-            "module": "src/orchestrator/locales/index.ts"
+            "module": "src/orchestrator/locales/translations.ts"
           }
         },
         {
@@ -7249,97 +7388,15 @@
           "name": "mergeLocale",
           "declaration": {
             "name": "mergeLocale",
-            "module": "src/orchestrator/locales/index.ts"
+            "module": "src/orchestrator/locales/translations.ts"
           }
         },
         {
           "kind": "js",
-          "name": "localeFor",
+          "name": "Translations",
           "declaration": {
-            "name": "localeFor",
-            "module": "src/orchestrator/locales/index.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "isHidden",
-          "declaration": {
-            "name": "isHidden",
-            "module": "src/orchestrator/locales/index.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "primaryLanguage",
-          "declaration": {
-            "name": "primaryLanguage",
-            "module": "src/orchestrator/locales/index.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/orchestrator/locales/it.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "it",
-          "type": {
-            "text": "Locale"
-          },
-          "default": "{ // ═══════════════════════════════════════════════════════════════════════════ // Step: identifier (inserimento e-mail — prima schermata) // ═══════════════════════════════════════════════════════════════════════════ \"identifier.title\": \"Accedi\", \"identifier.description\": \"Inserisci la tua e-mail per continuare\", \"identifier.description.custom_identifier\": \"Inserisci i tuoi dati per continuare\", \"identifier.field.email\": \"E-mail\", \"identifier.field.email.placeholder\": \"tu@esempio.com\", \"identifier.field.password\": \"Password\", \"identifier.action.submit\": \"Accedi\", \"identifier.action.continue\": \"Continua\", \"identifier.action.passkey\": \"Accedi con passkey\", \"identifier.action.register.lead\": \"Non hai un account? \", \"identifier.action.register.link\": \"Registrati\", // ═══════════════════════════════════════════════════════════════════════════ // Step: authenticate (inserimento password — flusso di accesso) // ═══════════════════════════════════════════════════════════════════════════ \"authenticate.title\": \"Accedi\", \"authenticate.description\": \"Inserisci la tua password\", \"authenticate.field.password\": \"Password\", \"authenticate.action.submit\": \"Accedi\", // ═══════════════════════════════════════════════════════════════════════════ // Step: choose-register (scelta del percorso di registrazione — nessun campo) // ═══════════════════════════════════════════════════════════════════════════ \"choose-register.title\": \"Crea il tuo account\", \"choose-register.description\": \"Scegli come registrarti\", \"choose-register.action.register-with-password\": \"Registrati con password\", \"choose-register.action.register-with-passkey\": \"Registrati con passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-credentials (e-mail + password — registrazione con password) // ═══════════════════════════════════════════════════════════════════════════ \"collect-credentials.title\": \"Crea il tuo account\", \"collect-credentials.description\": \"Configura e-mail e password\", \"collect-credentials.field.email\": \"E-mail\", \"collect-credentials.field.email.placeholder\": \"tu@esempio.com\", \"collect-credentials.field.password\": \"Password\", \"collect-credentials.action.submit\": \"Registrati\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-password (inserimento password — percorso di registrazione) // Flusso login predefinito: register → register-password → passkey-upsell → done // ═══════════════════════════════════════════════════════════════════════════ \"register-password.title\": \"Crea la tua password\", \"register-password.description\": \"Scegli una password sicura per il tuo account\", \"register-password.field.password\": \"Password\", \"register-password.action.submit\": \"Registrati\", \"register-password.action.back\": \"Indietro\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-upsell (proposta passkey — dopo la registrazione) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-upsell.title\": \"Accedi più velocemente la prossima volta\", \"passkey-upsell.description\": \"Nessuna password necessaria.\", \"passkey-upsell.description.line1\": \"Nessuna password necessaria.\", \"passkey-upsell.description.line2\": \"Accedi con Face ID, Touch ID o PIN.\", \"passkey-upsell.action.passkey_register\": \"Configura passkey\", \"passkey-upsell.action.skip\": \"Salta per ora\", \"passkey-upsell.action.setup\": \"Configura passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-passkey-email (solo e-mail — registrazione solo passkey) // ═══════════════════════════════════════════════════════════════════════════ \"collect-passkey-email.title\": \"Crea il tuo account\", \"collect-passkey-email.description\": \"Inserisci la tua e-mail per configurare una passkey\", \"collect-passkey-email.field.email\": \"E-mail\", \"collect-passkey-email.field.email.placeholder\": \"tu@esempio.com\", \"collect-passkey-email.action.submit\": \"Continua\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-enroll (cerimonia passkey — percorso solo passkey) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-enroll.title\": \"Configura la tua passkey\", \"passkey-enroll.description\": \"Usa Face ID, Touch ID o il PIN del dispositivo per creare una passkey.\", \"passkey-enroll.action.passkey_register\": \"Configura passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: done (terminale — conferma accesso) // ═══════════════════════════════════════════════════════════════════════════ \"done.title\": \"Sei connesso\", \"done.description\": \"\", // --- Alias dei nomi step per il flusso login predefinito --- \"password.title\": \"Accedi\", \"password.description\": \"Inserisci la tua password\", \"password.description.sso\": \"Inserisci la tua password o continua con il tuo provider di accesso\", \"password.field.password\": \"Password\", \"password.action.signin\": \"Accedi\", \"password.action.passkey\": \"Accedi con passkey\", \"password.action.back\": \"Indietro\", \"password.action.register.lead\": \"Non hai un account? \", \"password.action.register.link\": \"Registrati\", \"register.title\": \"Crea il tuo account\", // Vuoto per design — la scheda di registrazione non ha sottotitolo. \"register.description\": \"Inserisci i tuoi dati per iniziare\", \"register.field.email\": \"E-mail\", \"register.field.email.placeholder\": \"tu@esempio.com\", \"register.field.password\": \"Password\", \"register.field.givenName\": \"Nome\", \"register.field.familyName\": \"Cognome\", \"register.field.companyName\": \"Nome azienda\", // L'<input type=\"date\"> nativo localizza il proprio formato di visualizzazione in base // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario. \"register.field.dateOfBirth\": \"Data di nascita\", \"register.field.country\": \"Paese\", \"register.field.country.placeholder\": \"Seleziona il tuo paese\", \"register.field.terms\": \"Accetto i termini di servizio\", \"register.action.password\": \"Continua con password\", \"register.action.passkey\": \"Continua con passkey\", \"register.action.submit\": \"Registrati\", \"register.action.back\": \"Indietro\", \"register.action.sign_in.lead\": \"Hai già un account? \", \"register.action.sign_in.link\": \"Accedi\", \"complete.title\": \"Sei connesso\", \"signed-in.continue\": \"Continua\", \"signed-in.logout\": \"Esci\", // --- Accesso con passkey --- \"passkey-login.title\": \"Accedi con la tua passkey\", // --- Step: passkey-first (passo iniziale del preset passkey-first) --- \"passkey-first.title\": \"Accedi\", \"passkey-first.description\": \"Usa la tua passkey per continuare\", \"passkey-first.action.passkey\": \"Continua con passkey\", \"passkey-first.action.email_fallback\": \"Accedi in un altro modo\", // --- Recupero password --- \"recover.title\": \"Controlla la tua e-mail\", \"recover.description\": \"Abbiamo inviato un link per reimpostare la password al tuo indirizzo e-mail.\", \"recover.action.back\": \"Torna all'accesso\", // --- Azioni condivise --- \"submit.continue\": \"Continua\", \"submit.signin\": \"Accedi\", \"action.forgot_password\": \"Password dimenticata?\", \"action.show_password\": \"Mostra password\", \"action.cancel\": \"Annulla\", // Fallback generico per la chiave `<step>.action.back` iniettata dal motore // (vedi INJECTED_KEY_FALLBACKS in liquid.ts). \"action.back\": \"Indietro\", \"action.use_another_account\": \"Usa un altro account\", // --- SSO --- \"sso.continue_with\": \"Continua con {name}\", \"sso.divider\": \"oppure\", \"register-sso.title\": \"Completa la creazione del tuo account\", \"register-sso.description\": \"Ci servono ancora pochi dati\", \"register-sso.field.email\": \"Email\", \"register-sso.action.submit\": \"Crea account\", \"sso-conflict.title\": \"Hai già un account\", \"sso-conflict.description\": \"Accedi come fai di solito per continuare\", \"sso-conflict.field.password\": \"Password\", \"sso-conflict.action.submit\": \"Accedi\", \"sso-conflict.action.passkey\": \"Usa una passkey\", \"sso-conflict.action.sign_in\": \"Torna all'accesso\", \"sso.redirect.title\": \"Reindirizzamento al provider…\", // --- Cerimonia passkey --- \"passkey.pending.status\": \"In attesa della tua passkey…\", // --- Errori passkey --- \"error.passkey_cancelled\": \"La richiesta della passkey è stata chiusa prima del completamento.\", \"error.passkey_timeout\": \"La richiesta della passkey è scaduta. Riprova.\", \"error.passkey_not_registered\": \"Questa passkey non è registrata. Accedi in un altro modo.\", \"error.passkey_setup_failed\": \"La registrazione della passkey non è stata completata. Riprova.\", \"error.passkey_unsupported\": \"Questo dispositivo non supporta le passkey\", \"error.passkey_failed\": \"Qualcosa è andato storto. Riprova.\", \"error.passkey_invalid\": \"Non è stato possibile verificare questa passkey. Riprova.\", \"error.sso_creation_disabled\": \"Non esiste un account per questo accesso e con questo provider non è possibile creare nuovi account.\", \"error.flow_restart_required\": \"Non è stato possibile proseguire l'accesso. Ricomincia da capo.\", \"error.passkey_registration_invalid\": \"Non è stato possibile verificare la nuova passkey. Riprova a registrarla.\", \"error.sso_user_schema_mismatch\": \"Questo account non può accedere con questo provider. Prova un altro metodo di accesso o contatta l'amministratore.\", \"error.sso_unavailable\": \"Questo provider di accesso non è disponibile al momento. Prova un altro metodo di accesso.\", \"error.sso_verified_unique_value_changed\": \"Il tuo provider di accesso ha confermato questo valore, quindi non può essere modificato qui.\", \"error.sso_user_invalid\": \"Alcuni dati non sono coerenti tra loro. Controllali e riprova.\", \"error.sso_user_cannot_be_created\": \"Non possiamo creare il tuo account con questo metodo di accesso. Contatta l'assistenza.\", \"error.user_already_exists\": \"Esiste già un account con questi dati.\", \"error.user_not_found\": \"Non abbiamo trovato un account con questi dati.\", \"error.sso_user_not_found\": \"Non esiste ancora un account per questo accesso.\", \"error.outcome_unhandled\": \"Non è stato possibile proseguire questo passaggio. Riprova.\", \"error.sign_in_first\": \"Accedi prima al tuo account.\", \"error.signup_check_failed\": \"Non è stato possibile creare il tuo account. Riprova.\", \"error.signup_rate_limited\": \"Troppi tentativi. Attendi un minuto e riprova.\", \"error.signup_secure_connection\": \"Per creare un account serve una connessione sicura. Apri questa pagina con https://.\", // --- Avvisi: perché il flusso passa da solo tra accesso e registrazione --- \"notice.user_not_found\": \"Non abbiamo trovato un account per questo indirizzo e-mail: puoi crearne uno ora. Hai sbagliato a scriverlo? Correggilo nel campo E-mail qui sotto.\", \"notice.user_not_found.custom_identifier\": \"Non abbiamo trovato un account con questi dati: puoi crearne uno ora. Hai sbagliato a scriverli? Correggili qui sotto.\", \"notice.user_already_exists\": \"Esiste già un account con questi dati. Accedi per continuare.\", \"notice.sso_user_not_found\": \"Non esiste ancora un account per questo accesso: puoi crearne uno ora.\", // --- Errori campo / modulo --- \"error.email_required\": \"Inserisci un indirizzo e-mail\", \"error.email_invalid\": \"Inserisci un indirizzo e-mail valido\", \"error.password_required\": \"Inserisci una password\", \"error.password_incorrect\": \"Password errata.\", \"error.email_exists\": \"Esiste già un account con questo indirizzo e-mail.\", \"error.invalid_credentials\": \"Password errata.\", \"error.required\": \"Questo campo è obbligatorio.\", // --- Fallback generici per regole di campo ({0} = etichetta del campo) --- \"error.field_required\": \"{0} è obbligatorio.\", \"error.field_format\": \"Inserisci un valore valido per {0}.\", \"error.field_min_length\": \"{0} è troppo corto.\", \"error.field_max_length\": \"{0} è troppo lungo.\", \"error.field_min_length_value\": \"{0} deve contenere almeno {1} caratteri.\", \"error.field_max_length_value\": \"{0} può contenere al massimo {1} caratteri.\", \"error.field_invalid\": \"Controlla {0}.\", // --- Suggerimenti dalle regole di validazione ({0} = limite della regola) --- \"hint.field_min_length\": \"Almeno {0} caratteri.\", // --- Alert a livello di modulo --- \"error.sign_in_server.title\": \"Non è stato possibile completare l'accesso.\", \"error.sign_in_server.body\": \"Riprova tra qualche minuto\", \"error.sso_cancelled.title\": \"Accesso annullato\", \"error.sso_cancelled.body\": \"Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.\", \"error.sso_failed.title\": \"Accesso non riuscito\", \"error.sso_failed.body\": \"Non è stato possibile completare l'accesso. Riprova.\", \"error.more_info\": \"Maggiori informazioni\", }"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "src/orchestrator/locales/it.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/orchestrator/locales/load.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "loadLocale",
-          "return": {
-            "type": {
-              "text": ""
-            }
-          },
-          "parameters": [
-            {
-              "name": "tag",
-              "type": {
-                "text": "string"
-              },
-              "description": "The BCP 47 language tag."
-            },
-            {
-              "name": "locales",
-              "type": {
-                "text": "Readonly<Record<string, Partial<Locale>>> | undefined"
-              },
-              "description": "The integrator's dictionaries, by primary subtag."
-            }
-          ],
-          "description": "Loads the dictionary for a BCP 47 language tag: its built-in translation,\nif there is one, with the integrator's `locales` merged over it\n(localeFor)."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "loadLocale",
-          "declaration": {
-            "name": "loadLocale",
-            "module": "src/orchestrator/locales/load.ts"
+            "name": "Translations",
+            "module": "src/orchestrator/locales/translations.ts"
           }
         }
       ]
@@ -8734,7 +8791,7 @@
               "type": {
                 "text": "| Readonly<Record<string, Partial<Locale>>>\n    | undefined"
               },
-              "description": "Custom locale dictionaries keyed by language code. Entries may be\npartial — each is merged over the built-in dictionary for its language,\nso a preset like businessLocales (or a hand-written subset) is\ndirectly assignable. The `en` entries also fill whatever another language\nhas no text for (localeFor):\n\n```ts\nimport { businessLocales } from \"@zitadel/components\";\nloginElement.locales = businessLocales;\n// or override individual keys:\nloginElement.locales = { en: { \"identifier.title\": \"Welcome\" } };\n```"
+              "description": "Custom locale dictionaries keyed by language code. Entries may be\npartial — each is merged over the built-in dictionary for its language,\nso a preset like businessLocales (or a hand-written subset) is\ndirectly assignable. The `en` entries also fill whatever another language\nhas no text for (Translations):\n\n```ts\nimport { businessLocales } from \"@zitadel/components\";\nloginElement.locales = businessLocales;\n// or override individual keys:\nloginElement.locales = { en: { \"identifier.title\": \"Welcome\" } };\n```"
             },
             {
               "kind": "field",
@@ -8826,7 +8883,7 @@
               "name": "rendering",
               "privacy": "private",
               "readonly": true,
-              "default": "new Task(this, { args: () => [this.resolveLanguage(), this.locales] as const, task: async ([language, locales]) => { const [locale, sanitiser] = await Promise.all([ loadLocale(language, locales), createSanitiser(), ]); return { locale, engine: await createLiquidEngine({ locale }), sanitiser }; }, })",
+              "default": "new Task(this, { args: () => [this.resolveLanguage(), this.locales] as const, task: async ([language, locales]) => { const [translations, sanitiser] = await Promise.all([ Translations.load(language, locales), createSanitiser(), ]); const engine = await createLiquidEngine({ locale: translations.texts }); return { translations, engine, sanitiser }; }, })",
               "description": "What a step renders with: the dictionary for the page's language, the\nLiquidJS engine and the sanitiser. Each loads on demand in its own chunk\n(the translation the page shows, the engine, and DOMPurify where the\nbrowser has no `setHTML()`). The loader shows until they are there, and a\nchange of `lang` or `locales` loads them again."
             },
             {
@@ -8878,6 +8935,17 @@
             },
             {
               "kind": "method",
+              "name": "resolveTranslations",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Translations"
+                }
+              },
+              "description": "The texts for the resolved language, with the `locales` map merged over\nthe built-in copy; bundled English until rendering has loaded."
+            },
+            {
+              "kind": "method",
               "name": "resolveLocale",
               "privacy": "private",
               "return": {
@@ -8885,7 +8953,7 @@
                   "text": "Locale"
                 }
               },
-              "description": "Resolves the effective locale dictionary for the resolved language, with\nthe `locales` map merged over the built-in copy (localeFor)."
+              "description": "The texts for the resolved language, by key."
             },
             {
               "kind": "method",

@@ -35,8 +35,7 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys, stepNotice, stepTexts } from "./liquid.js";
-import { isHidden, localeFor, type Locale } from "./locales/index.js";
-import { loadLocale } from "./locales/load.js";
+import { type Locale, Translations } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
 import { resolveApi } from "./resolve-api.js";
@@ -412,7 +411,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * partial — each is merged over the built-in dictionary for its language,
    * so a preset like {@link businessLocales} (or a hand-written subset) is
    * directly assignable. The `en` entries also fill whatever another language
-   * has no text for ({@link localeFor}):
+   * has no text for ({@link Translations}):
    *
    * ```ts
    * import { businessLocales } from "@zitadel/components";
@@ -467,11 +466,12 @@ export class ZitadelLogin extends ZitadelSurface {
   private readonly rendering = new Task(this, {
     args: () => [this.resolveLanguage(), this.locales] as const,
     task: async ([language, locales]) => {
-      const [locale, sanitiser] = await Promise.all([
-        loadLocale(language, locales),
+      const [translations, sanitiser] = await Promise.all([
+        Translations.load(language, locales),
         createSanitiser(),
       ]);
-      return { locale, engine: await createLiquidEngine({ locale }), sanitiser };
+      const engine = await createLiquidEngine({ locale: translations.texts });
+      return { translations, engine, sanitiser };
     },
   });
 
@@ -593,11 +593,21 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Resolves the effective locale dictionary for the resolved language, with
-   * the `locales` map merged over the built-in copy ({@link localeFor}).
+   * The texts for the resolved language, with the `locales` map merged over
+   * the built-in copy; bundled English until {@link rendering} has loaded.
+   */
+  private resolveTranslations(): Translations {
+    return (
+      this.rendering.value?.translations ??
+      Translations.english(this.resolveLanguage(), this.locales)
+    );
+  }
+
+  /**
+   * The texts for the resolved language, by key.
    */
   private resolveLocale(): Locale {
-    return this.rendering.value?.locale ?? localeFor(this.resolveLanguage(), this.locales);
+    return this.resolveTranslations().texts;
   }
 
   /**
@@ -1294,12 +1304,12 @@ export class ZitadelLogin extends ZitadelSurface {
     const actions = step.actions ?? [];
     // Why the flow moved between sign-in and sign-up without being asked, on
     // the step right after the move. A host that sets the notice's text to ""
-    // in `locales` opts out of it ({@link isHidden}). The plain key counts as
+    // in `locales` opts out of it (`Translations.isHidden`). The plain key counts as
     // well as the variant shown: a built-in translation's variant would
     // otherwise outlive an English "".
-    const language = this.resolveLanguage();
+    const translations = this.resolveTranslations();
     const notice =
-      step.notice && !isHidden(language, this.locales, step.notice)
+      step.notice && !translations.isHidden(step.notice)
         ? stepNotice(step.notice, fields, this.resolveLocale())
         : undefined;
     const context: LiquidContext = {
@@ -1319,9 +1329,7 @@ export class ZitadelLogin extends ZitadelSurface {
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
       messages:
-        notice && !isHidden(language, this.locales, notice)
-          ? [{ level: "info", text_key: notice }]
-          : [],
+        notice && !translations.isHidden(notice) ? [{ level: "info", text_key: notice }] : [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),
