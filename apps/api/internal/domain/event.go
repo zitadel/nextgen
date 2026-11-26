@@ -112,6 +112,9 @@ const (
 	EventTypeAuthCheckFailed         EventType = "auth.check.failed"
 	EventTypeAuthCheckSucceeded      EventType = "auth.check.succeeded"
 	EventTypeAuthRequestCreated      EventType = "auth.request.created"
+	// A check refused a code that was redeemed, which consumed it. An unknown
+	// code consumes nothing and writes no event.
+	EventTypeAuthRequestExchangeFailed EventType = "auth.request.exchange.failed"
 
 	// The SSO callback's outcome, separate from auth.check.*: a succeeded
 	// exchange is not a sign-in, since the identity may still match no account.
@@ -180,7 +183,7 @@ const (
 // WrittenEventTypes is every event type the server writes: the Path A and
 // Path B types of docs/design/api/events-catalog.md. A retired type is not in
 // it, since nothing writes it any more. A webhook's filter is checked against
-// it (ADR 090 §1). The catalog's producer test keeps it in step with the
+// it (ADR 091 §1). The catalog's producer test keeps it in step with the
 // catalog.
 func WrittenEventTypes() []EventType {
 	return []EventType{
@@ -208,7 +211,7 @@ func WrittenEventTypes() []EventType {
 		EventTypeAuthzGranted, EventTypeAuthzRevoked,
 		EventTypeAuthFactorPasswordSet, EventTypeAuthFactorPasskeyEnrolled,
 		EventTypeApplicationCreated, EventTypeApplicationUpdated,
-		EventTypeAuthRequestCreated, EventTypeOAuthSettingsCreated,
+		EventTypeAuthRequestCreated, EventTypeAuthRequestExchangeFailed, EventTypeOAuthSettingsCreated,
 		EventTypeInvitationCreated, EventTypeInvitationAccepted, EventTypeInvitationRejected, EventTypeInvitationCancelled,
 		EventTypeWebhookCreated, EventTypeWebhookUpdated, EventTypeWebhookDeleted, EventTypeWebhookSecretRotated,
 	}

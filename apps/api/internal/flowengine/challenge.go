@@ -77,6 +77,19 @@ func (r *FlowStateMachineRuntime) issueChallenge(pc *processCtx, method string, 
 	if err != nil {
 		return FlowStepResult{}, fmt.Errorf("flow state machine: issue %s: %w", declared.label, err)
 	}
+	// Checked before the browser prompts, so a taken value leaves no passkey
+	// in the password manager that the verify step would refuse. Only a
+	// ceremony that creates its user is checked: the lookup pins the owner,
+	// which must never replace a user the attempt carries.
+	if declared.createsUser && out.Provisional {
+		taken, err := r.resolveTakenUniqueValue(pc, fields)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		if taken {
+			return r.routeOutcome(pc, resolved, domain.FlowImplicitOutcomeUserAlreadyExists, false)
+		}
+	}
 	if declared.bindsUserAtIssue {
 		// Keep the (possibly minted) user handle so a re-issued challenge
 		// stays stable and the verify leg knows which user it targets.
@@ -156,17 +169,44 @@ func (r *FlowStateMachineRuntime) verifyChallenge(pc *processCtx, resolved, fiel
 // uniquely-keyed field finds the owner even when the race was lost on an
 // undesignated unique attribute (e.g. a fresh email but a taken phone).
 func (r *FlowStateMachineRuntime) routeCreatedUserConflict(pc *processCtx, resolved, fields domain.FlowResolvedFields) (FlowStepResult, error) {
-	ctx, state := pc.ctx, pc.state
-	clearUserBoundState(state)
+	clearUserBoundState(pc.state)
+	// No owner found routes anyway and the next step re-collects.
+	if _, err := r.resolveTakenUniqueValue(pc, fields); err != nil {
+		return FlowStepResult{}, err
+	}
+	return r.routeOutcome(pc, resolved, domain.FlowImplicitOutcomeUserAlreadyExists, false)
+}
+
+// resolveTakenUniqueValue looks up the owner of each collected unique value
+// and pins the first one found on the attempt and the state. It reports
+// whether a value is taken, which holds even when no owner can be pinned.
+func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, fields domain.FlowResolvedFields) (bool, error) {
+	state := pc.state
 	candidates := uniqueFieldValues(state.CollectedData.UserData, fields)
-	if visited, verr := r.resolveVisitedFields(pc); verr == nil {
+	if visited, err := r.resolveVisitedFields(pc); err == nil {
 		candidates = uniqueFieldValues(state.CollectedData.UserData, fields, visited)
 	}
+	taken := false
 	for _, candidate := range candidates {
-		// Only a sign-up's create loses this race, so a free candidate is
-		// the sign-up's own value, not a failed sign-in: Register keeps it
-		// from writing one.
-		userID, rerr := r.authAttempts.SubmitIdentifier(ctx, domain.FlowSubmitIdentifierInput{
+		// An attribute can be unique across the whole project (like email) or
+		// only within a team (like a handle). Before the sign-up starts, count
+		// only the values a new user, who has no team, would actually clash with.
+		owner, err := r.ssoIdentities.FindUniqueOwner(pc.ctx, state.ProjectID, state.UserSchemaURL, candidate[0], candidate[1])
+		if errors.Is(err, domain.ErrSSOOwnerOtherSchema) {
+			// Creation would collide, but the flow cannot continue with that
+			// user; a later field may still name one it can.
+			taken = true
+			continue
+		}
+		if err != nil {
+			return false, fmt.Errorf("flow state machine: look up unique value %q: %w", candidate[0], err)
+		}
+		if owner == "" {
+			continue
+		}
+		// Only a sign-up looks here, so a miss is not a failed sign-in:
+		// Register keeps it from writing one.
+		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, domain.FlowSubmitIdentifierInput{
 			ProjectID:     state.ProjectID,
 			AttemptID:     state.AuthAttemptID,
 			AttributeName: candidate[0],
@@ -174,18 +214,18 @@ func (r *FlowStateMachineRuntime) routeCreatedUserConflict(pc *processCtx, resol
 			UserSchemaURL: state.UserSchemaURL,
 			Register:      true,
 		})
-		if rerr == nil {
+		if err == nil {
 			recordResolvedUser(state, userID)
-			break
+			return true, nil
 		}
-		if !errors.Is(rerr, domain.ErrAuthAttemptProofRejected(nil)) {
-			return FlowStepResult{}, fmt.Errorf("flow state machine: resolve conflicting user: %w", rerr)
+		if !errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)) {
+			return false, fmt.Errorf("flow state machine: resolve conflicting user: %w", err)
 		}
-		// Rejected means this field's value is not the taken one (or the
-		// owner vanished again); try the next candidate. All-rejected
-		// routes anyway and the next step re-collects.
+		// The owner holds the value, but the sign-in lookup cannot single it
+		// out (another team holds it too, or the owner vanished): still taken.
+		taken = true
 	}
-	return r.routeOutcome(pc, resolved, domain.FlowImplicitOutcomeUserAlreadyExists, false)
+	return taken, nil
 }
 
 // renderPendingChallenge renders the step carrying the pending ceremony: one

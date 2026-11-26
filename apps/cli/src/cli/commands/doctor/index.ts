@@ -47,6 +47,7 @@ import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -566,12 +567,15 @@ async function runEnvironmentChecks(input: {
 /**
  * `zitadel doctor` — verify local runtime and project state.
  */
-export default class Doctor extends Destructive(
-  LocalServerCommand(Previewable(ServerCommand(BaseCommand))),
-  "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+export default class Doctor extends Telemetered(
+  Destructive(
+    LocalServerCommand(Previewable(ServerCommand(BaseCommand))),
+    "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+  ),
 ) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.gettingStarted;
+  static override readonly headline = "failed_checks";
   static override groupOrder = 3;
 
   static override examples = ["<%= config.bin %> doctor", "<%= config.bin %> doctor --fix"];
@@ -897,7 +901,7 @@ export default class Doctor extends Destructive(
       ...(warningAdvice?.nextActions ?? []),
       ...(serving ? [new Guidance(this.suggest).serverLog()] : []),
     ];
-    this.recordTelemetry({
+    this.annotate({
       runtime: runtimeBackend,
       checks_total: checks.length,
       checks_failed: failed.length,

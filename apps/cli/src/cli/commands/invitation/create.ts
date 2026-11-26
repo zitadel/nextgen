@@ -18,6 +18,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { invitationIdSchema } from "./id";
 import { Promptable } from "@/cli/core/promptable";
 import { ChangeCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The product event a create or replace sends once the API confirms it (ADR 086 §9). */
 const INVITATION_CREATED = "invitation_created";
@@ -78,6 +79,9 @@ const REPLACES_ACCEPTED_REFUSAL = {
   next: [{ id: "invitation:create" }],
 } as const satisfies Refusal;
 
+/** Says the link cannot be read again, in the console's words. */
+const SHOWN_ONCE = "This link is shown only once. Copy it now.";
+
 /**
  * `zitadel invitation create` — invite someone into the project with a link.
  *
@@ -86,7 +90,7 @@ const REPLACES_ACCEPTED_REFUSAL = {
  * never recorded anywhere but the output. `--replaces` makes a new link for an
  * invitation that was lost or expired, keeping its journey (ADR 086).
  */
-export default class InvitationCreate extends Promptable(ChangeCommand) {
+export default class InvitationCreate extends Telemetered(Promptable(ChangeCommand)) {
   static override description = "Invite someone into the project with a link to share.";
   static override group = CommandGroups.usersAndAccess;
   static override groupOrder = 5;
@@ -187,6 +191,7 @@ export default class InvitationCreate extends Promptable(ChangeCommand) {
         lines: [
           escapeControlCharacters(invitation.link),
           `Whoever opens it gets the ${invitationRole(invitation)} role. It expires in 72 hours.`,
+          SHOWN_ONCE,
         ],
       },
       next: {

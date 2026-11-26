@@ -20,6 +20,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Project } from "@/lib/project";
 import { Spelling } from "@/lib/suggestion";
 import { ChangeCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -154,10 +155,11 @@ const CHALLENGE_ID: Refused<string> = {
  * `--no-wait` returns the link as the result, and `--challenge-id` resumes
  * waiting on it in a second run.
  */
-export default class Claim extends ChangeCommand {
+export default class Claim extends Telemetered(ChangeCommand) {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;
+  static override readonly headline = "claim_outcome";
   static override groupOrder = 2;
 
   static override examples = [
@@ -224,7 +226,7 @@ export default class Claim extends ChangeCommand {
       : flags.challengeId === undefined
         ? "Open a browser to claim this project"
         : "Wait for the link to be used to claim this project";
-    this.recordTelemetry({ claim_outcome: "dry_run" });
+    this.annotate({ claim_outcome: "dry_run" });
 
     const would =
       localRecord && !flags.noWait
@@ -328,7 +330,7 @@ export default class Claim extends ChangeCommand {
         });
       }
       case "window-expired": {
-        this.recordTelemetry({ claim_outcome: "window_expired" });
+        this.annotate({ claim_outcome: "window_expired" });
         throw refusalError(WINDOW_CLOSED_REFUSAL, {});
       }
       case "started": {
@@ -458,7 +460,7 @@ export default class Claim extends ChangeCommand {
     }
     this.info("Project claimed");
 
-    this.recordTelemetry({
+    this.annotate({
       claim_outcome: "completed",
       browser_opened: opened,
     });
@@ -514,30 +516,30 @@ export default class Claim extends ChangeCommand {
         }
 
         const progress = await claimService.status(challengeId).catch((error: unknown) => {
-          this.recordTelemetry({ poll_count: attempt });
+          this.annotate({ poll_count: attempt });
           throw new AbortError(error instanceof Error ? error : new Error(String(error)));
         });
         switch (progress.outcome) {
           case "completed": {
-            this.recordTelemetry({ poll_count: attempt });
+            this.annotate({ poll_count: attempt });
             return progress.claim;
           }
           case "window-expired": {
-            this.recordTelemetry({
+            this.annotate({
               claim_outcome: "window_expired",
               poll_count: attempt,
             });
             throw new AbortError(refusalError(WINDOW_CLOSED_REFUSAL, {}));
           }
           case "expired": {
-            this.recordTelemetry({
+            this.annotate({
               claim_outcome: "expired",
               poll_count: attempt,
             });
             throw new AbortError(refusalError(LINK_EXPIRED_REFUSAL, {}, { claim: startOver }));
           }
           case "not-found": {
-            this.recordTelemetry({
+            this.annotate({
               claim_outcome: "not_found",
               poll_count: attempt,
             });
@@ -570,7 +572,7 @@ export default class Claim extends ChangeCommand {
       if (!(error instanceof NotFinished)) {
         throw error;
       }
-      this.recordTelemetry({
+      this.annotate({
         claim_outcome: "timeout",
         poll_count: error.attempt,
       });
@@ -587,7 +589,7 @@ export default class Claim extends ChangeCommand {
     projectId: string,
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
   ): CommandResult {
-    this.recordTelemetry({ claim_outcome: "link_issued" });
+    this.annotate({ claim_outcome: "link_issued" });
     const wait = this.suggest({
       id: "claim",
       flags: { challengeId: challenge.challenge_id },
@@ -634,7 +636,7 @@ export default class Claim extends ChangeCommand {
     claimed_at?: string;
     dashboard_url?: string;
   }): CommandResult {
-    this.recordTelemetry({ claim_outcome: "already_claimed" });
+    this.annotate({ claim_outcome: "already_claimed" });
     const title = "This project already belongs to a team";
     const consoleUrl =
       data.dashboard_url ??

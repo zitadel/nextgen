@@ -1,6 +1,6 @@
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import { AuthMethodDisableCommand } from "@/cli/commands/auth-method/command";
+import { AuthMethodDisableCommand, providerKind } from "@/cli/commands/auth-method/command";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -58,6 +58,7 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
     const config = target.config;
     const schema = target.schema;
     const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
+    this.annotate({ provider_type: providerKind(flags.provider) });
     const change = await this.previewIfNoSignInLeft(
       target,
       (options) => {
@@ -134,6 +135,7 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
     const config = target.config;
     const schema = target.schema;
     const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
+    this.annotate({ provider_type: providerKind(flags.provider) });
     const confirmed = await this.confirmIfNoSignInLeft(
       target,
       (options) => {

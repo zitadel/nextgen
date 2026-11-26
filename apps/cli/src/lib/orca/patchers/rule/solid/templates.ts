@@ -55,20 +55,20 @@ export default function App() {
   }
   if (path.startsWith("/profile")) {
     return (
-      <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+      <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
         <ZitadelSession project={project} postSignOutUrl="/login" />
       </div>
     );
   }
   if (path.startsWith("/register")) {
     return (
-      <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+      <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
         <ZitadelLogin project={project}${localesAttr} purpose="register" postSignInUrl="/profile" />
       </div>
     );
   }
   return (
-    <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+    <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
       <ZitadelLogin project={project}${localesAttr} purpose="login" postSignInUrl="/profile" />
     </div>
   );

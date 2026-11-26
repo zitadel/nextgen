@@ -14,10 +14,10 @@ import {
 
 const SDK_DEPENDENCY = "@zitadel/sdk-qwik-router";
 /**
- * The idiomatic Qwik component library that ships the `<ZitadelLogin>` /
- * `<ZitadelSession>` Qwik components the routes render. The server SDK above is
- * plumbing only; the widget comes from here, so a Qwik Router app gets the native
- * Qwik component (typed props, callback events) rather than the bare element.
+ * The Qwik UI SDK behind the widgets. The routes import the widgets from
+ * `@zitadel/sdk-qwik-router/components`, which re-exports this package, yet the
+ * app still declares it as a direct dependency: Qwik's optimizer finds the
+ * Qwik libraries to bundle in the app's own `package.json`.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-qwik";
 
@@ -25,10 +25,10 @@ const COMPONENT_DEPENDENCY = "@zitadel/sdk-qwik";
  * Rule-based patcher for a Qwik Router app. Like Next.js and SvelteKit, Qwik Router
  * proxies the backend and verifies the session through a server entrypoint —
  * here the `@zitadel/sdk-qwik-router` `onRequest` plugin in
- * `src/routes/plugin@nextgen.ts`. Contributes the landing/login/register/profile
+ * `src/routes/plugin@zitadel.ts`. Contributes the landing/login/register/profile
  * file-based routes (the idiomatic `<ZitadelLogin>`/`<ZitadelSession>` Qwik
- * components from `@zitadel/sdk-qwik`), the public project-id env var, and both
- * deps. No config edit is needed — the plugin is a plain route file, so (like
+ * components from `@zitadel/sdk-qwik-router/components`), the public
+ * project-id env var, and both deps. No config edit is needed — the plugin is a plain route file, so (like
  * Next) every managed file carries the marker.
  */
 export class QwikRouterPatcher extends AbstractRulePatcher {
@@ -48,7 +48,7 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
       // The auth boundary is written on every setup; a pre-existing plugin at
       // this exact path is a genuine conflict the file-writer refuses (and
       // --force replaces), the same way Next writes its request boundary.
-      { kind: "write", path: src("routes/plugin@nextgen.ts"), contents: pluginTemplate() },
+      { kind: "write", path: src("routes/plugin@zitadel.ts"), contents: pluginTemplate() },
       // The landing page is written only when setup created the skeleton
       // itself — a pre-existing app keeps its own landing page (ADR 044),
       // same as the Next/Nuxt homepage.
@@ -101,7 +101,7 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
       return join(view.framework.appDir, rel);
     };
     return [
-      src("routes/plugin@nextgen.ts"),
+      src("routes/plugin@zitadel.ts"),
       src("routes/index.tsx"),
       src("routes/login/index.tsx"),
       src("routes/register/index.tsx"),
@@ -113,7 +113,7 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
     // The auth boundary — proxy, session check and route protection — is
     // infrastructure: without it /__nextgen/* 404s and protected routes open, so
     // doctor fails rather than warning about a missing page.
-    return [join(view.framework.appDir, "routes/plugin@nextgen.ts")];
+    return [join(view.framework.appDir, "routes/plugin@zitadel.ts")];
   }
 
   protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
@@ -137,7 +137,7 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
     return {
       title: "Qwik Router integration",
       detail:
-        "Wrote src/routes/plugin@nextgen.ts (@zitadel/sdk-qwik-router onRequest) plus landing/login/register/profile routes using @zitadel/sdk-qwik.",
+        "Wrote src/routes/plugin@zitadel.ts (@zitadel/sdk-qwik-router onRequest) plus landing/login/register/profile routes that import the widgets from @zitadel/sdk-qwik-router/components.",
     };
   }
 }

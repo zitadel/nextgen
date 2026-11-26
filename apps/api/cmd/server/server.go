@@ -355,7 +355,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	applicationService := service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator(), variableService, keyService)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
-	authRequestService := service.NewAuthRequestService(serviceDBPool)
+	authRequestService := service.NewAuthRequestService(serviceDBPool, keyService)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
 	// serves traffic. A project's published instance is resolved per password

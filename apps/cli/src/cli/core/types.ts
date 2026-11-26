@@ -91,7 +91,9 @@ export type GlobalOptions = {
  * reads it declares it and reads it by `name`, and the CLI reference lists it
  * beside the flag (`FLAG_VARIABLES` in `./base`).
  */
-export type FlagVariable = EnvironmentVariable<keyof (typeof BaseCommand)["baseFlags"] | "server">;
+export type FlagVariable = EnvironmentVariable<
+  keyof (typeof BaseCommand)["baseFlags"] | "server" | "telemetry"
+>;
 
 /**
  * What a command body returns to {@link import("./base").BaseCommand.emit}: a

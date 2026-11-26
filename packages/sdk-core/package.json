@@ -13,14 +13,16 @@
     "directory": "packages/sdk-core"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/api-docs"
   ],
   "type": "module",
   "scripts": {
-    "build": "tsdown && attw --pack . --profile=esm-only",
+    "build": "tsdown && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "lint": "biome check .",
+    "docs:api": "typedoc",
     "prepack": "publint --strict"
   },
   "exports": {
@@ -48,6 +50,11 @@
       "@zitadel/source": "./src/session.ts",
       "types": "./dist/session.d.mts",
       "import": "./dist/session.mjs"
+    },
+    "./config": {
+      "@zitadel/source": "./src/config.ts",
+      "types": "./dist/config.d.mts",
+      "import": "./dist/config.mjs"
     }
   },
   "publishConfig": {

@@ -27,6 +27,7 @@ const PREPARED: PreparedRelease = {
   warnings: [],
   notices: [],
   lockouts: [],
+  changedConfiguration: undefined,
   gitSha: "abc1234",
   gitDirty: false,
   referenced: [],
@@ -188,6 +189,16 @@ describe("Publisher.deploy", () => {
       }),
       PROJECT_ID,
     );
+
+    it("tells which stage it enters, release creation then deployment", async () => {
+      const stages: string[] = [];
+
+      await publisher.deploy({ prepared: PREPARED }, (stage) => {
+        stages.push(stage);
+      });
+
+      expect(stages).toEqual(["release_creation", "deployment"]);
+    });
 
     it("answers the release it built", async () => {
       const outcome = await publisher.deploy({ prepared: PREPARED });

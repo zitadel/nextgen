@@ -29,15 +29,15 @@ export function nuxtConfigEdit(): (source: string | undefined) => string {
       modules.push(NUXT_MODULE);
     }
 
-    config.nextgen ??= {};
-    const nextgen = file.objectAt(config, "nextgen");
-    const addsLoginPath = nextgen.loginPath === undefined;
+    config.zitadel ??= {};
+    const zitadel = file.objectAt(config, "zitadel");
+    const addsLoginPath = zitadel.loginPath === undefined;
     if (addsLoginPath) {
-      nextgen.loginPath = "/login";
+      zitadel.loginPath = "/login";
     }
-    const addsProtectedRoutes = nextgen.protectedRoutes === undefined;
+    const addsProtectedRoutes = zitadel.protectedRoutes === undefined;
     if (addsProtectedRoutes) {
-      nextgen.protectedRoutes = ["/profile"];
+      zitadel.protectedRoutes = ["/profile"];
     }
 
     // Tell Vue's template compiler the `zitadel-*` Lit elements are custom

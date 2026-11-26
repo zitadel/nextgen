@@ -106,6 +106,9 @@ type TeamMembershipUpdatedPayload struct {
 
 type AuthTokenIssuedPayload struct {
 	Scopes []string `json:"scopes,omitempty"`
+	// ClientID is the client that redeemed an authorization code; empty for
+	// every other token.
+	ClientID string `json:"client_id,omitempty"`
 }
 
 type AuthTokenRevokedPayload struct{}
@@ -130,6 +133,27 @@ type AuthAttemptHandedOffPayload struct{}
 // challenge and the redirect URI come from the request and stay out.
 type AuthRequestCreatedPayload struct {
 	ClientID string `json:"client_id"`
+}
+
+// Reasons on auth.request.exchange.failed: the check that refused the code.
+const (
+	AuthRequestExchangeReasonClientMismatch         = "client_mismatch"
+	AuthRequestExchangeReasonCodeExpired            = "code_expired"
+	AuthRequestExchangeReasonRedirectURIMismatch    = "redirect_uri_mismatch"
+	AuthRequestExchangeReasonCodeVerifierMissing    = "code_verifier_missing"
+	AuthRequestExchangeReasonCodeVerifierInvalid    = "code_verifier_invalid"
+	AuthRequestExchangeReasonCodeVerifierUnexpected = "code_verifier_unexpected"
+	AuthRequestExchangeReasonReleaseRevoked         = "release_revoked"
+	AuthRequestExchangeReasonSessionNotActive       = "session_not_active"
+	AuthRequestExchangeReasonUserNotActive          = "user_not_active"
+)
+
+// AuthRequestExchangeFailedPayload names the client that presented the code
+// and why it was refused. The code, its hash, the verifier and the redirect
+// URI stay out.
+type AuthRequestExchangeFailedPayload struct {
+	ClientID string `json:"client_id"`
+	Reason   string `json:"reason"`
 }
 
 type AuthCheckPayload struct {
@@ -485,7 +509,7 @@ type SignupChallengePayload struct{}
 // (delta: only the fields the update named, with their new values). The
 // signing secret is never part of it, plain or encrypted, and the url is
 // recorded without its query and fragment, which may carry a token
-// (ADR 090 §5).
+// (ADR 091 §5).
 //
 // Description and Enabled are pointers so the delta can tell "not named"
 // (absent) from the empty string and false.

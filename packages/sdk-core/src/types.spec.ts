@@ -1,6 +1,30 @@
+import type {
+  CreateFlow201Step,
+  CreateFlow201StepComplete,
+  CreateFlowBodyPurpose,
+} from "@zitadel/api/generated/model";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { standardAttributes } from "./types.js";
+import {
+  standardAttributes,
+  type ZitadelFlowBehavior,
+  type ZitadelFlowPurpose,
+  type ZitadelFlowStep,
+} from "./types.js";
+
+describe("the flow contract the SDKs declare themselves", () => {
+  it("has exactly the purposes the API accepts", () => {
+    expectTypeOf<ZitadelFlowPurpose>().toEqualTypeOf<CreateFlowBodyPurpose>();
+  });
+
+  it("has exactly the completion behaviors the API sends", () => {
+    expectTypeOf<ZitadelFlowBehavior>().toEqualTypeOf<CreateFlow201StepComplete>();
+  });
+
+  it("is something every step the API sends can be read as", () => {
+    expectTypeOf<CreateFlow201Step>().toExtend<ZitadelFlowStep>();
+  });
+});
 
 describe("standardAttributes", () => {
   it("keeps the standard attributes", () => {

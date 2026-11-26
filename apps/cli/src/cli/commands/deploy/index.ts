@@ -30,6 +30,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { Project } from "@/lib/project";
 import { RemoveCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -179,8 +180,10 @@ function commitConfig(
  * (primary origins are never named one by one). `--dry-run` stops after the
  * diff, writing nothing to the server.
  */
-export default class Deploy extends RemoveCommand(
-  "Deploy even when the release leaves existing users unable to sign in, without asking. Required for that when non-interactive.",
+export default class Deploy extends Telemetered(
+  RemoveCommand(
+    "Deploy even when the release leaves existing users unable to sign in, without asking. Required for that when non-interactive.",
+  ),
 ) {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
@@ -216,6 +219,7 @@ export default class Deploy extends RemoveCommand(
    */
   protected async preview({ flags }: Admitted<typeof Deploy>): Promise<CommandResult> {
     const publisher = await this.service(Publisher);
+    this.annotate({ stage: "validation" });
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
@@ -223,6 +227,7 @@ export default class Deploy extends RemoveCommand(
       dryRun: true,
       compare: true,
     });
+    this.annotate({ stage: undefined });
     const diff = this.said(prepared);
     const question = await this.lockoutQuestion(prepared.lockouts);
     if (question !== undefined && this.nonInteractive && !this.force) {
@@ -237,7 +242,7 @@ export default class Deploy extends RemoveCommand(
       );
     }
     const { resourceCount } = prepared;
-    this.recordTelemetry({ resources: resourceCount });
+    this.annotate({ resources: resourceCount });
     const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
     const result = dryRunResult({
       verb: "deploy",
@@ -299,6 +304,7 @@ export default class Deploy extends RemoveCommand(
     const { client, projectId, environment } = await this.connect();
     const publisher = new Publisher(client, projectId);
     await this.requirePrimaryOrigin(publisher, projectId, environment);
+    this.annotate({ stage: "validation" });
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
@@ -306,6 +312,7 @@ export default class Deploy extends RemoveCommand(
       dryRun: false,
       compare: true,
     });
+    this.annotate({ stage: undefined });
     const diff = this.said(prepared);
     const question = await this.lockoutQuestion(prepared.lockouts);
     if (question !== undefined) {
@@ -319,7 +326,7 @@ export default class Deploy extends RemoveCommand(
       }
     }
     const { resourceCount } = prepared;
-    this.recordTelemetry({ resources: resourceCount });
+    this.annotate({ resources: resourceCount });
     const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
 
     if (prepared.gitDirty) {
@@ -328,10 +335,15 @@ export default class Deploy extends RemoveCommand(
       );
     }
 
-    const { release, publication } = await publisher.deploy({
-      prepared,
-      message,
-    });
+    const { release, publication } = await publisher.deploy(
+      {
+        prepared,
+        message,
+      },
+      (stage) => {
+        this.annotate({ stage });
+      },
+    );
     switch (publication.outcome) {
       case "revoked": {
         throw new ZitadelError(
@@ -375,9 +387,13 @@ export default class Deploy extends RemoveCommand(
       }
     }
     const { deployment } = publication;
+    this.annotate({
+      stage: undefined,
+      changed_configuration_types: prepared.changedConfiguration,
+    });
 
     const servedOrigins = deployment.origins;
-    this.recordTelemetry({ origin_count: servedOrigins.length });
+    this.annotate({ origin_count: servedOrigins.length });
 
     const title = `Deployed ${resources}`;
     const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;

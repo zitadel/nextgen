@@ -3,6 +3,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
 import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
@@ -13,7 +14,7 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
  * when it carries one. An environment that lives only in a CI secret store is
  * not visible here, which is correct.
  */
-export default class EnvList extends ReadCommand {
+export default class EnvList extends Telemetered(ReadCommand) {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.projectSettings;
   static override groupOrder = 2;

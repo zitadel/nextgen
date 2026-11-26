@@ -262,8 +262,6 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
-  /projects/{project_id}/admins:
-    $ref: endpoints/projects/by_id/admins/methods.yaml
   /projects/{project_id}/members:
     $ref: endpoints/projects/by_id/members/methods.yaml
   /projects/{project_id}/claim/init:

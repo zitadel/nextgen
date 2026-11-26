@@ -125,7 +125,8 @@ are not inputs to the live risk evaluator
 
 - The user as a record: `user.created`, `user.updated`, `user.deleted`.
 - A session or a token that belongs to a user: `session.established`,
-  `session.deleted`, `auth.token.issued`, `auth.token.revoked`.
+  `session.deleted`, `auth.token.issued`, `auth.token.revoked`, and a code
+  refused at redemption: `auth.request.exchange.failed`.
 - A sign-in, once its attempt has resolved a user: `auth.attempt.created`,
   `auth.attempt.handed_off`, `auth.check.succeeded`, `auth.check.failed`,
   `auth.sso.authorization.failed`, `auth.sso.exchange.failed`,
@@ -189,7 +190,7 @@ tracked below.
 | `CreateTeam` | `team.created` | `admin` | `team` | `name` |
 | `UpdateTeam` | `team.updated` | `admin` | `team` | delta: `name` |
 | `DeactivateTeam` (when status changed) | `team.deactivated` | `admin` | `team` | _(empty)_ |
-| `CreateToken` / session mint / `GenerateJWE` | `auth.token.issued` | `auth` | `token` | `scopes[]` |
+| `CreateToken` / session mint / `GenerateJWE` / authorization code redemption (`RedeemCode`) | `auth.token.issued` | `auth` | `token` | `scopes[]`, `client_id` (code redemption only) |
 | `DeleteTokenByID` / `RevokeToken` | `auth.token.revoked` | `auth` | `token` | _(empty)_ |
 | Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
 | `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` (secondary) |
@@ -198,6 +199,7 @@ tracked below.
 | Signup proof consumed | `flow.signup_challenge.consumed` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
 | `CreateAuthRequest` (OAuth authorization endpoint) | `auth.request.created` | `auth` | `auth_request` | `client_id` |
+| `RedeemCode` refused a code it consumed (an unknown code consumes nothing and writes no event) | `auth.request.exchange.failed` | `auth` | `auth_request` | `client_id` (the client that presented the code), `reason` (`client_mismatch`, `code_expired`, `redirect_uri_mismatch`, `code_verifier_missing`, `code_verifier_invalid`, `code_verifier_unexpected`, `release_revoked`, `session_not_active`, `user_not_active`); `user_id` and `session_id` columns set |
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
 | Challenge failed (not a sign-up's identifier that matches no account: that lookup asks whether the identifier is free, and counts only toward the challenge's failures) | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
@@ -241,7 +243,8 @@ tracked below.
 internals without a product mutate API; signal category deferred until ADR 019
 writers exist; issuing a challenge or an sso state record (`IssueChallenge`,
 `IssueSSOState`), which mints the `check_id` the outcome event then carries;
-storing the rehash of an outdated password hash on sign-in, which rewrites the
+issuing an authorization code (`IssueCode`), whose redemption writes
+`auth.token.issued`; storing the rehash of an outdated password hash on sign-in, which rewrites the
 existing password row in place.
 
 ## Retired
@@ -278,5 +281,5 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
 | `preview.expired` | [#2280](https://github.com/zitadel/nextgen/issues/2280) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
-| `webhook.disabled` | [ADR 090 §4](../../adrs/090-project-webhooks.md): the shipper disabling a webhook that failed for 3 days or answered `410`; lands with delivery |
+| `webhook.disabled` | [ADR 091 §4](../../adrs/091-project-webhooks.md): the shipper disabling a webhook that failed for 3 days or answered `410`; lands with delivery |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

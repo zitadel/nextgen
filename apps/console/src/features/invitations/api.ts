@@ -12,7 +12,7 @@ import {
   isOpen,
   type ProjectRelation,
 } from "./model";
-import { clearInvitationToken, readInvitationToken } from "./token";
+import { clearInvitationToken, holdInvitationTokenFor } from "./token";
 
 /** The first page of a project's invitations, or why it could not be read. */
 export type InvitationsRead =
@@ -77,13 +77,14 @@ export async function createProjectInvitation(
 }
 
 /**
- * What the invitation page shows for the token the link left in storage. It
- * only looks the invitation up, which is a read, so running it again can never
- * spend the link. A token the server no longer knows is cleared; a failure of
- * any other kind keeps it for a retry.
+ * What the invitation page shows the signed-in person for the token the link
+ * left in storage. It only looks the invitation up, which is a read, so
+ * running it again can never spend the link. A token the server no longer
+ * knows is cleared; a failure of any other kind keeps it for a retry. A token
+ * someone else on this tab was already shown is not theirs (`token.ts`).
  */
-export async function lookupStoredInvitation(): Promise<InvitationPageState> {
-  const token = readInvitationToken();
+export async function lookupStoredInvitation(viewerUserId: string): Promise<InvitationPageState> {
+  const token = holdInvitationTokenFor(viewerUserId);
   if (!token) return { kind: "unavailable" };
   try {
     const invitation = await api.lookupInvitation({ token });

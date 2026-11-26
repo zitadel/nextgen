@@ -21,7 +21,8 @@ docs' live examples ([`apps/docs/AGENTS.md`](../docs/AGENTS.md#live-examples)).
   theirs in `packages/components` specs. This app gates render and a11y.
 - Only orchestrator stories give the one MSW worker handlers
   (`parameters.msw`), and they are tagged `no-test` to keep the network out of
-  the test run.
+  the test run. `PasskeyLogin` is the one exception (`!no-test`): it gates the
+  pending step against a real virtual authenticator.
 - The build is relocatable: address files relative to the page or Vite's
   base, never from `/`. The MSW worker follows the base.
 
@@ -52,9 +53,11 @@ docs' live examples ([`apps/docs/AGENTS.md`](../docs/AGENTS.md#live-examples)).
 - Never remove the story-id-and-args key on the mock-backed subtree in
   `.storybook/preview.ts`: without it, a flow driven to `done` leaks into the
   next story.
-- `passkey-login` stories stub `navigator.credentials` with
-  `freezePasskeyCeremony()` in `beforeEach`. Keep that stub in the workbench;
-  the login element gets no "skip the ceremony" prop.
+- `passkey-login` stories hold the ceremony open with `holdPasskeyCeremony()` in
+  `beforeEach`: under Vitest a virtual authenticator that never answers the
+  touch, in the gallery the `freezePasskeyCeremony()` stub of `navigator.credentials`
+  (a person's Chrome has no DevTools-protocol client). Keep that stub in the
+  workbench; the login element gets no "skip the ceremony" prop.
 - Not storied on purpose: `passkey-setup` / `passkey-upsell` (legacy; the
   default flow no longer routes through them) and `sso-redirect` (it
   navigates away).

@@ -117,6 +117,15 @@ export class Ui {
   }
 
   /**
+   * Be told each time a prompt is about to be drawn. See {@link Chain.listenToPrompts}.
+   *
+   * @param listener - Called before the prompt is drawn.
+   */
+  onPrompt(listener: () => void): void {
+    this.chain.listenToPrompts(listener);
+  }
+
+  /**
    * The one question `--force` answers, which is whether a destructive action
    * may go ahead. Only `Consent.request` asks it: it is not among
    * {@link questions}, so a command cannot get a boolean for it.

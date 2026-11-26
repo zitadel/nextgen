@@ -1,20 +1,20 @@
-import { createNextgenMiddleware } from "@zitadel/sdk-nuxt/server";
+import { createZitadelMiddleware } from "@zitadel/sdk-nuxt/server";
 import { createApp, toWebHandler } from "h3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
 
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
 
 /** Sends a request through the built middleware, the way Nitro would, and returns the answer. */
-async function serve(request: Request, options: NextgenMiddlewareOptions): Promise<Response> {
+async function serve(request: Request, options: ZitadelMiddlewareOptions): Promise<Response> {
   const app = createApp();
   app.use((event) => {
     Object.defineProperty(event.node.req, "socket", { value: { remoteAddress: CLIENT_ADDRESS } });
   });
-  app.use(createNextgenMiddleware(options));
+  app.use(createZitadelMiddleware(options));
   app.use(() => "ok");
   return toWebHandler(app)(request);
 }
@@ -24,7 +24,7 @@ describeEdgeServer(serve);
 // The stub behind `#imports` answers the runtime config a Nuxt app sets in `nuxt.config`.
 describe("the runtime config in the edge runtime", () => {
   afterEach(() => {
-    setRuntimeConfig({ nextgen: {} });
+    setRuntimeConfig({ zitadel: {} });
     vi.unstubAllGlobals();
   });
 
@@ -34,7 +34,7 @@ describe("the runtime config in the edge runtime", () => {
       forwarded.push(new Request(input, init));
       return new Response("{}");
     });
-    setRuntimeConfig({ nextgen: { projectSecret: "s3cret" } });
+    setRuntimeConfig({ zitadel: { projectSecret: "s3cret" } });
     await serve(
       new Request("http://localhost:3000/__nextgen/api/v1/sessions/exchange", {
         method: "POST",

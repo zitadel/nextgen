@@ -4,9 +4,12 @@ import { describe, expect, it } from "vitest";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
-import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
+import { type ZitadelWidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
-import { describeServerStandardAttributes } from "@zitadel/client-sdk-contract/server-render";
+import {
+  describeServerRenderCases,
+  describeServerStandardAttributes,
+} from "@zitadel/client-sdk-contract/server-render";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(
@@ -128,7 +131,7 @@ describe("server-rendered widget options", () => {
 
 /** The attributes on the widget's element in the markup a server would send. */
 async function renderAttributes(
-  widget: WidgetName,
+  widget: ZitadelWidgetName,
   props: Readonly<Record<string, unknown>>,
 ): Promise<Record<string, string>> {
   return serverAttributes(
@@ -138,6 +141,7 @@ async function renderAttributes(
   );
 }
 
+describeServerRenderCases("svelte", renderAttributes);
 describeServerStandardAttributes(renderAttributes);
 
 describe("the package entry on a Node server", () => {

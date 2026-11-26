@@ -248,7 +248,7 @@ var invitationAccess = resourceAccess{
 	denied:    domain.ErrInvitationPermissionDenied,
 }
 
-// webhookAccess gates a project's webhooks (ADR 090). A webhook has no
+// webhookAccess gates a project's webhooks (ADR 091). A webhook has no
 // resource_scope_index row and every op takes project_id from the query
 // (same as grants and invitations), so there is no kind to check. It is
 // configuration: a webhook is an address the project registers to send its
