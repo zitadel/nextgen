@@ -1,5 +1,4 @@
 import type { Hook } from "@oclif/core";
-import { ZitadelLibError } from "@/lib/errors";
 
 /** Whether these arguments print the version: oclif's `--version`, or `version` for a person. */
 export function isVersionRun(argv: readonly string[]): boolean {
@@ -33,11 +32,9 @@ const hook: Hook<"finally"> = async ({ config }) => {
     if (notice !== undefined) {
       process.stderr.write(`${notice}\n`);
     }
-  } catch (error) {
-    if (error instanceof ZitadelLibError) {
-      return;
-    }
-    throw error;
+  } catch {
+    // A safety net: advice about the version must never break printing it.
+    return;
   }
 };
 

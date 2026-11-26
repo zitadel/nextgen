@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   LocalRuntime,
+  LocalServerError,
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
   StartedServer,
@@ -555,6 +556,12 @@ async function runEnvironmentChecks(input: {
       if (error instanceof FsError) {
         return { failure: error };
       }
+      if (error instanceof LocalServerError) {
+        return { failure: error };
+      }
+      if (error instanceof ProjectError) {
+        return { failure: error };
+      }
       throw error;
     });
   if ("failure" in resolved) {
@@ -939,6 +946,12 @@ export default class Doctor extends Telemetered(
           if (error instanceof FsError) {
             return false;
           }
+          if (error instanceof LocalServerError) {
+            return false;
+          }
+          if (error instanceof ProjectError) {
+            return false;
+          }
           throw error;
         }));
     const developmentEnvFile = join(this.cwd, ".env.development.local");
@@ -962,6 +975,12 @@ export default class Doctor extends Telemetered(
             return false;
           }
           if (error instanceof FsError) {
+            return false;
+          }
+          if (error instanceof LocalServerError) {
+            return false;
+          }
+          if (error instanceof ProjectError) {
             return false;
           }
           throw error;

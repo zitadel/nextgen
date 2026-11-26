@@ -343,25 +343,19 @@ async function findLockouts(ctx: StepContext): Promise<Found> {
   const share = Math.max(1, Math.floor(SCAN_CAP / (scanned.size + 1 + disabling.changes.length)));
   // One scan failing must not discard what the other found.
   const scans = await Promise.all([
-    lookupWarnings(ctx, flows, share).catch((error: unknown) => {
-      if (error instanceof BackendError) {
-        return { ...NOTHING, failed: true };
-      }
-      throw error;
+    lookupWarnings(ctx, flows, share).catch(() => {
+      // A safety net: a scan that fails is noted, never a failed deploy.
+      return { ...NOTHING, failed: true };
     }),
     ssoSkipped === undefined
-      ? unservedWarnings(ctx, flows, names, share).catch((error: unknown) => {
-          if (error instanceof BackendError) {
-            return { ...NOTHING, failed: true };
-          }
-          throw error;
+      ? unservedWarnings(ctx, flows, names, share).catch(() => {
+          // A safety net: a scan that fails is noted, never a failed deploy.
+          return { ...NOTHING, failed: true };
         })
       : NOTHING,
-    credentialWarnings(ctx, disabling.changes, share).catch((error: unknown) => {
-      if (error instanceof BackendError) {
-        return { ...NOTHING, failed: true };
-      }
-      throw error;
+    credentialWarnings(ctx, disabling.changes, share).catch(() => {
+      // A safety net: a scan that fails is noted, never a failed deploy.
+      return { ...NOTHING, failed: true };
     }),
   ]);
   const scan = merged(scans);

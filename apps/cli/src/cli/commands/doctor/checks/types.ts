@@ -1,5 +1,5 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { ZitadelError, ZitadelLibError, type ZitadelErrorCode } from "@/lib/errors";
+import { ZitadelError, ZitadelLibError, type ZitadelErrorCode, errorMessage } from "@/lib/errors";
 import { FsNotFoundError } from "@/lib/fs";
 import type { Orca } from "@/lib/orca";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
@@ -142,7 +142,13 @@ export abstract class AbstractSanityCheck implements SanityCheck {
           message: error.message === "" ? fallback : error.message,
         };
       }
-      throw error;
+      // A safety net: a check that fails in a way nobody anticipated is reported
+      // as a failing check, never as a crash of the whole doctor run.
+      return {
+        name,
+        status: failureStatus,
+        message: errorMessage(error) === "" ? fallback : errorMessage(error),
+      };
     }
   }
 
@@ -207,7 +213,14 @@ export abstract class AbstractSanityCheck implements SanityCheck {
           hint: error.hint,
         };
       }
-      throw error;
+      // A safety net: a check that fails in a way nobody anticipated is reported
+      // as a failing check, never as a crash of the whole doctor run.
+      return {
+        name: this.name,
+        status: "fail",
+        message: errorMessage(error),
+        path: this.path,
+      };
     }
   }
 

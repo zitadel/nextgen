@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { Flags } from "@oclif/core";
 
-import { toZitadelError, ZitadelLibError } from "@/lib/errors";
+import { toZitadelError } from "@/lib/errors";
 import type { BaseCommand, Facts, MetaOptions } from "@/cli/core/base";
 import type { CommandClass } from "@/lib/oclif/command-class";
 import type { CommandResult, JsonEnvelope } from "@/cli/core";
@@ -279,12 +279,11 @@ export function Telemetered<
      */
     protected override async finally(error: Error | undefined): Promise<void> {
       await super.finally(error);
-      await this.reportClient?.shutdown(1000).catch((error: unknown) => {
-        if (error instanceof ZitadelLibError) {
-          return;
-        }
-        throw error;
-      });
+      try {
+        await this.reportClient?.shutdown(1000);
+      } catch {
+        // A safety net: flushing reports must never fail a run that finished.
+      }
       if (this.reportClient?.enabled) {
         this.armExitWatchdog();
       }
@@ -342,12 +341,10 @@ export function Telemetered<
     private reportFacts(): Facts {
       try {
         return this.describe();
-      } catch (error) {
-        // A run that failed before its flags were read has no facts of its own.
-        if (error instanceof TypeError) {
-          return {};
-        }
-        throw error;
+      } catch {
+        // A safety net: a run that failed before its flags were read has no facts
+        // of its own, and reporting must never fail the run.
+        return {};
       }
     }
 
@@ -374,12 +371,8 @@ export function Telemetered<
     private reportGuard(work: () => void): void {
       try {
         work();
-      } catch (error) {
-        // Reporting never changes what a command does.
-        if (error instanceof ZitadelLibError) {
-          return;
-        }
-        throw error;
+      } catch {
+        // A safety net: reporting never changes what a command does.
       }
     }
 
