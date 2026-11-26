@@ -562,6 +562,7 @@ export default class Setup extends Telemetered(
       .step(new ChooseSocialSignIn(prompting))
       .step(
         new SettleAnswers({
+          cwd: this.cwd,
           dryRun: this.dryRun,
           machine,
           nonInteractive: this.nonInteractive,

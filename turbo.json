@@ -268,6 +268,14 @@
         "playwright-report"
       ]
     },
+    // The API reference of an SDK (`pnpm run docs:api` at the root). TypeDoc reads the declarations
+    // that the builds emit and writes dist/api-docs. It is never cached, so every run prints its
+    // whole output, and the `ci` script runs it, so a broken {@link} or an undocumented export
+    // fails the pull request that causes it.
+    "docs:api": {
+      "dependsOn": ["^build", "build"],
+      "cache": false
+    },
     "dev": {
       "cache": false,
       "persistent": true

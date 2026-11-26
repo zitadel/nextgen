@@ -11,7 +11,7 @@ description: >-
 
 # @zitadel/sdk-nuxt
 
-A Nuxt module, Nitro middleware, and composables that add Zitadel (Nextgen)
+A Nuxt module, Nitro middleware, and composables that add Zitadel
 auth to a Nuxt 4 app. The module proxies auth traffic same-origin under
 `/__nextgen`, verifies the session JWT via JWKS on the server, seeds auth state
 into SSR and hydrates it on the client, and gates protected routes.
@@ -34,13 +34,13 @@ Peer dependencies: `nuxt >=4`, `h3 ^1.15.0`.
 
 ## Integrate
 
-The recommended path is the Nuxt module. Register it under the `nextgen` key:
+The recommended path is the Nuxt module. Register it under the `zitadel` key:
 
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
   modules: ['@zitadel/sdk-nuxt/module'],
-  nextgen: {
+  zitadel: {
     protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
     loginPath: '/login',
   },
@@ -52,18 +52,19 @@ composables — no manual `server/middleware/auth.ts`. It reads `ZITADEL_URL`,
 `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and the server-only `ZITADEL_PROJECT_SECRET`
 from the environment, or in `nuxt dev` from `.env.local` when the environment
 has none (Nuxt itself loads only `.env`). `url` and the project secret default to `ZITADEL_URL` and
-`ZITADEL_PROJECT_SECRET`; pass `nextgen.url` only to override. A built server
-reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own runtime environment (`NUXT_NEXTGEN_URL`
-and `NUXT_NEXTGEN_PROJECT_SECRET` take precedence) and never has them baked
-into `.output/`. A `nextgen.url` or `runtimeConfig.public.zitadelProjectId` in
+`ZITADEL_PROJECT_SECRET`; pass `zitadel.url` only to override. A built server
+reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own runtime environment (`NUXT_ZITADEL_URL`
+and `NUXT_ZITADEL_PROJECT_SECRET` take precedence) and never has them baked
+into `.output/`. A `zitadel.url` or `runtimeConfig.public.zitadelProjectId` in
 `nuxt.config.ts` wins over the variables. Sessions count only in the app's own
-project, the public project id unless `nextgen.projectId` names one: with none,
+project, the public project id unless `zitadel.projectId` names one: with none,
 nobody is signed in.
 
 The module also loads the web components in the browser through a client-only
 plugin and provides the business copy overlay as
 `useNuxtApp().$zitadelBusinessLocales`. Do not install or import
 `@zitadel/components` in the app.
+The typed Vue wrappers come from `@zitadel/sdk-nuxt/components`, so one package is enough.
 
 Login and logout pages bind the project handle from `useZitadelProject()` inside
 `<ClientOnly>`; navigation after each flow is driven by the URL props (there is
@@ -98,10 +99,10 @@ export default defineEventHandler((event) => {
 ```
 
 The other middleware options (`ignoredRoutes`, `audience`,
-`allowedAlgorithms`, `clockSkewMs`, the timeouts) go under `nextgen` too, and a
-built server takes each one from `NUXT_NEXTGEN_<OPTION>` (a list as JSON). Only
+`allowedAlgorithms`, `clockSkewMs`, the timeouts) go under `zitadel` too, and a
+built server takes each one from `NUXT_ZITADEL_<OPTION>` (a list as JSON). Only
 an app without the module hand-rolls `server/middleware/auth.ts` with
-`createNextgenMiddleware(...)` from `@zitadel/sdk-nuxt/server`.
+`createZitadelMiddleware(...)` from `@zitadel/sdk-nuxt/server`.
 
 ## Widget props and events
 

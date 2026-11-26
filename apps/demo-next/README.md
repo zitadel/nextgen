@@ -1,6 +1,6 @@
 # demo-next
 
-A minimal Next.js application demonstrating [Nextgen Auth](../../packages/sdk-next) end-to-end: login, protected routes, and sign-out.
+A minimal Next.js application demonstrating [Zitadel Auth](../../packages/sdk-next) end-to-end: login, protected routes, and sign-out.
 
 ## Running locally
 
@@ -134,7 +134,7 @@ The demo imports the package from `dist/`, not source.
 
 ## How it works
 
-**Middleware** (`src/proxy.ts`) uses `nextgenMiddleware` from `@zitadel/sdk-next` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
+**Middleware** (`src/proxy.ts`) uses `zitadelMiddleware` from `@zitadel/sdk-next` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
 
 **Login page** renders the `<zitadel-login>` web component, loaded through `@zitadel/sdk-next/client`, inside a client-only dynamic import to avoid SSR.
 

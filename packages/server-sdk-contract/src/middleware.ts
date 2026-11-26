@@ -5,7 +5,7 @@
  * {@link describeServerMiddleware}.
  */
 
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { ZitadelAuthResult, ZitadelMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
@@ -177,7 +177,7 @@ function signOutBackend(check: () => Response): { method: string; cookie: string
   return calls;
 }
 
-export type ServeOptions = NextgenMiddlewareOptions & { projectSecret?: string };
+export type ServeOptions = ZitadelMiddlewareOptions;
 
 export interface ServeInit {
   readonly method?: string;
@@ -191,7 +191,7 @@ export interface Served {
   readonly status: number;
   readonly headers: Headers;
   /** What a downstream handler reads as the session; undefined when none was set. */
-  readonly auth: AuthResult | undefined;
+  readonly auth: ZitadelAuthResult | undefined;
   /** The answer's body. */
   readonly body: string;
 }
@@ -209,7 +209,7 @@ export interface ServerSdkAdapter {
   /** Configures the project id the same way as {@link configureSecret}. */
   configureProject(configured?: string, environment?: string): ServeOptions;
   /** Reads the auth result the way a page does, from the request context the handler fills. */
-  readAuth(context: unknown): Promise<AuthResult>;
+  readAuth(context: unknown): Promise<ZitadelAuthResult>;
   /** Asserts, at type level, that the handler is assignable to the framework's handler type. */
   expectHandlerType(): void;
   /**
@@ -503,11 +503,26 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
 
       const served = await serve(
         `${ORIGIN}/__nextgen/v1/flows`,
-        { headers: { "x-nextgen-auth-token": "forged" } },
+        { headers: { "x-zitadel-auth-token": "forged" } },
         PROXY,
       );
 
       expect(served.status).toBe(400);
+      expect(calls).toHaveLength(0);
+    });
+
+    // The name from before the rename is no credential and no source of one.
+    it("grants no session to the old x-nextgen-auth-token header", async () => {
+      const calls = captureFetch();
+
+      const served = await serve(
+        `${ORIGIN}/admin`,
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        OPTIONS,
+      );
+
+      expect(served.status).toBe(302);
+      expect(served.headers.get("location")).toContain("/login");
       expect(calls).toHaveLength(0);
     });
 
@@ -595,8 +610,6 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
               `${SERVER_SESSION}=console`,
               `zitadel_session_${OTHER_PROJECT}=other`,
               `__Host-zitadel_session_${OTHER_PROJECT}=other`,
-              "__nextgen_session=old",
-              `__nextgen_session_${PROJECT}=old`,
               "_zflow=f",
             ].join("; "),
           },
@@ -605,21 +618,6 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       );
 
       expect(calls[0]?.headers.get("cookie")).toBe("_zflow=f");
-    });
-
-    // ADR 083: a session cookie from before it is neither renamed nor passed on.
-    it("drops the Set-Cookie of a session cookie from before ADR 083", async () => {
-      const upstream = new Headers();
-      upstream.append("set-cookie", "__nextgen_session=abc; Path=/; HttpOnly; SameSite=Lax");
-      captureFetch(() => new Response("{}", { status: 200, headers: upstream }));
-
-      const served = await serve(
-        `${ORIGIN}/__nextgen/sessions/exchange`,
-        { method: "POST" },
-        APP_PROXY,
-      );
-
-      expect(served.headers.get("set-cookie")).toBeNull();
     });
 
     // A session kept under the shared name before ADR 073 reaches the backend
@@ -1108,8 +1106,8 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       expect(served.headers.get("set-cookie")).toBeNull();
     });
 
-    // ADR 083: a session cookie from before it is no credential and no source of one.
-    it("reads no session from a cookie from before ADR 083", async () => {
+    // The name from before the project-named cookie is no credential and no source of one.
+    it("reads no session from the old __nextgen_session cookies", async () => {
       const calls = captureFetch();
 
       const served = await serve(
@@ -1515,7 +1513,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
     it("refuses a request that carries the auth header", async () => {
       const served = await serve(
         `${ORIGIN}/`,
-        { headers: { "x-nextgen-auth-token": "forged" } },
+        { headers: { "x-zitadel-auth-token": "forged" } },
         OPTIONS,
       );
 
@@ -1526,7 +1524,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
     it("refuses a request that carries the auth header on an ignored route", async () => {
       const served = await serve(
         `${ORIGIN}/health`,
-        { headers: { "x-nextgen-auth-token": "forged" } },
+        { headers: { "x-zitadel-auth-token": "forged" } },
         { ...OPTIONS, ignoredRoutes: ["/health"] },
       );
 

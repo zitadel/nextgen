@@ -2,7 +2,7 @@ import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
-import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
+import { type ZitadelWidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
 import {
   describeServerRenderCases,
@@ -24,7 +24,7 @@ describeServerRenderCases(SDK, renderAttributes);
 
 /** The attributes on the widget's element in the markup a server would send. */
 async function renderAttributes(
-  widget: WidgetName,
+  widget: ZitadelWidgetName,
   props: Readonly<Record<string, unknown>>,
 ): Promise<Record<string, string>> {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];

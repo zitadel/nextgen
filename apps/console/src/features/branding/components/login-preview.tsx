@@ -1,4 +1,5 @@
 import { type LoginPreviewState, loginPreviewStatesFor } from "@zitadel/components";
+import type { CreateFlow201Step } from "@zitadel/api/generated/model";
 import { ZitadelLogin, type ZitadelProject } from "@zitadel/sdk-react";
 import { useEffect, useMemo, useRef } from "react";
 
@@ -108,7 +109,9 @@ export function LoginPreview({
         previewState={state}
         previewSuccessStep={successStep}
         onFlowStep={({ step }) => {
-          onStates?.(loginPreviewStatesFor(step));
+          // The SDK promises only the few fields of its own step type. The console is first-party
+          // and the preview helper reads the whole step the server sent, so it names that type.
+          onStates?.(loginPreviewStatesFor(step as CreateFlow201Step));
           // The step carries the revision; its colours are on the element now.
           read.current();
         }}

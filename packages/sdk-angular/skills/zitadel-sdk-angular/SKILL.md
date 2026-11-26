@@ -22,7 +22,7 @@ The `zitadel` CLI scaffolds a *fresh* Angular app
 (`npx @zitadel/cli@latest setup --framework angular`) with this SDK already wired in. In an
 **existing** Angular app it writes the root component to `src/app/app.ts`, and
 stops with `E_CONFLICT` when the app has one there, or when `src/main.ts`
-bootstraps a root from another file (Angular 17–19's
+bootstraps a root from another file (Angular 19's
 `src/app/app.component.ts`). When setup stops, follow this skill to install the
 package and wire the components in manually.
 
@@ -32,7 +32,7 @@ package and wire the components in manually.
 npm install @zitadel/sdk-angular@latest
 ```
 
-Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
+Peer dependencies: `@angular/core` and `@angular/common`, both `>=19` (signal `input()` and `output()` are stable from 19). Requires TypeScript ≥ 5.0 (the published types use `export type *`).
 
 ## Integrate
 
@@ -44,13 +44,13 @@ The components are **standalone** — import them directly into a component's
 
    ```ts
    import { Component } from '@angular/core';
-   import { ZitadelLoginComponent, configureZitadel } from '@zitadel/sdk-angular';
+   import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-angular';
 
    const project = configureZitadel({ projectId: '…', proxyPath: '/__nextgen' });
 
    @Component({
      standalone: true,
-     imports: [ZitadelLoginComponent],
+     imports: [ZitadelLogin],
      template: `<zitadel-auth-login
        [project]="project"
        purpose="login"
@@ -71,7 +71,7 @@ The components are **standalone** — import them directly into a component's
 
 3. Wire them into your routes as ordinary standalone components, e.g. a
    `/login` route rendering `LoginPage` and a `/logout` route rendering a
-   component that imports `ZitadelLogoutComponent`. `purpose="login"` vs
+   component that imports `ZitadelLogout`. `purpose="login"` vs
    `purpose="register"` on `<zitadel-auth-login>` selects sign-in vs
    registration; `postSignInUrl` / `postSignOutUrl` are where the widget sends
    the user afterwards.
@@ -83,14 +83,14 @@ The components are **standalone** — import them directly into a component's
 
 ## Widget props and events
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default. They are signal inputs, bound in templates the usual way.
 
 | Prop | Type | Default | Widgets | Description |
 | --- | --- | --- | --- | --- |
 | `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |
 | `projectId` | `string` | unset | Login, Logout, Session | Project id, read when no `project` handle is passed. |
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
-| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
+| `purpose` | `ZitadelFlowPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
 | `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
 | `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
@@ -107,7 +107,7 @@ The components are **standalone** — import them directly into a component's
 
 Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
 
-| Widget event | Fires when | Detail | Widgets | Callback |
+| Widget event | Fires when | Detail | Widgets | Output |
 | --- | --- | --- | --- | --- |
 | `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `(flowStep)` |
 | `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `(flowInput)` |
@@ -130,14 +130,14 @@ exact names, inputs, and props, treat the installed package as authoritative:
 - `node_modules/@zitadel/sdk-angular/README.md` — the install, usage, and
   proxy/deployment notes.
 - The TypeScript types / exports (`node_modules/@zitadel/sdk-angular/dist/types/public-api.d.ts`)
-  — the exported symbols (`ZitadelLoginComponent`, `ZitadelLogoutComponent`,
-  `ZitadelSessionComponent`, `configureZitadel`, `ZitadelConfig`,
-  `ZitadelProject`, `businessLocales`) and every component `@Input()` /
-  `@Output()`. Read them before using an input you are unsure of.
+  — the exported symbols (`ZitadelLogin`, `ZitadelLogout`,
+  `ZitadelSession`, `configureZitadel`, `getApi`, `getZitadelConfig`, `ZitadelConfig`,
+  `ZitadelProject`, `businessLocales`) and every component `input()` and
+  `output()`. Read them before using an input you are unsure of.
 
 ## Gotchas
 
-- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration (the `zitadel-auth-login` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `zitadel-auth-login` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Selector is `zitadel-auth-login`, not `zitadel-login`.** The wrapper's
   selector is `zitadel-auth-login` (and `zitadel-auth-logout`,
   `zitadel-auth-session`); `<zitadel-login>` is the underlying custom element
@@ -146,4 +146,4 @@ exact names, inputs, and props, treat the installed package as authoritative:
   `${proxyPath}` must be provided by your hosting platform, and the CLI cannot
   yet scaffold those configs. The CLI dev proxy covers local development only.
 - **Session card export name.** `<zitadel-auth-session>` is exported as
-  `ZitadelSessionComponent`.
+  `ZitadelSession`.
