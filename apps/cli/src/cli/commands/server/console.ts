@@ -2,7 +2,12 @@ import { Flags } from "@oclif/core";
 
 import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
-import { AdminSession, LocalRuntime, ZitadelRuntime } from "@/lib/server";
+import {
+  AdminSession,
+  LocalRuntime,
+  LocalServerPlatformMissingError,
+  ZitadelRuntime,
+} from "@/lib/server";
 import { section } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
@@ -20,6 +25,20 @@ const NO_LOCAL_ADMIN_REFUSAL = {
   message: "No local admin in this directory or its parents",
   hint: "Run this from the directory the local server was started in, or one inside it. If it was never started, start it first; that is what creates the local admin the console signs in as.",
   next: [{ id: "start" }],
+} as const satisfies Refusal;
+
+/** How a local server without the platform project is refused. */
+const PLATFORM_MISSING_REFUSAL = {
+  message: "{message}",
+  hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
+  next: [
+    {
+      id: "stop",
+    },
+    {
+      id: "start",
+    },
+  ],
 } as const satisfies Refusal;
 
 /**
@@ -159,37 +178,47 @@ export default class Console extends Telemetered(
     }
 
     const { localDir, admin } = target;
-    const serverUrl = await this.serverInThisFolder(localDir).runningUrl();
-    const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
+    try {
+      const serverUrl = await this.serverInThisFolder(localDir).runningUrl();
+      const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
 
-    this.debug(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
-    this.debug(escapeControlCharacters(signInUrl));
-    const skipLaunch = flags.noOpen || this.nonInteractive;
-    const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
+      this.debug(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
+      this.debug(escapeControlCharacters(signInUrl));
+      const skipLaunch = flags.noOpen || this.nonInteractive;
+      const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
 
-    const title = "Local console sign-in link";
+      const title = "Local console sign-in link";
 
-    return {
-      status: "ok",
-      data: {
-        title,
-        signed_in_as: admin.email,
-        sign_in_url: signInUrl,
-        browser_opened: opened,
-      },
-      summary: {
-        title,
-        sections: [
-          section(undefined, ["Signed in as", escapeControlCharacters(admin.email)]),
-          section(undefined, ["Link", escapeControlCharacters(signInUrl)]),
-        ],
-      },
-      next: {
-        actions: [
-          `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
-        ],
-      },
-    };
+      return {
+        status: "ok",
+        data: {
+          title,
+          signed_in_as: admin.email,
+          sign_in_url: signInUrl,
+          browser_opened: opened,
+        },
+        summary: {
+          title,
+          sections: [
+            section(undefined, ["Signed in as", escapeControlCharacters(admin.email)]),
+            section(undefined, ["Link", escapeControlCharacters(signInUrl)]),
+          ],
+        },
+        next: {
+          actions: [
+            `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
+          ],
+        },
+      };
+    } catch (error) {
+      if (error instanceof LocalServerPlatformMissingError) {
+        throw refusalError(PLATFORM_MISSING_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   }
 
   /**

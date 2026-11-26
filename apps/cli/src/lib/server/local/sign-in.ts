@@ -1,7 +1,7 @@
 import { apiBaseUrl, request } from "@/lib/backend/transport";
 
 import { createZitadelClient, AuthAttemptService } from "@/lib/backend";
-import { LocalServerDeniedError, LocalServerInvalidError } from "@/lib/server/errors";
+import { LocalServerDeniedError, LocalServerPlatformMissingError } from "@/lib/server/errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 
@@ -108,7 +108,7 @@ async function signIn(
 ): Promise<{ handoffToken: string; publishableKey: string }> {
   const runtime = await readPlatformRuntime(serverUrl, REQUEST_TIMEOUT_MS);
   if (!runtime) {
-    throw new LocalServerInvalidError(
+    throw new LocalServerPlatformMissingError(
       `The local server at ${serverUrl} does not host the platform project, so the local admin cannot sign in`,
     );
   }

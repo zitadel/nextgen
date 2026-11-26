@@ -8,6 +8,7 @@ export {
   LocalServerNotRespondingElsewhereError,
   LocalServerNotRespondingError,
   LocalServerNotRunningError,
+  LocalServerPlatformMissingError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
   LocalServerRecordMalformedError,

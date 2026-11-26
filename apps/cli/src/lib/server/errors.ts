@@ -59,6 +59,13 @@ export class LocalServerInvalidError extends LocalServerError {
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
+/** The local server does not host the platform project, so the local admin cannot sign in. */
+export class LocalServerPlatformMissingError extends LocalServerError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
 /** Another start is running in the folder, and still holds its lock. */
 export class LocalServerBusyError extends LocalServerError {
   override readonly category: ErrorCategory = "conflict";

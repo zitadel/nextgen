@@ -161,14 +161,12 @@ describe("console", () => {
           command: "console",
           source: `http://localhost:${app.localPortOf(started)}`,
           code: "E_VALIDATION",
-          message:
-            "The local server does not host the platform project, so the local admin cannot sign in",
+          message: `The local server at http://localhost:${app.localPortOf(started)} does not host the platform project, so the local admin cannot sign in`,
           hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
           next_commands: [
             expectedPublicCliCommand(`stop --cwd ${app.path}`),
             expectedPublicCliCommand(`start --cwd ${app.path}`),
           ],
-          details: { server_url: `http://localhost:${app.localPortOf(started)}` },
         });
       });
 

@@ -6,6 +6,8 @@ import {
   LocalServerDockerMissingError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
   LocalServerStartCleanupFailedError,
   LocalServerStartExitedError,
   LocalServerStartTimeoutError,
@@ -120,6 +122,31 @@ const SERVER_NOT_READY_AND_RUNNING_REFUSAL = {
       flags: { all: true },
     },
   ],
+} as const satisfies Refusal;
+
+/** How a start is refused when the runtime record of this folder is not in the shape it is written in. */
+const RECORD_MALFORMED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel reset --force`, then `zitadel start`.",
+  next: [
+    {
+      id: "reset",
+      flags: {
+        force: true,
+      },
+    },
+    {
+      id: "start",
+    },
+  ],
+} as const satisfies Refusal;
+
+/** How a start is refused when the runtime record of this folder cannot be read. */
+const RECORD_UNREADABLE_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Check that the runtime record and its directory are readable by you.",
 } as const satisfies Refusal;
 
 /** How a start is refused when the server it had to replace would not stop. */
@@ -359,6 +386,18 @@ export default class Start extends Telemetered(
         };
       }
     } catch (error) {
+      if (error instanceof LocalServerRecordMalformedError) {
+        throw refusalError(RECORD_MALFORMED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof LocalServerRecordUnreadableError) {
+        throw refusalError(RECORD_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof LocalServerDockerMissingError) {
         throw refusalError(
           DOCKER_UNAVAILABLE_REFUSAL,
@@ -382,6 +421,7 @@ export default class Start extends Telemetered(
           {
             ...error,
             message: error.message,
+            port: error.port,
             url: LocalRuntime.urlOf(error.port),
             listeners: await this.machine().listeners(error.port, {
               timeoutMs: 5000,
