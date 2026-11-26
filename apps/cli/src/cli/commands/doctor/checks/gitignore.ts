@@ -1,9 +1,9 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
 import { errorMessage } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
+import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 import { Project, type GitignoreRule } from "@/lib/project";
@@ -143,7 +143,7 @@ async function readText(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, "utf8");
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return undefined;
     }
     throw error;
