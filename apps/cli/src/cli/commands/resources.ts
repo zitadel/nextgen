@@ -743,6 +743,14 @@ export const RESOURCES = {
           operations: ["equals"],
         },
         {
+          field: "release_id",
+          operations: ["equals"],
+        },
+        {
+          field: "deployment_id",
+          operations: ["equals"],
+        },
+        {
           field: "entity_type",
           operations: ["equals"],
         },

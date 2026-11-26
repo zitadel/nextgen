@@ -39,6 +39,23 @@ type ActorContext struct {
 	Authenticated  bool
 }
 
+// runtimeKey carries the deployment that served the request: a context value
+// of its own, beside the actor slot, for the reason the authorization mark is
+// one (BindRuntime).
+type runtimeKey struct{}
+
+// Runtime is the deployment that served a request, its release, and the
+// origin that resolved it ("" when the request named none).
+type Runtime struct {
+	DeploymentID string
+	ReleaseID    string
+	Target       string
+}
+
+type runtimeMark struct {
+	runtime atomic.Pointer[Runtime]
+}
+
 // authorizationMark holds the path that authorized a request when it was not
 // a grant on the protected project (ADR 053 §8, ADR 075 §5).
 type authorizationMark struct {
@@ -52,7 +69,38 @@ func WithActorSlot(ctx context.Context) context.Context {
 	if _, ok := ctx.Value(actorSlotKey{}).(*ActorContext); ok {
 		return ctx
 	}
-	return context.WithValue(withAuthorizationMark(ctx), actorSlotKey{}, &ActorContext{})
+	return context.WithValue(withRuntimeMark(withAuthorizationMark(ctx)), actorSlotKey{}, &ActorContext{})
+}
+
+// withRuntimeMark plants the request's runtime mark, unless ctx already
+// carries one.
+func withRuntimeMark(ctx context.Context) context.Context {
+	if _, ok := ctx.Value(runtimeKey{}).(*runtimeMark); ok {
+		return ctx
+	}
+	return context.WithValue(ctx, runtimeKey{}, &runtimeMark{})
+}
+
+// BindRuntime records the deployment that serves the request, once it is
+// resolved or read back from a flow or an attempt, and returns ctx carrying
+// it. Every event emitted from the returned context carries it, and so does
+// the request's request.api event when the request event middleware planted
+// the mark. ctx unchanged without a deployment.
+func BindRuntime(ctx context.Context, runtime Runtime) context.Context {
+	if runtime.DeploymentID == "" {
+		return ctx
+	}
+	ctx = withRuntimeMark(ctx)
+	ctx.Value(runtimeKey{}).(*runtimeMark).runtime.Store(&runtime)
+	return ctx
+}
+
+// runtimeFromContext is the deployment that served the request, or nil.
+func runtimeFromContext(ctx context.Context) *Runtime {
+	if mark, ok := ctx.Value(runtimeKey{}).(*runtimeMark); ok {
+		return mark.runtime.Load()
+	}
+	return nil
 }
 
 // withAuthorizationMark plants the request's authorization mark, unless ctx
@@ -135,7 +183,7 @@ func WithActorContext(ctx context.Context, ac ActorContext) context.Context {
 	if slot, ok := ActorSlotFromContext(ctx); ok {
 		*slot = ac
 	}
-	return context.WithValue(withAuthorizationMark(ctx), contextKey{}, ac)
+	return context.WithValue(withRuntimeMark(withAuthorizationMark(ctx)), contextKey{}, ac)
 }
 
 func ActorFromContext(ctx context.Context) (ActorContext, bool) {
@@ -187,6 +235,15 @@ func FromContext(ctx context.Context, eventType domain.EventType, category domai
 	ev.SessionID = ac.SessionID
 	ev.FlowID = ac.FlowID
 	ev.RequestID = ac.RequestID
+	if runtime := runtimeFromContext(ctx); runtime != nil {
+		ev.DeploymentID = new(runtime.DeploymentID)
+		if runtime.ReleaseID != "" {
+			ev.ReleaseID = new(runtime.ReleaseID)
+		}
+		if runtime.Target != "" {
+			ev.Target = new(runtime.Target)
+		}
+	}
 	if authorization := AuthorizationFromContext(ctx); authorization != nil {
 		if meta, err := events.MarshalPayload(domain.EventMetadata{Authorization: authorization}); err == nil {
 			ev.Metadata = meta

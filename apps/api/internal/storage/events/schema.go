@@ -113,6 +113,18 @@ var Schema = database.NewSchema(map[domain.EventField]database.FieldBinding[doma
 		Coerce:   database.CoerceString,
 		Nullable: true,
 	},
+	domain.EventFieldDeploymentID: {
+		SQLName:  "deployment_id",
+		Accessor: func(e *domain.Event) any { return database.NullableValue(e.DeploymentID) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
+	domain.EventFieldReleaseID: {
+		SQLName:  "release_id",
+		Accessor: func(e *domain.Event) any { return database.NullableValue(e.ReleaseID) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
 	domain.EventFieldOperationStatus: {
 		SQLName:  "operation_status",
 		Accessor: func(e *domain.Event) any { return database.NullableValue(OperationStatusOf(e)) },

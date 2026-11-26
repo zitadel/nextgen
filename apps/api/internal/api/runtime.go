@@ -4,6 +4,7 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -18,7 +19,19 @@ func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin, release
 	if err != nil {
 		return ctx, err
 	}
-	return service.WithRuntimeResolution(ctx, resolution), nil
+	return service.WithRuntimeResolution(bindRuntime(ctx, resolution), resolution), nil
+}
+
+// bindRuntime records the resolved deployment on the request's events.
+func bindRuntime(ctx context.Context, resolution *service.RuntimeResolution) context.Context {
+	if resolution == nil || resolution.Deployment == nil {
+		return ctx
+	}
+	runtime := audit.Runtime{DeploymentID: resolution.Deployment.ID, Target: resolution.Origin}
+	if resolution.Release != nil {
+		runtime.ReleaseID = resolution.Release.ID
+	}
+	return audit.BindRuntime(ctx, runtime)
 }
 
 // releasePin reads the X-Zitadel-Release header: the release id it pins, ""
@@ -41,12 +54,13 @@ func (h *Handler) resolvePrimaryRuntime(ctx context.Context, projectID string) (
 	if err != nil {
 		return ctx, err
 	}
-	return service.WithRuntimeResolution(ctx, resolution), nil
+	return service.WithRuntimeResolution(bindRuntime(ctx, resolution), resolution), nil
 }
 
 // withSealedRuntime puts the sealed release back on the context and refuses
-// when it was revoked since create. No-op when nothing was sealed.
-func (h *Handler) withSealedRuntime(ctx context.Context, projectID, deploymentID, releaseID string) (context.Context, error) {
+// when it was revoked since create. No-op when nothing was sealed. origin is
+// the request's Origin the gate admitted, "" when it checked none.
+func (h *Handler) withSealedRuntime(ctx context.Context, projectID, deploymentID, releaseID, origin string) (context.Context, error) {
 	if releaseID == "" || h.releaseService == nil {
 		return ctx, nil
 	}
@@ -57,7 +71,7 @@ func (h *Handler) withSealedRuntime(ctx context.Context, projectID, deploymentID
 	if release.Revoked() {
 		return ctx, domain.ErrReleaseRevoked()
 	}
-	resolution := &service.RuntimeResolution{Release: release}
+	resolution := &service.RuntimeResolution{Release: release, Origin: origin}
 	if deploymentID != "" && h.pool != nil {
 		dep, err := h.pool.Statements().GetDeploymentByID(ctx, projectID, deploymentID)
 		if err != nil {
@@ -65,5 +79,6 @@ func (h *Handler) withSealedRuntime(ctx context.Context, projectID, deploymentID
 		}
 		resolution.Deployment = dep
 	}
+	ctx = audit.BindRuntime(ctx, audit.Runtime{DeploymentID: deploymentID, ReleaseID: releaseID, Target: origin})
 	return service.WithRuntimeResolution(ctx, resolution), nil
 }

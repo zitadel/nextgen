@@ -48,6 +48,12 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 	if v, ok := params.RequestID.Get(); ok {
 		req.RequestID = v
 	}
+	if v, ok := params.ReleaseID.Get(); ok {
+		req.ReleaseID = v
+	}
+	if v, ok := params.DeploymentID.Get(); ok {
+		req.DeploymentID = v
+	}
 	if v, ok := params.Fingerprint.Get(); ok {
 		req.Fingerprint = v
 	}

@@ -451,6 +451,16 @@ func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID s
 
 // IssueChallenge issues a challenge for the given check type on an existing attempt.
 // For passkey, the user check must already be verified so the user ID is known.
+// bindAttemptRuntime records the deployment sealed into the attempt on the
+// request's events, for a call that reaches the attempt directly rather than
+// through a flow step, which recorded it already.
+func bindAttemptRuntime(ctx context.Context, attempt *domain.AuthAttempt) context.Context {
+	if RuntimeResolutionFromContext(ctx) != nil {
+		return ctx
+	}
+	return audit.BindRuntime(ctx, audit.Runtime{DeploymentID: attempt.DeploymentID, ReleaseID: attempt.ReleaseID})
+}
+
 func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (_ *domain.AuthAttempt, err error) {
 	ctx, end := startSpan(ctx, "AuthAttemptService.IssueChallenge")
 	defer end(&err)
@@ -459,6 +469,7 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 	if err != nil {
 		return nil, err
 	}
+	ctx = bindAttemptRuntime(ctx, attempt)
 
 	challenge, err := s.buildChallenge(ctx, attempt, input.Challenge)
 	if err != nil {
@@ -565,6 +576,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 	if err != nil {
 		return nil, err
 	}
+	ctx = bindAttemptRuntime(ctx, attempt)
 
 	challenge, factor, txExtra, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
 	if err != nil {
@@ -615,6 +627,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (_
 	if err != nil {
 		return nil, err
 	}
+	ctx = bindAttemptRuntime(ctx, attempt)
 
 	if err := attempt.PrepareHandoff(); err != nil {
 		return nil, err

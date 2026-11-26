@@ -208,6 +208,14 @@ type Event struct {
 	SessionID *string
 	FlowID    *string
 
+	// DeploymentID, ReleaseID and Target are the deployment that served the
+	// request the event was emitted in, its release, and the origin that
+	// resolved it. Nil on an event no deployment served; Target is also nil
+	// when the request named no origin.
+	DeploymentID *string
+	ReleaseID    *string
+	Target       *string
+
 	// OperationID and StatusClass copy what a request.api event's payload
 	// records, the operation and the class of the response status, into
 	// columns GET /events reads them from by index
@@ -278,6 +286,8 @@ const (
 	EventFieldOperationStatus
 	EventFieldStatusClass
 	EventFieldUserID
+	EventFieldDeploymentID
+	EventFieldReleaseID
 )
 
 func ErrEventNotFound() Error {

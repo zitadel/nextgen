@@ -28,6 +28,7 @@ INSERT INTO events (
     entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
+    deployment_id, release_id, target,
     operation_status, status_class,
     payload, metadata
 ) VALUES (
@@ -36,6 +37,7 @@ INSERT INTO events (
     ?, ?, ?,
     ?, ?, ?,
     ?, ?, ?, ?, ?, ?,
+    ?, ?, ?,
     ?, ?, ?,
     ?, ?,
     ?, ?
@@ -48,6 +50,7 @@ INSERT INTO events (
     entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
+    deployment_id, release_id, target,
     operation_status, status_class,
     payload, metadata
 FROM events`
@@ -121,6 +124,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		nullString(event.EntityType), nullString(event.EntityID), nullString(event.UserID),
 		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
 		nullString(event.RequestID), nullString(event.SessionID), nullString(event.FlowID),
+		nullString(event.DeploymentID), nullString(event.ReleaseID), nullString(event.Target),
 		nullString(events.OperationStatusOf(event)), nullStatusClass(event.StatusClass),
 		string(payload), string(metadata),
 	).Scan(&occurredOut, &createdOut)
@@ -340,6 +344,7 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 		teamID, actorID, actorType, entityType, entityID sql.NullString
 		userID                                           sql.NullString
 		requestID, sessionID, flowID                     sql.NullString
+		deploymentID, releaseID, target                  sql.NullString
 		operationStatus, statusClass                     sql.NullString
 		occurredNano, createdNano                        int64
 		payload, metadata                                string
@@ -351,6 +356,7 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 		&entityType, &entityID, &userID,
 		&ev.ClientID, &ev.TokenID, &ev.DelegationType, &ev.DelegationID, &ev.Grantor, &ev.Fingerprint,
 		&requestID, &sessionID, &flowID,
+		&deploymentID, &releaseID, &target,
 		&operationStatus, &statusClass,
 		&payload, &metadata,
 	); err != nil {
@@ -372,6 +378,9 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 	ev.RequestID = nullStringPtr(requestID)
 	ev.SessionID = nullStringPtr(sessionID)
 	ev.FlowID = nullStringPtr(flowID)
+	ev.DeploymentID = nullStringPtr(deploymentID)
+	ev.ReleaseID = nullStringPtr(releaseID)
+	ev.Target = nullStringPtr(target)
 	if statusClass.Valid {
 		c := domain.HTTPStatusClass(statusClass.String)
 		ev.StatusClass = &c
