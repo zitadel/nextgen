@@ -76,6 +76,24 @@ type CreateFlowParams struct {
 	// Browsers send it automatically; no client action is required. Absent when the caller is not a
 	// browser.
 	Origin OptURI `json:",omitempty,omitzero"`
+	// Pins the request to a release: the app sends the release id that `zitadel deploy` or
+	// `zitadel preview` printed when it was built, and is served that release's configuration instead of
+	// the newest one deployed to its origin.
+	//
+	// The `Origin` header picks the target first, as it does without a pin. The pin then selects among the
+	// releases deployed to that target, and the request runs on the newest deployment of the pinned
+	// release there. A pin never deploys a release and never admits an origin, and it needs no credential
+	// of its own: a release stays pinnable until it is revoked.
+	//
+	// The release id, `rel_` followed by letters, digits, `_` or `-`, is the one form accepted. Send the
+	// value as it was printed, without reading it.
+	//
+	//  - `400 rel.reference_invalid`: the value is not a release id.
+	//  - `404 rel.not_found`: the project has no release with that id.
+	//  - `409 rel.not_deployed`: the release was never deployed to the target, or the request has no
+	//    `Origin` to pick one.
+	//  - `409 rel.revoked`: the release is revoked.
+	XZitadelRelease OptString `json:",omitempty,omitzero"`
 }
 
 // CreateGrantParams is parameters of createGrant operation.
@@ -1121,6 +1139,24 @@ type SetUserPasswordParams struct {
 	// Standard browser `Origin` header. Selects the deployment whose password policy applies. Browsers
 	// send it automatically; no client action is required. Absent when the caller is not a browser.
 	Origin OptURI `json:",omitempty,omitzero"`
+	// Pins the request to a release: the app sends the release id that `zitadel deploy` or
+	// `zitadel preview` printed when it was built, and is served that release's configuration instead of
+	// the newest one deployed to its origin.
+	//
+	// The `Origin` header picks the target first, as it does without a pin. The pin then selects among the
+	// releases deployed to that target, and the request runs on the newest deployment of the pinned
+	// release there. A pin never deploys a release and never admits an origin, and it needs no credential
+	// of its own: a release stays pinnable until it is revoked.
+	//
+	// The release id, `rel_` followed by letters, digits, `_` or `-`, is the one form accepted. Send the
+	// value as it was printed, without reading it.
+	//
+	//  - `400 rel.reference_invalid`: the value is not a release id.
+	//  - `404 rel.not_found`: the project has no release with that id.
+	//  - `409 rel.not_deployed`: the release was never deployed to the target, or the request has no
+	//    `Origin` to pick one.
+	//  - `409 rel.revoked`: the release is revoked.
+	XZitadelRelease OptString `json:",omitempty,omitzero"`
 }
 
 // SetVariablesParams is parameters of setVariables operation.

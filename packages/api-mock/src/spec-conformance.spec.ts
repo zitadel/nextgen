@@ -3900,6 +3900,29 @@ describe("api-mock error paths — each refusal a handler names", () => {
       );
     });
 
+    test("records a pinned flow start, and refuses a pin as the server does", async () => {
+      const pinned = (release: string) =>
+        fetch(`${IN_PROCESS_ORIGIN}${API_PREFIX}/flows`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-zitadel-release": release },
+          body: JSON.stringify({ purpose: "login", project_id: "proj_in_process" }),
+        });
+
+      expect((await pinned("rel_01KB3F7Y4Q2M8XVN")).status).toBe(201);
+      expect(mock.getCaptured().at(-1)).toEqual(
+        expect.objectContaining({ kind: "createFlow", release: "rel_01KB3F7Y4Q2M8XVN" }),
+      );
+
+      await expectRefusal(await pinned("main"), 400, "rel.reference_invalid");
+      mock.refuseNextPin("rel.not_deployed");
+      await expectRefusal(await pinned("rel_01KB3F7Y4Q2M8XVN"), 409, "rel.not_deployed");
+      mock.refuseNextPin("rel.revoked");
+      await expectRefusal(await pinned("rel_01KB3F7Y4Q2M8XVN"), 409, "rel.revoked");
+      mock.refuseNextPin("rel.not_found");
+      await expectRefusal(await pinned("rel_01KB3F7Y4Q2M8XVN"), 404, "rel.not_found");
+      expect((await pinned("rel_01KB3F7Y4Q2M8XVN")).status, "a refusal applies once").toBe(201);
+    });
+
     test("answers the session reads and sign-out of a signed-out browser with 401", async () => {
       await expectRefusal(await call("GET", "/sessions/me"), 401, "auth.unauthorized");
       await expectRefusal(await call("GET", "/sessions/me/csrf"), 401, "auth.unauthorized");

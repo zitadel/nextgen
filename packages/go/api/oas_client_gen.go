@@ -286,6 +286,13 @@ type Invoker interface {
 	//    `zitadel deploy`.
 	//  - A revoked release answers `409` with `rel.revoked`.
 	//
+	// An `X-Zitadel-Release` header pins the flow to a release deployed to the target: the flow runs on
+	// the newest deployment of that release there instead of the target's newest deployment, and the
+	// cookie seals it as it seals any other. A pin to a release never deployed to the target answers `409`
+	// with `rel.not_deployed`, a revoked one `409` with `rel.revoked`, an unknown id `404` with
+	// `rel.not_found`, and a value that is not a release id `400` with `rel.reference_invalid`. A pinned
+	// request needs an `Origin`.
+	//
 	// A request with no `Origin` passes the check, and so does the server's own origin, from which its
 	// console previews a project's login. Both are served the project's newest primary deployment unless
 	// the project lists that origin; with no primary deployment they answer `409` with `rel.no_default`. A
@@ -1675,6 +1682,9 @@ type Invoker interface {
 	//  - `409 rel.no_default`: the request names no origin and the project has no primary deployment. Run
 	//    `zitadel deploy`.
 	//  - `409 rel.revoked`: the release that serves the origin is revoked.
+	//
+	// An `X-Zitadel-Release` header pins the policy to a release deployed to that origin, as it pins a
+	// flow; see `createFlow` (`POST /flows`).
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
@@ -3554,6 +3564,13 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 //     `zitadel deploy`.
 //   - A revoked release answers `409` with `rel.revoked`.
 //
+// An `X-Zitadel-Release` header pins the flow to a release deployed to the target: the flow runs on
+// the newest deployment of that release there instead of the target's newest deployment, and the
+// cookie seals it as it seals any other. A pin to a release never deployed to the target answers `409`
+// with `rel.not_deployed`, a revoked one `409` with `rel.revoked`, an unknown id `404` with
+// `rel.not_found`, and a value that is not a release id `400` with `rel.reference_invalid`. A pinned
+// request needs an `Origin`.
+//
 // A request with no `Origin` passes the check, and so does the server's own origin, from which its
 // console previews a project's login. Both are served the project's newest primary deployment unless
 // the project lists that origin; with no primary deployment they answer `409` with `rel.no_default`. A
@@ -3642,6 +3659,20 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest,
 		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Origin.Get(); ok {
 				return e.EncodeValue(conv.URLToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Zitadel-Release",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.XZitadelRelease.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil
 		}); err != nil {
@@ -19231,6 +19262,9 @@ func (c *Client) sendSearch(ctx context.Context, request *SearchRequest, params 
 //     `zitadel deploy`.
 //   - `409 rel.revoked`: the release that serves the origin is revoked.
 //
+// An `X-Zitadel-Release` header pins the policy to a release deployed to that origin, as it pins a
+// flow; see `createFlow` (`POST /flows`).
+//
 // PUT /users/{user_id}/password
 func (c *Client) SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error) {
 	res, err := c.sendSetUserPassword(ctx, request, params)
@@ -19319,6 +19353,20 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Origin.Get(); ok {
 				return e.EncodeValue(conv.URLToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Zitadel-Release",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.XZitadelRelease.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil
 		}); err != nil {

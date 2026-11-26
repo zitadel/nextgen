@@ -179,3 +179,23 @@ func TestReleasePins(t *testing.T) {
 	}, release.Pins(domain.ReleasePointerKindFlowDefinition))
 	assert.Empty(t, release.Pins(domain.ReleasePointerKindBranding))
 }
+
+func TestParseReleaseReference(t *testing.T) {
+	t.Parallel()
+
+	releaseID, err := domain.ParseReleaseReference(" rel_01KB3F7Y4Q2M8XVN ")
+	require.NoError(t, err)
+	assert.Equal(t, "rel_01KB3F7Y4Q2M8XVN", releaseID)
+
+	for _, reference := range []string{
+		"",
+		"rel_",
+		"main",
+		"dep_01KB3F7Y4Q2M8XVN",
+		"sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f",
+		"rel_01KB3F7Y4Q2M8XVN extra",
+	} {
+		_, err := domain.ParseReleaseReference(reference)
+		assert.ErrorIs(t, err, domain.ErrReleaseReferenceInvalid(nil), "reference %q", reference)
+	}
+}
