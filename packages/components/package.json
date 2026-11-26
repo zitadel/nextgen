@@ -121,6 +121,7 @@
     "lightningcss": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
+    "rollup-plugin-minify-template-literals": "catalog:",
     "ts-lit-plugin": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",

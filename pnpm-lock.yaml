@@ -512,6 +512,9 @@ catalogs:
     remark-gfm:
       specifier: ^4.0.1
       version: 4.0.1
+    rollup-plugin-minify-template-literals:
+      specifier: ^2.2.0
+      version: 2.2.0
     rosie-skills:
       specifier: ^0.8.5
       version: 0.8.5
@@ -2173,6 +2176,9 @@ importers:
       playwright:
         specifier: 'catalog:'
         version: 1.65.1
+      rollup-plugin-minify-template-literals:
+        specifier: 'catalog:'
+        version: 2.2.0(rollup@4.67.4)
       ts-lit-plugin:
         specifier: 'catalog:'
         version: 2.0.2
@@ -11909,6 +11915,10 @@ packages:
     resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
     engines: {node: '>=20.19.0'}
 
+  entities@8.1.0:
+    resolution: {integrity: sha512-kxL7msIffSuh9aaFAMD7rxAIuTRMAHMeBtgHW2yUdWw732ZNh4MehkF2gdjvtdmikkaIP9bFDDJOPlsvm7avrA==}
+    engines: {node: '>=20.19.0'}
+
   env-runner@0.1.16:
     resolution: {integrity: sha512-2LRJM4P2KLX6J83QZZrMqvgCDt/D5ea7wPcI3yYiy5cG/9rX5QwdwZFx0D7ktWnjdRyZxYjttGGorb5nFqb1CA==}
     hasBin: true
@@ -12844,6 +12854,16 @@ packages:
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
+
+  html-minifier-next@8.11.0:
+    resolution: {integrity: sha512-DOdvMAS4B2mrIiy5M8sMVtp/Z8Z4K1cSon58i4pPxl4gY0eCb0/7IZs2B97IQI0zKvHej3wEnWabri4UN/8XGw==}
+    engines: {node: '>=22.13'}
+    hasBin: true
+    peerDependencies:
+      '@swc/core': ^1.15.7
+    peerDependenciesMeta:
+      '@swc/core':
+        optional: true
 
   html-to-image@1.11.13:
     resolution: {integrity: sha512-cuOPoI7WApyhBElTTb9oqsawRvZ0rHhaHwghRLlTuffoD1B2aDemlCruLeZrUIIdvG7gs9xeELEPm6PhuASqrg==}
@@ -14162,6 +14182,10 @@ packages:
   min-indent@1.0.1:
     resolution: {integrity: sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg==}
     engines: {node: '>=4'}
+
+  minify-literals@2.2.0:
+    resolution: {integrity: sha512-7/udxD+oQu5XoerRCnmwTqNS79GZolgluoMtGVsLI9TqSp7td5vNmIY0IIg/q5T7cnXH4olyzBekWiGmZHdFRw==}
+    engines: {node: '>=22.0.0'}
 
   minimatch@10.2.6:
     resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
@@ -15508,6 +15532,10 @@ packages:
     peerDependencies:
       rollup: ^3.29.4 || ^4
       typescript: ^4.5 || ^5.0 || ^6.0
+
+  rollup-plugin-minify-template-literals@2.2.0:
+    resolution: {integrity: sha512-9t+6B1xRGs6v3vKDNKRGrj/qYs0FVDFrN3ZBt8IbD11WlOwFAtUKFbSzMMAPOG5NJy0f0H2Q6QeoyrAUYT3Njw==}
+    engines: {node: '>=24.0.0'}
 
   rollup-plugin-visualizer@7.1.1:
     resolution: {integrity: sha512-ThaGiHTU8XW02OkK80TrTHATraJmM9OAduU4otal+7gyXLpYEtmGBLfx5kW+EHvvLwn03YGW2NnwKUIqsYlJAA==}
@@ -27818,6 +27846,8 @@ snapshots:
 
   entities@8.0.0: {}
 
+  entities@8.1.0: {}
+
   env-runner@0.1.16:
     dependencies:
       crossws: 0.4.17(srvx@0.11.22)
@@ -29117,6 +29147,14 @@ snapshots:
   html-entities@2.3.3: {}
 
   html-escaper@2.0.2: {}
+
+  html-minifier-next@8.11.0:
+    dependencies:
+      commander: 15.0.0
+      entities: 8.1.0
+      lightningcss: 1.33.0
+      svgo: 4.1.0
+      terser: 5.51.2
 
   html-to-image@1.11.13: {}
 
@@ -30867,6 +30905,16 @@ snapshots:
   mimic-response@4.0.0: {}
 
   min-indent@1.0.1: {}
+
+  minify-literals@2.2.0:
+    dependencies:
+      '@sveltejs/acorn-typescript': 1.0.13(acorn@8.19.0)
+      acorn: 8.19.0
+      html-minifier-next: 8.11.0
+      lightningcss: 1.33.0
+      magic-string: 1.4.5
+    transitivePeerDependencies:
+      - '@swc/core'
 
   minimatch@10.2.6:
     dependencies:
@@ -33190,6 +33238,14 @@ snapshots:
     optionalDependencies:
       '@babel/code-frame': 7.29.7
     optional: true
+
+  rollup-plugin-minify-template-literals@2.2.0(rollup@4.67.4):
+    dependencies:
+      '@rollup/pluginutils': 5.4.0(rollup@4.67.4)
+      minify-literals: 2.2.0
+    transitivePeerDependencies:
+      - '@swc/core'
+      - rollup
 
   rollup-plugin-visualizer@7.1.1(rolldown@1.2.19)(rollup@4.67.4):
     dependencies:

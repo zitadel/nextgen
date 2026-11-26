@@ -147,6 +147,7 @@ catalog:
   react-markdown: ^10.1.0
   remark: ^15.0.1
   remark-gfm: ^4.0.1
+  rollup-plugin-minify-template-literals: ^2.2.0
   rosie-skills: ^0.8.5
   safe-stable-stringify: ^2.5.0
   sanitize-html: ^2.18.1

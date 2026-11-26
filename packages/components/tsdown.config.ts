@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { minifyTemplateLiterals } from "rollup-plugin-minify-template-literals";
 import { defineConfig, type TsdownPlugin } from "tsdown";
 
 /**
@@ -60,7 +61,7 @@ export default defineConfig([
    * (no duplicate-Lit). This is what `import "@zitadel/components"` resolves to.
    */
   {
-    plugins: [liquidRaw()],
+    plugins: [liquidRaw(), minifyTemplateLiterals()],
     entry: {
       index: "src/index.ts",
       // Resolved instead of `index` under the edge export conditions (see
@@ -121,7 +122,7 @@ export default defineConfig([
    * inlined deps so no Node-only entry points leak in.
    */
   {
-    plugins: [liquidRaw()],
+    plugins: [liquidRaw(), minifyTemplateLiterals()],
     entry: { standalone: "src/index.ts" },
     outDir: "dist",
     format: ["esm"],
