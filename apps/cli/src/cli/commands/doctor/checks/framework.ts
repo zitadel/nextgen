@@ -5,11 +5,12 @@ import { Project } from "@/lib/project";
 
 /**
  * How the check fails for an app whose framework is older than the floor: the
- * version found, then the upgrade, in the one message the doctor report shows.
+ * version found, and the upgrade as its hint.
  */
 const VERSION_BELOW_FLOOR_REFUSAL = {
   code: "E_UNSUPPORTED_PROJECT_SHAPE",
-  message: "{message}. Upgrade the app to {displayName} {versionFloor} or later and rerun.{note}",
+  message: "{message}",
+  hint: "Upgrade the app to {displayName} {versionFloor} or later and rerun.{note}",
 } as const satisfies Refusal;
 
 /**

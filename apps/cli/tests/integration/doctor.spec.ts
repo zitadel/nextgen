@@ -556,9 +556,11 @@ describe("doctor", () => {
               {
                 name: "framework",
                 status: "fail",
-                message: `Next.js "^14.2.0" is below the supported floor — the CLI integrates Next.js 15.2.3 and newer. Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).`,
+                message:
+                  'Next.js "^14.2.0" is below the supported floor — the CLI integrates Next.js 15.2.3 and newer',
                 path: "zitadel.json",
                 code: "E_UNSUPPORTED_PROJECT_SHAPE",
+                hint: "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
                 category: "app_integration",
               },
               CHECK.schema,
@@ -606,6 +608,7 @@ describe("doctor", () => {
                 message: expect.any(String),
                 path: "zitadel.json",
                 code: "E_UNSUPPORTED_PROJECT_SHAPE",
+                hint: "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
                 category: "app_integration",
               },
               CHECK.schema,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { LocalRuntimeChecks } from "@/cli/commands/doctor/checks/local-runtime";
 import {
+  LocalServerDockerMissingError,
   type DockerResult,
   LocalRuntime,
   type LocalServers,
@@ -158,6 +159,14 @@ describe("LocalRuntimeChecks", () => {
           code: "ENOENT",
         }),
         "",
+      ],
+      [
+        "why the launcher found no Docker",
+        new LocalServerDockerMissingError(
+          "Docker is not reachable: spawn docker ENOENT",
+          new Error("spawn docker ENOENT"),
+        ),
+        " (spawn docker ENOENT)",
       ],
     ])("carries %s", async (_name, docker, detail) => {
       const { byName } = await outcomes({ backend: "docker", machine: { docker } });

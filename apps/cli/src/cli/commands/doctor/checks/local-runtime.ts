@@ -5,6 +5,7 @@ import {
   DockerLauncher,
   type DockerResult,
   LocalRuntime,
+  LocalServerDockerMissingError,
   type LocalServers,
   type ManagedRuntimeProcess,
   type RuntimeBackend,
@@ -102,6 +103,11 @@ export class LocalRuntimeChecks {
             }
             return `Docker engine ${result.stdout.trim() || "available"}`;
           } catch (error) {
+            if (error instanceof LocalServerDockerMissingError) {
+              throw new CheckFailure(unreachable(errorMessage(error.cause)), undefined, {
+                cause: error,
+              });
+            }
             if (isErrno(error, "ENOENT") || isErrno(error, "EACCES")) {
               throw new CheckFailure(unreachable(errorMessage(error)), undefined, { cause: error });
             }

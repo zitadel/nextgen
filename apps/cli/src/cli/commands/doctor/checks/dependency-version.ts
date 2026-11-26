@@ -110,14 +110,14 @@ export class DependencyVersionCheck implements SanityCheck {
         return {
           ...base,
           status: "pass",
-          message: "No readable package.json to compare pins against",
+          message: "No package.json to compare pins against",
         };
       }
       if (error instanceof FsError) {
         return {
           ...base,
           status: "pass",
-          message: "No readable package.json to compare pins against",
+          message: "No package.json to compare pins against",
         };
       }
       throw error;
