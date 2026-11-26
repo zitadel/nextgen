@@ -2,6 +2,8 @@
 
 ## Where the rules live
 
+Read the [product writing guide](../../docs/design/voice/product.md) before writing or changing user-facing copy; preserve scoped implementation rules.
+
 - [`SKILL.md`](skills/zitadel-cli/SKILL.md) is the agent-facing contract (JSON
   envelope, invocation rules, claim, doctor repair). Update it with every
   change to the command surface.

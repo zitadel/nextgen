@@ -36,6 +36,8 @@ one, update the ADR in the same change.
 
 ## Building UI
 
+Read the [product writing guide](../../docs/design/voice/product.md) before writing or changing user-facing copy; preserve scoped implementation rules.
+
 Read [`docs/styling.md`](docs/styling.md) before building any console UI: it
 decides the surface (shadcn with unprefixed utilities here; Lit atoms belong to
 the login surface) and owns the token rules. The atom recipe is in
