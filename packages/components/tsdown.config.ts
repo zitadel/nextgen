@@ -124,6 +124,8 @@ export default defineConfig([
     tsconfig: "tsconfig.lib.json",
     dts: false,
     sourcemap: false,
+    // Loaded as is from a CDN, so nothing minifies it after us.
+    minify: true,
     // One file: the dynamic imports (LiquidJS) are inlined, not split.
     outputOptions: { codeSplitting: false },
     clean: false,
