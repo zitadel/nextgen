@@ -55,14 +55,16 @@ A preview is not an environment. It runs on a URL of an existing project and sha
 - **Application files are checked before anything is uploaded.** An
   application file, `.zitadel/applications/<slug>.json`, declares one of your
   applications and its OAuth clients; `.zitadel/meta/application.json`
-  describes it. `deploy` sends every one with the release and shows an added,
-  changed or removed file in its diff. It stops with `E_VALIDATION` when:
+  describes its shape, so an editor catches a misspelled key but not a missing
+  `client_id` or secret. `deploy` sends every file with the release and shows
+  an added, changed or removed file in its diff. It stops with `E_VALIDATION`
+  when:
   - a file breaks the schema;
   - a client has no `client_id`;
   - a confidential client does not name its secret as a `${{ NAME }}` project
     variable;
-  - two files share a slug, or two clients share a `client_id` or a secret
-    variable.
+  - two files share a slug, or two clients share a `client_id`;
+  - a client's secret variable is one another client or a connection names.
 
   It also stops when a client's secret variable is not on the project
   (`E_CREDENTIAL_MISSING`) or is not a secret (`E_VALIDATION`).

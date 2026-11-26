@@ -61,12 +61,6 @@ export const POLICY_FILE_SCHEMA_REF = "../meta/policy.json";
 export const POLICY_TEST_FILE_SCHEMA_REF = "../meta/policy-test.json";
 
 /**
- * The `$schema` value application files carry, relative to
- * `.zitadel/applications/`: resolves to `{@link META_SCHEMA_DIR}/application.json`.
- */
-export const APPLICATION_FILE_SCHEMA_REF = "../meta/application.json";
-
-/**
  * The `$schema` value `zitadel.json` carries, relative to the project root —
  * resolves to `{@link META_SCHEMA_DIR}/project.json`.
  */

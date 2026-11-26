@@ -2150,6 +2150,34 @@ export class ScaffoldedApp {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
   }
 
+  /**
+   * Declares the `shop` application, as the developer owning it would: one
+   * confidential client `web`, `shop-web`, whose secret is the project
+   * variable `secretVariable`.
+   */
+  async declareApplication(secretVariable: string): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/applications"), { recursive: true });
+    const application = {
+      $schema: "../meta/application.json",
+      slug: "shop",
+      name: "Shop",
+      clients: [
+        {
+          slug: "web",
+          type: "confidential",
+          client_id: "shop-web",
+          secret: `\${{ ${secretVariable} }}`,
+          grant_types: ["authorization_code"],
+          redirect_uris: ["https://shop.example.com/callback"],
+        },
+      ],
+    };
+    await this.writeProjectFile(
+      ".zitadel/applications/shop.json",
+      `${JSON.stringify(application, null, 2)}\n`,
+    );
+  }
+
   /** Renames a committed connection file without touching its contents. */
   async renameConnection(slug: string, name: string): Promise<void> {
     await this.copyConnection(slug, name);

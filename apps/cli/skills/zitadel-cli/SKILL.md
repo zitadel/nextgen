@@ -1133,16 +1133,30 @@ passing dry run does not promise the release is accepted.
 
 `deploy` sends every `.zitadel/applications/<slug>.json` with the release; a
 release declares those applications, and `POST /applications` may not write
-one (`app.declared`). `.zitadel/meta/application.json` is the file's schema.
-Each client sets its `client_id`, and each confidential client names its
-secret as `"secret": "${{ NAME }}"`, never the value (`contract/application`).
-Two files with one `slug` (`application/duplicate-slug`), two clients with one
-`client_id` (`application/duplicate-client-id`) or one secret variable
+one (`app.declared`). `.zitadel/meta/application.json` is the file's schema;
+it checks the shape only, not the two rules that follow. Each client sets its
+`client_id`, and each confidential client names its secret as
+`"secret": "${{ NAME }}"`, never the value (`contract/application`). Two files
+with one `slug` (`application/duplicate-slug`), two clients with one
+`client_id` (`application/duplicate-client-id`), and a secret variable that
+another client or a connection's `client_id` or `client_secret` names
 (`application/shared-variable`) are issues of the same `E_VALIDATION`. Before
 the release is built, a secret variable the project lacks fails with
 `E_CREDENTIAL_MISSING`, and one that is not a secret with `E_VALIDATION`; both
 name the file and client, with `variable set NAME --secret` in
 `next_commands`.
+
+Only the server, once the build is submitted, refuses these, as
+`application <slug>: …` lines in the `E_VALIDATION` hint:
+
+- a slug an application registered through `POST /applications` holds
+  (`app.registered`): pick another slug;
+- a changed `client_id` on a client a release deployed
+  (`app.field_immutable`): a client keeps its `client_id`;
+- a `client_id` another client of the project holds or once held
+  (`app.client_id_taken`). Renaming an application's slug declares a new
+  application, so keeping its old `client_id`s is refused too: rename the
+  slug and give its clients new `client_id`s, or keep the slug.
 
 A flow is matched to a local schema by the schema's `objectType`, its `$id`, an
 id `.zitadel/state.json` records for it, or, for a schema with no `$id`, the

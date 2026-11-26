@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import applicationMetaSchema from "../meta-schemas/application.json" with { type: "json" };
 import { webApplication } from "./application-presets.js";
-import { applicationConfigSchema, declaredApplicationIssues } from "./schemas.js";
 
 const validate = new Ajv2020({ strict: false }).compile(applicationMetaSchema);
 
@@ -34,24 +33,6 @@ describe("web application preset", () => {
     expect(app.name).toBe("Shop");
     expect(app.clients[0]?.redirect_uris).toEqual(redirectUris);
     expect(app.clients[0]?.redirect_uris).not.toBe(redirectUris);
-  });
-
-  it("leaves the client id and secret out for the server to issue", () => {
-    expect(app.clients[0]).not.toHaveProperty("client_id");
-    expect(app.clients[0]).not.toHaveProperty("secret");
-  });
-
-  it("builds a file a release declares, with the client id and secret variable it is given", () => {
-    const declared = webApplication({
-      slug: "shop",
-      name: "Shop",
-      redirectUris,
-      declared: { clientId: "shop-web", secretVariable: "SHOP_WEB_CLIENT_SECRET" },
-    });
-    expect(declared.clients[0]?.client_id).toBe("shop-web");
-    expect(declared.clients[0]?.secret).toBe("${{ SHOP_WEB_CLIENT_SECRET }}");
-    expect(applicationConfigSchema.safeParse(declared).success).toBe(true);
-    expect(declaredApplicationIssues(declared)).toEqual([]);
   });
 
   it("drops duplicate redirect URIs and keeps their order", () => {
