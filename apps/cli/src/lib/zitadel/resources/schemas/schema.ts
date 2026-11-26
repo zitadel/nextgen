@@ -37,11 +37,6 @@ import type { JsonObject } from "@/lib/zitadel/types";
 import { isJsonArray, isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**
- * What a key the user meta-schema refuses is reported with, after the key.
- */
-const REFUSED_KEY = " is not an allowed key";
-
-/**
  * A user schema under `.zitadel/schemas/`: the properties a user has, and how
  * a user signs in.
  */
@@ -64,19 +59,6 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
       });
     },
   };
-
-  /**
-   * Whether a finding refuses a key the user meta-schema does not declare,
-   * which may be one a newer server added that this CLI does not know yet.
-   *
-   * @param issue - The finding.
-   * @param issue.rule - The rule it was raised under.
-   * @param issue.message - What it says.
-   * @returns Whether the schema contract refused a key.
-   */
-  static refusesKey(issue: { readonly rule: string; readonly message: string }): boolean {
-    return issue.rule === UserSchema.CONTRACT.rule && issue.message.includes(REFUSED_KEY);
-  }
 
   /**
    * Whether a method named in a file is one a flow can offer.

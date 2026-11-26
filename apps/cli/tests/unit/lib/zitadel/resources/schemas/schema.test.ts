@@ -143,16 +143,6 @@ describe("UserSchema.read", () => {
   });
 });
 
-describe("UserSchema.refusesKey", () => {
-  it.each([
-    [true, "contract/schema", "properties.firstName minimumLength is not an allowed key"],
-    [false, "contract/schema", "objectType Expected string"],
-    [false, "contract/flow", "steps.0 foo is not an allowed key"],
-  ])("is %s for a %s finding saying %j", (expected, rule, message) => {
-    expect(UserSchema.refusesKey({ rule, message })).toBe(expected);
-  });
-});
-
 describe("UserSchema.of", () => {
   it("takes the file as read", () => {
     const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));

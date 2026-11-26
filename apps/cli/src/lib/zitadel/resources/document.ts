@@ -109,9 +109,15 @@ export type DocumentContract<Schema extends ZodType> = {
    *
    * @param file - The file the schema refused.
    * @param refusals - One finding per refusal, under {@link rule}.
+   * @param paths - The dotted path each refusal is at, in the order of
+   *   `refusals` (empty for the root).
    * @returns The findings; never none.
    */
-  readonly explain?: (file: DocumentFile, refusals: readonly Issue[]) => readonly Issue[];
+  readonly explain?: (
+    file: DocumentFile,
+    refusals: readonly Issue[],
+    paths: readonly string[],
+  ) => readonly Issue[];
 };
 
 /**
@@ -314,16 +320,24 @@ export abstract class ConfigDocument<Value = unknown> {
       return make(result.data, file);
     }
     const parsed = result.success ? [] : result.error.issues;
-    const refusals = [
+    const located = [
       ...parsed.map((refusal) => {
         return { path: refusal.path.join("."), message: refusal.message };
       }),
       ...refused,
-    ].map((refusal) => {
+    ];
+    const refusals = located.map((refusal) => {
       const where = refusal.path || "(root)";
       return ConfigDocument.makeFileIssue(file.path, contract.rule, `${where} ${refusal.message}`);
     });
-    const issues = contract.explain?.(file, refusals) ?? refusals;
+    const issues =
+      contract.explain?.(
+        file,
+        refusals,
+        located.map((refusal) => {
+          return refusal.path;
+        }),
+      ) ?? refusals;
     return new BrokenFile({ path: file.path, kind: contract.kind, body: file.body, issues });
   }
 

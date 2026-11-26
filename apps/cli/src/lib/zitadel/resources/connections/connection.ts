@@ -65,8 +65,8 @@ export class Connection extends ConfigDocument<ConnectionValue> {
     kind: "connection",
     rule: "contract/connection",
     schema: idpConnectionConfigSchema,
-    explain: (file, refusals) => {
-      return Connection.findIssues(file, refusals);
+    explain: (file, refusals, paths) => {
+      return Connection.findIssues(file, refusals, paths);
     },
   };
 
@@ -240,7 +240,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    *   connection is sound.
    */
   override check(_context: ValidationContext): readonly Issue[] {
-    return Connection.findIssues(this.file, []);
+    return Connection.findIssues(this.file, [], []);
   }
 
   /**
@@ -257,10 +257,15 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * @param file - The connection file.
    * @param refusals - The `contract/connection` refusals; none for a file the
    *   contract takes.
+   * @param paths - The dotted path each refusal is at, in the order of `refusals`.
    * @returns The kept refusals, then the `connection/literal-secret`,
    *   `connection/endpoints` and `sso/unknown-connection-field` findings.
    */
-  private static findIssues(file: DocumentFile, refusals: readonly Issue[]): readonly Issue[] {
+  private static findIssues(
+    file: DocumentFile,
+    refusals: readonly Issue[],
+    paths: readonly string[],
+  ): readonly Issue[] {
     const body = file.body;
     const secret = stringAt(objectAt(body, "oidc"), "client_secret");
     const literalSecret = secret !== undefined && !isVariableReference(secret);
@@ -277,8 +282,8 @@ export class Connection extends ConfigDocument<ConnectionValue> {
     );
     const secretIssues = literalSecret ? [secretIssue] : [];
     const endpointsIssues = missing.length > 0 ? [endpointsIssue] : [];
-    const kept = refusals.filter((refusal) => {
-      return !(literalSecret && refusal.message.includes("client_secret"));
+    const kept = refusals.filter((_refusal, index) => {
+      return !(literalSecret && paths[index]?.split(".").includes("client_secret"));
     });
     const unknownFields = CHECKED_BLOCKS.flatMap((block) => {
       const allowed = Connection.readAllowedFields(block.path);
