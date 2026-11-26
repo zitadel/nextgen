@@ -450,7 +450,7 @@ describe("ErrorSupport", () => {
         "a flow name no flow carries",
         new BackendNameUnknownError('No flow definition named "x"', "flow", "x"),
         {
-          hint: "Run `zitadel flow-definition list` to see the flows this project has.",
+          hint: "Run `flow-definition list` to see the flows this project has.",
           nextCommands: undefined,
         },
       ],
@@ -458,7 +458,7 @@ describe("ErrorSupport", () => {
         "a schema name no schema carries",
         new BackendNameUnknownError('No schema named "x"', "schema", "x"),
         {
-          hint: "Run `zitadel schema list` to see the object types this project has.",
+          hint: "Run `schema list` to see the object types this project has.",
           nextCommands: undefined,
         },
       ],

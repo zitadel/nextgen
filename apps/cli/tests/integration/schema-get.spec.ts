@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
-import { expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 usePlatformMock();
 
@@ -24,7 +23,7 @@ describe("schema get", () => {
         expect(app.envelopeOf(result)).toMatchObject({
           status: "error",
           code: "E_NOT_FOUND",
-          hint: `Run ${expectedPublicCliCommand("schema list")} to see the object types this project has.`,
+          hint: "Run schema list to see the object types this project has.",
         });
       });
     });

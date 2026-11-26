@@ -323,7 +323,7 @@ describe("what each local server error states", () => {
       ),
       {
         message: "package missing",
-        hint: undefined,
+        hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
         details: { package: "@zitadel/server-darwin-arm64", failure: "boom" },
         code: "E_VALIDATION",
         category: "invalid",
@@ -335,7 +335,7 @@ describe("what each local server error states", () => {
       new classes.LocalServerLaunchFailedError("launch failed", "/bin/zitadel", new Error("boom")),
       {
         message: "launch failed",
-        hint: undefined,
+        hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
         details: { command: "/bin/zitadel", failure: "boom" },
         code: "E_VALIDATION",
         category: "invalid",
@@ -347,7 +347,7 @@ describe("what each local server error states", () => {
       new classes.LocalServerDockerFailedError("docker failed", ["docker", "run"], "no such image"),
       {
         message: "docker failed",
-        hint: undefined,
+        hint: "Check that Docker is installed, running, and reachable from this shell.",
         details: { command: ["docker", "run"], stderr: "no such image" },
         code: "E_VALIDATION",
         category: "invalid",
@@ -447,7 +447,7 @@ describe("what each local server error states", () => {
       new classes.LocalServerPlatformMissingError("no platform", "http://localhost:8080"),
       {
         message: "no platform",
-        hint: undefined,
+        hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
         details: { server_url: "http://localhost:8080" },
         code: "E_VALIDATION",
         category: "invalid",

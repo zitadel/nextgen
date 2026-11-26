@@ -132,7 +132,7 @@ describe("what each environment error states", () => {
       }),
       {
         message: "GOOGLE_ID is not set",
-        hint: undefined,
+        hint: "Consulted, in order: .env.staging, process. Set GOOGLE_ID in .env.staging or the process environment.",
         details: {
           environment: "staging",
           variable: "GOOGLE_ID",
@@ -170,7 +170,7 @@ describe("what each environment error states", () => {
       }),
       {
         message: "GOOGLE_ID is not bound",
-        hint: undefined,
+        hint: "Consulted, in order: . Set GOOGLE_ID in .env.staging or the process environment.",
         details: {
           environment: "staging",
           variable: "GOOGLE_ID",

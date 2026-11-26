@@ -90,8 +90,8 @@ const NAME_UNKNOWN_ADVICE = {
 
 /** The command that lists each kind of named record, as the hint names it. */
 const LISTED_BY = {
-  flow: "Run `zitadel flow-definition list` to see the flows this project has.",
-  schema: "Run `zitadel schema list` to see the object types this project has.",
+  flow: "Run `flow-definition list` to see the flows this project has.",
+  schema: "Run `schema list` to see the object types this project has.",
 } as const;
 
 /**
