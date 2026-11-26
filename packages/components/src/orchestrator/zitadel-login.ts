@@ -33,7 +33,7 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { createLiquidEngine, localiseFlowErrorKeys, stepNotice, stepTexts } from "./liquid.js";
+import { localiseFlowErrorKeys, stepNotice, stepTexts } from "./step-texts.js";
 import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
@@ -594,7 +594,13 @@ export class ZitadelLogin extends ZitadelSurface {
 
   override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
-      this.engine = createLiquidEngine({ locale: this.resolveLocale() });
+      // LiquidJS loads on first render, in its own chunk; the loader shows
+      // until the engine is there.
+      const locale = this.resolveLocale();
+      void import("./liquid.js").then(({ createLiquidEngine }) => {
+        this.engine = createLiquidEngine({ locale });
+        this.requestUpdate();
+      });
     }
     if (changed.has("previewState") && this.previewState && !this.preview) {
       console.warn(

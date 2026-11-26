@@ -124,6 +124,8 @@ export default defineConfig([
     tsconfig: "tsconfig.lib.json",
     dts: false,
     sourcemap: false,
+    // One file: the dynamic imports (LiquidJS) are inlined, not split.
+    outputOptions: { codeSplitting: false },
     clean: false,
     target: "es2022",
     deps: {
