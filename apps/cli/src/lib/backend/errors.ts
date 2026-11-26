@@ -1,6 +1,6 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import { ZitadelLibError } from "@/lib/errors";
+import { ZitadelLibError } from "@/lib/lib-error";
 import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /** What a failure carries beyond its message. */
