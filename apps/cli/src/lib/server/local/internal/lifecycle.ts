@@ -19,7 +19,7 @@ import {
   LocalServerStartTimeoutError,
   LocalServerStopError,
 } from "@/lib/server/errors";
-import { isErrno } from "@/lib/errno";
+import { FsDeniedError } from "@/lib/fs";
 import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/server/local/runtime";
 import { type Clock, SystemClock } from "@/lib/clock";
 
@@ -446,7 +446,10 @@ export class Lifecycle<R extends ServerRecord> {
   > {
     // The log goes first: cleaning up may remove it with the server.
     const logTail = await this.deps.launcher.logTail?.(record, 40)?.catch((error: unknown) => {
-      if (error instanceof LocalServerInvalidError || isErrno(error, "EACCES")) {
+      if (error instanceof LocalServerInvalidError) {
+        return undefined;
+      }
+      if (error instanceof FsDeniedError) {
         return undefined;
       }
       throw error;

@@ -11,7 +11,11 @@ import pWaitFor from "p-wait-for";
 
 import { errorMessage } from "@/lib/errors";
 import { FsNotFoundError, mkdir, open, readFile, stat } from "@/lib/fs";
-import { LocalServerInvalidError } from "@/lib/server/errors";
+import {
+  LocalServerInvalidError,
+  LocalServerProcessDeniedError,
+  LocalServerProcessGoneError,
+} from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/server/local/runtime";
@@ -282,10 +286,10 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
       return false;
     }
     try {
-      process.kill(-pid, 0);
+      signalProcess(-pid, 0);
       return true;
     } catch (error) {
-      return isErrno(error, "EPERM");
+      return error instanceof LocalServerProcessDeniedError;
     }
   }
 
@@ -295,10 +299,10 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
    */
   static isPidRunning(pid: number): boolean {
     try {
-      process.kill(pid, 0);
+      signalProcess(pid, 0);
       return true;
     } catch (error) {
-      return isErrno(error, "EPERM");
+      return error instanceof LocalServerProcessDeniedError;
     }
   }
 
@@ -563,15 +567,23 @@ async function readBytes(path: string, position: number, length: number): Promis
 }
 
 /**
- * Signals one process. `false` when there is no such process, which is an answer, not an error.
+ * Signals one process, or the group a negative pid names.
+ *
+ * @throws {LocalServerProcessGoneError} When there is no such process.
+ * @throws {LocalServerProcessDeniedError} When the process is not the CLI's to signal.
  */
-function signalProcess(pid: number, signal: NodeJS.Signals): boolean {
+function signalProcess(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(pid, signal);
-    return true;
   } catch (error) {
     if (isErrno(error, "ESRCH")) {
-      return false;
+      throw new LocalServerProcessGoneError(`No process ${String(pid)}`, error);
+    }
+    if (isErrno(error, "EPERM")) {
+      throw new LocalServerProcessDeniedError(
+        `Process ${String(pid)} is not ours to signal`,
+        error,
+      );
     }
     throw error;
   }
@@ -589,15 +601,23 @@ function signalRuntime(
 ): { sent: boolean; target: "process" | "process-group" } {
   if (process.platform !== "win32") {
     try {
-      process.kill(-pid, signal);
+      signalProcess(-pid, signal);
       return { sent: true, target: "process-group" };
     } catch (error) {
-      if (!isErrno(error, "ESRCH")) {
+      if (!(error instanceof LocalServerProcessGoneError)) {
         throw error;
       }
     }
   }
-  return { sent: signalProcess(pid, signal), target: "process" };
+  try {
+    signalProcess(pid, signal);
+    return { sent: true, target: "process" };
+  } catch (error) {
+    if (error instanceof LocalServerProcessGoneError) {
+      return { sent: false, target: "process" };
+    }
+    throw error;
+  }
 }
 
 /**

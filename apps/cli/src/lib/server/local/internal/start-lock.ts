@@ -2,8 +2,8 @@ import { dirname } from "node:path";
 
 import { FsExistsError, mkdir, readFile, rm, stat, writeFile } from "@/lib/fs";
 import { LocalServerBusyError } from "@/lib/server/errors";
-import { isErrno } from "@/lib/errno";
 import { type Clock, SystemClock } from "@/lib/clock";
+import { BinaryLauncher } from "./binary-launcher";
 
 type LockOptions = Readonly<{
   /** How long to wait for another start to finish. */
@@ -204,10 +204,5 @@ async function readOwner(lockFile: string): Promise<number | undefined> {
 }
 
 function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return isErrno(error, "EPERM");
-  }
+  return BinaryLauncher.isPidRunning(pid);
 }

@@ -1,7 +1,7 @@
 import { execa } from "execa";
 
-import { LocalServerInvalidError } from "@/lib/server/errors";
-import { isErrno } from "@/lib/errno";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerDockerMissingError, LocalServerInvalidError } from "@/lib/server/errors";
 
 import {
   EMPTY_ENV,
@@ -311,7 +311,7 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       await requireDocker(["rm", containerName], `Remove ${containerName}`);
       return true;
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof LocalServerDockerMissingError) {
         return false;
       }
       throw error;
@@ -386,6 +386,12 @@ async function runDocker(
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
   const result = await execa("docker", args, { stdin: "ignore", env, reject: false });
+  if (result.code === "ENOENT") {
+    throw new LocalServerDockerMissingError(
+      `Docker is not reachable: ${errorMessage(result).trim() || "no reason given"}`,
+      result,
+    );
+  }
   if (result.code !== undefined) {
     throw result;
   }

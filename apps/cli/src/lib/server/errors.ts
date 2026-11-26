@@ -76,6 +76,20 @@ export class LocalServerDockerMissingError extends LocalServerError {
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 }
 
+/** A process the CLI signalled does not exist, so there is nothing to signal. */
+export class LocalServerProcessGoneError extends LocalServerError {
+  override readonly category: ErrorCategory = "unavailable";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NETWORK";
+}
+
+/** A process the CLI signalled exists but belongs to someone the CLI may not signal. */
+export class LocalServerProcessDeniedError extends LocalServerError {
+  override readonly category: ErrorCategory = "denied";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_AUTH";
+}
+
 /** The server does not know the local admin, or refused its session. */
 export class LocalServerDeniedError extends LocalServerError {
   override readonly category: ErrorCategory = "denied";

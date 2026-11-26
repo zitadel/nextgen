@@ -11,6 +11,8 @@ import {
   LocalServerNotRunningError,
   LocalServerPortBusyError,
   LocalServerPortFullError,
+  LocalServerProcessDeniedError,
+  LocalServerProcessGoneError,
   LocalServerRecordMalformedError,
   LocalServerRecordUnreadableError,
   LocalServerStartCleanupFailedError,
@@ -48,6 +50,8 @@ describe("the local server errors", () => {
     ["port full", new LocalServerPortFullError("full"), "unavailable", "E_PORT_IN_USE"],
     ["docker", new LocalServerDockerMissingError("no daemon"), "unavailable", "E_NETWORK"],
     ["denied", new LocalServerDeniedError("no"), "denied", "E_AUTH"],
+    ["process gone", new LocalServerProcessGoneError("gone"), "unavailable", "E_NETWORK"],
+    ["process denied", new LocalServerProcessDeniedError("no"), "denied", "E_AUTH"],
     ["start exited", new LocalServerStartExitedError("exited"), "unavailable", "E_NETWORK"],
     ["start timeout", new LocalServerStartTimeoutError("late"), "unavailable", "E_NETWORK"],
     [
