@@ -371,7 +371,7 @@ export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
   }
 
   const parsed = parseJsonObject(raw, LOCAL_RUNTIME_FILE);
-  return normalizeRuntimeMetadata(parsed, cwd);
+  return normalizeRuntimeMetadata(parsed);
 }
 
 export async function writeRuntimeMetadata(cwd: string, metadata: RuntimeMetadata): Promise<void> {
@@ -451,10 +451,7 @@ async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   }
 }
 
-function normalizeRuntimeMetadata(
-  input: Record<string, unknown>,
-  directory: string,
-): RuntimeMetadata {
+function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetadata {
   if (
     input.schema_version !== 1 ||
     typeof input.port !== "number" ||
