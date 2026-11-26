@@ -1,6 +1,6 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+import { FsExistsError, mkdir, readFile, rm, stat, writeFile } from "@/lib/fs";
 import { LocalServerBusyError } from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
 import { type Clock, SystemClock } from "@/lib/clock";
@@ -55,7 +55,7 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
         }
       };
     } catch (error) {
-      if (!isErrno(error, "EEXIST")) {
+      if (!(error instanceof FsExistsError)) {
         throw error;
       }
     }
@@ -74,7 +74,7 @@ async function createOwned(file: string): Promise<void> {
   try {
     await writeFile(file, String(process.pid), { flag: "wx", mode: 0o600 });
   } catch (error) {
-    if (!isErrno(error, "EEXIST")) {
+    if (!(error instanceof FsExistsError)) {
       await rm(file, { force: true });
     }
     throw error;
@@ -152,7 +152,7 @@ async function takeGuard(guardFile: string): Promise<(() => Promise<void>) | und
         await rm(file, { force: true });
       };
     } catch (error) {
-      if (!isErrno(error, "EEXIST")) {
+      if (!(error instanceof FsExistsError)) {
         throw error;
       }
     }
