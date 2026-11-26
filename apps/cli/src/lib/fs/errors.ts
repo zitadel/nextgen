@@ -16,7 +16,7 @@ export abstract class FsError extends ZitadelLibError {}
 export class FsNotFoundError extends FsError {
   override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /** The process may not touch the path (`EACCES` or `EPERM`). */

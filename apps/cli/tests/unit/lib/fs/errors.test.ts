@@ -27,7 +27,7 @@ describe("FsNotFoundError", () => {
       name: "FsNotFoundError",
       category: "missing",
       retryable: false,
-      code: "E_NOT_FOUND",
+      code: "E_VALIDATION",
     });
   });
 });

@@ -1,4 +1,10 @@
+import { mkdir as nodeMkdir, mkdtemp, readFile as nodeReadFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
+import { mkdir, readFile } from "@/lib/fs";
 
 import { responseFailure } from "@/lib/backend";
 import {
@@ -93,6 +99,39 @@ describe("ZitadelLibError", () => {
 });
 
 describe("toZitadelError", () => {
+  it.each([
+    ["a missing file", "missing.txt", "E_VALIDATION"],
+    ["a directory read as a file", ".", "E_VALIDATION"],
+    ["a file read as a directory", "file.txt/child", "E_VALIDATION"],
+  ])("reports %s with the code a Node error got before", async (_what, relative, code) => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-errors-"));
+    await writeFile(join(dir, "file.txt"), "x");
+    const path = join(dir, relative);
+    const wrapped = await readFile(path, "utf8").catch((error: unknown) => {
+      return error;
+    });
+    const raw = await nodeReadFile(path, "utf8").catch((error: unknown) => {
+      return error;
+    });
+
+    expect([toZitadelError(wrapped).code, toZitadelError(raw).code]).toEqual([code, code]);
+  });
+
+  it("reports an existing path with the code a Node error got before", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-errors-"));
+    const wrapped = await mkdir(dir).catch((error: unknown) => {
+      return error;
+    });
+    const raw = await nodeMkdir(dir).catch((error: unknown) => {
+      return error;
+    });
+
+    expect([toZitadelError(wrapped).code, toZitadelError(raw).code]).toEqual([
+      "E_CONFLICT",
+      "E_CONFLICT",
+    ]);
+  });
+
   it("passes an existing ZitadelError through unchanged", () => {
     const original = new ZitadelError("E_AUTH", "already normalised");
     expect(toZitadelError(original)).toBe(original);
