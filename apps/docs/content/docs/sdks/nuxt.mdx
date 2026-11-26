@@ -62,12 +62,12 @@ Setup installs the SDK. To add it yourself, run:
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`. When setup created the app itself, it also writes `app/app.vue` and an `app/pages/index.vue` that redirects to `/login`.
   </Tab>
   <Tab>
-    Register the SDK's Nuxt module and configure it under `nextgen`. The module adds the server middleware, the plugin that exposes auth state, and the client plugin that loads the web components.
+    Register the SDK's Nuxt module and configure it under `zitadel`. The module adds the server middleware, the plugin that exposes auth state, and the client plugin that loads the web components.
 
     ```ts
     export default defineNuxtConfig({
       modules: ["@zitadel/sdk-nuxt/module"],
-      nextgen: {
+      zitadel: {
         loginPath: "/login",
         protectedRoutes: ["/profile"],
       },
@@ -82,7 +82,7 @@ Setup installs the SDK. To add it yourself, run:
     });
     ```
 
-    In `nuxt dev` the module reads `ZITADEL_URL`, `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `ZITADEL_PROJECT_SECRET` from the environment, or from `.env.local` when the environment has none, so the `.env.local` that setup writes works even though Nuxt itself loads only `.env`. A `nextgen.url` or `runtimeConfig.public.zitadelProjectId` in the config wins over the variables. The backend URL and the project secret default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from the server environment; set `nextgen.url` or the `NUXT_NEXTGEN_*` variables only to override. A built server reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own runtime environment when it starts, and `NUXT_NEXTGEN_URL` and `NUXT_NEXTGEN_PROJECT_SECRET` take precedence over them. `nuxt build` never copies the URL or the secret into `.output/`, so one build runs against any backend and the secret exists only where the server runs; a built server does not read `.env.local`. The public project ID is still read when `nuxt build` runs, so set `NUXT_PUBLIC_ZITADEL_PROJECT_ID` in the runtime environment to change it per deployment.
+    In `nuxt dev` the module reads `ZITADEL_URL`, `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `ZITADEL_PROJECT_SECRET` from the environment, or from `.env.local` when the environment has none, so the `.env.local` that setup writes works even though Nuxt itself loads only `.env`. A `zitadel.url` or `runtimeConfig.public.zitadelProjectId` in the config wins over the variables. The backend URL and the project secret default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from the server environment; set `zitadel.url` or the `NUXT_ZITADEL_*` variables only to override. A built server reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own runtime environment when it starts, and `NUXT_ZITADEL_URL` and `NUXT_ZITADEL_PROJECT_SECRET` take precedence over them. `nuxt build` never copies the URL or the secret into `.output/`, so one build runs against any backend and the secret exists only where the server runs; a built server does not read `.env.local`. The public project ID is still read when `nuxt build` runs, so set `NUXT_PUBLIC_ZITADEL_PROJECT_ID` in the runtime environment to change it per deployment.
 
     The module also loads the web components on the client and provides the business copy overlay as `useNuxtApp().$zitadelBusinessLocales`, so the app does not install or import `@zitadel/components`.
   </Tab>

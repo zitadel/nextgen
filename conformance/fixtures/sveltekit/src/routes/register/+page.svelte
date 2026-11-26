@@ -1,7 +1,7 @@
 <script lang="ts">
   // zitadel-cli: managed-file v1
   import { onMount } from "svelte";
-  import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-svelte";
+  import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-sveltekit/components";
 
   const project = configureZitadel({
     projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",

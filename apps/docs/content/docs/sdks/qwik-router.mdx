@@ -8,7 +8,7 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The Qwik Router SDK (`@zitadel/sdk-qwik-router`) is an `onRequest` plugin, a Qwik Router handler that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. The login and logout components come from the [Qwik SDK](/docs/sdks/qwik).
+The Qwik Router SDK (`@zitadel/sdk-qwik-router`) is an `onRequest` plugin, a Qwik Router handler that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. Its `/components` entry also exports the login, logout and session components of the [Qwik SDK](/docs/sdks/qwik), so the app imports everything from this one package.
 
 <Callout title="Requires Qwik 2" type="warn">
   The SDK declares Qwik 2 as peer dependencies: `@qwik.dev/core` and `@qwik.dev/router` (Qwik Router, which Qwik 2 renamed from Qwik City). A Qwik 1 app (`@builder.io/qwik-city`) is not supported, because the components need Qwik 2. Migrate the app to `@qwik.dev/*` first. The CLI scaffolds new apps on Qwik 2.
@@ -21,9 +21,9 @@ The Qwik Router SDK (`@zitadel/sdk-qwik-router`) is an `onRequest` plugin, a Qwi
 - A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in), or [Add Zitadel to an existing app](/docs/get-started/existing-app).
 - The URL, project ID and project secret. Setup writes them to `.env.local` as `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET` and `PUBLIC_ZITADEL_PROJECT_ID`.
 
-## Install the SDKs
+## Install the SDK
 
-Setup installs both packages. To add them yourself, install them as dev dependencies. Qwik bundles `devDependencies` into the server build, and its starter `vite.config.ts` refuses to start when a package is listed in both sections.
+Install `@zitadel/sdk-qwik-router`. It re-exports the Qwik widgets, so the app needs no other import. Setup also adds `@zitadel/sdk-qwik` as a direct dependency, because Qwik's optimizer looks for libraries to compile in the app's `package.json`. To add both yourself, install them as dev dependencies. Qwik bundles `devDependencies` into the server build, and its starter `vite.config.ts` refuses to start when a package is listed in both sections.
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -50,7 +50,7 @@ Setup installs both packages. To add them yourself, install them as dev dependen
     The CLI adds the plugin, the routes, environment files, and both SDK packages. No config file changes: Qwik Router picks up `plugin@*.ts` route files on its own.
 
     <Files>
-      <File name="src/routes/plugin@nextgen.ts" />
+      <File name="src/routes/plugin@zitadel.ts" />
       <File name="src/routes/index.tsx" />
       <File name="src/routes/login/index.tsx" />
       <File name="src/routes/register/index.tsx" />
@@ -63,12 +63,12 @@ Setup installs both packages. To add them yourself, install them as dev dependen
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Create `src/routes/plugin@nextgen.ts`. The handler reads `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` per request from the request event's `env`, which is where Vite loads `.env.local`:
+    Create `src/routes/plugin@zitadel.ts`. The handler reads `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` per request from the request event's `env`, which is where Vite loads `.env.local`:
 
     ```ts
-    import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
+    import { createZitadelOnRequest } from "@zitadel/sdk-qwik-router/server";
 
-    export const onRequest = createNextgenOnRequest({
+    export const onRequest = createZitadelOnRequest({
       protectedRoutes: ["/profile"],
       loginPath: "/login",
     });
@@ -78,7 +78,7 @@ Setup installs both packages. To add them yourself, install them as dev dependen
 
     ```tsx
     import { component$ } from "@qwik.dev/core";
-    import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-qwik";
+    import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-qwik-router/components";
 
     const project = configureZitadel({
       projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "",

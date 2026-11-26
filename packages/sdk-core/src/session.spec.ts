@@ -105,13 +105,19 @@ describe("getSession()", () => {
   ])("throws on non-canonical HTTP %i error body %#", async (status, body) => {
     fetchMock.mockResolvedValue(jsonResponse(body, status));
 
-    await expect(getSession()).rejects.toThrow(new RegExp(`HTTP ${status}`));
+    await expect(getSession()).rejects.toMatchObject({
+      code: "E_ZITADEL_SESSION_READ_FAILED",
+      message: expect.stringContaining(`HTTP ${status}`),
+    });
   });
 
   it("throws on other failures instead of silently rendering signed-out", async () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: "boom" }, 502));
 
-    await expect(getSession()).rejects.toThrow(/HTTP 502/);
+    await expect(getSession()).rejects.toMatchObject({
+      code: "E_ZITADEL_SESSION_READ_FAILED",
+      message: expect.stringContaining("HTTP 502"),
+    });
   });
 
   it("throws on a framework's HTML 404 — only the backend's canonical 404 means signed out", async () => {
@@ -215,7 +221,10 @@ describe("getSession()", () => {
   it("refuses to run outside a browser", async () => {
     vi.stubGlobal("window", undefined);
 
-    await expect(getSession()).rejects.toThrow(/from the browser/);
+    await expect(getSession()).rejects.toMatchObject({
+      name: "ZitadelRuntimeError",
+      code: "E_ZITADEL_SESSION_NO_BROWSER",
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

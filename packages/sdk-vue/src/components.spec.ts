@@ -15,11 +15,11 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
-  type WidgetTag,
-  type WidgetName,
+  type ZitadelWidgetTag,
+  type ZitadelWidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { createSSRApp, defineComponent, h, nextTick, shallowRef, type Ref } from "vue";
 import { renderToString } from "vue/server-renderer";
 
@@ -37,6 +37,9 @@ import {
   cssProperties,
   describeStandardAttributes,
 } from "@zitadel/client-sdk-contract/standard-attributes";
+import type { ZitadelLoginProps, ZitadelLogoutProps, ZitadelSessionProps } from "./types";
+import { describeSharedConfigHelpers } from "@zitadel/client-sdk-contract/config-helpers";
+import * as sdk from "./index";
 
 // A consumer's `ref` on these components resolves to the component instance,
 // whose `expose({ element })` surfaces the inner DOM node. Vue's exposed proxy
@@ -51,7 +54,7 @@ function mountWithInstanceRef(
 } {
   const captured = shallowRef<{ element: HTMLElement | null } | null>(null);
   const parent = defineComponent({
-    setup: () => () => h(child, { ref: captured }),
+    setup: () => () => h(child, { ref: captured, project }),
   });
   const { container } = render(parent);
   return { captured, container };
@@ -76,11 +79,41 @@ async function serverRender(
   return host.firstElementChild!;
 }
 
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+function widgetIn<Tag extends ZitadelWidgetTag>(
+  root: ParentNode,
+  tag: Tag,
+): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
-  if (!element) throw new Error(`no <${tag}> was rendered`);
+  if (!element) {
+    throw new Error(`no <${tag}> was rendered`);
+  }
   return element;
 }
+
+describeSharedConfigHelpers(sdk);
+
+describe("the exported props types describe what the components accept", () => {
+  it("ZitadelLoginProps is accepted by ZitadelLogin", () => {
+    type Accepted = InstanceType<typeof ZitadelLogin>["$props"];
+
+    expectTypeOf<keyof ZitadelLoginProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLoginProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelLogoutProps is accepted by ZitadelLogout", () => {
+    type Accepted = InstanceType<typeof ZitadelLogout>["$props"];
+
+    expectTypeOf<keyof ZitadelLogoutProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLogoutProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelSessionProps is accepted by ZitadelSession", () => {
+    type Accepted = InstanceType<typeof ZitadelSession>["$props"];
+
+    expectTypeOf<keyof ZitadelSessionProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelSessionProps>().toExtend<Accepted>();
+  });
+});
 
 describe("ZitadelLogin", () => {
   it("keeps the properties the client render assigns", () => {
@@ -529,7 +562,9 @@ describe("server-rendered markup carries no force-attribute prefix", () => {
     );
     vi.unstubAllGlobals();
 
-    for (const attribute of expected) expect(html).toContain(attribute);
+    for (const attribute of expected) {
+      expect(html).toContain(attribute);
+    }
     expect(html).not.toContain("^");
   });
 
@@ -593,8 +628,9 @@ const staleOnRemoval: readonly string[] = [];
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref` on the component, the way a consumer does.
 // `update` renders it again with other attributes.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
+async function mountWidget(widget: ZitadelWidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  configureZitadel(project);
   const current = shallowRef(attributes);
   const captured = shallowRef<{ element: HTMLElement | null } | null>(null);
   const parent = defineComponent({
@@ -617,6 +653,10 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     },
   };
 }
+
+afterEach(() => {
+  _resetConfigForTesting();
+});
 
 describeStandardAttributes<ForwardedAttributes, WidgetProps>({
   mountWidget,

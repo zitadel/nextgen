@@ -21,7 +21,7 @@ const CREATE_QWIK = frameworkCli("create-qwik");
  * removes the starter `src/routes/index.tsx` so the patcher can write the
  * managed landing page without colliding with boilerplate. `vite.config.ts` is
  * left in place — the Qwik Router integration wires auth through the
- * `src/routes/plugin@nextgen.ts` `onRequest` plugin (a plain route file the
+ * `src/routes/plugin@zitadel.ts` `onRequest` plugin (a plain route file the
  * patcher writes), so no config edit is needed.
  */
 export class QwikRouterScaffolder extends AbstractCLIScaffolder {
