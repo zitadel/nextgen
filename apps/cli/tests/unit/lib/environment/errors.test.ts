@@ -66,3 +66,18 @@ describe("the environment errors' codes", () => {
     expect(new EnvironmentNameInvalidError("why", "ZITADEL_ENV").code).toBe("E_VALIDATION");
   });
 });
+
+describe("what an environment error states", () => {
+  it("says where to fix a server address that is no URL", () => {
+    const error = new EnvironmentValueInvalidError(
+      "ZITADEL_URL is not a server",
+      ".env.ci.local",
+      new LocalServerUrlInvalidError("Invalid server"),
+    );
+
+    expect(error).toMatchObject({
+      hint: "Fix or remove ZITADEL_URL in .env.ci.local; it must be a URL such as https://preview.zitadel.com.",
+      details: { cause: "Invalid server" },
+    });
+  });
+});

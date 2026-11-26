@@ -91,3 +91,52 @@ describe("FsExistsError", () => {
     });
   });
 });
+
+/**
+ * An error as Node raises it for a failed system call.
+ *
+ * @param code - The errno.
+ * @param message - Node's message.
+ * @returns The error.
+ */
+function nodeError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { code });
+}
+
+describe("what a file-system error states", () => {
+  it.each([
+    [
+      "a missing file",
+      new FsNotFoundError(
+        "ENOENT: no such file",
+        nodeError("ENOENT", "ENOENT: no such file"),
+        "ENOENT",
+      ),
+      "A required file or directory is missing.",
+    ],
+    [
+      "a file it may not read",
+      new FsDeniedError("Permission denied: EACCES", nodeError("EACCES", "EACCES"), "EACCES"),
+      "Check file permissions or run with the right user.",
+    ],
+    [
+      "a file in the way",
+      new FsExistsError("EEXIST", nodeError("EEXIST", "EEXIST"), "EEXIST"),
+      undefined,
+    ],
+  ] as const)("states the hint of %s", (_situation, error, hint) => {
+    expect(error.hint).toBe(hint);
+  });
+
+  it("reports Node's error as its only fact", () => {
+    const error = new FsNotFoundError(
+      "ENOENT: no such file",
+      nodeError("ENOENT", "ENOENT: no such file"),
+      "ENOENT",
+    );
+
+    expect(error.details).toEqual({
+      original: { name: "Error", message: "ENOENT: no such file", code: "ENOENT" },
+    });
+  });
+});

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { BackendReleaseContentRevokedError } from "@/lib/backend";
+
 import {
   BackendClaimChallengeNotFoundError,
   BackendClaimWindowExpiredError,
@@ -87,5 +89,49 @@ describe("the backend errors' codes", () => {
     });
     expect(new BackendTimeoutError("why")).toMatchObject({ code: "E_NETWORK", retryable: true });
     expect(new BackendUnreadableError("why")).toMatchObject({ code: "E_NETWORK", retryable: true });
+  });
+});
+
+describe("what a backend error states", () => {
+  it.each([
+    [
+      "an unreachable server",
+      new BackendUnreachableError("no answer", { url: "https://a.test" }),
+      "unreachable",
+      undefined,
+    ],
+    [
+      "a server that took too long",
+      new BackendTimeoutError("timed out", { url: "https://a.test" }),
+      "timeout",
+      "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+    ],
+    [
+      "an answer it could not read",
+      new BackendUnreadableError("unreadable", { url: "https://a.test" }),
+      "unreadable",
+      "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+    ],
+  ] as const)("reports the URL and the reason of %s", (_situation, error, reason, hint) => {
+    expect(error).toMatchObject({ hint, details: { url: "https://a.test", reason } });
+  });
+
+  it("says a revoked release can never be served again", () => {
+    const error = new BackendReleaseContentRevokedError(
+      "released as rel_1, which is revoked",
+      "rel_1",
+      "h1",
+    );
+
+    expect(error).toMatchObject({
+      hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
+      details: { release_id: "rel_1", content_hash: "h1" },
+    });
+  });
+
+  it("reports a bug as the failure it is", () => {
+    expect(new BackendInternalError("no page").details).toEqual({
+      original: { name: "BackendInternalError", message: "no page", code: undefined },
+    });
   });
 });

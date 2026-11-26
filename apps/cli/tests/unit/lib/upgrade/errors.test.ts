@@ -45,3 +45,11 @@ describe("UpgradeInstallFailedError", () => {
     expect(error.code).toBe("E_VALIDATION");
   });
 });
+
+describe("what UpgradeReleaseLookupError states", () => {
+  it("reports itself as the failure it is", () => {
+    expect(new UpgradeReleaseLookupError("fatal: bad").details).toEqual({
+      original: { name: "UpgradeReleaseLookupError", message: "fatal: bad", code: undefined },
+    });
+  });
+});

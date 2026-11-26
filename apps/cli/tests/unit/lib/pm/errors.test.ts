@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   PmCommandFailedError,
+  PmCommandMissingError,
   PmCommandNotPermittedError,
   PmError,
   PmManifestInvalidError,
@@ -60,5 +61,47 @@ describe("the package manager errors", () => {
     expect(error.category).toBe("denied");
     expect(error.retryable).toBe(false);
     expect(error.code).toBe("E_AUTH");
+  });
+});
+
+describe("what a package manager error states", () => {
+  it("says the operating system refused to run the command", () => {
+    const error = new PmCommandNotPermittedError("spawn npm EACCES", "EACCES");
+
+    expect(error).toMatchObject({
+      message: "Permission denied: spawn npm EACCES",
+      hint: "Check file permissions or run with the right user.",
+      details: {
+        original: {
+          name: "PmCommandNotPermittedError",
+          message: "spawn npm EACCES",
+          code: "EACCES",
+        },
+      },
+    });
+  });
+
+  it("says a package manager that is not there is missing", () => {
+    expect(new PmCommandMissingError("spawn npm ENOENT", "ENOENT").hint).toBe(
+      "A required file or directory is missing.",
+    );
+  });
+
+  it("reports the failure and the status it ended with", () => {
+    expect(new PmCommandFailedError("npm install failed with exit 1", 1, "out").details).toEqual({
+      original: {
+        name: "PmCommandFailedError",
+        message: "npm install failed with exit 1",
+        code: 1,
+      },
+    });
+  });
+
+  it("reports the error a manifest could not be read with", () => {
+    const cause = new SyntaxError("Unexpected token");
+
+    expect(new PmManifestInvalidError("Unexpected token", cause).details).toEqual({
+      original: { name: "SyntaxError", message: "Unexpected token", code: undefined },
+    });
   });
 });

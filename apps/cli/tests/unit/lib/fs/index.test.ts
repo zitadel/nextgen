@@ -4,14 +4,15 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import {
-  entryExists,
+  pathExists,
+  pathExistsStrict,
   FsDeniedError,
   FsFailedError,
+  fsFailure,
   FsIsDirectoryError,
   FsNotDirectoryError,
   isFile,
-  pathExists,
-  pathExistsStrict,
+  entryExists,
   readDirIfExists,
   readFile,
   readIfExists,
@@ -162,5 +163,34 @@ describe("entryExists", () => {
 
     expect(await entryExists(join(dir, "a.txt"))).toBe(true);
     expect(await entryExists(join(dir, "missing"))).toBe(false);
+  });
+});
+
+describe("fsFailure", () => {
+  it.each([
+    [
+      "ENOENT",
+      "ENOENT: no such file or directory, open '/a'",
+      "ENOENT: no such file or directory, open '/a'",
+    ],
+    [
+      "EACCES",
+      "EACCES: permission denied, open '/a'",
+      "Permission denied: EACCES: permission denied, open '/a'",
+    ],
+    [
+      "EPERM",
+      "EPERM: operation not permitted, unlink '/a'",
+      "Permission denied: EPERM: operation not permitted, unlink '/a'",
+    ],
+    [
+      "ELOOP",
+      "ELOOP: too many symbolic links encountered, open '/a'",
+      "ELOOP: too many symbolic links encountered, open '/a'",
+    ],
+  ])("says what Node said of %s", (code, said, message) => {
+    const failure = fsFailure(Object.assign(new Error(said), { code, syscall: "open" }));
+
+    expect(failure).toMatchObject({ message });
   });
 });

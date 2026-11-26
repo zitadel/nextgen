@@ -17,3 +17,11 @@ describe("the consent errors", () => {
     expect(error.retryable).toBe(false);
   });
 });
+
+describe("what ConsentInternalError states", () => {
+  it("reports itself as the failure it is", () => {
+    expect(new ConsentInternalError("fatal: bad").details).toEqual({
+      original: { name: "ConsentInternalError", message: "fatal: bad", code: undefined },
+    });
+  });
+});

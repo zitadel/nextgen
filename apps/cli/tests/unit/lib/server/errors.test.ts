@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { LocalServerUrlInvalidError } from "@/lib/server";
+
 import {
   LocalServerBusyError,
   LocalServerAdminNotFoundError,
@@ -185,5 +187,73 @@ describe("the local server errors", () => {
     expect(new LocalServerPortBusyError(8080)).toMatchObject({
       port: 8080,
     });
+  });
+});
+
+describe("what a local server error states", () => {
+  it("says to check that an unreadable record can be read", () => {
+    const error = new LocalServerRecordUnreadableError(
+      "cannot be read",
+      "/w/.zitadel/local/runtime.json",
+      new Error("EACCES"),
+    );
+
+    expect(error).toMatchObject({
+      hint: "Check that /w/.zitadel/local/runtime.json and its directory are readable by you.",
+      details: { path: "/w/.zitadel/local/runtime.json", cause: "EACCES" },
+    });
+  });
+
+  it("says to fix an env file it cannot read", () => {
+    const error = new LocalServerEnvUnreadableError(
+      "Cannot read /w/.env",
+      "/w/.env",
+      new Error("EACCES"),
+    );
+
+    expect(error).toMatchObject({
+      hint: "The file /w/.env exists but could not be read; fix its permissions or remove it.",
+      details: { path: "/w/.env", message: "EACCES" },
+    });
+  });
+
+  it("says to wait for the start that holds the lock", () => {
+    const error = new LocalServerBusyError("busy", "/w/.zitadel/local/start.lock", 42);
+
+    expect(error).toMatchObject({
+      hint: "Wait for it to finish, or delete /w/.zitadel/local/start.lock if no start is running.",
+      details: { lock_file: "/w/.zitadel/local/start.lock", owner_pid: 42 },
+    });
+  });
+
+  it.each([
+    [
+      "a permit for another folder",
+      new LocalServerPermitMismatchError("for /other"),
+      "A reset acts on one folder only. Run it from the folder whose server you mean to reset.",
+    ],
+    [
+      "a server that did not stop",
+      new LocalServerStopError("did not stop", {}),
+      "Inspect the local runtime process and stop it manually, then rerun the command.",
+    ],
+    [
+      "an address that is no URL",
+      new LocalServerUrlInvalidError("Invalid server"),
+      "Use a URL like https://preview.zitadel.com.",
+    ],
+  ] as const)("states the hint of %s", (_situation, error, hint) => {
+    expect(error.hint).toBe(hint);
+  });
+
+  it("reports a refused signal as the operating system's error", () => {
+    const cause = Object.assign(new Error("kill EPERM"), { code: "EPERM" });
+
+    expect(new LocalServerProcessDeniedError("Permission denied: kill EPERM", cause)).toMatchObject(
+      {
+        hint: "Check file permissions or run with the right user.",
+        details: { original: { name: "Error", message: "kill EPERM", code: "EPERM" } },
+      },
+    );
   });
 });

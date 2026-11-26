@@ -30,3 +30,11 @@ describe("the identity-provider errors' codes", () => {
     expect(error.code).toBe("E_VALIDATION");
   });
 });
+
+describe("what an idp error states", () => {
+  it("names the providers it takes", () => {
+    const error = new IdpProviderUnknownError("acme", ["google", "github", "custom"]);
+
+    expect(error).toMatchObject({ hint: "Use one of google, github, custom.", details: {} });
+  });
+});

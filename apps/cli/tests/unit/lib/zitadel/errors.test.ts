@@ -1,20 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ZitadelConfigError,
-  ZitadelConfigResourceClashError,
-  ZitadelConfigResourceMissingError,
-  ZitadelConfigSchemaAmbiguousError,
-  ZitadelConfigSchemaMissingError,
   CONFIG_DIRECTORIES,
+  ZitadelConfigActionClashError,
   ZitadelConfigConnectionExistsError,
-  ZitadelConfigFileExistsError,
+  ZitadelConfigDirectoryInTheWayError,
   ZitadelConfigEditLockoutError,
+  ZitadelConfigError,
+  ZitadelConfigFileExistsError,
   ZitadelConfigFileUnreadableError,
   ZitadelConfigFlowMethodInUseError,
   ZitadelConfigFlowUncheckedError,
   ZitadelConfigInternalError,
+  ZitadelConfigPathBlockedError,
   ZitadelConfigPathUnreadableError,
+  ZitadelConfigProviderUnknownError,
+  ZitadelConfigReferenceBrokenError,
+  ZitadelConfigReferenceMissingError,
+  ZitadelConfigResourceClashError,
+  ZitadelConfigResourceMissingError,
+  ZitadelConfigSchemaAmbiguousError,
+  ZitadelConfigSchemaMissingError,
+  ZitadelConfigSlugDuplicatedError,
 } from "@/lib/zitadel";
 import { googleSelection } from "@tests/helpers/idp-values";
 
@@ -217,6 +224,66 @@ describe("ZitadelConfigSchemaAmbiguousError", () => {
       code: "E_VALIDATION",
       message: "More than one user schema is named customers",
       candidates: [],
+    });
+  });
+});
+
+describe("what a config error states", () => {
+  it("reports a project file as file and the system's code as code", () => {
+    expect(new ZitadelConfigFileUnreadableError(".zitadel/a.json", "EACCES")).toMatchObject({
+      hint: "Check that the file is readable, then run the command again.",
+      details: { file: ".zitadel/a.json", code: "EACCES" },
+    });
+  });
+
+  it("names the providers a schema offers and the connections there are", () => {
+    expect(new ZitadelConfigProviderUnknownError("user", "acme", [], ["sso"])).toMatchObject({
+      hint: "user offers: none. Connections under .zitadel/idps/: sso.",
+      details: { requested: "acme", offered: [], connections: ["sso"] },
+    });
+  });
+
+  it("reports the files a duplicated slug is in", () => {
+    expect(new ZitadelConfigSlugDuplicatedError("sso", ["a.json", "b.json"]).details).toEqual({
+      slug: "sso",
+      files: ["a.json", "b.json"],
+    });
+  });
+
+  it.each([
+    [
+      "a file where a directory is needed",
+      new ZitadelConfigPathBlockedError(".zitadel/s/a.json", ".zitadel/s"),
+      "Remove .zitadel/s, which is a file where a directory is needed, then run the command again.",
+      { file: ".zitadel/s/a.json", code: "ENOTDIR", blocker: ".zitadel/s" },
+    ],
+    [
+      "a directory where a file is expected",
+      new ZitadelConfigDirectoryInTheWayError(".zitadel/a.json"),
+      "Remove .zitadel/a.json, which is a directory where a file is expected, then run the command again.",
+      { file: ".zitadel/a.json", code: "EISDIR" },
+    ],
+    [
+      "a reference it cannot read",
+      new ZitadelConfigReferenceMissingError("./a.txt"),
+      "Create the referenced file or fix the path.",
+      {},
+    ],
+    [
+      "a reference that failed without a code",
+      new ZitadelConfigReferenceBrokenError(".zitadel/a.json", "./a.txt", undefined),
+      "Create the referenced file or fix the path.",
+      { file: ".zitadel/a.json", ref: "./a.txt" },
+    ],
+  ] as const)("states the hint and facts of %s", (_situation, error, hint, details) => {
+    expect(error).toMatchObject({ hint, details });
+    expect(error.details).toEqual(details);
+  });
+
+  it("reports the step and the action a clash is about", () => {
+    expect(new ZitadelConfigActionClashError("clash", "password", "sso").details).toEqual({
+      step: "password",
+      action: "sso",
     });
   });
 });

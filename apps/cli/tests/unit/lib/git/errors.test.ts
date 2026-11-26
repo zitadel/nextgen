@@ -85,3 +85,11 @@ describe("GitError.headline", () => {
     expect(new GitCommandFailedError("").headline()).toBe("git gave no reason");
   });
 });
+
+describe("what GitCommandFailedError states", () => {
+  it("reports itself as the failure it is", () => {
+    expect(new GitCommandFailedError("fatal: bad").details).toEqual({
+      original: { name: "GitCommandFailedError", message: "fatal: bad", code: undefined },
+    });
+  });
+});

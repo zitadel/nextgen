@@ -16,3 +16,11 @@ describe("the wizard errors", () => {
     expect(new WizardDefinitionError("undo failed", cause).cause).toBe(cause);
   });
 });
+
+describe("what WizardDefinitionError states", () => {
+  it("reports itself as the failure it is", () => {
+    expect(new WizardDefinitionError("fatal: bad").details).toEqual({
+      original: { name: "WizardDefinitionError", message: "fatal: bad", code: undefined },
+    });
+  });
+});

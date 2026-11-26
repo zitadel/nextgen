@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SyncError, SyncStateMalformedError } from "@/lib/sync";
+import { SyncError, SyncStateMalformedError, SyncStateUnreadableError } from "@/lib/sync";
 
 describe("the sync errors", () => {
   it("reports a malformed state as a validation failure", () => {
@@ -18,5 +18,23 @@ describe("the sync errors", () => {
     const cause = new SyntaxError("bad");
 
     expect(new SyncStateMalformedError("Cannot read f: p", cause).cause).toBe(cause);
+  });
+});
+
+describe("what a sync error states", () => {
+  it("says to fix or remove a malformed state file", () => {
+    expect(new SyncStateMalformedError("malformed")).toMatchObject({
+      hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
+      details: { file: ".zitadel/state.json" },
+    });
+  });
+
+  it("reports the failure an unreadable state file was read with, and no hint", () => {
+    const error = new SyncStateUnreadableError("not JSON", new SyntaxError("Unexpected token"));
+
+    expect(error).toMatchObject({
+      hint: undefined,
+      details: { original: { name: "SyntaxError", message: "Unexpected token" } },
+    });
   });
 });

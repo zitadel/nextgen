@@ -58,3 +58,23 @@ describe("the publish errors", () => {
     expect(error.code).toBe(code);
   });
 });
+
+describe("what a publish error states", () => {
+  it.each([
+    [false, "Fix the files named above and rerun; no changes were made."],
+    [
+      true,
+      "Fix the files named above and rerun; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
+    ],
+  ] as const)("says what to fix of a configuration that refuses a key: %s", (refusedKey, hint) => {
+    const error = new PublishConfigInvalidError("invalid", [{ rule: "r" }], refusedKey);
+
+    expect(error).toMatchObject({ hint, details: { issues: [{ rule: "r" }] } });
+  });
+
+  it("says to give a client id and secret their own variables", () => {
+    expect(new PublishConnectionVariableSharedError("shared", "V", "f.json").hint).toBe(
+      "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+    );
+  });
+});
