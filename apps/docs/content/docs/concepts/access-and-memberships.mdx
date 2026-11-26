@@ -11,7 +11,7 @@ Console accounts and the teams that own customer projects live in a reserved **p
 
 A project role is one of `viewer`, `editor`, or `admin`. Roles are additive: `admin` includes `editor`, and `editor` includes `viewer`. The strongest role wins when several paths apply. Roles are project-scoped, not per origin or environment.
 
-Besides the owning team, access comes from [grants](/docs/reference/api/grants) and [invitations](/docs/reference/api/invitations). A grant binds a user or a team on the platform project to a role. An invitation is a 72-hour shareable link that offers a role to whoever opens it while signed in; you send the link to the recipient yourself. Effective members are the union of these paths. A deployment can also configure platform operators with standing `admin` on every project; they are not listed as project members.
+Besides the owning team, access comes from [grants](/docs/reference/api/grants). A grant binds a user or a team on the platform project to a role. An [invitation](/docs/reference/api/invitations) is a way to get a grant: a 72-hour link you send to the recipient yourself. Whoever opens it while signed in and accepts receives a grant for the offered role; a pending invitation gives no access. A project's members are the owning team's active members plus everyone its grants reach. A deployment can also configure platform operators with standing `admin` on every project; they are not listed as project members.
 
 ## Team memberships vs. lifecycle ownership
 
