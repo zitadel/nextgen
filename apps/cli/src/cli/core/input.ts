@@ -5,7 +5,13 @@ import { text } from "node:stream/consumers";
 import { Errors, Flags, type Command, type Interfaces, Parser } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
-import { isObject, parseJsonObject, parseJsonOrUndefined, wordOf } from "@/lib/json";
+import {
+  isObject,
+  JsonNotAnObjectError,
+  parseJsonObject,
+  parseJsonOrUndefined,
+  wordOf,
+} from "@/lib/json";
 import { kebab } from "@/lib/names";
 import { environmentFlags } from "./environment-flags";
 import { refusalError, type Refusal } from "./refusal";
@@ -362,6 +368,11 @@ export class Input {
     } catch (error) {
       if (error instanceof ZitadelError) {
         throw error;
+      }
+      if (error instanceof JsonNotAnObjectError) {
+        throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
+          problem: error.message,
+        });
       }
       if (error instanceof SyntaxError) {
         throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
