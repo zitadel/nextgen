@@ -124,10 +124,10 @@ export class IssuerOriginCheck implements SanityCheck {
         );
       }
     } catch (error) {
+      warnings.report(
+        `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
+      );
       if (error instanceof BackendError) {
-        warnings.report(
-          `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
-        );
         return;
       }
       throw error;

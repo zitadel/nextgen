@@ -358,6 +358,37 @@ describe("IssuerOriginCheck.fix", () => {
     });
   });
 
+  describe("when reading the deployments fails with no backend error", () => {
+    it("still says to deploy", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      server.use(
+        http.get(`${SERVER}/api/v1/deployments`, () => {
+          return HttpResponse.json({
+            deployments: [
+              {
+                id: "dep_primary",
+                release_id: "rel_primary",
+                kind: "primary",
+              },
+            ],
+            next_page_token: null,
+          });
+        }),
+      );
+
+      const error = await rejectionOf(() => {
+        return check.fix(aCheckContext(dir, { consent: forced() }));
+      });
+
+      expect([error, warnings.take()]).toEqual([
+        expect.any(TypeError),
+        [
+          `${ISSUER} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
+        ],
+      ]);
+    });
+  });
+
   describe("when the server refuses the issuer as primary", () => {
     it("fails the repair", async ({ dir }) => {
       await aProject(dir, AS_PREVIEW);
