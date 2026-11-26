@@ -6,7 +6,7 @@ Read the internal Zitadel brand voice guide and product context first, then [REA
 
 ## 1. Apply the existing brand voice
 
-Use the five brand voice attributes as defined in the skill. Expressive and rebellious does not mean hostile; friendly authority does not mean generic corporate reassurance. Use wit, warmth and fresh language without obscuring the benefit or making unsupported claims. Start with the reader's problem or the command, rather than the company, in line with the skill.
+Use the five brand voice attributes as defined in the brand guide. Expressive and rebellious does not mean hostile; friendly authority does not mean generic corporate reassurance. Use wit, warmth and fresh language without obscuring the benefit or making unsupported claims. Start with the reader's problem or the command, rather than the company, in line with the brand guide.
 
 The documented promise, **"You own the experience. Zitadel guards the state."**, remains valid marketing positioning. Do not confuse it with the wording of a project-claim action in the interface.
 
@@ -24,7 +24,7 @@ If internal guidance is unavailable, preserve approved copy and CTA ordering, us
 
 | Write | Avoid | Why |
 | --- | --- | --- |
-| Stop juggling auth providers. | The seamless, robust identity platform. | Names a problem; avoids the skill's banned words. |
+| Stop juggling auth providers. | The seamless, robust identity platform. | Names a problem; avoids the brand guide's banned words. |
 | Add passkey sign-in to your app. | Next-generation passwordless security. | Names a concrete outcome instead of a category label. |
 | You own the experience. Zitadel guards the state. | Generic ownership claims without context | The documented promise has a concrete product meaning. |
 | Coming soon: [capability name] | Describing a planned capability as available | Distinguishes direction from shipped behaviour; use only for publicly announced capabilities and approved launch wording. |
@@ -37,18 +37,18 @@ The first example is drawn from the brand positioning. The promise is from the p
 | --- | --- |
 | Product landing page | Lead with the benefit or problem; demonstrate the product. Follow the website's established narrative. |
 | Product demo | Let real behaviour carry the story. Keep on-screen text readable; preserve actual commands and output. |
-| Launch video or brand campaign | Use narrative, metaphor, pacing and emotional resonance without changing factual product claims. Keep product claims accurate. |
+| Launch video or brand campaign | Use narrative, metaphor, pacing and emotional resonance while keeping product claims accurate. |
 | Social and blog | Adapt the length and emphasis to the audience and channel; use concrete examples to illustrate factual claims. |
 
 There is no universal limit on metaphors or sentence count. Choose a form that serves comprehension and the brand. For audience emphasis, consult the internal messaging matrix.
 
 ## 5. Calls to action
 
-Follow the brand voice guide's CTA order and the product context's command guidance. For the product front page, use the verified current command as the primary CTA. Do not copy an outdated command from another product or release. Other formats can use an appropriate CTA from the existing strategy.
+Follow the brand voice guide's CTA order and the product context's command guidance. For the product front page, use the verified current command as the primary CTA. Do not copy an outdated command from another product or release. For other formats, use an approved CTA for that channel; if none is available, ask the owner.
 
 ## 6. Review checklist
 
-- [ ] The copy reflects the internal brand guidance brand voice and current product positioning.
+- [ ] The copy reflects the approved brand voice and current product positioning.
 - [ ] Factual claims are supported and planned capabilities are identified honestly.
 - [ ] The creative treatment serves the message and audience.
 - [ ] Commands, product names and domain terms are accurate.
@@ -56,4 +56,4 @@ Follow the brand voice guide's CTA order and the product context's command guida
 
 ## 7. Open decisions
 
-Confirm the launch hero, naming, canonical commands and planned-capability wording with the relevant owners. No change to internal brand guidance positioning or its brand attributes is proposed.
+Confirm the launch hero, naming, canonical commands and planned-capability wording with the relevant owners. This guide does not change approved positioning or brand attributes.

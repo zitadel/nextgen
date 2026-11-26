@@ -14,7 +14,7 @@ If the internal brand guidance is unavailable, follow this repository's writing 
 
 | The task is about | Read |
 | --- | --- |
-| Website, landing page, launch post, blog, social copy, video scripts | internal brand voice guide and product context, then [marketing.md](marketing.md) |
+| Website, landing page, launch post, blog, social copy, video scripts | Internal brand voice guide and product context, then [marketing.md](marketing.md) |
 | Console, login component, CLI prompts and output, interface errors | [product.md](product.md), then the relevant surface's implementation rules |
 | Documentation, tutorials, concepts, SDK guides, API and CLI reference | [Technical writing rules](../../../apps/docs/AGENTS.md#writing) and the relevant API or CLI source rules |
 

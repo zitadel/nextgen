@@ -2,6 +2,8 @@
 
 **Authority:** [D47](../../decisions.md) defines the approved reusable pattern target; [README](README.md) distinguishes approved targets from the implemented baseline.
 
+For shared copy rules, read the [product writing guide](../../voice/product.md); this pattern remains authoritative for interaction and presentation.
+
 ## 1. Purpose & Scope
 
 Canonical owner for **form fields, labels, optional markers, helper placement, validation timing, selection primitives, creation/edit surfaces, confirmation dialogs and destructive copy**. Link/Copy belongs to UI-02, text styles to UI-03, action loading/error semantics to UI-06. Which fields, actions or forms a particular screen contains are product-specific rather than global pattern requirements.

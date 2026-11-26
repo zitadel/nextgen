@@ -5,6 +5,8 @@ The Lit atoms (`<zl-*>`) and the orchestrators under `src/orchestrator/`
 [`README.md`](README.md). To add an atom, follow the recipe in
 [`apps/storybook/AGENTS.md`](../../apps/storybook/AGENTS.md).
 
+Read the [product writing guide](../../docs/design/voice/product.md) before writing or changing user-facing copy; preserve scoped implementation rules.
+
 ## Theming and types
 
 - The theme mode is resolved in `src/orchestrator/theme-controller.ts` and

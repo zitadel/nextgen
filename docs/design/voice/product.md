@@ -12,7 +12,6 @@
 - [ ] API error handling preserves the verbatim returned message required by ADR 030.
 - [ ] Destructive actions explain their consequences; accessible names are meaningful.
 - [ ] Existing localized versions and the relevant screen designs have been checked.
-
 - [ ] Do not introduce Proposed strings or unconfirmed terminology before approval.
 - [ ] Do not override scoped implementation rules or technical contracts.
 
@@ -25,7 +24,7 @@
 | **Functional, not poetic** | Name actions plainly: *claim*, *join*, *create*. No “make it yours” or “graduation”. | Metaphor decision; manifest: “no marketing language” |
 | **Brief** | Use the fewest words that communicate the meaning. Many screens need only a label and one line; add context only to explain a decision, requirement, limitation or consequence. | Manifest: “brief” |
 | **Transparent, not explanatory** | Say what an action does and what matters to the user. Do not narrate internal mechanics or approval processes unless relevant to the decision or its consequences. | Manifest: transparency over surprise |
-| **Honest on failure** | Explain what happened and, a verified recovery action if one exists. Never alarm or blame. | Manifest: “honest” |
+| **Honest on failure** | Explain what happened and give a verified recovery action if one exists. Never alarm or blame. | Manifest: “honest” |
 | **Neutral** | Prioritize the task over brand expression. Avoid decorative metaphors or wit that obscures the action. | Follows from the job of the text, see `README.md` |
 
 ## 2. The metaphor decision and what it rules out
@@ -83,13 +82,13 @@ Apply the relevant lessons from [Technical Writing](../../../apps/docs/AGENTS.md
 - Avoid redundant headings, subtitles, and helper paragraphs. Keep helper text when it materially helps users complete the field or understand a limitation.
 - Copy controls should have accessible labels that identify the copied content; use the existing shared feedback pattern for success.
 
-**Screen-level proposals, not global mandates:** Change Users `Add` to `Add user` and `View details` to `View user` only after checking shared action naming and the current screen flows. Do not rename unrelated actions based on these examples alone.
+**Screen-level proposals, not global mandates:** Change Users `Add` to `Add user` and `View details` to `View user` only after Design/Product approval and verification of shared action naming and current screen flows. Do not rename unrelated actions based on these examples alone.
 
 ## 6. Errors, confirmations & implementation constraints
 
 - **API errors:** Respect the existing technical baseline and [ADR 030](../../adrs/030-error-model-mapping-and-reporting.md): show the **verbatim returned API response-body error message** where required. Do not replace or silently paraphrase it for voice consistency. Surrounding UI guidance may provide a next step if this does not alter the actual error.
 - **Missing data vs failure:** Empty, unconfigured, not linked, inaccessible, and failed-to-load states have different meanings and must stay distinct.
-- **Confirmation copy:** State the concrete action and irreversible consequences if the operation is irreversible; avoid generic “Are you sure?” as the only explanation.
+- **Confirmation copy:** State the concrete action and explain any irreversible consequences; avoid generic “Are you sure?” as the only explanation.
 - **Loading:** Only claim progress while a request is actually running. Do not display success before the operation completes.
 - **Security-sensitive copy:** Do not disclose whether an account exists when the authentication journey intentionally avoids account enumeration.
 - **Localization:** Translate the **meaning and domain terminology**, not just literal English wording. Do not introduce inconsistent terms across languages. Exact translations belong to a localization review, not this guideline.

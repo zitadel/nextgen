@@ -2,6 +2,8 @@
 
 **Authority:** [D47](../../decisions.md) defines the approved reusable pattern target; [README](README.md) distinguishes approved targets from the implemented baseline.
 
+For shared copy rules, read the [product writing guide](../../voice/product.md); this pattern remains authoritative for interaction and presentation.
+
 ## 1. Purpose & Scope
 
 Canonical owner of shared **text roles, resource identifier presentation, dates/times, truncation, and nonredundant helper copy**. Table geometry and identity-cell contents belong to UI-01; Copy to UI-02; detail composition to UI-04; form label composition to UI-07; global shell and navigation are separate.

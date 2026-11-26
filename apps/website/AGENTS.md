@@ -5,6 +5,8 @@ page per entry and a feed under it, and the guide to choosing it or Zitadel v4
 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
+Read the [marketing writing guide](../../docs/design/voice/marketing.md) before writing or changing website or launch copy; preserve scoped implementation rules.
+
 - The front page says the benefit, then proves it, and nothing else: the
   hero with the commands, then the showcase's steps, ending on the
   quickstart. Feature lists, ways in and roadmaps belong on the docs and

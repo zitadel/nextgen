@@ -2,6 +2,8 @@
 
 **Authority:** [D47](../../decisions.md) defines the approved reusable pattern target; [README](README.md) distinguishes approved targets from the implemented baseline.
 
+For shared copy rules, read the [product writing guide](../../voice/product.md); this pattern remains authoritative for interaction and presentation.
+
 ## 1. Purpose & Scope
 
 Canonical owner of **loading, empty, filtered-empty, error, success, mutation pending and passive business-status feedback**. Generic state meanings are shared; screen copy, individual status-to-API mappings and particular error illustrations belong to screen-level polishing tickets. Link/copy actions belong to UI-02; forms and validation to UI-07; theme tokens to UI-05.
