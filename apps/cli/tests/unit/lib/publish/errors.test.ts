@@ -16,7 +16,12 @@ describe("the publish errors", () => {
       "missing",
       "E_CREDENTIAL_MISSING",
     ],
-    ["unsafe asset target", new PublishAssetTargetUnsafeError("private"), "invalid", "E_VALIDATION"],
+    [
+      "unsafe asset target",
+      new PublishAssetTargetUnsafeError("private"),
+      "invalid",
+      "E_VALIDATION",
+    ],
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {
     expect(error).toBeInstanceOf(PublishError);
     expect(error.category).toBe(category);

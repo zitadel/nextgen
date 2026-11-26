@@ -90,48 +90,49 @@ export abstract class Store implements ConfigStore {
    */
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
-    const [listed] = await Promise.allSettled([
-      this.fs.promises.readdir(this.root.resolve(directory).toString()),
-    ]);
-    // Only an absent directory means the project has none: a permission
-    // failure, or a file where the directory should be, reported as "no
-    // files" would hide what is there and let a later write fail instead.
-    if (listed?.status === "rejected" && !isErrno(listed.reason, "ENOENT")) {
-      if (isErrno(listed.reason, "EACCES")) {
+    try {
+      const names: readonly unknown[] = await this.fs.promises.readdir(
+        this.root.resolve(directory).toString(),
+      );
+      // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
+      const files = names
+        .map((name) => {
+          return String(name);
+        })
+        .filter((name) => {
+          return name.endsWith(".json");
+        })
+        .sort();
+      // One file at a time in path order, so the first failure in path order
+      // is the one raised and which bad file is named never depends on which
+      // read finished first.
+      const stored: StoredFile[] = [];
+      for (const name of files) {
+        stored.push(await this.readFileAt(`${directory}/${name}`));
+      }
+
+      return stored;
+    } catch (error) {
+      // Only an absent directory means the project has none: a permission
+      // failure, or a file where the directory should be, reported as "no
+      // files" would hide what is there and let a later write fail instead.
+      if (error instanceof ZitadelConfigError) {
+        throw error;
+      }
+      if (isErrno(error, "ENOENT")) {
+        return [];
+      }
+      if (isErrno(error, "EACCES")) {
         throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EACCES)`);
       }
-      if (isErrno(listed.reason, "EPERM")) {
+      if (isErrno(error, "EPERM")) {
         throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EPERM)`);
       }
-      if (isErrno(listed.reason, "ENOTDIR")) {
+      if (isErrno(error, "ENOTDIR")) {
         throw new ZitadelConfigError(`${directory} cannot be read (ENOTDIR)`);
       }
       throw new ZitadelConfigError(`${directory} cannot be read`);
     }
-    const names: readonly unknown[] = listed?.status === "fulfilled" ? listed.value : [];
-    // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
-    const files = names
-      .map((name) => {
-        return String(name);
-      })
-      .filter((name) => {
-        return name.endsWith(".json");
-      })
-      .sort();
-    // Every read settles before any failure is raised, and the first failure
-    // in path order is the one raised, so which bad file is named never
-    // depends on which read finished first.
-    const readings = await Promise.allSettled(
-      files.map((name) => {
-        return this.readFileAt(`${directory}/${name}`);
-      }),
-    );
-    return readings.map((reading) => {
-      if (reading.status === "rejected") {
-        throw reading.reason;
-      }
-      return reading.value;
-    });
   }
 
   /**

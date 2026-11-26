@@ -3,8 +3,6 @@ import { copyFile, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { isErrno } from "@/lib/errno";
-
 import { Git } from "./git";
 import type { Check } from "./operation";
 import { CurrentCommit } from "./operations/current-commit";
@@ -45,10 +43,9 @@ export class StagingArea {
     } finally {
       try {
         await rm(scratch, { recursive: true, force: true });
-      } catch (error) {
-        if (!isErrno(error, "EBUSY") && !isErrno(error, "EPERM") && !isErrno(error, "EACCES")) {
-          throw error;
-        }
+      } catch {
+        // Dropped, as the doc says: the work is done, and a finally cannot throw without
+        // replacing how it ended.
       }
     }
   }

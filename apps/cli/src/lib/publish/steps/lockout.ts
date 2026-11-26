@@ -269,19 +269,17 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  const memo: { listed?: Promise<Listing | undefined> } = {};
-  return () => {
-    memo.listed ??= (async (): Promise<Listing | undefined> => {
-      try {
-        return await objectTypes(ctx);
-      } catch (error) {
-        if (error instanceof BackendError) {
-          return undefined;
-        }
-        throw error;
+  const memo: { listed?: Promise<Listing> } = {};
+  return async () => {
+    memo.listed ??= objectTypes(ctx);
+    try {
+      return await memo.listed;
+    } catch (error) {
+      if (error instanceof BackendError) {
+        return undefined;
       }
-    })();
-    return memo.listed;
+      throw error;
+    }
   };
 }
 

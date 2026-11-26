@@ -221,8 +221,11 @@ export abstract class ZitadelRuntime {
   isLoopback(): boolean {
     try {
       return isLoopbackHost(new URL(this.address).hostname);
-    } catch {
-      return false;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        return false;
+      }
+      throw error;
     }
   }
 
@@ -269,11 +272,14 @@ export abstract class ZitadelRuntime {
       const { host } = new URL(this.address);
       if (host === new URL(ZitadelRuntime.DEFAULT).host) {
         return undefined;
-      } else {
-        return host;
       }
-    } catch {
-      return undefined;
+
+      return host;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 }
@@ -1143,17 +1149,20 @@ export class LocalRuntime extends ZitadelRuntime {
       }
 
       const { image } = config;
-      const [reached] = await Promise.allSettled([this.directory.docker.available()]);
-      if (reached?.status !== "fulfilled") {
+      try {
+        const docker = await this.directory.docker.available();
+        if (docker.status !== 0) {
+          throw new LocalServerDockerMissingError(
+            `Docker is not reachable: ${docker.stderr.trim() || "docker version failed"}`,
+          );
+        }
+      } catch (error) {
+        if (error instanceof LocalServerDockerMissingError) {
+          throw error;
+        }
         throw new LocalServerDockerMissingError(
-          `Docker is not reachable: ${errorMessage(reached?.reason).trim() || "no reason given"}`,
-          reached?.reason,
-        );
-      }
-      const docker = reached.value;
-      if (docker.status !== 0) {
-        throw new LocalServerDockerMissingError(
-          `Docker is not reachable: ${docker.stderr.trim() || "docker version failed"}`,
+          `Docker is not reachable: ${errorMessage(error).trim() || "no reason given"}`,
+          error,
         );
       }
       if (existing?.backend === "binary") {
@@ -1196,14 +1205,13 @@ export class LocalRuntime extends ZitadelRuntime {
       if (runtime?.backend !== "docker") {
         return { container: undefined, dockerError: undefined };
       }
-      return this.directory.docker.inspect(runtime.container_name).then(
-        (inspected) => {
-          return { container: inspected, dockerError: undefined };
-        },
-        (error: unknown) => {
-          return { container: undefined, dockerError: errorMessage(error) };
-        },
-      );
+      try {
+        const inspected = await this.directory.docker.inspect(runtime.container_name);
+
+        return { container: inspected, dockerError: undefined };
+      } catch (error) {
+        return { container: undefined, dockerError: errorMessage(error) };
+      }
     };
     const { container, dockerError } = await inspectContainer();
     const healthy =
@@ -1286,18 +1294,15 @@ export class LocalRuntime extends ZitadelRuntime {
       // stopped before the data is deleted from under them.
       const discovery = await this.directory.servers.current();
       if (!discovery.supported) {
-        const recordExists = await readFile(localRuntimePaths(this.cwd).runtimeFile, "utf8").then(
-          () => {
-            return true;
-          },
-          () => {
-            return false;
-          },
-        );
-        if (recordExists) {
+        try {
+          await readFile(localRuntimePaths(this.cwd).runtimeFile, "utf8");
           throw new LocalServerInvalidError(
             "The local runtime record cannot be read and the machine's processes cannot be listed",
           );
+        } catch (error) {
+          if (!isErrno(error, "ENOENT")) {
+            throw error;
+          }
         }
       }
       const realPath = async (path: string): Promise<string> => {
@@ -1364,13 +1369,10 @@ export class LocalRuntime extends ZitadelRuntime {
     // Docker picks the last lines itself, but by count only, so lines at a
     // level are picked here from the whole log.
     const dockerTail = (options.level && "all") || options.tail;
-    const text = await (async () => {
-      if (runtime.backend === "binary") {
-        return this.directory.processes.readLog(runtime.log_path);
-      } else {
-        return this.directory.docker.readLogs(runtime.container_name, dockerTail);
-      }
-    })();
+    const text =
+      runtime.backend === "binary"
+        ? await this.directory.processes.readLog(runtime.log_path)
+        : await this.directory.docker.readLogs(runtime.container_name, dockerTail);
     return { runtime, lines: new LogLines(lastLines(logLines(text), options.tail, options.level)) };
   }
 

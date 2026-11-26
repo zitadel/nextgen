@@ -39,14 +39,6 @@ export async function updateNotice(input: {
   if (updateCheckDisabled(env)) {
     return undefined;
   }
-  const read: (Dependencies | undefined)[] = [];
-  try {
-    read.push(await Dependencies.read(cwd, ZITADEL_SCOPE));
-  } catch (error) {
-    if (!(error instanceof PmManifestInvalidError)) {
-      throw error;
-    }
-  }
   const release = await releaseChannel(cliVersion, env).latest();
   if (release === undefined) {
     return undefined;
@@ -56,12 +48,17 @@ export async function updateNotice(input: {
   if (release.isNewerThan(cliVersion)) {
     behind.push(`CLI ${cliVersion} → ${release.version}`);
   }
-  for (const dependency of read.flatMap((dependencies) => {
-    return dependencies?.exact() ?? [];
-  })) {
-    if (dependency.isBehind(release.version)) {
-      const name = escapeControlCharacters(dependency.name);
-      behind.push(`${name} ${dependency.specifier} → ${release.version}`);
+  try {
+    const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE);
+    for (const dependency of dependencies?.exact() ?? []) {
+      if (dependency.isBehind(release.version)) {
+        const name = escapeControlCharacters(dependency.name);
+        behind.push(`${name} ${dependency.specifier} → ${release.version}`);
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof PmManifestInvalidError)) {
+      throw error;
     }
   }
   if (behind.length === 0) {

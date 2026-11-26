@@ -1,7 +1,6 @@
 import { chmod, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { isErrno } from "@/lib/errno";
 import { warnings } from "@/lib/ui/warnings";
 
 /** A file that may carry a credential is owner read/write only. */
@@ -95,10 +94,8 @@ export class SecretFile {
     } finally {
       try {
         await rm(probe, { force: true });
-      } catch (error) {
-        if (!isErrno(error, "EACCES") && !isErrno(error, "EPERM")) {
-          throw error;
-        }
+      } catch {
+        // The probe stays; a finally cannot throw without replacing the answer.
       }
     }
   }

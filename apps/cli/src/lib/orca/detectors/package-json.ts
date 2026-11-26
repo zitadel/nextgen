@@ -151,17 +151,13 @@ export type InstalledPackage = { version: string; path: string };
 
 /** Whether `dir` is the root of a workspace, above which no app's dependencies are installed. */
 async function isWorkspaceRoot(dir: string): Promise<boolean> {
-  if (
-    await readFile(join(dir, "pnpm-workspace.yaml")).then(
-      () => {
-        return true;
-      },
-      () => {
-        return false;
-      },
-    )
-  ) {
+  try {
+    await readFile(join(dir, "pnpm-workspace.yaml"));
     return true;
+  } catch (error) {
+    if (!isErrno(error, "ENOENT")) {
+      throw error;
+    }
   }
   try {
     const pkg = await readPackageJson(dir);

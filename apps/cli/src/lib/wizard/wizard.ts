@@ -223,34 +223,33 @@ export class Wizard<Initial extends object, State extends object, Result> {
         return before;
       }
       const attempt = async (): Promise<Progress<State & Out, Result>> => {
-        told(() => options.watch?.started?.(step.key));
-        const out = await reader.run(before.state);
-        const undo = async (): Promise<void> => {
-          try {
-            await reader.undo(out);
-          } catch (error) {
-            options.onUndoError?.(step.key, error);
-          }
-          await before.undo();
-        };
+        try {
+          told(() => options.watch?.started?.(step.key));
+          const out = await reader.run(before.state);
+          const undo = async (): Promise<void> => {
+            try {
+              await reader.undo(out);
+            } catch (error) {
+              options.onUndoError?.(step.key, error);
+            }
+            await before.undo();
+          };
 
-        return {
-          kind: "continue",
-          state: {
-            ...before.state,
-            ...out,
-          },
-          undo,
-        };
+          return {
+            kind: "continue",
+            state: {
+              ...before.state,
+              ...out,
+            },
+            undo,
+          };
+        } catch (error) {
+          told(() => options.watch?.failed?.(step.key, error));
+          await before.undo();
+          throw error;
+        }
       };
-      let finished: Progress<State & Out, Result>;
-      try {
-        finished = await attempt();
-      } catch (error) {
-        told(() => options.watch?.failed?.(step.key, error));
-        await before.undo();
-        throw error;
-      }
+      const finished = await attempt();
       if (finished.kind === "continue") {
         told(() => options.watch?.finished?.(step.key, finished.state));
         try {
