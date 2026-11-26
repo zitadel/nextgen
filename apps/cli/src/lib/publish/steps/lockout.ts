@@ -344,28 +344,34 @@ async function findLockouts(ctx: StepContext): Promise<Found> {
   );
   const share = Math.max(1, Math.floor(SCAN_CAP / (scanned.size + 1 + disabling.changes.length)));
   // One scan failing must not discard what the other found.
-  const settled = await Promise.allSettled([
-    lookupWarnings(ctx, flows, share),
-    ssoSkipped === undefined ? unservedWarnings(ctx, flows, names, share) : NOTHING,
-    credentialWarnings(ctx, disabling.changes, share),
+  const scans = await Promise.all([
+    lookupWarnings(ctx, flows, share).catch((error: unknown) => {
+      if (error instanceof BackendError || isCancellation(error)) {
+        return { ...NOTHING, failed: true };
+      }
+      throw error;
+    }),
+    ssoSkipped === undefined
+      ? unservedWarnings(ctx, flows, names, share).catch((error: unknown) => {
+          if (error instanceof BackendError || isCancellation(error)) {
+            return { ...NOTHING, failed: true };
+          }
+          throw error;
+        })
+      : NOTHING,
+    credentialWarnings(ctx, disabling.changes, share).catch((error: unknown) => {
+      if (error instanceof BackendError || isCancellation(error)) {
+        return { ...NOTHING, failed: true };
+      }
+      throw error;
+    }),
   ]);
-  const scans = settled.flatMap((outcome) => {
-    if (outcome.status !== "fulfilled") {
-      return [];
-    }
-    return [outcome.value];
-  });
   const scan = merged(scans);
-  // A clean result must not look the same as a check that did not run fully.
-  const rejected = settled.some((outcome) => {
-    return outcome.status === "rejected";
-  });
-  const failedNote =
-    rejected || scan.failed
-      ? [
-          "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
-        ]
-      : [];
+  const failedNote = scan.failed
+    ? [
+        "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
+      ]
+    : [];
   const skippedNote = ssoSkipped === undefined ? [] : [ssoSkipped];
   const disablingNote = disabling.unreadable
     ? [

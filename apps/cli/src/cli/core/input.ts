@@ -5,7 +5,7 @@ import { text } from "node:stream/consumers";
 import { Errors, Flags, type Command, type Interfaces, Parser } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
-import { parseJsonObject, wordOf } from "@/lib/json";
+import { isObject, parseJsonObject, parseJsonOrUndefined, wordOf } from "@/lib/json";
 import { kebab } from "@/lib/names";
 import { environmentFlags } from "./environment-flags";
 import { refusalError, type Refusal } from "./refusal";
@@ -313,13 +313,11 @@ export class Input {
     }
     try {
       const body = await Input.textOf(source);
-      const asked: boolean[] = [];
-      try {
-        asked.push(parseJsonObject(body, "--input").json === true);
-      } catch {}
+      const parsed = parseJsonOrUndefined(body);
+      const asked = isObject(parsed) && parsed.json === true;
       const fallback = [
         ...line.kept,
-        ...(asked.includes(true) && !line.given.includes("json") ? ["--json"] : []),
+        ...(asked && !line.given.includes("json") ? ["--json"] : []),
         ...line.others,
         `--input=${Input.inline.test(body.trim()) ? body : JSON.stringify(body)}`,
       ];

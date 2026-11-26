@@ -187,15 +187,13 @@ export async function installedPackage(
   name: string,
 ): Promise<InstalledPackage | undefined> {
   const resolved = resolve(cwd);
-  const real: string[] = [];
-  try {
-    real.push(await realpath(resolved));
-  } catch (error) {
-    if (!isErrno(error, "ENOENT")) {
-      throw error;
+  const real = await realpath(resolved).catch((error: unknown) => {
+    if (isErrno(error, "ENOENT")) {
+      return undefined;
     }
-  }
-  const [start = resolved] = real;
+    throw error;
+  });
+  const start = real ?? resolved;
   for (const dir of ancestors(start)) {
     const path = join(dir, "node_modules", name, "package.json");
     try {
