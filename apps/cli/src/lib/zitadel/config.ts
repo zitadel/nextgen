@@ -437,7 +437,7 @@ export class ZitadelConfig {
     // carries a single one of each. The cap below would not catch a second
     // file, so it is refused here, before anything is inlined or sent.
     this.refuseSecond("branding", this.branding.all.length, "branding");
-    this.refuseSecond("oauth", this.oauth.all.length, "OAuth settings file");
+    this.refuseSecondOAuth();
     const branding = this.branding.all[0]?.toWireBody(store);
     const oauth = this.oauth.all[0]?.toWireBody(store);
     const policyBodies = this.policies.all.map((policy) => {
@@ -485,6 +485,19 @@ export class ZitadelConfig {
       );
     }
     return { bundle, resourceCount };
+  }
+
+  /**
+   * Refuses a second OAuth settings file, as building the bundle does, so a
+   * command that edits the one a release carries finds the problem before
+   * `deploy` does.
+   *
+   * @returns This configuration.
+   * @throws {@link ConfigError} When `.zitadel/oauth/` holds more than one file.
+   */
+  refuseSecondOAuth(): ZitadelConfig {
+    this.refuseSecond("oauth", this.oauth.all.length, "OAuth settings file");
+    return this;
   }
 
   /**

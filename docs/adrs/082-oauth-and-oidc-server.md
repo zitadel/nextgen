@@ -685,7 +685,7 @@ Decided on 2026-11-06 and 2026-11-09 in
   confidential clients, so none breaks.
 - `iss` on authorization responses (§2) stays required, as the review asked.
   It may ship after step 2, since adding it breaks no client.
-- `zitadel application create` writes `.zitadel/oauth.json` when the issuer
+- `zitadel application create` writes `.zitadel/oauth/oauth.json` when the issuer
   is off, and `zitadel settings oauth enable` stays for doing that alone
   (§12), under a `settings` group that later protocol switches share.
 - A request without `resource` (§5) gets an access token for the client's

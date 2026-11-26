@@ -34,16 +34,26 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
    * @returns The dry run's envelope.
    */
   protected async preview(): Promise<CommandResult> {
-    const written = await this.enabled(true);
-    if (written === undefined) {
+    const { file, switched, written } = await this.enabled(true);
+    const lines = written.map((path) => {
+      return `Would write ${path}`;
+    });
+    if (!switched) {
       const title = `${ALREADY_ENABLED} (dry run)`;
       return {
         status: "ok",
-        data: { title, dry_run: true },
-        summary: { title, sections: [], lines: [SettingsOauthEnable.NOTHING_TO_WRITE] },
+        data: {
+          title,
+          dry_run: true,
+          ...(written.length === 0 ? {} : { files_would_write: written }),
+        },
+        summary: {
+          title,
+          sections: [],
+          lines: written.length > 0 ? lines : [SettingsOauthEnable.NOTHING_TO_WRITE],
+        },
       };
     }
-    const [file] = written;
     const result = dryRunResult({
       verb: "enable",
       topic: "OAuth",
@@ -54,12 +64,7 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
       ...result,
       pretty: undefined,
       data: { ...(result.data as object), files_would_write: written },
-      summary: {
-        ...result.summary,
-        lines: written.map((path) => {
-          return `Would write ${path}`;
-        }),
-      },
+      summary: { ...result.summary, lines },
     };
   }
 
@@ -69,8 +74,8 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
    * @returns The envelope of the run.
    */
   protected async apply(): Promise<CommandResult> {
-    const written = await this.enabled(false);
-    if (written === undefined) {
+    const { file, switched, written } = await this.enabled(false);
+    if (written.length === 0) {
       return {
         status: "skipped",
         reason: "already-enabled",
@@ -82,18 +87,22 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
         },
       };
     }
-    const [file] = written;
+    const lines = written.map((path) => {
+      return `Wrote ${path}`;
+    });
+    if (!switched) {
+      // The switch was on, but its meta-schema was missing or outdated.
+      return {
+        status: "ok",
+        data: { title: ALREADY_ENABLED, files_written: written },
+        summary: { title: ALREADY_ENABLED, sections: [], lines },
+      };
+    }
     const title = `Enabled the OAuth authorization server in ${file}`;
     return {
       status: "ok",
       data: { title, files_written: written },
-      summary: {
-        title,
-        sections: [],
-        lines: written.map((path) => {
-          return `Wrote ${path}`;
-        }),
-      },
+      summary: { title, sections: [], lines },
       next: {
         actions: ["See the diff with a dry run, then publish the switch with the next release."],
         commands: [
@@ -104,37 +113,45 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
     };
   }
 
-  /** What a run that finds the switch on says it left alone. */
+  /** What a run that finds nothing to write says it left alone. */
   private static readonly NOTHING_TO_WRITE =
     `${CONFIG_DIRECTORIES.oauth}/ already holds the switch, so nothing was written`;
 
   /**
    * The checks and the writes a dry run and the real run share: the settings
    * the project has get the switch set, keeping their path; a project without
-   * any gets the one file. A broken settings file is refused as every command
-   * that reads the configuration refuses one. The settings' `$schema` must
-   * resolve to the dialect they were written in, so the CLI-owned meta-schema
-   * is written when missing or outdated, as `doctor --fix` does.
+   * any gets the one file. A broken settings file, or a second one, is refused
+   * as `deploy` refuses it. The settings' `$schema` must resolve to the
+   * dialect they were written in, so the CLI-owned meta-schema is written
+   * when missing or outdated, as `doctor --fix` does, also when the switch
+   * was already on.
    *
    * @param dryRun - Whether the files are only checked, never written.
-   * @returns The project-relative paths written (or that would be), the
-   *   settings file first, or `undefined` when the switch was already on.
+   * @returns The settings file's path, whether the switch was turned on, and
+   *   the project-relative paths written (or that would be), the settings
+   *   file first when it was.
    */
-  private async enabled(dryRun: boolean): Promise<readonly [string, ...string[]] | undefined> {
+  private async enabled(dryRun: boolean): Promise<{
+    readonly file: string;
+    readonly switched: boolean;
+    readonly written: readonly string[];
+  }> {
     await refuseOutsideProject(this.cwd, "the OAuth settings live under .zitadel/.");
     const store = new DiskStore(this.cwd);
-    const config = (await ZitadelConfig.loadKinds(store, ["oauth"])).refuseBroken(store);
+    const config = (await ZitadelConfig.loadKinds(store, ["oauth"]))
+      .refuseBroken(store)
+      .refuseSecondOAuth();
     const existing = config.oauth.all[0];
     const edit = existing === undefined ? undefined : existing.withEnabled(true);
-    if (edit?.changed === false) {
-      return undefined;
-    }
     const document = edit?.document ?? OAuthSettings.enabled();
-    const change = config.oauth.put(document);
-    if (dryRun) {
-      await change.check(store);
-    } else {
-      await change.save(store);
+    const switched = edit?.changed !== false;
+    if (switched) {
+      const change = config.oauth.put(document);
+      if (dryRun) {
+        await change.check(store);
+      } else {
+        await change.save(store);
+      }
     }
     const meta = MetaSchemas.of(this.cliVersion).only((file) => {
       return file.path === `${META_SCHEMA_DIR}/oauth-settings.json`;
@@ -143,6 +160,10 @@ export default class SettingsOauthEnable extends Telemetered(Previewable(BaseCom
     const metaPaths = metaWrites.written.flatMap((artifact) => {
       return artifact.kind === "file" ? [artifact.path] : [];
     });
-    return [document.path, ...metaPaths];
+    return {
+      file: document.path,
+      switched,
+      written: switched ? [document.path, ...metaPaths] : metaPaths,
+    };
   }
 }
