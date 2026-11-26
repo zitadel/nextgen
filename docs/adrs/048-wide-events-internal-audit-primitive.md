@@ -36,6 +36,13 @@
 > filters on it. See
 > [the amendment](#amendment-2026-11-11-the-user-an-event-concerns).
 >
+> **Proposed amendment (2026-11-26):** `events` gains a `correlation_id`
+> column, the chain of requests an event belongs to, and an index and a
+> `GET /events` filter for it. A request inherits the id from the stored thing
+> that brought it: an authorization request, a login flow, an auth attempt, an
+> invitation or a claim challenge. Not built. See
+> [the amendment](#proposed-amendment-2026-11-26-a-correlation-id-that-requests-inherit).
+>
 > **Proposed amendment — [ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
 > if ADR 053 is accepted, the emit-time rule for `team_id` changes. Today the
 > column captures the resolved credential's `ScopeContext` team, which for a
@@ -934,3 +941,169 @@ Spanner was not measured: no local Spanner shows a plan.
 **Cost.** One more index entry for an event that names a user. On the
 measured data the index was 54 MB beside the 160 MB table, with 300,055 of
 600,074 events naming a user.
+
+## Proposed amendment (2026-11-26): a correlation id that requests inherit
+
+§2's scopes each name one thing: a request, a session, a login flow. Work
+that takes several requests has no scope of its own, and each feature that
+needed one built it by hand:
+
+| Chain | How its requests are joined today |
+| --- | --- |
+| A login flow, its SSO callback and its handoff exchange | `flow_id`, sealed in the `_zflow` cookie and stored on `auth_attempts` for the two requests that arrive without the cookie. Three emitters pass it through `EmitSpec.FlowID`. |
+| An invitation and its replacements | `journey_id`, stored on `invitations` and written to each event's payload, which no filter of `GET /events` reads. |
+| An authorization request, the sign-in it asks for and the token its code buys | Nothing. The flow state keeps the request's ID and no event records it. `auth.request.created` names no session or flow, and the token a code buys names only the session. |
+| A project claim: the CLI's init, its polls and the browser's completion | Nothing. |
+
+Two more things follow from how the scopes reach an event:
+
+- **Path A and Path B read different context.** The request event reads the
+  mutable actor slot; a domain event prefers the actor the security handler
+  stamped, a copy (`actorFromContext`). A flow bound on an authenticated
+  request reaches its `request.api` and not its domain events. The exchange
+  and the SSO callback work around that with `EmitSpec.FlowID`, and bind the
+  flow for Path A after their transaction.
+- **Nothing outside the API's middleware chain has a slot.** The OAuth
+  endpoints are mounted with the request ID and no more.
+
+**Column.** `correlation_id` is the chain an event belongs to: the requests
+that one piece of work took, whoever sent them. It is NULL on an event whose
+request is the whole of it, and `request_id` joins those.
+
+**Carriers.** A chain crosses requests through something the server stored or
+sealed, a carrier. The carrier holds the chain's ID:
+
+| Carrier | Holds the ID in | Read by |
+| --- | --- | --- |
+| Authorization request | `auth_requests.correlation_id` | the flow created for it, and the code's redemption |
+| Login flow | the sealed flow state | every request of the flow |
+| Auth attempt | `auth_attempts.correlation_id` | the SSO callback, through its state, and the handoff exchange |
+| Invitation | `invitations.journey_id`, as today | a replace, a cancel, an accept and a decline |
+| Claim challenge | `claim_challenges.correlation_id` | the status polls and the completion |
+
+**The rule.** One place applies it, and no emitter passes an ID:
+
+1. A request starts without a correlation ID.
+2. A request that reads a carrier takes the carrier's ID. The first carrier
+   read decides; a request never changes chain.
+3. A request that creates a carrier stores its ID on it, and mints one first
+   when it has none. So a flow created for an authorization request is in
+   that request's chain, and its attempt with it.
+4. Every event the request writes from then on carries the ID, on both paths.
+   An event written before the carrier was read does not, so a handler reads
+   its carrier first, as each does today.
+
+`createFlow` is the exception to "as each does today": it keeps the
+`auth_request_id` it is given without reading the request. It reads it under
+this amendment.
+
+**Where a chain ends.** A session and a token are not carriers. A chain ends
+with the events that create them, `session.established` and
+`auth.token.issued`, and the requests they authenticate afterwards each stand
+alone. If they inherited, every request of a session would be one chain,
+which `session_id` already is. A step-up flow on a session starts a chain of
+its own.
+
+**One holder a request.** The correlation ID and the flow ID live in one
+mutable holder, planted with the request ID by the middleware every mount
+passes, the OAuth endpoints and the IdP callback included.
+`middleware.RequestContext` declares `SessionID`, `FlowID` and `Fingerprint`
+for this and nothing writes them. `FromContext` reads the holder on both
+paths, so the two cannot disagree. `EmitSpec.FlowID` and `Session.FlowID` are
+then not needed: the exchange and the SSO callback bind the attempt's flow
+before they emit. This part changes no schema and comes first.
+
+**The ID.** The server mints it and reads it back only from a carrier, never
+from a request header, so §2's rule holds: a client cannot put an event into
+a chain. It names no resource, so it is not a managed ID of
+[ADR 047](047-dialect-id-generation.md) and takes no prefix. A new ID is 16
+random bytes as 32 hex digits, the shape of a W3C trace ID. An invitation's
+stored `journey_id` keeps its value.
+
+**OpenTelemetry.** The model is a trace's: the chain is the trace, a request
+a span in it, and a carrier is trace context kept at rest. The ID is still
+not the live trace ID of [ADR 080](080-incoming-trace-context.md):
+
+- A request learns its chain inside the handler, from a cookie or a row,
+  after its server span has started. A started span cannot change its trace.
+- With `trust_remote_spans` on, the caller chooses the trace ID.
+- With tracing off there is none, and the audit trail does not depend on it.
+
+What the two share:
+
+- §9's export takes `correlation_id` for the trace ID of an event that has
+  one, and `request_id` as before of one that has none. An ID that is not 32
+  hex digits is mapped to one, as a `request_id` is.
+- A request that joins a chain sets the ID as an attribute of its server
+  span. Not a span link: the chain is no recorded trace to link to.
+- A request whose server span is sampled writes that span's trace ID to
+  `metadata.trace_id`, so an event leads to its trace in the operator's
+  backend. It is observed context, as `metadata.client` is: not indexed, not
+  a filter, and on Path A only.
+
+**Index.**
+
+| Index | Serves |
+| --- | --- |
+| `(project_id, correlation_id, created_at, id)` | the events of one chain |
+
+- It holds the time and no category, as the request's and the login flow's
+  do: a chain holds few events.
+- On Postgres and SQLite it leaves out the rows without the value; on Spanner
+  it indexes every row and keeps the time descending, as in the first
+  amendment of 2026-11-10.
+
+**How a list is read.** `GET /events` takes `correlation_id`
+([ADR 049 §1](049-events-api-retention-export.md)). `planEventRead` puts it
+after the request and the login flow and before the session: it reads, as one
+range, when neither of those is named, and is matched beside one. The plan is
+pinned in `TestListEvents_FilterPlans`.
+
+**What stays.**
+
+- `flow_id` stays a scope of its own. One chain can hold several flows, a
+  sign-up that was restarted or an invitation link opened twice, and the ID
+  must match the path of `/flows/{flow_id}`.
+- `payload.journey_id` stays on the invitation events, equal to their
+  `correlation_id`. Retiring it changes their contract, as retiring
+  `payload.user_id` would have.
+- There is no parent pointer. A chain is flat and read as one range; a tree
+  needs a read per level. `request_id` already groups the events of one
+  request inside a chain.
+
+**Why NULL outside a chain.** Setting it on every event, to the request ID
+when nothing else, would let a reader group by one column. It would also add
+an index entry for every API request on Postgres and SQLite, where the
+partial index otherwise holds only the chains.
+
+**No backfill.** The events stored before the migration keep no
+`correlation_id`, and neither does a flow or an attempt in flight when it
+lands. They age out, as in the amendments before.
+
+**Not part of this.**
+
+- An ID a client supplies: a CLI run that takes several requests, an app's
+  own request ID. Those stay §2's `metadata.client_hints`, untrusted and
+  unbuilt.
+- The OAuth endpoints' request events. Their domain events will carry the
+  chain, and their `request_id` still names a request with no `request.api`
+  event, so no `metadata.client`.
+- A background job. One that acts on a carrier, an invitation it expires,
+  writes the carrier's ID; any other job event has none.
+  [ADR 065](065-background-jobs.md) has no emitter yet.
+
+**Cost.** Not measured. On Postgres and SQLite, one more index entry for an
+event in a chain; the login flow's index, which most of the same events
+fill, was 7 MB of the 1,351 MB the seven indexes of 2026-11-10 added. On Spanner one
+more entry for every event, as each of those seven costs. It is measured, on
+Postgres as the amendments before, before this one is marked built.
+
+**Steps.**
+
+1. The holder, read by both paths; `EmitSpec.FlowID` and `Session.FlowID`
+   go. No schema change, no change to a stored event.
+2. The column, the index, the filter and the event's `correlation_id` field,
+   on all three dialects.
+3. The carriers: the flow state and the auth attempt, then the authorization
+   request, the invitation and the claim challenge.
+4. The export mapping, the span attribute and `metadata.trace_id`.
