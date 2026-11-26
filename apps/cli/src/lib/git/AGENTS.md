@@ -17,7 +17,7 @@ Zitadel: callers say what to leave out and whom to name as author.
 - Add a precondition as a `Check` in `checks/`, one class per condition, so
   each is unit-tested against every answer git can give.
 - Keep Zitadel out: pass knowledge in (`except`, `authorIfGitHasNone`), never
-  import from the rest of the CLI.
+  import from the rest of the CLI except the shared error base in `errors.ts`.
 - Assume a modern git (2.25 or later); add no fallbacks or workarounds for
   older versions.
 - Throw a `GitError` subclass with git's own message; the caller decides whether a

@@ -16,7 +16,7 @@ export abstract class UpgradeError extends ZitadelLibError {}
  * a caller words the failure for its own person, with its own suggestions.
  */
 export class UpgradeReleaseLookupError extends UpgradeError {
-  override readonly category: ErrorCategory = "unknown";
+  override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }

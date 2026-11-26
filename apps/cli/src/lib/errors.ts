@@ -20,15 +20,14 @@ export const CANCELLED = "Cancelled";
  *
  * @remarks
  * A package's base error carries one of these as `category`, so the command
- * that catches it, and the boundary that finally reports it, can say what
- * kind of failure it was without knowing which package raised it.
+ * that catches it can say what kind of failure it was without knowing which
+ * package raised it.
  *
  * Choose one by walking this list in order; the first yes wins.
  *
  * 1. `fault`: our own code is wrong (an internal guard).
- * 2. `unknown`: nobody anticipated it, so there is no typed class. The
- *    boundary assigns it to any error that is not categorized; a typed class
- *    never uses it, except a package's own "<X>FailedError" generic wrapper.
+ * 2. `unknown`: nobody anticipated it; only a package's own "<X>FailedError"
+ *    generic wrapper uses it.
  * 3. `unavailable`: the request got no decision: no network, a timeout, a 429,
  *    a 5xx, a server or machine that is not up, a port or lock that is held.
  * 4. `denied`: the problem is identity: not signed in, or not allowed (401, 403).

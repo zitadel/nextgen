@@ -22,9 +22,9 @@ export class ProjectFileMissingError extends ProjectError {
 }
 
 /**
- * A project file or value cannot be used as it is: `.zitadel/secret` is not
- * JSON, not an object or lacks what it must hold, or a value a `.env` file
- * cannot hold has a line break or no quoting that reads it back unchanged.
+ * A project file or value cannot be used as it is: `.zitadel/secret` lacks a
+ * field it must hold, or a value a `.env` file cannot hold has a line break or
+ * no quoting that reads it back unchanged.
  */
 export class ProjectInvalidError extends ProjectError {
   override readonly category: ErrorCategory = "invalid";

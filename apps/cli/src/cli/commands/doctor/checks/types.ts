@@ -1,5 +1,5 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { errorMessage, ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
+import { errorMessage, ZitadelError, ZitadelLibError, type ZitadelErrorCode } from "@/lib/errors";
 import type { Orca } from "@/lib/orca";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 
@@ -160,6 +160,11 @@ export abstract class AbstractSanityCheck implements SanityCheck {
           ? {
               code: error.code,
               ...(error.hint === undefined ? {} : { hint: error.hint }),
+            }
+          : {}),
+        ...(error instanceof ZitadelLibError
+          ? {
+              code: error.code,
             }
           : {}),
       };
