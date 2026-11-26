@@ -1,6 +1,8 @@
 import { format } from "node:util";
 
-import { type Command, Errors } from "@oclif/core";
+import type { Command } from "@oclif/core";
+
+import { ZitadelError, errorMessage } from "@/lib/errors";
 
 import { refusalError, type Refusal } from "@/cli/core/refusal";
 import { prose } from "@/lib/oclif/rendering";
@@ -142,12 +144,14 @@ export function Wrapped<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
           },
         };
       } catch (error) {
-        if (error instanceof Errors.CLIError) {
-          throw refusalError(PLUGIN_REFUSED_REFUSAL, {
-            problem: error.message,
-          });
+        // A plugin is third-party code that may throw anything; only an error
+        // of our own passes through, and the rest is reported in its words.
+        if (error instanceof ZitadelError) {
+          throw error;
         }
-        throw error;
+        throw refusalError(PLUGIN_REFUSED_REFUSAL, {
+          problem: errorMessage(error),
+        });
       } finally {
         process.stdout.write = write;
         console.log = consoleLog;

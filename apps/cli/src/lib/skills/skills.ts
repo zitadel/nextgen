@@ -108,7 +108,13 @@ export class Skills {
    * @returns `true` when the offer is still to be made.
    */
   async eligible(): Promise<boolean> {
-    return (await this.pendingOffer()) !== undefined;
+    try {
+      return (await this.pendingOffer()) !== undefined;
+    } catch {
+      // Nothing here may fail the command the person actually ran, and agent
+      // detection is third-party code that may fail in any way.
+      return false;
+    }
   }
 
   /**
@@ -191,12 +197,9 @@ export class Skills {
         unlinkSync(shownPath);
         throw error;
       }
-    } catch (error) {
-      // A marker that cannot be written must never break `setup` or the root help.
-      if (error instanceof FsError) {
-        return;
-      }
-      throw error;
+    } catch {
+      // A hint must never break `setup` or the root help, whatever failed:
+      // agent detection, the marker, or the stream it is shown on.
     }
   }
 
@@ -244,15 +247,21 @@ export class Skills {
   }
 
   /**
-   * Whether Claude Code is installed on this machine. It only decides the
-   * extra folder, never whether the skills are added.
+   * Whether Claude Code is installed on this machine. A detection that fails
+   * counts as no: it only decides the extra folder, never whether the skills
+   * are added.
    *
    * @returns `true` when it is installed.
    */
   private static async claudeCodeInstalled(): Promise<boolean> {
-    return (await rosie.agents()).some((agent) => {
-      return agent.name === "claude" && agent.detected;
-    });
+    try {
+      return (await rosie.agents()).some((agent) => {
+        return agent.name === "claude" && agent.detected;
+      });
+    } catch {
+      // Agent detection is third-party code; one that fails counts as no.
+      return false;
+    }
   }
 
   /**

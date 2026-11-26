@@ -14,7 +14,7 @@ or {
   `$promise.catch($handler)` as $call where {
     // The documented safety nets (apps/cli/AGENTS.md, Errors), which must never
     // break a run, may swallow what they did not anticipate.
-    not $filename <: r".*/apps/cli/(?:src/cli/telemetry/telemetered|src/cli/hooks/version-notice|src/cli/commands/doctor/checks/types|src/cli/commands/setup/steps/claim-ownership|src/cli/commands/setup/steps/do-initial-deploy|src/lib/publish/steps/lockout)\.ts$",
+    not $filename <: r".*/apps/cli/(?:src/cli/telemetry/telemetered|src/cli/hooks/version-notice|src/cli/commands/doctor/checks/types|src/cli/commands/setup/steps/claim-ownership|src/cli/commands/setup/steps/do-initial-deploy|src/lib/publish/steps/lockout|src/cli/core/run-context|src/cli/core/wrapped|src/lib/backend/services/origin|src/lib/browser/index|src/lib/git/repository|src/lib/idp/credentials|src/lib/skills/skills|src/lib/telemetry/mixpanel-sink|src/lib/wizard/wizard)\.ts$",
     not $handler <: r"^\s*(?:async )?\(error: unknown\) => \{[\s\S]*\bthrow [^;]+;\s*\}\s*$",
     register_diagnostic(span=$call, message="A `.catch` takes `(error: unknown) => { if (error instanceof X) { return fallback; } throw error; }`.", severity="error")
   }

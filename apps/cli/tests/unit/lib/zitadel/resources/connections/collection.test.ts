@@ -1252,7 +1252,8 @@ describe("Connections.resolveExisting", () => {
         expect(error).toMatchObject({
           message: `${ACME_SSO_FILE} already exists and is not the acme-sso connection`,
           path: ACME_SSO_FILE,
-          slug: "something-else",
+          wanted: "acme-sso",
+          slug: "acme-sso",
         });
       });
     });

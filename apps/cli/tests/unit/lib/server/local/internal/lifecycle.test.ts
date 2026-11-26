@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ManualClock } from "@tests/fixtures/clock";
 
+import { FsFailedError } from "@/lib/fs";
+
 import {
   LocalServerPortBusyError,
   LocalServerPortFullError,
@@ -563,7 +565,7 @@ describe("Lifecycle", () => {
       const world = new World();
       world.writeError = new Error("read-only file system");
       world.launcher.terminate = async () => {
-        throw new Error("docker daemon is gone");
+        throw new LocalServerDockerFailedError("docker daemon is gone");
       };
 
       await expect(world.server().start()).rejects.toBeInstanceOf(LocalServerStopError);
@@ -572,7 +574,7 @@ describe("Lifecycle", () => {
     it("does not let a claim that cannot be removed hide a successful start", async () => {
       const world = new World();
       world.ports.reserve = async () => async () => {
-        throw new Error("EBUSY");
+        throw new FsFailedError("EBUSY: resource busy or locked", "EBUSY");
       };
 
       await expect(world.server().start()).resolves.toMatchObject({ alreadyRunning: false });

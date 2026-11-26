@@ -244,6 +244,17 @@ export class LocalServerDockerMissingError extends LocalServerError {
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 }
 
+/**
+ * A program the CLI asked the machine about (`lsof`, `ps`) could not answer:
+ * it is not installed, exited non-zero, or ran past its timeout. The message
+ * says what running it said.
+ */
+export class LocalServerProgramFailedError extends LocalServerError {
+  override readonly category: ErrorCategory = "unavailable";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_NETWORK";
+}
+
 /** A process the CLI signalled does not exist, so there is nothing to signal. */
 export class LocalServerProcessGoneError extends LocalServerError {
   override readonly category: ErrorCategory = "unavailable";

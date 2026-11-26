@@ -1,7 +1,13 @@
 import { stringify } from "safe-stable-stringify";
 
 import { isErrno } from "@/lib/errno";
-import { FsIsDirectoryError, FsNotDirectoryError, FsNotFoundError, fsFailure } from "@/lib/fs";
+import {
+  FsError,
+  FsIsDirectoryError,
+  FsNotDirectoryError,
+  FsNotFoundError,
+  fsFailure,
+} from "@/lib/fs";
 import {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
@@ -293,14 +299,19 @@ export abstract class Store implements ConfigStore {
           if (failure instanceof FsNotDirectoryError) {
             return undefined;
           }
-          const message = `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`;
           if (isErrno(error, "EACCES")) {
-            throw new ZitadelConfigReferenceUnreadableError(message, error);
+            throw new ZitadelConfigReferenceUnreadableError(file.path, ref, "EACCES", error);
           }
           if (isErrno(error, "EPERM")) {
-            throw new ZitadelConfigReferenceUnreadableError(message, error);
+            throw new ZitadelConfigReferenceUnreadableError(file.path, ref, "EPERM", error);
           }
-          throw new ZitadelConfigError(message, error);
+          if (failure instanceof FsError) {
+            throw new ZitadelConfigError(
+              `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`,
+              error,
+            );
+          }
+          throw error;
         }
       },
       missing,

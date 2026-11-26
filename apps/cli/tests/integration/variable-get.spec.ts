@@ -377,7 +377,7 @@ describe("variable get", () => {
         expect(JSON.parse(result.stdout)).toMatchObject({
           code: "E_NOT_FOUND",
           message: "Variable API_URL has no preview value.",
-          hint: "A name has a preview value only once one is set with `--preview`.",
+          hint: "A name has a preview value only once one is set with --preview.",
         });
       });
 
@@ -390,7 +390,7 @@ describe("variable get", () => {
         expect(JSON.parse(result.stdout)).toMatchObject({
           code: "E_NOT_FOUND",
           message: "Variable API_URL has no primary value.",
-          hint: "Set one with `variable set`.",
+          hint: "Set one with variable set.",
         });
       });
 

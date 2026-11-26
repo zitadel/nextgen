@@ -15,7 +15,7 @@ import { Consent, ConsentInternalError } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import { SyncStateMalformedError } from "@/lib/sync";
 
-import { type Change, ZitadelConfigError, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
+import { type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
 import { recordLog } from "@tests/fixtures/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
@@ -994,9 +994,15 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
+        code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/schemas/customers.json:"),
+        details: {
+          problems: expect.arrayContaining([
+            expect.objectContaining({ path: ".zitadel/schemas/customers.json" }),
+          ]),
+        },
       });
     });
 
@@ -1009,9 +1015,15 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees" });
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
+        code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/schemas/employees.json:"),
+        details: {
+          problems: expect.arrayContaining([
+            expect.objectContaining({ path: ".zitadel/schemas/employees.json" }),
+          ]),
+        },
       });
     });
   });
@@ -1030,7 +1042,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).not.toBeInstanceOf(ZitadelConfigError);
+      expect(error).not.toMatchObject({ details: { problems: expect.anything() } });
       expect(error).toMatchObject({
         message: "This project has more than one user schema",
       });
@@ -1049,7 +1061,13 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees.json" });
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        details: {
+          problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
+        },
+      });
     });
 
     it("refuses a name no schema has as unknown, not as the broken file", async ({ dir }) => {
@@ -1095,9 +1113,15 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
+        code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/idps/broken.json:"),
+        details: {
+          problems: expect.arrayContaining([
+            expect.objectContaining({ path: ".zitadel/idps/broken.json" }),
+          ]),
+        },
       });
     });
   });

@@ -1096,7 +1096,8 @@ export class ScaffoldedApp {
 
   /** Leaves this directory with a `.env.local` that exists but cannot be read as a file. */
   async makeLocalEnvFileUnreadable(): Promise<void> {
-    await mkdir(join(this.path, ".env.local"), { recursive: true });
+    await rm(join(this.path, ".env.local"), { force: true });
+    await mkdir(join(this.path, ".env.local"));
   }
 
   /** The `.env.local` of this directory, which refusals about it name. */

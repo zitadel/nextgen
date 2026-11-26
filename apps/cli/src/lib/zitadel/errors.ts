@@ -681,9 +681,16 @@ export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
    * @param path - The project-relative path that cannot be read.
    * @param errno - The operating system's error code.
    * @param cause - The failure that stopped the read.
+   * @param message - What went wrong, when it is more than the path that
+   *   cannot be read.
    */
-  constructor(path: string, errno: string, cause?: unknown) {
-    super(`${path} cannot be read (${errno})`, cause);
+  constructor(
+    path: string,
+    errno: string,
+    cause?: unknown,
+    message = `${path} cannot be read (${errno})`,
+  ) {
+    super(message, cause);
     this.path = path;
     this.errno = errno;
   }
@@ -691,12 +698,32 @@ export class ZitadelConfigFileUnreadableError extends ZitadelConfigError {
 
 /**
  * A `$file` reference whose file is there but that the operating system
- * refused to let this process read.
+ * refused to let this process read. It is a file that cannot be read, so a
+ * caller that refuses one refuses the other the same way.
  */
-export class ZitadelConfigReferenceUnreadableError extends ZitadelConfigError {
-  override readonly category: ErrorCategory = "denied";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_AUTH";
+export class ZitadelConfigReferenceUnreadableError extends ZitadelConfigFileUnreadableError {
+  /**
+   * The reference, as the file holding it wrote it.
+   */
+  readonly ref: string;
+
+  /**
+   * Make the failure for this reference.
+   *
+   * @param path - The project-relative path of the file holding the reference.
+   * @param ref - The reference, as that file wrote it.
+   * @param errno - The operating system's error code.
+   * @param cause - The failure that stopped the read.
+   */
+  constructor(path: string, ref: string, errno: string, cause?: unknown) {
+    super(
+      path,
+      errno,
+      cause,
+      `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`,
+    );
+    this.ref = ref;
+  }
 }
 
 /** A bug in this package: something that cannot happen unless the code is wrong. */

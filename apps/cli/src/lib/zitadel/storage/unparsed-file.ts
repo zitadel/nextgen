@@ -114,6 +114,10 @@ export class UnparsedFile {
         }
         return `line ${found.line}, column ${found.column}`;
       }
+      // A text nested deeper than the stack can follow has no place to give.
+      if (error instanceof RangeError) {
+        return undefined;
+      }
       throw error;
     }
     return undefined;
@@ -133,15 +137,24 @@ export class UnparsedFile {
    */
   private static placeParserFinds(text: string): string | undefined {
     const places: string[] = [];
-    visit(
-      text,
-      {
-        onError: (_error, _offset, _length, line, character) => {
-          places.push(`line ${line + 1}, column ${character + 1}`);
+    try {
+      visit(
+        text,
+        {
+          onError: (_error, _offset, _length, line, character) => {
+            places.push(`line ${line + 1}, column ${character + 1}`);
+          },
         },
-      },
-      STRICT_JSON,
-    );
+        STRICT_JSON,
+      );
+    } catch (error) {
+      // The visitor recurses: a text nested deeper than the stack can follow
+      // has no place to give.
+      if (error instanceof RangeError) {
+        return undefined;
+      }
+      throw error;
+    }
     return places[0];
   }
 }

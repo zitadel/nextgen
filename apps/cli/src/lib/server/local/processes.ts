@@ -1,5 +1,6 @@
-import { ExecaError } from "execa";
 import { basename } from "node:path";
+
+import { LocalServerProgramFailedError } from "@/lib/server/errors";
 
 import { type Run, systemRun } from "./ports";
 
@@ -71,7 +72,7 @@ export async function discoverManagedRuntimeProcesses(opts?: {
       return { rows: parsePsRows(stdout) };
     })
     .catch((error: unknown) => {
-      if (error instanceof ExecaError) {
+      if (error instanceof LocalServerProgramFailedError) {
         return { error: errorMessage(error) };
       }
       throw error;
@@ -117,7 +118,7 @@ async function hydrateCommand(
     });
     return stdout.trim() || fallback;
   } catch (error) {
-    if (error instanceof ExecaError) {
+    if (error instanceof LocalServerProgramFailedError) {
       return fallback;
     }
     throw error;

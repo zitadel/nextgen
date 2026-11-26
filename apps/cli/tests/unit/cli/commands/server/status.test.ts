@@ -13,9 +13,11 @@ import { stripAnsi } from "@tests/helpers/run-cli";
 
 // The platform is unreachable unless a test says otherwise — a network error,
 // not an HTTP status — so the user-presence probe reads as "unknown" and
-// status keeps its lifecycle-only output.
+// status keeps its lifecycle-only output. A recorded server that is not running
+// answers its health check the same way, as a closed port does.
 it.beforeEach(({ server }) => {
   server.use(http.post("*/users/query", () => HttpResponse.error()));
+  server.use(http.get("http://localhost:9/readyz", () => HttpResponse.error()));
 });
 
 const SECRET = {

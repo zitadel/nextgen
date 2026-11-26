@@ -6,7 +6,6 @@ import type {
   ConnectionEndpoints,
 } from "@zitadel/config/idp";
 
-import { BackendError } from "@/lib/backend";
 import { log } from "@/lib/ui/log";
 import { warnings } from "@/lib/ui/warnings";
 import type { SuggestedCommand } from "@/lib/suggestion";
@@ -158,11 +157,10 @@ async function publishSecret(
 
     return "stored";
   } catch (error) {
-    if (error instanceof BackendError) {
-      log.debug(`Publishing ${name} to the project failed`, error);
-      return "failed";
-    }
-    throw error;
+    // The publisher is the caller's and may fail in any way; the delivery
+    // report says so rather than failing the command.
+    log.debug(`Publishing ${name} to the project failed`, error);
+    return "failed";
   }
 }
 

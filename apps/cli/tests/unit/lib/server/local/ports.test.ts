@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { LocalServerProgramFailedError } from "@/lib/server/errors";
 import { listListeningTcpListeners, type Run, workingDirectories } from "@/lib/server/local/ports";
 
 /**
@@ -67,29 +68,23 @@ describe("listListeningTcpListeners", () => {
   });
 
   it("returns [] when lsof is not on PATH (ENOENT)", async () => {
-    const enoent: NodeJS.ErrnoException = Object.assign(new Error("spawn lsof ENOENT"), {
-      code: "ENOENT",
-    });
-    const run = lsofFailingWith(enoent);
+    const run = lsofFailingWith(new LocalServerProgramFailedError("spawn lsof ENOENT"));
 
     expect(await listListeningTcpListeners({ run })).toEqual([]);
   });
 
   it("returns [] when lsof exits non-zero", async () => {
-    const failure: NodeJS.ErrnoException = Object.assign(new Error("Command failed"), {
-      code: "1",
-    });
-    const run = lsofFailingWith(failure);
+    const run = lsofFailingWith(
+      new LocalServerProgramFailedError("Command failed with exit code 1"),
+    );
 
     expect(await listListeningTcpListeners({ run })).toEqual([]);
   });
 
   it("returns [] when lsof exceeds the timeout", async () => {
-    // execa's timeout error has code "ETIMEDOUT" / signal.
-    const timedOut: NodeJS.ErrnoException = Object.assign(new Error("timeout"), {
-      code: "ETIMEDOUT",
-    });
-    const run = lsofFailingWith(timedOut);
+    const run = lsofFailingWith(
+      new LocalServerProgramFailedError("Command timed out after 1 milliseconds"),
+    );
 
     expect(await listListeningTcpListeners({ timeoutMs: 1, run })).toEqual([]);
   });
@@ -159,7 +154,7 @@ describe("workingDirectories", () => {
   });
 
   it("knows no folder when lsof fails", async () => {
-    const run = lsofFailingWith(Object.assign(new Error("spawn lsof ENOENT"), { code: "ENOENT" }));
+    const run = lsofFailingWith(new LocalServerProgramFailedError("spawn lsof ENOENT"));
 
     await expect(workingDirectories([4242], { run })).resolves.toEqual(new Map());
   });

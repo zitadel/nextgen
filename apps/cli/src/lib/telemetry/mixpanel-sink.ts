@@ -41,11 +41,10 @@ export class MixpanelSink implements TelemetrySink {
       const init = settings.init ?? defaultInit;
       const client = init(settings.token, resolveTelemetryEndpoint(settings.env));
       return new MixpanelSink(client, settings.distinctId, settings.debug);
-    } catch (error) {
-      if (error instanceof TelemetryClientError) {
-        return undefined;
-      }
-      throw error;
+    } catch {
+      // Telemetry fails open: an injected or third-party client that cannot
+      // be made, in any way, only means nothing is sent.
+      return undefined;
     }
   }
 

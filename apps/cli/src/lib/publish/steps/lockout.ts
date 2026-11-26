@@ -1,4 +1,5 @@
 import { BackendError, type Credential, type QueriedUser, type UserQuery } from "@/lib/backend";
+import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import type { Lockout, Step, StepContext, StepResult } from "@/lib/publish/pipeline";
@@ -793,10 +794,12 @@ async function credentialWarnings(
         try {
           return await ctx.users.credentials(user.id, asked);
         } catch (error) {
-          if (error instanceof BackendError) {
-            return undefined;
+          // Any failure of one user's read, not only the server's, leaves the
+          // count a lower bound; only the person stopping the command stops it.
+          if (isCancellation(error)) {
+            throw error;
           }
-          throw error;
+          return undefined;
         }
       });
       const failed = held.includes(undefined);

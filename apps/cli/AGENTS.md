@@ -373,7 +373,9 @@
 - Let an error nobody anticipated bubble up unwrapped.
 - The one exception is a safety net that must never break a run: telemetry reporting
   (`cli/telemetry/telemetered.ts`), the version notice, a doctor check's outcome
-  (`doctor/checks/types.ts`), setup's claim and first deploy, and the deploy lockout scans.
+  (`doctor/checks/types.ts`), setup's claim and first deploy, the deploy lockout scans,
+  and every call into code the CLI does not own (a plugin, an injected opener, publisher,
+  question, resolver or telemetry client, a step's undo, agent detection, an origin re-read).
   They keep their typed branches and fall back for the rest; the lint rules name these files.
 - These rules are lint: `biome-plugins/error-*.grit` and `no-node-fs-promises.grit` fail
   `biome check` on any catch that breaks them (`src/lib/orca/patchers` excepted).

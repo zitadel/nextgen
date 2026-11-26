@@ -404,14 +404,14 @@ export class OriginService extends ApiService {
       // A cancellation is not a project that could not be read: the person
       // asked the command to stop, so it stops rather than reporting what the
       // removal left behind.
-      if (error instanceof BackendError && !isCancelled(this.client)) {
-        return {
-          pattern,
-          outcome: "unverified",
-          cause: error,
-        };
+      if (isCancelled(this.client)) {
+        throw error;
       }
-      throw error;
+      return {
+        pattern,
+        outcome: "unverified",
+        cause: error,
+      };
     }
   }
 }

@@ -759,6 +759,7 @@ describe("Store.inlineReferences", () => {
         });
 
         expect(error).toBeInstanceOf(ZitadelConfigFileUnreadableError);
+        expect(error).toMatchObject({ errno: "EACCES" });
       },
     );
 

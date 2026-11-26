@@ -44,8 +44,8 @@ import { ReadSsoFlags } from "@/cli/commands/setup/steps/read-sso-flags";
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { customExample, IdpSettingsMissingError, SETUP_FLAG_NAMES } from "@/lib/idp";
-import { FsIsDirectoryError } from "@/lib/fs";
+import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { FsFailedError, FsIsDirectoryError } from "@/lib/fs";
 import { Ui, warnings } from "@/lib/ui";
 import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
 import { FakeMachine } from "@tests/helpers/local-machine";
@@ -1096,7 +1096,7 @@ describe("setup", () => {
         code: "E_LOCAL_SERVER_NOT_RUNNING",
         message: "Local Zitadel server is not running",
         hint: expect.stringContaining(
-          `No local server has been started in this directory or a parent. Run \`${expectedPublicCliCommand("start")}\`, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup.`,
+          `No local server has been started in this directory or a parent. Run ${expectedPublicCliCommand("start")}, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup.`,
         ),
       });
     });
@@ -3306,7 +3306,9 @@ describe("Setup.run", () => {
     it("says in the chain that a step it could not finish gave up", async ({ dir }) => {
       await aNextApp(dir);
       answeringEveryQuestion();
-      vi.spyOn(Orca, "writeManifest").mockRejectedValueOnce(new Error("disk full"));
+      vi.spyOn(Orca, "writeManifest").mockRejectedValueOnce(
+        new FsFailedError("Could not write .zitadel/sync.json: disk full (ENOSPC)", "ENOSPC"),
+      );
 
       await asTerminal(() => {
         return Setup.run(["--cwd", dir, "--server", CLOUD, "--skip-install"], config);
@@ -4189,10 +4191,10 @@ describe("ReadSsoFlags", () => {
           return readingFlags(true);
         });
 
-        expect(error).toBeInstanceOf(IdpSettingsMissingError);
+        expect(error).toBeInstanceOf(ZitadelError);
         expect(error).toMatchObject({
           code: "E_VALIDATION",
-          example: expect.stringContaining("--provider custom"),
+          hint: expect.stringContaining("--sso custom"),
         });
       });
 

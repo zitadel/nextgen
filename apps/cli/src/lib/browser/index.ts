@@ -70,14 +70,13 @@ export async function openInBrowser(
   try {
     await deps.open(url, browser || undefined);
     return { opened: true };
-  } catch (error) {
-    if (error instanceof BrowserLaunchError) {
-      return {
-        opened: false,
-        reason: "spawn-failed",
-      };
-    }
-    throw error;
+  } catch {
+    // Best effort is the contract: an injected or third-party opener may
+    // fail in any way, and none of it may reach the command.
+    return {
+      opened: false,
+      reason: "spawn-failed",
+    };
   }
 }
 

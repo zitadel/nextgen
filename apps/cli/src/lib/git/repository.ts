@@ -3,7 +3,7 @@ import { realpath, rm } from "@/lib/fs";
 import { join } from "node:path";
 
 import { entryExists, FsError } from "@/lib/fs";
-import { GitBinaryMissingError, GitCommandFailedError, GitError } from "./errors";
+import { GitBinaryMissingError, GitCommandFailedError } from "./errors";
 import { Git } from "./git";
 import type { Operation } from "./operation";
 import { CommitAll } from "./operations/commit-all";
@@ -100,14 +100,10 @@ export class Repository {
         return otherwise;
       }
       return await question(repository);
-    } catch (error) {
-      if (error instanceof GitError) {
-        return otherwise;
-      }
-      if (error instanceof FsError) {
-        return otherwise;
-      }
-      throw error;
+    } catch {
+      // The question is the caller's code and may fail in any way; the
+      // contract is to give the default instead.
+      return otherwise;
     }
   }
 

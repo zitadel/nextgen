@@ -195,7 +195,7 @@ describe("start", () => {
         expect(app.envelopeOf(result)).toMatchObject({
           status: "error",
           code: "E_VALIDATION",
-          hint: `Delete ${app.localAdminFile} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.`,
+          hint: `Delete ${app.localAdminFile} and run ${expectedPublicCliCommand("reset --force")}, then ${expectedPublicCliCommand("start")}. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.`,
         });
       });
 

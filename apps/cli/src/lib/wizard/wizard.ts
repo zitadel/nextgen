@@ -1,4 +1,3 @@
-import { FsError } from "@/lib/fs";
 import { WizardDefinitionError } from "./errors";
 import type { EndStep, WizardStep } from "./step";
 
@@ -217,13 +216,9 @@ export class Wizard<Initial extends object, State extends object, Result> {
             try {
               await reader.undo(out);
             } catch (error) {
-              // A step's undo fails only with the file system, as both of setup's do.
-              if (error instanceof FsError) {
-                options.onUndoError?.(step.key, error);
-                await before.undo();
-                return;
-              }
-              throw error;
+              // A step's undo is the step's own code and may fail in any way;
+              // one that fails is reported and the undoing goes on.
+              options.onUndoError?.(step.key, error);
             }
             await before.undo();
           };

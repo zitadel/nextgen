@@ -1,4 +1,3 @@
-import { ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { byName } from "@/lib/names";
 import { resolveCwd } from "@/lib/paths";
 import type { Scope } from "@/lib/suggestion";
@@ -176,30 +175,18 @@ export class RunContext {
         scope,
         false,
       );
-    } catch (error) {
-      if (error instanceof ZitadelLibError) {
-        return new RunContext(
-          {
-            ...meta,
-            cwd,
-            serverFlag,
-          },
-          scope,
-          false,
-        );
-      }
-      if (error instanceof ZitadelError) {
-        return new RunContext(
-          {
-            ...meta,
-            cwd,
-            serverFlag,
-          },
-          scope,
-          false,
-        );
-      }
-      throw error;
+    } catch {
+      // The resolver is injected and may fail in any way; a server that
+      // cannot be resolved is left to the command's own failure.
+      return new RunContext(
+        {
+          ...meta,
+          cwd,
+          serverFlag,
+        },
+        scope,
+        false,
+      );
     }
   }
 
