@@ -13,8 +13,9 @@ The public Go client module, `go.zitadel.com/zitadel/v5`.
   the server and `tools/bench` reach it through a `replace` to this directory.
 - A type the spec names with `x-ogen-type` lives in `ogenx/`, because a
   public module cannot import the server's `internal/`.
-- Keep `README.md`'s example and `api/example_test.go` the same in substance;
-  `zitadel/v5#test` compiles and runs the Example.
+- Keep `README.md`'s examples and `api/example_test.go` and
+  `login/example_test.go` the same in substance; `zitadel/v5#test` compiles and
+  runs both Examples.
 - MIT, not AGPL ([LICENSING.md](../../LICENSING.md)).
 - Change the `module` line together with the go-import page
   (`apps/cloud/go-import/public/index.html`); `TestVercelJSONServesGoImportMetadataOnGoHost` (`@zitadel/server#test`) fails on drift.
