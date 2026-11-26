@@ -3,7 +3,13 @@ import { ZitadelRuntime } from "@/lib/server";
 import { isCancellation } from "@/lib/errors";
 import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { Runtime } from "@/lib/runtime";
-import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
+import {
+  CONFIG_DIRECTORIES,
+  DiskStore,
+  type Issue,
+  ZitadelConfig,
+  ZitadelConfigError,
+} from "@/lib/zitadel";
 
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 import { Project } from "@/lib/project";
@@ -57,11 +63,14 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
-      const found = await this.inspected(ctx).catch(() => {
-        return undefined;
-      });
-      if (found === undefined) {
-        return await super.run(ctx);
+      let found: Inspection;
+      try {
+        found = await this.inspected(ctx);
+      } catch (error) {
+        if (error instanceof ZitadelConfigError) {
+          return await super.run(ctx);
+        }
+        throw error;
       }
       const brokenSchemas = found.config.broken.filter((file) => {
         return file.kind === "schema";

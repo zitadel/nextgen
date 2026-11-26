@@ -1,6 +1,6 @@
 import semver from "semver";
 
-import { PM } from "@/lib/pm";
+import { PM, PmManifestInvalidError } from "@/lib/pm";
 import { suggestedCommandOf } from "@/lib/suggestion";
 import { Dependencies } from "@/lib/upgrade/dependencies";
 import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
@@ -53,9 +53,19 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    const dependencies = await Dependencies.read(ctx.cwd, ZITADEL_SCOPE).catch(() => {
-      return undefined;
-    });
+    let dependencies: Dependencies | undefined;
+    try {
+      dependencies = await Dependencies.read(ctx.cwd, ZITADEL_SCOPE);
+    } catch (error) {
+      if (error instanceof PmManifestInvalidError) {
+        return {
+          ...base,
+          status: "pass",
+          message: "No readable package.json to compare pins against",
+        };
+      }
+      throw error;
+    }
     if (dependencies === undefined) {
       return {
         ...base,

@@ -3,7 +3,13 @@ import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { LocalRuntime, StartedServer, ZitadelRuntime } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
+  StartedServer,
+  ZitadelRuntime,
+} from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
 import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
@@ -1085,14 +1091,27 @@ export default class Doctor extends Telemetered(
       return already;
     }
     const working = (async () => {
-      const hint = await this.started.of(cwd).catch(() => {
-        return undefined;
-      });
-      return {
-        cwd,
-        port: flags.port ?? hint?.runtime.port ?? LocalRuntime.DEFAULT_PORT,
-        hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
-      };
+      const hostedServer = await this.hostedServerWithoutLocalRuntime(flags, cwd);
+      try {
+        const hint = await this.started.of(cwd);
+        return {
+          cwd,
+          port: flags.port ?? hint?.runtime.port ?? LocalRuntime.DEFAULT_PORT,
+          hostedServer,
+        };
+      } catch (error) {
+        if (
+          error instanceof LocalServerRecordUnreadableError ||
+          error instanceof LocalServerRecordMalformedError
+        ) {
+          return {
+            cwd,
+            port: flags.port ?? LocalRuntime.DEFAULT_PORT,
+            hostedServer,
+          };
+        }
+        throw error;
+      }
     })();
     this.checking.set(asked, working);
     return working;

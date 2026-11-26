@@ -1,18 +1,19 @@
 import { configuredIssuer } from "@/cli/commands/doctor/patch-context";
 import { ZitadelRuntime } from "@/lib/server";
 import {
+  BackendError,
   createZitadelClient,
   DeploymentService,
   OriginService,
   Origins,
   type ZitadelClient,
 } from "@/lib/backend";
-import { errorMessage, isCancellation } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
 import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { Project, type ProjectSecret } from "@/lib/project";
+import { Project, ProjectError, type ProjectSecret } from "@/lib/project";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -111,15 +112,19 @@ export class IssuerOriginCheck implements SanityCheck {
         }),
       })
       .write();
-    const extended = await new DeploymentService(client, held.project_id)
-      .extendPrimary(pattern, `Made ${pattern} a primary origin`)
-      .catch((error: unknown) => {
-        if (isCancellation(error)) {
-          throw error;
-        }
-        return undefined;
-      });
-    if (extended?.outcome !== "deployed" && extended?.outcome !== "unchanged") {
+    let deployed = false;
+    try {
+      const extended = await new DeploymentService(client, held.project_id).extendPrimary(
+        pattern,
+        `Made ${pattern} a primary origin`,
+      );
+      deployed = extended.outcome === "deployed" || extended.outcome === "unchanged";
+    } catch (error) {
+      if (!(error instanceof BackendError)) {
+        throw error;
+      }
+    }
+    if (!deployed) {
       warnings.report(
         `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
       );
@@ -141,24 +146,20 @@ export class IssuerOriginCheck implements SanityCheck {
  * @throws The cancellation, when the person stopped the run.
  */
 async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
-  const records = await Project.at(cwd)
-    .secret()
-    .then(async (secret) => {
+  let secret: ProjectSecret;
+  let server: string;
+  try {
+    secret = await Project.at(cwd).secret();
+    server = (await Project.at(cwd).config()).server ?? ZitadelRuntime.DEFAULT;
+  } catch (error) {
+    if (error instanceof ProjectError) {
       return {
-        secret,
-        server: (await Project.at(cwd).config()).server ?? ZitadelRuntime.DEFAULT,
+        status: "pass",
+        message: "Skipped: could not read the project files that record its origins",
       };
-    })
-    .catch(() => {
-      return undefined;
-    });
-  if (records === undefined) {
-    return {
-      status: "pass",
-      message: "Skipped: could not read the project files that record its origins",
-    };
+    }
+    throw error;
   }
-  const { secret, server } = records;
   const issuer = await configuredIssuer(cwd);
   if (issuer === undefined) {
     return {
@@ -194,24 +195,18 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
     signal,
   });
   const originService = new OriginService(client, secret.data.project_id);
-  const read = await originService
-    .list()
-    .then((origins) => {
-      return { origins };
-    })
-    .catch((error: unknown) => {
-      if (isCancellation(error)) {
-        throw error;
-      }
-      return { failure: error };
-    });
-  if ("failure" in read) {
-    return {
-      status: "pass",
-      message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(read.failure)}`,
-    };
+  let origins: Origins;
+  try {
+    origins = await originService.list();
+  } catch (error) {
+    if (error instanceof BackendError) {
+      return {
+        status: "pass",
+        message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(error)}`,
+      };
+    }
+    throw error;
   }
-  const { origins } = read;
   const pattern = origins.heldAsPreview(issuer);
   if (pattern !== undefined) {
     return {
