@@ -1265,6 +1265,22 @@ export class ScaffoldedApp {
     expect(result, "origin add should have succeeded").toSucceed();
   }
 
+  /** Turn the OAuth authorization server on with `settings oauth enable`. */
+  enableOAuth(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["settings", "oauth", "enable", "--json", ...extraArgs]);
+  }
+
+  /** The kinds a release pins, as `release get` reports them. */
+  async releasePointerKinds(releaseId: string): Promise<string[]> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ pointers: { kind: string }[] }>(result).data.pointers.map(
+      (pointer) => {
+        return pointer.kind;
+      },
+    );
+  }
+
   /**
    * Invite someone into the project with `invitation create`.
    *
