@@ -1,6 +1,9 @@
 import { ATTRIBUTES, ELEMENTS, REMOVED_TAGS, UNWRAPPED_TAGS } from "./allowlist.js";
 import type { Sanitiser } from "./sanitiser.js";
 
+/** The URL schemes that run script when followed. */
+const SCRIPT_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:"]);
+
 /**
  * Sanitises with the browser's own HTML Sanitizer API, `Element.setHTML()`.
  *
@@ -8,6 +11,12 @@ import type { Sanitiser } from "./sanitiser.js";
  * safe HTML such as `<b>` and `<table>`, and adds the atoms and attributes in
  * `allowlist.ts`. The markup is parsed into an inert document, so nothing in
  * it loads or runs and no custom element upgrades while it is sanitised.
+ *
+ * The browser strips `javascript:` only from its own link attributes, such as
+ * `href` on `<a>`. An atom that renders a link from its own attribute
+ * (`<zl-pill href>`, `<zl-field forgot-password-href>`) would still run it, so
+ * every attribute that holds a script URL is dropped afterwards, as DOMPurify
+ * does for every attribute.
  */
 export class NativeSanitiser implements Sanitiser {
   private readonly sanitizer: Sanitizer = NativeSanitiser.configure();
@@ -53,12 +62,30 @@ export class NativeSanitiser implements Sanitiser {
   }
 
   /**
+   * Whether a value is a URL that runs script, read the way a browser reads a
+   * link, so `" java\tscript:"` counts too.
+   *
+   * @param value - An attribute value.
+   * @returns `true` for a `javascript:` or `vbscript:` URL.
+   */
+  private static isScriptUrl(value: string): boolean {
+    return SCRIPT_SCHEMES.has(URL.parse(value, document.baseURI)?.protocol ?? "");
+  }
+
+  /**
    * @param html - The untrusted markup.
    * @returns The sanitised markup.
    */
   sanitise(html: string): string {
     const host = document.implementation.createHTMLDocument("").createElement("div");
     host.setHTML(html, { sanitizer: this.sanitizer });
+    for (const element of host.querySelectorAll("*")) {
+      for (const attribute of [...element.attributes]) {
+        if (NativeSanitiser.isScriptUrl(attribute.value)) {
+          element.removeAttribute(attribute.name);
+        }
+      }
+    }
     return host.innerHTML;
   }
 }

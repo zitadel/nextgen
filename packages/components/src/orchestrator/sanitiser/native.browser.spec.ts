@@ -61,6 +61,16 @@ const cases: ReadonlyArray<[string, string, string]> = [
     `<img src="x" onerror="alert(1)"><a href="javascript:alert(1)" data-action="recover">Reset</a>`,
     `<img src="x"><a data-action="recover">Reset</a>`,
   ],
+  [
+    "drops an element it does not know, with its content",
+    `<p>a</p><my-note>Contact support</my-note>`,
+    `<p>a</p>`,
+  ],
+  [
+    "strips javascript: links an atom would render",
+    `<zl-pill href="javascript:alert(1)">x</zl-pill><zl-field name="p" label="x" forgot-password-href=" java\tscript:alert(1)"></zl-field>`,
+    `<zl-pill>x</zl-pill><zl-field name="p" label="x"></zl-field>`,
+  ],
   ...["name", "title", "id", "action", "method", "length", "location", "body", "domain"].map(
     (value): [string, string, string] => [
       `keeps a field named "${value}" that collides with a DOM property (#2532)`,

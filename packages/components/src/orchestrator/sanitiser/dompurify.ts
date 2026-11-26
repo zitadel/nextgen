@@ -7,8 +7,9 @@ import type { Sanitiser } from "./sanitiser.js";
  * Sanitises with DOMPurify, for browsers without the HTML Sanitizer API.
  *
  * Its HTML profile allows safe HTML such as `<b>` and `<table>`; the allowlist
- * adds the atoms and the attributes their manifests declare, and a dropped
- * element keeps its text, as {@link NativeSanitiser} does. DOM clobbering protection is off because
+ * adds the atoms and the attributes their manifests declare. As in
+ * {@link NativeSanitiser}, an element outside the allowlist is dropped with its
+ * content, and only the unwrapped tags keep theirs. DOM clobbering protection is off because
  * the output renders inside the `<zitadel-login>` shadow root, which named
  * access on `document` and `window` cannot reach, and the guard would drop
  * field names such as `name` (#2532).
@@ -23,8 +24,8 @@ export class DomPurifySanitiser implements Sanitiser {
     USE_PROFILES: { html: true },
     ADD_TAGS: [...ELEMENTS],
     ADD_ATTR: [...ATTRIBUTES],
-    FORBID_TAGS: [...REMOVED_TAGS, ...UNWRAPPED_TAGS],
-    KEEP_CONTENT: true,
+    FORBID_TAGS: [...REMOVED_TAGS],
+    KEEP_CONTENT: false,
     ALLOW_DATA_ATTR: true,
     ALLOW_ARIA_ATTR: true,
     RETURN_TRUSTED_TYPE: false,
@@ -58,7 +59,13 @@ export class DomPurifySanitiser implements Sanitiser {
    */
   sanitise(html: string): string {
     if (this.instance?.node !== window.Node) {
-      this.instance = { node: window.Node, purify: this.purify(window) };
+      const purify = this.purify(window);
+      purify.addHook("uponSanitizeElement", (node) => {
+        if (node instanceof Element && UNWRAPPED_TAGS.includes(node.localName)) {
+          node.replaceWith(...node.childNodes);
+        }
+      });
+      this.instance = { node: window.Node, purify };
     }
     return String(this.instance.purify.sanitize(html, this.config));
   }
