@@ -457,20 +457,21 @@ export class ZitadelLogin extends ZitadelSurface {
   private previewRepaint = false;
 
   /**
-   * The dictionary and the LiquidJS engine for the page's language. Both load
-   * on demand: the translation the page shows, and the engine, each in its own
-   * chunk. The loader shows until they are there, and a change of `lang` or
+   * The dictionary, the LiquidJS engine and the sanitiser for the page's
+   * language. Each loads on demand in its own chunk: the translation the page
+   * shows, the engine, and DOMPurify where the browser has no `setHTML()`. The loader shows until they are there, and a change of `lang` or
    * `locales` loads them again.
    */
   private readonly rendering = new Task(this, {
     args: () => [this.resolveLanguage(), this.locales] as const,
     task: async ([language, locales]) => {
-      const [builtin, { createLiquidEngine }] = await Promise.all([
+      const [builtin, { createLiquidEngine }, sanitise] = await Promise.all([
         loadBuiltinLocale(language),
         import("./liquid.js"),
+        createSanitiser(),
       ]);
       const locale = localeFor(language, locales, builtin);
-      return { locale, engine: createLiquidEngine({ locale }) };
+      return { locale, engine: createLiquidEngine({ locale }), sanitise };
     },
   });
 
@@ -481,8 +482,6 @@ export class ZitadelLogin extends ZitadelSurface {
    * unless it is put back.
    */
   private lastRenderedTheme: ResolvedTheme | null = null;
-
-  private readonly sanitise = createSanitiser();
 
   /**
    * Cached compiled tenant template, keyed by source string. Re-rendering on
@@ -558,6 +557,9 @@ export class ZitadelLogin extends ZitadelSurface {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    // A detached element renders no step (see `render`), so one moved back
+    // into the page renders again.
+    this.requestUpdate();
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", this.handlePopState);
     }
@@ -788,12 +790,15 @@ export class ZitadelLogin extends ZitadelSurface {
     }
     // `completing` holds the loader through the terminal step: painting a
     // success screen the host immediately navigates away from shows the user
-    // two confirmations for one sign-in.
+    // two confirmations for one sign-in. A detached element renders no step:
+    // what it loads on demand can finish after it left the page.
     const rendering = this.rendering.value;
-    if (!this.response || !rendering || this.completing) {
+    if (!this.response || !rendering || this.completing || !this.isConnected) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.injectAttribution(this.renderStep(this.response.step, rendering.engine));
+    const rendered = this.injectAttribution(
+      this.renderStep(this.response.step, rendering.engine, rendering.sanitise),
+    );
     return html`<form
       class="zl-mount"
       part="form"
@@ -1254,7 +1259,11 @@ export class ZitadelLogin extends ZitadelSurface {
     return returnPathFromLocation() ?? this.postSignInUrl;
   }
 
-  private renderStep(step: CreateFlow201Step, engine: Liquid): string {
+  private renderStep(
+    step: CreateFlow201Step,
+    engine: Liquid,
+    sanitise: (html: string) => string,
+  ): string {
     const tenantSource =
       typeof this.branding?.liquid_template === "string" && this.branding.liquid_template.length > 0
         ? this.branding.liquid_template
@@ -1347,7 +1356,7 @@ export class ZitadelLogin extends ZitadelSurface {
     }
 
     const patched = patchMandatoryGates(raw, step, this.resolveLocale());
-    return this.sanitise(patched);
+    return sanitise(patched);
   }
 
   /**

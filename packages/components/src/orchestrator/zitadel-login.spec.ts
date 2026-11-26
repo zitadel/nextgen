@@ -938,6 +938,26 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("renders no step while detached", async () => {
+    const element = await mount(host);
+    element.remove();
+    element.requestUpdate();
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector("zl-field")).toBeNull();
+  });
+
+  it("renders the step again when attached again", async () => {
+    const element = await mount(host);
+    element.remove();
+    element.requestUpdate();
+    await element.updateComplete;
+    host.appendChild(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector("zl-field")).not.toBeNull();
+  });
+
   it("renders the bundled default template when the server sends no liquid_template", async () => {
     // `clearBranding()` in beforeEach means the mock — like the real server —
     // ships no `branding.liquid_template`. The `data-testid` markers exist

@@ -17,6 +17,8 @@ import { armAssetFallbacks } from "./asset-fallback.js";
 import { createLiquidEngine } from "./liquid.js";
 import { createSanitiser } from "./sanitiser.js";
 
+const sanitise = await createSanitiser();
+
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
   "identifier.field.email": "Work email",
@@ -52,7 +54,7 @@ function render(design: string, branding: Record<string, string>): HTMLElement {
     challenge: null,
   });
   const root = document.createElement("div");
-  root.innerHTML = createSanitiser()(html);
+  root.innerHTML = sanitise(html);
   document.body.append(root);
   return root;
 }

@@ -1,7 +1,10 @@
 /**
  * Layer 2 of the template security pipeline (`docs/design/flowengine/template-security.md`).
  *
- * Wraps DOMPurify with the configuration the auth-UI templates need:
+ * Sanitises with the browser's own HTML Sanitizer API (`Element.setHTML()`)
+ * where it exists, and loads DOMPurify only where it does not (Safari, older
+ * browsers), as Chrome's guidance on sanitising untrusted HTML recommends. Both
+ * enforce the same allowlist:
  *
  * - Allow every `<zl-*>` custom element registered in the manifest registry,
  *   plus the union of attributes declared on each manifest.
@@ -12,7 +15,7 @@
  * Runs after Liquid finishes rendering and before the HTML is handed to Lit's
  * `unsafeHTML` directive.
  */
-import DOMPurify, { type Config } from "dompurify";
+import type { Config } from "dompurify";
 
 import { manifestRegistry } from "../manifests.js";
 
@@ -84,8 +87,6 @@ const COMMON_ATTRS: readonly string[] = [
   "hidden",
 ];
 
-const CUSTOM_TAG_PATTERN = /^zl-[a-z0-9-]+$/;
-
 function buildAllowedTagList(): string[] {
   const set = new Set<string>(STRUCTURAL_TAGS);
   for (const manifest of manifestRegistry) {
@@ -105,38 +106,107 @@ function buildAllowedAttrList(): string[] {
 }
 
 /**
- * Returns a sanitiser bound to the current manifest registry. Callers should
- * cache the result; rebuilding is cheap but allocates a fresh DOMPurify config.
- * The output is meant for the `<zitadel-login>` shadow root and DOM clobbering
- * protection (`SANITIZE_DOM`) is off, so callers must not inject it into the
- * document itself.
+ * The `aria-*` attributes (WAI-ARIA 1.2). The Sanitizer API has no wildcard
+ * for them, so both paths list them.
+ */
+const ARIA_ATTRS: readonly string[] = [
+  "aria-activedescendant",
+  "aria-atomic",
+  "aria-autocomplete",
+  "aria-busy",
+  "aria-checked",
+  "aria-colcount",
+  "aria-colindex",
+  "aria-colspan",
+  "aria-controls",
+  "aria-current",
+  "aria-describedby",
+  "aria-description",
+  "aria-details",
+  "aria-disabled",
+  "aria-errormessage",
+  "aria-expanded",
+  "aria-flowto",
+  "aria-haspopup",
+  "aria-hidden",
+  "aria-invalid",
+  "aria-keyshortcuts",
+  "aria-label",
+  "aria-labelledby",
+  "aria-level",
+  "aria-live",
+  "aria-modal",
+  "aria-multiline",
+  "aria-multiselectable",
+  "aria-orientation",
+  "aria-owns",
+  "aria-placeholder",
+  "aria-posinset",
+  "aria-pressed",
+  "aria-readonly",
+  "aria-relevant",
+  "aria-required",
+  "aria-roledescription",
+  "aria-rowcount",
+  "aria-rowindex",
+  "aria-rowspan",
+  "aria-selected",
+  "aria-setsize",
+  "aria-sort",
+  "aria-valuemax",
+  "aria-valuemin",
+  "aria-valuenow",
+  "aria-valuetext",
+];
+
+/**
+ * Loads a sanitiser bound to the current manifest registry. In a browser with
+ * `Element.setHTML()` it uses that; elsewhere it imports DOMPurify, in its own
+ * chunk, with the same allowlist. Callers should keep the result.
  *
+ * The output is meant for the `<zitadel-login>` shadow root, so callers must
+ * not inject it into the document itself.
+ *
+ * @returns A function from untrusted HTML to sanitised HTML.
  * @internal
  */
-export function createSanitiser(): (html: string) => string {
+export async function createSanitiser(): Promise<(html: string) => string> {
+  const elements = buildAllowedTagList();
+  // Each attribute once, and no `data-*`: `dataAttributes` covers those, and
+  // the Sanitizer API rejects a configuration that lists one or repeats one.
+  const attributes = [...new Set([...buildAllowedAttrList(), ...ARIA_ATTRS])].filter(
+    (attribute) => !attribute.startsWith("data-"),
+  );
+  if (typeof Element !== "undefined" && "setHTML" in Element.prototype) {
+    const sanitizer = { elements, attributes, dataAttributes: true, comments: false };
+    return function sanitise(html: string): string {
+      // An inert document: nothing in it loads or runs, and no custom element
+      // upgrades while the markup is sanitised.
+      const host = document.implementation.createHTMLDocument("").createElement("div");
+      host.setHTML(html, { sanitizer });
+      return host.innerHTML;
+    };
+  }
+  const { default: DOMPurify } = await import("dompurify");
+  // DOMPurify's defaults differ from the Sanitizer API's; these match them:
+  // only the listed elements and attributes, `data-*`, and a removed
+  // element's content removed with it.
   const config: Config = {
-    USE_PROFILES: { html: true },
-    ADD_TAGS: buildAllowedTagList(),
-    ADD_ATTR: buildAllowedAttrList(),
-    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button"],
-    FORBID_ATTR: ["onerror", "onclick", "onload", "onfocus", "onblur"],
-    CUSTOM_ELEMENT_HANDLING: {
-      tagNameCheck: CUSTOM_TAG_PATTERN,
-      attributeNameCheck: /^(?!on)[a-z][a-z0-9-]*$/,
-      allowCustomizedBuiltInElements: false,
-    },
-    KEEP_CONTENT: true,
+    ALLOWED_TAGS: [...elements, "#text"],
+    ALLOWED_ATTR: attributes,
     ALLOW_DATA_ATTR: true,
-    ALLOW_ARIA_ATTR: true,
+    ALLOW_ARIA_ATTR: false,
+    KEEP_CONTENT: false,
     RETURN_TRUSTED_TYPE: false,
     // The output renders inside the <zitadel-login> shadow root, which document and window
-    // named access cannot reach, and <form>/<input> are forbidden above. The clobbering guard
-    // would otherwise drop common field names such as "name" or "title" (#2532).
+    // named access cannot reach. The clobbering guard would otherwise drop common field
+    // names such as "name" or "title" (#2532).
     SANITIZE_DOM: false,
   };
-
   return function sanitise(html: string): string {
-    const result = DOMPurify.sanitize(html, config);
-    return typeof result === "string" ? result : String(result);
+    // An instance per call, bound to the window as it is now: DOMPurify keeps
+    // the DOM classes it finds when an instance is made, and a server render
+    // (Angular's, for one) swaps those globals for its own while it runs.
+    return String(DOMPurify(window).sanitize(html, config));
   };
 }

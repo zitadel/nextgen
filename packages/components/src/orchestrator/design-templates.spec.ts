@@ -25,6 +25,8 @@ import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-ga
 import { createSanitiser } from "./sanitiser.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 
+const sanitise = await createSanitiser();
+
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
   "identifier.field.email": "Work email",
@@ -95,7 +97,7 @@ function templateFor(design: string): string {
 function renderDesign(design: string): string {
   const engine = createLiquidEngine({ locale });
   const rendered = engine.parseAndRenderSync(templateFor(design), context);
-  const sanitised = createSanitiser()(rendered);
+  const sanitised = sanitise(rendered);
   return patchMandatoryGates(sanitised, step, locale);
 }
 
@@ -142,7 +144,7 @@ describe("account chip", () => {
 
   function chip(design: string, data: Record<string, unknown>): Element | null {
     const engine = createLiquidEngine({ locale });
-    const html = createSanitiser()(engine.parseAndRenderSync(templateFor(design), data));
+    const html = sanitise(engine.parseAndRenderSync(templateFor(design), data));
     const doc = document.createElement("template");
     doc.innerHTML = html;
     return doc.content.querySelector('zl-account[data-testid="zitadel-account"]');
@@ -212,7 +214,7 @@ describe("branding design catalog", () => {
           ...context,
           actions: [...step.actions, { name: "back", kind: "back", text_key: "action.back" }],
         });
-        const html2 = createSanitiser()(rendered);
+        const html2 = sanitise(rendered);
         // Back-navigation is gesture-only (ADR 022): the template renders no
         // control for the action, and the kind-based exclusion keeps it out
         // of the secondary-button loop.
@@ -233,7 +235,7 @@ describe("branding design catalog", () => {
         { name: "given_name", type: "text", text_key: "identifier.field.email" },
       ],
     });
-    const fields = createSanitiser()(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
+    const fields = sanitise(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
 
     expect(fields).toHaveLength(2);
     expect(fields.find((f) => f.includes('name="email"'))).toMatch(/\sreadonly[\s>=]/);
@@ -253,7 +255,7 @@ describe("branding design catalog", () => {
     function render(ctx: Record<string, unknown>): string {
       const engine = createLiquidEngine({ locale });
       const { template } = getDefaultBrandingConfig(design);
-      return createSanitiser()(engine.parseAndRenderSync(template, ctx));
+      return sanitise(engine.parseAndRenderSync(template, ctx));
     }
 
     it("renders the provider atom with the step's providers", () => {
@@ -346,7 +348,7 @@ describe("branding design catalog", () => {
           design === "default.liquid"
             ? engine.renderFileSync(TEMPLATE_NAMES.default, ctx)
             : engine.parseAndRenderSync(getDefaultBrandingConfig(design).template, ctx);
-        return createSanitiser()(rendered);
+        return sanitise(rendered);
       }
 
       it.each(["error.sso_cancelled", "error.sso_failed"])("renders %s's title and body", (key) => {
@@ -376,12 +378,12 @@ describe("branding design catalog", () => {
     const noAssets = { ...context, branding: {} };
     for (const design of ["split", "split-right"]) {
       const template = legacyTemplate(design);
-      const bare = createSanitiser()(engine.parseAndRenderSync(template, noAssets));
+      const bare = sanitise(engine.parseAndRenderSync(template, noAssets));
       // An empty brand pane renders the whole design as a lonely off-centre
       // card; the decorative panel must survive the sanitiser.
       expect(bare, design).toContain("zl-split__placeholder");
 
-      const branded = createSanitiser()(engine.parseAndRenderSync(template, context));
+      const branded = sanitise(engine.parseAndRenderSync(template, context));
       expect(branded, design).not.toContain("zl-split__placeholder");
     }
   });
@@ -403,7 +405,7 @@ describe("branding design catalog", () => {
     for (const design of ["split", "split-right"]) {
       const template = legacyTemplate(design);
       const html = patchMandatoryGates(
-        createSanitiser()(engine.parseAndRenderSync(template, heroOnly)),
+        sanitise(engine.parseAndRenderSync(template, heroOnly)),
         step,
         locale,
       );
@@ -447,7 +449,7 @@ describe("branding design catalog", () => {
       messages: [{ level: "info", text_key: "notice.user_not_found" }],
     };
     for (const design of BRANDING_DESIGNS) {
-      const html = createSanitiser()(engine.parseAndRenderSync(templateFor(design), withNotice));
+      const html = sanitise(engine.parseAndRenderSync(templateFor(design), withNotice));
       expect(html, design).toContain(
         '<zl-alert severity="info" data-zl-step-message="">No account</zl-alert>',
       );

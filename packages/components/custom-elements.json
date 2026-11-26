@@ -7389,7 +7389,16 @@
     {
       "kind": "javascript-module",
       "path": "src/orchestrator/sanitiser.ts",
-      "declarations": [],
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "elements"
+        },
+        {
+          "kind": "variable",
+          "name": "attributes"
+        }
+      ],
       "exports": []
     },
     {
@@ -8713,8 +8722,8 @@
               "name": "rendering",
               "privacy": "private",
               "readonly": true,
-              "default": "new Task(this, { args: () => [this.resolveLanguage(), this.locales] as const, task: async ([language, locales]) => { const [builtin, { createLiquidEngine }] = await Promise.all([ loadBuiltinLocale(language), import(\"./liquid.js\"), ]); const locale = localeFor(language, locales, builtin); return { locale, engine: createLiquidEngine({ locale }) }; }, })",
-              "description": "The dictionary and the LiquidJS engine for the page's language. Both load\non demand: the translation the page shows, and the engine, each in its own\nchunk. The loader shows until they are there, and a change of `lang` or\n`locales` loads them again."
+              "default": "new Task(this, { args: () => [this.resolveLanguage(), this.locales] as const, task: async ([language, locales]) => { const [builtin, { createLiquidEngine }, sanitise] = await Promise.all([ loadBuiltinLocale(language), import(\"./liquid.js\"), createSanitiser(), ]); const locale = localeFor(language, locales, builtin); return { locale, engine: createLiquidEngine({ locale }), sanitise }; }, })",
+              "description": "The dictionary, the LiquidJS engine and the sanitiser for the page's\nlanguage. Each loads on demand in its own chunk: the translation the page\nshows, the engine, and DOMPurify where the browser has no `setHTML()`. The loader shows until they are there, and a change of `lang` or\n`locales` loads them again."
             },
             {
               "kind": "field",
@@ -8725,12 +8734,6 @@
               "privacy": "private",
               "default": "null",
               "description": "The theme the last commit rendered with. The template output carries the\nresolved side's mark, so a theme change rewrites the string and\n`unsafeHTML` rebuilds the form — which drops what the visitor had typed\nunless it is put back."
-            },
-            {
-              "kind": "field",
-              "name": "sanitise",
-              "privacy": "private",
-              "readonly": true
             },
             {
               "kind": "field",
@@ -9091,6 +9094,12 @@
                   "name": "engine",
                   "type": {
                     "text": "Liquid"
+                  }
+                },
+                {
+                  "name": "sanitise",
+                  "type": {
+                    "text": "(html: string) => string"
                   }
                 }
               ]

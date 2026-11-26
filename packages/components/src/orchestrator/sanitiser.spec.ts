@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { createSanitiser } from "./sanitiser.js";
 
-describe("DOMPurify sanitiser", () => {
-  const sanitise = createSanitiser();
+const sanitise = await createSanitiser();
 
+describe("createSanitiser", () => {
   it("preserves <zl-*> custom elements", () => {
     const out = sanitise(
       `<div><zl-field name="email" label="Email" type="email" required></zl-field></div>`,
