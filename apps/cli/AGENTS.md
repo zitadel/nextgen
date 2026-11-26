@@ -336,7 +336,8 @@
   `code`, `category` or `retryable`.
 - Give an error a template-literal `message` that carries its facts, and an
   optional `cause`.
-- Add no other property, parameter or method to an error.
+- Add no other property, parameter or method to an error, except data the
+  catching command needs to word its refusal (a name, a folder, a command).
 - State `category`, `retryable` and `code` as literals in each class.
 - Add no type for errors beyond `ErrorCategory`.
 - `toZitadelError` has one branch for `ZitadelLibError`; add no per-package branch.
