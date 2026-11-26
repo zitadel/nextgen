@@ -1,3 +1,4 @@
+import { FsError } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
 import { Dependencies } from "@/lib/upgrade/dependencies";
 
@@ -50,6 +51,9 @@ export async function updateNotice(input: {
   }
   const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE).catch((error: unknown) => {
     if (error instanceof PmManifestInvalidError) {
+      return undefined;
+    }
+    if (error instanceof FsError) {
       return undefined;
     }
     throw error;
