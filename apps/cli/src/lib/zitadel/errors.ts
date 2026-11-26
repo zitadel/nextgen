@@ -319,18 +319,12 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
   /**
    * Make the failure for these issues.
    *
-   * @param input - The heading, the issues, and the steps that use the method.
-   * @param input.heading - The line the listed issues follow.
-   * @param input.issues - Every issue, as the server's flow rules word it.
-   * @param input.uses - The steps that use the method being disabled, if one is.
+   * @param heading - The line the listed issues follow.
+   * @param issues - Every issue, as the server's flow rules word it.
+   * @param uses - The steps that use the method being disabled, if one is.
    */
-  constructor(input: {
-    readonly heading: string;
-    readonly issues: readonly FlowIssue[];
-    readonly uses?: readonly FlowMethodUse[];
-  }) {
-    const uses = input.uses ?? [];
-    const unexplained = input.issues.filter((item) => {
+  constructor(heading: string, issues: readonly FlowIssue[], uses: readonly FlowMethodUse[] = []) {
+    const unexplained = issues.filter((item) => {
       return !uses.some((use) => {
         return use.path === item.path && use.step === item.issue.step;
       });
@@ -342,7 +336,7 @@ export class ZitadelConfigEditBreaksFlowsError extends ZitadelConfigError {
     const listed = lines.map((line) => {
       return `  - ${line}`;
     });
-    super([input.heading, ...listed].join("\n"));
+    super([heading, ...listed].join("\n"));
   }
 
   /**

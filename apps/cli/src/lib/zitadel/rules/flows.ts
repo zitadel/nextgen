@@ -104,10 +104,10 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
   if (introduced.length === 0) {
     return;
   }
-  throw new ZitadelConfigEditBreaksFlowsError({
-    heading: "A login flow would stop validating after this change:",
-    issues: introduced,
-  });
+  throw new ZitadelConfigEditBreaksFlowsError(
+    "A login flow would stop validating after this change:",
+    introduced,
+  );
 }
 
 /**
@@ -151,11 +151,11 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
     });
     return { ...use, staying };
   });
-  throw new ZitadelConfigEditBreaksFlowsError({
-    heading: `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
-    issues: introduced,
+  throw new ZitadelConfigEditBreaksFlowsError(
+    `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
+    introduced,
     uses,
-  });
+  );
 }
 
 /**
@@ -188,10 +188,10 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
     return check.issues;
   });
   if (unchecked.length > 0) {
-    throw new ZitadelConfigEditBreaksFlowsError({
-      heading: "A login flow has errors, so it cannot be checked against the changed schema:",
-      issues: unchecked,
-    });
+    throw new ZitadelConfigEditBreaksFlowsError(
+      "A login flow has errors, so it cannot be checked against the changed schema:",
+      unchecked,
+    );
   }
   return checks.flatMap((check) => {
     if (check.kind !== "checked") {

@@ -108,11 +108,7 @@ function refusalOf(
   uses?: readonly FlowMethodUse[],
 ): ZitadelConfigError {
   const heading = "A login flow would stop validating after this change:";
-  return new ZitadelConfigEditBreaksFlowsError({
-    heading,
-    issues,
-    uses,
-  });
+  return new ZitadelConfigEditBreaksFlowsError(heading, issues, uses);
 }
 
 describe("ZitadelConfigEditBreaksFlowsError", () => {
