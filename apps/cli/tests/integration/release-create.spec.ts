@@ -1,3 +1,6 @@
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
@@ -421,6 +424,21 @@ describe("release create", () => {
         const result = await app.run(["release", "create", "--dry-run", "--non-interactive"]);
 
         expect(result).toSayOnce(expectedPublicCliCommand(app.againAsRun("release create")));
+      });
+    });
+  });
+
+  describe("with nothing in .zitadel/ to deploy", () => {
+    it("says to add a resource under .zitadel/ or set the project up", async () => {
+      const app = await aSetUpApp();
+      await rm(join(app.path, ".zitadel"), { recursive: true, force: true });
+
+      const result = await createRelease(app);
+
+      expect(app.envelopeOf(result)).toMatchObject({
+        code: "E_VALIDATION",
+        message: "There is nothing in .zitadel/ to deploy",
+        hint: `Add a schema, flow, policy or branding under .zitadel/, or run ${expectedPublicCliCommand("setup")} to scaffold one.`,
       });
     });
   });

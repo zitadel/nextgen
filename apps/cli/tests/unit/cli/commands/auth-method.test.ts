@@ -443,7 +443,64 @@ describe("auth-method password and passkey", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        message: expect.stringContaining(SCHEMA_FILE),
+        details: { problems: [expect.objectContaining({ path: SCHEMA_FILE })] },
+      });
+    });
+
+    it("says to fix the file it names before running again", async ({ dir }) => {
+      await writeProject(dir, aProject([]));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        hint: "Fix the files named above, then run the command again; nothing was changed.",
+      });
+    });
+
+    describe.skipIf(RUNS_AS_ROOT)("when the schema cannot be read", () => {
+      it("refuses as a permission failure, naming the file and its error code", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH));
+        await chmod(join(dir, SCHEMA_FILE), 0o000);
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          code: "E_AUTH",
+          message: `${SCHEMA_FILE} cannot be read (EACCES)`,
+          details: {
+            file: SCHEMA_FILE,
+            code: "EACCES",
+          },
+        });
+      });
+
+      it("says to make the file readable", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH));
+        await chmod(join(dir, SCHEMA_FILE), 0o000);
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          hint: "Check that the file is readable, then run the command again.",
+        });
+      });
+    });
+
+    it("refuses a configuration directory that is a file, naming its error code", async ({
+      dir,
+    }) => {
+      await writeProject(dir, aProject(BOTH), { ".zitadel/idps": "" });
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_VALIDATION",
+        message: ".zitadel/idps cannot be read (ENOTDIR)",
+        hint: "Check that the file is readable, then run the command again.",
+        details: {
+          file: ".zitadel/idps",
+          code: "ENOTDIR",
+        },
       });
     });
 
@@ -467,7 +524,9 @@ describe("auth-method password and passkey", () => {
 
         expect(parseJson(result.stdout)).toMatchObject({
           code: "E_VALIDATION",
-          message: expect.stringContaining(`${LOGIN_FLOW_FILE}: step "password"`),
+          details: {
+            issues: [expect.objectContaining({ rule: "schema/fields-resolve", step: "password" })],
+          },
         });
       });
 
@@ -484,15 +543,36 @@ describe("auth-method password and passkey", () => {
         });
       });
 
-      it("says to edit the steps first", async ({ dir }) => {
+      it("says only the edits the steps need", async ({ dir }) => {
         await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
         const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
 
         expect(parseJson(result.stdout)).toMatchObject({
           hint:
-            "Edit those steps first; login flows are not edited for you. " +
+            "Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. " +
+            "Delete a step left with no field or sign-in method: retarget the transitions listed for it. " +
             `${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
+        });
+      });
+
+      it("lists each step with what it keeps and what leads to it", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+        const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          details: {
+            steps: [
+              {
+                path: LOGIN_FLOW_FILE,
+                step: "password",
+                keeps: [],
+                entry_for: [],
+                targeted_by: [{ step: "identifier", transition: "submit" }],
+              },
+            ],
+          },
         });
       });
 
@@ -502,7 +582,9 @@ describe("auth-method password and passkey", () => {
         const result = await runCliForTest(authMethodJson(dir, "password", "disable", "--dry-run"));
 
         expect(parseJson(result.stdout)).toMatchObject({
-          message: expect.stringContaining(`${LOGIN_FLOW_FILE}: step "password"`),
+          details: {
+            issues: [expect.objectContaining({ rule: "schema/fields-resolve", step: "password" })],
+          },
         });
       });
 
@@ -551,6 +633,19 @@ describe("auth-method password and passkey", () => {
             '    Still has field "email".',
         });
       });
+
+      it("says to point the purpose at another step", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH, passkeyFirst));
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          hint:
+            "Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. " +
+            "Delete a step left with no field or sign-in method: point the purposes key it is the entry step of at another step. " +
+            `${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
+        });
+      });
     });
 
     it.for([
@@ -585,7 +680,7 @@ describe("auth-method password and passkey", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        message: expect.stringContaining(LOGIN_FLOW_FILE),
+        details: { problems: [expect.objectContaining({ path: LOGIN_FLOW_FILE })] },
       });
     });
 
@@ -797,7 +892,9 @@ describe("auth-method password and passkey", () => {
       const result = await runCliForTest(authMethodJson(dir, "password", "disable", "--force"));
 
       expect(parseJson(result.stdout)).toMatchObject({
-        message: expect.stringContaining(`${LOGIN_FLOW_FILE}: step "password"`),
+        details: {
+          issues: [expect.objectContaining({ rule: "schema/fields-resolve", step: "password" })],
+        },
       });
     });
   });

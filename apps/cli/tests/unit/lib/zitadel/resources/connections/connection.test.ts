@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { idpProvider } from "@zitadel/config/idp";
 
 import {
-  ZitadelConfigError,
   Connection,
-  ZitadelConfigResourceClashError,
   UserSchema,
+  ZitadelConfigClientIdMismatchError,
+  ZitadelConfigConnectionNotOidcError,
+  ZitadelConfigSettingUnusableError,
 } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
@@ -510,9 +511,12 @@ describe("Connection.refuseDifferentClientId", () => {
         return acme.refuseDifferentClientId("other");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigClientIdMismatchError);
       expect(error).toMatchObject({
         message: `${ACME_FILE} already uses client id client, not other`,
+        path: ACME_FILE,
+        stored: "client",
+        supplied: "other",
       });
     });
   });
@@ -551,7 +555,11 @@ describe("Connection.refuseNonOidc", () => {
         return acme.refuseNonOidc();
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionNotOidcError);
+      expect(error).toMatchObject({
+        path: ACME_SSO_FILE,
+        slug: "acme-sso",
+      });
     });
   });
 });
@@ -571,9 +579,11 @@ describe("Connection.readUsableDisplayName", () => {
         return acme.readUsableDisplayName();
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigSettingUnusableError);
       expect(error).toMatchObject({
         message: expect.stringContaining(ACME_SSO_FILE),
+        path: ACME_SSO_FILE,
+        slug: "acme-sso",
       });
     });
   });

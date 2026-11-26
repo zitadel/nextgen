@@ -354,6 +354,19 @@ describe("deploy", () => {
         });
       });
 
+      it("says to add a resource under .zitadel/ or set the project up", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await rm(join(app.path, ".zitadel"), { recursive: true, force: true });
+
+        const result = await app.deploy();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          message: "There is nothing in .zitadel/ to deploy",
+          hint: `Add a schema, flow, policy or branding under .zitadel/, or run ${expectedPublicCliCommand("setup")} to scaffold one.`,
+        });
+      });
+
       it("sends no policy it stopped before", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

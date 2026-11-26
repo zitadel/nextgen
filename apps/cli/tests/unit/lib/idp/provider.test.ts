@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { IdpError, ProviderChoice } from "@/lib/idp";
-import { Connection, ZitadelConfigError, ZitadelConfigResourceClashError } from "@/lib/zitadel";
+import {
+  Connection,
+  ZitadelConfigConnectionNotOidcError,
+  ZitadelConfigSettingUnusableError,
+} from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -41,7 +45,7 @@ describe("ProviderChoice.fromFlags", () => {
     expect(error).toBeInstanceOf(IdpError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      message: expect.stringContaining("Unknown provider nope; use one of "),
+      message: "Unknown provider nope",
     });
   });
 
@@ -62,7 +66,7 @@ describe("ProviderChoice.fromFlags", () => {
     expect(error).toBeInstanceOf(IdpError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      message: expect.stringContaining("--display-name, --issuer"),
+      missing: ["--display-name", "--issuer"],
     });
   });
 
@@ -118,11 +122,13 @@ describe("ProviderChoice.readStoredSettings", () => {
         return UNDESCRIBED.readStoredSettings(acme);
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigSettingUnusableError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           `${ACME_SSO_FILE} holds a display name that cannot be used: `,
         ),
+        path: ACME_SSO_FILE,
+        slug: "acme-sso",
       });
     });
   });
@@ -145,9 +151,11 @@ describe("ProviderChoice.readStoredSettings", () => {
         return choice.readStoredSettings(acme);
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionNotOidcError);
       expect(error).toMatchObject({
         message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
+        path: ACME_SSO_FILE,
+        slug: "acme-sso",
       });
     });
   });

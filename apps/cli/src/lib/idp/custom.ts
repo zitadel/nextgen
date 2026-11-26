@@ -15,7 +15,12 @@ import {
 
 import type { SuggestFlags } from "@/lib/suggestion";
 
-import { IdpProviderUnknownError, IdpSettingsInvalidError } from "./errors";
+import {
+  IdpProviderUnknownError,
+  IdpSettingsInvalidError,
+  IdpSettingsMissingError,
+  IdpSettingsUnusedError,
+} from "./errors";
 
 /**
  * The settings that describe a custom connection, in the order a command line
@@ -256,7 +261,7 @@ export function givenCustomFlags(
  */
 function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
   if (!parsed.ok) {
-    throw new IdpSettingsInvalidError(`${name}: ${parsed.problem}`);
+    throw new IdpSettingsInvalidError(name, parsed.problem);
   }
 
   return parsed.value;
@@ -308,8 +313,10 @@ export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlag
  * @param flag - How the command spells each flag.
  * @param example - A complete command line, for the refusal of an incomplete one.
  * @returns The provider, checked.
- * @throws {@link IdpSettingsInvalidError} When a setting accompanies a catalog
- *   provider, a custom connection lacks a setting, or a setting is refused.
+ * @throws {@link IdpSettingsUnusedError} When a setting accompanies a catalog
+ *   provider.
+ * @throws {@link IdpSettingsMissingError} When a custom connection lacks a setting.
+ * @throws {@link IdpSettingsInvalidError} When a setting is refused.
  * @throws {@link IdpProviderUnknownError} When the provider is unknown.
  */
 export function selectionFromFlags(
@@ -324,16 +331,12 @@ export function selectionFromFlags(
     // A catalog provider knows its own name, issuer and scopes, so a setting
     // given alongside it would be ignored, and an ignored flag reads as honoured.
     if (given.length > 0) {
-      throw new IdpSettingsInvalidError(
-        `${given.join(", ")} only applies to a custom connection; add ${flag.provider} ${CUSTOM_PROVIDER}, or remove ${new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them"}`,
-      );
+      throw new IdpSettingsUnusedError(given, flag.provider);
     }
     const selection = parseProviderSelection(provider);
     if (selection === undefined) {
       const known = [...IDP_PROVIDERS, CUSTOM_PROVIDER];
-      throw new IdpProviderUnknownError(
-        `Unknown provider ${provider}; use one of ${known.join(", ")}`,
-      );
+      throw new IdpProviderUnknownError(provider, known);
     }
 
     return selection;
@@ -344,9 +347,7 @@ export function selectionFromFlags(
     const missing = [flag.slug, flag.displayName, flag.issuer].filter((name) => {
       return !given.includes(name);
     });
-    throw new IdpSettingsInvalidError(
-      `A custom connection needs ${missing.join(", ")}; describe it, e.g. ${example}`,
-    );
+    throw new IdpSettingsMissingError(missing, example);
   }
 
   return {

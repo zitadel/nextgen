@@ -17,10 +17,42 @@ import {
   PublishConnectionVariableMissingError,
   PublishConnectionVariableSharedError,
 } from "@/lib/publish";
+import {
+  ZitadelConfigFileUnreadableError,
+  ZitadelConfigNothingToDeployError,
+  ZitadelConfigPathUnreadableError,
+} from "@/lib/zitadel";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { ChangeCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
+
+/** How a configuration with nothing in `.zitadel/` to publish is refused. */
+const NOTHING_TO_DEPLOY_REFUSAL = {
+  message: "{message}",
+  hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+} as const satisfies Refusal;
+
+/** How a configuration file the operating system refuses to let this process read is refused. */
+const FILE_UNREADABLE_REFUSAL = {
+  code: "E_AUTH",
+  message: "{message}",
+  hint: "Check that the file is readable, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "{errno}",
+  },
+} as const satisfies Refusal;
+
+/** How a configuration file that cannot be read for another reason is refused. */
+const PATH_UNREADABLE_REFUSAL = {
+  message: "{message}",
+  hint: "Check that the file is readable, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "{errno}",
+  },
+} as const satisfies Refusal;
 
 /** How a configuration with errors is refused. */
 const CONFIG_INVALID_REFUSAL = {
@@ -270,6 +302,25 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
             },
           },
         );
+      }
+      if (error instanceof ZitadelConfigNothingToDeployError) {
+        throw refusalError(NOTHING_TO_DEPLOY_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigFileUnreadableError) {
+        throw refusalError(FILE_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigPathUnreadableError) {
+        throw refusalError(PATH_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+          errno: error.errno ?? null,
+        });
       }
       if (error instanceof PublishConfigInvalidError) {
         throw refusalError(CONFIG_INVALID_REFUSAL, {

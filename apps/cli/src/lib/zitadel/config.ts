@@ -16,6 +16,8 @@ import {
   ZitadelConfigError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
+  ZitadelConfigFilesBrokenError,
+  ZitadelConfigNothingToDeployError,
 } from "@/lib/zitadel/errors";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import { Flows } from "@/lib/zitadel/resources/flows/collection";
@@ -195,7 +197,7 @@ export class ZitadelConfig {
    * @param options - What is known beyond the files.
    * @returns The configuration, holding no broken file of a kind a release
    *   carries.
-   * @throws {@link ZitadelConfigError} Naming every file the contract rules refuse.
+   * @throws {@link ZitadelConfigFilesBrokenError} Naming every file the contract rules refuse.
    */
   static async load(store: ConfigStore, options: ConfigOptions = {}): Promise<ZitadelConfig> {
     const config = await ZitadelConfig.loadUnchecked(store, options);
@@ -403,8 +405,9 @@ export class ZitadelConfig {
    *
    * @param store - Where branding's referenced files are read from.
    * @returns The bundle and how many resources it carries.
-   * @throws {@link ZitadelConfigError} When there is nothing to deploy, more than one
-   *   branding, or more resources than a release may pin.
+   * @throws {@link ZitadelConfigNothingToDeployError} When there is nothing to deploy.
+   * @throws {@link ZitadelConfigError} When there is more than one branding, or
+   *   more resources than a release may pin.
    */
   bundle(store: ConfigStore): BuiltBundle {
     const brandingCount =
@@ -453,7 +456,7 @@ export class ZitadelConfig {
         return file.kind !== "policy-test";
       }).length;
     if (fileCount === 0) {
-      throw new ZitadelConfigError("There is nothing in .zitadel/ to deploy");
+      throw new ZitadelConfigNothingToDeployError();
     }
     if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
       throw new ZitadelConfigError(
@@ -612,7 +615,7 @@ export class ZitadelConfig {
    * @param store - Where the configuration is kept, for the rules that read
    *   beside the files.
    * @returns This configuration.
-   * @throws {@link ZitadelConfigError} Naming every file the contract rules refuse.
+   * @throws {@link ZitadelConfigFilesBrokenError} Naming every file the contract rules refuse.
    */
   refuseBroken(store: ConfigStore): ZitadelConfig {
     const problems = CONTRACT_RULES.flatMap((rule) => {
@@ -625,30 +628,7 @@ export class ZitadelConfig {
         return { path: issue.file, problem: issue.message };
       });
     if (problems.length > 0) {
-      throw new ZitadelConfigError(
-        [
-          `${
-            new Set(
-              problems.map((entry) => {
-                return entry.path;
-              }),
-            ).size
-          } configuration ${
-            new Intl.PluralRules("en").select(
-              new Set(
-                problems.map((entry) => {
-                  return entry.path;
-                }),
-              ).size,
-            ) === "one"
-              ? "file is"
-              : "files are"
-          } not valid:`,
-          ...problems.map((entry) => {
-            return `  - ${entry.path}: ${entry.problem}`;
-          }),
-        ].join("\n"),
-      );
+      throw new ZitadelConfigFilesBrokenError(problems);
     }
     return this;
   }

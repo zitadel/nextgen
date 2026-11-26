@@ -28,6 +28,8 @@ export {
   IdpError,
   IdpProviderUnknownError,
   IdpSettingsInvalidError,
+  IdpSettingsMissingError,
+  IdpSettingsUnusedError,
 } from "./errors";
 export {
   type CredentialNames,

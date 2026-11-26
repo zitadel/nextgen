@@ -16,7 +16,9 @@ import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Output, warnings } from "@/lib/ui";
 import {
-  ZitadelConfigError,
+  ZitadelConfigFilesBrokenError,
+  ZitadelConfigFileUnreadableError,
+  ZitadelConfigPathUnreadableError,
   ZitadelConfigSchemaAmbiguousError,
   type Change,
   CONFIG_DIRECTORIES,
@@ -28,6 +30,8 @@ import {
   ZitadelConfigFlowBrokenError,
   ZitadelConfigFlowUncheckedError,
   ZitadelConfigSchemaMissingError,
+  type JsonObject,
+  PASSWORD_FIELD,
   type Schemas,
   type ToggleableMethod,
   type UserSchema,
@@ -83,7 +87,12 @@ type SchemaFlags = {
  */
 const FLOW_METHOD_IN_USE_REFUSAL = {
   message: "{message}",
-  hint: "Edit those steps first; login flows are not edited for you. `zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+  hint: "Edit those steps first; login flows are not edited for you. From each step, remove its {removed}.{deletion} `zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+  details: {
+    file: "{file}",
+    issues: "{issues}",
+    steps: "{steps}",
+  },
   next: [
     {
       id: "deploy",
@@ -92,6 +101,141 @@ const FLOW_METHOD_IN_USE_REFUSAL = {
       },
     },
   ],
+} as const satisfies Refusal;
+
+/**
+ * What a step that uses a method holds once the method is gone: the part of
+ * the step a person removes from it.
+ */
+const REMOVED_PART = {
+  password: `${PASSWORD_FIELD} field`,
+  passkey: "passkey actions and their transitions",
+} as const satisfies Record<ToggleableMethod, string>;
+
+/**
+ * What a refusal to turn off a method a login flow still uses says beyond its
+ * message: the part to remove from each step, what to do about a step left
+ * with nothing, and each issue and step in the shape `--json` reports.
+ *
+ * @remarks
+ * Only the edits these steps need are named: a step left with nothing goes, so
+ * what leads to it changes too.
+ *
+ * @param error - The refusal the configuration raised.
+ * @returns The values {@link FLOW_METHOD_IN_USE_REFUSAL} is filled from.
+ */
+function methodInUseFacts(error: ZitadelConfigFlowMethodInUseError): {
+  readonly removed: string;
+  readonly deletion: string;
+  readonly issues: readonly JsonObject[];
+  readonly steps: readonly JsonObject[];
+} {
+  const emptied = error.uses.filter((use) => {
+    return use.keeps.length === 0;
+  });
+  const incoming = emptied.flatMap((use) => {
+    return use.staying;
+  });
+  const viaPurpose = incoming.some((item) => {
+    return item.purpose !== undefined;
+  });
+  const isEntry = emptied.some((use) => {
+    return use.entryFor.length > 0;
+  });
+  const fixes = [
+    ...(incoming.length > 0
+      ? [
+          viaPurpose
+            ? "retarget the transitions listed for it (one marked via purposes.<key> follows that key instead)"
+            : "retarget the transitions listed for it",
+        ]
+      : []),
+    ...(isEntry ? ["point the purposes key it is the entry step of at another step"] : []),
+  ];
+  const deletion =
+    emptied.length === 0
+      ? ""
+      : fixes.length > 0
+        ? ` Delete a step left with no field or sign-in method: ${fixes.join(", and ")}.`
+        : " Delete a step left with no field or sign-in method.";
+  return {
+    removed: REMOVED_PART[error.method],
+    deletion,
+    issues: error.issues.map((item): JsonObject => {
+      if (item.issue.step === undefined) {
+        return {
+          path: item.path,
+          rule: item.issue.rule,
+          message: item.issue.message,
+        };
+      }
+      return {
+        path: item.path,
+        rule: item.issue.rule,
+        message: item.issue.message,
+        step: item.issue.step,
+      };
+    }),
+    steps: error.uses.map((use): JsonObject => {
+      return {
+        path: use.path,
+        step: use.step,
+        keeps: use.keeps,
+        entry_for: use.entryFor,
+        targeted_by: use.targetedBy.map((item): JsonObject => {
+          if (item.purpose === undefined) {
+            return {
+              step: item.step,
+              transition: item.transition,
+            };
+          }
+          return {
+            step: item.step,
+            transition: item.transition,
+            purpose: item.purpose,
+          };
+        }),
+      };
+    }),
+  };
+}
+
+/**
+ * What configuration files their contract rules refuse are refused for.
+ */
+const FILES_BROKEN_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the files named above, then run the command again; nothing was changed.",
+  details: {
+    problems: "{problems}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a configuration file the operating system refuses to let this process
+ * read is refused for.
+ */
+const FILE_UNREADABLE_REFUSAL = {
+  code: "E_AUTH",
+  message: "{message}",
+  hint: "Check that the file is readable, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "{errno}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a configuration file that cannot be read for another reason is
+ * refused for.
+ */
+const PATH_UNREADABLE_REFUSAL = {
+  message: "{message}",
+  hint: "Check that the file is readable, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "{errno}",
+  },
 } as const satisfies Refusal;
 
 /**
@@ -210,64 +354,81 @@ const AMBIGUOUS_SCHEMA_REFUSAL = {
  * @returns What the run read.
  * @throws {@link ZitadelError} When no schema, or more than one, fits
  *   `--schema`, or the one that does points at an external schema.
- * @throws {@link ZitadelConfigError} Naming every file the contract rules refuse.
+ * @throws {@link ZitadelError} Naming every file the contract rules refuse, or
+ *   a configuration file that cannot be read.
  */
 export async function readSchemaTarget(input: {
   cwd: string;
   schema: string | undefined;
 }): Promise<SchemaTarget> {
-  const store = new DiskStore(input.cwd);
-  const loaded = await ZitadelConfig.loadUnchecked(store);
   try {
-    loaded.schemas.resolve(input.schema);
-  } catch (error) {
-    if (error instanceof ZitadelConfigSchemaMissingError) {
-      const brokenSchemas = loaded.broken.filter((file) => {
-        return file.kind === "schema";
-      });
-      const name = input.schema?.endsWith(".json")
-        ? input.schema.slice(0, -".json".length)
-        : input.schema;
-      const broken =
-        input.schema === undefined
-          ? brokenSchemas
-          : brokenSchemas.filter((file) => {
-              return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
-            });
-      if (broken.length > 0) {
-        throw new ZitadelConfigError(
-          [
-            "Configuration files are not valid:",
-            ...broken
-              .flatMap((file) => {
-                return file.problems;
-              })
-              .map((entry) => {
-                return `  - ${entry.path}: ${entry.problem}`;
-              }),
-          ].join("\n"),
-        );
+    const store = new DiskStore(input.cwd);
+    const loaded = await ZitadelConfig.loadUnchecked(store);
+    try {
+      loaded.schemas.resolve(input.schema);
+    } catch (error) {
+      if (error instanceof ZitadelConfigSchemaMissingError) {
+        const brokenSchemas = loaded.broken.filter((file) => {
+          return file.kind === "schema";
+        });
+        const name = input.schema?.endsWith(".json")
+          ? input.schema.slice(0, -".json".length)
+          : input.schema;
+        const broken =
+          input.schema === undefined
+            ? brokenSchemas
+            : brokenSchemas.filter((file) => {
+                return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
+              });
+        if (broken.length > 0) {
+          throw new ZitadelConfigFilesBrokenError(
+            broken.flatMap((file) => {
+              return file.problems;
+            }),
+          );
+        }
       }
     }
+    const schema = chosenSchema(loaded.schemas, input.schema);
+    if (schema.isExternal) {
+      throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
+        file: schema.path,
+        url: String(schema.body.url),
+      });
+    }
+    const published = await publishedIds(input.cwd, [schema.path]);
+    const config = loaded.withOptions({ published }).refuseBroken(store);
+    const schemaFlag = config.schemas.nameUniquely(schema);
+    return {
+      cwd: input.cwd,
+      config,
+      store,
+      schema,
+      schemaFlag,
+      schemaGiven: input.schema === undefined ? undefined : schemaFlag,
+    };
+  } catch (error) {
+    if (error instanceof ZitadelConfigFilesBrokenError) {
+      throw refusalError(FILES_BROKEN_REFUSAL, {
+        ...error,
+        message: error.message,
+      });
+    }
+    if (error instanceof ZitadelConfigFileUnreadableError) {
+      throw refusalError(FILE_UNREADABLE_REFUSAL, {
+        ...error,
+        message: error.message,
+      });
+    }
+    if (error instanceof ZitadelConfigPathUnreadableError) {
+      throw refusalError(PATH_UNREADABLE_REFUSAL, {
+        ...error,
+        message: error.message,
+        errno: error.errno ?? null,
+      });
+    }
+    throw error;
   }
-  const schema = chosenSchema(loaded.schemas, input.schema);
-  if (schema.isExternal) {
-    throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
-      file: schema.path,
-      url: String(schema.body.url),
-    });
-  }
-  const published = await publishedIds(input.cwd, [schema.path]);
-  const config = loaded.withOptions({ published }).refuseBroken(store);
-  const schemaFlag = config.schemas.nameUniquely(schema);
-  return {
-    cwd: input.cwd,
-    config,
-    store,
-    schema,
-    schemaFlag,
-    schemaGiven: input.schema === undefined ? undefined : schemaFlag,
-  };
 }
 
 /**
@@ -852,6 +1013,7 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         throw refusalError(FLOW_METHOD_IN_USE_REFUSAL, {
           ...error,
           message: error.message,
+          ...methodInUseFacts(error),
         });
       }
       if (error instanceof ZitadelConfigFlowUncheckedError) {
@@ -912,6 +1074,7 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         throw refusalError(FLOW_METHOD_IN_USE_REFUSAL, {
           ...error,
           message: error.message,
+          ...methodInUseFacts(error),
         });
       }
       if (error instanceof ZitadelConfigFlowUncheckedError) {

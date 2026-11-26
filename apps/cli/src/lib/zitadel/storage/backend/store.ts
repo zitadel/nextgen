@@ -5,6 +5,8 @@ import {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
   ZitadelConfigFileUnreadableError,
+  ZitadelConfigPathUnreadableError,
+  ZitadelConfigReferenceUnreadableError,
 } from "@/lib/zitadel/errors";
 import {
   CONFIG_DIRECTORIES,
@@ -85,8 +87,11 @@ export abstract class Store implements ConfigStore {
    * @returns The files, in file-name order; none when the kind's directory is
    *   not there. A file that is not valid JSON, or holds something other than
    *   a JSON object, comes back as an {@link UnparsedFile} with the reason.
-   * @throws {@link ZitadelConfigError} When the directory or a file cannot be read;
-   *   of several files that cannot, the first in path order.
+   * @throws {@link ZitadelConfigFileUnreadableError} When the operating system
+   *   refuses to let the directory or a file be read; of several files that
+   *   cannot, the first in path order.
+   * @throws {@link ZitadelConfigPathUnreadableError} When the directory or a
+   *   file cannot be read for another reason.
    */
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
@@ -137,15 +142,12 @@ export abstract class Store implements ConfigStore {
         return [];
       }
       if (isErrno(error, "EACCES")) {
-        throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EACCES)`);
+        throw new ZitadelConfigFileUnreadableError(directory, "EACCES", error);
       }
       if (isErrno(error, "EPERM")) {
-        throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EPERM)`);
+        throw new ZitadelConfigFileUnreadableError(directory, "EPERM", error);
       }
-      if (isErrno(error, "ENOTDIR")) {
-        throw new ZitadelConfigError(`${directory} cannot be read (ENOTDIR)`);
-      }
-      throw new ZitadelConfigError(`${directory} cannot be read`);
+      throw new ZitadelConfigPathUnreadableError(directory, Store.errnoOf(error), error);
     }
   }
 
@@ -279,7 +281,7 @@ export abstract class Store implements ConfigStore {
           }
           const message = `$file ${JSON.stringify(ref)} cannot be read; create the referenced file or fix the path`;
           if (isErrno(error, "EACCES") || isErrno(error, "EPERM")) {
-            throw new ZitadelConfigFileUnreadableError(message, error);
+            throw new ZitadelConfigReferenceUnreadableError(message, error);
           }
           throw new ZitadelConfigError(message, error);
         }
@@ -398,8 +400,10 @@ export abstract class Store implements ConfigStore {
    * @param path - The project-relative path.
    * @returns The file; an {@link UnparsedFile} with the reason when it is not
    *   valid JSON, not a JSON object, or a directory.
-   * @throws {@link ZitadelConfigError} When the file cannot be read, naming the error
-   *   code.
+   * @throws {@link ZitadelConfigFileUnreadableError} When the operating system
+   *   refuses to let it be read, naming the error code.
+   * @throws {@link ZitadelConfigPathUnreadableError} When it cannot be read for
+   *   another reason, naming the error code when there is one.
    */
   private async readFileAt(path: string): Promise<StoredFile> {
     try {
@@ -424,16 +428,30 @@ export abstract class Store implements ConfigStore {
         return UnparsedFile.directory(path);
       }
       if (isErrno(error, "EACCES")) {
-        throw new ZitadelConfigFileUnreadableError(`${path} cannot be read (EACCES)`);
+        throw new ZitadelConfigFileUnreadableError(path, "EACCES", error);
       }
       if (isErrno(error, "EPERM")) {
-        throw new ZitadelConfigFileUnreadableError(`${path} cannot be read (EPERM)`);
+        throw new ZitadelConfigFileUnreadableError(path, "EPERM", error);
       }
-      if (isErrno(error, "ENOTDIR")) {
-        throw new ZitadelConfigError(`${path} cannot be read (ENOTDIR)`);
-      }
-      throw new ZitadelConfigError(`${path} cannot be read`);
+      throw new ZitadelConfigPathUnreadableError(path, Store.errnoOf(error), error);
     }
+  }
+
+  /**
+   * The operating system's error code a failed call carries, read here where
+   * the injected file system's failures enter the library.
+   *
+   * @param error - What the call failed with.
+   * @returns The code, or `undefined` when the failure carries none.
+   */
+  private static errnoOf(error: unknown): string | undefined {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+      return undefined;
+    }
+    if (typeof error.code !== "string") {
+      return undefined;
+    }
+    return error.code;
   }
 
   /**

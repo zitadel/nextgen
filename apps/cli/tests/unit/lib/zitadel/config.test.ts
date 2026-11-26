@@ -9,6 +9,7 @@ import {
   ZitadelConfigResourceClashError,
   ZitadelConfigConnectionExistsError,
   ZitadelConfigFileExistsError,
+  ZitadelConfigNothingToDeployError,
   Flow,
   PasswordPolicy,
   Policy,
@@ -983,7 +984,7 @@ describe("ZitadelConfig.bundle", () => {
       return config.bundle(new MemoryStore());
     });
 
-    expect(error).toBeInstanceOf(ZitadelConfigError);
+    expect(error).toBeInstanceOf(ZitadelConfigNothingToDeployError);
     expect(error).toMatchObject({ message: "There is nothing in .zitadel/ to deploy" });
   });
 

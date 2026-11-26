@@ -14,6 +14,7 @@ import {
   ZitadelConfigFlowMethodInUseError,
   ZitadelConfigFlowUncheckedError,
   ZitadelConfigInternalError,
+  ZitadelConfigPathUnreadableError,
 } from "@/lib/zitadel";
 import { googleSelection } from "@tests/helpers/idp-values";
 
@@ -95,16 +96,46 @@ describe("ZitadelConfigFileExistsError", () => {
 
 describe("ZitadelConfigFileUnreadableError", () => {
   it("is a denied failure when the permission is refused", () => {
-    expect(new ZitadelConfigFileUnreadableError("x.json cannot be read")).toMatchObject({
+    expect(new ZitadelConfigFileUnreadableError("x.json", "EACCES")).toMatchObject({
       category: "denied",
       code: "E_AUTH",
+    });
+  });
+
+  it("names the path and the error code in its message", () => {
+    expect(new ZitadelConfigFileUnreadableError("x.json", "EPERM")).toMatchObject({
+      message: "x.json cannot be read (EPERM)",
+      path: "x.json",
+      errno: "EPERM",
+    });
+  });
+});
+
+describe("ZitadelConfigPathUnreadableError", () => {
+  it("names the error code in its message when there is one", () => {
+    expect(new ZitadelConfigPathUnreadableError("x.json", "EIO")).toMatchObject({
+      message: "x.json cannot be read (EIO)",
+      code: "E_VALIDATION",
+    });
+  });
+
+  it("leaves the code out of its message when there is none", () => {
+    expect(new ZitadelConfigPathUnreadableError("x.json", undefined)).toMatchObject({
+      message: "x.json cannot be read",
     });
   });
 });
 
 describe("ZitadelConfigFlowMethodInUseError", () => {
   it("is a validation failure", () => {
-    expect(new ZitadelConfigFlowMethodInUseError("a flow uses it")).toMatchObject({
+    expect(
+      new ZitadelConfigFlowMethodInUseError("a flow uses it", {
+        file: ".zitadel/schemas/customers.json",
+        method: "password",
+        issues: [],
+        uses: [],
+      }),
+    ).toMatchObject({
       category: "invalid",
       code: "E_VALIDATION",
     });

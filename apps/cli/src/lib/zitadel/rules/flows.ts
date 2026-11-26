@@ -202,6 +202,12 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
           return `  - ${item.path}: ${item.issue.message}`;
         }),
     ].join("\n"),
+    {
+      file: edit.edited.path,
+      method,
+      issues: introduced,
+      uses,
+    },
   );
 }
 

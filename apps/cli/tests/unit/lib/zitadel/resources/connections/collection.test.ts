@@ -4,6 +4,10 @@ import { idpProvider } from "@zitadel/config/idp";
 
 import {
   ZitadelConfigError,
+  ZitadelConfigClientIdMismatchError,
+  ZitadelConfigConnectionFileTakenError,
+  ZitadelConfigConnectionIssuerClashError,
+  ZitadelConfigProviderFileTakenError,
   ZitadelConfigResourceClashError,
   ZitadelConfigResourceMissingError,
   Connection,
@@ -1207,9 +1211,11 @@ describe("Connections.resolveExisting", () => {
         return config.connections.resolveExisting(ACME_SSO, { clientId: clientId("another-id") });
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigClientIdMismatchError);
       expect(error).toMatchObject({
         message: `${ACME_SSO_FILE} already uses client id literal-id, not another-id`,
+        stored: "literal-id",
+        supplied: "another-id",
       });
     });
 
@@ -1225,7 +1231,7 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(candidate);
         });
 
-        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
+        expect(error).toBeInstanceOf(ZitadelConfigConnectionIssuerClashError);
         expect(error).toMatchObject({
           message: expect.stringContaining("not https://sso.other.example"),
         });
@@ -1242,9 +1248,11 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(ACME_SSO);
         });
 
-        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
+        expect(error).toBeInstanceOf(ZitadelConfigConnectionFileTakenError);
         expect(error).toMatchObject({
           message: `${ACME_SSO_FILE} already exists and is not the acme-sso connection`,
+          path: ACME_SSO_FILE,
+          slug: "something-else",
         });
       });
     });
@@ -1265,9 +1273,11 @@ describe("Connections.resolveExisting", () => {
           return config.connections.resolveExisting(GOOGLE);
         });
 
-        expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
+        expect(error).toBeInstanceOf(ZitadelConfigProviderFileTakenError);
         expect(error).toMatchObject({
           message: `${GOOGLE_FILE} already exists and is not the google connection`,
+          path: GOOGLE_FILE,
+          slug: "something-else",
         });
       });
     });
@@ -1339,8 +1349,12 @@ describe("Connections.resolveBySlug", () => {
         return config.connections.resolveBySlug("acme-sso", "https://sso.other.example");
       });
 
-      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionIssuerClashError);
       expect(error).toMatchObject({
+        path: ACME_SSO_FILE,
+        slug: "acme-sso",
+        issuer: "https://sso.other.example",
+        existingIssuer: ACME_SSO_ISSUER,
         message: expect.stringContaining(
           `connects to ${ACME_SSO_ISSUER}, not https://sso.other.example`,
         ),

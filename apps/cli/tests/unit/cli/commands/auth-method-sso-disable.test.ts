@@ -1127,7 +1127,7 @@ describe("auth-method sso disable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        message: expect.stringContaining(`${SCHEMA_FILE}:`),
+        details: { problems: [expect.objectContaining({ path: SCHEMA_FILE })] },
       });
     });
   });

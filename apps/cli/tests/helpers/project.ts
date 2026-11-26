@@ -1083,6 +1083,27 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ runtime: { port: number; pid: number } }>(result).data.runtime;
   }
 
+  /** Leaves this directory with a local admin file that is not JSON. */
+  async writeMalformedLocalAdmin(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/admin.json"), "{ truncated");
+  }
+
+  /** The local admin file of this directory, which refusals about it name. */
+  get localAdminFile(): string {
+    return join(this.path, ".zitadel/local/admin.json");
+  }
+
+  /** Leaves this directory with a `.env.local` that exists but cannot be read as a file. */
+  async makeLocalEnvFileUnreadable(): Promise<void> {
+    await mkdir(join(this.path, ".env.local"), { recursive: true });
+  }
+
+  /** The `.env.local` of this directory, which refusals about it name. */
+  get localEnvFile(): string {
+    return join(this.path, ".env.local");
+  }
+
   /** Leaves this directory with a record of its local server that cannot be read. */
   async corruptLocalServerRecord(): Promise<void> {
     await mkdir(join(this.path, ".zitadel/local"), { recursive: true });

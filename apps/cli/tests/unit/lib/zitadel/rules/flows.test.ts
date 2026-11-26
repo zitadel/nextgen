@@ -392,6 +392,26 @@ describe("assertMethodUnused", () => {
         message: expect.stringContaining(`${FLOW_PATH}: step "identifier"`),
       });
     });
+
+    it("carries the schema, the method and each step for the refusal to name", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+        flows: { [FLOW_FILE]: PASSKEY_FIRST_FLOW },
+      });
+      const edit = aMethodEdit(config, "passkey", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "passkey");
+      });
+
+      expect(error).toMatchObject({
+        file: SCHEMA_PATH,
+        method: "passkey",
+        uses: expect.arrayContaining([
+          expect.objectContaining({ path: FLOW_PATH, step: "identifier" }),
+        ]),
+      });
+    });
   });
 
   describe("when a step left with nothing leads to another", () => {

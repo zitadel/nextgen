@@ -212,12 +212,83 @@ describe("auth-method passkey disable", () => {
             source: "",
             code: "E_VALIDATION",
             message: `Disabling passkey in ${SCHEMA_FILE} would break a login flow that still uses it:\n  - ${FLOW_FILE}: step "passkey-first" offers passkey (action "passkey")\n    Left with no field or sign-in method. Entry step of purposes.login. Targeted by register.sign_in (via purposes.login).\n  - ${FLOW_FILE}: step "identifier" offers passkey (action "passkey")\n    Still has field "email".\n  - ${FLOW_FILE}: step "password" offers passkey (action "passkey")\n    Still has field "x-auth-methods#password".\n  - ${FLOW_FILE}: step "register" offers passkey (action "passkey_register")\n    Still has field "email".`,
-            hint: `Edit those steps first; login flows are not edited for you. ${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
+            hint: `Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. Delete a step left with no field or sign-in method: retarget the transitions listed for it (one marked via purposes.<key> follows that key instead), and point the purposes key it is the entry step of at another step. ${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
             next_commands: [
               expectedPublicCliCommand(
                 `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
+            details: {
+              file: SCHEMA_FILE,
+              issues: [
+                {
+                  path: FLOW_FILE,
+                  rule: "schema/passkey-actions",
+                  message:
+                    'step "passkey-first": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
+                  step: "passkey-first",
+                },
+                {
+                  path: FLOW_FILE,
+                  rule: "schema/passkey-actions",
+                  message:
+                    'step "identifier": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
+                  step: "identifier",
+                },
+                {
+                  path: FLOW_FILE,
+                  rule: "schema/passkey-actions",
+                  message:
+                    'step "password": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
+                  step: "password",
+                },
+                {
+                  path: FLOW_FILE,
+                  rule: "schema/passkey-actions",
+                  message:
+                    'step "register": action "passkey_register" offers passkey but "passkey" is not an enabled authentication method',
+                  step: "register",
+                },
+              ],
+              steps: [
+                {
+                  path: FLOW_FILE,
+                  step: "passkey-first",
+                  keeps: [],
+                  entry_for: ["login"],
+                  targeted_by: [{ step: "register", transition: "sign_in", purpose: "login" }],
+                },
+                {
+                  path: FLOW_FILE,
+                  step: "identifier",
+                  keeps: ['field "email"'],
+                  entry_for: [],
+                  targeted_by: [{ step: "passkey-first", transition: "email_fallback" }],
+                },
+                {
+                  path: FLOW_FILE,
+                  step: "password",
+                  keeps: ['field "x-auth-methods#password"'],
+                  entry_for: [],
+                  targeted_by: [
+                    { step: "identifier", transition: "submit" },
+                    { step: "register", transition: "user_already_exists" },
+                    { step: "register-password", transition: "user_already_exists" },
+                  ],
+                },
+                {
+                  path: FLOW_FILE,
+                  step: "register",
+                  keeps: ['field "email"'],
+                  entry_for: ["register"],
+                  targeted_by: [
+                    { step: "passkey-first", transition: "register", purpose: "register" },
+                    { step: "identifier", transition: "register", purpose: "register" },
+                    { step: "identifier", transition: "user_not_found" },
+                  ],
+                },
+              ],
+            },
           });
         });
 

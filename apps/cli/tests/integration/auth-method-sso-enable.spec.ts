@@ -1043,6 +1043,13 @@ describe("auth-method sso enable", () => {
             code: "E_CONFLICT",
             message:
               ".zitadel/idps/acme-sso.json is already named acme-sso and connects to https://sso.acme.example, not https://sso.other.example",
+            hint: "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another slug for this connection, then move the schemas and flows that name the old one to it.",
+            details: {
+              file: ".zitadel/idps/acme-sso.json",
+              slug: "acme-sso",
+              issuer: "https://sso.other.example",
+              existing_issuer: "https://sso.acme.example",
+            },
           });
         });
       });

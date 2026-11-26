@@ -174,7 +174,7 @@ describe("toZitadelError", () => {
     ["a ZitadelConfigError", new ZitadelConfigError("not valid")],
     [
       "a ZitadelConfigFileUnreadableError",
-      new ZitadelConfigFileUnreadableError("x.json is locked"),
+      new ZitadelConfigFileUnreadableError("x.json", "EACCES"),
     ],
   ])("reports %s by the code and message its class states", (_name, error) => {
     const result = toZitadelError(error);

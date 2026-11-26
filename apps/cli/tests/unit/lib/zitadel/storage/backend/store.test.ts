@@ -5,6 +5,7 @@ import {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
   ZitadelConfigFileUnreadableError,
+  ZitadelConfigPathUnreadableError,
   type JsonObject,
 } from "@/lib/zitadel";
 import type { Store } from "@/lib/zitadel/storage/backend/store";
@@ -202,9 +203,11 @@ describe("Store.read", () => {
         return store.read("connections");
       });
 
-      expect(error).not.toBeInstanceOf(ZitadelConfigFileUnreadableError);
+      expect(error).toBeInstanceOf(ZitadelConfigPathUnreadableError);
       expect(error).toMatchObject({
         message: `${CONFIG_DIRECTORIES.connections} cannot be read (ENOTDIR)`,
+        path: CONFIG_DIRECTORIES.connections,
+        errno: "ENOTDIR",
       });
     });
 
@@ -220,6 +223,8 @@ describe("Store.read", () => {
       expect(error).toBeInstanceOf(ZitadelConfigFileUnreadableError);
       expect(error).toMatchObject({
         message: `${IDP_A} cannot be read (EACCES)`,
+        path: IDP_A,
+        errno: "EACCES",
       });
     });
 
@@ -253,6 +258,8 @@ describe("Store.read", () => {
         expect(error).toBeInstanceOf(ZitadelConfigFileUnreadableError);
         expect(error).toMatchObject({
           message: `${CONFIG_DIRECTORIES.connections} cannot be read (EACCES)`,
+          path: CONFIG_DIRECTORIES.connections,
+          errno: "EACCES",
         });
       },
     );

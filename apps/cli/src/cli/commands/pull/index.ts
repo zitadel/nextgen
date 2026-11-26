@@ -22,6 +22,8 @@ import {
   isJsonValue,
   type Schemas,
   ZitadelConfig,
+  ZitadelConfigFileUnreadableError,
+  ZitadelConfigPathUnreadableError,
 } from "@/lib/zitadel";
 import { ChangeCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
@@ -103,6 +105,33 @@ const TARGET = {
     hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
   },
 } as const satisfies Refused<PullTarget>;
+
+/**
+ * What a configuration file the operating system refuses to let this process
+ * read is refused for.
+ */
+const FILE_UNREADABLE_REFUSAL = {
+  code: "E_AUTH",
+  message: "{message}",
+  hint: "Check that the file is readable, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "{errno}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a configuration file that cannot be read for another reason is
+ * refused for.
+ */
+const PATH_UNREADABLE_REFUSAL = {
+  message: "{message}",
+  hint: "Check that the file is readable, then run the command again.",
+  details: {
+    file: "{path}",
+    code: "{errno}",
+  },
+} as const satisfies Refusal;
 
 /**
  * What a release that pins two resources into one file is refused for.
@@ -375,72 +404,89 @@ export default class Pull extends Telemetered(ChangeCommand) {
    */
   private async gathered(target: PullTarget) {
     const store = new DiskStore(this.cwd);
-    const config = await ZitadelConfig.loadKinds(store, ["schemas", "flows"]);
+    try {
+      const config = await ZitadelConfig.loadKinds(new DiskStore(this.cwd), ["schemas", "flows"]);
 
-    const configuration = await this.service(PublishedConfiguration);
-    const releaseId = await this.resolveReleaseId(configuration, target);
-    const release = await configuration.fetchRelease(releaseId);
+      const configuration = await this.service(PublishedConfiguration);
+      const releaseId = await this.resolveReleaseId(configuration, target);
+      const release = await configuration.fetchRelease(releaseId);
 
-    const attempts = await mapBounded(
-      release.pointers,
-      FETCH_CONCURRENCY,
-      async (
-        pointer,
-      ): Promise<
-        | { readonly kind: "done"; readonly outcome: PullOutcome }
-        | { readonly kind: "failed"; readonly error: unknown }
-      > => {
-        try {
-          return {
-            kind: "done",
-            outcome: await this.fetchOne(configuration, config, pointer),
-          };
-        } catch (error) {
-          return {
-            kind: "failed",
-            error,
-          };
-        }
-      },
-    );
-    const failed = attempts.find((attempt) => {
-      return attempt.kind === "failed";
-    });
-    if (failed !== undefined) {
-      throw failed.error;
-    }
-    const outcomes: PullOutcome[] = attempts.flatMap((attempt) => {
-      return attempt.kind === "done" ? [attempt.outcome] : [];
-    });
-    const owners = new Map<string, PulledResource>();
-    for (const outcome of outcomes) {
-      if (outcome.kind !== "pulled") {
-        continue;
+      const attempts = await mapBounded(
+        release.pointers,
+        FETCH_CONCURRENCY,
+        async (
+          pointer,
+        ): Promise<
+          | { readonly kind: "done"; readonly outcome: PullOutcome }
+          | { readonly kind: "failed"; readonly error: unknown }
+        > => {
+          try {
+            return {
+              kind: "done",
+              outcome: await this.fetchOne(configuration, config, pointer),
+            };
+          } catch (error) {
+            return {
+              kind: "failed",
+              error,
+            };
+          }
+        },
+      );
+      const failed = attempts.find((attempt) => {
+        return attempt.kind === "failed";
+      });
+      if (failed !== undefined) {
+        throw failed.error;
       }
-      const owner = owners.get(outcome.resource.path);
-      if (owner !== undefined) {
-        throw refusalError(SHARED_FILE_REFUSAL, {
-          first: owner.handle,
-          second: outcome.resource.handle,
-          path: outcome.resource.path,
-          handles: [owner.handle, outcome.resource.handle],
+      const outcomes: PullOutcome[] = attempts.flatMap((attempt) => {
+        return attempt.kind === "done" ? [attempt.outcome] : [];
+      });
+      const owners = new Map<string, PulledResource>();
+      for (const outcome of outcomes) {
+        if (outcome.kind !== "pulled") {
+          continue;
+        }
+        const owner = owners.get(outcome.resource.path);
+        if (owner !== undefined) {
+          throw refusalError(SHARED_FILE_REFUSAL, {
+            first: owner.handle,
+            second: outcome.resource.handle,
+            path: outcome.resource.path,
+            handles: [owner.handle, outcome.resource.handle],
+          });
+        }
+        owners.set(outcome.resource.path, outcome.resource);
+      }
+      for (const outcome of outcomes) {
+        if (outcome.kind === "skipped") {
+          warnings.report(
+            `The release pins ${outcome.resource.kind} "${outcome.resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
+          );
+        }
+      }
+
+      return {
+        store,
+        release,
+        outcomes,
+      };
+    } catch (error) {
+      if (error instanceof ZitadelConfigFileUnreadableError) {
+        throw refusalError(FILE_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
         });
       }
-      owners.set(outcome.resource.path, outcome.resource);
-    }
-    for (const outcome of outcomes) {
-      if (outcome.kind === "skipped") {
-        warnings.report(
-          `The release pins ${outcome.resource.kind} "${outcome.resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
-        );
+      if (error instanceof ZitadelConfigPathUnreadableError) {
+        throw refusalError(PATH_UNREADABLE_REFUSAL, {
+          ...error,
+          message: error.message,
+          errno: error.errno ?? null,
+        });
       }
+      throw error;
     }
-
-    return {
-      store,
-      release,
-      outcomes,
-    };
   }
 
   /**

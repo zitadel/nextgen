@@ -14,9 +14,69 @@ import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import {
   Connection,
+  ZitadelConfigClientIdMismatchError,
+  ZitadelConfigConnectionFileTakenError,
+  ZitadelConfigConnectionIssuerClashError,
   ZitadelConfigFlowBrokenError,
   ZitadelConfigFlowUncheckedError,
+  ZitadelConfigProviderFileTakenError,
 } from "@/lib/zitadel";
+
+/**
+ * What a client id other than the one the connection file holds is refused for.
+ */
+const CLIENT_ID_MISMATCH_REFUSAL = {
+  message: "{message}",
+  hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
+  details: {
+    file: "{path}",
+    stored_client_id: "{stored}",
+    supplied_client_id: "{supplied}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a slug that already names a connection to another issuer is refused for.
+ */
+const ISSUER_CLASH_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another slug for this connection, then move the schemas and flows that name the old one to it.",
+  details: {
+    file: "{path}",
+    slug: "{slug}",
+    issuer: "{issuer}",
+    existing_issuer: "{existingIssuer}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a catalog provider's connection file name another connection already
+ * has is refused for.
+ */
+const PROVIDER_FILE_TAKEN_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rename or remove that file, then run the command again.",
+  details: {
+    file: "{path}",
+    slug: "{slug}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * What a custom connection's file name another connection already has is
+ * refused for.
+ */
+const CONNECTION_FILE_TAKEN_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rename or remove that file, or choose another slug, then run the command again.",
+  details: {
+    file: "{path}",
+    slug: "{slug}",
+  },
+} as const satisfies Refusal;
 
 /**
  * What a change is refused for when it would make a login flow stop validating.
@@ -169,6 +229,30 @@ export class PlanChange extends WizardStep<
         },
       };
     } catch (error) {
+      if (error instanceof ZitadelConfigClientIdMismatchError) {
+        throw refusalError(CLIENT_ID_MISMATCH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigConnectionIssuerClashError) {
+        throw refusalError(ISSUER_CLASH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigProviderFileTakenError) {
+        throw refusalError(PROVIDER_FILE_TAKEN_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigConnectionFileTakenError) {
+        throw refusalError(CONNECTION_FILE_TAKEN_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigFlowBrokenError) {
         throw refusalError(FLOW_BROKEN_REFUSAL, {
           ...error,

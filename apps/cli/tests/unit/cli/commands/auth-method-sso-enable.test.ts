@@ -1579,7 +1579,7 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        message: expect.stringContaining(`${LOGIN_FLOW_FILE}:`),
+        details: { problems: [expect.objectContaining({ path: LOGIN_FLOW_FILE })] },
       });
     });
 

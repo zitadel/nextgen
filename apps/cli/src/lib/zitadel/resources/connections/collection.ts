@@ -15,6 +15,9 @@ import type {
   UnusedConnection,
 } from "@/lib/zitadel/resources/connections/types";
 import {
+  ZitadelConfigConnectionFileTakenError,
+  ZitadelConfigConnectionIssuerClashError,
+  ZitadelConfigProviderFileTakenError,
   ZitadelConfigResourceClashError,
   ZitadelConfigResourceMissingError,
 } from "@/lib/zitadel/errors";
@@ -591,9 +594,7 @@ export class Connections extends Collection<Connection> {
     });
     if (taken) {
       const path: ConnectionPath = `${CONFIG_DIRECTORIES.connections}/${slug}.json`;
-      throw new ZitadelConfigResourceClashError(
-        `${path} already exists and is not the ${slug} connection`,
-      );
+      Connections.refuseFileTaken(path, slug, slug);
     }
     const parsed = parseConnectionSlug(slug);
     if (parsed.ok) {
@@ -622,9 +623,30 @@ export class Connections extends Collection<Connection> {
         `${candidate.path} is a connection called ${candidate.slug}, but not to ${candidate.displayName}: its issuer is not ${issuer}`,
       );
     }
-    throw new ZitadelConfigResourceClashError(
-      `${candidate.path} already exists and is not the ${candidate.slug} connection`,
-    );
+    Connections.refuseFileTaken(candidate.path, candidate.slug, occupied.slug);
+  }
+
+  /**
+   * Refuse a file name another connection already has, as the catalog
+   * provider's or the custom connection's it was wanted for.
+   *
+   * @param path - The project-relative path that is taken.
+   * @param wanted - The slug the file was wanted for.
+   * @param slug - The slug of the connection the file holds.
+   * @returns Never.
+   * @throws {@link ZitadelConfigProviderFileTakenError} When the slug is a catalog
+   *   provider's.
+   * @throws {@link ZitadelConfigConnectionFileTakenError} When it is a custom
+   *   connection's.
+   */
+  private static refuseFileTaken(path: string, wanted: string, slug: string): never {
+    const inCatalog = IDP_PROVIDERS.some((provider) => {
+      return provider === wanted;
+    });
+    if (inCatalog) {
+      throw new ZitadelConfigProviderFileTakenError(path, wanted, slug);
+    }
+    throw new ZitadelConfigConnectionFileTakenError(path, wanted, slug);
   }
 
   /**
@@ -635,18 +657,17 @@ export class Connections extends Collection<Connection> {
    * @param connection - The existing connection.
    * @param slug - Its slug.
    * @param issuer - The issuer the developer gave.
-   * @throws {@link ZitadelConfigResourceClashError} When they differ.
+   * @throws {@link ZitadelConfigConnectionIssuerClashError} When they differ.
    */
   private refuseChangedIssuer(connection: Connection, slug: string, issuer: string): void {
     if (connection.issuer === issuer) {
       return;
     }
-    const found =
-      connection.issuer === undefined
-        ? `is not an OIDC connection to ${issuer}`
-        : `connects to ${connection.issuer}, not ${issuer}`;
-    throw new ZitadelConfigResourceClashError(
-      `${connection.path} is already named ${slug} and ${found}`,
+    throw new ZitadelConfigConnectionIssuerClashError(
+      connection.path,
+      slug,
+      issuer,
+      connection.issuer,
     );
   }
 
