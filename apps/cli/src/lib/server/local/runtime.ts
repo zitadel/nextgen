@@ -313,25 +313,23 @@ export async function loopbackReach(
   cwd: string,
   serverUrl: string,
 ): Promise<"allowed" | "container" | "unknown"> {
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let nearest: Awaited<ReturnType<typeof readNearestRuntimeMetadata>>;
   try {
-    nearest = await readNearestRuntimeMetadata(cwd);
+    const nearest = await readNearestRuntimeMetadata(cwd);
+    if (!nearest || !sameLocalServer(nearest.runtime.server_url, serverUrl)) {
+      return "unknown";
+    }
+    if (nearest.runtime.backend === "docker") {
+      return "container";
+    }
+    const injectsEveryDefault = Object.keys(LOCAL_DEFAULTS).every((name) => {
+      return nearest.runtime.env?.injected.includes(name);
+    });
+    if (injectsEveryDefault) {
+      return "allowed";
+    } else {
+      return "unknown";
+    }
   } catch {
-    return "unknown";
-  }
-  if (!nearest || !sameLocalServer(nearest.runtime.server_url, serverUrl)) {
-    return "unknown";
-  }
-  if (nearest.runtime.backend === "docker") {
-    return "container";
-  }
-  const injectsEveryDefault = Object.keys(LOCAL_DEFAULTS).every((name) => {
-    return nearest.runtime.env?.injected.includes(name);
-  });
-  if (injectsEveryDefault) {
-    return "allowed";
-  } else {
     return "unknown";
   }
 }
@@ -502,20 +500,17 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
 
 async function nearestExistingDirectory(path: string): Promise<string> {
   for (const current of ancestors(path)) {
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let info: Awaited<ReturnType<typeof stat>>;
     try {
-      info = await stat(current);
+      const info = await stat(current);
+      if (!info.isDirectory()) {
+        throw new Error(`${current} exists but is not a directory`);
+      }
+      return current;
     } catch (error) {
       if (!isErrno(error, "ENOENT") || dirname(current) === current) {
         throw error;
       }
-      continue;
     }
-    if (!info.isDirectory()) {
-      throw new Error(`${current} exists but is not a directory`);
-    }
-    return current;
   }
   throw new Error(`${path} has no existing directory above it`);
 }

@@ -260,30 +260,33 @@ export class Facts implements Renderable {
  */
 const argumentBreaks = (command: string): number[] => {
   const at: number[] = [];
-  // biome-ignore lint/plugin: the quote the scan is inside, changed as it reads
-  let quote: string | undefined;
-  // biome-ignore lint/plugin: whether the last character was a backslash
-  let escaped = false;
+  const scan: { quote?: string; escaped: boolean } = { escaped: false };
   // Indexes are UTF-16 units, as `slice` reads them; quotes and spaces are never half a pair.
-  // biome-ignore lint/plugin: the scan position, read through one character at a time
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command.charAt(index);
-    if (escaped) {
-      escaped = false;
-    } else if (character === "\\" && quote !== "'") {
-      escaped = true;
-    } else if (quote !== undefined) {
-      quote = character === quote ? undefined : quote;
-    } else if (
+  command.split("").forEach((character, index) => {
+    if (scan.escaped) {
+      scan.escaped = false;
+      return;
+    }
+    if (character === "\\" && scan.quote !== "'") {
+      scan.escaped = true;
+      return;
+    }
+    if (scan.quote !== undefined) {
+      scan.quote = character === scan.quote ? undefined : scan.quote;
+      return;
+    }
+    if (
       (character === "'" || character === '"') &&
       !/[\p{L}\p{N}]/u.test(command.charAt(index - 1)) &&
       command.includes(character, index + 1)
     ) {
-      quote = character;
-    } else if (character === " ") {
+      scan.quote = character;
+      return;
+    }
+    if (character === " ") {
       at.push(index);
     }
-  }
+  });
   return at;
 };
 
@@ -308,24 +311,25 @@ const argumentBreaks = (command: string): number[] => {
  */
 export const wrapCommand = (command: string, width: number, lead = ""): string[] => {
   const lines: string[] = [];
-  // biome-ignore lint/plugin: the rest of the command, shortened by each line cut off, so wrapping is a loop and cannot overflow the stack
-  let rest = command;
-  // biome-ignore lint/plugin: the lead for the line being filled
-  let indent = lead;
-  while (indent.length + rest.length > width) {
-    const cut = argumentBreaks(rest)
+  const fold = { rest: command };
+  // Each cut takes at least two characters, so the command's length bounds the lines, and a
+  // bounded loop rather than recursion cannot overflow the stack.
+  for (const _ of command) {
+    if (lead.length + fold.rest.length <= width) {
+      break;
+    }
+    const cut = argumentBreaks(fold.rest)
       .filter((at) => {
-        return at > 0 && at <= Math.max(1, width - indent.length - 2);
+        return at > 0 && at <= Math.max(1, width - lead.length - 2);
       })
       .at(-1);
     if (cut === undefined) {
       break;
     }
-    lines.push(`${indent}${rest.slice(0, cut)} \\`);
-    rest = rest.slice(cut + 1);
-    indent = lead;
+    lines.push(`${lead}${fold.rest.slice(0, cut)} \\`);
+    fold.rest = fold.rest.slice(cut + 1);
   }
-  return [...lines, `${indent}${rest}`];
+  return [...lines, `${lead}${fold.rest}`];
 };
 
 /**

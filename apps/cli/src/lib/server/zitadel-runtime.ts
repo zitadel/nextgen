@@ -26,7 +26,6 @@ import {
   DEFAULT_LOCAL_SERVER_URL,
   defaultLocalServerImageForCliVersion,
   type DestroyPermit,
-  type DockerResult,
   DockerLauncher,
   EMPTY_SUMMARY,
   ensureContainerIdentity,
@@ -1144,16 +1143,14 @@ export class LocalRuntime extends ZitadelRuntime {
       }
 
       const { image } = config;
-      // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-      let docker: DockerResult;
-      try {
-        docker = await this.directory.docker.available();
-      } catch (error) {
+      const [reached] = await Promise.allSettled([this.directory.docker.available()]);
+      if (reached?.status !== "fulfilled") {
         throw new LocalServerDockerMissingError(
-          `Docker is not reachable: ${errorMessage(error).trim() || "no reason given"}`,
-          error,
+          `Docker is not reachable: ${errorMessage(reached?.reason).trim() || "no reason given"}`,
+          reached?.reason,
         );
       }
+      const docker = reached.value;
       if (docker.status !== 0) {
         throw new LocalServerDockerMissingError(
           `Docker is not reachable: ${docker.stderr.trim() || "docker version failed"}`,

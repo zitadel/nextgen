@@ -73,10 +73,10 @@ export async function findLocalAdminFor(
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {
-  // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
-  let raw: string | undefined;
   try {
-    raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
+    const raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
+    const parsed: unknown = JSON.parse(raw);
+    if (isLocalAdmin(parsed)) return parsed;
   } catch (error) {
     // Only a missing file means `start` never created the admin. A file that
     // exists but cannot be read is still the credential the server imported,
@@ -84,19 +84,14 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     if (isErrno(error, "ENOENT")) {
       return undefined;
     }
+    if (error instanceof SyntaxError) {
+      throw new LocalServerInvalidError(
+        `${join(cwd, LOCAL_ADMIN_FILE)} is malformed: ${errorMessage(error)}`,
+        error,
+      );
+    }
     throw new LocalServerInvalidError(
       `${join(cwd, LOCAL_ADMIN_FILE)} cannot be read: ${errorMessage(error)}`,
-      error,
-    );
-  }
-  if (raw === undefined) return undefined;
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (isLocalAdmin(parsed)) return parsed;
-  } catch (error) {
-    throw new LocalServerInvalidError(
-      `${join(cwd, LOCAL_ADMIN_FILE)} is malformed: ${errorMessage(error)}`,
       error,
     );
   }

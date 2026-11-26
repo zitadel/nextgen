@@ -90,28 +90,25 @@ export abstract class Store implements ConfigStore {
    */
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
-    // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
-    let names: readonly unknown[];
-    try {
-      names = await this.fs.promises.readdir(this.root.resolve(directory).toString());
-    } catch (error) {
-      // Only an absent directory means the project has none: a permission
-      // failure, or a file where the directory should be, reported as "no
-      // files" would hide what is there and let a later write fail instead.
-      if (!isErrno(error, "ENOENT")) {
-        if (isErrno(error, "EACCES")) {
-          throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EACCES)`);
-        }
-        if (isErrno(error, "EPERM")) {
-          throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EPERM)`);
-        }
-        if (isErrno(error, "ENOTDIR")) {
-          throw new ZitadelConfigError(`${directory} cannot be read (ENOTDIR)`);
-        }
-        throw new ZitadelConfigError(`${directory} cannot be read`);
+    const [listed] = await Promise.allSettled([
+      this.fs.promises.readdir(this.root.resolve(directory).toString()),
+    ]);
+    // Only an absent directory means the project has none: a permission
+    // failure, or a file where the directory should be, reported as "no
+    // files" would hide what is there and let a later write fail instead.
+    if (listed?.status === "rejected" && !isErrno(listed.reason, "ENOENT")) {
+      if (isErrno(listed.reason, "EACCES")) {
+        throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EACCES)`);
       }
-      names = [];
+      if (isErrno(listed.reason, "EPERM")) {
+        throw new ZitadelConfigFileUnreadableError(`${directory} cannot be read (EPERM)`);
+      }
+      if (isErrno(listed.reason, "ENOTDIR")) {
+        throw new ZitadelConfigError(`${directory} cannot be read (ENOTDIR)`);
+      }
+      throw new ZitadelConfigError(`${directory} cannot be read`);
     }
+    const names: readonly unknown[] = listed?.status === "fulfilled" ? listed.value : [];
     // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
     const files = names
       .map((name) => {
@@ -390,11 +387,21 @@ export abstract class Store implements ConfigStore {
    *   code.
    */
   private async readFileAt(path: string): Promise<StoredFile> {
-    // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
-    let text: string;
     try {
       const contents = await this.fs.promises.readFile(this.root.resolve(path).toString(), "utf8");
-      text = contents.toString();
+      const text = contents.toString();
+      try {
+        const body: unknown = JSON.parse(text);
+        if (!isJsonValue(body) || !isJsonObject(body)) {
+          return UnparsedFile.notAnObject(path);
+        }
+        return { path, body };
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          return UnparsedFile.invalidJson(path, text);
+        }
+        throw error;
+      }
     } catch (error) {
       // A directory named like a file cannot be parsed, but it hides nothing
       // else: it is reported as the broken entry it is.
@@ -412,20 +419,6 @@ export abstract class Store implements ConfigStore {
       }
       throw new ZitadelConfigError(`${path} cannot be read`);
     }
-    // biome-ignore lint/plugin: assigned inside the try that guards the parse, used after it
-    let body: unknown;
-    try {
-      body = JSON.parse(text);
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        return UnparsedFile.invalidJson(path, text);
-      }
-      throw error;
-    }
-    if (!isJsonValue(body) || !isJsonObject(body)) {
-      return UnparsedFile.notAnObject(path);
-    }
-    return { path, body };
   }
 
   /**

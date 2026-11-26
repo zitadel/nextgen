@@ -282,23 +282,21 @@ export class Orca {
     };
     // The scaffolder lookup throws for an unknown framework, so it sits under
     // the same undo as the scaffold itself.
-    // biome-ignore lint/plugin: the return after the scaffold needs `facts` and must not sit inside the try that undoes it
-    let facts: FrameworkFacts;
     try {
       await this.scaffolderFor(framework).scaffold(workspace?.work ?? cwd, framework);
       await workspace?.moveInto(cwd);
-      facts = await this.detect(cwd, framework);
+      const facts = await this.detect(cwd, framework);
+      return {
+        facts,
+        undo,
+        keep: async () => {
+          await workspace?.drop();
+        },
+      };
     } catch (error) {
       await undo();
       throw error;
     }
-    return {
-      facts,
-      undo,
-      keep: async () => {
-        await workspace?.drop();
-      },
-    };
   }
 
   /**

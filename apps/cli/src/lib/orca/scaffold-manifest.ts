@@ -113,20 +113,23 @@ export class ScaffoldManifestFile {
       });
     const read = await Promise.all(
       marked.map(async ({ path, key }) => {
-        // biome-ignore lint/plugin: the code after the read needs `contents` and must not sit inside the try that guards it
-        let contents: string | undefined;
         try {
-          contents = await readFile(join(cwd, key), "utf8");
+          const contents = await readFile(join(cwd, key), "utf8");
+          return {
+            path,
+            key,
+            contents,
+          };
         } catch (error) {
           if (!isErrno(error, "ENOENT")) {
             throw error;
           }
+          return {
+            path,
+            key,
+            contents: undefined,
+          };
         }
-        return {
-          path,
-          key,
-          contents,
-        };
       }),
     );
     const files: ScaffoldManifest["files"] = Object.fromEntries(

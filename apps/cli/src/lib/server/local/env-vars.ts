@@ -95,24 +95,22 @@ export const loadEnvFiles = async (
 };
 
 const readEnvFile = async (path: string): Promise<Readonly<Record<string, string>>> => {
-  // biome-ignore lint/plugin: assigned inside the try that guards the read, used after it
-  let contents: string;
   try {
-    contents = await readFile(path, "utf8");
+    const contents = await readFile(path, "utf8");
+    // parseEnv types values as possibly-undefined (it never emits them); drop them for the string map.
+    return Object.fromEntries(
+      Object.entries(parseEnv(contents.replace(/^\uFEFF/, ""))).filter(
+        (entry): entry is [string, string] => {
+          return entry[1] !== undefined;
+        },
+      ),
+    );
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return {};
     }
     throw new LocalServerInvalidError(`Cannot read ${path}: ${errorMessage(error)}`, error);
   }
-  // parseEnv types values as possibly-undefined (it never emits them); drop them for the string map.
-  return Object.fromEntries(
-    Object.entries(parseEnv(contents.replace(/^\uFEFF/, ""))).filter(
-      (entry): entry is [string, string] => {
-        return entry[1] !== undefined;
-      },
-    ),
-  );
 };
 
 /**

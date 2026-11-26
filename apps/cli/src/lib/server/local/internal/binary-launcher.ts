@@ -438,62 +438,58 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   const programs = [started, SERVER_PROGRAM];
   // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
   // such as pnpm export), and the server's long path is cut before its name.
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let listing: string;
   try {
-    listing = await ps(["axww", "-o", "pid=,pgid=,command="]);
+    const listing = await ps(["axww", "-o", "pid=,pgid=,command="]);
+    const candidates = listing.split(/\r?\n/).flatMap((line) => {
+      const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
+      const named =
+        match !== null &&
+        programs.some((program) => {
+          return (match[3] ?? "").includes(program);
+        });
+      const ours =
+        match !== null && (Number(match[1]) === record.pid || Number(match[2]) === record.pid);
+      if (named && ours) {
+        return [Number(match[1])];
+      } else {
+        return [];
+      }
+    });
+    for (const pid of candidates) {
+      if (await servesDataDir(pid, record.data_dir)) {
+        return true;
+      }
+    }
+    return false;
   } catch (error) {
     if (error instanceof ExecaError) {
       return true;
     }
     throw error;
   }
-  const candidates = listing.split(/\r?\n/).flatMap((line) => {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
-    const named =
-      match !== null &&
-      programs.some((program) => {
-        return (match[3] ?? "").includes(program);
-      });
-    const ours =
-      match !== null && (Number(match[1]) === record.pid || Number(match[2]) === record.pid);
-    if (named && ours) {
-      return [Number(match[1])];
-    } else {
-      return [];
-    }
-  });
-  for (const pid of candidates) {
-    if (await servesDataDir(pid, record.data_dir)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
 
 /** Whether a process serves a data directory, or its environment does not say. */
 async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let command: string;
   try {
-    command = await ps(["eww", "-p", String(pid), "-o", "command="]);
+    const command = await ps(["eww", "-p", String(pid), "-o", "command="]);
+    const at = command.indexOf(DATA_DIR_VARIABLE);
+    if (at === -1) {
+      return true;
+    }
+    const rest = command.slice(at + DATA_DIR_VARIABLE.length);
+    return (
+      rest.startsWith(dataDir) &&
+      (rest.length === dataDir.length || /\s/.test(rest[dataDir.length] ?? ""))
+    );
   } catch (error) {
     if (error instanceof ExecaError) {
       return true;
     }
     throw error;
   }
-  const at = command.indexOf(DATA_DIR_VARIABLE);
-  if (at === -1) {
-    return true;
-  }
-  const rest = command.slice(at + DATA_DIR_VARIABLE.length);
-  return (
-    rest.startsWith(dataDir) &&
-    (rest.length === dataDir.length || /\s/.test(rest[dataDir.length] ?? ""))
-  );
 }
 
 /**

@@ -79,13 +79,23 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     await DockerLauncher.remove(spec.containerName);
     await ensureImage(spec.image);
     const env = spec.env ?? EMPTY_ENV;
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let result: DockerResult;
     try {
-      result = await requireDocker(
+      const result = await requireDocker(
         DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
         "Start local Zitadel container",
         env.values,
+      );
+      return launched(
+        DockerLauncher.metadata({
+          cwdDataDir: spec.dataDir,
+          cliVersion: spec.cliVersion,
+          containerName: spec.containerName,
+          containerId: result.stdout.trim(),
+          image: spec.image,
+          port: target.port,
+          serverUrl: target.serverUrl,
+          env: envSummary(env),
+        }),
       );
     } catch (error) {
       try {
@@ -98,18 +108,6 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       }
       throw error;
     }
-    return launched(
-      DockerLauncher.metadata({
-        cwdDataDir: spec.dataDir,
-        cliVersion: spec.cliVersion,
-        containerName: spec.containerName,
-        containerId: result.stdout.trim(),
-        image: spec.image,
-        port: target.port,
-        serverUrl: target.serverUrl,
-        env: envSummary(env),
-      }),
-    );
   }
 
   /**
@@ -246,11 +244,22 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     }
 
     const args = ["manifest", "inspect", image];
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let result: DockerResult;
     try {
-      result = await runDocker(args);
+      const result = await runDocker(args);
+      if (result.status === 0) {
+        return "remote";
+      }
+      if (typeof result === "object" && result !== null && "stderr" in result) {
+        throw new LocalServerInvalidError(
+          `Inspect Docker image ${image} failed: ${String(result.stderr)}`,
+          result,
+        );
+      }
+      throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, result);
     } catch (error) {
+      if (error instanceof LocalServerInvalidError) {
+        throw error;
+      }
       if (typeof error === "object" && error !== null && "stderr" in error) {
         throw new LocalServerInvalidError(
           `Inspect Docker image ${image} failed: ${String(error.stderr)}`,
@@ -259,16 +268,6 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       }
       throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, error);
     }
-    if (result.status === 0) {
-      return "remote";
-    }
-    if (typeof result === "object" && result !== null && "stderr" in result) {
-      throw new LocalServerInvalidError(
-        `Inspect Docker image ${image} failed: ${String(result.stderr)}`,
-        result,
-      );
-    }
-    throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, result);
   }
 
   /**
@@ -301,24 +300,22 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * a container must not fail for want of a `docker` to ask.
    */
   static async remove(containerName: string): Promise<boolean> {
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let inspect: Awaited<ReturnType<typeof DockerLauncher.inspect>>;
     try {
-      inspect = await DockerLauncher.inspect(containerName);
+      const inspect = await DockerLauncher.inspect(containerName);
+      if (!inspect.exists) {
+        return false;
+      }
+      if (inspect.running) {
+        await requireDocker(["stop", containerName], `Stop ${containerName}`);
+      }
+      await requireDocker(["rm", containerName], `Remove ${containerName}`);
+      return true;
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         return false;
       }
       throw error;
     }
-    if (!inspect.exists) {
-      return false;
-    }
-    if (inspect.running) {
-      await requireDocker(["stop", containerName], `Stop ${containerName}`);
-    }
-    await requireDocker(["rm", containerName], `Remove ${containerName}`);
-    return true;
   }
 
   /**
@@ -451,23 +448,24 @@ async function requireDocker(
   action: string,
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let result: DockerResult;
   try {
-    result = await runDocker(args, env);
+    const result = await runDocker(args, env);
+    if (result.status !== 0) {
+      if (typeof result === "object" && result !== null && "stderr" in result) {
+        throw new LocalServerInvalidError(`${action} failed: ${String(result.stderr)}`, result);
+      }
+      throw new LocalServerInvalidError(`${action} failed`, result);
+    }
+    return result;
   } catch (error) {
+    if (error instanceof LocalServerInvalidError) {
+      throw error;
+    }
     if (typeof error === "object" && error !== null && "stderr" in error) {
       throw new LocalServerInvalidError(`${action} failed: ${String(error.stderr)}`, error);
     }
     throw new LocalServerInvalidError(`${action} failed`, error);
   }
-  if (result.status !== 0) {
-    if (typeof result === "object" && result !== null && "stderr" in result) {
-      throw new LocalServerInvalidError(`${action} failed: ${String(result.stderr)}`, result);
-    }
-    throw new LocalServerInvalidError(`${action} failed`, result);
-  }
-  return result;
 }
 
 /**
@@ -475,10 +473,9 @@ async function requireDocker(
  */
 async function imageExists(image: string): Promise<boolean> {
   const args = ["image", "inspect", image];
-  // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-  let result: DockerResult;
   try {
-    result = await runDocker(args);
+    const result = await runDocker(args);
+    return result.status === 0;
   } catch (error) {
     if (typeof error === "object" && error !== null && "stderr" in error) {
       throw new LocalServerInvalidError(
@@ -488,7 +485,6 @@ async function imageExists(image: string): Promise<boolean> {
     }
     throw new LocalServerInvalidError(`Inspect Docker image ${image} failed`, error);
   }
-  return result.status === 0;
 }
 
 /**

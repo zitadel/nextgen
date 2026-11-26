@@ -445,15 +445,14 @@ export class Lifecycle<R extends ServerRecord> {
     LocalServerStartExitedError | LocalServerStartTimeoutError | LocalServerStartCleanupFailedError
   > {
     // The log goes first: cleaning up may remove it with the server.
-    // biome-ignore lint/plugin: assigned inside the try that guards the call, read after it
-    let logTail: string | undefined;
-    try {
-      logTail = await this.deps.launcher.logTail?.(record, 40);
-    } catch (error) {
-      if (!(error instanceof LocalServerInvalidError || isErrno(error, "EACCES"))) {
-        throw error;
-      }
+    const [read] = await Promise.allSettled([this.deps.launcher.logTail?.(record, 40)]);
+    if (
+      read?.status === "rejected" &&
+      !(read.reason instanceof LocalServerInvalidError || isErrno(read.reason, "EACCES"))
+    ) {
+      throw read.reason;
     }
+    const logTail = read?.status === "fulfilled" ? read.value : undefined;
     const outcome = await this.terminateQuietly(record);
     const logged = logTail ? `\nThe server logged:\n${logTail}` : "";
 

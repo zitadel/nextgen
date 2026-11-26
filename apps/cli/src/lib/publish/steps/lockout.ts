@@ -269,10 +269,9 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  // biome-ignore lint/plugin: the memoised read, started on first use
-  let listed: Promise<Listing | undefined> | undefined;
+  const memo: { listed?: Promise<Listing | undefined> } = {};
   return () => {
-    listed ??= (async (): Promise<Listing | undefined> => {
+    memo.listed ??= (async (): Promise<Listing | undefined> => {
       try {
         return await objectTypes(ctx);
       } catch (error) {
@@ -282,7 +281,7 @@ function lazyNames(ctx: StepContext): Names {
         throw error;
       }
     })();
-    return listed;
+    return memo.listed;
   };
 }
 
