@@ -12,7 +12,7 @@
     // the only one that writes the dist (the release graph packs it too), and
     // demo-nuxt's build waits for it through its edge.
     "build": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build", "@zitadel/sdk-vue#build"]
     },
     "test": {
       "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
@@ -20,7 +20,7 @@
     // tsup's declaration pass resolves the workspace packages, which need
     // api's generated client and the built dependencies.
     "dev": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build", "@zitadel/sdk-vue#build"]
     }
   }
 }

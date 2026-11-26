@@ -2,36 +2,91 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import type { ClientAuthResult } from "./types.js";
+import type { ZitadelClientAuthResult } from "./types.js";
 
-const defaultValue: ClientAuthResult = { isAuthenticated: false, session: null };
-
-const NextgenAuthContext = createContext<ClientAuthResult>(defaultValue);
+const defaultValue: ZitadelClientAuthResult = { isAuthenticated: false, session: null };
 
 /**
- * Client-side context carrier. In the standard server-seeded setup, render
- * {@link NextgenProvider} from `@zitadel/sdk-next/server` instead — it
- * normalises the server's `auth()` result to the client-safe shape (dropping
- * the raw session token) *before* the value crosses the server→client
- * component boundary, and its `server-only` guard keeps it out of client
- * wrappers where that strip would come too late.
+ * The React context that carries the client-safe auth state. It defaults to signed out, so a
+ * component rendered outside a provider never throws.
+ */
+const ZitadelAuthContext = createContext<ZitadelClientAuthResult>(defaultValue);
+
+/**
+ * Provides a client-safe auth state to the client components below it.
  *
- * Render this component directly only from client code that already holds a
- * client-safe value — e.g. seeding from a `getSession()` read.
+ * In the standard server-seeded setup, render {@link server!ZitadelProvider | ZitadelProvider}
+ * from `@zitadel/sdk-next/server` instead. It converts the result of
+ * {@link server!auth | auth} to the client-safe shape and drops the raw session token before
+ * the value crosses the server-to-client boundary, and its `server-only` guard keeps it out of
+ * client wrappers where the strip would come too late.
  *
- * The `value` prop is deliberately typed as {@link ClientAuthResult}: the
- * raw session token must never enter client-side state.
+ * Render this component directly only from client code that already holds a client-safe value,
+ * for example a state seeded from a {@link session!getSession | getSession} read in an effect.
+ * The `value` prop is typed as {@link ZitadelClientAuthResult}, which has no `token` field. The type
+ * does not stop the token: the token-bearing result of {@link server!auth | auth} still compiles,
+ * because TypeScript allows an extra property on a value that is not an object literal, and the
+ * provider does not copy or strip the value. Strip it first with
+ * {@link server!ZitadelProvider | ZitadelProvider}. Without any provider above,
+ * {@link useAuth} reads as signed out.
+ *
+ * The file starts with `"use client"`. Keep that directive on the first line of the file.
+ *
+ * @param props - The `value` to provide and the `children` that read it.
+ * @returns The children wrapped in the auth context.
+ *
+ * @example
+ * ```tsx
+ * "use client";
+ * import { AuthContextProvider } from "@zitadel/sdk-next/react";
+ * import type { ZitadelClientAuthResult } from "@zitadel/sdk-next/session";
+ *
+ * export function Seeded(props: { auth: ZitadelClientAuthResult; children: React.ReactNode }) {
+ *   return <AuthContextProvider value={props.auth}>{props.children}</AuthContextProvider>;
+ * }
+ * ```
  */
 export function AuthContextProvider({
   value,
   children,
 }: {
-  value: ClientAuthResult;
+  /**
+   * The client-safe auth state that every {@link useAuth} call below this provider reads.
+   *
+   * It is typed as {@link ZitadelClientAuthResult}, which has no `token` field. A token-bearing result of
+   * {@link server!auth | auth} still compiles here, and the provider does not copy or validate
+   * the value, so pass an object that is already token-less.
+   */
+  value: ZitadelClientAuthResult;
+  /**
+   * The client subtree that reads the state with {@link useAuth}.
+   */
   children: ReactNode;
 }) {
-  return <NextgenAuthContext.Provider value={value}>{children}</NextgenAuthContext.Provider>;
+  return <ZitadelAuthContext.Provider value={value}>{children}</ZitadelAuthContext.Provider>;
 }
 
-export function useAuthContext(): ClientAuthResult {
-  return useContext(NextgenAuthContext);
+/**
+ * Reads the auth state from the nearest {@link AuthContextProvider}, or the signed-out state when
+ * none is rendered above the caller.
+ *
+ * {@link useAuth} is the same read under the name an app calls. This is the lower-level hook it
+ * is built on, exported for code that wants the context without the public hook name. Prefer
+ * {@link useAuth} in application code.
+ *
+ * @returns The client-safe {@link ZitadelClientAuthResult} of the nearest provider.
+ *
+ * @example
+ * ```tsx
+ * "use client";
+ * import { useAuthContext } from "@zitadel/sdk-next/react";
+ *
+ * export function UserId() {
+ *   const { session } = useAuthContext();
+ *   return <span>{session?.userId ?? "anonymous"}</span>;
+ * }
+ * ```
+ */
+export function useAuthContext(): ZitadelClientAuthResult {
+  return useContext(ZitadelAuthContext);
 }

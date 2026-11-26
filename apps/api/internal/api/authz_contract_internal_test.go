@@ -221,11 +221,10 @@ var gateRows = []gateRow{
 	{op: "GetPolicy", cookie: true, relation: viewer, target: onResource, idField: "PolicyID", kind: domain.ResourceKindPolicy, denied: policyCodes.denied, miss: policyCodes.readMiss},
 	{op: "ListPolicyRevisions", cookie: true, relation: viewer, target: onResource, idField: "PolicyID", kind: domain.ResourceKindPolicy, denied: policyCodes.denied, miss: policyCodes.readMiss},
 
-	// Projects, their admins and members, claim and origins.
+	// Projects, their members, claim and origins.
 	{op: "QueryProjects", relation: viewer, why: whyQuery, target: onOwnProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "GetProject", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "UpdateProject", cookie: true, relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
-	{op: "ListProjectAdmins", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "ListProjectMembers", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "CreateProjectClaim", relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "GetProjectClaimStatus", relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},

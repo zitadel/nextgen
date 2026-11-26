@@ -830,17 +830,6 @@ type ListPolicyRevisionsParams struct {
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
-// ListProjectAdminsParams is parameters of listProjectAdmins operation.
-type ListProjectAdminsParams struct {
-	// Maximum number of items to return.
-	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
-	// previous response. Omit to start from the beginning. Its format is opaque and may change between
-	// releases.
-	PageToken OptPageToken `json:",omitempty,omitzero"`
-	ProjectID ProjectID
-}
-
 // ListProjectMembersParams is parameters of listProjectMembers operation.
 type ListProjectMembersParams struct {
 	// Maximum number of items to return.

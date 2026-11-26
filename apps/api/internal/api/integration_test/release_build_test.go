@@ -79,6 +79,31 @@ func TestBuildRelease(t *testing.T) {
 			created.Pointers[indexOfKind(created.Pointers, api.ReleasePointerKindSchema)].RevisionID)
 	})
 
+	t.Run("reuses a flow whose gate declares no config", func(t *testing.T) {
+		own, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, ownClient, own)
+		ownParams := api.BuildReleaseParams{ProjectID: api.ProjectID(own.ID)}
+
+		flow := newFlowDefinitionFixture("gated-login", "human-user")
+		flow.Steps[0].Gates = api.NewOptFlowDefinitionStepGates(api.FlowDefinitionStepGates{
+			"bot_check": {Kind: api.GateKindCaptcha, Provider: "example"},
+		})
+		bundle := api.ConfigurationBundle{FlowDefinitions: []api.FlowDefinition{flow}}
+
+		first, err := ownClient.BuildRelease(t.Context(), &api.BuildReleaseRequest{Bundle: bundle}, ownParams)
+		require.NoError(t, err)
+		require.IsType(t, &api.BuildReleaseCreated{}, first, helpers.MustMarshal(t, first))
+		created := api.Release(*first.(*api.BuildReleaseCreated))
+
+		again, err := ownClient.BuildRelease(t.Context(), &api.BuildReleaseRequest{Bundle: bundle}, ownParams)
+		require.NoError(t, err)
+		require.IsType(t, &api.BuildReleaseOK{}, again, helpers.MustMarshal(t, again))
+		assert.Equal(t, created.ID, api.Release(*again.(*api.BuildReleaseOK)).ID)
+	})
+
 	t.Run("reports every failing resource at once", func(t *testing.T) {
 		// Designation fails: x-identifier without x-unique:project.
 		badSchema := fmt.Sprintf(`{

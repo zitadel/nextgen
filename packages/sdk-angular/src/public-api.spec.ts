@@ -15,8 +15,12 @@ describe("package manifest", () => {
   };
 
   function targets(value: unknown): string[] {
-    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
-    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    if (typeof value === "string") {
+      return value.startsWith("./") ? [value] : [];
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(targets);
+    }
     return [];
   }
 
@@ -28,8 +32,8 @@ describe("package manifest", () => {
 
   it("declares its supported peer ranges", () => {
     expect(manifest.peerDependencies).toEqual({
-      "@angular/common": ">=17",
-      "@angular/core": ">=17",
+      "@angular/common": ">=19",
+      "@angular/core": ">=19",
     });
   });
 });

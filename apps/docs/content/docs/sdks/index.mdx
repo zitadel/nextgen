@@ -49,15 +49,15 @@ Lower-level packages the framework SDKs are built on. Use them to embed the comp
 
 ## Choosing an SDK
 
-All packages ship on npm's `latest` tag in one release. Install the same version of all of them, for example `pnpm add @zitadel/sdk-next@latest`. Until 1.0.0, a minor version can break, and its release note marks it **Breaking:**.
+All packages ship on npm's `latest` tag in one release. Install the same version of all of them, for example `pnpm add @zitadel/sdk-next@latest`. A framework SDK (the first six rows) re-exports the widgets of its UI SDK from a `/components` entry, so one package is enough to import from. The SvelteKit, SolidStart and Qwik Router SDKs also need their UI SDK installed, because the framework's compiler plugin looks for it in the app's own `package.json`; the CLI adds both. Until 1.0.0, a minor version can break, and its release note marks it **Breaking:**.
 
 | Framework | Package | Rendering | Same-origin `/__nextgen/*` proxy | CLI scaffolds |
 | --------- | ------- | --------- | -------------------------------- | ------------- |
 | Next.js | `@zitadel/sdk-next` | Server (App Router) | Built into the SDK middleware | routes + `proxy.ts` (or `middleware.ts`, by the Next version in `package.json`) |
 | Nuxt | `@zitadel/sdk-nuxt` | Server (Nitro) | Nitro server middleware | pages + module config in `nuxt.config` |
-| SvelteKit | `@zitadel/sdk-sveltekit` + `@zitadel/sdk-svelte` | Server (SSR) | `handle` server hook | `src/hooks.server.ts` + routes |
-| SolidStart | `@zitadel/sdk-solid-start` + `@zitadel/sdk-solid` | Server (SSR) | SolidStart request middleware | `src/middleware.ts` registered in `vite.config.ts` + routes |
-| Qwik Router | `@zitadel/sdk-qwik-router` + `@zitadel/sdk-qwik` | Server (SSR) | Root `onRequest` plugin | `src/routes/plugin@nextgen.ts` + routes |
+| SvelteKit | `@zitadel/sdk-sveltekit` | Server (SSR) | `handle` server hook | `src/hooks.server.ts` + routes |
+| SolidStart | `@zitadel/sdk-solid-start` | Server (SSR) | SolidStart request middleware | `src/middleware.ts` registered in `vite.config.ts` + routes |
+| Qwik Router | `@zitadel/sdk-qwik-router` | Server (SSR) | Root `onRequest` plugin | `src/routes/plugin@zitadel.ts` + routes |
 | TanStack Start | `@zitadel/sdk-tanstack-start` | Server (SSR) | Global request middleware | `src/start.ts` + routes |
 | React | `@zitadel/sdk-react` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Vue | `@zitadel/sdk-vue` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |

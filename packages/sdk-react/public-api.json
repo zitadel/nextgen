@@ -1,0 +1,24 @@
+{
+  "entries": {
+    ".": {
+      "source": "src/index.tsx",
+      "kind": "ui",
+      "extras": [
+        "ZitadelClientAuthResult",
+        "ZitadelClientAuthState",
+        "ZitadelClientSession",
+        "ZitadelGetSessionOptions",
+        "ZitadelSessionError",
+        "ZitadelSessionErrorCode",
+        "ZitadelSessionSnapshot",
+        "ZitadelSessionStatus",
+        "ZitadelSessionStore",
+        "ZitadelSessionStoreOptions",
+        "ZitadelUseSessionResult",
+        "getSession",
+        "sessionStore",
+        "useSession"
+      ]
+    }
+  }
+}

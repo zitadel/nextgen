@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/zitadel/oidc/v3/pkg/oidc"
@@ -22,6 +23,7 @@ import (
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 const (
@@ -50,9 +52,11 @@ const (
 )
 
 // AuthRequestStore stores an authorization request with its expiry and
-// binding, and returns the nonce the browser's binding cookie holds.
+// binding, and returns the nonce the browser's binding cookie holds. It
+// redeems the code the login issued for a request.
 type AuthRequestStore interface {
 	Create(ctx context.Context, request *domain.AuthRequest) (bindingNonce string, err error)
+	RedeemCode(ctx context.Context, input service.RedeemCodeInput) (accessToken string, expiresIn time.Duration, err error)
 }
 
 // answeredErrorKey is the context key of the error an opServer method
@@ -60,11 +64,15 @@ type AuthRequestStore interface {
 type answeredErrorKey struct{}
 
 // errorWriter records an error status and the body the library writes after
-// it. With page set it holds both back, so the error page can take their
-// place.
+// it. With page or token set it holds both back, so the error page can take
+// their place, or the token endpoint can answer an invalid_client as a 401.
 type errorWriter struct {
 	http.ResponseWriter
-	page   bool
+	page bool
+	// token is set at the token endpoint, the only one that authenticates
+	// clients with HTTP Basic. /revoke authenticates the client the same way
+	// and needs the challenge when it is served.
+	token  bool
 	status int
 	body   bytes.Buffer
 }
@@ -94,10 +102,8 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("the method must be GET or POST"), http.StatusBadRequest)
 	}
-	for name, values := range r.Form {
-		if len(values) > 1 {
-			return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("a parameter is repeated").WithParent(fmt.Errorf("the parameter %.100q is repeated", name)), http.StatusBadRequest)
-		}
+	if err := repeatedParameter(r.Form); err != nil {
+		return nil, err
 	}
 	unknownClient := op.NewStatusError(oidc.ErrInvalidClient().WithDescription("unknown client"), http.StatusBadRequest)
 	// A lookup with text a dialect cannot hold fails as a 500.
@@ -329,12 +335,29 @@ func withErrorPages(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Accept")
 		var answered error
-		ew := &errorWriter{ResponseWriter: w, page: errorpage.Wants(r)}
+		ew := &errorWriter{ResponseWriter: w, page: errorpage.Wants(r), token: strings.HasSuffix(r.URL.Path, TokenPath)}
 		next.ServeHTTP(ew, r.WithContext(context.WithValue(r.Context(), answeredErrorKey{}, &answered)))
 		refusal := new(oidc.Error)
 		// A body that is not the library's JSON leaves the line and the page without a description.
 		_ = json.Unmarshal(ew.body.Bytes(), refusal)
+		if ew.token && ew.status != 0 {
+			// RFC 6749 section 5.2: a client that fails to authenticate gets a
+			// 401, also when the library answers 400 invalid_client (a Basic
+			// header with broken percent-encoding).
+			if refusal.ErrorType == oidc.InvalidClient {
+				ew.status = http.StatusUnauthorized
+			}
+			// The challenge only when the client sent Basic credentials, as the
+			// RFC asks: a browser may open its own login dialog for it.
+			if _, _, basic := r.BasicAuth(); basic && ew.status == http.StatusUnauthorized {
+				w.Header().Set("WWW-Authenticate", `Basic realm="oauth"`)
+			}
+		}
 		logError(r.Context(), answered, ew.status, refusal)
+		if ew.token && !ew.page && ew.status != 0 {
+			w.WriteHeader(ew.status)
+			_, _ = w.Write(ew.body.Bytes())
+		}
 		if ew.page && ew.status != 0 {
 			// The token and revocation endpoints quote the request in their
 			// descriptions, so their pages get no sentence.
@@ -349,7 +372,7 @@ func withErrorPages(next http.Handler) http.Handler {
 func (w *errorWriter) WriteHeader(status int) {
 	if status >= http.StatusBadRequest {
 		w.status = status
-		if w.page {
+		if w.page || w.token {
 			return
 		}
 	}
@@ -359,7 +382,7 @@ func (w *errorWriter) WriteHeader(status int) {
 func (w *errorWriter) Write(b []byte) (int, error) {
 	if w.status != 0 {
 		w.body.Write(b)
-		if w.page {
+		if w.page || w.token {
 			return len(b), nil
 		}
 	}
