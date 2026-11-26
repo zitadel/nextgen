@@ -78,8 +78,9 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const lines = errors.map((finding) => {
     return `  - ${finding.file}: ${finding.message}`;
   });
-  const message = `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`;
-  throw new PublishConfigInvalidError(message);
+  throw new PublishConfigInvalidError(
+    `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
+  );
 }
 
 /**

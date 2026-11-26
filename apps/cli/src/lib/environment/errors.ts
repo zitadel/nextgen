@@ -31,15 +31,6 @@ export class EnvironmentNameInvalidError extends EnvironmentError {
 }
 
 /**
- * A server address a source supplied that is not a URL.
- */
-export class EnvironmentServerInvalidError extends EnvironmentError {
-  override readonly category: ErrorCategory = "invalid";
-  override readonly retryable: boolean = false;
-  override readonly code: ZitadelErrorCode = "E_VALIDATION";
-}
-
-/**
  * The file an environment was told to read does not exist.
  */
 export class EnvironmentFileMissingError extends EnvironmentError {
@@ -49,7 +40,8 @@ export class EnvironmentFileMissingError extends EnvironmentError {
 }
 
 /**
- * A value the command cannot run without is set in no source.
+ * A value the command cannot run without is set in no source, or a server address a
+ * source supplied is not a URL.
  */
 export class EnvironmentValueMissingError extends EnvironmentError {
   override readonly category: ErrorCategory = "invalid";

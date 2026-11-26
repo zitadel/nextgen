@@ -47,10 +47,8 @@ function refusalOf(error: ApiError): BackendError {
     cause: error,
   };
   const message = apiErrorMessage(error);
-  // A 410 is gone rather than never there — the claim window that closed, the
-  // flow that already completed — but either way what was asked for is not
-  // there, and neither is a request to correct and send again.
   const code = apiErrorCode(error);
+  // A 410 is gone rather than never there: it is its own class so a caller can tell it from a 404.
   if (error.status === 410 && code === "proj.claim_window_expired") {
     return new BackendClaimWindowExpiredError(message, options);
   }

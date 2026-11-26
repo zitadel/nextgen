@@ -12,7 +12,7 @@ describe("the publish errors", () => {
     [
       "missing variable",
       new PublishConnectionVariableMissingError("missing"),
-      "conflict",
+      "missing",
       "E_CREDENTIAL_MISSING",
     ],
   ] as const)("reports a %s failure by its category and code", (_name, error, category, code) => {

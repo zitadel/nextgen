@@ -131,14 +131,10 @@ function checkCredentialVariables(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
       );
     }
-    if (wantsSecret && !isSecret) {
+    if (isSecret !== wantsSecret) {
+      const kind = isSecret ? "a secret" : "not a secret";
       throw new PublishConfigInvalidError(
-        `${file}: ${field} names the variable ${variable}, which is not a secret`,
-      );
-    }
-    if (!wantsSecret && isSecret) {
-      throw new PublishConfigInvalidError(
-        `${file}: ${field} names the variable ${variable}, which is a secret`,
+        `${file}: ${field} names the variable ${variable}, which is ${kind}`,
       );
     }
   }

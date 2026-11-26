@@ -15,7 +15,6 @@ export {
   EnvironmentError,
   EnvironmentFileMissingError,
   EnvironmentNameInvalidError,
-  EnvironmentServerInvalidError,
   EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
   EnvironmentValueUnboundError,

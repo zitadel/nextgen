@@ -1,7 +1,7 @@
 import { apiErrorCode } from "@zitadel/api/runtime/fetch";
 
 import { ZitadelLibError } from "@/lib/errors";
-import type { ZitadelErrorCode } from "@/lib/errors";
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
 /** What a failure carries beyond its message. */
 export type BackendErrorOptions = Readonly<{
@@ -58,91 +58,91 @@ export abstract class BackendError extends ZitadelLibError {
 
 /** Something that is not there: a `404`, or a name that matches nothing. */
 export class BackendNotFoundError extends BackendError {
-  override readonly category = "missing";
+  override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
 }
 
 /** The state the server holds refused the request: a `409`, or content that can never be served. */
 export class BackendConflictError extends BackendError {
-  override readonly category = "conflict";
+  override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
 /** The server rejected the request as wrong: a `400` or `422`, or an origin it refuses. */
 export class BackendRejectedError extends BackendError {
-  override readonly category = "invalid";
+  override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /** The server answered that what was asked for is gone: a `410`. */
-export class BackendGoneError extends BackendNotFoundError {
-  override readonly category = "missing";
+export class BackendGoneError extends BackendError {
+  override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
 }
 
 /** The claim window of a project closed: a `410` naming `proj.claim_window_expired`. */
-export class BackendClaimWindowExpiredError extends BackendGoneError {
-  override readonly category = "missing";
+export class BackendClaimWindowExpiredError extends BackendError {
+  override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
 }
 
 /** The claim link is not known to the server: a `404` naming `claim_challenge.not_found`. */
-export class BackendClaimChallengeNotFoundError extends BackendNotFoundError {
-  override readonly category = "missing";
+export class BackendClaimChallengeNotFoundError extends BackendError {
+  override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_NOT_FOUND";
 }
 
 /** The release was revoked and can never be served: a `409` naming `rel.revoked`. */
-export class BackendReleaseRevokedError extends BackendConflictError {
-  override readonly category = "conflict";
+export class BackendReleaseRevokedError extends BackendError {
+  override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
 /** The release is still served by an origin: a `409` naming `rel.in_use`. */
-export class BackendReleaseInUseError extends BackendConflictError {
-  override readonly category = "conflict";
+export class BackendReleaseInUseError extends BackendError {
+  override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
 /** The proof of an authentication attempt was wrong: a `409` naming `att.proof_rejected`. */
-export class BackendProofRejectedError extends BackendConflictError {
-  override readonly category = "conflict";
+export class BackendProofRejectedError extends BackendError {
+  override readonly category: ErrorCategory = "conflict";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CONFLICT";
 }
 
 /** The request did not say what it must: a rejection naming `req.invalid`. */
-export class BackendRequestInvalidError extends BackendRejectedError {
-  override readonly category = "invalid";
+export class BackendRequestInvalidError extends BackendError {
+  override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /** The operation or path asked for names nothing the API has. */
 export class BackendOperationUnknownError extends BackendError {
-  override readonly category = "missing";
+  override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /** The path names several operations and the method does not pick one, or picks none. */
 export class BackendOperationAmbiguousError extends BackendError {
-  override readonly category = "invalid";
+  override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /** A bug in the backend's own code: something that cannot happen unless the code is wrong. */
 export class BackendInternalError extends BackendError {
-  override readonly category = "fault";
+  override readonly category: ErrorCategory = "fault";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
@@ -153,7 +153,7 @@ export class BackendInternalError extends BackendError {
  * refusal of permission must not tolerate this.
  */
 export class BackendUnauthorizedError extends BackendError {
-  override readonly category = "denied";
+  override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";
 }
@@ -164,7 +164,7 @@ export class BackendUnauthorizedError extends BackendError {
  * tolerates this one and nothing else.
  */
 export class BackendForbiddenError extends BackendError {
-  override readonly category = "denied";
+  override readonly category: ErrorCategory = "denied";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_AUTH";
 }
@@ -181,7 +181,7 @@ export type UnavailableErrorOptions = BackendErrorOptions &
 
 /** The server could not be used: it did not answer, or it failed with a `5xx`. */
 export class BackendUnavailableError extends BackendError {
-  override readonly category = "unavailable";
+  override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 
@@ -194,8 +194,8 @@ export class BackendUnavailableError extends BackendError {
 }
 
 /** The server asked the caller to come back later: a `429`. */
-export class BackendTooManyRequestsError extends BackendUnavailableError {
-  override readonly category = "unavailable";
+export class BackendTooManyRequestsError extends BackendError {
+  override readonly category: ErrorCategory = "unavailable";
   override readonly retryable: boolean = true;
   override readonly code: ZitadelErrorCode = "E_NETWORK";
 }

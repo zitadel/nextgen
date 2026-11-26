@@ -10,7 +10,6 @@ import {
   Environment,
   EnvironmentFileMissingError,
   EnvironmentNameInvalidError,
-  EnvironmentServerInvalidError,
   EnvironmentValueMissingError,
   EnvironmentValueUnboundError,
 } from "@/lib/environment";
@@ -319,7 +318,7 @@ describe("Environment.resolve", () => {
 
       const rejection = resolve(dir);
 
-      await expect(rejection).rejects.toBeInstanceOf(EnvironmentServerInvalidError);
+      await expect(rejection).rejects.toBeInstanceOf(EnvironmentValueMissingError);
       await expect(rejection).rejects.toMatchObject({
         code: "E_VALIDATION",
       });
@@ -329,7 +328,7 @@ describe("Environment.resolve", () => {
       await write(dir, ".env", { ZITADEL_URL: "localhost:8080" });
 
       const rejection = expect(resolve(dir)).rejects;
-      await rejection.toBeInstanceOf(EnvironmentServerInvalidError);
+      await rejection.toBeInstanceOf(EnvironmentValueMissingError);
       await rejection.toMatchObject({
         message: expect.stringContaining("ZITADEL_URL from .env"),
       });

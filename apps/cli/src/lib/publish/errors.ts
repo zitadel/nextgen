@@ -25,7 +25,7 @@ export class PublishConfigInvalidError extends PublishError {
  * A connection names a variable the project does not have.
  */
 export class PublishConnectionVariableMissingError extends PublishError {
-  override readonly category: ErrorCategory = "conflict";
+  override readonly category: ErrorCategory = "missing";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_CREDENTIAL_MISSING";
 }

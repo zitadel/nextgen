@@ -2,7 +2,11 @@ import type { GetVariable200, ListVariables200 } from "@zitadel/api/generated/mo
 
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
-import { BackendForbiddenError, BackendNotFoundError } from "@/lib/backend/errors";
+import {
+  BackendForbiddenError,
+  BackendGoneError,
+  BackendNotFoundError,
+} from "@/lib/backend/errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -579,7 +583,13 @@ export class VariableService extends ApiService {
         kind: "primary",
       })
       .catch((error: unknown): GetVariable200 => {
-        if (error instanceof BackendNotFoundError || error instanceof BackendForbiddenError) {
+        if (error instanceof BackendNotFoundError) {
+          return {};
+        }
+        if (error instanceof BackendGoneError) {
+          return {};
+        }
+        if (error instanceof BackendForbiddenError) {
           return {};
         }
         throw error;

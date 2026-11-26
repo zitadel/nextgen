@@ -4,7 +4,6 @@ import {
   EnvironmentError,
   EnvironmentFileMissingError,
   EnvironmentNameInvalidError,
-  EnvironmentServerInvalidError,
   EnvironmentSourcesConflictError,
   EnvironmentValueMissingError,
   EnvironmentValueUnboundError,
@@ -14,7 +13,6 @@ describe("the environment errors", () => {
   it.each([
     ["both sources", new EnvironmentSourcesConflictError("both"), "invalid"],
     ["name", new EnvironmentNameInvalidError("bad"), "invalid"],
-    ["server", new EnvironmentServerInvalidError("bad"), "invalid"],
     ["file", new EnvironmentFileMissingError("gone"), "missing"],
     ["missing value", new EnvironmentValueMissingError("not set"), "invalid"],
     ["unbound value", new EnvironmentValueUnboundError("not set"), "invalid"],
@@ -26,7 +24,7 @@ describe("the environment errors", () => {
   it("keeps the failure a server address was made from as its cause", () => {
     const cause = new Error("not a URL");
 
-    expect(new EnvironmentServerInvalidError("bad", cause).cause).toBe(cause);
+    expect(new EnvironmentValueMissingError("bad", cause).cause).toBe(cause);
   });
 });
 
