@@ -121,36 +121,33 @@ export class PatchApp extends WizardStep<
     const patching = this.deps.ui.begin(
       `Patching project files${this.deps.dryRun ? " (dry run)" : ""}`,
     );
-    try {
-      const patched = await patcher.patch(patchContext(framework, project), {
+    const patched = await patcher
+      .patch(patchContext(framework, project), {
         cwd: this.deps.cwd,
         dryRun: this.deps.dryRun,
         force: this.deps.force,
+      })
+      .catch(async (error: unknown) => {
+        await this.rollBack(envFilesBefore);
+        patching.fail();
+        throw error;
       });
-      for (const file of patched.filesWritten) {
-        const sentence = describeWrittenFile(
-          relativeDisplay(this.deps.cwd, file),
-          this.deps.dryRun,
-        );
-        if (sentence) {
-          patching.detail(sentence);
-        }
+    for (const file of patched.filesWritten) {
+      const sentence = describeWrittenFile(relativeDisplay(this.deps.cwd, file), this.deps.dryRun);
+      if (sentence) {
+        patching.detail(sentence);
       }
-      for (const file of patched.filesSkipped) {
-        patching.detail(
-          `Left ${escapeControlCharacters(relativeDisplay(this.deps.cwd, file))} unchanged (already matches target)`,
-        );
-      }
-      return {
-        patched,
-        envFilesBefore,
-        patching,
-      };
-    } catch (error) {
-      await this.rollBack(envFilesBefore);
-      patching.fail();
-      throw error;
     }
+    for (const file of patched.filesSkipped) {
+      patching.detail(
+        `Left ${escapeControlCharacters(relativeDisplay(this.deps.cwd, file))} unchanged (already matches target)`,
+      );
+    }
+    return {
+      patched,
+      envFilesBefore,
+      patching,
+    };
   }
 
   /**
