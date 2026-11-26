@@ -16,6 +16,7 @@ import {
 } from "@/lib/backend";
 import {
   EXIT_CODES,
+  PromptCancelled,
   ZitadelError,
   errorMessage,
   failureText,
@@ -690,6 +691,17 @@ describe("a failure as a person is shown it", () => {
         sentence: "Bad port\nUse 1 to 65535.",
         misuse: false,
       });
+    });
+  });
+});
+
+describe("PromptCancelled", () => {
+  it("states a cancelled prompt with no hint or details", () => {
+    expect(new PromptCancelled()).toMatchObject({
+      message: "Cancelled by user",
+      code: "E_CANCELLED",
+      hint: undefined,
+      details: undefined,
     });
   });
 });
