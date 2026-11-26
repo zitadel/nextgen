@@ -155,10 +155,10 @@ describe("status", () => {
       });
     });
 
-    describe("that refuses the reads the user probe makes", () => {
+    describe("that fails the read the user probe makes", () => {
       it("still succeeds", async () => {
         const app = await aSetUpApp();
-        platform.refusesProjectReads();
+        platform.cannotQueryUsers();
 
         const result = await app.status();
 

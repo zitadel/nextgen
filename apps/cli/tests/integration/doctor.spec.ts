@@ -531,7 +531,7 @@ describe("doctor", () => {
         const result = await app.doctor();
 
         expect(app.envelopeOf(result)).toMatchObject({
-          data: {
+          details: {
             checks: expect.arrayContaining([expect.objectContaining({ name: "managed-files" })]),
           },
         });
