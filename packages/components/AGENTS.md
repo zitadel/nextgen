@@ -111,3 +111,18 @@ test; a warm `.vitest` cache brings that down to seconds.
 
 `tsdown.config.ts` keeps `lit`, `liquidjs`, `dompurify` and `lucide` external
 in the library build so consumers share one copy; never bundle them there.
+
+## Bundle size
+
+Everything the package root reaches lands in every SDK app's main chunk.
+
+- Load `liquidjs`, `dompurify` and every dictionary but `en` only through
+  `import()` (`liquid.ts`, `sanitiser/dompurify.ts`, `locales/translations.ts`).
+- Never re-export `de`, `it` or `builtinLocales` from the root: a static export keeps
+  them in every bundle; their home is `@zitadel/components/locales`.
+- Add a language as `locales/<code>.ts` plus one loader in `BUILTIN`
+  (`locales/translations.ts`); resolve texts only through `Translations`.
+- Import an API endpoint by name in `api-client.ts`; never through
+  `createZitadelClient`, whose `Proxy` defeats tree-shaking.
+- Allow a tag or attribute in `sanitiser/allowlist.ts`, for both sanitisers; never list a
+  `data-*` attribute or one twice: `setHTML()` rejects the whole configuration.
