@@ -81,10 +81,12 @@
         "$TURBO_ROOT$/scripts/dev-process.mjs",
         // The Go login SDK's generation reads sources outside this module:
         // templ compiles its .templ files, and the assets generator reads
-        // the components package's TS catalogs. Without them a cache hit
-        // would hide drift when only a template or a catalog changed.
+        // the components package's TS catalogs and the design tokens' CSS.
+        // Without them a cache hit would hide drift when only a template, a
+        // catalog or a token changed.
         "$TURBO_ROOT$/scripts/generate-go-login-assets.ts",
         "$TURBO_ROOT$/packages/components/src/orchestrator/locales/*.ts",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/packages/go/login/**/*.templ",
         "$TURBO_ROOT$/redocly.yaml"
       ]
