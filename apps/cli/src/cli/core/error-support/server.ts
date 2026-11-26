@@ -116,7 +116,6 @@ const SESSION_REFUSED_ADVICE = {
 
 /** How a run is refused when the server npm package cannot be found. */
 const PACKAGE_MISSING_ADVICE = {
-  hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
   next: ["{reinstall}"],
   details: {
     package: "{package}",
@@ -126,7 +125,6 @@ const PACKAGE_MISSING_ADVICE = {
 
 /** How a run is refused when the server binary was found but could not be launched. */
 const LAUNCH_FAILED_ADVICE = {
-  hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
   next: ["{reinstall}"],
   details: {
     command: "{command}",
@@ -136,7 +134,6 @@ const LAUNCH_FAILED_ADVICE = {
 
 /** How a run is refused when a command it ran with Docker failed. */
 const DOCKER_FAILED_ADVICE = {
-  hint: "Check that Docker is installed, running, and reachable from this shell.",
   next: [
     {
       id: "doctor",
@@ -161,7 +158,6 @@ const DOCKER_MISSING_ADVICE = {
 
 /** How a run is refused when the local server does not host the platform project. */
 const PLATFORM_MISSING_ADVICE = {
-  hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
   next: [
     {
       id: "stop",

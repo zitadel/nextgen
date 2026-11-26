@@ -31,7 +31,6 @@ const VALUE_UNBOUND_ADVICE = {
 
 /** How a value set in no source is refused. */
 const VALUE_MISSING_ADVICE = {
-  hint: "Consulted, in order: {sources}. Set {variable} in {file} or the process environment.",
   details: {
     environment: "{environment}",
     variable: "{variable}",
@@ -73,11 +72,5 @@ export const ENVIRONMENT_WORDINGS: readonly Wording[] = [
       },
     };
   }),
-  derived(EnvironmentValueMissingError, VALUE_MISSING_ADVICE, (error) => {
-    return {
-      values: {
-        sources: error.consulted.join(", "),
-      },
-    };
-  }),
+  [EnvironmentValueMissingError, VALUE_MISSING_ADVICE],
 ];

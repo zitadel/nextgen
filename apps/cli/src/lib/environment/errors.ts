@@ -74,6 +74,9 @@ export class EnvironmentValueMissingError extends EnvironmentError {
   /** The file to set the value in, beside the process environment. */
   readonly file: string;
 
+  /** Where to set the value: the file, or the process environment. */
+  override readonly hint: string;
+
   /**
    * Creates the error.
    *
@@ -94,6 +97,7 @@ export class EnvironmentValueMissingError extends EnvironmentError {
     this.variable = missing.variable;
     this.consulted = missing.consulted;
     this.file = missing.file;
+    this.hint = `Consulted, in order: ${missing.consulted.join(", ")}. Set ${missing.variable} in ${missing.file} or the process environment.`;
   }
 }
 

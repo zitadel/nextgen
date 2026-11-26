@@ -87,6 +87,8 @@ export class LocalServerPackageMissingError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.";
 
   /** The npm package that cannot be found. */
   readonly package: string;
@@ -113,6 +115,8 @@ export class LocalServerLaunchFailedError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Check that the server binary exists and can be run, or reinstall @zitadel/cli.";
 
   /** The server binary that was run. */
   readonly command: string;
@@ -139,6 +143,8 @@ export class LocalServerDockerFailedError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Check that Docker is installed, running, and reachable from this shell.";
 
   /** The Docker command that was run. */
   readonly command: readonly string[];
@@ -344,6 +350,8 @@ export class LocalServerPlatformMissingError extends LocalServerError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
+  override readonly hint: string =
+    "Stop it, then start it again so it boots with the platform project and the local admin.";
 
   /** The server that does not host it. */
   readonly serverUrl: string;
