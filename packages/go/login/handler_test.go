@@ -1,6 +1,7 @@
 package login
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -245,4 +246,53 @@ func TestHandlerTerminalWithoutHandoff(t *testing.T) {
 	assert.Contains(t, string(body), `data-step="no-account"`)
 	assert.Less(t, cookiesByName(res)[FlowCookie].MaxAge, 0)
 	assert.Nil(t, cookiesByName(res)["zitadel_session_proj_1"])
+}
+
+func TestHandlerPasskey(t *testing.T) {
+	api := newFakeAPI(t)
+	cfg := testConfig(api.URL)
+	cfg.PostSignInURL = "/app"
+	app := newApp(t, cfg)
+	app.get("/login/")
+
+	// The passkey button posts like any other; the step comes back with the
+	// challenge and so renders the atom, its input and the script.
+	res := app.post("/login/?flow=flow_1", url.Values{"action": {"passkey"}})
+	assert.Equal(t, "/login/?flow=flow_1", res.Header.Get("Location"))
+	assert.Nil(t, api.submits[0]["challenge_response"])
+	_, body := app.get("/login/?flow=flow_1")
+	assert.Contains(t, body, `<zl-passkey ceremony="authenticate" method="passkey" challenge-id="ch_1" options="{&#34;challenge&#34;:&#34;Y2hhbGxlbmdl&#34;}"`)
+	assert.Contains(t, body, `<input type="hidden" name="challenge_response">`)
+	assert.Contains(t, body, `<script type="module" src="passkey.js"></script>`)
+
+	// The script is the glue and the atom, in that order, as one module.
+	res, js := app.get("/login/passkey.js")
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, "text/javascript; charset=utf-8", res.Header.Get("Content-Type"))
+	assert.Equal(t, "no-cache", res.Header.Get("Cache-Control"))
+	assert.Less(t, strings.Index(js, `addEventListener("zl-passkey-result"`), strings.Index(js, `customElements.define`))
+	assert.NotContains(t, js, "liquidjs", "the atom alone, not the widget")
+	req, err := http.NewRequest(http.MethodGet, app.URL+"/login/passkey.js", nil)
+	require.NoError(t, err)
+	req.Header.Set("If-None-Match", res.Header.Get("ETag"))
+	res, err = app.client.Do(req)
+	require.NoError(t, err)
+	require.NoError(t, res.Body.Close())
+	assert.Equal(t, http.StatusNotModified, res.StatusCode)
+
+	// A proof that is not the atom's result is refused, not forwarded.
+	res = app.post("/login/?flow=flow_1", url.Values{"action": {"passkey"}, "challenge_response": {"{"}})
+	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+	assert.Len(t, api.submits, 1)
+
+	// The glue posts the atom's result whole, which goes to the API as the
+	// challenge response, apart from the fields.
+	proof := `{"challenge_id":"ch_1","method":"passkey","proof":{"id":"cred_1","rawId":"Y3JlZF8x","type":"public-key","response":{"clientDataJSON":"e30","authenticatorData":"AA","signature":"BB"}}}`
+	res = app.post("/login/?flow=flow_1", url.Values{"action": {"passkey"}, "challenge_response": {proof}})
+	assert.Equal(t, http.StatusSeeOther, res.StatusCode)
+	assert.Equal(t, "/app", res.Header.Get("Location"))
+	var want map[string]any
+	require.NoError(t, json.Unmarshal([]byte(proof), &want))
+	assert.Equal(t, want, api.submits[1]["challenge_response"])
+	assert.Equal(t, map[string]any{}, api.submits[1]["fields"], "the proof is not a field")
 }

@@ -111,7 +111,36 @@ func TestStep(t *testing.T) {
 	assert.Contains(t, html, `<button type="submit" name="action" value="submit" class="action primary" data-testid="zitadel-button-submit">PASSWORD.ACTION.SIGNIN</button>`)
 	assert.Contains(t, html, `<button type="submit" name="action" value="back" class="action back" data-testid="zitadel-button-back">BACK</button>`)
 	assert.Contains(t, html, `<button type="submit" name="action" value="passkey" class="action" data-testid="zitadel-button-passkey">PASSKEY</button>`, "a passkey action posts like any other")
+	assert.NotContains(t, html, "<zl-passkey", "no challenge, no atom")
+	assert.NotContains(t, html, "challenge_response")
+	assert.NotContains(t, html, "passkey.js")
 	assert.Contains(t, html, `<p class="divider">SSO.DIVIDER</p>`)
 	assert.Contains(t, html, `<form method="post" action="?flow=flow_1" class="sso"><input type="hidden" name="action" value="sso">`)
 	assert.Contains(t, html, `<button type="submit" name="sso_provider_id" value="idp_1" class="action" data-testid="zitadel-sso-idp_1">SSO.CONTINUE_WITH</button></form>`)
+}
+
+func TestStepChallenge(t *testing.T) {
+	challenge := func(method api.FlowStepChallengeMethod, options string) api.FlowStep {
+		var opts api.FlowStepChallengeOptions
+		require.NoError(t, opts.UnmarshalJSON([]byte(options)))
+		return api.FlowStep{Name: "password", Challenge: api.NewOptFlowStepChallenge(api.FlowStepChallenge{
+			Method:      api.NewOptFlowStepChallengeMethod(method),
+			ChallengeID: api.NewOptString("ch_1"),
+			Options:     api.NewOptFlowStepChallengeOptions(opts),
+		})}
+	}
+
+	// A sign-in: the atom over the options, escaped as any attribute, the
+	// input the glue fills, the paragraph it writes an error to, the script.
+	html := render(t, challenge(api.FlowStepChallengeMethodPasskey, `{"challenge":"a<b\"c"}`))
+	assert.Contains(t, html, `<zl-passkey ceremony="authenticate" method="passkey" challenge-id="ch_1" options="{&#34;challenge&#34;:&#34;a&lt;b\&#34;c&#34;}" pending-label="PASSKEY.PENDING.STATUS" cancel-label="ACTION.CANCEL"></zl-passkey>`)
+	assert.Contains(t, html, `<input type="hidden" name="challenge_response">`)
+	assert.Contains(t, html, `<p class="error passkey-error" role="alert" hidden data-cancelled="ERROR.PASSKEY_CANCELLED" data-timeout="ERROR.PASSKEY_TIMEOUT" data-failed="ERROR.PASSKEY_FAILED"></p>`)
+	assert.Contains(t, html, `<script type="module" src="passkey.js"></script></form>`, "inside the form, so the glue finds it from the atom")
+
+	// A registration, by its method or by the user in the options.
+	html = render(t, challenge(api.FlowStepChallengeMethodPasskeyRegister, `{"challenge":"x"}`))
+	assert.Contains(t, html, `<zl-passkey ceremony="register" method="passkey_register"`)
+	html = render(t, challenge(api.FlowStepChallengeMethodPasskey, `{"user":{"id":"u_1"}}`))
+	assert.Contains(t, html, `<zl-passkey ceremony="register" method="passkey_register" challenge-id="ch_1" options="{&#34;user&#34;:{&#34;id&#34;:&#34;u_1&#34;}}"`)
 }

@@ -3,10 +3,13 @@ package login
 import (
 	"bytes"
 	"cmp"
+	"crypto/sha256"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/a-h/templ"
 
@@ -25,13 +28,16 @@ func Mount(mux *http.ServeMux, prefix string, cfg Config) error {
 		return err
 	}
 	prefix = strings.TrimSuffix(prefix, "/")
+	js := passkeyFormJS + passkeyStandaloneJS
 	h := &handler{
-		cfg:   cfg,
-		flow:  flow,
-		texts: Texts{Locale: cfg.Locale},
-		log:   cfg.logger(),
-		css:   tokensCSS + loginCSS,
-		path:  prefix + "/",
+		cfg:    cfg,
+		flow:   flow,
+		texts:  Texts{Locale: cfg.Locale},
+		log:    cfg.logger(),
+		css:    tokensCSS + loginCSS,
+		js:     js,
+		jsETag: fmt.Sprintf(`"%x"`, sha256.Sum256([]byte(js))),
+		path:   prefix + "/",
 		// The __Host- prefix needs Path=/ and makes the cookie unsettable by
 		// a sibling subdomain, the one way to plant a flow; over plain http
 		// the prefix is not allowed, and the login's own path will do.
@@ -42,6 +48,7 @@ func Mount(mux *http.ServeMux, prefix string, cfg Config) error {
 	}
 	mux.HandleFunc("GET "+prefix+"/{$}", h.get)
 	mux.HandleFunc("POST "+prefix+"/{$}", h.post)
+	mux.HandleFunc("GET "+prefix+"/passkey.js", h.passkeyJS)
 	return nil
 }
 
@@ -59,6 +66,9 @@ type handler struct {
 	texts Texts
 	log   *slog.Logger
 	css   string
+	// js is passkey.js, the one script a step loads: the glue, then the atom.
+	js     string
+	jsETag string
 	// path is the login's route, where its cookie and redirects point.
 	path string
 	// cookie is the browser's copy of the flow cookie, without a value.
@@ -100,8 +110,9 @@ func (h *handler) get(w http.ResponseWriter, r *http.Request) {
 	h.finish(w, r, flow, res, false)
 }
 
-// post submits the form's action with its other values, or starts the
-// sign-in with the chosen provider, and sends the browser back to get.
+// post submits the form's action with its other values and, after a passkey
+// ceremony, the proof passkey-form.js put in challenge_response, or starts
+// the sign-in with the chosen provider, and sends the browser back to get.
 func (h *handler) post(w http.ResponseWriter, r *http.Request) {
 	flow := h.request(r)
 	id := r.URL.Query().Get("flow")
@@ -115,13 +126,21 @@ func (h *handler) post(w http.ResponseWriter, r *http.Request) {
 	if r.PostForm.Get("action") == "sso" {
 		res, err = flow.SubmitSSO(r.Context(), id, r.PostForm.Get("sso_provider_id"), h.cfg.PublicOrigin+h.path+"?flow="+url.QueryEscape(id))
 	} else {
+		var challenge *api.FlowSubmitRequestChallengeResponse
+		if raw := r.PostForm.Get("challenge_response"); raw != "" {
+			challenge = new(api.FlowSubmitRequestChallengeResponse)
+			if err := challenge.UnmarshalJSON([]byte(raw)); err != nil {
+				http.Error(w, "challenge_response is not the atom's result", http.StatusBadRequest)
+				return
+			}
+		}
 		fields := make(map[string]string, len(r.PostForm))
 		for name := range r.PostForm {
-			if name != "action" {
+			if name != "action" && name != "challenge_response" {
 				fields[name] = r.PostForm.Get(name)
 			}
 		}
-		res, err = flow.Submit(r.Context(), id, r.PostForm.Get("action"), fields)
+		res, err = flow.Submit(r.Context(), id, r.PostForm.Get("action"), fields, challenge)
 	}
 	if err != nil {
 		h.fail(w, r, err)
@@ -192,6 +211,15 @@ func (h *handler) render(w http.ResponseWriter, r *http.Request, res *api.FlowRe
 	// A login page in a frame is clickjacking.
 	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
 	_, _ = w.Write(body.Bytes())
+}
+
+// passkeyJS serves the passkey step's script, which is part of the binary:
+// cached by the browser and revalidated against its ETag, so an update
+// reaches it with the page.
+func (h *handler) passkeyJS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("ETag", h.jsETag)
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeContent(w, r, "passkey.js", time.Time{}, strings.NewReader(h.js))
 }
 
 // fail answers an error: a flow the API will not continue starts over,

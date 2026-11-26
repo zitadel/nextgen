@@ -4,3 +4,4 @@
 
 apps/api/internal/api/generated/** linguist-generated=true
 apps/api/internal/domain/mock/** linguist-generated=true
+packages/go/login/assets/passkey-standalone.mjs linguist-generated=true

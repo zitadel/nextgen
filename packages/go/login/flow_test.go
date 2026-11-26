@@ -29,6 +29,9 @@ type fakeAPI struct {
 	// noHandoff makes the completing submission a terminal step with nobody
 	// signed in, as "no account" ends.
 	noHandoff bool
+	// challenge is set by a passkey action without a proof: the pending
+	// ceremony, re-attached to the password step until the proof arrives.
+	challenge bool
 }
 
 func newFakeAPI(t *testing.T) *fakeAPI {
@@ -45,7 +48,11 @@ func newFakeAPI(t *testing.T) *fakeAPI {
 		case http.StatusInternalServerError:
 			f.errorf(w, f.getStatus, "enc_key.decrypt_failed", "the sealed state could not be opened")
 		case 0:
-			f.step(w, http.StatusOK, passwordStep)
+			if f.challenge {
+				f.step(w, http.StatusOK, passwordStep+","+passkeyChallenge)
+			} else {
+				f.step(w, http.StatusOK, passwordStep)
+			}
 		}
 	})
 	mux.HandleFunc("POST /api/v1/flows/{flow_id}/submit", func(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +70,12 @@ func newFakeAPI(t *testing.T) *fakeAPI {
 				f.step(w, http.StatusOK, completeStep)
 			} else {
 				f.step(w, http.StatusOK, passwordStep)
+			}
+		case "passkey":
+			if f.challenge = body["challenge_response"] == nil; f.challenge {
+				f.step(w, http.StatusOK, passwordStep+","+passkeyChallenge)
+			} else {
+				f.step(w, http.StatusOK, completeStep)
 			}
 		case "sso":
 			f.step(w, http.StatusOK, `"name":"sso-redirect","redirect_url":"https://idp.example/authorize","fields":[],"actions":[],"gates":{}`)
@@ -97,8 +110,9 @@ const (
 	passwordStep = `"name":"password","texts":{"title_key":"password.title"},` +
 		`"fields":[{"name":"password","type":"password","text_key":"password.field.password","autocomplete":"current-password","required":true}],` +
 		`"actions":[{"name":"submit","kind":"submit","primary":true},{"name":"back","kind":"back"}],"gates":{}`
-	completeStep  = `"name":"done","complete":"show","fields":[],"actions":[],"gates":{}`
-	noAccountStep = `"name":"no-account","texts":{"title_key":"no-account.title"},"complete":"show","fields":[],"actions":[],"gates":{}`
+	passkeyChallenge = `"challenge":{"method":"passkey","challenge_id":"ch_1","options":{"challenge":"Y2hhbGxlbmdl"}}`
+	completeStep     = `"name":"done","complete":"show","fields":[],"actions":[],"gates":{}`
+	noAccountStep    = `"name":"no-account","texts":{"title_key":"no-account.title"},"complete":"show","fields":[],"actions":[],"gates":{}`
 )
 
 func (f *fakeAPI) errorf(w http.ResponseWriter, status int, code, message string) {
@@ -143,13 +157,13 @@ func TestFlow(t *testing.T) {
 	assert.Equal(t, "sealed-1", flow.Cookie)
 	assert.Equal(t, 600, flow.CookieMaxAge)
 
-	res, err = flow.Submit(ctx, res.ID, "submit", map[string]string{"email": "a@example.com"})
+	res, err = flow.Submit(ctx, res.ID, "submit", map[string]string{"email": "a@example.com"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "password", res.Step.Name)
 	assert.Equal(t, map[string]any{"email": "a@example.com"}, server.submits[0]["fields"])
 
 	// A refused submission is the step again, with its error, not a Go error.
-	res, err = flow.Submit(ctx, res.ID, "submit", map[string]string{"password": "wrong"})
+	res, err = flow.Submit(ctx, res.ID, "submit", map[string]string{"password": "wrong"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "error.invalid_credentials", res.Step.Error.Value)
 	assert.Equal(t, "sealed-3", flow.Cookie, "a 400 rotates the cookie too")
@@ -158,7 +172,7 @@ func TestFlow(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "password", res.Step.Name)
 
-	res, err = flow.Submit(ctx, res.ID, "submit", map[string]string{"password": "right"})
+	res, err = flow.Submit(ctx, res.ID, "submit", map[string]string{"password": "right"}, nil)
 	require.NoError(t, err)
 	assert.True(t, res.Step.Complete.IsSet())
 
@@ -189,7 +203,7 @@ func TestFlowErrors(t *testing.T) {
 	res, err := flow.Start(t.Context())
 	require.NoError(t, err)
 
-	_, err = flow.Submit(t.Context(), res.ID, "nope", nil)
+	_, err = flow.Submit(t.Context(), res.ID, "nope", nil, nil)
 	assert.EqualError(t, err, "login: submit: no such action (flow.invalid_action)")
 	assert.False(t, Restartable(err))
 	_, _, err = flow.Exchange(t.Context(), "hot_stale")
