@@ -95,20 +95,18 @@ export class LocalRuntimeChecks {
         "docker-cli",
         "Docker is reachable",
         async () => {
-          // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-          let result: DockerResult;
           try {
-            result = await this.docker();
+            const result = await this.docker();
+            if (result.status !== 0) {
+              throw new Error(unreachable(result.stderr || "docker version failed"));
+            }
+            return `Docker engine ${result.stdout.trim() || "available"}`;
           } catch (error) {
             if (isErrno(error, "ENOENT") || isErrno(error, "EACCES")) {
               throw new Error(unreachable(errorMessage(error)), { cause: error });
             }
             throw error;
           }
-          if (result.status !== 0) {
-            throw new Error(unreachable(result.stderr || "docker version failed"));
-          }
-          return `Docker engine ${result.stdout.trim() || "available"}`;
         },
         "warn",
       );

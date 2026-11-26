@@ -53,10 +53,57 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-    let dependencies: Dependencies | undefined;
     try {
-      dependencies = await Dependencies.read(ctx.cwd, ZITADEL_SCOPE);
+      const dependencies = await Dependencies.read(ctx.cwd, ZITADEL_SCOPE);
+      if (dependencies === undefined) {
+        return {
+          ...base,
+          status: "pass",
+          message: "No package.json to compare pins against",
+        };
+      }
+      const exact = dependencies.exact();
+      const mismatched = exact.filter((dependency) => {
+        return !semver.eq(dependency.specifier, ctx.cliVersion);
+      });
+      if (mismatched.length > 0) {
+        return {
+          ...base,
+          status: "warn",
+          message:
+            `${mismatched
+              .map((dependency) => {
+                return `${dependency.name}@${dependency.specifier}`;
+              })
+              .join(", ")} ` +
+            `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
+            `guidance target the CLI's train`,
+          details: {
+            mismatched: mismatched.map((dependency) => {
+              return {
+                name: dependency.name,
+                declared: dependency.specifier,
+                expected: ctx.cliVersion,
+              };
+            }),
+          },
+          remedy: suggestedCommandOf(
+            (await PM.detect(ctx.cwd)).addExact(
+              mismatched.map((dependency) => {
+                return `${dependency.name}@${ctx.cliVersion}`;
+              }),
+            ),
+          ),
+        };
+      }
+      return {
+        ...base,
+        status: "pass",
+        message:
+          exact.length > 0
+            ? `Zitadel package pins match the CLI version (${exact.length} compared)`
+            : "No exactly-pinned Zitadel packages to compare",
+      };
     } catch (error) {
       if (error instanceof PmManifestInvalidError) {
         return {
@@ -67,55 +114,6 @@ export class DependencyVersionCheck implements SanityCheck {
       }
       throw error;
     }
-    if (dependencies === undefined) {
-      return {
-        ...base,
-        status: "pass",
-        message: "No package.json to compare pins against",
-      };
-    }
-    const exact = dependencies.exact();
-    const mismatched = exact.filter((dependency) => {
-      return !semver.eq(dependency.specifier, ctx.cliVersion);
-    });
-    if (mismatched.length > 0) {
-      return {
-        ...base,
-        status: "warn",
-        message:
-          `${mismatched
-            .map((dependency) => {
-              return `${dependency.name}@${dependency.specifier}`;
-            })
-            .join(", ")} ` +
-          `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
-          `guidance target the CLI's train`,
-        details: {
-          mismatched: mismatched.map((dependency) => {
-            return {
-              name: dependency.name,
-              declared: dependency.specifier,
-              expected: ctx.cliVersion,
-            };
-          }),
-        },
-        remedy: suggestedCommandOf(
-          (await PM.detect(ctx.cwd)).addExact(
-            mismatched.map((dependency) => {
-              return `${dependency.name}@${ctx.cliVersion}`;
-            }),
-          ),
-        ),
-      };
-    }
-    return {
-      ...base,
-      status: "pass",
-      message:
-        exact.length > 0
-          ? `Zitadel package pins match the CLI version (${exact.length} compared)`
-          : "No exactly-pinned Zitadel packages to compare",
-    };
   }
 
   /**

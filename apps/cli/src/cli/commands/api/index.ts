@@ -450,12 +450,36 @@ export default class Api extends Telemetered(
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
-    // biome-ignore lint/plugin: the code after the call needs `response` and must not sit inside the try that translates its errors
-    let response: Awaited<ReturnType<typeof operationService.call>>;
     try {
-      response = await (flags.paginate
+      const response = await (flags.paginate
         ? operationService.callAll(request)
         : operationService.call(request));
+
+      if (response.body === undefined) {
+        return {
+          status: "ok",
+          data: null,
+          verbatim: true,
+          ...(Output.screen ? {} : { pretty: prose("") }),
+          summary: {
+            title: `No content (${response.status})`,
+            sections: [],
+          },
+        };
+      }
+      const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
+
+      return {
+        status: "ok",
+        data: response.body,
+        verbatim: true,
+        ...(Output.screen ? {} : { pretty }),
+        summary: {
+          title: `Called ${operation.id}`,
+          sections: [],
+          lines: pretty.text.split("\n"),
+        },
+      };
     } catch (error) {
       if (error instanceof BackendUnauthorizedError && operation.auth === "secret") {
         throw refusalError(UNAUTHORIZED_SECRET_REFUSAL, {
@@ -467,32 +491,6 @@ export default class Api extends Telemetered(
       }
       throw error;
     }
-
-    if (response.body === undefined) {
-      return {
-        status: "ok",
-        data: null,
-        verbatim: true,
-        ...(Output.screen ? {} : { pretty: prose("") }),
-        summary: {
-          title: `No content (${response.status})`,
-          sections: [],
-        },
-      };
-    }
-    const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
-
-    return {
-      status: "ok",
-      data: response.body,
-      verbatim: true,
-      ...(Output.screen ? {} : { pretty }),
-      summary: {
-        title: `Called ${operation.id}`,
-        sections: [],
-        lines: pretty.text.split("\n"),
-      },
-    };
   }
 
   /**

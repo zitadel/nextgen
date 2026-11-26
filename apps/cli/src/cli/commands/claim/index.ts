@@ -516,14 +516,14 @@ export default class Claim extends Telemetered(ChangeCommand) {
             throw new NotFinished(attempt - 1);
           }
 
-          // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-          let progress: Awaited<ReturnType<typeof claimService.status>>;
-          try {
-            progress = await claimService.status(challengeId);
-          } catch (error) {
+          const [status] = await Promise.allSettled([claimService.status(challengeId)]);
+          if (status.status === "rejected") {
             this.annotate({ poll_count: attempt });
-            throw new AbortError(error instanceof Error ? error : new Error(String(error)));
+            throw new AbortError(
+              status.reason instanceof Error ? status.reason : new Error(String(status.reason)),
+            );
           }
+          const progress = status.value;
           switch (progress.outcome) {
             case "completed": {
               this.annotate({ poll_count: attempt });

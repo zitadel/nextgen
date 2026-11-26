@@ -25,15 +25,11 @@ export class EnvExampleCheck extends AbstractSanityCheck {
 
   override async fix(ctx: CheckContext): Promise<void> {
     const path = join(ctx.cwd, ".env.example");
-    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-    let existing = "";
-    try {
-      existing = await readFile(path, "utf8");
-    } catch (error) {
-      if (!isErrno(error, "ENOENT")) {
-        throw error;
-      }
+    const [read] = await Promise.allSettled([readFile(path, "utf8")]);
+    if (read.status === "rejected" && !isErrno(read.reason, "ENOENT")) {
+      throw read.reason;
     }
+    const existing = read.status === "fulfilled" ? read.value : "";
     const missing = REQUIRED_KEYS.filter((key) => {
       return !existing.includes(`${key}=`);
     });

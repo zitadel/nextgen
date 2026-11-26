@@ -1,13 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  BackendError,
-  DeploymentService,
-  type ReleasePointer,
-  ReleaseService,
-  type ZitadelClient,
-} from "@/lib/backend";
+import { BackendError, DeploymentService, ReleaseService, type ZitadelClient } from "@/lib/backend";
 import { RollbackDeploymentParams } from "@/lib/backend/schemas";
 import { toZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -257,18 +251,16 @@ export default class DeploymentRollback extends Telemetered(
           ...(guard === undefined ? {} : { expected_deployment_id: guard }),
         });
         const releaseService = await this.service(ReleaseService);
-        // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-        let pointers: readonly ReleasePointer[] | undefined;
-        try {
-          pointers = (await releaseService.get(deployment.release_id)).pointers;
-        } catch (error) {
-          if (!(error instanceof BackendError)) {
-            throw error;
+        const [release] = await Promise.allSettled([releaseService.get(deployment.release_id)]);
+        if (release.status === "rejected") {
+          if (!(release.reason instanceof BackendError)) {
+            throw release.reason;
           }
           warnings.report(
-            `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
+            `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(release.reason).message}`,
           );
         }
+        const pointers = release.status === "fulfilled" ? release.value.pointers : undefined;
 
         const pointerTable =
           pointers === undefined
