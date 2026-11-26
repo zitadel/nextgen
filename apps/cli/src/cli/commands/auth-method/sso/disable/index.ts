@@ -5,7 +5,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, nonBlankString } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import type { UserSchema } from "@/lib/zitadel";
+import { type UserSchema, ZitadelConfigFlowBrokenError } from "@/lib/zitadel";
 import { dryRunResult } from "@/cli/core/crud/shared";
 
 /**
@@ -17,6 +17,14 @@ import { dryRunResult } from "@/cli/core/crud/shared";
 const NAME_PROVIDER_REFUSAL = {
   message: "Name the provider to remove",
   hint: "Pass --provider, e.g. --provider {example}. {schema} offers: {offered}.",
+} as const satisfies Refusal;
+
+/**
+ * What a change is refused for when it would make a login flow stop validating.
+ */
+const FLOW_BROKEN_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the steps named above, then run the command again.",
 } as const satisfies Refusal;
 
 /**
@@ -62,7 +70,17 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
     const change = await this.previewIfNoSignInLeft(
       target,
       (options) => {
-        return config.connections.disable(schema, provider, options);
+        try {
+          return config.connections.disable(schema, provider, options);
+        } catch (error) {
+          if (error instanceof ZitadelConfigFlowBrokenError) {
+            throw refusalError(FLOW_BROKEN_REFUSAL, {
+              ...error,
+              message: error.message,
+            });
+          }
+          throw error;
+        }
       },
       { provider },
     );
@@ -139,7 +157,17 @@ export default class AuthMethodSsoDisable extends AuthMethodDisableCommand {
     const confirmed = await this.confirmIfNoSignInLeft(
       target,
       (options) => {
-        return config.connections.disable(schema, provider, options);
+        try {
+          return config.connections.disable(schema, provider, options);
+        } catch (error) {
+          if (error instanceof ZitadelConfigFlowBrokenError) {
+            throw refusalError(FLOW_BROKEN_REFUSAL, {
+              ...error,
+              message: error.message,
+            });
+          }
+          throw error;
+        }
       },
       { provider },
     );

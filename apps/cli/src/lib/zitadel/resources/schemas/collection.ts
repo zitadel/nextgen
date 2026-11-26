@@ -64,7 +64,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * @returns The change.
    * @throws {@link ZitadelConfigError} When the schema's methods are not the
    *   shape the edit writes, or password is enabled without an identifier.
-   * @throws {@link ZitadelConfigError} When a flow would stop validating.
+   * @throws {@link ZitadelConfigFlowBrokenError} When a flow would stop validating.
    */
   enable(schema: UserSchema, method: ToggleableMethod): Change {
     const edited = schema.withMethod(method).document;

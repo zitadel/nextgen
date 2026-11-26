@@ -25,6 +25,7 @@ import {
   type ForceOptions,
   ZitadelConfigEditLockoutError,
   ZitadelConfigFlowMethodInUseError,
+  ZitadelConfigFlowBrokenError,
   ZitadelConfigFlowUncheckedError,
   ZitadelConfigSchemaMissingError,
   type Schemas,
@@ -91,6 +92,14 @@ const FLOW_METHOD_IN_USE_REFUSAL = {
       },
     },
   ],
+} as const satisfies Refusal;
+
+/**
+ * What a change is refused for when it would make a login flow stop validating.
+ */
+const FLOW_BROKEN_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the steps named above, then run the command again.",
 } as const satisfies Refusal;
 
 /**
@@ -1032,6 +1041,12 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
         true,
       );
     } catch (error) {
+      if (error instanceof ZitadelConfigFlowBrokenError) {
+        throw refusalError(FLOW_BROKEN_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigFlowUncheckedError) {
         throw refusalError(FLOW_UNCHECKED_REFUSAL, {
           ...error,
@@ -1059,6 +1074,12 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
         true,
       );
     } catch (error) {
+      if (error instanceof ZitadelConfigFlowBrokenError) {
+        throw refusalError(FLOW_BROKEN_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigFlowUncheckedError) {
         throw refusalError(FLOW_UNCHECKED_REFUSAL, {
           ...error,

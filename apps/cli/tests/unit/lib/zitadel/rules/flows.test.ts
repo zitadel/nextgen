@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelConfigError, type JsonObject } from "@/lib/zitadel";
+import { ZitadelConfigError, ZitadelConfigFlowBrokenError, type JsonObject } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
 import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
 import {
@@ -206,6 +206,20 @@ describe("assertFlowsIntact", () => {
     expect(error).toMatchObject({
       message: expect.stringContaining("A login flow would stop validating after this change:"),
     });
+  });
+
+  it("refuses an edit that breaks a flow as a broken flow", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEdit(config, "password", false);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeInstanceOf(ZitadelConfigFlowBrokenError);
   });
 
   it("names the step that still offers a disabled passkey", () => {

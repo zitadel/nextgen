@@ -1069,6 +1069,32 @@ describe("auth-method sso enable", () => {
         });
       });
 
+      describe("a sign-up step asking for a field the schema lacks", () => {
+        it("refuses a catalog provider, saying to fix the steps it names", async () => {
+          const app = await aSetUpApp();
+          await app.asksAtSignUpForAFieldTheSchemaLacks();
+
+          const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+          expect(JSON.parse(result.stdout)).toMatchObject({
+            status: "error",
+            hint: "Fix the steps named above, then run the command again.",
+          });
+        });
+
+        it("refuses a custom connection, saying to fix the steps it names", async () => {
+          const app = await aSetUpApp();
+          await app.asksAtSignUpForAFieldTheSchemaLacks();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+
+          expect(JSON.parse(result.stdout)).toMatchObject({
+            status: "error",
+            hint: "Fix the steps named above, then run the command again.",
+          });
+        });
+      });
+
       describe("a provider the catalog does not list", () => {
         it("is refused before anything is asked", async () => {
           const app = await aSetUpApp();

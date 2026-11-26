@@ -17,7 +17,7 @@
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
 
 import {
-  ZitadelConfigError,
+  ZitadelConfigFlowBrokenError,
   ZitadelConfigFlowMethodInUseError,
   ZitadelConfigFlowUncheckedError,
 } from "@/lib/zitadel/errors";
@@ -101,14 +101,14 @@ export const FLOW_RULES: readonly Rule[] = [
  * An edit that changes nothing breaks nothing.
  *
  * @param edit - The edit.
- * @throws {@link ZitadelConfigError} When the edit breaks a flow, naming every issue.
+ * @throws {@link ZitadelConfigFlowBrokenError} When the edit breaks a flow, naming every issue.
  */
 export function assertFlowsIntact(edit: SchemaEdit): void {
   const introduced = checkedIssues(edit);
   if (introduced.length === 0) {
     return;
   }
-  throw new ZitadelConfigError(
+  throw new ZitadelConfigFlowBrokenError(
     [
       "A login flow would stop validating after this change:",
       ...introduced.map((item) => {

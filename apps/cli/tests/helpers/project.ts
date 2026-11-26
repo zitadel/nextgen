@@ -2220,6 +2220,25 @@ export class ScaffoldedApp {
     });
   }
 
+  /**
+   * Has the sign-up step ask for `nickname`, which the user schema does not
+   * hold, as a developer editing the flow by hand would. The flow already fails
+   * for it, and a provider's generated sign-up step would copy the field.
+   *
+   * @returns When the flow is written.
+   */
+  asksAtSignUpForAFieldTheSchemaLacks(): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => {
+        return candidate.name === flow.purposes.register;
+      });
+      if (step === undefined) {
+        throw new Error("the login flow has no sign-up entry step");
+      }
+      step.fields = [...(step.fields ?? []), "nickname"];
+    });
+  }
+
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
     return this.editDocument("package.json", PackageJsonSchema, edit);
   }

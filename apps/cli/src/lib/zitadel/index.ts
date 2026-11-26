@@ -58,6 +58,7 @@ export {
   ZitadelConfigError,
   ZitadelConfigFileExistsError,
   ZitadelConfigFileUnreadableError,
+  ZitadelConfigFlowBrokenError,
   ZitadelConfigFlowMethodInUseError,
   ZitadelConfigFlowUncheckedError,
   ZitadelConfigInternalError,

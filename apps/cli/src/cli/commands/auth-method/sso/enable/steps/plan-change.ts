@@ -1,7 +1,7 @@
 import { providerOf, selectionName } from "@zitadel/config/idp";
 
 import { FLOW_UNCHECKED_REFUSAL } from "@/cli/commands/auth-method/command";
-import { refusalError } from "@/cli/core/refusal";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
   callbackUriFor,
@@ -12,7 +12,19 @@ import {
 import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
-import { Connection, ZitadelConfigFlowUncheckedError } from "@/lib/zitadel";
+import {
+  Connection,
+  ZitadelConfigFlowBrokenError,
+  ZitadelConfigFlowUncheckedError,
+} from "@/lib/zitadel";
+
+/**
+ * What a change is refused for when it would make a login flow stop validating.
+ */
+const FLOW_BROKEN_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the steps named above, then run the command again.",
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -157,6 +169,12 @@ export class PlanChange extends WizardStep<
         },
       };
     } catch (error) {
+      if (error instanceof ZitadelConfigFlowBrokenError) {
+        throw refusalError(FLOW_BROKEN_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (error instanceof ZitadelConfigFlowUncheckedError) {
         throw refusalError(FLOW_UNCHECKED_REFUSAL, {
           ...error,

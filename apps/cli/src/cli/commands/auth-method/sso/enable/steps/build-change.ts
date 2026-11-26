@@ -1,7 +1,17 @@
 import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { ZitadelConfigFlowBrokenError } from "@/lib/zitadel";
 import { log } from "@/lib/ui";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
+
+/**
+ * What a change is refused for when it would make a login flow stop validating.
+ */
+const FLOW_BROKEN_REFUSAL = {
+  message: "{message}",
+  hint: "Fix the steps named above, then run the command again.",
+} as const satisfies Refusal;
 
 /**
  * What the step reads from the steps before it.
@@ -38,20 +48,30 @@ export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
    * @throws {@link ZitadelError} When saving the change would be refused.
    */
   async run(needs: Needs): Promise<Fact<"change">> {
-    const change =
-      needs.given.endpoints === undefined
-        ? needs.preview
-        : needs.target.config.connections.enable(
-            needs.target.schema,
-            needs.candidate.withEndpoints(needs.given.endpoints).document,
-            needs.options,
-          );
-    if (needs.summary.reused) {
-      log.debug(`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`);
+    try {
+      const change =
+        needs.given.endpoints === undefined
+          ? needs.preview
+          : needs.target.config.connections.enable(
+              needs.target.schema,
+              needs.candidate.withEndpoints(needs.given.endpoints).document,
+              needs.options,
+            );
+      if (needs.summary.reused) {
+        log.debug(`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`);
+      }
+      await change.check(needs.target.store);
+      return {
+        change,
+      };
+    } catch (error) {
+      if (error instanceof ZitadelConfigFlowBrokenError) {
+        throw refusalError(FLOW_BROKEN_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
     }
-    await change.check(needs.target.store);
-    return {
-      change,
-    };
   }
 }
