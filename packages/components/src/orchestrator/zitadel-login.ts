@@ -619,6 +619,8 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * The texts for the resolved language, with the `locales` map merged over
    * the built-in copy; bundled English until {@link rendering} has loaded.
+   *
+   * @returns The translations the element renders with.
    */
   private resolveTranslations(): Translations {
     return (
@@ -629,6 +631,8 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * The texts for the resolved language, by key.
+   *
+   * @returns The texts of {@link resolveTranslations}.
    */
   private resolveLocale(): Locale {
     return this.resolveTranslations().texts;

@@ -5866,7 +5866,7 @@
           "name": "startFlow",
           "return": {
             "type": {
-              "text": "Promise<CreateFlow201>"
+              "text": ""
             }
           },
           "parameters": [
@@ -5874,22 +5874,25 @@
               "name": "project",
               "type": {
                 "text": "ZitadelProject"
-              }
+              },
+              "description": "The project the flow belongs to."
             },
             {
               "name": "input",
               "type": {
                 "text": "CreateFlowBody"
-              }
+              },
+              "description": "The flow's purpose, project and optional starting values."
             }
-          ]
+          ],
+          "description": "Starts a flow (`POST /flows`) for the project and returns its first step."
         },
         {
           "kind": "function",
           "name": "submitStep",
           "return": {
             "type": {
-              "text": "Promise<CreateFlow201>"
+              "text": ""
             }
           },
           "parameters": [
@@ -5897,28 +5900,32 @@
               "name": "project",
               "type": {
                 "text": "ZitadelProject"
-              }
+              },
+              "description": "The project the flow belongs to."
             },
             {
               "name": "id",
               "type": {
                 "text": "string"
-              }
+              },
+              "description": "The flow's id."
             },
             {
               "name": "body",
               "type": {
                 "text": "SubmitFlowStepBody"
-              }
+              },
+              "description": "The submitted action and field values."
             }
-          ]
+          ],
+          "description": "Submits the current step of a flow (`POST /flows/{id}/submit`).\n\nField validation errors come back as 400 with the step echoed and\n`step.error` set; that shape is returned like a 200 so the step re-renders\nwith its error. Every other failure rejects."
         },
         {
           "kind": "function",
           "name": "getCurrentStep",
           "return": {
             "type": {
-              "text": "Promise<CreateFlow201>"
+              "text": ""
             }
           },
           "parameters": [
@@ -5926,22 +5933,25 @@
               "name": "project",
               "type": {
                 "text": "ZitadelProject"
-              }
+              },
+              "description": "The project the flow belongs to."
             },
             {
               "name": "id",
               "type": {
                 "text": "string"
-              }
+              },
+              "description": "The flow's id."
             }
-          ]
+          ],
+          "description": "Reads a flow's current step (`GET /flows/{id}`), as when a page reloads\nmid-flow."
         },
         {
           "kind": "function",
           "name": "exchangeSession",
           "return": {
             "type": {
-              "text": "Promise<ExchangeHandoff200>"
+              "text": ""
             }
           },
           "parameters": [
@@ -5949,19 +5959,22 @@
               "name": "project",
               "type": {
                 "text": "ZitadelProject"
-              }
+              },
+              "description": "The project the session is for."
             },
             {
               "name": "body",
               "type": {
                 "text": "ExchangeHandoffBody"
-              }
+              },
+              "description": "The handoff token."
             },
             {
               "name": "params",
               "type": {
                 "text": "ExchangeHandoffParams"
-              }
+              },
+              "description": "The project id query parameter."
             }
           ],
           "description": "Exchange a terminal-flow `handoff_token` for an authenticated session.\nThe server sets the HttpOnly session cookie on success.\n\nUses the generated `exchangeHandoff` client which handles the\n`project_id` query parameter via ExchangeHandoffParams."
@@ -5971,7 +5984,7 @@
           "name": "getSession",
           "return": {
             "type": {
-              "text": "Promise<SessionIdentity | null>"
+              "text": ""
             }
           },
           "parameters": [
@@ -5979,13 +5992,15 @@
               "name": "project",
               "type": {
                 "text": "ZitadelProject"
-              }
+              },
+              "description": "The project the element is configured with."
             },
             {
               "name": "projectId",
               "type": {
                 "text": "string"
-              }
+              },
+              "description": "The project id to read the session for; empty reads any."
             }
           ],
           "description": "Reads the current session (`GET /sessions/me`) with credentials so the\nsession cookie authenticates the request. Used by the\norchestrator's signed-in surfaces to render the user's identity.\n\nThe read names the element's project. A session of another project on the\nsame server, which the server refuses (`403 sess.project_mismatch`) or a\nserver that predates the parameter answers for, resolves to `null`: it is\nlive, but not this app's. Any other failure rejects."
@@ -5995,7 +6010,7 @@
           "name": "revokeSession",
           "return": {
             "type": {
-              "text": "Promise<void>"
+              "text": ""
             }
           },
           "parameters": [
@@ -6003,13 +6018,15 @@
               "name": "project",
               "type": {
                 "text": "ZitadelProject"
-              }
+              },
+              "description": "The project the element is configured with."
             },
             {
               "name": "projectId",
               "type": {
                 "text": "string"
-              }
+              },
+              "description": "The project id to revoke the session for; empty for any."
             }
           ],
           "description": "Revokes the current session (`DELETE /sessions/me`) with credentials. The\nserver deletes the session and clears the cookie via `Set-Cookie: Max-Age=0`.\nSign-out is a write, so it carries the session's CSRF token (ADR 053 §5),\nread first from `GET /sessions/me/csrf` and sent on this one request only:\nthe element shares the page with the host app's own API client.\n\nBoth calls name the element's project. Two refusals leave nothing of this\napp's to revoke, so the call resolves: a session that is already gone, signed\nout in another tab or expired (`401 auth.unauthorized`), and a session of\nanother project on the same server (`403 sess.project_mismatch`), which stays\nlive and keeps its cookie. Any other failure rejects."
@@ -7186,7 +7203,7 @@
           "name": "mergeLocale",
           "return": {
             "type": {
-              "text": "Locale"
+              "text": ""
             }
           },
           "parameters": [
@@ -7194,13 +7211,15 @@
               "name": "builtin",
               "type": {
                 "text": "Locale"
-              }
+              },
+              "description": "The built-in dictionary."
             },
             {
               "name": "custom",
               "type": {
                 "text": "Partial<Locale>"
-              }
+              },
+              "description": "The integrator's entries for the same language."
             }
           ],
           "description": "A built-in dictionary with an integrator's `locales` entries on top.\n\nEntries are partial: they merge key by key, and an explicit `undefined` is\nskipped rather than shadowing the built-in copy.\n\nA step can ask for a variant of a key (a step that offers sign-in providers\nasks for `<step>.description.sso`), and falls back to the plain key only\nwhen the variant is missing. So when the integrator wrote their own text\nfor a key but not a variant of their own (absent, or the built-in one copied\nin by spreading a built-in dictionary), the built-in variant is dropped:\ntheirs is what shows, rather than built-in copy, possibly in another\nlanguage, that they never saw."
@@ -7227,6 +7246,7 @@
               },
               "privacy": "private",
               "readonly": true,
+              "description": "The primary language subtag the texts are for.",
               "default": "language"
             },
             {
@@ -7237,6 +7257,7 @@
               },
               "privacy": "private",
               "readonly": true,
+              "description": "The app's dictionaries, read again by isHidden.",
               "default": "locales"
             },
             {
@@ -7674,7 +7695,8 @@
               },
               "privacy": "private",
               "readonly": true,
-              "default": "{ USE_PROFILES: { html: true }, ADD_TAGS: [...ELEMENTS], ADD_ATTR: [...ATTRIBUTES], FORBID_TAGS: [...REMOVED_TAGS], KEEP_CONTENT: false, ALLOW_DATA_ATTR: true, ALLOW_ARIA_ATTR: true, RETURN_TRUSTED_TYPE: false, SANITIZE_DOM: false, }"
+              "default": "{ USE_PROFILES: { html: true }, ADD_TAGS: [...ELEMENTS], ADD_ATTR: [...ATTRIBUTES], FORBID_TAGS: [...REMOVED_TAGS], KEEP_CONTENT: false, ALLOW_DATA_ATTR: true, ALLOW_ARIA_ATTR: true, RETURN_TRUSTED_TYPE: false, SANITIZE_DOM: false, }",
+              "description": "DOMPurify's configuration: its HTML profile plus the allowlist."
             },
             {
               "kind": "field",
@@ -7684,6 +7706,7 @@
               },
               "privacy": "private",
               "readonly": true,
+              "description": "DOMPurify's factory, which binds an instance to a window.",
               "default": "purify"
             },
             {
@@ -7693,7 +7716,8 @@
                 "text": "{ node: typeof Node; purify: DOMPurify } | null"
               },
               "privacy": "private",
-              "default": "null"
+              "default": "null",
+              "description": "The instance for the current window's DOM classes, rebuilt when they change."
             },
             {
               "kind": "method",
@@ -7722,7 +7746,8 @@
                   },
                   "description": "The untrusted markup."
                 }
-              ]
+              ],
+              "description": "Sanitises markup with DOMPurify and the allowlist."
             }
           ]
         }
@@ -7769,7 +7794,8 @@
                 "text": "Sanitizer"
               },
               "privacy": "private",
-              "readonly": true
+              "readonly": true,
+              "description": "The browser's sanitizer, configured once with the allowlist."
             },
             {
               "kind": "method",
@@ -7838,7 +7864,8 @@
                   },
                   "description": "The untrusted markup."
                 }
-              ]
+              ],
+              "description": "Sanitises markup with `setHTML()` and drops unsafe link URLs."
             }
           ]
         }
@@ -9044,7 +9071,7 @@
               "privacy": "private",
               "return": {
                 "type": {
-                  "text": "Translations"
+                  "text": ""
                 }
               },
               "description": "The texts for the resolved language, with the `locales` map merged over\nthe built-in copy; bundled English until rendering has loaded."
@@ -9055,7 +9082,7 @@
               "privacy": "private",
               "return": {
                 "type": {
-                  "text": "Locale"
+                  "text": ""
                 }
               },
               "description": "The texts for the resolved language, by key."

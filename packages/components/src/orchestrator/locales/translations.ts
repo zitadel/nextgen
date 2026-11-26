@@ -37,6 +37,10 @@ const VARIANT_SUFFIXES = [".sso", CUSTOM_IDENTIFIER_SUFFIX];
  * in by spreading a built-in dictionary), the built-in variant is dropped:
  * theirs is what shows, rather than built-in copy, possibly in another
  * language, that they never saw.
+ *
+ * @param builtin - The built-in dictionary.
+ * @param custom - The integrator's entries for the same language.
+ * @returns The merged dictionary.
  */
 export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
   const merged: Locale = { ...builtin };
@@ -81,11 +85,19 @@ export class Translations {
    */
   readonly texts: Locale;
 
+  /**
+   * The primary language subtag the texts are for.
+   */
   private readonly language: string;
 
+  /**
+   * The app's dictionaries, read again by {@link isHidden}.
+   */
   private readonly locales: AppLocales | undefined;
 
   /**
+   * Merges the layers once; use {@link load} or {@link english}.
+   *
    * @param language - The primary language subtag.
    * @param locales - The app's dictionaries.
    * @param builtin - The built-in translation for the language, if any.

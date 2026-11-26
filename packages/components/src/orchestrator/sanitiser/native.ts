@@ -32,6 +32,9 @@ const UNSAFE_SCHEMES: ReadonlySet<string> = new Set(["javascript:", "vbscript:",
  * DOMPurify does (which still allows a `data:` image).
  */
 export class NativeSanitiser implements Sanitiser {
+  /**
+   * The browser's sanitizer, configured once with the allowlist.
+   */
   private readonly sanitizer: Sanitizer = NativeSanitiser.configure();
 
   /**
@@ -96,6 +99,8 @@ export class NativeSanitiser implements Sanitiser {
   }
 
   /**
+   * Sanitises markup with `setHTML()` and drops unsafe link URLs.
+   *
    * @param html - The untrusted markup.
    * @returns The sanitised markup.
    */

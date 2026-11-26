@@ -20,6 +20,9 @@ import type { Sanitiser } from "./sanitiser.js";
  * with.
  */
 export class DomPurifySanitiser implements Sanitiser {
+  /**
+   * DOMPurify's configuration: its HTML profile plus the allowlist.
+   */
   private readonly config: Config = {
     USE_PROFILES: { html: true },
     ADD_TAGS: [...ELEMENTS],
@@ -32,11 +35,19 @@ export class DomPurifySanitiser implements Sanitiser {
     SANITIZE_DOM: false,
   };
 
+  /**
+   * DOMPurify's factory, which binds an instance to a window.
+   */
   private readonly purify: DOMPurify;
 
+  /**
+   * The instance for the current window's DOM classes, rebuilt when they change.
+   */
   private instance: { node: typeof Node; purify: DOMPurify } | null = null;
 
   /**
+   * Keeps the factory; use {@link load}.
+   *
    * @param purify - DOMPurify's factory.
    */
   private constructor(purify: DOMPurify) {
@@ -54,6 +65,8 @@ export class DomPurifySanitiser implements Sanitiser {
   }
 
   /**
+   * Sanitises markup with DOMPurify and the allowlist.
+   *
    * @param html - The untrusted markup.
    * @returns The sanitised markup.
    */

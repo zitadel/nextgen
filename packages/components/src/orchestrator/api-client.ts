@@ -51,6 +51,7 @@ const apiRequestInit: RequestInit = { credentials: "include" };
  * before each call, as another project on the page may have changed them.
  *
  * @param project - The project the call is for.
+ * @returns Nothing; it sets the generated client's module configuration.
  */
 function useProject(project: ZitadelProject): void {
   setProxyPath(project.proxyPath);
@@ -65,6 +66,14 @@ function useProject(project: ZitadelProject): void {
  */
 export type SessionIdentity = GetMySession200;
 
+/**
+ * Starts a flow (`POST /flows`) for the project and returns its first step.
+ *
+ * @param project - The project the flow belongs to.
+ * @param input - The flow's purpose, project and optional starting values.
+ * @returns The created flow with its first step.
+ * @throws {ApiError} When the server refuses the request.
+ */
 export async function startFlow(
   project: ZitadelProject,
   input: CreateFlowBody,
@@ -73,9 +82,19 @@ export async function startFlow(
   return createFlow(input, apiRequestInit);
 }
 
-// Field validation errors come back as 400 with the step echoed and
-// `step.error` set. Unwrap that shape so it flows through like a 200;
-// everything else bubbles.
+/**
+ * Submits the current step of a flow (`POST /flows/{id}/submit`).
+ *
+ * Field validation errors come back as 400 with the step echoed and
+ * `step.error` set; that shape is returned like a 200 so the step re-renders
+ * with its error. Every other failure rejects.
+ *
+ * @param project - The project the flow belongs to.
+ * @param id - The flow's id.
+ * @param body - The submitted action and field values.
+ * @returns The flow with its next step, or the same step with its error.
+ * @throws {ApiError} When the server refuses the submit for another reason.
+ */
 export async function submitStep(
   project: ZitadelProject,
   id: string,
@@ -92,10 +111,25 @@ export async function submitStep(
   }
 }
 
+/**
+ * Whether an error body is a flow response (a step echoed with its error).
+ *
+ * @param body - The error's body.
+ * @returns `true` when the body carries a `step`.
+ */
 function isFlowResponse(body: unknown): body is CreateFlow201 {
   return typeof body === "object" && body !== null && "step" in body;
 }
 
+/**
+ * Reads a flow's current step (`GET /flows/{id}`), as when a page reloads
+ * mid-flow.
+ *
+ * @param project - The project the flow belongs to.
+ * @param id - The flow's id.
+ * @returns The flow with its current step.
+ * @throws {ApiError} When the flow is gone or the server refuses the request.
+ */
 export async function getCurrentStep(project: ZitadelProject, id: string): Promise<CreateFlow201> {
   useProject(project);
   return getFlowStep(id, apiRequestInit);
@@ -107,6 +141,12 @@ export async function getCurrentStep(project: ZitadelProject, id: string): Promi
  *
  * Uses the generated `exchangeHandoff` client which handles the
  * `project_id` query parameter via {@link ExchangeHandoffParams}.
+ *
+ * @param project - The project the session is for.
+ * @param body - The handoff token.
+ * @param params - The project id query parameter.
+ * @returns The exchanged session.
+ * @throws {ApiError} When the server refuses the token.
  */
 export async function exchangeSession(
   project: ZitadelProject,
@@ -126,6 +166,11 @@ export async function exchangeSession(
  * same server, which the server refuses (`403 sess.project_mismatch`) or a
  * server that predates the parameter answers for, resolves to `null`: it is
  * live, but not this app's. Any other failure rejects.
+ *
+ * @param project - The project the element is configured with.
+ * @param projectId - The project id to read the session for; empty reads any.
+ * @returns The session, or `null` when it belongs to another project.
+ * @throws {ApiError} When the read fails for another reason.
  */
 export async function getSession(
   project: ZitadelProject,
@@ -158,6 +203,11 @@ export async function getSession(
  * out in another tab or expired (`401 auth.unauthorized`), and a session of
  * another project on the same server (`403 sess.project_mismatch`), which stays
  * live and keeps its cookie. Any other failure rejects.
+ *
+ * @param project - The project the element is configured with.
+ * @param projectId - The project id to revoke the session for; empty for any.
+ * @returns Once the session is revoked or already not this app's.
+ * @throws {ApiError} When revoking fails for another reason.
  */
 export async function revokeSession(project: ZitadelProject, projectId: string): Promise<void> {
   const params = projectId ? { project_id: projectId } : undefined;
