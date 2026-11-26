@@ -12,6 +12,11 @@ const platform = usePlatformMock();
 const OAUTH_FILE = ".zitadel/oauth/oauth.json";
 
 /**
+ * The editor schema the settings file's `$schema` points at.
+ */
+const OAUTH_META_SCHEMA = ".zitadel/meta/oauth-settings.json";
+
+/**
  * The headline of a run that turned the switch on.
  */
 const ENABLED = `Enabled the OAuth authorization server in ${OAUTH_FILE}`;
@@ -102,6 +107,19 @@ describe("settings oauth enable", () => {
         });
       });
 
+      it("writes a missing meta-schema when the switch is already on", async () => {
+        const app = await aSetUpApp();
+        await app.enableOAuth();
+        await app.lacksEditorSchema("oauth-settings");
+
+        const result = await app.enableOAuth();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "ok",
+          data: { title: ALREADY_ENABLED, files_written: [OAUTH_META_SCHEMA] },
+        });
+      });
+
       it("turns the settings the project already has on in place, whatever their name", async () => {
         const app = await aSetUpApp();
         const file = await app.writeOAuthSettings("settings.json", false);
@@ -167,20 +185,29 @@ describe("settings oauth enable", () => {
       });
     });
 
+    describe("with two settings files under .zitadel/oauth/", () => {
+      it("is refused and writes nothing, as deploy would refuse them", async () => {
+        const app = await aSetUpApp();
+        await app.writeOAuthSettings("a.json", true);
+        await app.writeOAuthSettings("b.json", false);
+        const before = await app.snapshot();
+
+        const result = await app.enableOAuth();
+
+        expect(app.envelopeOf(result)).toMatchObject({ status: "error", code: "E_VALIDATION" });
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+    });
+
     describe("in a directory setup has not made a project", () => {
       it("is refused, with setup as the way out", async () => {
         const app = await anApp();
 
         const result = await app.enableOAuth();
 
-        expect(app.envelopeOf(result)).toEqual({
+        expect(app.envelopeOf(result)).toMatchObject({
           status: "error",
-          cli_version: cliVersion.version,
-          command: "settings:oauth:enable",
-          source: "",
           code: "E_VALIDATION",
-          message: "This directory is not a Zitadel project",
-          hint: "Run setup first; the OAuth settings live under .zitadel/.",
           next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
         });
       });

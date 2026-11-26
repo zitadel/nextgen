@@ -1123,10 +1123,12 @@ outdated one the same way, and never replace one when the project pins a newer
 The project's OAuth authorization server is a switch in the release:
 `settings oauth enable` writes `{"enabled": true}` into `.zitadel/oauth/oauth.json`
 (the one file under `.zitadel/oauth/`, like branding's descriptor; a second file
-there fails the deploy) and uploads nothing, reporting the files in
+there is refused with `E_VALIDATION`, as `deploy` refuses it) and uploads nothing, reporting the files in
 `data.files_written` (the meta-schema beside them when it was missing) and
-`deploy --dry-run` then `deploy` in `data.next_commands`; a second run is
-`skipped` with `reason: already-enabled`, and its dry run is `ok`. The next `deploy` pins the settings as
+`deploy --dry-run` then `deploy` in `data.next_commands`. A run that finds the
+switch on still writes a missing or outdated meta-schema and answers `ok` with
+it in `data.files_written`; one with nothing to write is `skipped` with
+`reason: already-enabled`, and its dry run is `ok`. The next `deploy` pins the settings as
 the release's `oauth` resource, and a release without the file leaves the
 authorization server off. There is no `disable` command yet: remove the file,
 or set `enabled` to `false`, and deploy.
