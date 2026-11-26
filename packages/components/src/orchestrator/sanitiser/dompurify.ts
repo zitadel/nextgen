@@ -1,33 +1,44 @@
 import type { Config, DOMPurify } from "dompurify";
 
-import { ATTRIBUTES, ELEMENTS } from "./allowlist.js";
+import { ATTRIBUTES, ELEMENTS, REMOVED_TAGS, UNWRAPPED_TAGS } from "./allowlist.js";
 import type { Sanitiser } from "./sanitiser.js";
 
 /**
  * Sanitises with DOMPurify, for browsers without the HTML Sanitizer API.
  *
- * Its configuration matches {@link NativeSanitiser}: only the listed elements
- * and attributes plus `data-*`, and a removed element's content removed with
- * it. DOM clobbering protection is off because the output renders inside the
- * `<zitadel-login>` shadow root, which named access on `document` and `window`
- * cannot reach, and the guard would drop field names such as `name` (#2532).
+ * Its HTML profile allows safe HTML such as `<b>` and `<table>`; the allowlist
+ * adds the atoms and their attributes, and a dropped element keeps its text,
+ * as {@link NativeSanitiser} does. DOM clobbering protection is off because
+ * the output renders inside the `<zitadel-login>` shadow root, which named
+ * access on `document` and `window` cannot reach, and the guard would drop
+ * field names such as `name` (#2532).
  *
- * Each call makes an instance for the current `window`: DOMPurify keeps the
- * DOM classes it finds when an instance is made, and a server render (such as
- * Angular's) swaps those globals while it runs.
+ * DOMPurify keeps the DOM classes it finds when an instance is made, and a
+ * server render (such as Angular's) swaps those globals while it runs, so the
+ * instance is rebuilt whenever `window.Node` is no longer the one it was made
+ * with.
  */
 export class DomPurifySanitiser implements Sanitiser {
   private readonly config: Config = {
-    ALLOWED_TAGS: [...ELEMENTS, "#text"],
-    ALLOWED_ATTR: [...ATTRIBUTES],
+    USE_PROFILES: { html: true },
+    ADD_TAGS: [...ELEMENTS],
+    ADD_ATTR: [...ATTRIBUTES],
+    FORBID_TAGS: [...REMOVED_TAGS, ...UNWRAPPED_TAGS],
+    CUSTOM_ELEMENT_HANDLING: {
+      tagNameCheck: /^zl-[a-z0-9-]+$/,
+      attributeNameCheck: /^(?!on)[a-z][a-z0-9-]*$/,
+      allowCustomizedBuiltInElements: false,
+    },
+    KEEP_CONTENT: true,
     ALLOW_DATA_ATTR: true,
-    ALLOW_ARIA_ATTR: false,
-    KEEP_CONTENT: false,
+    ALLOW_ARIA_ATTR: true,
     RETURN_TRUSTED_TYPE: false,
     SANITIZE_DOM: false,
   };
 
   private readonly purify: DOMPurify;
+
+  private instance: { node: typeof Node; purify: DOMPurify } | null = null;
 
   /**
    * @param purify - DOMPurify's factory.
@@ -51,6 +62,9 @@ export class DomPurifySanitiser implements Sanitiser {
    * @returns The sanitised markup.
    */
   sanitise(html: string): string {
-    return String(this.purify(window).sanitize(html, this.config));
+    if (this.instance?.node !== window.Node) {
+      this.instance = { node: window.Node, purify: this.purify(window) };
+    }
+    return String(this.instance.purify.sanitize(html, this.config));
   }
 }

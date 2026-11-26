@@ -1,14 +1,16 @@
 /**
- * What a template may contain once sanitised. Both sanitisers enforce exactly
- * this allowlist: the structural tags and every `<zl-*>` atom, with the
- * common, per-atom and ARIA attributes, plus `data-*` as a whole.
+ * What a template may contain once sanitised, on top of the sanitiser's own
+ * safe HTML: every `<zl-*>` atom, the attributes templates use, and the tags
+ * that are dropped. Both sanitisers start from their library's standard set
+ * (the browser's default Sanitizer configuration, DOMPurify's HTML profile)
+ * and apply these lists, so plain HTML such as `<b>` or `<table>` keeps working.
  */
 import { manifestRegistry } from "../../manifests.js";
 
 /**
  * Standard HTML tags that templates may use as structural chrome around
- * `<zl-*>` atoms. Anything outside this list and the manifest registry is
- * stripped at sanitise-time.
+ * `<zl-*>` atoms. The sanitisers allow most of them already; listing them
+ * keeps them allowed whatever a library default leaves out (such as `<img>`).
  */
 const STRUCTURAL_TAGS: readonly string[] = [
   "div",
@@ -69,6 +71,9 @@ const COMMON_ATTRS: readonly string[] = [
   "name",
   "for",
   "hidden",
+  "width",
+  "height",
+  "loading",
 ];
 
 /**
@@ -144,3 +149,14 @@ export const ATTRIBUTES: readonly string[] = [
     ...ARIA_ATTRS,
   ]),
 ].filter((attribute) => !attribute.startsWith("data-"));
+
+/**
+ * Tags dropped together with their content.
+ */
+export const REMOVED_TAGS: readonly string[] = ["script", "style", "iframe"];
+
+/**
+ * Tags dropped while their content stays: templates use `<zl-*>` atoms for
+ * controls, and a stray `<button>Go</button>` keeps its text.
+ */
+export const UNWRAPPED_TAGS: readonly string[] = ["object", "embed", "form", "input", "button"];

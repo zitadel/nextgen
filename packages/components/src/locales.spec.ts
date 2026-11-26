@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { de } from "./de.js";
-import { en } from "./en.js";
-import { it as italian } from "./it.js";
-import { builtinLocales } from "../../locales.js";
+import { de } from "./orchestrator/locales/de.js";
+import { en } from "./orchestrator/locales/en.js";
+import { it as italian } from "./orchestrator/locales/it.js";
+import { builtinLocales } from "./locales.js";
 
 describe("built-in locale dictionaries", () => {
   it("keeps translated locale keys aligned with English", () => {

@@ -28,7 +28,11 @@ export const TEMPLATE_NAMES = {
 } as const;
 
 export type CreateLiquidOptions = {
-  locale: Locale;
+  /**
+   * The dictionary the text filters read, or a promise of it: the engine then
+   * loads LiquidJS while the dictionary is still loading.
+   */
+  locale: Locale | Promise<Locale>;
   /**
    * Additional in-memory templates merged on top of the bundled defaults.
    * Useful for tests and for tenant-supplied `branding.liquid_template`
@@ -65,9 +69,10 @@ const fieldErrorKeys: Record<string, string> = {
  * @returns The configured engine.
  */
 export async function createLiquidEngine(options: CreateLiquidOptions): Promise<Liquid> {
-  const [{ Liquid }, { MANDATORY_GATES_TAG }] = await Promise.all([
+  const [{ Liquid }, { MANDATORY_GATES_TAG }, locale] = await Promise.all([
     import("liquidjs"),
     import("@zitadel/config/template"),
+    options.locale,
   ]);
 
   const templates: Record<string, string> = {
@@ -109,13 +114,13 @@ export async function createLiquidEngine(options: CreateLiquidOptions): Promise<
       // nor the plain description exists, the plain key is the one to add.
       const lookupKey =
         requested.endsWith(SSO_DESCRIPTION_SUFFIX) &&
-        options.locale[requested] === undefined &&
-        options.locale[requested.slice(0, -".sso".length)] === undefined
+        locale[requested] === undefined &&
+        locale[requested.slice(0, -".sso".length)] === undefined
           ? requested.slice(0, -".sso".length)
           : requested;
       let template =
-        options.locale[lookupKey] ??
-        injectedKeyFallback(options.locale, lookupKey) ??
+        locale[lookupKey] ??
+        injectedKeyFallback(locale, lookupKey) ??
         fieldLabelFallback(lookupKey);
       if (template === undefined) {
         template = lookupKey;
@@ -131,13 +136,13 @@ export async function createLiquidEngine(options: CreateLiquidOptions): Promise<
   /** Resolves `{text_key}.placeholder` — empty when undefined (not the raw key). */
   engine.registerFilter("fieldPlaceholder", (textKey: unknown) => {
     const lookupKey = `${stringify(textKey)}.placeholder`;
-    return options.locale[lookupKey] ?? "";
+    return locale[lookupKey] ?? "";
   });
 
   /** Resolves `{text_key}.help` — empty when undefined. */
   engine.registerFilter("fieldHelp", (textKey: unknown) => {
     const lookupKey = `${stringify(textKey)}.help`;
-    return options.locale[lookupKey] ?? "";
+    return locale[lookupKey] ?? "";
   });
 
   /**
@@ -157,7 +162,7 @@ export async function createLiquidEngine(options: CreateLiquidOptions): Promise<
     const { type, validation } = (field ?? {}) as Partial<CreateFlow201StepFieldsItem>;
     const minLength = validation?.min_length;
     if (type !== "password" || minLength === undefined || minLength <= 0) return "";
-    const template = options.locale["hint.field_min_length"];
+    const template = locale["hint.field_min_length"];
     return template === undefined ? "" : interpolate(template, [String(minLength)]);
   });
 
@@ -178,13 +183,13 @@ export async function createLiquidEngine(options: CreateLiquidOptions): Promise<
   /** Resolves `{text_key}.title` for form-level `<zl-alert heading>`. */
   engine.registerFilter("alertHeading", (textKey: unknown) => {
     const lookupKey = `${stringify(textKey)}.title`;
-    return options.locale[lookupKey] ?? "";
+    return locale[lookupKey] ?? "";
   });
 
   /** Resolves `{text_key}.body` for form-level `<zl-alert>` message slot. */
   engine.registerFilter("alertBody", (textKey: unknown) => {
     const lookupKey = `${stringify(textKey)}.body`;
-    return options.locale[lookupKey] ?? "";
+    return locale[lookupKey] ?? "";
   });
 
   /** Localized inline error for `fieldName`, or empty when none applies. */
@@ -196,7 +201,7 @@ export async function createLiquidEngine(options: CreateLiquidOptions): Promise<
       if (err.field !== name) continue;
       // A catalog key localises through the active dictionary; a pre-localised
       // generic field error (no catalog entry) carries its `message` verbatim.
-      return err.text_key ? (options.locale[err.text_key] ?? err.text_key) : (err.message ?? "");
+      return err.text_key ? (locale[err.text_key] ?? err.text_key) : (err.message ?? "");
     }
     return "";
   });

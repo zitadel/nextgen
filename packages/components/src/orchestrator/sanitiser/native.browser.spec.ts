@@ -1,53 +1,89 @@
 import { describe, expect, it } from "vitest";
 
+import { DomPurifySanitiser } from "./dompurify.js";
 import { NativeSanitiser } from "./native.js";
 
-const sanitiser = new NativeSanitiser();
+const native = new NativeSanitiser();
+const purify = await DomPurifySanitiser.load();
+
+/**
+ * Template markup and what both sanitisers make of it: the native one exactly,
+ * DOMPurify (which Safari loads, configured as before the native path existed)
+ * with the same text and elements.
+ */
+const cases: ReadonlyArray<[string, string, string]> = [
+  [
+    "keeps atoms with their attributes and text",
+    `<zl-page-shell data-zl-template-root><h1 class="zl-card-title">Sign in</h1><zl-field name="email" label="Email" type="email" required></zl-field></zl-page-shell>`,
+    `<zl-page-shell data-zl-template-root=""><h1 class="zl-card-title">Sign in</h1><zl-field name="email" label="Email" type="email" required=""></zl-field></zl-page-shell>`,
+  ],
+  [
+    "keeps the test id on an atom",
+    `<zl-button action="submit" data-testid="zitadel-action-submit"></zl-button>`,
+    `<zl-button action="submit" data-testid="zitadel-action-submit"></zl-button>`,
+  ],
+  [
+    "keeps data-* and aria-* attributes",
+    `<div data-theme="dark" data-testid="login" aria-label="Login" aria-live="polite">x</div>`,
+    `<div data-theme="dark" data-testid="login" aria-label="Login" aria-live="polite">x</div>`,
+  ],
+  [
+    "keeps inline formatting and its text",
+    `<p><b>Note:</b> use your <i>work</i> email, <code>name@example.com</code></p>`,
+    `<p><b>Note:</b> use your <i>work</i> email, <code>name@example.com</code></p>`,
+  ],
+  [
+    "keeps a table",
+    `<table><tr><td colspan="2">Cell</td></tr></table>`,
+    `<table><tbody><tr><td colspan="2">Cell</td></tr></tbody></table>`,
+  ],
+  [
+    "keeps an image with its size",
+    `<img src="https://cdn.example.com/logo.svg" width="120" height="40" alt="" loading="lazy">`,
+    `<img src="https://cdn.example.com/logo.svg" width="120" height="40" alt="" loading="lazy">`,
+  ],
+  [
+    "keeps the text of a raw button or form, not the controls",
+    `<button>Continue</button><form><input name="i">Fields</form>`,
+    `ContinueFields`,
+  ],
+  [
+    "strips scripts, styles, frames and their content",
+    `<div>safe</div><script>alert(1)</script><style>:host{}</style><iframe src="https://evil.example.com">x</iframe>`,
+    `<div>safe</div>`,
+  ],
+  [
+    "strips event handlers and javascript: links",
+    `<img src="x" onerror="alert(1)"><a href="javascript:alert(1)" data-action="recover">Reset</a>`,
+    `<img src="x"><a data-action="recover">Reset</a>`,
+  ],
+  ...["name", "title", "id", "action", "method", "length", "location", "body", "domain"].map(
+    (value): [string, string, string] => [
+      `keeps a field named "${value}" that collides with a DOM property (#2532)`,
+      `<zl-field name="${value}" label="x"></zl-field>`,
+      `<zl-field name="${value}" label="x"></zl-field>`,
+    ],
+  ),
+];
 
 describe("NativeSanitiser", () => {
   it("is supported on a browser that has setHTML()", () => {
     expect(NativeSanitiser.isSupported()).toBe(true);
   });
 
-  it("keeps <zl-*> elements with their attributes and text", () => {
-    const out = sanitiser.sanitise(
-      `<zl-page-shell data-zl-template-root><h1 class="zl-card-title">Sign in</h1><zl-field name="email" label="Email" type="email" required></zl-field></zl-page-shell>`,
-    );
-
-    expect(out).toBe(
-      `<zl-page-shell data-zl-template-root=""><h1 class="zl-card-title">Sign in</h1><zl-field name="email" label="Email" type="email" required=""></zl-field></zl-page-shell>`,
-    );
+  it.each(cases)("%s", (_name, input, expected) => {
+    expect(native.sanitise(input)).toBe(expected);
   });
 
-  it("keeps the test id on an atom", () => {
-    const out = sanitiser.sanitise(
-      `<zl-button action="submit" data-testid="zitadel-action-submit"></zl-button>`,
+  it.each(cases)("%s as DOMPurify does", (_name, input) => {
+    const parse = (html: string) => {
+      const template = document.createElement("template");
+      template.innerHTML = html;
+      return template.content;
+    };
+
+    expect(parse(native.sanitise(input)).textContent).toBe(
+      parse(purify.sanitise(input)).textContent,
     );
-
-    expect(out).toBe(`<zl-button action="submit" data-testid="zitadel-action-submit"></zl-button>`);
-  });
-
-  it("keeps data-* and aria-* attributes", () => {
-    const out = sanitiser.sanitise(
-      `<div data-theme="dark" data-testid="login" aria-label="Login">x</div>`,
-    );
-
-    expect(out).toBe(`<div data-theme="dark" data-testid="login" aria-label="Login">x</div>`);
-  });
-
-  it("strips scripts, event handlers and javascript: links", () => {
-    const out = sanitiser.sanitise(
-      `<div>safe</div><script>alert(1)</script><img src="x" onerror="alert(1)"><a href="javascript:alert(1)" data-action="recover">Reset</a>`,
-    );
-
-    expect(out).toBe(`<div>safe</div><img src="x"><a data-action="recover">Reset</a>`);
-  });
-
-  it("strips elements outside the allowlist", () => {
-    const out = sanitiser.sanitise(
-      `<x-foo>evil</x-foo><iframe src="https://evil.example.com"></iframe><p>ok</p>`,
-    );
-
-    expect(out).toBe(`<p>ok</p>`);
   });
 });

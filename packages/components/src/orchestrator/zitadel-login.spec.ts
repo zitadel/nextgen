@@ -938,24 +938,71 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
-  it("renders no step while detached", async () => {
+  it("does not render while detached", async () => {
     const element = await mount(host);
     element.remove();
-    element.requestUpdate();
+    element.lang = "de";
     await element.updateComplete;
 
-    expect(element.shadowRoot!.querySelector("zl-field")).toBeNull();
+    expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
+      en["identifier.title"],
+    );
   });
 
-  it("renders the step again when attached again", async () => {
+  it("applies what changed while detached when attached again", async () => {
     const element = await mount(host);
     element.remove();
-    element.requestUpdate();
-    await element.updateComplete;
+    element.lang = "de";
     host.appendChild(element);
     await element.updateComplete;
 
-    expect(element.shadowRoot!.querySelector("zl-field")).not.toBeNull();
+    expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
+      de["identifier.title"],
+    );
+  });
+
+  it("shows the startup error when what it loads on demand fails", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    let reads = 0;
+    element.locales = new Proxy(
+      {},
+      {
+        get() {
+          reads += 1;
+          if (reads === 1) {
+            throw new Error("Translations unavailable");
+          }
+          return undefined;
+        },
+      },
+    );
+    const errors: string[] = [];
+    element.addEventListener("zitadel-flow-error", (event) => {
+      errors.push((event as CustomEvent<{ message: string }>).detail.message);
+    });
+    host.appendChild(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector("zl-alert")?.textContent).toBe(
+      "Translations unavailable",
+    );
+    expect(errors).toEqual(["Translations unavailable"]);
+  });
+
+  it("renders a tenant template in the new language after lang changes", async () => {
+    applyBranding({
+      liquid_template: '<p data-testid="tenant-title">{{ "identifier.title" | t }}</p>',
+    });
+    const element = attachLogin(host);
+    await waitFor(() => element.shadowRoot?.querySelector('[data-testid="tenant-title"]'));
+    element.lang = "de";
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector('[data-testid="tenant-title"]')?.textContent).toBe(
+      de["identifier.title"],
+    );
   });
 
   it("renders the bundled default template when the server sends no liquid_template", async () => {

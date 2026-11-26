@@ -180,6 +180,8 @@ describe("Translations.load", () => {
     ["it", italian],
     ["en-GB", en],
     ["fr", en],
+    ["__proto__", en],
+    ["constructor", en],
   ])("loads the built-in dictionary for %s", async (tag, expected) => {
     expect((await Translations.load(tag)).texts).toEqual(expected);
   });

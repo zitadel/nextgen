@@ -460,19 +460,22 @@ export class ZitadelLogin extends ZitadelSurface {
    * What a step renders with: the dictionary for the page's language, the
    * LiquidJS engine and the sanitiser. Each loads on demand in its own chunk
    * (the translation the page shows, the engine, and DOMPurify where the
-   * browser has no `setHTML()`). The loader shows until they are there, and a
-   * change of `lang` or `locales` loads them again.
+   * browser has no `setHTML()`), all three at once. The loader shows until they
+   * are there, a change of `lang` or `locales` loads them again, and a load that
+   * fails (a chunk gone after a deploy, say) shows the startup error.
    */
   private readonly rendering = new Task(this, {
     args: () => [this.resolveLanguage(), this.locales] as const,
     task: async ([language, locales]) => {
-      const [translations, sanitiser] = await Promise.all([
-        Translations.load(language, locales),
+      const translations = Translations.load(language, locales);
+      const [loaded, sanitiser, engine] = await Promise.all([
+        translations,
         createSanitiser(),
+        createLiquidEngine({ locale: translations.then(({ texts }) => texts) }),
       ]);
-      const engine = await createLiquidEngine({ locale: translations.texts });
-      return { translations, engine, sanitiser };
+      return { translations: loaded, engine, sanitiser };
     },
+    onError: (error) => this.handleTransportError(error),
   });
 
   /**
@@ -484,10 +487,12 @@ export class ZitadelLogin extends ZitadelSurface {
   private lastRenderedTheme: ResolvedTheme | null = null;
 
   /**
-   * Cached compiled tenant template, keyed by source string. Re-rendering on
+   * Cached compiled tenant template, keyed by source string and the engine that
+   * parsed it, whose filters hold its locale. Re-rendering on
    * every `formValues` change otherwise re-parses the same template.
    */
-  private tenantTemplateCache: { source: string; template: Template[] } | null = null;
+  private tenantTemplateCache: { source: string; engine: Liquid; template: Template[] } | null =
+    null;
 
   /**
    * Whether the widget currently owns a same-document history entry (the
@@ -556,8 +561,8 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Renders again on every attach: a detached element renders no step, as
-   * what it loads on demand can finish after it left the page.
+   * Renders again on every attach, as updates are skipped while detached
+   * ({@link shouldUpdate}).
    */
   override connectedCallback(): void {
     super.connectedCallback();
@@ -625,14 +630,27 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Resolves once the element has rendered with what {@link rendering} loads,
-   * so `await el.updateComplete` sees the step rather than the loader.
+   * so `await el.updateComplete` sees the step rather than the loader. A
+   * failed load resolves too: it renders as the startup error.
    *
    * @returns Whether the update completed without another pending.
    */
   protected override async getUpdateComplete(): Promise<boolean> {
     await super.getUpdateComplete();
-    await this.rendering.taskComplete;
+    await this.rendering.taskComplete.catch(() => undefined);
     return super.getUpdateComplete();
+  }
+
+  /**
+   * Skips updates while detached: what the element loads on demand can finish
+   * after it left the page, and rendering then would replace the step it shows.
+   * The next attach renders again ({@link connectedCallback}).
+   *
+   * @param changed - The properties that changed.
+   * @returns Whether to update.
+   */
+  protected override shouldUpdate(changed: PropertyValues<this>): boolean {
+    return this.isConnected && super.shouldUpdate(changed);
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -802,7 +820,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // success screen the host immediately navigates away from shows the user
     // two confirmations for one sign-in.
     const rendering = this.rendering.value;
-    if (!this.response || !rendering || this.completing || !this.isConnected) {
+    if (!this.response || !rendering || this.completing) {
       return html`<slot name="loader"></slot>`;
     }
     const rendered = this.injectAttribution(
@@ -1341,10 +1359,11 @@ export class ZitadelLogin extends ZitadelSurface {
     try {
       if (tenantSource) {
         const compiled =
-          this.tenantTemplateCache?.source === tenantSource
+          this.tenantTemplateCache?.source === tenantSource &&
+          this.tenantTemplateCache.engine === engine
             ? this.tenantTemplateCache.template
             : engine.parse(tenantSource);
-        this.tenantTemplateCache = { source: tenantSource, template: compiled };
+        this.tenantTemplateCache = { source: tenantSource, engine, template: compiled };
         raw = engine.renderSync(compiled, context);
       } else {
         raw = engine.renderFileSync(TEMPLATE_NAMES.default, context);

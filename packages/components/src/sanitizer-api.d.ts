@@ -11,5 +11,5 @@ interface Element {
    * @param html - The untrusted markup.
    * @param options - The sanitizer configuration.
    */
-  setHTML(html: string, options?: { sanitizer?: SanitizerConfig }): void;
+  setHTML(html: string, options?: { sanitizer?: Sanitizer | SanitizerConfig }): void;
 }

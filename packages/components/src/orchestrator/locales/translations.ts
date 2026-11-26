@@ -105,7 +105,8 @@ export class Translations {
    */
   static async load(tag: string, locales?: AppLocales): Promise<Translations> {
     const language = Translations.languageOf(tag);
-    return new Translations(language, locales, await BUILTIN[language]?.());
+    const builtin = Object.hasOwn(BUILTIN, language) ? await BUILTIN[language]?.() : undefined;
+    return new Translations(language, locales, builtin);
   }
 
   /**
