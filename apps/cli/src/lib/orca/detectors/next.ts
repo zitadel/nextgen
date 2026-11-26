@@ -1,6 +1,6 @@
 import { isErrno } from "@/lib/errno";
+import { FsNotFoundError, stat } from "@/lib/fs";
 import { PmManifestInvalidError } from "@/lib/pm";
-import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { OrcaFrameworkUnsupportedError } from "@/lib/orca/errors";
@@ -75,7 +75,7 @@ async function dirExists(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return false;
     }
     throw error;
