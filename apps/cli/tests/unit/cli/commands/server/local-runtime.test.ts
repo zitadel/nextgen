@@ -669,7 +669,7 @@ describe("local runtime commands", () => {
     const envelope = parseJson(result.stdout) as { code: string; message: string; status: string };
     expect(envelope.status).toBe("error");
     expect(envelope.code).toBe("E_NETWORK");
-    expect(envelope.message).toContain("exited before it became healthy");
+    expect(envelope.message).toContain("process exited before becoming healthy");
   });
 
   it("start --json starts the single-container runtime and writes metadata", async ({

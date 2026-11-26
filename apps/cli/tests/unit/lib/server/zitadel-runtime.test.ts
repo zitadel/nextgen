@@ -760,7 +760,8 @@ describe("LocalRuntime launch", () => {
 
     await expect(launching).rejects.toBeInstanceOf(LocalServerDockerMissingError);
     await expect(launching).rejects.toMatchObject({
-      message: "Docker is not reachable: no daemon",
+      message: "Docker is not reachable",
+      detail: "no daemon",
     });
   });
 
@@ -776,7 +777,8 @@ describe("LocalRuntime launch", () => {
     ).rejects;
     await rejection.toBeInstanceOf(LocalServerDockerMissingError);
     await rejection.toMatchObject({
-      message: "Docker is not reachable: daemon is down",
+      message: "Docker is not reachable",
+      detail: "daemon is down",
     });
   });
 
