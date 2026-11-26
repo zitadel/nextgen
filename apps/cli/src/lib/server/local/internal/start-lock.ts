@@ -62,7 +62,7 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
     const owner = await readOwner(lockFile);
     const abandoned =
       (owner === undefined && (await isUnwritten(lockFile))) ||
-      (owner !== undefined && !isAlive(owner));
+      (owner !== undefined && !BinaryLauncher.isPidRunning(owner));
     if (!abandoned || !(await clearStale(lockFile, owner))) {
       return undefined;
     }
@@ -159,7 +159,7 @@ async function takeGuard(guardFile: string): Promise<(() => Promise<void>) | und
     const holder = await readOwner(file);
     if (
       (holder === undefined && !(await isUnwritten(file))) ||
-      (holder !== undefined && isAlive(holder))
+      (holder !== undefined && BinaryLauncher.isPidRunning(holder))
     ) {
       return undefined;
     }
@@ -179,6 +179,7 @@ async function acquireLock(lockFile: string, options: LockOptions): Promise<() =
     if (clock.now() >= deadline) {
       throw new LocalServerBusyError(
         `Another \`zitadel start\` is still running in this directory; delete ${lockFile} if no start is running`,
+        lockFile,
       );
     }
     await clock.wait(pollMs);
@@ -201,8 +202,4 @@ async function readOwner(lockFile: string): Promise<number | undefined> {
   } catch {
     return undefined;
   }
-}
-
-function isAlive(pid: number): boolean {
-  return BinaryLauncher.isPidRunning(pid);
 }
