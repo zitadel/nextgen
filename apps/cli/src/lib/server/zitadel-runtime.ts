@@ -3,7 +3,6 @@ import { join, resolve } from "node:path";
 import { SERVER } from "@/constants";
 import type { Parsed } from "@zitadel/config/idp";
 
-import { isErrno } from "@/lib/errno";
 import { errorMessage } from "@/lib/errors";
 import { FsNotFoundError, readFile, realpath } from "@/lib/fs";
 import {
@@ -798,7 +797,7 @@ export class LocalRuntime extends ZitadelRuntime {
           return runtime.server_url;
         }
       } catch (error) {
-        if (!isErrno(error, "ENOENT")) {
+        if (!(error instanceof LocalServerDockerMissingError)) {
           throw error;
         }
       }

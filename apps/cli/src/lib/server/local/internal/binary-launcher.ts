@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -557,9 +556,10 @@ async function fileSize(path: string): Promise<number> {
 /** Up to `length` bytes of a file from `position` on; none for a file that is gone. */
 async function readBytes(path: string, position: number, length: number): Promise<Buffer> {
   try {
-    return await buffer(createReadStream(path, { start: position, end: position + length - 1 }));
+    const handle = await open(path, "r");
+    return await buffer(handle.createReadStream({ start: position, end: position + length - 1 }));
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return Buffer.alloc(0);
     }
     throw error;
@@ -572,7 +572,7 @@ async function readBytes(path: string, position: number, length: number): Promis
  * @throws {LocalServerProcessGoneError} When there is no such process.
  * @throws {LocalServerProcessDeniedError} When the process is not the CLI's to signal.
  */
-function signalProcess(pid: number, signal: NodeJS.Signals): void {
+function signalProcess(pid: number, signal: NodeJS.Signals | 0): void {
   try {
     process.kill(pid, signal);
   } catch (error) {
