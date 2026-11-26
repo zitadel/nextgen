@@ -739,6 +739,10 @@ export const RESOURCES = {
           operations: ["equals"],
         },
         {
+          field: "correlation_id",
+          operations: ["equals"],
+        },
+        {
           field: "request_id",
           operations: ["equals"],
         },

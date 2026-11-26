@@ -1112,8 +1112,6 @@ amendments before.
 - A background job. One that acts on a carrier, an invitation it expires,
   is to join the carrier's chain; any other job event has none.
   [ADR 065](065-background-jobs.md) has no emitter yet.
-- The CLI's `event list --filter` and the console's Events screen: neither
-  filters by it yet.
 
 **Measured** on Postgres 16 with 1,000,000 events in one project: 960,000 API
 requests in no chain, and 4,000 sign-ins, each a chain of ten events, four of
