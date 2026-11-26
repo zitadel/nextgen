@@ -334,19 +334,20 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
         throw refusalError(PLAYWRIGHT_CONFIG_REFUSAL, { config });
       }
     }
-    // biome-ignore lint/plugin: assigned inside the try that translates its errors, read after it
-    let packageJson: PackageJson;
-    try {
-      packageJson = await PM.manifest(this.cwd);
-    } catch (error) {
-      if (isErrno(error, "ENOENT")) {
-        throw refusalError(MANIFEST_REFUSAL, {});
-      }
-      if (error instanceof PmManifestInvalidError) {
-        throw refusalError(MANIFEST_REFUSAL, {});
-      }
-      throw error;
-    }
+    const packageJson: PackageJson = await PM.manifest(this.cwd).then(
+      (read) => {
+        return read;
+      },
+      (error: unknown) => {
+        if (isErrno(error, "ENOENT")) {
+          throw refusalError(MANIFEST_REFUSAL, {});
+        }
+        if (error instanceof PmManifestInvalidError) {
+          throw refusalError(MANIFEST_REFUSAL, {});
+        }
+        throw error;
+      },
+    );
     const manifest: Manifest = {
       dependencies: new Set(
         [packageJson.dependencies, packageJson.devDependencies].flatMap((section) => {

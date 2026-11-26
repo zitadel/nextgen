@@ -148,17 +148,21 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
         );
       }
       const store = new DiskStore(this.deps.cwd);
-      let saved: Awaited<ReturnType<typeof scaffold.change.save>>;
-      try {
-        saved = await scaffold.change.save(store, {
+      const saved = await scaffold.change
+        .save(store, {
           overwrite: this.deps.force,
           createOnly: (document) => {
             return document instanceof Connection;
           },
-        });
-      } catch (error) {
-        throw setupRefusal(error, scaffold.connections);
-      }
+        })
+        .then(
+          (written) => {
+            return written;
+          },
+          (error: unknown) => {
+            throw setupRefusal(error, scaffold.connections);
+          },
+        );
       const readmes = await Promise.all(
         [
           {

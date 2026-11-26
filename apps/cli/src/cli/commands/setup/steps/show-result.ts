@@ -337,16 +337,19 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
     if (!this.deps.dryRun) {
       this.deps.ui.ranAgainst(project.id, answers.server);
     }
-    let manifest: Awaited<ReturnType<typeof PM.manifest>> | undefined;
-    if (!this.deps.isJson) {
-      try {
-        manifest = await PM.manifest(this.deps.cwd);
-      } catch (error) {
-        if (!(error instanceof PmManifestInvalidError) && !isErrno(error, "ENOENT")) {
-          throw error;
-        }
-      }
-    }
+    const manifest = this.deps.isJson
+      ? undefined
+      : await PM.manifest(this.deps.cwd).then(
+          (read) => {
+            return read;
+          },
+          (error: unknown) => {
+            if (!(error instanceof PmManifestInvalidError) && !isErrno(error, "ENOENT")) {
+              throw error;
+            }
+            return undefined;
+          },
+        );
     const projectFacts = this.deps.isJson
       ? undefined
       : await Promise.all([

@@ -186,27 +186,28 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
     });
     const { plan, breaking, notes } = await this.planned(upgrader);
 
-    // biome-ignore lint/plugin: the code after the install needs `result` and must not sit inside the try that translates its errors
-    let result: Awaited<ReturnType<typeof upgrader.apply>>;
-    try {
-      result = await upgrader.apply(plan);
-    } catch (error) {
-      if (error instanceof UpgradeInstallFailedError) {
-        throw refusalError(
-          INSTALL_FAILED_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-            reason: errorMessage(error.cause),
-          },
-          {
-            install: suggestedCommandOf(error.command),
-            again: await this.again("upgrade", {}),
-          },
-        );
-      }
-      throw error;
-    }
+    const result = await upgrader.apply(plan).then(
+      (applied) => {
+        return applied;
+      },
+      async (error: unknown) => {
+        if (error instanceof UpgradeInstallFailedError) {
+          throw refusalError(
+            INSTALL_FAILED_REFUSAL,
+            {
+              ...error,
+              message: error.message,
+              reason: errorMessage(error.cause),
+            },
+            {
+              install: suggestedCommandOf(error.command),
+              again: await this.again("upgrade", {}),
+            },
+          );
+        }
+        throw error;
+      },
+    );
 
     const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
 
@@ -296,25 +297,26 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
   private async planned(
     upgrader: Upgrader,
   ): Promise<{ plan: Plan; breaking: readonly BreakingChange[]; notes: ReleaseNotes }> {
-    // biome-ignore lint/plugin: the code after the lookup needs `plan` and must not sit inside the try that translates its errors
-    let plan: Plan;
-    try {
-      plan = await upgrader.plan();
-    } catch (error) {
-      if (error instanceof UpgradeReleaseLookupError) {
-        throw refusalError(
-          RELEASE_LOOKUP_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-          },
-          {
-            again: await this.again("upgrade", {}),
-          },
-        );
-      }
-      throw error;
-    }
+    const plan: Plan = await upgrader.plan().then(
+      (looked) => {
+        return looked;
+      },
+      async (error: unknown) => {
+        if (error instanceof UpgradeReleaseLookupError) {
+          throw refusalError(
+            RELEASE_LOOKUP_REFUSAL,
+            {
+              ...error,
+              message: error.message,
+            },
+            {
+              again: await this.again("upgrade", {}),
+            },
+          );
+        }
+        throw error;
+      },
+    );
 
     const notes = new ReleaseNotes();
     const breaking: readonly BreakingChange[] = plan.upToDate
