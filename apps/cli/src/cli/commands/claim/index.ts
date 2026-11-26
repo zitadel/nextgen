@@ -388,40 +388,6 @@ export default class Claim extends Telemetered(ChangeCommand) {
   }
 
   /**
-   * The project the resolved environment points at.
-   *
-   * @returns Its id.
-   * @throws {@link ZitadelError} When the environment has no project, pointing at `setup`.
-   */
-  private projectIdOfEnvironment(): string {
-    try {
-      return this.environment.require("ZITADEL_PROJECT_ID");
-    } catch (error) {
-      if (error instanceof EnvironmentValueUnboundError) {
-        throw refusalError(
-          NOT_SET_UP_REFUSAL,
-          {
-            ...error,
-            message: error.message,
-          },
-          {
-            setup: {
-              id: "setup",
-              flags:
-                this.cwd === process.cwd()
-                  ? {}
-                  : {
-                      cwd: this.cwd,
-                    },
-            },
-          },
-        );
-      }
-      throw error;
-    }
-  }
-
-  /**
    * Resolves what both a dry run and a claim start from: the project to claim,
    * its local record when the secret describes this very project, and the
    * command that hands a fresh link back when this one dies.
@@ -451,17 +417,41 @@ export default class Claim extends Telemetered(ChangeCommand) {
             id: "claim",
             flags: { noOpen: flags.noOpen, timeout: flags.timeout },
           });
-    const projectId = prompted?.projectId ?? this.projectIdOfEnvironment();
-    const localSecret = (await Project.at(this.cwd).hasSecret())
-      ? await Project.at(this.cwd).secret()
-      : undefined;
-    const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
+    try {
+      const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
+      const localSecret = (await Project.at(this.cwd).hasSecret())
+        ? await Project.at(this.cwd).secret()
+        : undefined;
+      const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
 
-    return {
-      startOver,
-      projectId,
-      localRecord,
-    };
+      return {
+        startOver,
+        projectId,
+        localRecord,
+      };
+    } catch (error) {
+      if (error instanceof EnvironmentValueUnboundError) {
+        throw refusalError(
+          NOT_SET_UP_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            setup: {
+              id: "setup",
+              flags:
+                this.cwd === process.cwd()
+                  ? {}
+                  : {
+                      cwd: this.cwd,
+                    },
+            },
+          },
+        );
+      }
+      throw error;
+    }
   }
 
   /**
