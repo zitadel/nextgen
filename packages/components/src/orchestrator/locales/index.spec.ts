@@ -133,38 +133,46 @@ describe("localeFor", () => {
   };
 
   it("puts the integrator's English over the built-in English", () => {
-    expect(localeFor("en-US", locales)["identifier.title"]).toBe("Welcome back");
+    expect(localeFor("en-US", locales, en)["identifier.title"]).toBe("Welcome back");
   });
 
   it("keeps a built-in language's translations and fills its gaps with the integrator's English", () => {
-    const locale = localeFor("de", locales);
+    const locale = localeFor("de", locales, de);
 
     expect(locale["identifier.title"]).toBe(de["identifier.title"]);
     expect(locale["company-details.title"]).toBe("About your company");
   });
 
   it("gives a language with no built-in dictionary the integrator's English", () => {
-    const locale = localeFor("fr", locales);
+    const locale = localeFor("fr", locales, undefined);
 
     expect(locale["identifier.title"]).toBe("Welcome back");
     expect(locale["identifier.description"]).toBe(en["identifier.description"]);
   });
 
   it("puts a language's own entries over the integrator's English", () => {
-    const locale = localeFor("fr", { ...locales, fr: { "identifier.title": "Bon retour" } });
+    const locale = localeFor(
+      "fr",
+      { ...locales, fr: { "identifier.title": "Bon retour" } },
+      undefined,
+    );
 
     expect(locale["identifier.title"]).toBe("Bon retour");
     expect(locale["company-details.title"]).toBe("About your company");
   });
 
   it("drops the integrator's English provider wording when a language rewrites the description", () => {
-    const locale = localeFor("fr", {
-      en: {
-        "password.description": "Enter your Acme password",
-        "password.description.sso": "Use your Acme password or Acme SSO",
+    const locale = localeFor(
+      "fr",
+      {
+        en: {
+          "password.description": "Enter your Acme password",
+          "password.description.sso": "Use your Acme password or Acme SSO",
+        },
+        fr: { "password.description": "Saisissez votre mot de passe Acme" },
       },
-      fr: { "password.description": "Saisissez votre mot de passe Acme" },
-    });
+      undefined,
+    );
 
     expect(locale).not.toHaveProperty("password.description.sso");
   });

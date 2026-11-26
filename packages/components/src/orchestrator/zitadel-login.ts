@@ -34,7 +34,13 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { localiseFlowErrorKeys, stepNotice, stepTexts } from "./step-texts.js";
-import { isHidden, localeFor, type Locale } from "./locales/index.js";
+import {
+  isHidden,
+  loadBuiltinLocale,
+  localeFor,
+  primaryLanguage,
+  type Locale,
+} from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
 import { resolveApi } from "./resolve-api.js";
@@ -458,6 +464,30 @@ export class ZitadelLogin extends ZitadelSurface {
   private engine: Liquid | null = null;
 
   /**
+   * The language whose built-in dictionary {@link builtinLocale} holds, or is
+   * loading; `null` before the first update.
+   */
+  private builtinLanguage: string | null = null;
+
+  /**
+   * The built-in dictionary for {@link builtinLanguage}, loaded on demand
+   * (`loadBuiltinLocale`); `undefined` while it loads or when the language
+   * has none.
+   */
+  private builtinLocale: Locale | undefined = undefined;
+
+  /**
+   * Whether {@link builtinLocale} has loaded for {@link builtinLanguage}.
+   */
+  private builtinLoaded = false;
+
+  /**
+   * The dictionary or engine load in flight, if any; {@link getUpdateComplete}
+   * waits for it.
+   */
+  private pendingLoad: Promise<void> | null = null;
+
+  /**
    * The theme the last commit rendered with. The template output carries the
    * resolved side's mark, so a theme change rewrites the string and
    * `unsafeHTML` rebuilds the form — which drops what the visitor had typed
@@ -576,7 +606,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * the `locales` map merged over the built-in copy ({@link localeFor}).
    */
   private resolveLocale(): Locale {
-    return localeFor(this.resolveLanguage(), this.locales);
+    return localeFor(this.resolveLanguage(), this.locales, this.builtinLocale);
   }
 
   /**
@@ -592,14 +622,52 @@ export class ZitadelLogin extends ZitadelSurface {
     );
   }
 
+  /**
+   * Resolves once the element has rendered with what it loads on demand (the
+   * built-in dictionary and LiquidJS), so `await el.updateComplete` sees the
+   * step rather than the loader.
+   *
+   * @returns Whether the last update completed without another pending.
+   */
+  protected override async getUpdateComplete(): Promise<boolean> {
+    let result = await super.getUpdateComplete();
+    while (this.pendingLoad !== null) {
+      const load = this.pendingLoad;
+      await load;
+      if (this.pendingLoad === load) {
+        this.pendingLoad = null;
+      }
+      result = await super.getUpdateComplete();
+    }
+    return result;
+  }
+
   override willUpdate(changed: PropertyValues<this>): void {
-    if (!this.engine || changed.has("locales") || changed.has("lang")) {
+    const language = primaryLanguage(this.resolveLanguage());
+    if (language !== this.builtinLanguage) {
+      // The language changed: drop the engine, whose filters hold the old
+      // dictionary, and load the new one. The loader shows meanwhile.
+      this.builtinLanguage = language;
+      this.builtinLocale = undefined;
+      this.builtinLoaded = false;
+      this.engine = null;
+      this.pendingLoad = loadBuiltinLocale(language).then((dictionary) => {
+        if (this.builtinLanguage === language) {
+          this.builtinLocale = dictionary;
+          this.builtinLoaded = true;
+          this.requestUpdate();
+        }
+      });
+    }
+    if (this.builtinLoaded && (!this.engine || changed.has("locales") || changed.has("lang"))) {
       // LiquidJS loads on first render, in its own chunk; the loader shows
       // until the engine is there.
       const locale = this.resolveLocale();
-      void import("./liquid.js").then(({ createLiquidEngine }) => {
-        this.engine = createLiquidEngine({ locale });
-        this.requestUpdate();
+      this.pendingLoad = import("./liquid.js").then(({ createLiquidEngine }) => {
+        if (this.builtinLanguage === language) {
+          this.engine = createLiquidEngine({ locale });
+          this.requestUpdate();
+        }
       });
     }
     if (changed.has("previewState") && this.previewState && !this.preview) {

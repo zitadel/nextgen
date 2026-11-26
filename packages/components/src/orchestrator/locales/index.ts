@@ -71,23 +71,29 @@ export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
  * The integrator's English is thus the fallback for every language: a key a
  * language has no text for, such as one for a step they added, shows their
  * English rather than the raw key, while a built-in translation still beats it.
+ *
+ * @param tag - The BCP 47 language tag.
+ * @param locales - The integrator's dictionaries, by primary subtag.
+ * @param builtin - The built-in dictionary for the tag's language, which the
+ *   caller loads ({@link loadBuiltinLocale}); `undefined` when there is none.
+ * @returns The merged dictionary.
  */
 export function localeFor(
   tag: string,
-  locales?: Readonly<Record<string, Partial<Locale>>>,
+  locales: Readonly<Record<string, Partial<Locale>>> | undefined,
+  builtin: Locale | undefined,
 ): Locale {
   const language = primaryLanguage(tag);
   const custom = locales?.[language];
   const fallback = locales?.en;
   if (language === "en" || !fallback) {
-    const builtin = builtinLocales[language] ?? en;
-    return custom ? mergeLocale(builtin, custom) : builtin;
+    const base = builtin ?? en;
+    return custom ? mergeLocale(base, custom) : base;
   }
 
   // The built-in dictionaries share their keys, so merging one over the
   // integrator's English keeps only the keys they added themselves.
   const english = mergeLocale(en, fallback);
-  const builtin = builtinLocales[language];
   const base = builtin ? mergeLocale(english, builtin) : english;
   return custom ? mergeLocale(base, custom) : base;
 }
@@ -106,6 +112,34 @@ export function isHidden(
   return (locales?.[primaryLanguage(tag)]?.[key] ?? locales?.en?.[key]) === "";
 }
 
-function primaryLanguage(tag: string): string {
+/**
+ * The built-in dictionary for a language tag. English is bundled; the other
+ * translations load with a dynamic import, so a page downloads only the one it
+ * shows.
+ *
+ * @param tag - The BCP 47 language tag.
+ * @returns The dictionary, or `undefined` for a language with no built-in one.
+ */
+export async function loadBuiltinLocale(tag: string): Promise<Locale | undefined> {
+  const language = primaryLanguage(tag);
+  if (language === "de") {
+    return (await import("./de.js")).de;
+  }
+  if (language === "it") {
+    return (await import("./it.js")).it;
+  }
+  if (language === "en") {
+    return en;
+  }
+  return undefined;
+}
+
+/**
+ * The primary subtag of a language tag, lowercased.
+ *
+ * @param tag - The BCP 47 language tag.
+ * @returns The language, `de` for `de-CH`.
+ */
+export function primaryLanguage(tag: string): string {
   return (tag.split("-")[0] ?? "").toLowerCase();
 }
