@@ -10,6 +10,8 @@ import {
   ProjectSecretMissingError,
 } from "@/lib/project";
 
+import * as classes from "@/lib/project/errors";
+
 describe("the project errors", () => {
   it.each([
     [
@@ -83,5 +85,85 @@ describe("what a project error states", () => {
 
   it("reports no facts of a value a .env file cannot hold", () => {
     expect(new ProjectEnvValueMultilineError("A has a line break").details).toEqual({});
+  });
+});
+
+describe("what each project error states", () => {
+  it.each([
+    [
+      "ProjectConfigMissingError",
+      new classes.ProjectConfigMissingError("no .zitadel/config.json"),
+      {
+        message: "no .zitadel/config.json",
+        hint: "Set the project up first.",
+        details: {},
+        code: "E_VALIDATION",
+        category: "missing",
+        retryable: false,
+      },
+    ],
+    [
+      "ProjectSecretMissingError",
+      new classes.ProjectSecretMissingError("no .zitadel/secret"),
+      {
+        message: "no .zitadel/secret",
+        hint: undefined,
+        details: {},
+        code: "E_VALIDATION",
+        category: "missing",
+        retryable: false,
+      },
+    ],
+    [
+      "ProjectInvalidError",
+      new classes.ProjectInvalidError(".zitadel/config.json is invalid"),
+      {
+        message: ".zitadel/config.json is invalid",
+        hint: undefined,
+        details: {
+          original: {
+            name: "ProjectInvalidError",
+            message: ".zitadel/config.json is invalid",
+            code: undefined,
+          },
+        },
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+    [
+      "ProjectEnvValueMultilineError",
+      new classes.ProjectEnvValueMultilineError("KEY spans lines"),
+      {
+        message: "KEY spans lines",
+        hint: "A .env value is a single line; remove the newline or store the value another way.",
+        details: {},
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+    [
+      "ProjectEnvValueUnquotableError",
+      new classes.ProjectEnvValueUnquotableError("KEY cannot be quoted"),
+      {
+        message: "KEY cannot be quoted",
+        hint: "Set it in the process environment instead of a .env file.",
+        details: {},
+        code: "E_VALIDATION",
+        category: "invalid",
+        retryable: false,
+      },
+    ],
+  ])("states what a %s says and reports", (_name, error, expected) => {
+    expect({
+      message: error.message,
+      hint: error.hint,
+      details: error.details,
+      code: error.code,
+      category: error.category,
+      retryable: error.retryable,
+    }).toEqual(expected);
   });
 });
