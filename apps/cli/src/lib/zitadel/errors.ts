@@ -23,6 +23,24 @@ export class ZitadelConfigError extends ZitadelLibError {
 }
 
 /**
+ * A change that turns off a method a login flow still uses.
+ */
+export class ZitadelConfigFlowMethodInUseError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
+ * A login flow with errors of its own, so it cannot be checked against a changed schema.
+ */
+export class ZitadelConfigFlowUncheckedError extends ZitadelConfigError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
  * One file that could not be taken as configuration, and why.
  */
 export type FileProblem = {

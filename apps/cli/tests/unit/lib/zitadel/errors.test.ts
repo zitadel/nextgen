@@ -11,6 +11,8 @@ import {
   ZitadelConfigFileExistsError,
   ZitadelConfigEditLockoutError,
   ZitadelConfigFileUnreadableError,
+  ZitadelConfigFlowMethodInUseError,
+  ZitadelConfigFlowUncheckedError,
   ZitadelConfigInternalError,
 } from "@/lib/zitadel";
 import { googleSelection } from "@tests/helpers/idp-values";
@@ -96,6 +98,24 @@ describe("ZitadelConfigFileUnreadableError", () => {
     expect(new ZitadelConfigFileUnreadableError("x.json cannot be read")).toMatchObject({
       category: "denied",
       code: "E_AUTH",
+    });
+  });
+});
+
+describe("ZitadelConfigFlowMethodInUseError", () => {
+  it("is a validation failure", () => {
+    expect(new ZitadelConfigFlowMethodInUseError("a flow uses it")).toMatchObject({
+      category: "invalid",
+      code: "E_VALIDATION",
+    });
+  });
+});
+
+describe("ZitadelConfigFlowUncheckedError", () => {
+  it("is a validation failure", () => {
+    expect(new ZitadelConfigFlowUncheckedError("a flow has errors")).toMatchObject({
+      category: "invalid",
+      code: "E_VALIDATION",
     });
   });
 });

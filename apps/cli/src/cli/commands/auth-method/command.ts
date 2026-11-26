@@ -24,6 +24,8 @@ import {
   DiskStore,
   type ForceOptions,
   ZitadelConfigEditLockoutError,
+  ZitadelConfigFlowMethodInUseError,
+  ZitadelConfigFlowUncheckedError,
   ZitadelConfigSchemaMissingError,
   type Schemas,
   type ToggleableMethod,
@@ -74,6 +76,39 @@ type SchemaFlags = {
    */
   readonly schema?: string | undefined;
 };
+
+/**
+ * What a change that turns off a method a login flow still uses is refused for.
+ */
+const FLOW_METHOD_IN_USE_REFUSAL = {
+  message: "{message}",
+  hint: "Edit those steps first; login flows are not edited for you. `zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+  next: [
+    {
+      id: "deploy",
+      flags: {
+        dryRun: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
+
+/**
+ * What a change is refused for when a login flow has errors that keep it from
+ * being checked against the changed schema.
+ */
+export const FLOW_UNCHECKED_REFUSAL = {
+  message: "{message}",
+  hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
+  next: [
+    {
+      id: "deploy",
+      flags: {
+        dryRun: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
 
 /**
  * What a schema pointing at an external URL is refused for.
@@ -804,6 +839,18 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         dryRun: true,
       });
     } catch (error) {
+      if (error instanceof ZitadelConfigFlowMethodInUseError) {
+        throw refusalError(FLOW_METHOD_IN_USE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigFlowUncheckedError) {
+        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (!(error instanceof ZitadelConfigEditLockoutError)) {
         throw error;
       }
@@ -852,6 +899,18 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         consent: undefined,
       };
     } catch (error) {
+      if (error instanceof ZitadelConfigFlowMethodInUseError) {
+        throw refusalError(FLOW_METHOD_IN_USE_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof ZitadelConfigFlowUncheckedError) {
+        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
       if (!(error instanceof ZitadelConfigEditLockoutError)) {
         throw error;
       }
@@ -965,12 +1024,22 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
   protected async preview({ flags }: Admitted<typeof MethodEnableCommand>): Promise<CommandResult> {
     const target = await this.loadSchemaTarget(flags);
 
-    return this.previewToggle(
-      target,
-      target.config.schemas.enable(target.schema, this.method),
-      this.method,
-      true,
-    );
+    try {
+      return await this.previewToggle(
+        target,
+        target.config.schemas.enable(target.schema, this.method),
+        this.method,
+        true,
+      );
+    } catch (error) {
+      if (error instanceof ZitadelConfigFlowUncheckedError) {
+        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -982,12 +1051,22 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
   protected async apply({ flags }: Admitted<typeof MethodEnableCommand>): Promise<CommandResult> {
     const target = await this.loadSchemaTarget(flags);
 
-    return this.applyToggle(
-      target,
-      target.config.schemas.enable(target.schema, this.method),
-      this.method,
-      true,
-    );
+    try {
+      return await this.applyToggle(
+        target,
+        target.config.schemas.enable(target.schema, this.method),
+        this.method,
+        true,
+      );
+    } catch (error) {
+      if (error instanceof ZitadelConfigFlowUncheckedError) {
+        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   }
 }
 

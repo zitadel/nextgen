@@ -1,5 +1,7 @@
 import { providerOf, selectionName } from "@zitadel/config/idp";
 
+import { FLOW_UNCHECKED_REFUSAL } from "@/cli/commands/auth-method/command";
+import { refusalError } from "@/cli/core/refusal";
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
   callbackUriFor,
@@ -10,7 +12,7 @@ import {
 import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
-import { Connection } from "@/lib/zitadel";
+import { Connection, ZitadelConfigFlowUncheckedError } from "@/lib/zitadel";
 
 /**
  * What the step reads from what is known.
@@ -73,85 +75,95 @@ export class PlanChange extends WizardStep<
   async run(
     needs: Needs,
   ): Promise<Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">> {
-    const candidate = Connection.forProvider(needs.provider, needs.target.schema);
-    const preview = needs.target.config.connections.enable(
-      needs.target.schema,
-      candidate,
-      needs.options,
-    );
-    const loopback = loopbackIssuerWarning(
-      needs.selection,
-      await this.deps.machine.loopbackReach(needs.target.cwd, needs.remote.server),
-    );
-    if (loopback !== undefined) {
-      warnings.report(loopback);
-    }
-    const connection = preview.document;
-    const reused = !preview.created;
-    const delivery = new CredentialDelivery({
-      connection,
-      reused,
-      republish: (missing) => {
-        return this.deps.suggest({
-          id: "variable:set",
-          args: { name: missing.name },
-          flags: { secret: missing.secret },
-        });
-      },
-    });
-    const callbackUri = callbackUriFor(needs.issuer, connection.slug);
-    const deployedCallbackUris = [
-      ...new Set(
-        needs.origins.primary.map((origin) => {
-          return callbackUriFor(origin, connection.slug);
-        }),
-      ),
-    ].filter((uri) => {
-      return uri !== callbackUri;
-    });
-    return {
-      candidate,
-      preview,
-      delivery,
-      prompt: new CredentialPrompt({
-        selection: needs.selection,
-        reused,
-        secretVariable: delivery.names.clientSecret,
-        ask: this.deps.ask,
-        developmentBuild: this.deps.developmentBuild,
-        retry: async (clientId, piped) => {
-          if (needs.selection.kind !== "catalog") {
-            return undefined;
-          }
-          const command = await this.deps.again("auth-method:sso:enable", {
-            with: {
-              provider: selectionName(needs.selection),
-              clientId,
-            },
-          });
-
-          return piped ? pipedFrom("CLIENT_SECRET", command) : command;
-        },
-      }),
-      summary: {
-        projectId: needs.remote.projectId,
-        provider: selectionName(needs.selection),
-        displayName: providerOf(needs.selection).displayName,
-        schema: needs.target.schema.name,
+    try {
+      const candidate = Connection.forProvider(needs.provider, needs.target.schema);
+      const preview = needs.target.config.connections.enable(
+        needs.target.schema,
+        candidate,
+        needs.options,
+      );
+      const loopback = loopbackIssuerWarning(
+        needs.selection,
+        await this.deps.machine.loopbackReach(needs.target.cwd, needs.remote.server),
+      );
+      if (loopback !== undefined) {
+        warnings.report(loopback);
+      }
+      const connection = preview.document;
+      const reused = !preview.created;
+      const delivery = new CredentialDelivery({
         connection,
         reused,
-        callbackUri,
-        deployedCallbackUris,
-        previewCallbackUris: [
-          ...new Set(
-            needs.origins.preview.map((pattern) => {
-              return callbackUriFor(pattern, connection.slug);
-            }),
-          ),
-        ].filter((uri) => {
-          return uri !== callbackUri && !deployedCallbackUris.includes(uri);
+        republish: (missing) => {
+          return this.deps.suggest({
+            id: "variable:set",
+            args: { name: missing.name },
+            flags: { secret: missing.secret },
+          });
+        },
+      });
+      const callbackUri = callbackUriFor(needs.issuer, connection.slug);
+      const deployedCallbackUris = [
+        ...new Set(
+          needs.origins.primary.map((origin) => {
+            return callbackUriFor(origin, connection.slug);
+          }),
+        ),
+      ].filter((uri) => {
+        return uri !== callbackUri;
+      });
+      return {
+        candidate,
+        preview,
+        delivery,
+        prompt: new CredentialPrompt({
+          selection: needs.selection,
+          reused,
+          secretVariable: delivery.names.clientSecret,
+          ask: this.deps.ask,
+          developmentBuild: this.deps.developmentBuild,
+          retry: async (clientId, piped) => {
+            if (needs.selection.kind !== "catalog") {
+              return undefined;
+            }
+            const command = await this.deps.again("auth-method:sso:enable", {
+              with: {
+                provider: selectionName(needs.selection),
+                clientId,
+              },
+            });
+
+            return piped ? pipedFrom("CLIENT_SECRET", command) : command;
+          },
         }),
-      },
-    };
+        summary: {
+          projectId: needs.remote.projectId,
+          provider: selectionName(needs.selection),
+          displayName: providerOf(needs.selection).displayName,
+          schema: needs.target.schema.name,
+          connection,
+          reused,
+          callbackUri,
+          deployedCallbackUris,
+          previewCallbackUris: [
+            ...new Set(
+              needs.origins.preview.map((pattern) => {
+                return callbackUriFor(pattern, connection.slug);
+              }),
+            ),
+          ].filter((uri) => {
+            return uri !== callbackUri && !deployedCallbackUris.includes(uri);
+          }),
+        },
+      };
+    } catch (error) {
+      if (error instanceof ZitadelConfigFlowUncheckedError) {
+        throw refusalError(FLOW_UNCHECKED_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   }
 }
