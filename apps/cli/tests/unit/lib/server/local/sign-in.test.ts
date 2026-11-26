@@ -169,7 +169,7 @@ describe("local admin sign-in", () => {
 
     expect(failure.code).toBe("E_NETWORK");
     expect(failure.exitCode).toBe(EXIT_CODES.E_NETWORK);
-    expect(failure.hint).toContain("connection");
+    expect(failure.details).toMatchObject({ reason: "unreachable" });
   });
 
   // A server reached over https sets the prefixed name, and takes it back.
