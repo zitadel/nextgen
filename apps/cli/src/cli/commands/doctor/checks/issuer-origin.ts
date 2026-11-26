@@ -8,7 +8,7 @@ import {
   Origins,
   type ZitadelClient,
 } from "@/lib/backend";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, isCancellation } from "@/lib/errors";
 import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
 
@@ -124,6 +124,9 @@ export class IssuerOriginCheck implements SanityCheck {
         );
       }
     } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
       warnings.report(
         `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
       );
