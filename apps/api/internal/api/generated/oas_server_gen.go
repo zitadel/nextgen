@@ -14,8 +14,8 @@ type Handler interface {
 	//
 	// Send the plaintext token from the invitation link fragment. Acceptance grants the invitation's role
 	// (a project grant for `project_member`) when the invitation is pending and unexpired, the project is
-	// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
-	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
+	// claimed, and the creator still holds `admin` unless `created_by` is null. The inviter cannot accept
+	// their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
 	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
 	// that scheme's CSRF rules.
@@ -317,11 +317,12 @@ type Handler interface {
 	// `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
 	// invitations ship. Optional `metadata.name` (1–200 characters) labels who the link is for. Optional
 	// `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
-	// and the original is deleted in the same transaction unless it was accepted.
+	// and the original is deleted in the same transaction. An accepted original cannot be replaced: the
+	// request answers `404`.
 	//
-	// The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
-	// can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
-	// platform project, and when the project already has 100 pending unexpired invitations.
+	// The `link` appears only in this response. Send it to the recipient yourself; whoever opens it and is
+	// signed in can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server
+	// without a platform project, and when the project already has 100 pending unexpired invitations.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 	// Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -1014,11 +1015,11 @@ type Handler interface {
 	//
 	// Filters combine. These are answered from an index and fill their pages: no filter, `category`,
 	// `event_type`, `status_class`, `operation_id` with or without `status_class`, `request_id`,
-	// `flow_id`, and `session_id`, `entity_id`, `user_id`, `actor_id` or `entity_type` with or without
-	// `category`, each with or without the time bounds. Any other filter or combination is matched event
-	// by event, over at most a few thousand events per request. Such a page can hold fewer events than
-	// `limit`, or none, and still carry `next_page_token`: keep passing the token until a response has
-	// none.
+	// `flow_id`, `correlation_id`, and `session_id`, `entity_id`, `user_id`, `actor_id` or `entity_type`
+	// with or without `category`, each with or without the time bounds. Any other filter or combination is
+	// matched event by event, over at most a few thousand events per request. Such a page can hold fewer
+	// events than `limit`, or none, and still carry `next_page_token`: keep passing the token until a
+	// response has none.
 	//
 	// [claim]: /docs/concepts/project-team-user#claim
 	//
@@ -1243,6 +1244,9 @@ type Handler interface {
 	// Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
 	// expiry.
 	//
+	// It also returns the access the signed-in user already has to the project as `membership`; a user
+	// with access can neither accept nor decline the invitation.
+	//
 	// Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 	// Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
@@ -1256,14 +1260,14 @@ type Handler interface {
 	// does not already exist in the project, a new application is created. If one with that slug already
 	// exists, a revision is created.
 	//
-	// A revision gets a new `revision_id` and does not modify the application's `id`. Sending an unchanged
-	// document also creates a revision. Each client is matched to the stored one by its slug and keeps its
-	// `client_id`: a revision that changes a client's `client_id` is rejected with `app.field_immutable`.
-	// A revision keeps every client of the stored document: one that omits a client is also rejected with
-	// `app.field_immutable`, since removing a client is not available yet. A client with a new slug is a
-	// new client. It takes the `client_id` the document supplies, or the server generates one, and every
-	// response carries it in `definition`. A `client_id` another client of the project holds, or ever
-	// held, is rejected with `app.client_id_taken`.
+	// A revision gets a new `revision_id` and does not modify the application's `id`. Without an
+	// `Idempotency-Key`, sending an unchanged document also creates a revision. Each client is matched to
+	// the stored one by its slug and keeps its `client_id`: a revision that changes a client's `client_id`
+	// is rejected with `app.field_immutable`. A revision keeps every client of the stored document: one
+	// that omits a client is also rejected with `app.field_immutable`, since removing a client is not
+	// available yet. A client with a new slug is a new client. It takes the `client_id` the document
+	// supplies, or the server generates one, and every response carries it in `definition`. A `client_id`
+	// another client of the project holds, or ever held, is rejected with `app.client_id_taken`.
 	//
 	// Every new client gets a secret, generated by the server and returned once in `client_secrets`. The
 	// server stores only its hash, so no later read returns it.

@@ -7,14 +7,14 @@ The `zitadel` CLI sends anonymous usage analytics: which commands run, how they 
 
 ## What it sends
 
-Every command sends two events to Vercel Web Analytics on the Zitadel cloud (`preview.zitadel.com`):
+The CLI sends its events to [Mixpanel](#what-mixpanel-gets) and to Vercel Web Analytics on the Zitadel cloud (`preview.zitadel.com`). Every command sends two events:
 
 - `cli_command_started`, once the command has read its flags.
 - `cli_command_completed` when it finishes, or `cli_command_failed` when it fails.
 
 `invitation create` also sends `invitation_created` once the server has made the invitation, and `invitation cancel` sends `invitation_cancelled` once it has cancelled one.
 
-Each event keeps at most eight properties:
+Vercel gets these events only from an installed CLI: a run in CI, in development mode or from a source checkout sends Vercel nothing. Each event Vercel gets keeps at most eight properties:
 
 | Property | What it holds |
 | --- | --- |
@@ -37,13 +37,15 @@ A few commands add one property of their own. When a failed command's event alre
 | `api` | `operation` | The operation it called, such as `listReleases`, never a path, an ID or a field. |
 | `start` | `runtime` | The runtime: `binary` or `docker`. |
 
-Vercel records a location (country, region and city) worked out from the IP address an event comes from. Runs in CI send nothing.
+Vercel records a location (country, region and city) worked out from the IP address an event comes from.
 
 Run a command with `--debug` to see each event on stderr before it is sent.
 
-### What Mixpanel would get
+### What Mixpanel gets
 
-The CLI can also send its events to [Mixpanel](https://mixpanel.com), in the EU region, for production and for development alike, where events go through the Zitadel cloud (`preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`). A run in development mode or from a source checkout goes to a separate development project, so it never reaches customer data, and a run in CI sends nothing. `cli_command_completed` also carries `duration_ms`, `cli_command_failed` carries `exit_code` and `duration_ms`, and each event carries:
+[Mixpanel](https://mixpanel.com) gets the same events in its EU region, through the Zitadel cloud: `preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`. An installed CLI sends to the production project. A run in development mode or from a source checkout sends to a separate development project, so it never reaches customer data. A run in CI sends Mixpanel nothing.
+
+`cli_command_completed` also carries `duration_ms`, `cli_command_failed` carries `exit_code` and `duration_ms`, and each event carries:
 
 | Property | What it holds |
 | --- | --- |
@@ -78,7 +80,7 @@ Some commands add what they did, as counts and fixed values:
 
 `invitation_created` and `invitation_cancelled` carry the role the invitation grants, such as `project_editor`, and its journey ID: a random ID the invitation and its replacements share, so the time to accept can be measured. They never carry the name you gave, the invitation ID or the link. Their Vercel copies keep only the eight properties above.
 
-When it sends again, a few journeys also send events of their own. They carry the properties above, and only fixed names, counts and durations:
+A few journeys also send events of their own, to Mixpanel only. They carry the properties above, and only fixed names, counts and durations:
 
 | Event | When | What it adds |
 | --- | --- | --- |
@@ -93,9 +95,9 @@ Nothing that identifies you or your machine: no name, email address, server URL,
 
 ## The install ID
 
-The first time it sends anything, the CLI creates a random ID for the install and keeps it in `~/.config/zitadel/cli/telemetry.json`: under `$XDG_CONFIG_HOME` when that is set, and under `%APPDATA%` on Windows. The ID ties the runs of one install together in Mixpanel, and holds nothing about you or the machine. The events for Vercel leave it out, so while Mixpanel is paused it stays on your machine. Delete the file to start over with a new one. Where the file cannot be written, every run takes a new ID.
+The first time it sends anything, the CLI creates a random ID for the install and keeps it in `~/.config/zitadel/cli/telemetry.json`: under `$XDG_CONFIG_HOME` when that is set, and under `%APPDATA%` on Windows. The ID ties the runs of one install together in Mixpanel, and holds nothing about you or the machine. Only Mixpanel gets it: the events for Vercel leave it out. Delete the file to start over with a new one. Where the file cannot be written, every run takes a new ID.
 
-The first time the CLI runs in an interactive terminal, before it sends anything, it says on stderr that it collects analytics, and how to opt out. A first run that is not interactive, such as `--json` or a script, leaves that notice for the first run that is. With Mixpanel, it also records the install itself: the platform, the CLI and Node versions, the country, `host_agent`, how it was launched, and, for an install this release created, the version it began on. It writes that record again when something in it changes, such as an upgrade, and at most once a day, so the record shows when the install was last used.
+The first time the CLI runs in an interactive terminal, before it sends anything, it says on stderr that it collects analytics, and how to opt out. A first run that is not interactive, such as `--json` or a script, leaves that notice for the first run that is. In Mixpanel, it also records the install itself: the platform, the CLI and Node versions, the country, `host_agent`, how it was launched, and, for an install this release created, the version it began on. It writes that record again when something in it changes, such as an upgrade, and at most once a day, so the record shows when the install was last used.
 
 ## When it sends
 

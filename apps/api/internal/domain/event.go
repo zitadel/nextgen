@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"time"
 )
@@ -145,8 +147,9 @@ const (
 	EventTypeReleaseCreated EventType = "release.created"
 	EventTypeReleaseRevoked EventType = "release.revoked"
 
-	EventTypeApplicationCreated EventType = "application.created"
-	EventTypeApplicationUpdated EventType = "application.updated"
+	EventTypeApplicationCreated             EventType = "application.created"
+	EventTypeApplicationUpdated             EventType = "application.updated"
+	EventTypeApplicationClientSecretRotated EventType = "application.client_secret.rotated"
 
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"
@@ -208,6 +211,13 @@ type Event struct {
 	SessionID *string
 	FlowID    *string
 
+	// CorrelationID is the chain the event belongs to: the requests one piece
+	// of work took, whoever sent them. A request inherits it from the stored
+	// thing that brought it, a carrier, and never from a header (ADR 048,
+	// amendment of 2026-11-26). Nil on an event whose request is the whole of
+	// its work; RequestID joins those.
+	CorrelationID *string
+
 	// OperationID and StatusClass copy what a request.api event's payload
 	// records, the operation and the class of the response status, into
 	// columns GET /events reads them from by index
@@ -237,6 +247,12 @@ type EventClientMetadata struct {
 
 // EventMetadata is the events.metadata JSON object.
 type EventMetadata struct {
+	// TraceID is the OpenTelemetry trace ID of the request, on a request.api
+	// event whose trace was sampled: it leads from the event to the trace in
+	// the operator's backend. Observed context, as Client is, and no
+	// correlation: with instrumentation.trace.trust_remote_spans the caller
+	// chooses it (ADR 080).
+	TraceID       string                      `json:"trace_id,omitempty"`
 	Client        *EventClientMetadata        `json:"client,omitempty"`
 	Authorization *EventAuthorizationMetadata `json:"authorization,omitempty"`
 }
@@ -278,7 +294,19 @@ const (
 	EventFieldOperationStatus
 	EventFieldStatusClass
 	EventFieldUserID
+	EventFieldCorrelationID
 )
+
+// NewCorrelationID mints the ID of a chain: 16 random bytes as 32 hex digits,
+// the shape of a W3C trace ID, so an export can use it as one. It names no
+// resource, so it is no managed ID of ADR 047 and takes no prefix.
+func NewCorrelationID() (string, error) {
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		return "", ErrInternal(err).WithMessage("failed to mint a correlation id")
+	}
+	return hex.EncodeToString(id[:]), nil
+}
 
 func ErrEventNotFound() Error {
 	return newError(PrefixEvent.ErrorCodePrefix("not_found"), "event: not found", nil, nil)

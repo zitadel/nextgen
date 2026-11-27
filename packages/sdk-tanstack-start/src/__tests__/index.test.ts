@@ -3,7 +3,12 @@ import { resolve } from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import * as index from "../index";
-import type { AuthResult, AuthState, NextgenSession, UnauthState } from "../index";
+import type {
+  ZitadelAuthResult,
+  ZitadelAuthState,
+  ZitadelAuthSession,
+  ZitadelUnauthState,
+} from "../index";
 
 // The package ships only what its build emits, so an `exports` target the build
 // misses breaks every consumer that imports it. `test` runs after `build`.
@@ -18,8 +23,12 @@ describe("package manifest", () => {
   };
 
   function targets(value: unknown): string[] {
-    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
-    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    if (typeof value === "string") {
+      return value.startsWith("./") ? [value] : [];
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(targets);
+    }
     return [];
   }
 
@@ -42,8 +51,8 @@ describe("index entry", () => {
   // A server route imports its helpers and their types from one place, as it
   // does with every other server SDK.
   it("exports the types its helpers answer with", () => {
-    expectTypeOf(index.getAuth).returns.toEqualTypeOf<AuthResult>();
-    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
-    expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
+    expectTypeOf(index.getAuth).returns.toEqualTypeOf<ZitadelAuthResult>();
+    expectTypeOf<ZitadelAuthState["session"]>().toEqualTypeOf<ZitadelAuthSession>();
+    expectTypeOf<ZitadelUnauthState["session"]>().toEqualTypeOf<null>();
   });
 });

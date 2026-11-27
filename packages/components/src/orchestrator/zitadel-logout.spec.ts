@@ -291,6 +291,35 @@ describe("<zitadel-logout>", () => {
     expect(window.location.href).toBe("https://app.test/done");
   });
 
+  it.each([
+    ["javascript:alert(1)", false],
+    ["data:text/html,x", false],
+    ["//evil.example/done", true],
+    ["/home", true],
+    ["https://app.test/done", true],
+  ])("checks the scheme of post-sign-out-url %s before navigating", async (url, allowed) => {
+    currentName = "Alice";
+    currentEmail = "alice@acme.com";
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount();
+    element.postSignOutUrl = url;
+    await flush(element);
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    await element.updateComplete;
+
+    expect(window.location.href).toBe(allowed ? url : "");
+    expect(element.shadowRoot?.querySelector(".error-bar")?.textContent?.trim() ?? null).toBe(
+      allowed ? null : "Refused to navigate: the target URL must use http or https.",
+    );
+  });
+
   it("waits for work a zitadel-signout listener registers before navigating to post-sign-out-url", async () => {
     Object.defineProperty(window, "location", {
       configurable: true,

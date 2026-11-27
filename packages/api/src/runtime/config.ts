@@ -1,5 +1,5 @@
-import { setProxyPath } from "./base-url";
-import { createZitadelClient, type ZitadelApi } from "./api-factory";
+import { createZitadelApi, type ZitadelApi } from "./api-factory";
+import { ZitadelClient } from "./client";
 
 /**
  * Input options for {@link configureZitadel}.
@@ -31,8 +31,8 @@ export interface ZitadelConfig {
 }
 
 /**
- * The initialized project handle returned by {@link configureZitadel}.
- * Pure data — use factory functions like {@link getApi} to derive services.
+ * The initialized project handle returned by `configureZitadel`.
+ * Pure data — use factory functions like `getApi` to derive services.
  */
 export interface ZitadelProject {
   /** Proxy path for API requests. */
@@ -83,6 +83,9 @@ function writeSlot(value: ZitadelProject | null): void {
  */
 const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
 
+/** Per-project client cache, for the same reason as {@link apiCache}. */
+const clientCache = new WeakMap<ZitadelProject, ZitadelClient>();
+
 /**
  * Initializes app-wide SDK configuration and returns the frozen
  * {@link ZitadelProject} handle.
@@ -103,14 +106,12 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
       existing.url === config.url &&
       existing.publishableKey === config.publishableKey
     ) {
-      setProxyPath(resolvedProxyPath);
       return existing;
     }
     console.warn(
       `[zitadel] configureZitadel() already called with different values. ` +
         `Ignoring: ${JSON.stringify(config)}`,
     );
-    setProxyPath(existing.proxyPath);
     return existing;
   }
 
@@ -121,13 +122,40 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
     publishableKey: config.publishableKey,
   });
   writeSlot(project);
-  setProxyPath(resolvedProxyPath);
   return project;
 }
 
 /**
- * Returns a typed API client for the given project, with the base URL
- * pre-bound. Cached per project handle — safe to call multiple times.
+ * Returns the {@link ZitadelClient} for the given project: its proxy path as
+ * the base URL and its publishable key (when the handle carries one) as the
+ * bearer, the ADR 036 public-plane credential. The app's own client may run
+ * destructive operations, since signing out is a `DELETE`. Cached per project
+ * handle — safe to call multiple times.
+ *
+ * Call the generated operations with it to bundle only those you use:
+ *
+ * ```ts
+ * import { getMySession } from "@zitadel/api/generated/endpoints/zitadelNextGen";
+ * const session = await getMySession(getClient(project));
+ * ```
+ */
+export function getClient(project: ZitadelProject): ZitadelClient {
+  let client = clientCache.get(project);
+  if (!client) {
+    client = new ZitadelClient({
+      baseUrl: project.proxyPath,
+      token: project.publishableKey,
+      allowDestructive: true,
+    });
+    clientCache.set(project, client);
+  }
+  return client;
+}
+
+/**
+ * Returns every operation bound to the project's {@link getClient} client.
+ * It imports every operation; code that calls a few should call them with
+ * {@link getClient} instead. Cached per project handle — safe to call multiple times.
  *
  * ```ts
  * const project = configureZitadel({ ... });
@@ -137,10 +165,7 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
 export function getApi(project: ZitadelProject): ZitadelApi {
   let api = apiCache.get(project);
   if (!api) {
-    // The publishable key (when the handle carries one) rides as the bearer
-    // on every call from this client — the ADR 036 public-plane credential.
-    // Handles without a key produce a token-less client, exactly as before.
-    api = createZitadelClient({ baseUrl: project.proxyPath, token: project.publishableKey });
+    api = createZitadelApi(getClient(project));
     apiCache.set(project, api);
   }
   return api;
@@ -164,5 +189,4 @@ export function getZitadelConfig(): ZitadelProject | null {
  */
 export function _resetConfigForTesting(): void {
   writeSlot(null);
-  setProxyPath("");
 }

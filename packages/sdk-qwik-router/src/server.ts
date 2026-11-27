@@ -1,10 +1,30 @@
-export { createNextgenOnRequest, getAuth } from "./request-handler";
-export type { QwikRequestEvent, QwikCookieValue } from "./request-handler";
+/**
+ * The server entry of the Qwik Router SDK.
+ *
+ * This entry exposes {@link createZitadelOnRequest}, which builds the `onRequest` handler that
+ * proxies `/__nextgen/*`, verifies the session and guards routes, and {@link getAuth}, which
+ * reads the result from a loader, action or endpoint. It reads the project secret and verifies
+ * tokens, so import it only in server code.
+ *
+ * @example
+ * ```ts
+ * import { createZitadelOnRequest, getAuth } from "@zitadel/sdk-qwik-router/server";
+ * ```
+ *
+ * @module
+ */
+
+export { createZitadelOnRequest, getAuth } from "./request-handler";
 export type {
-  NextgenMiddlewareOptions,
-  AuthResult,
-  NextgenSession,
-  AuthState,
-  UnauthState,
-  ClientAuthResult,
+  ZitadelQwikRequestEvent,
+  ZitadelQwikCookieValue,
+  ZitadelQwikCookieOptions,
+} from "./request-handler";
+export type {
+  ZitadelMiddlewareOptions,
+  ZitadelAuthResult,
+  ZitadelAuthSession,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelClientAuthResult,
 } from "./types.js";

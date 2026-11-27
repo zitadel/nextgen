@@ -2,6 +2,7 @@
  * The client's own use of the cursor walk: `pages`, `items` and `all` on one
  * generated function. Internal to the package; `./paging` is what it exports.
  */
+import type { ZitadelClient } from "./client";
 import { Paging } from "./paging";
 
 /**
@@ -23,15 +24,22 @@ type Hooks = Readonly<{
 
 /**
  * `pages`, `items` and `all` for one generated function. Each takes the
- * function's own arguments; the first page is fetched with them as given, so a
- * `page_token` among them is where it starts. `send` fetches a page as the
- * server answers it, so the cursor is read before `hooks.respond` sees the
- * page, and every failure of the walk reaches `hooks.fail` once.
+ * function's own arguments after its client; every page is fetched with
+ * `client` first, then them as given, so a `page_token` among them is where it
+ * starts. `send` fetches a page as the server answers it, so the cursor is read
+ * before `hooks.respond` sees the page, and every failure of the walk reaches
+ * `hooks.fail` once.
  */
-export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape, hooks: Hooks) {
+export function paged(
+  client: ZitadelClient,
+  send: (...args: unknown[]) => unknown,
+  shape: PagingShape,
+  hooks: Hooks,
+) {
   const paging = new Paging<unknown>(shape);
 
-  async function* walk<T>(args: unknown[], take: (page: unknown) => readonly T[]) {
+  async function* walk<T>(rest: unknown[], take: (page: unknown) => readonly T[]) {
+    const args = [client, ...rest];
     const raw = paging.walk(async (token) => {
       return token === undefined ? send(...args) : send(...shape.withToken(args, token));
     });

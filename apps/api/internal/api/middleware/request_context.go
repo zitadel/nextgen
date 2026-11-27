@@ -9,12 +9,10 @@ import (
 
 type requestContextKey struct{}
 
-// RequestContext carries server-authoritative correlation fields for Path A/B events.
+// RequestContext carries the request's ID. What a request learns inside its
+// handler, its login flow and its chain, is in its [Correlation].
 type RequestContext struct {
-	RequestID   string
-	SessionID   string
-	FlowID      string
-	Fingerprint string
+	RequestID string
 }
 
 func WithRequestContext(ctx context.Context, rc RequestContext) context.Context {
@@ -27,7 +25,9 @@ func GetRequestContext(ctx context.Context) (RequestContext, bool) {
 }
 
 // WithRequestContextMiddleware gives the request its request_id, stores
-// RequestContext, and echoes X-Request-Id.
+// RequestContext, plants its [Correlation], and echoes X-Request-Id. Every
+// mount passes it, the ones outside the API's chain included, so a handler
+// there can join a chain too.
 //
 // The ID is minted, unless idHeader names a header that a proxy in front of
 // the server sets to its own ID for the request and the request carries a
@@ -36,6 +36,7 @@ func GetRequestContext(ctx context.Context) (RequestContext, bool) {
 // only behind a proxy that overwrites it, or a client chooses its own ID.
 func WithRequestContextMiddleware(generator RequestIDGenerator, idHeader string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(WithCorrelation(r.Context()))
 		id := proxyRequestID(r, idHeader)
 		if id == "" {
 			if minted, err := generator.New("req"); err == nil {

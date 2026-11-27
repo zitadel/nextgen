@@ -41,8 +41,8 @@ where the code runs, not the root, from client modules:
 
 | Import                         | Runs in                           | Provides                           |
 | ------------------------------ | --------------------------------- | ---------------------------------- |
-| `@zitadel/sdk-next/middleware` | Edge middleware                   | `nextgenMiddleware`, `createProxy` |
-| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `NextgenProvider`        |
+| `@zitadel/sdk-next/middleware` | Edge middleware                   | `zitadelMiddleware`, `createProxy` |
+| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `ZitadelProvider`        |
 | `@zitadel/sdk-next/react`      | Client Components                 | `useAuth()`, `AuthContextProvider` |
 | `@zitadel/sdk-next/session`    | Client Components                 | `getSession()`                     |
 | `@zitadel/sdk-next/client`     | Client boundary                   | `configureZitadel()`, web components |
@@ -62,11 +62,11 @@ The body is the same either way (only the file and function name change):
 ```ts
 // Next 16+: src/proxy.ts, exporting `proxy`.
 // Next 15:  src/middleware.ts, exporting `middleware` (rename the function).
-import { nextgenMiddleware } from '@zitadel/sdk-next/middleware';
+import { zitadelMiddleware } from '@zitadel/sdk-next/middleware';
 import type { NextRequest } from 'next/server';
 
 export function proxy(req: NextRequest) {
-  return nextgenMiddleware(req, {
+  return zitadelMiddleware(req, {
     url: process.env.ZITADEL_URL,
     protectedRoutes: ['/admin', '/dashboard*'],
     loginPath: '/login',
@@ -96,7 +96,7 @@ async function Greeting() {
 }
 ```
 
-**3. Seed client components** by rendering `NextgenProvider` (server-only — it
+**3. Seed client components** by rendering `ZitadelProvider` (server-only — it
 strips the raw token before the server→client boundary) in your root layout,
 then read with `useAuth()` in any client component. For chrome on pages the
 matcher does not cover, read client-side with `getSession()` from
@@ -149,10 +149,10 @@ Confirm names against those before writing code.
 - **Never import the package root from a `"use client"` module.** The root
   re-exports the server-only `auth()`; pulling it into a client graph fails the
   build. Client code imports from `/react` or `/session` only.
-- **`NextgenProvider` is server-only** and must not be re-exported through a
+- **`ZitadelProvider` is server-only** and must not be re-exported through a
   `"use client"` `providers.tsx` wrapper — that would leak the unstripped token
   into the RSC flight payload. To seed from client state, use
-  `AuthContextProvider` from `/react` (it only takes the token-less shape).
+  `AuthContextProvider` from `/react` (typed as the token-less shape; it strips nothing).
 - **Same-origin proxy is required.** The widgets and `getSession()` hit
   `{proxyPath}/api/v1/sessions/me` on the same origin; the middleware `matcher` must
   cover `{proxyPath}/:path*` or the proxy breaks.

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelApi } from "@zitadel/api/client";
 
 import type { Identity, SeededUser, SeedUserInput, SeedUsersTemplate } from "./types";
 
@@ -32,7 +32,7 @@ export function identity(): Identity {
  * is what makes per-test seeding parallel-safe on a shared instance.
  */
 export async function seedUser(
-  client: ZitadelClient,
+  client: ZitadelApi,
   context: SeedContext,
   input: SeedUserInput = {},
 ): Promise<SeededUser> {
@@ -61,7 +61,7 @@ export async function seedUser(
  * schema that declares them (`useCase: "consumer"` or wider).
  */
 export async function seedUsers(
-  client: ZitadelClient,
+  client: ZitadelApi,
   context: SeedContext,
   count: number,
   template: SeedUsersTemplate = {},

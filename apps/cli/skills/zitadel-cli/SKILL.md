@@ -56,7 +56,7 @@ passes. Each of `doctor`'s `data.checks` has a `category`: `versions`,
 The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. The Angular CLI checks each major on its own, so only 22.22.3+ on 22, 24.15.0+ on 24 and 26.x are accepted (23 and 25 run with a warning), and Node 27 or later is refused even though the published range reads `>=26.0.0`. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
 
 The app's framework must be at or above a minimum version: Next.js 15.2.3,
-React 18, Vue 3.2, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
+React 18, Vue 3.2, Nuxt 4, Angular 19, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
 versions are not refused. `setup` and `doctor` refuse an app below its minimum,
 by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
 (exit 3); `setup` refuses before it scaffolds or patches anything, while
@@ -317,7 +317,7 @@ installed version. **Do not guess a command name.** Before running any command y
 are not certain of, look it up first and use the exact name the CLI prints:
 command and resource names and the exact verb are whatever the CLI shows, never
 what you would assume. A resource's noun is singular (`user list`,
-`policy get`, `flow-definition list`); `branding` has no other form. The
+`policy get`, `flow-definition list`); `branding` and `settings` have no other form. The
 plural runs the same command (`users list`), but nothing lists it, and every
 output names the singular. A wrong guess costs a failed call and a round of
 recovery; one cheap lookup up front avoids it. `zitadel --help` lists each
@@ -372,6 +372,14 @@ made to the user. Add `--filter category=auth` for the sign-ins alone.
 `--filter actor_id=<user-id>` is the other question, what that user did. Only
 events recorded by a server that has this filter carry `user_id`.
 
+To read everything one sign-in, invitation or project claim wrote, whoever
+sent each request: take the `correlation_id` of any of its events and run
+`event list --filter correlation_id=<id> --json`. A sign-in shares one ID
+from the OAuth authorization request, or the first step of its login flow, to
+the session and the token it ends with. An event whose request was the whole
+of its work has no `correlation_id`; its `request_id` joins what that request
+wrote. Only events recorded by a server that has this filter carry it.
+
 To find the API requests that failed: `event list --filter status_class=4xx
 --filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
 (such as `createUser`) for one operation. Only requests recorded by a server
@@ -393,7 +401,8 @@ Each invocation prints one JSON object:
 - `--dry-run` is taken only by a command that changes something, and `--force` only by one
   that asks consent; any other command refuses either as an unknown flag.
 - `--server` is taken only by a command that reads a server: `start`, `stop`, `reset`, `logs`,
-  `tests add`, `skills add`, `upgrade`, `eject` and `branding eject` refuse it as an unknown flag.
+  `tests add`, `skills add`, `upgrade`, `eject`, `branding eject` and `settings oauth enable`
+  refuse it as an unknown flag.
 - A dry run (`--dry-run`) answers `ok` with `data.dry_run: true` and a headline
   ending in `(dry run)` as `data.title`, never `skipped`, and `next_commands` holds
   the real command to run.
@@ -550,7 +559,7 @@ Each invocation prints one JSON object:
   one `{path, status, previous_path?, patch}` per changed file (`status` is
   `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
   diff), including rapid same-size edits and untracked configuration files.
-  It covers `schemas/`, `flows/`, `branding/` and `idps/` under `.zitadel/`,
+  It covers `schemas/`, `flows/`, `branding/`, `idps/` and `oauth/` under `.zitadel/`,
   the `*.json` files at the top of `.zitadel/policies/` but not their
   `*.test.json` test files, and any file a branding descriptor's `$file`
   inlines. Review it before you deploy. `files` is `[]` when nothing changed
@@ -976,9 +985,22 @@ holds the warnings and errors, and `--tail` counts only those lines. `logs
 errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
 running, name it in `data.next_actions`.
 
-To move a set-up app to another dev port (setup's `warnings` say the port is
-already in use, the dev server exits with `EADDRINUSE`, or another app needs
-the port), run `setup --dev-port <port>` in the app; never change the port in
+Setup pins the app's dev script to its dev port and registers
+`http://localhost:<port>` as the origin and issuer. A process running in the
+app's folder that holds the port is the app's own dev server: setup keeps the
+port and says nothing, so leave a running dev server up while setup runs. When
+something else holds it, a run that asks nothing warns in `warnings`. A warning
+that names the holder (`node (pid 4242)`) found it running outside the app's
+folder: stop it, or run the `setup --dev-port` it gives. A warning that names
+none could not see the holder (no `lsof`, or another user's process). Either
+way, if the holder is this app's dev server after all (in a container it shows
+as Docker's process), ignore the warning and keep the port: moved off the port
+its own dev server serves, the app's origin and issuer no longer match the
+running app.
+
+To move a set-up app to another dev port (a setup warning names another process
+on it, the dev server exits with `EADDRINUSE`, or another app needs the port),
+run `setup --dev-port <port>` in the app; never change the port in
 one file by hand. In a directory with a
 `zitadel.json`, `setup` returns `status: "skipped"` with `reason:
 "already-initialized"`, unless `--dev-port` is given: then it moves the app.
@@ -1103,9 +1125,21 @@ generated by the CLI, not config: never edit them. `doctor` warns when one is
 missing or outdated (after an upgrade that changed a dialect), and
 `doctor --fix` writes the current ones, unless the project pins a newer
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
-the path. `setup` and `branding eject` write a missing one and replace an
+the path. `setup`, `branding eject` and `settings oauth enable` write a missing one and replace an
 outdated one the same way, and never replace one when the project pins a newer
 `@zitadel/*` package. `deploy --dry-run` validates without them either way.
+The project's OAuth authorization server is a switch in the release:
+`settings oauth enable` writes `{"enabled": true}` into `.zitadel/oauth/oauth.json`
+(the one file under `.zitadel/oauth/`, like branding's descriptor; a second file
+there is refused with `E_VALIDATION`, as `deploy` refuses it) and uploads nothing, reporting the files in
+`data.files_written` (the meta-schema beside them when it was missing) and
+`deploy --dry-run` then `deploy` in `data.next_commands`. A run that finds the
+switch on still writes a missing or outdated meta-schema and answers `ok` with
+it in `data.files_written`; one with nothing to write is `skipped` with
+`reason: already-enabled`, and its dry run is `ok`. The next `deploy` pins the settings as
+the release's `oauth` resource, and a release without the file leaves the
+authorization server off. There is no `disable` command yet: remove the file,
+or set `enabled` to `false`, and deploy.
 `doctor`'s `schema` check holds every file under `.zitadel/` to the rules
 `deploy` validates with: it fails on an error and warns on a warning. It holds
 no environment, so `environment/missing-variable` is checked only by `deploy`.

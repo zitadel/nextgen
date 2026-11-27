@@ -200,6 +200,7 @@ which ships in this package.
 * [`zitadel session get ID`](#zitadel-session-get-id)
 * [`zitadel session list`](#zitadel-session-list)
 * [`zitadel session revoke ID`](#zitadel-session-revoke-id)
+* [`zitadel settings oauth enable`](#zitadel-settings-oauth-enable)
 * [`zitadel setup`](#zitadel-setup)
 * [`zitadel skills add`](#zitadel-skills-add)
 * [`zitadel start`](#zitadel-start)
@@ -1327,9 +1328,9 @@ FLAGS
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values
       request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals),
-      user_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id
-      (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx;
-      repeats widen), created_at (greater_than_or_equal|less_than).
+      user_id (equals), session_id (equals), flow_id (equals), correlation_id (equals), request_id (equals), entity_type
+      (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values
+      1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).
 
   --input=<value>
       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names; positional arguments go
@@ -3208,6 +3209,33 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel session revoke <id> --force --json
+```
+
+## `zitadel settings oauth enable`
+
+Turn the project's OAuth authorization server on: write the switch into .zitadel/oauth/.
+
+```
+USAGE
+  $ zitadel settings oauth enable [--json] [-c <value>] [--input <value>] [-n] [-v] [--debug] [--color] [--dry-run]
+    [--telemetry]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --input=<value>    The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                         positional arguments go under "args". Only the global flags may stand beside it.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Turn the project's OAuth authorization server on: write the switch into .zitadel/oauth/.
 ```
 
 ## `zitadel setup`

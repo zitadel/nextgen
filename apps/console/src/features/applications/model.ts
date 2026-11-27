@@ -30,3 +30,12 @@ const CLIENT_TYPE_LABELS: Record<ApplicationClient["type"], string> = {
 export function clientTypeLabel(type: ApplicationClient["type"]): string {
   return CLIENT_TYPE_LABELS[type];
 }
+
+/**
+ * Where an application is written, as the Source badge names it: `Code` for
+ * one a release declares from a file, `Registered` for one created through
+ * `POST /applications`.
+ */
+export function applicationSourceLabel(declared: boolean): string {
+  return declared ? "Code" : "Registered";
+}

@@ -395,7 +395,9 @@ describe("<zitadel-login> form + focus (chromium)", () => {
           validation: { enum: ["Red", "Green", "Blue"] },
         },
       ],
-      actions: [{ name: "submit", kind: "submit", text_key: "submit.register", primary: true }],
+      actions: [
+        { name: "submit", kind: "submit", text_key: "register.action.submit", primary: true },
+      ],
       gates: {},
     },
   };
@@ -479,7 +481,9 @@ describe("<zitadel-login> form + focus (chromium)", () => {
           required: true,
         },
       ],
-      actions: [{ name: "submit", kind: "submit", text_key: "submit.register", primary: true }],
+      actions: [
+        { name: "submit", kind: "submit", text_key: "register.action.submit", primary: true },
+      ],
       gates: {},
     },
   };
@@ -911,7 +915,7 @@ const passkeyRegisterStep: CreateFlow201 = {
   session_token: "tok_1",
   step: {
     name: "passkey-register",
-    texts: { title_key: "passkey-register.title" },
+    texts: { title_key: "passkey-enroll.title" },
     fields: [],
     actions: [],
     gates: {},

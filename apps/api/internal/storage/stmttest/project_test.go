@@ -414,7 +414,18 @@ func runListCursorTie(
 	}
 	require.NoError(t, d.seedTiedProjects(t.Context(), ids, tieCreatedAt))
 
-	tieFilter := database.Equal(database.Col(domain.ProjectFieldCreatedAt), tieCreatedAt)
+	// The suites share one database and run in parallel, so another test's
+	// project can land on the same microsecond: the moment alone does not
+	// single out these three.
+	idCol := database.Col(domain.ProjectFieldID)
+	tieFilter := database.And(
+		database.Equal(database.Col(domain.ProjectFieldCreatedAt), tieCreatedAt),
+		database.Or(
+			database.Equal(idCol, ids[0]),
+			database.Equal(idCol, ids[1]),
+			database.Equal(idCol, ids[2]),
+		),
+	)
 	wantFirst, wantSecond := wantPages(ids)
 
 	page := database.Page[domain.ProjectField]{

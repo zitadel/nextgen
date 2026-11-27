@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 
 import { auth } from "../auth";
-import { nextgenMiddleware } from "../middleware";
+import { zitadelMiddleware } from "../middleware";
 
 const mockHeaders = vi.hoisted(() => new Map<string, string>());
 
@@ -52,14 +52,17 @@ describe("session checks in the Next.js middleware", () => {
       headers: { cookie: `zitadel_session_${PROJECT}=opaque-session-token` },
     });
 
-    const response = await nextgenMiddleware(request, OPTIONS);
+    const response = await zitadelMiddleware(request, OPTIONS);
 
     expect(calls).toEqual([]);
-    const token = response.headers.get("x-middleware-request-x-nextgen-auth-token");
+    const token = response.headers.get("x-middleware-request-x-zitadel-auth-token");
     expect(token).toBe("opaque-session-token");
 
-    mockHeaders.set("x-nextgen-auth-token", token ?? "");
-    expect(await auth(OPTIONS)).toMatchObject({ isAuthenticated: true, session: { userId: "u1" } });
+    mockHeaders.set("x-zitadel-auth-token", token ?? "");
+    expect(await auth(OPTIONS)).toMatchObject({
+      isAuthenticated: true,
+      session: { userId: "u1" },
+    });
     expect(calls).toEqual([`http://localhost:4000/api/v1/sessions/me?project_id=${PROJECT}`]);
   });
 });

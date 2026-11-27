@@ -3,8 +3,11 @@
 package integration_test
 
 import (
+	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -159,11 +162,157 @@ func TestApplicationAccess(t *testing.T) {
 	})
 }
 
+// TestPublishApplicationIdempotencyKey holds one case per acceptance
+// criterion of #2923.
+func TestPublishApplicationIdempotencyKey(t *testing.T) {
+	t.Parallel()
+	f := newApplicationFixture(t)
+	stmts := harness.EnsureServiceDB(t).Statements()
+	storedSecretHashes := func(t *testing.T, clientID string) []string {
+		t.Helper()
+		client, err := stmts.GetApplicationClientByClientID(t.Context(), f.project.ID, clientID)
+		require.NoError(t, err)
+		secrets, err := stmts.ListApplicationClientSecrets(t.Context(), f.project.ID, client.ID)
+		require.NoError(t, err)
+		hashes := make([]string, len(secrets))
+		for i, secret := range secrets {
+			hashes[i] = secret.SecretHash
+		}
+		return hashes
+	}
+
+	t.Run("a create sent twice with the same key and body returns new secrets and keeps the revision", func(t *testing.T) {
+		keyed := f.withKey("create-twice")
+		app := api.Application{Slug: "twice", Name: "Twice", Clients: []api.ApplicationClient{webClient("web", ""), webClient("admin", "")}}
+		first := keyed.create(t, app)
+		retry := keyed.create(t, app)
+
+		assert.Equal(t, first.ID, retry.ID)
+		assert.Equal(t, first.RevisionID, retry.RevisionID)
+		require.Len(t, retry.ClientSecrets, 2)
+		for i, secret := range retry.ClientSecrets {
+			assert.Equal(t, first.ClientSecrets[i].ClientID, secret.ClientID)
+			assert.NotEqual(t, first.ClientSecrets[i].Secret, secret.Secret)
+			assert.Equal(t, []string{domain.HashSecret(secret.Secret)}, storedSecretHashes(t, secret.ClientID), "the first secret's hash is gone")
+		}
+		got := f.get(t, first.ID).(*api.ApplicationResponse)
+		assert.Equal(t, first.RevisionID, got.RevisionID)
+	})
+
+	t.Run("two requests with the same key and body at the same time answer as one", func(t *testing.T) {
+		app := api.Application{Slug: "parallel", Name: "Parallel", Clients: []api.ApplicationClient{webClient("web", ""), webClient("admin", "")}}
+		params := api.PublishApplicationParams{ProjectID: api.ProjectID(f.project.ID), IdempotencyKey: api.NewOptString("parallel")}
+		var (
+			wg        sync.WaitGroup
+			responses [2]api.PublishApplicationRes
+			errs      [2]error
+		)
+		for i := range responses {
+			wg.Go(func() {
+				responses[i], errs[i] = f.client.PublishApplication(t.Context(), &api.CreateApplicationRequest{Application: app}, params)
+			})
+		}
+		wg.Wait()
+
+		var created [2]api.CreateApplicationResponse
+		for i, resp := range responses {
+			require.NoError(t, errs[i])
+			require.IsType(t, &api.PublishApplicationCreated{}, resp, helpers.MustMarshal(t, resp))
+			created[i] = api.CreateApplicationResponse(*resp.(*api.PublishApplicationCreated))
+		}
+		assert.Equal(t, created[0].ID, created[1].ID)
+		got := f.get(t, created[0].ID).(*api.ApplicationResponse)
+		assert.Equal(t, got.RevisionID, created[0].RevisionID)
+		assert.Equal(t, got.RevisionID, created[1].RevisionID)
+		require.Len(t, created[0].ClientSecrets, 2)
+		require.Len(t, created[1].ClientSecrets, 2)
+		for i, secret := range created[0].ClientSecrets {
+			assert.Equal(t, secret.ClientID, created[1].ClientSecrets[i].ClientID)
+			hashes := storedSecretHashes(t, secret.ClientID)
+			require.Len(t, hashes, 1, "each client keeps one secret")
+			assert.Contains(t, []string{domain.HashSecret(secret.Secret), domain.HashSecret(created[1].ClientSecrets[i].Secret)}, hashes[0])
+		}
+	})
+
+	t.Run("a revision that adds a client, sent twice with the same key and body, returns the added client's secret", func(t *testing.T) {
+		app := api.Application{Slug: "grow", Name: "Grow", Clients: []api.ApplicationClient{webClient("web", "")}}
+		f.create(t, app)
+		app.Clients = append(app.Clients, webClient("admin", ""))
+		keyed := f.withKey("revise-twice")
+		first := keyed.revise(t, app)
+		retry := keyed.revise(t, app)
+
+		assert.Equal(t, first.RevisionID, retry.RevisionID)
+		require.Len(t, retry.ClientSecrets, 1)
+		assert.Equal(t, "admin", retry.ClientSecrets[0].Client)
+		assert.Equal(t, first.ClientSecrets[0].ClientID, retry.ClientSecrets[0].ClientID)
+	})
+
+	t.Run("a retry after a revision without the key returns that revision and the created clients' secrets", func(t *testing.T) {
+		app := api.Application{Slug: "between", Name: "Between", Clients: []api.ApplicationClient{webClient("web", "")}}
+		keyed := f.withKey("between")
+		first := keyed.create(t, app)
+		grown := app
+		grown.Clients = append(slices.Clone(app.Clients), webClient("admin", ""))
+		middle := f.revise(t, grown)
+		retry := keyed.create(t, app)
+
+		assert.Equal(t, first.ID, retry.ID)
+		assert.Equal(t, middle.RevisionID, retry.RevisionID)
+		require.Len(t, retry.ClientSecrets, 1)
+		assert.Equal(t, first.ClientSecrets[0].ClientID, retry.ClientSecrets[0].ClientID)
+	})
+
+	t.Run("the same key with another body is refused and stores nothing", func(t *testing.T) {
+		app := api.Application{Slug: "reused", Name: "Reused", Clients: []api.ApplicationClient{webClient("web", "")}}
+		keyed := f.withKey("reused")
+		first := keyed.create(t, app)
+		app.Name = "Another name"
+
+		resp := keyed.put(t, app)
+		require.IsType(t, &api.PublishApplicationUnprocessableEntity{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrApplicationIdempotencyKeyReused().Code), resp.(*api.PublishApplicationUnprocessableEntity).Code)
+		got := f.get(t, first.ID).(*api.ApplicationResponse)
+		assert.Equal(t, first.RevisionID, got.RevisionID)
+	})
+
+	t.Run("the same key and body after the window creates a revision and returns no secret", func(t *testing.T) {
+		app := api.Application{Slug: "expired", Name: "Expired", Clients: []api.ApplicationClient{webClient("web", "")}}
+		first := f.create(t, app)
+		document, err := app.MarshalJSON()
+		require.NoError(t, err)
+		client, err := stmts.GetApplicationClientByClientID(t.Context(), f.project.ID, first.ClientSecrets[0].ClientID)
+		require.NoError(t, err)
+		// Seeded below the API, which only stores keys that expire later.
+		firstRequest := time.Now().Add(-domain.ApplicationIdempotencyKeyTTL - time.Hour)
+		require.NoError(t, stmts.CreateApplicationIdempotencyKey(t.Context(), &domain.ApplicationIdempotencyKey{
+			ProjectID:     f.project.ID,
+			KeyHash:       domain.HashSecret("expired"),
+			RequestHash:   domain.HashSecret(string(document)),
+			ApplicationID: first.ID,
+			Created:       true,
+			ClientIDs:     []string{client.ID},
+			CreatedAt:     firstRequest,
+			ExpiresAt:     firstRequest.Add(domain.ApplicationIdempotencyKeyTTL),
+		}))
+
+		revised := f.withKey("expired").revise(t, app)
+		assert.NotEqual(t, first.RevisionID, revised.RevisionID)
+		assert.Empty(t, revised.ClientSecrets)
+	})
+}
+
 // applicationFixture is a project, removed when the test ends, and a client
-// holding that project's secret.
+// holding that project's secret. A non-empty key is sent as Idempotency-Key.
 type applicationFixture struct {
 	project *domain.Project
 	client  *helpers.ApiClient
+	key     string
+}
+
+func (f applicationFixture) withKey(key string) applicationFixture {
+	f.key = key
+	return f
 }
 
 func newApplicationFixture(t *testing.T) applicationFixture {
@@ -178,7 +327,11 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 
 func (f applicationFixture) put(t *testing.T, app api.Application) api.PublishApplicationRes {
 	t.Helper()
-	resp, err := f.client.PublishApplication(t.Context(), &api.CreateApplicationRequest{Application: app}, api.PublishApplicationParams{ProjectID: api.ProjectID(f.project.ID)})
+	params := api.PublishApplicationParams{ProjectID: api.ProjectID(f.project.ID)}
+	if f.key != "" {
+		params.IdempotencyKey = api.NewOptString(f.key)
+	}
+	resp, err := f.client.PublishApplication(t.Context(), &api.CreateApplicationRequest{Application: app}, params)
 	require.NoError(t, err)
 	return resp
 }

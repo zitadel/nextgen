@@ -28,6 +28,7 @@ type AcceptInvitationErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	InvAlreadyMember    InvAlreadyMember
 	InvInviterNotAdmin  InvInviterNotAdmin
 	InvNotFound         InvNotFound
 	InvPlatformRequired InvPlatformRequired
@@ -47,6 +48,7 @@ const (
 	AuthUnauthorizedAcceptInvitationErrorResponse    AcceptInvitationErrorResponseType = "auth.unauthorized"
 	EvtInvalidAcceptInvitationErrorResponse          AcceptInvitationErrorResponseType = "evt.invalid"
 	InternalAcceptInvitationErrorResponse            AcceptInvitationErrorResponseType = "internal"
+	InvAlreadyMemberAcceptInvitationErrorResponse    AcceptInvitationErrorResponseType = "inv.already_member"
 	InvInviterNotAdminAcceptInvitationErrorResponse  AcceptInvitationErrorResponseType = "inv.inviter_not_admin"
 	InvNotFoundAcceptInvitationErrorResponse         AcceptInvitationErrorResponseType = "inv.not_found"
 	InvPlatformRequiredAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.platform_required"
@@ -75,6 +77,11 @@ func (s AcceptInvitationErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether AcceptInvitationErrorResponse is Internal.
 func (s AcceptInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalAcceptInvitationErrorResponse
+}
+
+// IsInvAlreadyMember reports whether AcceptInvitationErrorResponse is InvAlreadyMember.
+func (s AcceptInvitationErrorResponse) IsInvAlreadyMember() bool {
+	return s.Type == InvAlreadyMemberAcceptInvitationErrorResponse
 }
 
 // IsInvInviterNotAdmin reports whether AcceptInvitationErrorResponse is InvInviterNotAdmin.
@@ -198,6 +205,27 @@ func (s AcceptInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalAcceptInvitationErrorResponse(v Internal) AcceptInvitationErrorResponse {
 	var s AcceptInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetInvAlreadyMember sets AcceptInvitationErrorResponse to InvAlreadyMember.
+func (s *AcceptInvitationErrorResponse) SetInvAlreadyMember(v InvAlreadyMember) {
+	s.Type = InvAlreadyMemberAcceptInvitationErrorResponse
+	s.InvAlreadyMember = v
+}
+
+// GetInvAlreadyMember returns InvAlreadyMember and true boolean if AcceptInvitationErrorResponse is InvAlreadyMember.
+func (s AcceptInvitationErrorResponse) GetInvAlreadyMember() (v InvAlreadyMember, ok bool) {
+	if !s.IsInvAlreadyMember() {
+		return v, false
+	}
+	return s.InvAlreadyMember, true
+}
+
+// NewInvAlreadyMemberAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvAlreadyMember.
+func NewInvAlreadyMemberAcceptInvitationErrorResponse(v InvAlreadyMember) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInvAlreadyMember(v)
 	return s
 }
 
@@ -1169,6 +1197,59 @@ func (s *AppFieldImmutableDetails) init() AppFieldImmutableDetails {
 
 // Merged schema.
 // Ref: #
+type AppIdempotencyKeyReused struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppIdempotencyKeyReusedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppIdempotencyKeyReused) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppIdempotencyKeyReused) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppIdempotencyKeyReused) GetDetails() OptAppIdempotencyKeyReusedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppIdempotencyKeyReused) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppIdempotencyKeyReused) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppIdempotencyKeyReused) SetDetails(val OptAppIdempotencyKeyReusedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppIdempotencyKeyReusedDetails map[string]jx.Raw
+
+func (s *AppIdempotencyKeyReusedDetails) init() AppIdempotencyKeyReusedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type AppInvalid struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -1702,6 +1783,483 @@ func (s *ApplicationClientSecret) SetSecret(val string) {
 	s.Secret = val
 }
 
+// Merged schema.
+// Ref: #
+type ApplicationClientSecretRotatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category ApplicationClientSecretRotatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock, to the millisecond.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock, to the millisecond.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilApplicationClientSecretRotatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a session, a token, a sign-in
+	// check or a credential belongs to, or the user a change was made to. Absent on an event that concerns
+	// no user.
+	UserID OptNilString `json:"user_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptApplicationClientSecretRotatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                            `json:"delegation_id"`
+	Grantor        OptString                                            `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
+	// `request.api` event of a request carries `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString       `json:"correlation_id"`
+	Metadata      OptEventMetadata   `json:"metadata"`
+	Payload       ApplicationPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *ApplicationClientSecretRotatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ApplicationClientSecretRotatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ApplicationClientSecretRotatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *ApplicationClientSecretRotatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *ApplicationClientSecretRotatedEvent) GetCategory() ApplicationClientSecretRotatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ApplicationClientSecretRotatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ApplicationClientSecretRotatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *ApplicationClientSecretRotatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ApplicationClientSecretRotatedEvent) GetActorType() OptNilApplicationClientSecretRotatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ApplicationClientSecretRotatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ApplicationClientSecretRotatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *ApplicationClientSecretRotatedEvent) GetUserID() OptNilString {
+	return s.UserID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationClientSecretRotatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ApplicationClientSecretRotatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ApplicationClientSecretRotatedEvent) GetDelegationType() OptApplicationClientSecretRotatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ApplicationClientSecretRotatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ApplicationClientSecretRotatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ApplicationClientSecretRotatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ApplicationClientSecretRotatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ApplicationClientSecretRotatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ApplicationClientSecretRotatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *ApplicationClientSecretRotatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ApplicationClientSecretRotatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ApplicationClientSecretRotatedEvent) GetPayload() ApplicationPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ApplicationClientSecretRotatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ApplicationClientSecretRotatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ApplicationClientSecretRotatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ApplicationClientSecretRotatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ApplicationClientSecretRotatedEvent) SetCategory(val ApplicationClientSecretRotatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ApplicationClientSecretRotatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ApplicationClientSecretRotatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ApplicationClientSecretRotatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ApplicationClientSecretRotatedEvent) SetActorType(val OptNilApplicationClientSecretRotatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ApplicationClientSecretRotatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ApplicationClientSecretRotatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *ApplicationClientSecretRotatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationClientSecretRotatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ApplicationClientSecretRotatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ApplicationClientSecretRotatedEvent) SetDelegationType(val OptApplicationClientSecretRotatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ApplicationClientSecretRotatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ApplicationClientSecretRotatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ApplicationClientSecretRotatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ApplicationClientSecretRotatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ApplicationClientSecretRotatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ApplicationClientSecretRotatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *ApplicationClientSecretRotatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ApplicationClientSecretRotatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ApplicationClientSecretRotatedEvent) SetPayload(val ApplicationPayload) {
+	s.Payload = val
+}
+
+type ApplicationClientSecretRotatedEventActorType string
+
+const (
+	ApplicationClientSecretRotatedEventActorTypeHuman   ApplicationClientSecretRotatedEventActorType = "human"
+	ApplicationClientSecretRotatedEventActorTypeService ApplicationClientSecretRotatedEventActorType = "service"
+	ApplicationClientSecretRotatedEventActorTypeSystem  ApplicationClientSecretRotatedEventActorType = "system"
+	ApplicationClientSecretRotatedEventActorTypeAgent   ApplicationClientSecretRotatedEventActorType = "agent"
+)
+
+// AllValues returns all ApplicationClientSecretRotatedEventActorType values.
+func (ApplicationClientSecretRotatedEventActorType) AllValues() []ApplicationClientSecretRotatedEventActorType {
+	return []ApplicationClientSecretRotatedEventActorType{
+		ApplicationClientSecretRotatedEventActorTypeHuman,
+		ApplicationClientSecretRotatedEventActorTypeService,
+		ApplicationClientSecretRotatedEventActorTypeSystem,
+		ApplicationClientSecretRotatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationClientSecretRotatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationClientSecretRotatedEventActorTypeHuman:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventActorTypeService:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventActorTypeSystem:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationClientSecretRotatedEventActorType) UnmarshalText(data []byte) error {
+	switch ApplicationClientSecretRotatedEventActorType(data) {
+	case ApplicationClientSecretRotatedEventActorTypeHuman:
+		*s = ApplicationClientSecretRotatedEventActorTypeHuman
+		return nil
+	case ApplicationClientSecretRotatedEventActorTypeService:
+		*s = ApplicationClientSecretRotatedEventActorTypeService
+		return nil
+	case ApplicationClientSecretRotatedEventActorTypeSystem:
+		*s = ApplicationClientSecretRotatedEventActorTypeSystem
+		return nil
+	case ApplicationClientSecretRotatedEventActorTypeAgent:
+		*s = ApplicationClientSecretRotatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type ApplicationClientSecretRotatedEventCategory string
+
+const (
+	ApplicationClientSecretRotatedEventCategoryRequest ApplicationClientSecretRotatedEventCategory = "request"
+	ApplicationClientSecretRotatedEventCategoryAuth    ApplicationClientSecretRotatedEventCategory = "auth"
+	ApplicationClientSecretRotatedEventCategorySession ApplicationClientSecretRotatedEventCategory = "session"
+	ApplicationClientSecretRotatedEventCategoryAdmin   ApplicationClientSecretRotatedEventCategory = "admin"
+	ApplicationClientSecretRotatedEventCategoryEntity  ApplicationClientSecretRotatedEventCategory = "entity"
+	ApplicationClientSecretRotatedEventCategorySignal  ApplicationClientSecretRotatedEventCategory = "signal"
+)
+
+// AllValues returns all ApplicationClientSecretRotatedEventCategory values.
+func (ApplicationClientSecretRotatedEventCategory) AllValues() []ApplicationClientSecretRotatedEventCategory {
+	return []ApplicationClientSecretRotatedEventCategory{
+		ApplicationClientSecretRotatedEventCategoryRequest,
+		ApplicationClientSecretRotatedEventCategoryAuth,
+		ApplicationClientSecretRotatedEventCategorySession,
+		ApplicationClientSecretRotatedEventCategoryAdmin,
+		ApplicationClientSecretRotatedEventCategoryEntity,
+		ApplicationClientSecretRotatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationClientSecretRotatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationClientSecretRotatedEventCategoryRequest:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventCategoryAuth:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventCategorySession:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventCategoryAdmin:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventCategoryEntity:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationClientSecretRotatedEventCategory) UnmarshalText(data []byte) error {
+	switch ApplicationClientSecretRotatedEventCategory(data) {
+	case ApplicationClientSecretRotatedEventCategoryRequest:
+		*s = ApplicationClientSecretRotatedEventCategoryRequest
+		return nil
+	case ApplicationClientSecretRotatedEventCategoryAuth:
+		*s = ApplicationClientSecretRotatedEventCategoryAuth
+		return nil
+	case ApplicationClientSecretRotatedEventCategorySession:
+		*s = ApplicationClientSecretRotatedEventCategorySession
+		return nil
+	case ApplicationClientSecretRotatedEventCategoryAdmin:
+		*s = ApplicationClientSecretRotatedEventCategoryAdmin
+		return nil
+	case ApplicationClientSecretRotatedEventCategoryEntity:
+		*s = ApplicationClientSecretRotatedEventCategoryEntity
+		return nil
+	case ApplicationClientSecretRotatedEventCategorySignal:
+		*s = ApplicationClientSecretRotatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type ApplicationClientSecretRotatedEventDelegationType string
+
+const (
+	ApplicationClientSecretRotatedEventDelegationTypeDirect    ApplicationClientSecretRotatedEventDelegationType = "direct"
+	ApplicationClientSecretRotatedEventDelegationTypeDelegated ApplicationClientSecretRotatedEventDelegationType = "delegated"
+	ApplicationClientSecretRotatedEventDelegationTypePatShared ApplicationClientSecretRotatedEventDelegationType = "pat_shared"
+	ApplicationClientSecretRotatedEventDelegationTypeExchanged ApplicationClientSecretRotatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ApplicationClientSecretRotatedEventDelegationType values.
+func (ApplicationClientSecretRotatedEventDelegationType) AllValues() []ApplicationClientSecretRotatedEventDelegationType {
+	return []ApplicationClientSecretRotatedEventDelegationType{
+		ApplicationClientSecretRotatedEventDelegationTypeDirect,
+		ApplicationClientSecretRotatedEventDelegationTypeDelegated,
+		ApplicationClientSecretRotatedEventDelegationTypePatShared,
+		ApplicationClientSecretRotatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationClientSecretRotatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationClientSecretRotatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ApplicationClientSecretRotatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationClientSecretRotatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ApplicationClientSecretRotatedEventDelegationType(data) {
+	case ApplicationClientSecretRotatedEventDelegationTypeDirect:
+		*s = ApplicationClientSecretRotatedEventDelegationTypeDirect
+		return nil
+	case ApplicationClientSecretRotatedEventDelegationTypeDelegated:
+		*s = ApplicationClientSecretRotatedEventDelegationTypeDelegated
+		return nil
+	case ApplicationClientSecretRotatedEventDelegationTypePatShared:
+		*s = ApplicationClientSecretRotatedEventDelegationTypePatShared
+		return nil
+	case ApplicationClientSecretRotatedEventDelegationTypeExchanged:
+		*s = ApplicationClientSecretRotatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // A `confidential` client runs where a secret can be kept, such as a web app's backend, and
 // authenticates with one at the token endpoint. Public clients, which hold no secret, are not
 // available yet.
@@ -1783,9 +2341,16 @@ type ApplicationCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
-	Metadata OptEventMetadata   `json:"metadata"`
-	Payload  ApplicationPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString       `json:"correlation_id"`
+	Metadata      OptEventMetadata   `json:"metadata"`
+	Payload       ApplicationPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -1891,6 +2456,11 @@ func (s *ApplicationCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ApplicationCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *ApplicationCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -2006,6 +2576,11 @@ func (s *ApplicationCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ApplicationCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *ApplicationCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -2201,16 +2776,19 @@ func (s *ApplicationCreatedEventDelegationType) UnmarshalText(data []byte) error
 
 // Payload for `application.created`, which holds every field, and `application.updated`, which holds
 // the new `revision_id`, `name` when it changed, and `client_ids` when the revision added a client.
-// The application ID is the event's `entity_id`. The application document and the client secrets are
-// never included.
+// `application.client_secret.rotated` holds the `client_ids` whose secrets were replaced and the
+// newest `revision_id`. The application ID is the event's `entity_id`. The application document and
+// the client secrets are never included.
 // Ref: #
 type ApplicationPayload struct {
 	Slug OptString `json:"slug"`
 	Name OptString `json:"name"`
 	// The `client_id` of each client the write created. A registered application's new client got a new
-	// secret; a declared one's names the variable holding its secret.
+	// secret; a declared one's names the variable holding its secret. For
+	// `application.client_secret.rotated`, the clients whose secrets were replaced.
 	ClientIds []string `json:"client_ids"`
-	// The revision the write appended.
+	// The revision the write appended. For `application.client_secret.rotated`, the newest revision, which
+	// the retry did not change.
 	RevisionID string `json:"revision_id"`
 }
 
@@ -2397,9 +2975,16 @@ type ApplicationUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
-	Metadata OptEventMetadata   `json:"metadata"`
-	Payload  ApplicationPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString       `json:"correlation_id"`
+	Metadata      OptEventMetadata   `json:"metadata"`
+	Payload       ApplicationPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -2505,6 +3090,11 @@ func (s *ApplicationUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ApplicationUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *ApplicationUpdatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -2620,6 +3210,11 @@ func (s *ApplicationUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ApplicationUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *ApplicationUpdatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -3283,9 +3878,16 @@ type AuthAttemptCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -3391,6 +3993,11 @@ func (s *AuthAttemptCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthAttemptCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthAttemptCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -3506,6 +4113,11 @@ func (s *AuthAttemptCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthAttemptCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthAttemptCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -3743,9 +4355,16 @@ type AuthAttemptHandedOffEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -3851,6 +4470,11 @@ func (s *AuthAttemptHandedOffEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthAttemptHandedOffEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthAttemptHandedOffEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -3966,6 +4590,11 @@ func (s *AuthAttemptHandedOffEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthAttemptHandedOffEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthAttemptHandedOffEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -4417,9 +5046,16 @@ type AuthCheckFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  AuthCheckPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       AuthCheckPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -4525,6 +5161,11 @@ func (s *AuthCheckFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthCheckFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthCheckFailedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -4640,6 +5281,11 @@ func (s *AuthCheckFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthCheckFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthCheckFailedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -4917,9 +5563,16 @@ type AuthCheckSucceededEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  AuthCheckPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       AuthCheckPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -5025,6 +5678,11 @@ func (s *AuthCheckSucceededEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthCheckSucceededEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthCheckSucceededEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -5140,6 +5798,11 @@ func (s *AuthCheckSucceededEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthCheckSucceededEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthCheckSucceededEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -5430,9 +6093,16 @@ type AuthFactorPasskeyEnrolledEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  AuthFactorPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       AuthFactorPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -5538,6 +6208,11 @@ func (s *AuthFactorPasskeyEnrolledEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthFactorPasskeyEnrolledEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthFactorPasskeyEnrolledEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -5653,6 +6328,11 @@ func (s *AuthFactorPasskeyEnrolledEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthFactorPasskeyEnrolledEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthFactorPasskeyEnrolledEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -5890,9 +6570,16 @@ type AuthFactorPasswordSetEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  AuthFactorPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       AuthFactorPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -5998,6 +6685,11 @@ func (s *AuthFactorPasswordSetEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthFactorPasswordSetEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthFactorPasswordSetEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -6113,6 +6805,11 @@ func (s *AuthFactorPasswordSetEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthFactorPasswordSetEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthFactorPasswordSetEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -6454,9 +7151,16 @@ type AuthRequestCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString              `json:"flow_id"`
-	Metadata OptEventMetadata          `json:"metadata"`
-	Payload  AuthRequestCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString              `json:"correlation_id"`
+	Metadata      OptEventMetadata          `json:"metadata"`
+	Payload       AuthRequestCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -6562,6 +7266,11 @@ func (s *AuthRequestCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthRequestCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthRequestCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -6677,6 +7386,11 @@ func (s *AuthRequestCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthRequestCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthRequestCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -6930,9 +7644,16 @@ type AuthRequestExchangeFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString                     `json:"flow_id"`
-	Metadata OptEventMetadata                 `json:"metadata"`
-	Payload  AuthRequestExchangeFailedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString                     `json:"correlation_id"`
+	Metadata      OptEventMetadata                 `json:"metadata"`
+	Payload       AuthRequestExchangeFailedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -7038,6 +7759,11 @@ func (s *AuthRequestExchangeFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthRequestExchangeFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthRequestExchangeFailedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -7153,6 +7879,11 @@ func (s *AuthRequestExchangeFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthRequestExchangeFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthRequestExchangeFailedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -7511,9 +8242,16 @@ type AuthSSOAuthorizationFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  AuthCheckPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       AuthCheckPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -7619,6 +8357,11 @@ func (s *AuthSSOAuthorizationFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthSSOAuthorizationFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthSSOAuthorizationFailedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -7734,6 +8477,11 @@ func (s *AuthSSOAuthorizationFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthSSOAuthorizationFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthSSOAuthorizationFailedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -7971,9 +8719,16 @@ type AuthSSOExchangeFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  AuthCheckPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       AuthCheckPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -8079,6 +8834,11 @@ func (s *AuthSSOExchangeFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthSSOExchangeFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthSSOExchangeFailedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -8194,6 +8954,11 @@ func (s *AuthSSOExchangeFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthSSOExchangeFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthSSOExchangeFailedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -8431,9 +9196,16 @@ type AuthSSOExchangeSucceededEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  AuthCheckPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       AuthCheckPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -8539,6 +9311,11 @@ func (s *AuthSSOExchangeSucceededEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthSSOExchangeSucceededEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthSSOExchangeSucceededEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -8654,6 +9431,11 @@ func (s *AuthSSOExchangeSucceededEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthSSOExchangeSucceededEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthSSOExchangeSucceededEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -8891,9 +9673,16 @@ type AuthTokenIssuedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString           `json:"flow_id"`
-	Metadata OptEventMetadata       `json:"metadata"`
-	Payload  AuthTokenIssuedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString           `json:"correlation_id"`
+	Metadata      OptEventMetadata       `json:"metadata"`
+	Payload       AuthTokenIssuedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -8999,6 +9788,11 @@ func (s *AuthTokenIssuedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthTokenIssuedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthTokenIssuedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -9114,6 +9908,11 @@ func (s *AuthTokenIssuedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthTokenIssuedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthTokenIssuedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -9379,9 +10178,16 @@ type AuthTokenRevokedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -9487,6 +10293,11 @@ func (s *AuthTokenRevokedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthTokenRevokedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthTokenRevokedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -9602,6 +10413,11 @@ func (s *AuthTokenRevokedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthTokenRevokedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthTokenRevokedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -9930,9 +10746,16 @@ type AuthzGrantedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString        `json:"flow_id"`
-	Metadata OptEventMetadata    `json:"metadata"`
-	Payload  AuthzGrantedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString        `json:"correlation_id"`
+	Metadata      OptEventMetadata    `json:"metadata"`
+	Payload       AuthzGrantedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -10038,6 +10861,11 @@ func (s *AuthzGrantedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthzGrantedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthzGrantedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -10153,6 +10981,11 @@ func (s *AuthzGrantedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthzGrantedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthzGrantedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -10428,9 +11261,16 @@ type AuthzRevokedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString        `json:"flow_id"`
-	Metadata OptEventMetadata    `json:"metadata"`
-	Payload  AuthzGrantedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString        `json:"correlation_id"`
+	Metadata      OptEventMetadata    `json:"metadata"`
+	Payload       AuthzGrantedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -10536,6 +11376,11 @@ func (s *AuthzRevokedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *AuthzRevokedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *AuthzRevokedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -10651,6 +11496,11 @@ func (s *AuthzRevokedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *AuthzRevokedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *AuthzRevokedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -11108,9 +11958,16 @@ type BrandingCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString           `json:"flow_id"`
-	Metadata OptEventMetadata       `json:"metadata"`
-	Payload  BrandingCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString           `json:"correlation_id"`
+	Metadata      OptEventMetadata       `json:"metadata"`
+	Payload       BrandingCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -11216,6 +12073,11 @@ func (s *BrandingCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *BrandingCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *BrandingCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -11331,6 +12193,11 @@ func (s *BrandingCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *BrandingCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *BrandingCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -26406,9 +27273,16 @@ type DeploymentCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString             `json:"flow_id"`
-	Metadata OptEventMetadata         `json:"metadata"`
-	Payload  DeploymentCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString             `json:"correlation_id"`
+	Metadata      OptEventMetadata         `json:"metadata"`
+	Payload       DeploymentCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -26514,6 +27388,11 @@ func (s *DeploymentCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *DeploymentCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *DeploymentCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -26629,6 +27508,11 @@ func (s *DeploymentCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *DeploymentCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *DeploymentCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -28308,62 +29192,63 @@ func (s *EvaluatePolicyResponseViolations) init() EvaluatePolicyResponseViolatio
 // Event represents sum type.
 type Event struct {
 	// Type selects the active sum variant, switch on this field.
-	Type                             EventType
-	ApplicationCreatedEvent          ApplicationCreatedEvent
-	ApplicationUpdatedEvent          ApplicationUpdatedEvent
-	AuthAttemptCreatedEvent          AuthAttemptCreatedEvent
-	AuthAttemptHandedOffEvent        AuthAttemptHandedOffEvent
-	AuthCheckFailedEvent             AuthCheckFailedEvent
-	AuthCheckSucceededEvent          AuthCheckSucceededEvent
-	AuthFactorPasskeyEnrolledEvent   AuthFactorPasskeyEnrolledEvent
-	AuthFactorPasswordSetEvent       AuthFactorPasswordSetEvent
-	AuthRequestCreatedEvent          AuthRequestCreatedEvent
-	AuthRequestExchangeFailedEvent   AuthRequestExchangeFailedEvent
-	AuthSSOAuthorizationFailedEvent  AuthSSOAuthorizationFailedEvent
-	AuthSSOExchangeFailedEvent       AuthSSOExchangeFailedEvent
-	AuthSSOExchangeSucceededEvent    AuthSSOExchangeSucceededEvent
-	AuthTokenIssuedEvent             AuthTokenIssuedEvent
-	AuthTokenRevokedEvent            AuthTokenRevokedEvent
-	AuthzGrantedEvent                AuthzGrantedEvent
-	AuthzRevokedEvent                AuthzRevokedEvent
-	BrandingCreatedEvent             BrandingCreatedEvent
-	DeploymentCreatedEvent           DeploymentCreatedEvent
-	FlowSignupChallengeConsumedEvent FlowSignupChallengeConsumedEvent
-	FlowSignupChallengeIssuedEvent   FlowSignupChallengeIssuedEvent
-	FlowdefCreatedEvent              FlowdefCreatedEvent
-	FlowdefDeletedEvent              FlowdefDeletedEvent
-	FlowdefUpdatedEvent              FlowdefUpdatedEvent
-	IdpCreatedEvent                  IdpCreatedEvent
-	IdpIdentityLinkCreatedEvent      IdpIdentityLinkCreatedEvent
-	IdpUpdatedEvent                  IdpUpdatedEvent
-	InvitationAcceptedEvent          InvitationAcceptedEvent
-	InvitationCancelledEvent         InvitationCancelledEvent
-	InvitationCreatedEvent           InvitationCreatedEvent
-	InvitationRejectedEvent          InvitationRejectedEvent
-	OAuthSettingsCreatedEvent        OAuthSettingsCreatedEvent
-	OriginAddedEvent                 OriginAddedEvent
-	OriginRemovedEvent               OriginRemovedEvent
-	PolicyCreatedEvent               PolicyCreatedEvent
-	PolicyUpdatedEvent               PolicyUpdatedEvent
-	PreviewRemovedEvent              PreviewRemovedEvent
-	ProjectCreatedEvent              ProjectCreatedEvent
-	ProjectDeletedEvent              ProjectDeletedEvent
-	ProjectUpdatedEvent              ProjectUpdatedEvent
-	ReleaseCreatedEvent              ReleaseCreatedEvent
-	ReleaseRevokedEvent              ReleaseRevokedEvent
-	RequestAPIEvent                  RequestAPIEvent
-	SchemaCreatedEvent               SchemaCreatedEvent
-	SessionDeletedEvent              SessionDeletedEvent
-	SessionEstablishedEvent          SessionEstablishedEvent
-	TeamCreatedEvent                 TeamCreatedEvent
-	TeamDeactivatedEvent             TeamDeactivatedEvent
-	TeamUpdatedEvent                 TeamUpdatedEvent
-	UserCreateFailedEvent            UserCreateFailedEvent
-	UserCreatedEvent                 UserCreatedEvent
-	UserDeletedEvent                 UserDeletedEvent
-	UserUpdatedEvent                 UserUpdatedEvent
-	VariableRemovedEvent             VariableRemovedEvent
-	VariableSetEvent                 VariableSetEvent
+	Type                                EventType
+	ApplicationClientSecretRotatedEvent ApplicationClientSecretRotatedEvent
+	ApplicationCreatedEvent             ApplicationCreatedEvent
+	ApplicationUpdatedEvent             ApplicationUpdatedEvent
+	AuthAttemptCreatedEvent             AuthAttemptCreatedEvent
+	AuthAttemptHandedOffEvent           AuthAttemptHandedOffEvent
+	AuthCheckFailedEvent                AuthCheckFailedEvent
+	AuthCheckSucceededEvent             AuthCheckSucceededEvent
+	AuthFactorPasskeyEnrolledEvent      AuthFactorPasskeyEnrolledEvent
+	AuthFactorPasswordSetEvent          AuthFactorPasswordSetEvent
+	AuthRequestCreatedEvent             AuthRequestCreatedEvent
+	AuthRequestExchangeFailedEvent      AuthRequestExchangeFailedEvent
+	AuthSSOAuthorizationFailedEvent     AuthSSOAuthorizationFailedEvent
+	AuthSSOExchangeFailedEvent          AuthSSOExchangeFailedEvent
+	AuthSSOExchangeSucceededEvent       AuthSSOExchangeSucceededEvent
+	AuthTokenIssuedEvent                AuthTokenIssuedEvent
+	AuthTokenRevokedEvent               AuthTokenRevokedEvent
+	AuthzGrantedEvent                   AuthzGrantedEvent
+	AuthzRevokedEvent                   AuthzRevokedEvent
+	BrandingCreatedEvent                BrandingCreatedEvent
+	DeploymentCreatedEvent              DeploymentCreatedEvent
+	FlowSignupChallengeConsumedEvent    FlowSignupChallengeConsumedEvent
+	FlowSignupChallengeIssuedEvent      FlowSignupChallengeIssuedEvent
+	FlowdefCreatedEvent                 FlowdefCreatedEvent
+	FlowdefDeletedEvent                 FlowdefDeletedEvent
+	FlowdefUpdatedEvent                 FlowdefUpdatedEvent
+	IdpCreatedEvent                     IdpCreatedEvent
+	IdpIdentityLinkCreatedEvent         IdpIdentityLinkCreatedEvent
+	IdpUpdatedEvent                     IdpUpdatedEvent
+	InvitationAcceptedEvent             InvitationAcceptedEvent
+	InvitationCancelledEvent            InvitationCancelledEvent
+	InvitationCreatedEvent              InvitationCreatedEvent
+	InvitationRejectedEvent             InvitationRejectedEvent
+	OAuthSettingsCreatedEvent           OAuthSettingsCreatedEvent
+	OriginAddedEvent                    OriginAddedEvent
+	OriginRemovedEvent                  OriginRemovedEvent
+	PolicyCreatedEvent                  PolicyCreatedEvent
+	PolicyUpdatedEvent                  PolicyUpdatedEvent
+	PreviewRemovedEvent                 PreviewRemovedEvent
+	ProjectCreatedEvent                 ProjectCreatedEvent
+	ProjectDeletedEvent                 ProjectDeletedEvent
+	ProjectUpdatedEvent                 ProjectUpdatedEvent
+	ReleaseCreatedEvent                 ReleaseCreatedEvent
+	ReleaseRevokedEvent                 ReleaseRevokedEvent
+	RequestAPIEvent                     RequestAPIEvent
+	SchemaCreatedEvent                  SchemaCreatedEvent
+	SessionDeletedEvent                 SessionDeletedEvent
+	SessionEstablishedEvent             SessionEstablishedEvent
+	TeamCreatedEvent                    TeamCreatedEvent
+	TeamDeactivatedEvent                TeamDeactivatedEvent
+	TeamUpdatedEvent                    TeamUpdatedEvent
+	UserCreateFailedEvent               UserCreateFailedEvent
+	UserCreatedEvent                    UserCreatedEvent
+	UserDeletedEvent                    UserDeletedEvent
+	UserUpdatedEvent                    UserUpdatedEvent
+	VariableRemovedEvent                VariableRemovedEvent
+	VariableSetEvent                    VariableSetEvent
 }
 
 // EventType is oneOf type of Event.
@@ -28371,62 +29256,68 @@ type EventType string
 
 // Possible values for EventType.
 const (
-	ApplicationCreatedEventEvent          EventType = "application.created"
-	ApplicationUpdatedEventEvent          EventType = "application.updated"
-	AuthAttemptCreatedEventEvent          EventType = "auth.attempt.created"
-	AuthAttemptHandedOffEventEvent        EventType = "auth.attempt.handed_off"
-	AuthCheckFailedEventEvent             EventType = "auth.check.failed"
-	AuthCheckSucceededEventEvent          EventType = "auth.check.succeeded"
-	AuthFactorPasskeyEnrolledEventEvent   EventType = "auth.factor.passkey.enrolled"
-	AuthFactorPasswordSetEventEvent       EventType = "auth.factor.password.set"
-	AuthRequestCreatedEventEvent          EventType = "auth.request.created"
-	AuthRequestExchangeFailedEventEvent   EventType = "auth.request.exchange.failed"
-	AuthSSOAuthorizationFailedEventEvent  EventType = "auth.sso.authorization.failed"
-	AuthSSOExchangeFailedEventEvent       EventType = "auth.sso.exchange.failed"
-	AuthSSOExchangeSucceededEventEvent    EventType = "auth.sso.exchange.succeeded"
-	AuthTokenIssuedEventEvent             EventType = "auth.token.issued"
-	AuthTokenRevokedEventEvent            EventType = "auth.token.revoked"
-	AuthzGrantedEventEvent                EventType = "authz.granted"
-	AuthzRevokedEventEvent                EventType = "authz.revoked"
-	BrandingCreatedEventEvent             EventType = "branding.created"
-	DeploymentCreatedEventEvent           EventType = "deployment.created"
-	FlowSignupChallengeConsumedEventEvent EventType = "flow.signup_challenge.consumed"
-	FlowSignupChallengeIssuedEventEvent   EventType = "flow.signup_challenge.issued"
-	FlowdefCreatedEventEvent              EventType = "flowdef.created"
-	FlowdefDeletedEventEvent              EventType = "flowdef.deleted"
-	FlowdefUpdatedEventEvent              EventType = "flowdef.updated"
-	IdpCreatedEventEvent                  EventType = "idp.created"
-	IdpIdentityLinkCreatedEventEvent      EventType = "idp.identity_link.created"
-	IdpUpdatedEventEvent                  EventType = "idp.updated"
-	InvitationAcceptedEventEvent          EventType = "invitation.accepted"
-	InvitationCancelledEventEvent         EventType = "invitation.cancelled"
-	InvitationCreatedEventEvent           EventType = "invitation.created"
-	InvitationRejectedEventEvent          EventType = "invitation.rejected"
-	OAuthSettingsCreatedEventEvent        EventType = "oauth_settings.created"
-	OriginAddedEventEvent                 EventType = "origin.added"
-	OriginRemovedEventEvent               EventType = "origin.removed"
-	PolicyCreatedEventEvent               EventType = "policy.created"
-	PolicyUpdatedEventEvent               EventType = "policy.updated"
-	PreviewRemovedEventEvent              EventType = "preview.removed"
-	ProjectCreatedEventEvent              EventType = "project.created"
-	ProjectDeletedEventEvent              EventType = "project.deleted"
-	ProjectUpdatedEventEvent              EventType = "project.updated"
-	ReleaseCreatedEventEvent              EventType = "release.created"
-	ReleaseRevokedEventEvent              EventType = "release.revoked"
-	RequestAPIEventEvent                  EventType = "request.api"
-	SchemaCreatedEventEvent               EventType = "schema.created"
-	SessionDeletedEventEvent              EventType = "session.deleted"
-	SessionEstablishedEventEvent          EventType = "session.established"
-	TeamCreatedEventEvent                 EventType = "team.created"
-	TeamDeactivatedEventEvent             EventType = "team.deactivated"
-	TeamUpdatedEventEvent                 EventType = "team.updated"
-	UserCreateFailedEventEvent            EventType = "user.create.failed"
-	UserCreatedEventEvent                 EventType = "user.created"
-	UserDeletedEventEvent                 EventType = "user.deleted"
-	UserUpdatedEventEvent                 EventType = "user.updated"
-	VariableRemovedEventEvent             EventType = "variable.removed"
-	VariableSetEventEvent                 EventType = "variable.set"
+	ApplicationClientSecretRotatedEventEvent EventType = "application.client_secret.rotated"
+	ApplicationCreatedEventEvent             EventType = "application.created"
+	ApplicationUpdatedEventEvent             EventType = "application.updated"
+	AuthAttemptCreatedEventEvent             EventType = "auth.attempt.created"
+	AuthAttemptHandedOffEventEvent           EventType = "auth.attempt.handed_off"
+	AuthCheckFailedEventEvent                EventType = "auth.check.failed"
+	AuthCheckSucceededEventEvent             EventType = "auth.check.succeeded"
+	AuthFactorPasskeyEnrolledEventEvent      EventType = "auth.factor.passkey.enrolled"
+	AuthFactorPasswordSetEventEvent          EventType = "auth.factor.password.set"
+	AuthRequestCreatedEventEvent             EventType = "auth.request.created"
+	AuthRequestExchangeFailedEventEvent      EventType = "auth.request.exchange.failed"
+	AuthSSOAuthorizationFailedEventEvent     EventType = "auth.sso.authorization.failed"
+	AuthSSOExchangeFailedEventEvent          EventType = "auth.sso.exchange.failed"
+	AuthSSOExchangeSucceededEventEvent       EventType = "auth.sso.exchange.succeeded"
+	AuthTokenIssuedEventEvent                EventType = "auth.token.issued"
+	AuthTokenRevokedEventEvent               EventType = "auth.token.revoked"
+	AuthzGrantedEventEvent                   EventType = "authz.granted"
+	AuthzRevokedEventEvent                   EventType = "authz.revoked"
+	BrandingCreatedEventEvent                EventType = "branding.created"
+	DeploymentCreatedEventEvent              EventType = "deployment.created"
+	FlowSignupChallengeConsumedEventEvent    EventType = "flow.signup_challenge.consumed"
+	FlowSignupChallengeIssuedEventEvent      EventType = "flow.signup_challenge.issued"
+	FlowdefCreatedEventEvent                 EventType = "flowdef.created"
+	FlowdefDeletedEventEvent                 EventType = "flowdef.deleted"
+	FlowdefUpdatedEventEvent                 EventType = "flowdef.updated"
+	IdpCreatedEventEvent                     EventType = "idp.created"
+	IdpIdentityLinkCreatedEventEvent         EventType = "idp.identity_link.created"
+	IdpUpdatedEventEvent                     EventType = "idp.updated"
+	InvitationAcceptedEventEvent             EventType = "invitation.accepted"
+	InvitationCancelledEventEvent            EventType = "invitation.cancelled"
+	InvitationCreatedEventEvent              EventType = "invitation.created"
+	InvitationRejectedEventEvent             EventType = "invitation.rejected"
+	OAuthSettingsCreatedEventEvent           EventType = "oauth_settings.created"
+	OriginAddedEventEvent                    EventType = "origin.added"
+	OriginRemovedEventEvent                  EventType = "origin.removed"
+	PolicyCreatedEventEvent                  EventType = "policy.created"
+	PolicyUpdatedEventEvent                  EventType = "policy.updated"
+	PreviewRemovedEventEvent                 EventType = "preview.removed"
+	ProjectCreatedEventEvent                 EventType = "project.created"
+	ProjectDeletedEventEvent                 EventType = "project.deleted"
+	ProjectUpdatedEventEvent                 EventType = "project.updated"
+	ReleaseCreatedEventEvent                 EventType = "release.created"
+	ReleaseRevokedEventEvent                 EventType = "release.revoked"
+	RequestAPIEventEvent                     EventType = "request.api"
+	SchemaCreatedEventEvent                  EventType = "schema.created"
+	SessionDeletedEventEvent                 EventType = "session.deleted"
+	SessionEstablishedEventEvent             EventType = "session.established"
+	TeamCreatedEventEvent                    EventType = "team.created"
+	TeamDeactivatedEventEvent                EventType = "team.deactivated"
+	TeamUpdatedEventEvent                    EventType = "team.updated"
+	UserCreateFailedEventEvent               EventType = "user.create.failed"
+	UserCreatedEventEvent                    EventType = "user.created"
+	UserDeletedEventEvent                    EventType = "user.deleted"
+	UserUpdatedEventEvent                    EventType = "user.updated"
+	VariableRemovedEventEvent                EventType = "variable.removed"
+	VariableSetEventEvent                    EventType = "variable.set"
 )
+
+// IsApplicationClientSecretRotatedEvent reports whether Event is ApplicationClientSecretRotatedEvent.
+func (s Event) IsApplicationClientSecretRotatedEvent() bool {
+	return s.Type == ApplicationClientSecretRotatedEventEvent
+}
 
 // IsApplicationCreatedEvent reports whether Event is ApplicationCreatedEvent.
 func (s Event) IsApplicationCreatedEvent() bool { return s.Type == ApplicationCreatedEventEvent }
@@ -28606,6 +29497,27 @@ func (s Event) IsVariableRemovedEvent() bool { return s.Type == VariableRemovedE
 
 // IsVariableSetEvent reports whether Event is VariableSetEvent.
 func (s Event) IsVariableSetEvent() bool { return s.Type == VariableSetEventEvent }
+
+// SetApplicationClientSecretRotatedEvent sets Event to ApplicationClientSecretRotatedEvent.
+func (s *Event) SetApplicationClientSecretRotatedEvent(v ApplicationClientSecretRotatedEvent) {
+	s.Type = ApplicationClientSecretRotatedEventEvent
+	s.ApplicationClientSecretRotatedEvent = v
+}
+
+// GetApplicationClientSecretRotatedEvent returns ApplicationClientSecretRotatedEvent and true boolean if Event is ApplicationClientSecretRotatedEvent.
+func (s Event) GetApplicationClientSecretRotatedEvent() (v ApplicationClientSecretRotatedEvent, ok bool) {
+	if !s.IsApplicationClientSecretRotatedEvent() {
+		return v, false
+	}
+	return s.ApplicationClientSecretRotatedEvent, true
+}
+
+// NewApplicationClientSecretRotatedEventEvent returns new Event from ApplicationClientSecretRotatedEvent.
+func NewApplicationClientSecretRotatedEventEvent(v ApplicationClientSecretRotatedEvent) Event {
+	var s Event
+	s.SetApplicationClientSecretRotatedEvent(v)
+	return s
+}
 
 // SetApplicationCreatedEvent sets Event to ApplicationCreatedEvent.
 func (s *Event) SetApplicationCreatedEvent(v ApplicationCreatedEvent) {
@@ -29772,6 +30684,10 @@ type EventMetadata struct {
 	// What authorized the request, when it was not a grant on the event's project. Every event of such a
 	// request carries it.
 	Authorization OptEventMetadataAuthorization `json:"authorization"`
+	// The OpenTelemetry trace ID of the request, set only on events from an API request (`request.api`)
+	// whose trace was sampled. It leads from the event to the request's trace in the operator's tracing
+	// backend. It is observed context, not a filter: `correlation_id` and `request_id` correlate events.
+	TraceID OptString `json:"trace_id"`
 	// The observed HTTP requestor context, set only on events from an API request (`request.api`).
 	Client          OptEventMetadataClient `json:"client"`
 	AdditionalProps EventMetadataAdditional
@@ -29780,6 +30696,11 @@ type EventMetadata struct {
 // GetAuthorization returns the value of Authorization.
 func (s *EventMetadata) GetAuthorization() OptEventMetadataAuthorization {
 	return s.Authorization
+}
+
+// GetTraceID returns the value of TraceID.
+func (s *EventMetadata) GetTraceID() OptString {
+	return s.TraceID
 }
 
 // GetClient returns the value of Client.
@@ -29795,6 +30716,11 @@ func (s *EventMetadata) GetAdditionalProps() EventMetadataAdditional {
 // SetAuthorization sets the value of Authorization.
 func (s *EventMetadata) SetAuthorization(val OptEventMetadataAuthorization) {
 	s.Authorization = val
+}
+
+// SetTraceID sets the value of TraceID.
+func (s *EventMetadata) SetTraceID(val OptString) {
+	s.TraceID = val
 }
 
 // SetClient sets the value of Client.
@@ -33044,9 +33970,16 @@ type FlowSignupChallengeConsumedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -33152,6 +34085,11 @@ func (s *FlowSignupChallengeConsumedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowSignupChallengeConsumedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *FlowSignupChallengeConsumedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -33267,6 +34205,11 @@ func (s *FlowSignupChallengeConsumedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowSignupChallengeConsumedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *FlowSignupChallengeConsumedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -33504,9 +34447,16 @@ type FlowSignupChallengeIssuedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -33612,6 +34562,11 @@ func (s *FlowSignupChallengeIssuedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowSignupChallengeIssuedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *FlowSignupChallengeIssuedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -33727,6 +34682,11 @@ func (s *FlowSignupChallengeIssuedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowSignupChallengeIssuedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *FlowSignupChallengeIssuedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -34845,9 +35805,16 @@ type FlowdefCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  FlowdefPayload   `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       FlowdefPayload   `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -34953,6 +35920,11 @@ func (s *FlowdefCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowdefCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *FlowdefCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -35068,6 +36040,11 @@ func (s *FlowdefCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowdefCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *FlowdefCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -35305,9 +36282,16 @@ type FlowdefDeletedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -35413,6 +36397,11 @@ func (s *FlowdefDeletedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowdefDeletedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *FlowdefDeletedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -35528,6 +36517,11 @@ func (s *FlowdefDeletedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowdefDeletedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *FlowdefDeletedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -36275,9 +37269,16 @@ type FlowdefUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  FlowdefPayload   `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       FlowdefPayload   `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -36383,6 +37384,11 @@ func (s *FlowdefUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *FlowdefUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *FlowdefUpdatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -36498,6 +37504,11 @@ func (s *FlowdefUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *FlowdefUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *FlowdefUpdatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -46914,9 +47925,16 @@ type IdpCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  IdpPayload       `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       IdpPayload       `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -47022,6 +48040,11 @@ func (s *IdpCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *IdpCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *IdpCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -47137,6 +48160,11 @@ func (s *IdpCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *IdpCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *IdpCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -47580,9 +48608,16 @@ type IdpIdentityLinkCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString                  `json:"flow_id"`
-	Metadata OptEventMetadata              `json:"metadata"`
-	Payload  IdpIdentityLinkCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString                  `json:"correlation_id"`
+	Metadata      OptEventMetadata              `json:"metadata"`
+	Payload       IdpIdentityLinkCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -47688,6 +48723,11 @@ func (s *IdpIdentityLinkCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *IdpIdentityLinkCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *IdpIdentityLinkCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -47803,6 +48843,11 @@ func (s *IdpIdentityLinkCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *IdpIdentityLinkCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *IdpIdentityLinkCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -48523,9 +49568,16 @@ type IdpUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  IdpPayload       `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       IdpPayload       `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -48631,6 +49683,11 @@ func (s *IdpUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *IdpUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *IdpUpdatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -48746,6 +49803,11 @@ func (s *IdpUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *IdpUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *IdpUpdatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -49027,6 +50089,59 @@ func (s *Internal) SetDetails(val OptInternalDetails) {
 type InternalDetails map[string]jx.Raw
 
 func (s *InternalDetails) init() InternalDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type InvAlreadyMember struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvAlreadyMemberDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvAlreadyMember) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvAlreadyMember) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvAlreadyMember) GetDetails() OptInvAlreadyMemberDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvAlreadyMember) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvAlreadyMember) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvAlreadyMember) SetDetails(val OptInvAlreadyMemberDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvAlreadyMemberDetails map[string]jx.Raw
+
+func (s *InvAlreadyMemberDetails) init() InvAlreadyMemberDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -49630,9 +50745,16 @@ type InvitationAcceptedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString              `json:"flow_id"`
-	Metadata OptEventMetadata          `json:"metadata"`
-	Payload  InvitationAcceptedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString              `json:"correlation_id"`
+	Metadata      OptEventMetadata          `json:"metadata"`
+	Payload       InvitationAcceptedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -49738,6 +50860,11 @@ func (s *InvitationAcceptedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *InvitationAcceptedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *InvitationAcceptedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -49853,6 +50980,11 @@ func (s *InvitationAcceptedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *InvitationAcceptedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *InvitationAcceptedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -50468,9 +51600,16 @@ type InvitationCancelledEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString               `json:"flow_id"`
-	Metadata OptEventMetadata           `json:"metadata"`
-	Payload  InvitationCancelledPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString               `json:"correlation_id"`
+	Metadata      OptEventMetadata           `json:"metadata"`
+	Payload       InvitationCancelledPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -50576,6 +51715,11 @@ func (s *InvitationCancelledEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *InvitationCancelledEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *InvitationCancelledEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -50691,6 +51835,11 @@ func (s *InvitationCancelledEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *InvitationCancelledEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *InvitationCancelledEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -51001,9 +52150,16 @@ type InvitationCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString             `json:"flow_id"`
-	Metadata OptEventMetadata         `json:"metadata"`
-	Payload  InvitationCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString             `json:"correlation_id"`
+	Metadata      OptEventMetadata         `json:"metadata"`
+	Payload       InvitationCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -51109,6 +52265,11 @@ func (s *InvitationCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *InvitationCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *InvitationCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -51224,6 +52385,11 @@ func (s *InvitationCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *InvitationCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *InvitationCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -51726,6 +52892,74 @@ func (s *InvitationExpand) UnmarshalText(data []byte) error {
 
 type InvitationID string
 
+// The access the signed-in user already has to the project.
+// Ref: #
+type InvitationLookupMembership struct {
+	// The user's strongest role on the project, by any path: a grant to them or to a team they're in, the
+	// owning team, or operating the deployment. A stronger role includes the weaker ones.
+	Relation InvitationLookupMembershipRelation `json:"relation"`
+}
+
+// GetRelation returns the value of Relation.
+func (s *InvitationLookupMembership) GetRelation() InvitationLookupMembershipRelation {
+	return s.Relation
+}
+
+// SetRelation sets the value of Relation.
+func (s *InvitationLookupMembership) SetRelation(val InvitationLookupMembershipRelation) {
+	s.Relation = val
+}
+
+// The user's strongest role on the project, by any path: a grant to them or to a team they're in, the
+// owning team, or operating the deployment. A stronger role includes the weaker ones.
+type InvitationLookupMembershipRelation string
+
+const (
+	InvitationLookupMembershipRelationViewer InvitationLookupMembershipRelation = "viewer"
+	InvitationLookupMembershipRelationEditor InvitationLookupMembershipRelation = "editor"
+	InvitationLookupMembershipRelationAdmin  InvitationLookupMembershipRelation = "admin"
+)
+
+// AllValues returns all InvitationLookupMembershipRelation values.
+func (InvitationLookupMembershipRelation) AllValues() []InvitationLookupMembershipRelation {
+	return []InvitationLookupMembershipRelation{
+		InvitationLookupMembershipRelationViewer,
+		InvitationLookupMembershipRelationEditor,
+		InvitationLookupMembershipRelationAdmin,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationLookupMembershipRelation) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationLookupMembershipRelationViewer:
+		return []byte(s), nil
+	case InvitationLookupMembershipRelationEditor:
+		return []byte(s), nil
+	case InvitationLookupMembershipRelationAdmin:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationLookupMembershipRelation) UnmarshalText(data []byte) error {
+	switch InvitationLookupMembershipRelation(data) {
+	case InvitationLookupMembershipRelationViewer:
+		*s = InvitationLookupMembershipRelationViewer
+		return nil
+	case InvitationLookupMembershipRelationEditor:
+		*s = InvitationLookupMembershipRelationEditor
+		return nil
+	case InvitationLookupMembershipRelationAdmin:
+		*s = InvitationLookupMembershipRelationAdmin
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Merged schema.
 // Ref: #
 type InvitationLookupProjectMemberResponse struct {
@@ -51743,6 +52977,11 @@ type InvitationLookupProjectMemberResponse struct {
 	Status        InvitationStatus                          `json:"status"`
 	Type          InvitationLookupProjectMemberResponseType `json:"type"`
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
+	// The access the signed-in user already has to the project. A user with access can neither accept nor
+	// decline the invitation: both answer `409 inv.already_member` and leave it pending for the person it
+	// was meant for. Its inviter gets `inv.self_accept` or `inv.self_reject` instead. Null when the user
+	// has no access.
+	Membership OptNilInvitationLookupMembership `json:"membership"`
 }
 
 // GetProjectID returns the value of ProjectID.
@@ -51790,6 +53029,11 @@ func (s *InvitationLookupProjectMemberResponse) GetProjectMember() InvitationPro
 	return s.ProjectMember
 }
 
+// GetMembership returns the value of Membership.
+func (s *InvitationLookupProjectMemberResponse) GetMembership() OptNilInvitationLookupMembership {
+	return s.Membership
+}
+
 // SetProjectID sets the value of ProjectID.
 func (s *InvitationLookupProjectMemberResponse) SetProjectID(val ProjectID) {
 	s.ProjectID = val
@@ -51833,6 +53077,11 @@ func (s *InvitationLookupProjectMemberResponse) SetType(val InvitationLookupProj
 // SetProjectMember sets the value of ProjectMember.
 func (s *InvitationLookupProjectMemberResponse) SetProjectMember(val InvitationProjectMemberPayload) {
 	s.ProjectMember = val
+}
+
+// SetMembership sets the value of Membership.
+func (s *InvitationLookupProjectMemberResponse) SetMembership(val OptNilInvitationLookupMembership) {
+	s.Membership = val
 }
 
 type InvitationLookupProjectMemberResponseCreatedByType string
@@ -52587,9 +53836,16 @@ type InvitationRejectedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString              `json:"flow_id"`
-	Metadata OptEventMetadata          `json:"metadata"`
-	Payload  InvitationRejectedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString              `json:"correlation_id"`
+	Metadata      OptEventMetadata          `json:"metadata"`
+	Payload       InvitationRejectedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -52695,6 +53951,11 @@ func (s *InvitationRejectedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *InvitationRejectedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *InvitationRejectedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -52810,6 +54071,11 @@ func (s *InvitationRejectedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *InvitationRejectedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *InvitationRejectedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -60385,7 +61651,8 @@ func (s *OAuth2) SetScopes(val []string) {
 // The OAuth settings of a project: whether the project's OAuth authorization server answers. It has
 // one shape in two places: the `oauth` resource of the bundle `buildRelease` (`POST /releases/build`)
 // takes, which publishes it as a new immutable revision, and the read-only revision `getOAuthSettings`
-// (`GET /oauth_settings/{oauth_settings_id}`) returns.
+// (`GET /oauth_settings/{oauth_settings_id}`) returns. Locally it is the `.zitadel/oauth/` descriptor
+// that `zitadel deploy` publishes with the rest of the bundle.
 //
 // A release is the only writer: there is no operation that publishes OAuth settings on their own. A
 // release without `oauth` leaves the authorization server off.
@@ -60464,9 +61731,16 @@ type OAuthSettingsCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString                `json:"flow_id"`
-	Metadata OptEventMetadata            `json:"metadata"`
-	Payload  OAuthSettingsCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString                `json:"correlation_id"`
+	Metadata      OptEventMetadata            `json:"metadata"`
+	Payload       OAuthSettingsCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -60572,6 +61846,11 @@ func (s *OAuthSettingsCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *OAuthSettingsCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *OAuthSettingsCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -60687,6 +61966,11 @@ func (s *OAuthSettingsCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *OAuthSettingsCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *OAuthSettingsCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -61185,6 +62469,52 @@ func (o OptAppFieldImmutableDetails) Or(d AppFieldImmutableDetails) AppFieldImmu
 	return d
 }
 
+// NewOptAppIdempotencyKeyReusedDetails returns new OptAppIdempotencyKeyReusedDetails with value set to v.
+func NewOptAppIdempotencyKeyReusedDetails(v AppIdempotencyKeyReusedDetails) OptAppIdempotencyKeyReusedDetails {
+	return OptAppIdempotencyKeyReusedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppIdempotencyKeyReusedDetails is optional AppIdempotencyKeyReusedDetails.
+type OptAppIdempotencyKeyReusedDetails struct {
+	Value AppIdempotencyKeyReusedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppIdempotencyKeyReusedDetails was set.
+func (o OptAppIdempotencyKeyReusedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppIdempotencyKeyReusedDetails) Reset() {
+	var v AppIdempotencyKeyReusedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppIdempotencyKeyReusedDetails) SetTo(v AppIdempotencyKeyReusedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppIdempotencyKeyReusedDetails) Get() (v AppIdempotencyKeyReusedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppIdempotencyKeyReusedDetails) Or(d AppIdempotencyKeyReusedDetails) AppIdempotencyKeyReusedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAppInvalidDetails returns new OptAppInvalidDetails with value set to v.
 func NewOptAppInvalidDetails(v AppInvalidDetails) OptAppInvalidDetails {
 	return OptAppInvalidDetails{
@@ -61409,6 +62739,52 @@ func (o OptAppRevisionConflictDetails) Get() (v AppRevisionConflictDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAppRevisionConflictDetails) Or(d AppRevisionConflictDetails) AppRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationClientSecretRotatedEventDelegationType returns new OptApplicationClientSecretRotatedEventDelegationType with value set to v.
+func NewOptApplicationClientSecretRotatedEventDelegationType(v ApplicationClientSecretRotatedEventDelegationType) OptApplicationClientSecretRotatedEventDelegationType {
+	return OptApplicationClientSecretRotatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationClientSecretRotatedEventDelegationType is optional ApplicationClientSecretRotatedEventDelegationType.
+type OptApplicationClientSecretRotatedEventDelegationType struct {
+	Value ApplicationClientSecretRotatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationClientSecretRotatedEventDelegationType was set.
+func (o OptApplicationClientSecretRotatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationClientSecretRotatedEventDelegationType) Reset() {
+	var v ApplicationClientSecretRotatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationClientSecretRotatedEventDelegationType) SetTo(v ApplicationClientSecretRotatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationClientSecretRotatedEventDelegationType) Get() (v ApplicationClientSecretRotatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationClientSecretRotatedEventDelegationType) Or(d ApplicationClientSecretRotatedEventDelegationType) ApplicationClientSecretRotatedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -68545,6 +69921,52 @@ func (o OptInternalDetails) Or(d InternalDetails) InternalDetails {
 	return d
 }
 
+// NewOptInvAlreadyMemberDetails returns new OptInvAlreadyMemberDetails with value set to v.
+func NewOptInvAlreadyMemberDetails(v InvAlreadyMemberDetails) OptInvAlreadyMemberDetails {
+	return OptInvAlreadyMemberDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvAlreadyMemberDetails is optional InvAlreadyMemberDetails.
+type OptInvAlreadyMemberDetails struct {
+	Value InvAlreadyMemberDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvAlreadyMemberDetails was set.
+func (o OptInvAlreadyMemberDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvAlreadyMemberDetails) Reset() {
+	var v InvAlreadyMemberDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvAlreadyMemberDetails) SetTo(v InvAlreadyMemberDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvAlreadyMemberDetails) Get() (v InvAlreadyMemberDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvAlreadyMemberDetails) Or(d InvAlreadyMemberDetails) InvAlreadyMemberDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInvInvalidDetails returns new OptInvInvalidDetails with value set to v.
 func NewOptInvInvalidDetails(v InvInvalidDetails) OptInvInvalidDetails {
 	return OptInvInvalidDetails{
@@ -69689,6 +71111,74 @@ func (o OptListSchemasRevisions) Get() (v ListSchemasRevisions, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListSchemasRevisions) Or(d ListSchemasRevisions) ListSchemasRevisions {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilApplicationClientSecretRotatedEventActorType returns new OptNilApplicationClientSecretRotatedEventActorType with value set to v.
+func NewOptNilApplicationClientSecretRotatedEventActorType(v ApplicationClientSecretRotatedEventActorType) OptNilApplicationClientSecretRotatedEventActorType {
+	return OptNilApplicationClientSecretRotatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilApplicationClientSecretRotatedEventActorType is optional nullable ApplicationClientSecretRotatedEventActorType.
+type OptNilApplicationClientSecretRotatedEventActorType struct {
+	Value ApplicationClientSecretRotatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilApplicationClientSecretRotatedEventActorType was set.
+func (o OptNilApplicationClientSecretRotatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilApplicationClientSecretRotatedEventActorType) Reset() {
+	var v ApplicationClientSecretRotatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilApplicationClientSecretRotatedEventActorType) SetTo(v ApplicationClientSecretRotatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilApplicationClientSecretRotatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilApplicationClientSecretRotatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ApplicationClientSecretRotatedEventActorType
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilApplicationClientSecretRotatedEventActorType) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilApplicationClientSecretRotatedEventActorType) Get() (v ApplicationClientSecretRotatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilApplicationClientSecretRotatedEventActorType) Or(d ApplicationClientSecretRotatedEventActorType) ApplicationClientSecretRotatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -72205,6 +73695,74 @@ func (o OptNilInvitationCreatedEventActorType) Get() (v InvitationCreatedEventAc
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilInvitationCreatedEventActorType) Or(d InvitationCreatedEventActorType) InvitationCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationLookupMembership returns new OptNilInvitationLookupMembership with value set to v.
+func NewOptNilInvitationLookupMembership(v InvitationLookupMembership) OptNilInvitationLookupMembership {
+	return OptNilInvitationLookupMembership{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationLookupMembership is optional nullable InvitationLookupMembership.
+type OptNilInvitationLookupMembership struct {
+	Value InvitationLookupMembership
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationLookupMembership was set.
+func (o OptNilInvitationLookupMembership) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationLookupMembership) Reset() {
+	var v InvitationLookupMembership
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationLookupMembership) SetTo(v InvitationLookupMembership) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationLookupMembership) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationLookupMembership) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationLookupMembership
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilInvitationLookupMembership) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationLookupMembership) Get() (v InvitationLookupMembership, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationLookupMembership) Or(d InvitationLookupMembership) InvitationLookupMembership {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -82105,9 +83663,16 @@ type OriginAddedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  OriginPayload    `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       OriginPayload    `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -82213,6 +83778,11 @@ func (s *OriginAddedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *OriginAddedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *OriginAddedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -82328,6 +83898,11 @@ func (s *OriginAddedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *OriginAddedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *OriginAddedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -82898,9 +84473,16 @@ type OriginRemovedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  OriginPayload    `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       OriginPayload    `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -83006,6 +84588,11 @@ func (s *OriginRemovedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *OriginRemovedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *OriginRemovedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -83121,6 +84708,11 @@ func (s *OriginRemovedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *OriginRemovedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *OriginRemovedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -84869,9 +86461,16 @@ type PolicyCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  PolicyPayload    `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       PolicyPayload    `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -84977,6 +86576,11 @@ func (s *PolicyCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *PolicyCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *PolicyCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -85092,6 +86696,11 @@ func (s *PolicyCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *PolicyCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *PolicyCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -85431,9 +87040,16 @@ type PolicyUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  PolicyPayload    `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       PolicyPayload    `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -85539,6 +87155,11 @@ func (s *PolicyUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *PolicyUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *PolicyUpdatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -85654,6 +87275,11 @@ func (s *PolicyUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *PolicyUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *PolicyUpdatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -86025,9 +87651,16 @@ type PreviewRemovedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -86133,6 +87766,11 @@ func (s *PreviewRemovedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *PreviewRemovedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *PreviewRemovedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -86248,6 +87886,11 @@ func (s *PreviewRemovedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *PreviewRemovedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *PreviewRemovedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -87129,9 +88772,16 @@ type ProjectCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  ProjectPayload   `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       ProjectPayload   `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -87237,6 +88887,11 @@ func (s *ProjectCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ProjectCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *ProjectCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -87352,6 +89007,11 @@ func (s *ProjectCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ProjectCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *ProjectCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -87589,9 +89249,16 @@ type ProjectDeletedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -87697,6 +89364,11 @@ func (s *ProjectDeletedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ProjectDeletedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *ProjectDeletedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -87812,6 +89484,11 @@ func (s *ProjectDeletedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ProjectDeletedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *ProjectDeletedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -88653,9 +90330,16 @@ type ProjectUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  ProjectPayload   `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       ProjectPayload   `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -88761,6 +90445,11 @@ func (s *ProjectUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ProjectUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *ProjectUpdatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -88876,6 +90565,11 @@ func (s *ProjectUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ProjectUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *ProjectUpdatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -89084,20 +90778,21 @@ func (*PublishApplicationCreated) publishApplicationRes() {}
 // PublishApplicationErrorResponse represents sum type.
 type PublishApplicationErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
-	Type                PublishApplicationErrorResponseType
-	AppClientIDTaken    AppClientIDTaken
-	AppDeclared         AppDeclared
-	AppFieldImmutable   AppFieldImmutable
-	AppInvalid          AppInvalid
-	AppNotFound         AppNotFound
-	AppPermissionDenied AppPermissionDenied
-	AppRevisionConflict AppRevisionConflict
-	AuthUnauthorized    AuthUnauthorized
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ReqInvalid          ReqInvalid
-	Unavailable         Unavailable
+	Type                    PublishApplicationErrorResponseType
+	AppClientIDTaken        AppClientIDTaken
+	AppDeclared             AppDeclared
+	AppFieldImmutable       AppFieldImmutable
+	AppIdempotencyKeyReused AppIdempotencyKeyReused
+	AppInvalid              AppInvalid
+	AppNotFound             AppNotFound
+	AppPermissionDenied     AppPermissionDenied
+	AppRevisionConflict     AppRevisionConflict
+	AuthUnauthorized        AuthUnauthorized
+	EvtInvalid              EvtInvalid
+	Internal                Internal
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
 }
 
 // PublishApplicationErrorResponseType is oneOf type of PublishApplicationErrorResponse.
@@ -89105,19 +90800,20 @@ type PublishApplicationErrorResponseType string
 
 // Possible values for PublishApplicationErrorResponseType.
 const (
-	AppClientIDTakenPublishApplicationErrorResponse    PublishApplicationErrorResponseType = "app.client_id_taken"
-	AppDeclaredPublishApplicationErrorResponse         PublishApplicationErrorResponseType = "app.declared"
-	AppFieldImmutablePublishApplicationErrorResponse   PublishApplicationErrorResponseType = "app.field_immutable"
-	AppInvalidPublishApplicationErrorResponse          PublishApplicationErrorResponseType = "app.invalid"
-	AppNotFoundPublishApplicationErrorResponse         PublishApplicationErrorResponseType = "app.not_found"
-	AppPermissionDeniedPublishApplicationErrorResponse PublishApplicationErrorResponseType = "app.permission_denied"
-	AppRevisionConflictPublishApplicationErrorResponse PublishApplicationErrorResponseType = "app.revision_conflict"
-	AuthUnauthorizedPublishApplicationErrorResponse    PublishApplicationErrorResponseType = "auth.unauthorized"
-	EvtInvalidPublishApplicationErrorResponse          PublishApplicationErrorResponseType = "evt.invalid"
-	InternalPublishApplicationErrorResponse            PublishApplicationErrorResponseType = "internal"
-	NotImplementedPublishApplicationErrorResponse      PublishApplicationErrorResponseType = "not_implemented"
-	ReqInvalidPublishApplicationErrorResponse          PublishApplicationErrorResponseType = "req.invalid"
-	UnavailablePublishApplicationErrorResponse         PublishApplicationErrorResponseType = "unavailable"
+	AppClientIDTakenPublishApplicationErrorResponse        PublishApplicationErrorResponseType = "app.client_id_taken"
+	AppDeclaredPublishApplicationErrorResponse             PublishApplicationErrorResponseType = "app.declared"
+	AppFieldImmutablePublishApplicationErrorResponse       PublishApplicationErrorResponseType = "app.field_immutable"
+	AppIdempotencyKeyReusedPublishApplicationErrorResponse PublishApplicationErrorResponseType = "app.idempotency_key_reused"
+	AppInvalidPublishApplicationErrorResponse              PublishApplicationErrorResponseType = "app.invalid"
+	AppNotFoundPublishApplicationErrorResponse             PublishApplicationErrorResponseType = "app.not_found"
+	AppPermissionDeniedPublishApplicationErrorResponse     PublishApplicationErrorResponseType = "app.permission_denied"
+	AppRevisionConflictPublishApplicationErrorResponse     PublishApplicationErrorResponseType = "app.revision_conflict"
+	AuthUnauthorizedPublishApplicationErrorResponse        PublishApplicationErrorResponseType = "auth.unauthorized"
+	EvtInvalidPublishApplicationErrorResponse              PublishApplicationErrorResponseType = "evt.invalid"
+	InternalPublishApplicationErrorResponse                PublishApplicationErrorResponseType = "internal"
+	NotImplementedPublishApplicationErrorResponse          PublishApplicationErrorResponseType = "not_implemented"
+	ReqInvalidPublishApplicationErrorResponse              PublishApplicationErrorResponseType = "req.invalid"
+	UnavailablePublishApplicationErrorResponse             PublishApplicationErrorResponseType = "unavailable"
 )
 
 // IsAppClientIDTaken reports whether PublishApplicationErrorResponse is AppClientIDTaken.
@@ -89133,6 +90829,11 @@ func (s PublishApplicationErrorResponse) IsAppDeclared() bool {
 // IsAppFieldImmutable reports whether PublishApplicationErrorResponse is AppFieldImmutable.
 func (s PublishApplicationErrorResponse) IsAppFieldImmutable() bool {
 	return s.Type == AppFieldImmutablePublishApplicationErrorResponse
+}
+
+// IsAppIdempotencyKeyReused reports whether PublishApplicationErrorResponse is AppIdempotencyKeyReused.
+func (s PublishApplicationErrorResponse) IsAppIdempotencyKeyReused() bool {
+	return s.Type == AppIdempotencyKeyReusedPublishApplicationErrorResponse
 }
 
 // IsAppInvalid reports whether PublishApplicationErrorResponse is AppInvalid.
@@ -89245,6 +90946,27 @@ func (s PublishApplicationErrorResponse) GetAppFieldImmutable() (v AppFieldImmut
 func NewAppFieldImmutablePublishApplicationErrorResponse(v AppFieldImmutable) PublishApplicationErrorResponse {
 	var s PublishApplicationErrorResponse
 	s.SetAppFieldImmutable(v)
+	return s
+}
+
+// SetAppIdempotencyKeyReused sets PublishApplicationErrorResponse to AppIdempotencyKeyReused.
+func (s *PublishApplicationErrorResponse) SetAppIdempotencyKeyReused(v AppIdempotencyKeyReused) {
+	s.Type = AppIdempotencyKeyReusedPublishApplicationErrorResponse
+	s.AppIdempotencyKeyReused = v
+}
+
+// GetAppIdempotencyKeyReused returns AppIdempotencyKeyReused and true boolean if PublishApplicationErrorResponse is AppIdempotencyKeyReused.
+func (s PublishApplicationErrorResponse) GetAppIdempotencyKeyReused() (v AppIdempotencyKeyReused, ok bool) {
+	if !s.IsAppIdempotencyKeyReused() {
+		return v, false
+	}
+	return s.AppIdempotencyKeyReused, true
+}
+
+// NewAppIdempotencyKeyReusedPublishApplicationErrorResponse returns new PublishApplicationErrorResponse from AppIdempotencyKeyReused.
+func NewAppIdempotencyKeyReusedPublishApplicationErrorResponse(v AppIdempotencyKeyReused) PublishApplicationErrorResponse {
+	var s PublishApplicationErrorResponse
+	s.SetAppIdempotencyKeyReused(v)
 	return s
 }
 
@@ -89501,6 +91223,10 @@ func (*PublishApplicationOK) publishApplicationRes() {}
 type PublishApplicationUnauthorized ErrorDetails
 
 func (*PublishApplicationUnauthorized) publishApplicationRes() {}
+
+type PublishApplicationUnprocessableEntity ErrorDetails
+
+func (*PublishApplicationUnprocessableEntity) publishApplicationRes() {}
 
 // PublishBrandingErrorResponse represents sum type.
 type PublishBrandingErrorResponse struct {
@@ -94197,6 +95923,10 @@ type RejectInvitationBadRequest ErrorDetails
 
 func (*RejectInvitationBadRequest) rejectInvitationRes() {}
 
+type RejectInvitationConflict ErrorDetails
+
+func (*RejectInvitationConflict) rejectInvitationRes() {}
+
 // RejectInvitationErrorResponse represents sum type.
 type RejectInvitationErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
@@ -94205,6 +95935,7 @@ type RejectInvitationErrorResponse struct {
 	AuthUnauthorized AuthUnauthorized
 	EvtInvalid       EvtInvalid
 	Internal         Internal
+	InvAlreadyMember InvAlreadyMember
 	InvNotFound      InvNotFound
 	InvSelfReject    InvSelfReject
 	NotImplemented   NotImplemented
@@ -94221,6 +95952,7 @@ const (
 	AuthUnauthorizedRejectInvitationErrorResponse RejectInvitationErrorResponseType = "auth.unauthorized"
 	EvtInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "evt.invalid"
 	InternalRejectInvitationErrorResponse         RejectInvitationErrorResponseType = "internal"
+	InvAlreadyMemberRejectInvitationErrorResponse RejectInvitationErrorResponseType = "inv.already_member"
 	InvNotFoundRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "inv.not_found"
 	InvSelfRejectRejectInvitationErrorResponse    RejectInvitationErrorResponseType = "inv.self_reject"
 	NotImplementedRejectInvitationErrorResponse   RejectInvitationErrorResponseType = "not_implemented"
@@ -94246,6 +95978,11 @@ func (s RejectInvitationErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether RejectInvitationErrorResponse is Internal.
 func (s RejectInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalRejectInvitationErrorResponse
+}
+
+// IsInvAlreadyMember reports whether RejectInvitationErrorResponse is InvAlreadyMember.
+func (s RejectInvitationErrorResponse) IsInvAlreadyMember() bool {
+	return s.Type == InvAlreadyMemberRejectInvitationErrorResponse
 }
 
 // IsInvNotFound reports whether RejectInvitationErrorResponse is InvNotFound.
@@ -94354,6 +96091,27 @@ func (s RejectInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalRejectInvitationErrorResponse(v Internal) RejectInvitationErrorResponse {
 	var s RejectInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetInvAlreadyMember sets RejectInvitationErrorResponse to InvAlreadyMember.
+func (s *RejectInvitationErrorResponse) SetInvAlreadyMember(v InvAlreadyMember) {
+	s.Type = InvAlreadyMemberRejectInvitationErrorResponse
+	s.InvAlreadyMember = v
+}
+
+// GetInvAlreadyMember returns InvAlreadyMember and true boolean if RejectInvitationErrorResponse is InvAlreadyMember.
+func (s RejectInvitationErrorResponse) GetInvAlreadyMember() (v InvAlreadyMember, ok bool) {
+	if !s.IsInvAlreadyMember() {
+		return v, false
+	}
+	return s.InvAlreadyMember, true
+}
+
+// NewInvAlreadyMemberRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from InvAlreadyMember.
+func NewInvAlreadyMemberRejectInvitationErrorResponse(v InvAlreadyMember) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetInvAlreadyMember(v)
 	return s
 }
 
@@ -95227,9 +96985,16 @@ type ReleaseCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString          `json:"flow_id"`
-	Metadata OptEventMetadata      `json:"metadata"`
-	Payload  ReleaseCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString          `json:"correlation_id"`
+	Metadata      OptEventMetadata      `json:"metadata"`
+	Payload       ReleaseCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -95335,6 +97100,11 @@ func (s *ReleaseCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ReleaseCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *ReleaseCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -95450,6 +97220,11 @@ func (s *ReleaseCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ReleaseCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *ReleaseCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -96100,9 +97875,16 @@ type ReleaseRevokedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString          `json:"flow_id"`
-	Metadata OptEventMetadata      `json:"metadata"`
-	Payload  ReleaseRevokedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString          `json:"correlation_id"`
+	Metadata      OptEventMetadata      `json:"metadata"`
+	Payload       ReleaseRevokedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -96208,6 +97990,11 @@ func (s *ReleaseRevokedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *ReleaseRevokedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *ReleaseRevokedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -96323,6 +98110,11 @@ func (s *ReleaseRevokedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *ReleaseRevokedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *ReleaseRevokedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -97386,9 +99178,16 @@ type RequestAPIEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  RequestAPIPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       RequestAPIPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -97494,6 +99293,11 @@ func (s *RequestAPIEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *RequestAPIEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *RequestAPIEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -97609,6 +99413,11 @@ func (s *RequestAPIEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *RequestAPIEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *RequestAPIEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -100382,9 +102191,16 @@ type SchemaCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString         `json:"flow_id"`
-	Metadata OptEventMetadata     `json:"metadata"`
-	Payload  SchemaCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString         `json:"correlation_id"`
+	Metadata      OptEventMetadata     `json:"metadata"`
+	Payload       SchemaCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -100490,6 +102306,11 @@ func (s *SchemaCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *SchemaCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *SchemaCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -100605,6 +102426,11 @@ func (s *SchemaCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *SchemaCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *SchemaCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -102270,9 +104096,16 @@ type SessionDeletedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString          `json:"flow_id"`
-	Metadata OptEventMetadata      `json:"metadata"`
-	Payload  SessionDeletedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString          `json:"correlation_id"`
+	Metadata      OptEventMetadata      `json:"metadata"`
+	Payload       SessionDeletedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -102378,6 +104211,11 @@ func (s *SessionDeletedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *SessionDeletedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *SessionDeletedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -102493,6 +104331,11 @@ func (s *SessionDeletedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *SessionDeletedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *SessionDeletedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -102746,9 +104589,16 @@ type SessionEstablishedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString              `json:"flow_id"`
-	Metadata OptEventMetadata          `json:"metadata"`
-	Payload  SessionEstablishedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString              `json:"correlation_id"`
+	Metadata      OptEventMetadata          `json:"metadata"`
+	Payload       SessionEstablishedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -102854,6 +104704,11 @@ func (s *SessionEstablishedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *SessionEstablishedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *SessionEstablishedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -102969,6 +104824,11 @@ func (s *SessionEstablishedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *SessionEstablishedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *SessionEstablishedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -106545,9 +108405,16 @@ type TeamCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  TeamPayload      `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       TeamPayload      `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -106653,6 +108520,11 @@ func (s *TeamCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *TeamCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *TeamCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -106768,6 +108640,11 @@ func (s *TeamCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *TeamCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *TeamCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -107005,9 +108882,16 @@ type TeamDeactivatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -107113,6 +108997,11 @@ func (s *TeamDeactivatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *TeamDeactivatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *TeamDeactivatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -107228,6 +109117,11 @@ func (s *TeamDeactivatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *TeamDeactivatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *TeamDeactivatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -107980,9 +109874,16 @@ type TeamUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  TeamPayload      `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString     `json:"correlation_id"`
+	Metadata      OptEventMetadata `json:"metadata"`
+	Payload       TeamPayload      `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -108088,6 +109989,11 @@ func (s *TeamUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *TeamUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *TeamUpdatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -108203,6 +110109,11 @@ func (s *TeamUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *TeamUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *TeamUpdatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -110735,9 +112646,16 @@ type UserCreateFailedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString            `json:"flow_id"`
-	Metadata OptEventMetadata        `json:"metadata"`
-	Payload  UserCreateFailedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString            `json:"correlation_id"`
+	Metadata      OptEventMetadata        `json:"metadata"`
+	Payload       UserCreateFailedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -110843,6 +112761,11 @@ func (s *UserCreateFailedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *UserCreateFailedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *UserCreateFailedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -110958,6 +112881,11 @@ func (s *UserCreateFailedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *UserCreateFailedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *UserCreateFailedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -111397,9 +113325,16 @@ type UserCreatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
-	Metadata OptEventMetadata   `json:"metadata"`
-	Payload  UserCreatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString       `json:"correlation_id"`
+	Metadata      OptEventMetadata   `json:"metadata"`
+	Payload       UserCreatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -111505,6 +113440,11 @@ func (s *UserCreatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *UserCreatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *UserCreatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -111620,6 +113560,11 @@ func (s *UserCreatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *UserCreatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *UserCreatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -111907,9 +113852,16 @@ type UserDeletedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString      `json:"flow_id"`
-	Metadata OptEventMetadata  `json:"metadata"`
-	Payload  EmptyEventPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString      `json:"correlation_id"`
+	Metadata      OptEventMetadata  `json:"metadata"`
+	Payload       EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -112015,6 +113967,11 @@ func (s *UserDeletedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *UserDeletedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *UserDeletedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -112130,6 +114087,11 @@ func (s *UserDeletedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *UserDeletedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *UserDeletedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -113731,9 +115693,16 @@ type UserUpdatedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
-	Metadata OptEventMetadata   `json:"metadata"`
-	Payload  UserUpdatedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString       `json:"correlation_id"`
+	Metadata      OptEventMetadata   `json:"metadata"`
+	Payload       UserUpdatedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -113839,6 +115808,11 @@ func (s *UserUpdatedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *UserUpdatedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *UserUpdatedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -113954,6 +115928,11 @@ func (s *UserUpdatedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *UserUpdatedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *UserUpdatedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -114911,9 +116890,16 @@ type VariableRemovedEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString           `json:"flow_id"`
-	Metadata OptEventMetadata       `json:"metadata"`
-	Payload  VariableRemovedPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString           `json:"correlation_id"`
+	Metadata      OptEventMetadata       `json:"metadata"`
+	Payload       VariableRemovedPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -115019,6 +117005,11 @@ func (s *VariableRemovedEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *VariableRemovedEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *VariableRemovedEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -115134,6 +117125,11 @@ func (s *VariableRemovedEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *VariableRemovedEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *VariableRemovedEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -115526,9 +117522,16 @@ type VariableSetEvent struct {
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
 	// An ID that correlates the events of one login flow.
-	FlowID   OptNilString       `json:"flow_id"`
-	Metadata OptEventMetadata   `json:"metadata"`
-	Payload  VariableSetPayload `json:"payload"`
+	FlowID OptNilString `json:"flow_id"`
+	// An ID that correlates the events of one chain: the requests that one piece of work took, whoever
+	// sent them. A sign-in shares it from the OAuth authorization request or the first step of the login
+	// flow to the session and the token it ends with. An invitation shares it with its replacements and
+	// its answer, and a project claim from its start to its completion. The server assigns it and never
+	// reads it from a request. Absent on an event whose request is the whole of its work; `request_id`
+	// correlates those.
+	CorrelationID OptNilString       `json:"correlation_id"`
+	Metadata      OptEventMetadata   `json:"metadata"`
+	Payload       VariableSetPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -115634,6 +117637,11 @@ func (s *VariableSetEvent) GetSessionID() OptNilString {
 // GetFlowID returns the value of FlowID.
 func (s *VariableSetEvent) GetFlowID() OptNilString {
 	return s.FlowID
+}
+
+// GetCorrelationID returns the value of CorrelationID.
+func (s *VariableSetEvent) GetCorrelationID() OptNilString {
+	return s.CorrelationID
 }
 
 // GetMetadata returns the value of Metadata.
@@ -115749,6 +117757,11 @@ func (s *VariableSetEvent) SetSessionID(val OptNilString) {
 // SetFlowID sets the value of FlowID.
 func (s *VariableSetEvent) SetFlowID(val OptNilString) {
 	s.FlowID = val
+}
+
+// SetCorrelationID sets the value of CorrelationID.
+func (s *VariableSetEvent) SetCorrelationID(val OptNilString) {
+	s.CorrelationID = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -116778,61 +118791,62 @@ func (s *WebhookDelivered) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
-func (*WebhookDelivered) applicationCreatedRes()          {}
-func (*WebhookDelivered) applicationUpdatedRes()          {}
-func (*WebhookDelivered) authAttemptCreatedRes()          {}
-func (*WebhookDelivered) authAttemptHandedOffRes()        {}
-func (*WebhookDelivered) authCheckFailedRes()             {}
-func (*WebhookDelivered) authCheckSucceededRes()          {}
-func (*WebhookDelivered) authFactorPasskeyEnrolledRes()   {}
-func (*WebhookDelivered) authFactorPasswordSetRes()       {}
-func (*WebhookDelivered) authRequestCreatedRes()          {}
-func (*WebhookDelivered) authRequestExchangeFailedRes()   {}
-func (*WebhookDelivered) authSsoAuthorizationFailedRes()  {}
-func (*WebhookDelivered) authSsoExchangeFailedRes()       {}
-func (*WebhookDelivered) authSsoExchangeSucceededRes()    {}
-func (*WebhookDelivered) authTokenIssuedRes()             {}
-func (*WebhookDelivered) authTokenRevokedRes()            {}
-func (*WebhookDelivered) authzGrantedRes()                {}
-func (*WebhookDelivered) authzRevokedRes()                {}
-func (*WebhookDelivered) brandingCreatedRes()             {}
-func (*WebhookDelivered) deploymentCreatedRes()           {}
-func (*WebhookDelivered) flowSignupChallengeConsumedRes() {}
-func (*WebhookDelivered) flowSignupChallengeIssuedRes()   {}
-func (*WebhookDelivered) flowdefCreatedRes()              {}
-func (*WebhookDelivered) flowdefDeletedRes()              {}
-func (*WebhookDelivered) flowdefUpdatedRes()              {}
-func (*WebhookDelivered) idpCreatedRes()                  {}
-func (*WebhookDelivered) idpIdentityLinkCreatedRes()      {}
-func (*WebhookDelivered) idpUpdatedRes()                  {}
-func (*WebhookDelivered) invitationAcceptedRes()          {}
-func (*WebhookDelivered) invitationCancelledRes()         {}
-func (*WebhookDelivered) invitationCreatedRes()           {}
-func (*WebhookDelivered) invitationRejectedRes()          {}
-func (*WebhookDelivered) oauthSettingsCreatedRes()        {}
-func (*WebhookDelivered) originAddedRes()                 {}
-func (*WebhookDelivered) originRemovedRes()               {}
-func (*WebhookDelivered) policyCreatedRes()               {}
-func (*WebhookDelivered) policyUpdatedRes()               {}
-func (*WebhookDelivered) previewRemovedRes()              {}
-func (*WebhookDelivered) projectCreatedRes()              {}
-func (*WebhookDelivered) projectDeletedRes()              {}
-func (*WebhookDelivered) projectUpdatedRes()              {}
-func (*WebhookDelivered) releaseCreatedRes()              {}
-func (*WebhookDelivered) releaseRevokedRes()              {}
-func (*WebhookDelivered) requestApiRes()                  {}
-func (*WebhookDelivered) schemaCreatedRes()               {}
-func (*WebhookDelivered) sessionDeletedRes()              {}
-func (*WebhookDelivered) sessionEstablishedRes()          {}
-func (*WebhookDelivered) teamCreatedRes()                 {}
-func (*WebhookDelivered) teamDeactivatedRes()             {}
-func (*WebhookDelivered) teamUpdatedRes()                 {}
-func (*WebhookDelivered) userCreateFailedRes()            {}
-func (*WebhookDelivered) userCreatedRes()                 {}
-func (*WebhookDelivered) userDeletedRes()                 {}
-func (*WebhookDelivered) userUpdatedRes()                 {}
-func (*WebhookDelivered) variableRemovedRes()             {}
-func (*WebhookDelivered) variableSetRes()                 {}
+func (*WebhookDelivered) applicationClientSecretRotatedRes() {}
+func (*WebhookDelivered) applicationCreatedRes()             {}
+func (*WebhookDelivered) applicationUpdatedRes()             {}
+func (*WebhookDelivered) authAttemptCreatedRes()             {}
+func (*WebhookDelivered) authAttemptHandedOffRes()           {}
+func (*WebhookDelivered) authCheckFailedRes()                {}
+func (*WebhookDelivered) authCheckSucceededRes()             {}
+func (*WebhookDelivered) authFactorPasskeyEnrolledRes()      {}
+func (*WebhookDelivered) authFactorPasswordSetRes()          {}
+func (*WebhookDelivered) authRequestCreatedRes()             {}
+func (*WebhookDelivered) authRequestExchangeFailedRes()      {}
+func (*WebhookDelivered) authSsoAuthorizationFailedRes()     {}
+func (*WebhookDelivered) authSsoExchangeFailedRes()          {}
+func (*WebhookDelivered) authSsoExchangeSucceededRes()       {}
+func (*WebhookDelivered) authTokenIssuedRes()                {}
+func (*WebhookDelivered) authTokenRevokedRes()               {}
+func (*WebhookDelivered) authzGrantedRes()                   {}
+func (*WebhookDelivered) authzRevokedRes()                   {}
+func (*WebhookDelivered) brandingCreatedRes()                {}
+func (*WebhookDelivered) deploymentCreatedRes()              {}
+func (*WebhookDelivered) flowSignupChallengeConsumedRes()    {}
+func (*WebhookDelivered) flowSignupChallengeIssuedRes()      {}
+func (*WebhookDelivered) flowdefCreatedRes()                 {}
+func (*WebhookDelivered) flowdefDeletedRes()                 {}
+func (*WebhookDelivered) flowdefUpdatedRes()                 {}
+func (*WebhookDelivered) idpCreatedRes()                     {}
+func (*WebhookDelivered) idpIdentityLinkCreatedRes()         {}
+func (*WebhookDelivered) idpUpdatedRes()                     {}
+func (*WebhookDelivered) invitationAcceptedRes()             {}
+func (*WebhookDelivered) invitationCancelledRes()            {}
+func (*WebhookDelivered) invitationCreatedRes()              {}
+func (*WebhookDelivered) invitationRejectedRes()             {}
+func (*WebhookDelivered) oauthSettingsCreatedRes()           {}
+func (*WebhookDelivered) originAddedRes()                    {}
+func (*WebhookDelivered) originRemovedRes()                  {}
+func (*WebhookDelivered) policyCreatedRes()                  {}
+func (*WebhookDelivered) policyUpdatedRes()                  {}
+func (*WebhookDelivered) previewRemovedRes()                 {}
+func (*WebhookDelivered) projectCreatedRes()                 {}
+func (*WebhookDelivered) projectDeletedRes()                 {}
+func (*WebhookDelivered) projectUpdatedRes()                 {}
+func (*WebhookDelivered) releaseCreatedRes()                 {}
+func (*WebhookDelivered) releaseRevokedRes()                 {}
+func (*WebhookDelivered) requestApiRes()                     {}
+func (*WebhookDelivered) schemaCreatedRes()                  {}
+func (*WebhookDelivered) sessionDeletedRes()                 {}
+func (*WebhookDelivered) sessionEstablishedRes()             {}
+func (*WebhookDelivered) teamCreatedRes()                    {}
+func (*WebhookDelivered) teamDeactivatedRes()                {}
+func (*WebhookDelivered) teamUpdatedRes()                    {}
+func (*WebhookDelivered) userCreateFailedRes()               {}
+func (*WebhookDelivered) userCreatedRes()                    {}
+func (*WebhookDelivered) userDeletedRes()                    {}
+func (*WebhookDelivered) userUpdatedRes()                    {}
+func (*WebhookDelivered) variableRemovedRes()                {}
+func (*WebhookDelivered) variableSetRes()                    {}
 
 // Ref: #
 type WebhookNotDelivered struct {
@@ -116849,58 +118863,59 @@ func (s *WebhookNotDelivered) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
-func (*WebhookNotDelivered) applicationCreatedRes()          {}
-func (*WebhookNotDelivered) applicationUpdatedRes()          {}
-func (*WebhookNotDelivered) authAttemptCreatedRes()          {}
-func (*WebhookNotDelivered) authAttemptHandedOffRes()        {}
-func (*WebhookNotDelivered) authCheckFailedRes()             {}
-func (*WebhookNotDelivered) authCheckSucceededRes()          {}
-func (*WebhookNotDelivered) authFactorPasskeyEnrolledRes()   {}
-func (*WebhookNotDelivered) authFactorPasswordSetRes()       {}
-func (*WebhookNotDelivered) authRequestCreatedRes()          {}
-func (*WebhookNotDelivered) authRequestExchangeFailedRes()   {}
-func (*WebhookNotDelivered) authSsoAuthorizationFailedRes()  {}
-func (*WebhookNotDelivered) authSsoExchangeFailedRes()       {}
-func (*WebhookNotDelivered) authSsoExchangeSucceededRes()    {}
-func (*WebhookNotDelivered) authTokenIssuedRes()             {}
-func (*WebhookNotDelivered) authTokenRevokedRes()            {}
-func (*WebhookNotDelivered) authzGrantedRes()                {}
-func (*WebhookNotDelivered) authzRevokedRes()                {}
-func (*WebhookNotDelivered) brandingCreatedRes()             {}
-func (*WebhookNotDelivered) deploymentCreatedRes()           {}
-func (*WebhookNotDelivered) flowSignupChallengeConsumedRes() {}
-func (*WebhookNotDelivered) flowSignupChallengeIssuedRes()   {}
-func (*WebhookNotDelivered) flowdefCreatedRes()              {}
-func (*WebhookNotDelivered) flowdefDeletedRes()              {}
-func (*WebhookNotDelivered) flowdefUpdatedRes()              {}
-func (*WebhookNotDelivered) idpCreatedRes()                  {}
-func (*WebhookNotDelivered) idpIdentityLinkCreatedRes()      {}
-func (*WebhookNotDelivered) idpUpdatedRes()                  {}
-func (*WebhookNotDelivered) invitationAcceptedRes()          {}
-func (*WebhookNotDelivered) invitationCancelledRes()         {}
-func (*WebhookNotDelivered) invitationCreatedRes()           {}
-func (*WebhookNotDelivered) invitationRejectedRes()          {}
-func (*WebhookNotDelivered) oauthSettingsCreatedRes()        {}
-func (*WebhookNotDelivered) originAddedRes()                 {}
-func (*WebhookNotDelivered) originRemovedRes()               {}
-func (*WebhookNotDelivered) policyCreatedRes()               {}
-func (*WebhookNotDelivered) policyUpdatedRes()               {}
-func (*WebhookNotDelivered) previewRemovedRes()              {}
-func (*WebhookNotDelivered) projectCreatedRes()              {}
-func (*WebhookNotDelivered) projectDeletedRes()              {}
-func (*WebhookNotDelivered) projectUpdatedRes()              {}
-func (*WebhookNotDelivered) releaseCreatedRes()              {}
-func (*WebhookNotDelivered) releaseRevokedRes()              {}
-func (*WebhookNotDelivered) requestApiRes()                  {}
-func (*WebhookNotDelivered) schemaCreatedRes()               {}
-func (*WebhookNotDelivered) sessionDeletedRes()              {}
-func (*WebhookNotDelivered) sessionEstablishedRes()          {}
-func (*WebhookNotDelivered) teamCreatedRes()                 {}
-func (*WebhookNotDelivered) teamDeactivatedRes()             {}
-func (*WebhookNotDelivered) teamUpdatedRes()                 {}
-func (*WebhookNotDelivered) userCreateFailedRes()            {}
-func (*WebhookNotDelivered) userCreatedRes()                 {}
-func (*WebhookNotDelivered) userDeletedRes()                 {}
-func (*WebhookNotDelivered) userUpdatedRes()                 {}
-func (*WebhookNotDelivered) variableRemovedRes()             {}
-func (*WebhookNotDelivered) variableSetRes()                 {}
+func (*WebhookNotDelivered) applicationClientSecretRotatedRes() {}
+func (*WebhookNotDelivered) applicationCreatedRes()             {}
+func (*WebhookNotDelivered) applicationUpdatedRes()             {}
+func (*WebhookNotDelivered) authAttemptCreatedRes()             {}
+func (*WebhookNotDelivered) authAttemptHandedOffRes()           {}
+func (*WebhookNotDelivered) authCheckFailedRes()                {}
+func (*WebhookNotDelivered) authCheckSucceededRes()             {}
+func (*WebhookNotDelivered) authFactorPasskeyEnrolledRes()      {}
+func (*WebhookNotDelivered) authFactorPasswordSetRes()          {}
+func (*WebhookNotDelivered) authRequestCreatedRes()             {}
+func (*WebhookNotDelivered) authRequestExchangeFailedRes()      {}
+func (*WebhookNotDelivered) authSsoAuthorizationFailedRes()     {}
+func (*WebhookNotDelivered) authSsoExchangeFailedRes()          {}
+func (*WebhookNotDelivered) authSsoExchangeSucceededRes()       {}
+func (*WebhookNotDelivered) authTokenIssuedRes()                {}
+func (*WebhookNotDelivered) authTokenRevokedRes()               {}
+func (*WebhookNotDelivered) authzGrantedRes()                   {}
+func (*WebhookNotDelivered) authzRevokedRes()                   {}
+func (*WebhookNotDelivered) brandingCreatedRes()                {}
+func (*WebhookNotDelivered) deploymentCreatedRes()              {}
+func (*WebhookNotDelivered) flowSignupChallengeConsumedRes()    {}
+func (*WebhookNotDelivered) flowSignupChallengeIssuedRes()      {}
+func (*WebhookNotDelivered) flowdefCreatedRes()                 {}
+func (*WebhookNotDelivered) flowdefDeletedRes()                 {}
+func (*WebhookNotDelivered) flowdefUpdatedRes()                 {}
+func (*WebhookNotDelivered) idpCreatedRes()                     {}
+func (*WebhookNotDelivered) idpIdentityLinkCreatedRes()         {}
+func (*WebhookNotDelivered) idpUpdatedRes()                     {}
+func (*WebhookNotDelivered) invitationAcceptedRes()             {}
+func (*WebhookNotDelivered) invitationCancelledRes()            {}
+func (*WebhookNotDelivered) invitationCreatedRes()              {}
+func (*WebhookNotDelivered) invitationRejectedRes()             {}
+func (*WebhookNotDelivered) oauthSettingsCreatedRes()           {}
+func (*WebhookNotDelivered) originAddedRes()                    {}
+func (*WebhookNotDelivered) originRemovedRes()                  {}
+func (*WebhookNotDelivered) policyCreatedRes()                  {}
+func (*WebhookNotDelivered) policyUpdatedRes()                  {}
+func (*WebhookNotDelivered) previewRemovedRes()                 {}
+func (*WebhookNotDelivered) projectCreatedRes()                 {}
+func (*WebhookNotDelivered) projectDeletedRes()                 {}
+func (*WebhookNotDelivered) projectUpdatedRes()                 {}
+func (*WebhookNotDelivered) releaseCreatedRes()                 {}
+func (*WebhookNotDelivered) releaseRevokedRes()                 {}
+func (*WebhookNotDelivered) requestApiRes()                     {}
+func (*WebhookNotDelivered) schemaCreatedRes()                  {}
+func (*WebhookNotDelivered) sessionDeletedRes()                 {}
+func (*WebhookNotDelivered) sessionEstablishedRes()             {}
+func (*WebhookNotDelivered) teamCreatedRes()                    {}
+func (*WebhookNotDelivered) teamDeactivatedRes()                {}
+func (*WebhookNotDelivered) teamUpdatedRes()                    {}
+func (*WebhookNotDelivered) userCreateFailedRes()               {}
+func (*WebhookNotDelivered) userCreatedRes()                    {}
+func (*WebhookNotDelivered) userDeletedRes()                    {}
+func (*WebhookNotDelivered) userUpdatedRes()                    {}
+func (*WebhookNotDelivered) variableRemovedRes()                {}
+func (*WebhookNotDelivered) variableSetRes()                    {}

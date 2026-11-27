@@ -1,11 +1,19 @@
 import type { CreateInvitation201, GetInvitation200 } from "@zitadel/api/generated/model";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect } from "vitest";
 
+import { it } from "@tests/fixtures";
+
+import { allowDestructive } from "@/lib/backend";
 import { InvitationService, invitationRole } from "@/lib/backend/services/invitation";
-import { fakeClient } from "@tests/helpers/fake-client";
+import { answering, answeringPages, testClient } from "@tests/helpers/api-answers";
 
 const PROJECT = "proj_1";
 const INVITATION = "inv_1";
+
+/** A service on a test client that may cancel invitations, bound to {@link PROJECT}. */
+function service(): InvitationService {
+  return new InvitationService(allowDestructive(testClient()), PROJECT);
+}
 
 /** A project invitation as the API answers one, with only what a test varies. */
 function projectInvitation(
@@ -29,84 +37,90 @@ function created(): CreateInvitation201 {
 }
 
 describe("InvitationService.create", () => {
-  it.each([
-    [
-      "a role alone",
-      { relation: "editor" as const },
-      { type: "project_member", project_member: { relation: "editor" } },
-    ],
-    [
-      "who it is for",
-      { relation: "viewer" as const, name: "John Doe" },
-      {
+  it.for([
+    {
+      what: "a role alone",
+      input: { relation: "editor" as const },
+      expected: { type: "project_member", project_member: { relation: "editor" } },
+    },
+    {
+      what: "who it is for",
+      input: { relation: "viewer" as const, name: "John Doe" },
+      expected: {
         type: "project_member",
         project_member: { relation: "viewer" },
         metadata: { name: "John Doe" },
       },
-    ],
-    [
-      "the invitation it replaces",
-      { relation: "admin" as const, replaces: "inv_0" },
-      {
+    },
+    {
+      what: "the invitation it replaces",
+      input: { relation: "admin" as const, replaces: "inv_0" },
+      expected: {
         type: "project_member",
         project_member: { relation: "admin" },
         replaces_invitation_id: "inv_0",
       },
-    ],
-  ])("sends %s as the project invitation body", async (_, input, body) => {
-    const createInvitation = vi.fn(async () => created());
-    const service = new InvitationService(fakeClient({ createInvitation }), PROJECT);
+    },
+  ])("sends $what as the project invitation body", async ({ input, expected }, { server }) => {
+    const sent = answering(server, "createInvitation", created());
 
-    await service.create(input);
+    await service().create(input);
 
-    expect(createInvitation).toHaveBeenCalledWith(body, { project_id: PROJECT });
+    expect(sent.map(({ url, body }) => [url.searchParams.get("project_id"), body])).toEqual([
+      [PROJECT, expected],
+    ]);
   });
 
-  it("answers the link the create returned", async () => {
-    const service = new InvitationService(
-      fakeClient({ createInvitation: async () => created() }),
-      PROJECT,
-    );
+  it("answers the link the create returned", async ({ server }) => {
+    answering(server, "createInvitation", created());
 
-    const invitation = await service.create({ relation: "viewer" });
+    const invitation = await service().create({ relation: "viewer" });
 
     expect(invitation.link).toBe("https://console.example.com/invitations#token=t");
   });
 });
 
 describe("InvitationService.cancellable", () => {
-  it("lists only the project's pending, expired and declined invitations", async () => {
-    const all = vi.fn(async () => [projectInvitation()]);
-    const service = new InvitationService(fakeClient({ listInvitations: { all } }), PROJECT);
-
-    await service.cancellable();
-
-    expect(all).toHaveBeenCalledWith({
-      project_id: PROJECT,
-      status: ["pending", "expired", "rejected"],
+  it("lists only the project's pending, expired and declined invitations", async ({ server }) => {
+    const listed = answeringPages(server, "listInvitations", {
+      invitations: [projectInvitation()],
     });
+
+    await service().cancellable();
+
+    expect(
+      listed.map(({ url }) => [
+        url.searchParams.get("project_id"),
+        url.searchParams.getAll("status"),
+      ]),
+    ).toEqual([[PROJECT, ["pending", "expired", "rejected"]]]);
   });
 });
 
 describe("InvitationService.get", () => {
-  it("reads the invitation in the service's project", async () => {
-    const getInvitation = vi.fn(async () => projectInvitation());
-    const service = new InvitationService(fakeClient({ getInvitation }), PROJECT);
+  it("reads the invitation in the service's project", async ({ server }) => {
+    const read = answering(server, "getInvitation", projectInvitation());
 
-    await service.get(INVITATION);
+    await service().get(INVITATION);
 
-    expect(getInvitation).toHaveBeenCalledWith(INVITATION, { project_id: PROJECT });
+    expect(
+      read.map(({ params, url }) => [params.invitation_id, url.searchParams.get("project_id")]),
+    ).toEqual([[INVITATION, PROJECT]]);
   });
 });
 
 describe("InvitationService.cancel", () => {
-  it("cancels the invitation in the service's project", async () => {
-    const cancelInvitation = vi.fn(async () => undefined);
-    const service = new InvitationService(fakeClient({ cancelInvitation }), PROJECT);
+  it("cancels the invitation in the service's project", async ({ server }) => {
+    const cancelled = answering(server, "cancelInvitation", undefined);
 
-    await service.cancel(INVITATION);
+    await service().cancel(INVITATION);
 
-    expect(cancelInvitation).toHaveBeenCalledWith(INVITATION, { project_id: PROJECT });
+    expect(
+      cancelled.map(({ params, url }) => [
+        params.invitation_id,
+        url.searchParams.get("project_id"),
+      ]),
+    ).toEqual([[INVITATION, PROJECT]]);
   });
 });
 
