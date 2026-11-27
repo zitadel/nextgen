@@ -24,6 +24,7 @@ type Handler struct {
 	brandingService       *service.BrandingService
 	oauthSettingsService  *service.OAuthSettingsService
 	policyService         *service.PolicyService
+	webhookService        *service.WebhookService
 	releaseService        service.ReleaseService
 	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService
