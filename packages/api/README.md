@@ -43,7 +43,7 @@ array. To change what every call returns, each page included, pass
 
 A `ZitadelClient` (from `@zitadel/api/client` or `@zitadel/api/runtime/client`)
 is one connection: the base URL, the bearer token, the deadline, the abort
-signal, the `User-Agent`, the CSRF token's source, and whether it may run
+signal, the `User-Agent`, the `fetch` it sends through, and whether it may run
 destructive operations. It is immutable; `client.with({ ... })` returns a new
 one. Nothing about a request is kept anywhere but in the client it was made
 with, so two clients on one page never see each other's settings.
@@ -88,37 +88,25 @@ sent. The configured project's client allows them: signing out is a `DELETE`.
 | `@zitadel/api/runtime/fetch` | `customFetch`, the transport every operation sends through; `ApiError`, `NetworkError`, `DestructiveOperationError` |
 | `@zitadel/api/runtime/paging` | `Paging`, the cursor walk behind every paged function's `pages`, `items` and `all`: it reads a page's items and cursor, and walks and gathers a list's pages |
 
-### CSRF token for session-cookie writes
+### Adding what only your app needs
 
-A browser app that authenticates management calls with the session cookie (the
-Console does) must send the session's CSRF token on state-changing requests.
-Load it once per session from `GET /sessions/me/csrf`, passing your project as
-`project_id` so that a session of another app on the same host gets none, and
-give the client a `csrf` provider:
+The client sends every request through `fetch`, and `fetch` is a setting: give
+the client your own to add a header, retry or log, without the client knowing.
+A browser app that signs in with a session cookie wraps it to send its CSRF
+header, for example:
 
 ```ts
 const client = getClient(project).with({
-  csrf: {
-    origin: window.location.origin,
-    token: () => csrfToken,
-    refresh: () => recheckSession(),
+  fetch: (input, init) => {
+    const headers = new Headers(init?.headers);
+    headers.set("X-Zitadel-CSRF", csrfToken);
+    return fetch(input, { ...init, headers });
   },
 });
 ```
 
-The transport reads `token()` on every unsafe request and adds the
-`X-Zitadel-CSRF` header, but only to `origin`: a request to any other host
-carries none. Return `undefined` from `token()` until one is loaded. Callers
-that use a project secret leave `csrf` out, and nothing is added.
-
-The token is bound to the session cookie, which another tab can replace by
-signing in again. When an unsafe request to `origin` is refused with
-`403 auth.csrf_invalid`, the transport calls `refresh()` once: re-check the
-session there, and return a fresh token only if it still belongs to the person
-the request was made for. The request is then retried once with it; returning
-`undefined` leaves it refused, so a write is never replayed under someone
-else's session. `apiErrorCode(error)` from `@zitadel/api/runtime/fetch` reads
-the code of an `ApiError`.
+`apiErrorCode(error)` from `@zitadel/api/runtime/fetch` reads the code of an
+`ApiError`.
 
 The generated files come from the OpenAPI 3.1 source in the
 [`zitadel/nextgen`](https://github.com/zitadel/nextgen) repository — do not

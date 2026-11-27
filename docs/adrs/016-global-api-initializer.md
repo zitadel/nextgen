@@ -393,8 +393,9 @@ module-level or `globalThis` slots that each client rewrote before every call.
 A `ZitadelClient` holds them, immutable, and every generated operation takes
 its client as a required first argument; the transport reads everything from
 that client. Two clients on one page (an app's own and the sign-in widget's)
-can no longer leak a timeout, signal, token or CSRF token into each other's
-requests.
+can no longer leak a timeout, signal or token into each other's requests.
+The client knows nothing of CSRF: the console sends its session's CSRF
+header through a `fetch` of its own that it gives its client.
 
 `configureZitadel()` keeps its one write-once app-wide project handle, the
 decision above. `getClient(project)` derives the project's client and
