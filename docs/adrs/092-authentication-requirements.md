@@ -286,9 +286,11 @@ enrolled methods:
   registered as a second factor in v4, responds only to a challenge that
   includes its credential ID, so it works once another check, such as the
   password check, is completed.
-- **No standalone codes:** TOTP codes, SMS codes, and recovery codes are
-  accepted only after another check (e.g., password), with appropriate
-  rate-limits for failed checks per user and method as defined in
+- **No standalone codes:** TOTP codes and SMS codes are accepted only after
+  another check (e.g., password or a recovery check). A recovery check can be
+  the first check of an attempt, as when the user has forgotten the password or
+  has lost every method ([§4.4](#44-account-recovery)). Failed checks are
+  rate-limited per user and method as defined in
   [ADR 078](078-abuse-prevention-in-layers.md#3-layer-2-guards-are-built-in-and-always-on).
 - **Uniform failures:** Checking an unenrolled method (e.g., password or TOTP)
   returns the same error and takes the constant time as an incorrect credential.
@@ -341,13 +343,13 @@ methods before completion:
   one app keeps access until the session expires. A token refresh is not
   evaluated either, so neither `max_age_seconds` nor `recent_check_seconds`
   limits how long an app that refreshes its tokens keeps access
-  ([Open question 3](#open-questions)).
+  ([Open question 2](#open-questions)).
 - With the session API, the server evaluates an existing session when the app
   that hosts the login starts a new attempt for it (`POST /auth_attempts` with
   `session_id`). Reading
   the session (`getSession`) does not evaluate it. After a stricter policy is
   deployed, a session that satisfied the old policy therefore keeps access until
-  the app starts a new attempt for it ([Open question 3](#open-questions)).
+  the app starts a new attempt for it ([Open question 2](#open-questions)).
 
 #### 4.2 Step-Up and Reauthentication (Sensitive Actions)
 
@@ -464,7 +466,7 @@ recommends for access tokens. With `prompt=none`, insufficient proof returns
 - **Session API:** Returns `factors` (each verified check with `verified_at`,
   plus `user_verified` for passkeys) and `assurance_levels` (which `acr`
   values of [§1](#1-model) are met; the session does not report the
-  age of the proof, see [Open question 8](#open-questions)).
+  age of the proof, see [Open question 7](#open-questions)).
 - **User-facing message:** The login page or the app tells the user why a check
   is needed or why it cannot be completed. The server returns `required_factors`
   for the first case and an error code for the second.
@@ -500,7 +502,7 @@ credentials through the following rules:
    the user cannot complete, so the user still completes the others. The server
    returns the authorization in the API response and the administrator delivers
    it to the user, as `createInvitation` does for its link. Which permission
-   issues it is open ([Open question 13](#open-questions)).
+   issues it is open ([Open question 12](#open-questions)).
 
 **The `first_enrollment` policy setting** governs users who only have a password
 or external sign-in:
@@ -523,10 +525,12 @@ or external sign-in:
 
 #### 4.4 Account Recovery
 
-When a user loses a method, they can complete a **recovery check** via a
-recovery route such as a recovery code
-([ADR 038](038-user-credential-migration-and-recovery.md#4-account-recovery))
-and the following rules apply:
+When a user loses a method or forgets their password, they can complete a
+**recovery check** via a recovery route: a recovery code, or a code or link sent
+to a verified email address
+([ADR 038](038-user-credential-migration-and-recovery.md#4-account-recovery),
+[NIST SP 800-63B-4 §4.2.1](https://pages.nist.gov/800-63-4/sp800-63b.html#account-recovery-methods)).
+The following rules apply:
 
 1. A recovery check does not count as a factor type (password + recovery code
    does not satisfy `mfa`), which prevents the use of a recovery code as a
@@ -537,15 +541,21 @@ and the following rules apply:
    checks, it must satisfy the policy and cover both factor types if the user
    has both enrolled. For example, a user who loses both a passkey and TOTP can
    replace the passkey using their password and a recovery check, without
-   needing a TOTP code ([Open question 14](#open-questions)).
-3. A recovery check alone does not permit the enrollment. A user who cannot
-   verify another method requires admin-authorized enrollment
-   ([#3202](https://github.com/zitadel/nextgen/issues/3202)).
+   needing a TOTP code. A forgotten password is a lost method: a user with a
+   password and TOTP sets a new password with a TOTP code and a recovery check.
+   Both cases follow
+   [NIST SP 800-63B-4 §4.2.2.2](https://pages.nist.gov/800-63-4/sp800-63b.html#recovery-at-aal2).
+3. A user who cannot verify another method completes two recovery checks by
+   different routes, such as a recovery code and a code sent by email
+   ([NIST SP 800-63B-4 §4.2.2.2](https://pages.nist.gov/800-63-4/sp800-63b.html#recovery-at-aal2)).
+   One recovery check is enough for a user whose only method is a password
+   ([NIST SP 800-63B-4 §4.2.2.1](https://pages.nist.gov/800-63-4/sp800-63b.html#recovery-without-identity-proofing)).
 4. Enrolling the replacement counts as a check of that method, allowing sign-in
    to complete (under `phishing_resistant`, the replacement must be a passkey)
    ([#3202](https://github.com/zitadel/nextgen/issues/3202)).
-5. A user who cannot complete a recovery check requires admin-authorized
-   enrollment ([#3202](https://github.com/zitadel/nextgen/issues/3202)).
+5. A user who cannot complete the recovery checks of rules 2 and 3 needs
+   admin-authorized enrollment
+   ([#3202](https://github.com/zitadel/nextgen/issues/3202)).
 
 #### 4.5 External Sign-In
 
@@ -599,10 +609,10 @@ values (supplied as OIDC ID token claims):
    another protocol can supply them in another way. Plain OAuth connections lack
    ID tokens, so they do not count as a factor type, fail age limits and recent
    checks, and do not count for an enrollment or a method change (rule 5), until
-   they supply equivalent values ([Open question 6](#open-questions)).
+   they supply equivalent values ([Open question 5](#open-questions)).
 
 _(Requesting stronger auth from a provider is deferred to
-[Open question 4](#open-questions).)_
+[Open question 3](#open-questions).)_
 
 #### 4.6 Changing Authentication Methods
 
@@ -633,7 +643,7 @@ session, and the following rules apply to it:
    preventing users refused under
    `acr_values=urn:zitadel:loa:1fa:phr` from bypassing the refusal
    via account settings. Whether this also holds when `first_enrollment` is not
-   set is open ([Open question 7](#open-questions)).
+   set is open ([Open question 6](#open-questions)).
 5. Removing a passkey requires verifying with _another_ passkey, and users with
    only one passkey need an administrator
    ([#3202](https://github.com/zitadel/nextgen/issues/3202),
@@ -673,6 +683,10 @@ event, with who performed it and when
    - _Via recovery:_ Someone with a user's password and recovery code can enroll
      their own passkey and subsequently satisfy `mfa` and `phishing_resistant`,
      also under `first_enrollment: admin` ([§4.4](#44-account-recovery)).
+   - _Via recovery checks alone:_ Someone with a user's recovery code and
+     access to their mailbox can enroll their own method without any method of
+     the user. For a user whose only method is a password, the recovery code
+     alone is enough ([§4.4](#44-account-recovery), rule 3).
    - _Via `first_enrollment: none`:_ Someone with a stolen sole credential
      (e.g., phished password) can enroll their own passkey and take over the
      account even under `phishing_resistant` ([§4.3](#43-first-enrollment)).
@@ -681,7 +695,7 @@ event, with who performed it and when
      administrator. For a user who has no other method, whoever holds the
      authorization can enroll a passkey, including the administrator who issued
      it. The same holds for a user whose only other method is a password while
-     an administrator can set it ([Open question 9](#open-questions)). The event
+     an administrator can set it ([Open question 8](#open-questions)). The event
      record of who authorized it is the only control.
    - _Via a method change:_ A passkey is required only to add or remove a
      passkey ([§4.6](#46-changing-authentication-methods)). A password and a
@@ -695,33 +709,28 @@ event, with who performed it and when
    Is a lost method removed when its replacement is enrolled after recovery? Can
    a user with one passkey and another method remove that passkey after
    verifying with it, without an admin?
-2. **Forgotten passwords:**
-   [ADR 038](038-user-credential-migration-and-recovery.md#recovery-codes)
-   excludes password resets, leaving no rule for users who forget their password
-   while retaining another method. Is a password reset a recovery check, and
-   what does it permit?
-3. **Long-lived single-app sessions:** Because policies are not evaluated on
+2. **Long-lived single-app sessions:** Because policies are not evaluated on
    token refresh, or when a session API app reads a session, a stricter policy,
    `max_age_seconds` or `recent_check_seconds` does not affect a user staying in
    one app until session expiry. Should the server evaluate the policy on token
    refresh and on a session read?
-4. **Requesting stronger auth from providers:**
+3. **Requesting stronger auth from providers:**
    [#3166](https://github.com/zitadel/nextgen/issues/3166) requires asking
    external providers for stronger auth. Which parameter should the server send
    for MFA, and how should it evaluate the response?
-5. **Additional trusted connection claims:** Trusted connections currently check
+4. **Additional trusted connection claims:** Trusted connections currently check
    only `amr` containing `mfa`. Should the server also accept an `acr` claim for
    MFA, or count a single `amr` value (e.g., `pwd`) as one factor type when
    combined with a Zitadel method
    ([#3166](https://github.com/zitadel/nextgen/issues/3166))?
-6. **Plain OAuth connections:** Without an ID token, where do methods and
+5. **Plain OAuth connections:** Without an ID token, where do methods and
    authentication time come from, and how does the server request fresh
    authentication?
-7. **Self-service enrollment when `first_enrollment` is unset:** Refusing
+6. **Self-service enrollment when `first_enrollment` is unset:** Refusing
    `acr_values` enrollment only holds if users cannot bypass it via account
    settings. May a password-only user self-enroll a passkey when
    `first_enrollment` is not set?
-8. **Proof age in the session API:** Sessions expose per-check `verified_at`
+7. **Proof age in the session API:** Sessions expose per-check `verified_at`
    timestamps but not which checks were needed. An app that sent `max_age`
    therefore cannot verify the result exactly, as an OIDC app does with
    `auth_time` ([§4.2](#42-step-up-and-reauthentication-sensitive-actions)). It
@@ -729,17 +738,18 @@ event, with who performed it and when
    match the server's comparison. The same applies when an app sends
    `recent_check`. Should the server return both `auth_time` and
    `recent_check_at`?
-9. **Admin password setting:** `setUserPassword` currently requires only
+8. **Admin password setting:** `setUserPassword` currently requires only
    `user.write`, letting admins set a known password. Should admins retain this
    capability?
-10. **Initial `required_factors` without a flow:** Session API attempts have no
-    flow definition, so the user schema is unknown until after the identifier is
-    provided. Which methods should the initial list return in a multi-schema
-    project?
-11. **Email codes and magic links:**
+9. **Initial `required_factors` without a flow:** Session API attempts have no
+   flow definition, so the user schema is unknown until after the identifier is
+   provided. Which methods should the initial list return in a multi-schema
+   project?
+10. **Email codes and magic links:**
     [ADR 038](038-user-credential-migration-and-recovery.md#magic-links-and-email-codes)
-    defines both as methods and recovery routes, but this ADR has no rules for
-    them. The server returns the code or the link in the API response and the
+    defines both as methods and recovery routes. As a recovery route they follow
+    [§4.4](#44-account-recovery). As a method, this ADR has no rules for them.
+    The server returns the code or the link in the API response and the
     app delivers it, as `createInvitation` does for its link.
     [#3166](https://github.com/zitadel/nextgen/issues/3166) names email only as
     an identifier. Does an email code count as possession, like an SMS code, or
@@ -748,19 +758,14 @@ event, with who performed it and when
     says: "Email SHALL NOT be used for out-of-band authentication because it may
     be vulnerable to" access using only a password, interception in transit or
     at intermediate mail servers, and rerouting attacks.
-12. **Trusted devices and biometrics:**
+11. **Trusted devices and biometrics:**
     [#3166](https://github.com/zitadel/nextgen/issues/3166) cites both as
     examples, but the server does not track trusted devices and UV does not
     distinguish PIN from biometric. Should either become an `acr_values` value?
-13. **Admin-authorized enrollment:** Which permission issues the authorization,
+12. **Admin-authorized enrollment:** Which permission issues the authorization,
     since `user.write` is too broad (Gap 8)?
     [#3202](https://github.com/zitadel/nextgen/issues/3202) also leaves open
     what the administrator checks before authorizing.
-14. **Recovery when two methods are lost:** A user with a password, a TOTP
-    method and a passkey loses the TOTP method and the passkey. Under
-    [§4.4](#44-account-recovery), the password and one recovery check permit
-    enrolling a new passkey, and the lost TOTP method is not checked. Is one
-    recovery check enough in this case, or does this user need an administrator?
 
 ## Gaps in the server today
 
@@ -775,7 +780,9 @@ event, with who performed it and when
    sign-up step.
 2. **No recovery check.** The server has storage for recovery codes
    (`internal/domain/user_recover_codes.go`), but it does not create a code, and
-   it has no check type that verifies one.
+   it has no check type that verifies one. It has no check type for a code or
+   link sent by email either, so neither recovery route of
+   [§4.4](#44-account-recovery) exists.
 3. **A passkey challenge returns the user's credential IDs after the identifier
    alone.** For a user who has a passkey, the challenge lists the credential IDs
    of the user's passkeys, and for a user without a passkey it lists no
