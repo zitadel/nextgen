@@ -74,8 +74,7 @@ const granted = new WeakSet<object>();
  * Proof that a person, or `--force`, agreed to one destructive action. A
  * command asks for it before it deletes, revokes or rolls back anything; the
  * local actions (`LocalRuntime.reset`, `eject`'s removals) take it as a
- * parameter, and the run's client refuses a destructive operation until the
- * run holds one.
+ * parameter.
  *
  * Only {@link Consent.request} makes one: the constructor is private, and a private
  * member makes the type nominal, so an object of the same shape is not a

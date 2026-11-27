@@ -106,9 +106,9 @@ describe("a client's destructive operations", () => {
   });
 
   /**
-   * The gate has two halves reading two generated shapes: this client narrows
-   * itself by `destructiveOperations`, a list of client function names, while
-   * `OperationService` asks each operation's own `destructive` flag. They are
+   * The spec's destructive marker is generated into two shapes:
+   * `destructiveOperations`, a list of client function names, and each
+   * operation's own `destructive` flag, which `OperationService` asks. They are
    * generated from the one marker in the spec, and nothing else holds them
    * together, so an operation withheld from one caller and not the other would
    * otherwise go unnoticed. Compared without case, because a client function is

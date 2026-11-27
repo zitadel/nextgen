@@ -345,6 +345,20 @@ describe("customFetch through the client's onRequest", () => {
     expect(error).toBe(refused);
     expect(seen).toEqual([]);
   });
+
+  it("sends the request as the client built it whatever it changes", async () => {
+    const { base, seen } = await recording();
+    const client = clientOf(base, {
+      token: "tok",
+      onRequest: ({ init }) => {
+        (init.headers as Headers).set("authorization", "Bearer other");
+      },
+    });
+
+    await send(client, "/teams", { method: "POST" });
+
+    expect(seen.map(({ headers }) => headers.authorization)).toEqual(["Bearer tok"]);
+  });
 });
 
 describe("apiErrorCode", () => {

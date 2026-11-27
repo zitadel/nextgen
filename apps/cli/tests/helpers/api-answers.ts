@@ -72,7 +72,7 @@ export type Reply<K extends OperationName> =
  * operation through the same transport, URLs, paging and error translation as
  * in production, and a test answers what reaches the server.
  *
- * @returns The client, without its destructive operations until `allowDestructive`.
+ * @returns The client.
  */
 export function testClient(): ZitadelClient {
   return createZitadelClient({ baseUrl: TEST_SERVER, signal: new AbortController().signal });

@@ -307,9 +307,8 @@
   (`src/cli/core/destructive.ts`), which takes `--force`, and does it in `this.confirmed({ ... })`
   inside `apply`. Declare no `--force` of your own unless it means something else
   (`setup` overwriting files).
-- Every destructive operation takes a `Consent` (`src/lib/consent/consent.ts`) as a
-  parameter: a backend method's, or `withConsent(client, consent)` for the client's own.
-  The client type has no destructive operation, so code without a consent does not compile.
+- Consent lives only in commands: ask in `confirmed()` or `this.consent(gate)`, never in
+  `lib/`. A spec runs the command without `--force`, then reads back with another command.
 - An update that sets a field to `null` removes it, so it asks as a deletion does and
   refuses without `--force` when nothing can ask.
 - The dry run of such an update warns and suggests the real run with `--force`.

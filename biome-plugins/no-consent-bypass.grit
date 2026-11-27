@@ -17,7 +17,7 @@ or {
     $client <: r"(?i)^[\w.]*client$|^[\w.]*client\(\)$",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
     $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
-    register_diagnostic(span=$bypass, message="Never cast a client: its destructive operations are reached only through Consent.unlock.", severity="error")
+    register_diagnostic(span=$bypass, message="Never cast a client: use the one lib/backend/client builds.", severity="error")
   },
   or {
     `Consent.request`,
@@ -56,7 +56,7 @@ or {
     $names <: r"(?s).*\brequest\b.*|(?s).*\bcustomFetch\b.*",
     $filename <: not r".*/apps/cli/src/lib/backend/services/operation\.ts$",
     $filename <: not r".*/apps/cli/src/lib/backend/transport\.ts$",
-    register_diagnostic(span=$bypass, message="Send a request through OperationService in lib/backend, which refuses a destructive operation on a client that may not reach them.", severity="error")
+    register_diagnostic(span=$bypass, message="Send a request through OperationService in lib/backend, so every request goes through the CLI's one client.", severity="error")
   },
   `fetch($_)` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
@@ -65,7 +65,7 @@ or {
     $filename <: not r".*/apps/cli/src/lib/telemetry/index\.ts$",
     $filename <: not r".*/apps/cli/src/lib/upgrade/channel\.ts$",
     $filename <: not r".*/apps/cli/src/lib/upgrade/release-notes\.ts$",
-    register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/backend/client or OperationService in lib/backend, which gate destructive operations.", severity="error")
+    register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/backend/client or OperationService in lib/backend.", severity="error")
   },
   `Consent.prototype` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
@@ -80,7 +80,7 @@ or {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
     $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
-    register_diagnostic(span=$bypass, message="Use the client from lib/backend/client, which the run's consent guards.", severity="error")
+    register_diagnostic(span=$bypass, message="Use the client from lib/backend/client, so every request goes through the CLI's one client.", severity="error")
   },
   `kind: "confirm"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",

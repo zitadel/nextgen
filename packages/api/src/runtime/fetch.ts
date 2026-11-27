@@ -122,7 +122,7 @@ export function customFetch(client: ZitadelClient, operation: string) {
     }
 
     const init = { ...options, headers };
-    await client.onRequest?.({ operation, url, init });
+    await client.onRequest?.({ operation, url, init: { ...init, headers: new Headers(headers) } });
     const { res, rawBody: parsed } = await request(url, init, policy, readBody);
 
     if (!res.ok) {
