@@ -16,4 +16,3 @@ import type * as React from "react";
 export type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
   React.HTMLAttributes<HTMLElement>
 >;
-export const knipProbe = 1;
