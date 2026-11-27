@@ -121,4 +121,4 @@ parity).
 ## Background jobs
 
 - Jobs persistence is `JobStatements` on `AllStatements` ([ADR 065](../../../../docs/adrs/065-background-jobs.md)): dialects own claim SQL and mint `job` / `sched` IDs; they never `RegisterWorker` or start poll loops.
-- Guide: [`docs/design/jobs/`](../../../../docs/design/jobs/README.md). Contract tests: `stmttest` + [acceptance](../../../../docs/design/jobs/acceptance/README.md).
+- Guide: [`docs/design/jobs/`](../../../../docs/design/jobs/README.md). Contract tests: `stmttest` + [acceptance](../../../../e2e/acceptance/background-jobs/README.md).

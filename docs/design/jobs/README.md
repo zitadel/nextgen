@@ -6,7 +6,7 @@ queued jobs on PostgreSQL, Spanner, and SQLite.
 | Doc | What it is |
 |-----|------------|
 | [runtime.md](./runtime.md) | Engine vs statements, wake modes, recipes, config |
-| [acceptance/](./acceptance/README.md) | Gherkin behavior contract |
+| [e2e/acceptance/background-jobs/](../../../e2e/acceptance/background-jobs/README.md) | Gherkin behavior contract |
 | [ADR 065](../../adrs/065-background-jobs.md) | Decision record (Proposed) |
 
 **First product handler:** `sessions.gc` ([#881](https://github.com/zitadel/nextgen/issues/881)).

@@ -124,4 +124,4 @@ resource, Path A durable outbox (can Enqueue later on this ledger).
 ## Related
 
 - [ADR 028](../../adrs/028-storage-v2-statements-and-dialects.md), [041](../../adrs/041-storage-statement-contract-tests.md), [047](../../adrs/047-dialect-id-generation.md), [048](../../adrs/048-wide-events-internal-audit-primitive.md), [049](../../adrs/049-events-api-retention-export.md)
-- Acceptance: [acceptance/](./acceptance/README.md)
+- Acceptance: [e2e/acceptance/background-jobs/](../../../e2e/acceptance/background-jobs/README.md)
