@@ -3,6 +3,7 @@ import type { Command } from "@oclif/core";
 import { Autocomplete, Commands, Help, Version, Which } from "./cli/commands/built-in";
 import Api from "./cli/commands/api/index";
 import ApiLs from "./cli/commands/api/ls";
+import ApplicationCreate from "./cli/commands/application/create";
 import AuthMethodPasskeyDisable from "./cli/commands/auth-method/passkey/disable";
 import AuthMethodPasskeyEnable from "./cli/commands/auth-method/passkey/enable";
 import AuthMethodPasswordDisable from "./cli/commands/auth-method/password/disable";
@@ -93,6 +94,7 @@ export const WORKFLOW_COMMANDS = {
   "auth-method:sso:enable": AuthMethodSsoEnable,
   "auth-method:sso:disable": AuthMethodSsoDisable,
   "api:ls": ApiLs,
+  "application:create": ApplicationCreate,
   "branding:eject": BrandingEject,
   "deployment:create": DeploymentCreate,
   "deployment:get": DeploymentGet,

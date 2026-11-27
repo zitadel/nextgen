@@ -55,6 +55,7 @@ Sign-in
   branding         Manage the login branding
   flow-definition  View login flows
   policy           View and test policies
+  application      Register an application and its first OIDC client on the project
 
 Project settings
   project          View and update projects
