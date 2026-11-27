@@ -28,6 +28,11 @@ export class NativeSanitiser implements Sanitiser {
   /**
    * Whether this browser has the HTML Sanitizer API.
    *
+   * Chrome 105 to 118 shipped an earlier draft of the API: `setHTML()` exists
+   * there, but `Sanitizer` lacks the methods {@link configure} calls, so the
+   * widget fails to start on those versions. They are intentionally not
+   * handled: they are out of support and no longer receive updates.
+   *
    * @returns `true` where `Element.setHTML()` exists.
    */
   static isSupported(): boolean {
