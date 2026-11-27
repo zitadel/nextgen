@@ -5,9 +5,31 @@ import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import type { ListDeployments200DeploymentsItem } from "../generated/model";
 import type { paging } from "../generated/paging";
-import { createZitadelClient, type ItemOf } from "./api-factory";
+import {
+  createZitadelApi,
+  type ItemOf,
+  ZitadelClient,
+  type ZitadelApiHooks,
+  type ZitadelClientSettings,
+} from "./api-factory";
+import { DestructiveOperationError } from "./fetch";
 
 type Paging = typeof paging;
+
+/**
+ * A convenience client over a client made from `settings`, which may not run
+ * destructive operations, with `hooks`.
+ */
+function apiFor({
+  onResponse,
+  onError,
+  ...settings
+}: Omit<ZitadelClientSettings, "allowDestructive"> & ZitadelApiHooks) {
+  return createZitadelApi(new ZitadelClient({ ...settings, allowDestructive: false }), {
+    onResponse,
+    onError,
+  });
+}
 
 const servers: Server[] = [];
 
@@ -77,8 +99,8 @@ describe("createZitadelClient", () => {
   it("keeps two clients' user agents apart while both are in flight", async () => {
     const one = await agents();
     const two = await agents();
-    const first = createZitadelClient({ baseUrl: one.base, userAgent: "zitadel-cli/first" });
-    const second = createZitadelClient({ baseUrl: two.base, userAgent: "zitadel-cli/second" });
+    const first = apiFor({ baseUrl: one.base, userAgent: "zitadel-cli/first" });
+    const second = apiFor({ baseUrl: two.base, userAgent: "zitadel-cli/second" });
 
     await Promise.all([
       first.listDeployments({ project_id: "proj_1" }),
@@ -93,8 +115,8 @@ describe("createZitadelClient", () => {
   it("walks a paged function's pages with its own base URL and token", async () => {
     const { base, requests } = await deployments();
     const elsewhere = await deployments();
-    const client = createZitadelClient({ baseUrl: base, token: "secret" });
-    const other = createZitadelClient({ baseUrl: elsewhere.base, token: "other" });
+    const client = apiFor({ baseUrl: base, token: "secret" });
+    const other = apiFor({ baseUrl: elsewhere.base, token: "other" });
 
     const ids = [];
     for await (const deployment of client.listDeployments.items({
@@ -120,8 +142,8 @@ describe("createZitadelClient", () => {
   it("keeps two clients' walks apart while both are in flight", async () => {
     const one = await deployments();
     const two = await deployments();
-    const first = createZitadelClient({ baseUrl: one.base, token: "one" });
-    const second = createZitadelClient({ baseUrl: two.base, token: "two" });
+    const first = apiFor({ baseUrl: one.base, token: "one" });
+    const second = apiFor({ baseUrl: two.base, token: "two" });
 
     await Promise.all([
       first.listDeployments.all({
@@ -145,7 +167,7 @@ describe("createZitadelClient", () => {
   });
 
   it("types a paged function's items as the response's list entries", () => {
-    const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1" });
+    const client = apiFor({ baseUrl: "http://127.0.0.1:1" });
 
     expectTypeOf(client.listDeployments.all).returns.resolves.toEqualTypeOf<
       ListDeployments200DeploymentsItem[]
@@ -161,7 +183,7 @@ describe("createZitadelClient", () => {
     });
     servers.push(server);
     await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-    const client = createZitadelClient({
+    const client = apiFor({
       baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
       userAgent: "zitadel-cli/1.0.0",
     });
@@ -175,7 +197,7 @@ describe("createZitadelClient", () => {
 
   it("applies its response hook to every page", async () => {
     const { base } = await deployments();
-    const client = createZitadelClient({
+    const client = apiFor({
       baseUrl: base,
       onResponse: (body) => ({
         ...(body as object),
@@ -195,7 +217,7 @@ describe("createZitadelClient", () => {
   it("applies its hooks when the global Promise has been replaced", async () => {
     const { base } = await deployments();
     const seen: unknown[] = [];
-    const client = createZitadelClient({
+    const client = apiFor({
       baseUrl: base,
       onResponse: (body) => {
         seen.push(body);
@@ -218,7 +240,7 @@ describe("createZitadelClient", () => {
 
   it("walks every page when its response hook reshapes them", async () => {
     const { base } = await deployments();
-    const client = createZitadelClient({
+    const client = apiFor({
       baseUrl: base,
       onResponse: (body) => {
         const { next_page_token: nextPageToken, ...rest } = body as Record<string, unknown>;
@@ -235,7 +257,7 @@ describe("createZitadelClient", () => {
 
   it("hands its response hook's failures to its error hook", async () => {
     const { base } = await deployments();
-    const client = createZitadelClient({
+    const client = apiFor({
       baseUrl: base,
       onResponse: () => {
         throw new Error("hook");
@@ -253,7 +275,7 @@ describe("createZitadelClient", () => {
   });
 
   it("hands every failure to its error hook", async () => {
-    const client = createZitadelClient({
+    const client = apiFor({
       baseUrl: "http://127.0.0.1:1",
       onError: () => {
         throw new Error("handled");
@@ -270,7 +292,7 @@ describe("createZitadelClient", () => {
   it("puts a later page's page_token in the query parameters after a path parameter", async () => {
     const { base, requests } = await twoPages("previews");
 
-    await createZitadelClient({ baseUrl: base }).listProjectPreviews.all("proj_1", { limit: 1 });
+    await apiFor({ baseUrl: base }).listProjectPreviews.all("proj_1", { limit: 1 });
 
     expect(requests.map(([path]) => path)).toEqual([
       "/api/v1/projects/proj_1/previews?limit=1",
@@ -281,7 +303,7 @@ describe("createZitadelClient", () => {
   it("puts a later page's page_token in query parameters the caller left off", async () => {
     const { base, requests } = await twoPages("previews");
 
-    await createZitadelClient({ baseUrl: base }).listProjectPreviews.all("proj_1");
+    await apiFor({ baseUrl: base }).listProjectPreviews.all("proj_1");
 
     expect(requests.map(([path]) => path)).toEqual([
       "/api/v1/projects/proj_1/previews",
@@ -292,7 +314,7 @@ describe("createZitadelClient", () => {
   it("puts a later page's page_token in the body of a query", async () => {
     const { base, requests } = await twoPages("users");
 
-    await createZitadelClient({ baseUrl: base }).queryUsers.all({ limit: 1 });
+    await apiFor({ baseUrl: base }).queryUsers.all({ limit: 1 });
 
     expect(requests.map(([, body]) => body)).toEqual([
       { limit: 1 },
@@ -310,19 +332,31 @@ describe("createZitadelClient", () => {
     expectTypeOf<Untyped>().toBeNever();
   });
 
-  it("builds a URL against its own base URL", () => {
-    const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1/" });
-
-    const url = client.getListDeploymentsUrl({
-      project_id: "proj_1",
-    });
-
-    expect(url).toBe("http://127.0.0.1:1/api/v1/deployments?project_id=proj_1");
-  });
-
   it("leaves paging off a function that does not page", () => {
-    const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1" });
+    const client = apiFor({ baseUrl: "http://127.0.0.1:1" });
 
     expect("items" in client.getDeployment).toBe(false);
+  });
+
+  it("runs every operation against the client it was made with", () => {
+    const client = new ZitadelClient({ baseUrl: "http://127.0.0.1:1", allowDestructive: false });
+
+    expect(createZitadelApi(client).client).toBe(client);
+  });
+
+  it("refuses a destructive operation its client does not allow", async () => {
+    const { base, requests } = await deployments();
+
+    const deleted = apiFor({ baseUrl: base }).deleteUser("usr_1");
+
+    await expect(deleted).rejects.toBeInstanceOf(DestructiveOperationError);
+    expect(requests).toEqual([]);
+  });
+
+  it("cannot be changed", () => {
+    const api = apiFor({ baseUrl: "http://127.0.0.1:1" });
+
+    expect(Object.isFrozen(api)).toBe(true);
+    expect(Object.isFrozen(api.listDeployments)).toBe(true);
   });
 });

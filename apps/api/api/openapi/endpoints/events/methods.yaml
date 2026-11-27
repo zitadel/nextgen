@@ -21,7 +21,7 @@ get:
 
     Filters combine. These are answered from an index and fill their pages: no
     filter, `category`, `event_type`, `status_class`, `operation_id` with or
-    without `status_class`, `request_id`, `flow_id`, and `session_id`,
+    without `status_class`, `request_id`, `flow_id`, `correlation_id`, and `session_id`,
     `entity_id`, `user_id`, `actor_id` or `entity_type` with or without
     `category`, each with or without the time bounds. Any other filter or combination is
     matched event by event, over at most a few thousand events per request.
@@ -92,6 +92,16 @@ get:
     - name: flow_id
       in: query
       description: Only events of this login flow ID.
+      schema:
+        type: string
+    - name: correlation_id
+      in: query
+      description: |
+        Only events of this chain: the requests that one sign-in, invitation
+        or project claim took, whoever sent them. Read the ID from the
+        `correlation_id` of an event in the chain. Events recorded by a server
+        version before this filter existed are not matched; they leave the
+        list as retention removes them.
       schema:
         type: string
     - name: request_id

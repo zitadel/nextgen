@@ -10,7 +10,8 @@ one, update the ADR in the same change.
   router factory, `basepath` from the Vite `base`.
 - [0002 API access](docs/adrs/0002-console-api-access.md): the console holds
   no script-readable credential. Call the API same-origin through
-  `configureZitadel()` / `getApi()`, never a bespoke client. The base is
+  `configureZitadel()` and the project's client (`src/api/zitadel.ts`),
+  never a bespoke one. The base is
   empty everywhere: the client calls `/api/v1` (root ADR 077), and the dev
   proxy forwards it unchanged.
 - [0003 Authentication](docs/adrs/0003-console-authentication.md): `/login`

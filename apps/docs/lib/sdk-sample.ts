@@ -67,7 +67,7 @@ export function sdkSample(
   const lines = [
     ...setup(auth, csrf),
     "",
-    `${callExpression(`${result}await client.${method}`, args)};`,
+    `${callExpression(`${result}await api.${method}`, args)};`,
   ];
   return lines.join("\n");
 }
@@ -129,31 +129,48 @@ export function authentication(operation: OperationObject, request?: RequestData
 
 function setup(auth: Authentication, csrf: boolean): string[] {
   if (auth === "session") {
+    const project = `configureZitadel({ projectId: ${JSON.stringify(exampleProjectId)} })`;
+    if (!csrf) {
+      return [
+        'import { configureZitadel, getApi } from "@zitadel/api/config";',
+        "",
+        "// In the browser, through the SDK proxy: the session cookie authenticates the call.",
+        `const api = getApi(${project});`,
+      ];
+    }
     return [
+      'import { createZitadelApi } from "@zitadel/api/client";',
       'import { configureZitadel, getApi } from "@zitadel/api/config";',
-      ...(csrf ? ['import { setApiCsrfToken } from "@zitadel/api/runtime/auth";'] : []),
       "",
       "// In the browser, through the SDK proxy: the session cookie authenticates the call.",
-      `const client = getApi(configureZitadel({ projectId: ${JSON.stringify(exampleProjectId)} }));`,
-      ...(csrf
-        ? [
-            "",
-            "// A write the session cookie authenticates carries the session's CSRF token.",
-            "setApiCsrfToken((await client.getMySessionCsrfToken()).csrf_token);",
-          ]
-        : []),
+      `const session = getApi(${project});`,
+      "",
+      "// A write the session cookie authenticates carries the session's CSRF token.",
+      "const { csrf_token } = await session.getMySessionCsrfToken();",
+      "const api = createZitadelApi(",
+      "  session.client.with({",
+      "    fetch: (input, init) => {",
+      "      const headers = new Headers(init?.headers);",
+      '      headers.set("X-Zitadel-CSRF", csrf_token);',
+      "      return fetch(input, { ...init, headers });",
+      "    },",
+      "  }),",
+      ");",
     ];
   }
 
   return [
-    'import { createZitadelClient } from "@zitadel/api/client";',
+    'import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";',
     "",
-    "const client = createZitadelClient({",
-    `  baseUrl: ${baseUrl},`,
+    "const api = createZitadelApi(",
+    "  new ZitadelClient({",
+    `    baseUrl: ${baseUrl},`,
     ...(auth === "secret"
-      ? ["  token: process.env.ZITADEL_PROJECT_SECRET!, // server-side only"]
+      ? ["    token: process.env.ZITADEL_PROJECT_SECRET!, // server-side only"]
       : []),
-    "});",
+    "    allowDestructive: true,",
+    "  }),",
+    ");",
   ];
 }
 
@@ -269,12 +286,15 @@ function returnsContent(operation: OperationObject): boolean {
 const verbs =
   /^(?:accept|add|build|cancel|complete|create|deactivate|delete|exchange|get|list|lookup|publish|query|reject|remove|revoke|rollback|set|submit|update|verify)(?=[A-Z])/;
 
-// What the call returns, named after the operation: getUser's is `user`.
+/**
+ * What the call returns, named after the operation: getUser's is `user`, and
+ * `result` where that would take the sample's own `api` or `session`.
+ */
 function resultName(method: string): string {
   const noun = method.replace(verbs, "").replace(/By[A-Z][A-Za-z]*$/, "");
   if (noun === method || noun === "") return "result";
   const name = noun.charAt(0).toLowerCase() + noun.slice(1);
-  return name === "client" ? "result" : name;
+  return name === "api" || name === "session" ? "result" : name;
 }
 
 /** The call, laid out as a formatter lays it out in 80 columns. */

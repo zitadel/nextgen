@@ -92,7 +92,7 @@ same TX (shared `request_id`).
 ### SIEM join path
 
 Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
-`client_id`, `token_id`, `actor_id`, `entity_id`, `user_id`.
+`correlation_id`, `client_id`, `token_id`, `actor_id`, `entity_id`, `user_id`.
 
 Path A `request.api` may also carry observed requestor context on metadata
 (`ip`, `user_agent`, `origin` under `client`). Join Path B mutations to that
@@ -115,6 +115,26 @@ are not inputs to the live risk evaluator
   and never the token an event is about; that one is `entity_id`. An export
   joins the requests a token authenticates to its `auth.token.issued` by
   `token_id` ↔ `entity_id`; `GET /events` has no `token_id` filter.
+
+### The chain an event belongs to
+
+`correlation_id` joins the requests one piece of work took, whoever sent
+them, and is a filter of `GET /events` that reads its own index. No emitter
+sets it: a request inherits it from the carrier it reads or creates
+([ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md#amendment-2026-11-26-a-correlation-id-that-requests-inherit)),
+and every event it writes from then on carries it, its `request.api`
+included.
+
+| Chain | Starts with | Ends with |
+|-------|-------------|-----------|
+| A sign-in | `auth.request.created` at the OAuth authorization endpoint, else the first `auth.attempt.created` of the login flow | `session.established` and `auth.token.issued` of the handoff exchange, or the `auth.token.issued` of the code's redemption |
+| An invitation | `invitation.created` | `invitation.accepted` with its `authz.granted`, `invitation.rejected`, or `invitation.cancelled`; a replacement stays in the chain |
+| A project claim | the init's `request.api` | the completion's `authz.granted` |
+
+An event of a request that reads no carrier has none: `request_id` joins the
+events of that request. A session and a token are no carriers, so what they
+authenticate afterwards is in no chain. The `journey_id` in an invitation
+event's payload equals its `correlation_id`.
 
 ### The user an event concerns
 
@@ -218,6 +238,7 @@ tracked below.
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
 | ApplicationService create (new slug; a release build for a declared one) | `application.created` | `admin` | `application` | `slug`, `name`, `client_ids[]`, `revision_id` |
 | ApplicationService revise (existing slug; a release build for a declared one) | `application.updated` | `admin` | `application` | `revision_id`; delta: `name` (when changed), `client_ids[]` (the clients the revision added) |
+| ApplicationService retry of a keyed `POST /applications` (same `Idempotency-Key` and body; none when no client is rotated) | `application.client_secret.rotated` | `admin` | `application` | `client_ids[]` (the clients whose secrets were replaced), `revision_id` (the newest) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
 | VariableService set (one event per row written; entering and replacing are the same event, since the value is the only difference and it never appears; a value written for both kinds is two rows) | `variable.set` | `entity` | `variable` | `kind` (with `entity_id`, the row key), `secret` |

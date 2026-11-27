@@ -1971,6 +1971,194 @@ func (s *AppFieldImmutableDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *AppIdempotencyKeyReused) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppIdempotencyKeyReused) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.idempotency_key_reused")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppIdempotencyKeyReused = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppIdempotencyKeyReused from json.
+func (s *AppIdempotencyKeyReused) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppIdempotencyKeyReused to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppIdempotencyKeyReused")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppIdempotencyKeyReused) {
+					name = jsonFieldsNameOfAppIdempotencyKeyReused[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppIdempotencyKeyReused) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppIdempotencyKeyReused) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppIdempotencyKeyReusedDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppIdempotencyKeyReusedDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppIdempotencyKeyReusedDetails from json.
+func (s *AppIdempotencyKeyReusedDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppIdempotencyKeyReusedDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppIdempotencyKeyReusedDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppIdempotencyKeyReusedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppIdempotencyKeyReusedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *AppInvalid) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -3473,6 +3661,625 @@ func (s *ApplicationClientSecret) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *ApplicationClientSecretRotatedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ApplicationClientSecretRotatedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("application.client_secret.rotated")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfApplicationClientSecretRotatedEvent = [24]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
+}
+
+// Decode decodes ApplicationClientSecretRotatedEvent from json.
+func (s *ApplicationClientSecretRotatedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationClientSecretRotatedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 4
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 7
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ApplicationClientSecretRotatedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00010000,
+		0b10000000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfApplicationClientSecretRotatedEvent) {
+					name = jsonFieldsNameOfApplicationClientSecretRotatedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ApplicationClientSecretRotatedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationClientSecretRotatedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationClientSecretRotatedEventActorType as json.
+func (s ApplicationClientSecretRotatedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationClientSecretRotatedEventActorType from json.
+func (s *ApplicationClientSecretRotatedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationClientSecretRotatedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationClientSecretRotatedEventActorType(v) {
+	case ApplicationClientSecretRotatedEventActorTypeHuman:
+		*s = ApplicationClientSecretRotatedEventActorTypeHuman
+	case ApplicationClientSecretRotatedEventActorTypeService:
+		*s = ApplicationClientSecretRotatedEventActorTypeService
+	case ApplicationClientSecretRotatedEventActorTypeSystem:
+		*s = ApplicationClientSecretRotatedEventActorTypeSystem
+	case ApplicationClientSecretRotatedEventActorTypeAgent:
+		*s = ApplicationClientSecretRotatedEventActorTypeAgent
+	default:
+		*s = ApplicationClientSecretRotatedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationClientSecretRotatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationClientSecretRotatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationClientSecretRotatedEventCategory as json.
+func (s ApplicationClientSecretRotatedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationClientSecretRotatedEventCategory from json.
+func (s *ApplicationClientSecretRotatedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationClientSecretRotatedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationClientSecretRotatedEventCategory(v) {
+	case ApplicationClientSecretRotatedEventCategoryRequest:
+		*s = ApplicationClientSecretRotatedEventCategoryRequest
+	case ApplicationClientSecretRotatedEventCategoryAuth:
+		*s = ApplicationClientSecretRotatedEventCategoryAuth
+	case ApplicationClientSecretRotatedEventCategorySession:
+		*s = ApplicationClientSecretRotatedEventCategorySession
+	case ApplicationClientSecretRotatedEventCategoryAdmin:
+		*s = ApplicationClientSecretRotatedEventCategoryAdmin
+	case ApplicationClientSecretRotatedEventCategoryEntity:
+		*s = ApplicationClientSecretRotatedEventCategoryEntity
+	case ApplicationClientSecretRotatedEventCategorySignal:
+		*s = ApplicationClientSecretRotatedEventCategorySignal
+	default:
+		*s = ApplicationClientSecretRotatedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationClientSecretRotatedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationClientSecretRotatedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationClientSecretRotatedEventDelegationType as json.
+func (s ApplicationClientSecretRotatedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationClientSecretRotatedEventDelegationType from json.
+func (s *ApplicationClientSecretRotatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationClientSecretRotatedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationClientSecretRotatedEventDelegationType(v) {
+	case ApplicationClientSecretRotatedEventDelegationTypeDirect:
+		*s = ApplicationClientSecretRotatedEventDelegationTypeDirect
+	case ApplicationClientSecretRotatedEventDelegationTypeDelegated:
+		*s = ApplicationClientSecretRotatedEventDelegationTypeDelegated
+	case ApplicationClientSecretRotatedEventDelegationTypePatShared:
+		*s = ApplicationClientSecretRotatedEventDelegationTypePatShared
+	case ApplicationClientSecretRotatedEventDelegationTypeExchanged:
+		*s = ApplicationClientSecretRotatedEventDelegationTypeExchanged
+	default:
+		*s = ApplicationClientSecretRotatedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationClientSecretRotatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationClientSecretRotatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ApplicationClientType as json.
 func (s ApplicationClientType) Encode(e *jx.Encoder) {
 	e.Str(string(s))
@@ -3633,6 +4440,12 @@ func (s *ApplicationCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -3644,7 +4457,7 @@ func (s *ApplicationCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfApplicationCreatedEvent = [23]string{
+var jsonFieldsNameOfApplicationCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -3666,8 +4479,9 @@ var jsonFieldsNameOfApplicationCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ApplicationCreatedEvent from json.
@@ -3899,6 +4713,16 @@ func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -3910,7 +4734,7 @@ func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -3931,7 +4755,7 @@ func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -4591,6 +5415,12 @@ func (s *ApplicationUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -4602,7 +5432,7 @@ func (s *ApplicationUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfApplicationUpdatedEvent = [23]string{
+var jsonFieldsNameOfApplicationUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -4624,8 +5454,9 @@ var jsonFieldsNameOfApplicationUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ApplicationUpdatedEvent from json.
@@ -4857,6 +5688,16 @@ func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -4868,7 +5709,7 @@ func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -4889,7 +5730,7 @@ func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -6737,6 +7578,12 @@ func (s *AuthAttemptCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -6748,7 +7595,7 @@ func (s *AuthAttemptCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthAttemptCreatedEvent = [23]string{
+var jsonFieldsNameOfAuthAttemptCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -6770,8 +7617,9 @@ var jsonFieldsNameOfAuthAttemptCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthAttemptCreatedEvent from json.
@@ -7003,6 +7851,16 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -7014,7 +7872,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -7035,7 +7893,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -7339,6 +8197,12 @@ func (s *AuthAttemptHandedOffEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -7350,7 +8214,7 @@ func (s *AuthAttemptHandedOffEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthAttemptHandedOffEvent = [23]string{
+var jsonFieldsNameOfAuthAttemptHandedOffEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -7372,8 +8236,9 @@ var jsonFieldsNameOfAuthAttemptHandedOffEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthAttemptHandedOffEvent from json.
@@ -7605,6 +8470,16 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -7616,7 +8491,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -7637,7 +8512,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -8262,6 +9137,12 @@ func (s *AuthCheckFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -8273,7 +9154,7 @@ func (s *AuthCheckFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthCheckFailedEvent = [23]string{
+var jsonFieldsNameOfAuthCheckFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -8295,8 +9176,9 @@ var jsonFieldsNameOfAuthCheckFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthCheckFailedEvent from json.
@@ -8528,6 +9410,16 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -8539,7 +9431,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -8560,7 +9452,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -8994,6 +9886,12 @@ func (s *AuthCheckSucceededEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -9005,7 +9903,7 @@ func (s *AuthCheckSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthCheckSucceededEvent = [23]string{
+var jsonFieldsNameOfAuthCheckSucceededEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -9027,8 +9925,9 @@ var jsonFieldsNameOfAuthCheckSucceededEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthCheckSucceededEvent from json.
@@ -9260,6 +10159,16 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -9271,7 +10180,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -9292,7 +10201,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -9784,6 +10693,12 @@ func (s *AuthFactorPasskeyEnrolledEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -9795,7 +10710,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [23]string{
+var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -9817,8 +10732,9 @@ var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthFactorPasskeyEnrolledEvent from json.
@@ -10050,6 +10966,16 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -10061,7 +10987,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -10082,7 +11008,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -10386,6 +11312,12 @@ func (s *AuthFactorPasswordSetEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -10397,7 +11329,7 @@ func (s *AuthFactorPasswordSetEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthFactorPasswordSetEvent = [23]string{
+var jsonFieldsNameOfAuthFactorPasswordSetEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -10419,8 +11351,9 @@ var jsonFieldsNameOfAuthFactorPasswordSetEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthFactorPasswordSetEvent from json.
@@ -10652,6 +11585,16 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -10663,7 +11606,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -10684,7 +11627,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -11339,6 +12282,12 @@ func (s *AuthRequestCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -11350,7 +12299,7 @@ func (s *AuthRequestCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthRequestCreatedEvent = [23]string{
+var jsonFieldsNameOfAuthRequestCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -11372,8 +12321,9 @@ var jsonFieldsNameOfAuthRequestCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthRequestCreatedEvent from json.
@@ -11605,6 +12555,16 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -11616,7 +12576,7 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -11637,7 +12597,7 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -12037,6 +12997,12 @@ func (s *AuthRequestExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -12048,7 +13014,7 @@ func (s *AuthRequestExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthRequestExchangeFailedEvent = [23]string{
+var jsonFieldsNameOfAuthRequestExchangeFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -12070,8 +13036,9 @@ var jsonFieldsNameOfAuthRequestExchangeFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthRequestExchangeFailedEvent from json.
@@ -12303,6 +13270,16 @@ func (s *AuthRequestExchangeFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -12314,7 +13291,7 @@ func (s *AuthRequestExchangeFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -12335,7 +13312,7 @@ func (s *AuthRequestExchangeFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -12804,6 +13781,12 @@ func (s *AuthSSOAuthorizationFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -12815,7 +13798,7 @@ func (s *AuthSSOAuthorizationFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [23]string{
+var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -12837,8 +13820,9 @@ var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthSSOAuthorizationFailedEvent from json.
@@ -13070,6 +14054,16 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -13081,7 +14075,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -13102,7 +14096,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -13406,6 +14400,12 @@ func (s *AuthSSOExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -13417,7 +14417,7 @@ func (s *AuthSSOExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [23]string{
+var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -13439,8 +14439,9 @@ var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthSSOExchangeFailedEvent from json.
@@ -13672,6 +14673,16 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -13683,7 +14694,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -13704,7 +14715,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -14008,6 +15019,12 @@ func (s *AuthSSOExchangeSucceededEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -14019,7 +15036,7 @@ func (s *AuthSSOExchangeSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [23]string{
+var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -14041,8 +15058,9 @@ var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthSSOExchangeSucceededEvent from json.
@@ -14274,6 +15292,16 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -14285,7 +15313,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -14306,7 +15334,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -14610,6 +15638,12 @@ func (s *AuthTokenIssuedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -14621,7 +15655,7 @@ func (s *AuthTokenIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthTokenIssuedEvent = [23]string{
+var jsonFieldsNameOfAuthTokenIssuedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -14643,8 +15677,9 @@ var jsonFieldsNameOfAuthTokenIssuedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthTokenIssuedEvent from json.
@@ -14876,6 +15911,16 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -14887,7 +15932,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -14908,7 +15953,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -15305,6 +16350,12 @@ func (s *AuthTokenRevokedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -15316,7 +16367,7 @@ func (s *AuthTokenRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthTokenRevokedEvent = [23]string{
+var jsonFieldsNameOfAuthTokenRevokedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -15338,8 +16389,9 @@ var jsonFieldsNameOfAuthTokenRevokedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthTokenRevokedEvent from json.
@@ -15571,6 +16623,16 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -15582,7 +16644,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -15603,7 +16665,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -16095,6 +17157,12 @@ func (s *AuthzGrantedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -16106,7 +17174,7 @@ func (s *AuthzGrantedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthzGrantedEvent = [23]string{
+var jsonFieldsNameOfAuthzGrantedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -16128,8 +17196,9 @@ var jsonFieldsNameOfAuthzGrantedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthzGrantedEvent from json.
@@ -16361,6 +17430,16 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -16372,7 +17451,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -16393,7 +17472,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -16794,6 +17873,12 @@ func (s *AuthzRevokedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -16805,7 +17890,7 @@ func (s *AuthzRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthzRevokedEvent = [23]string{
+var jsonFieldsNameOfAuthzRevokedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -16827,8 +17912,9 @@ var jsonFieldsNameOfAuthzRevokedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthzRevokedEvent from json.
@@ -17060,6 +18146,16 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -17071,7 +18167,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -17092,7 +18188,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -17947,6 +19043,12 @@ func (s *BrandingCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -17958,7 +19060,7 @@ func (s *BrandingCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfBrandingCreatedEvent = [23]string{
+var jsonFieldsNameOfBrandingCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -17980,8 +19082,9 @@ var jsonFieldsNameOfBrandingCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes BrandingCreatedEvent from json.
@@ -18213,6 +19316,16 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -18224,7 +19337,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -18245,7 +19358,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -41496,6 +42609,12 @@ func (s *DeploymentCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -41507,7 +42626,7 @@ func (s *DeploymentCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfDeploymentCreatedEvent = [23]string{
+var jsonFieldsNameOfDeploymentCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -41529,8 +42648,9 @@ var jsonFieldsNameOfDeploymentCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes DeploymentCreatedEvent from json.
@@ -41762,6 +42882,16 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -41773,7 +42903,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -41794,7 +42924,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -45238,6 +46368,136 @@ func (s Event) Encode(e *jx.Encoder) {
 
 func (s Event) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case ApplicationClientSecretRotatedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("application.client_secret.rotated")
+		{
+			s := s.ApplicationClientSecretRotatedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
 	case ApplicationCreatedEventEvent:
 		e.FieldStart("event_type")
 		e.Str("application.created")
@@ -45349,6 +46609,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -45476,6 +46742,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -45597,6 +46869,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -45724,6 +47002,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -45845,6 +47129,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -45972,6 +47262,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -46093,6 +47389,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -46220,6 +47522,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -46341,6 +47649,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -46468,6 +47782,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -46589,6 +47909,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -46716,6 +48042,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -46837,6 +48169,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -46964,6 +48302,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -47085,6 +48429,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -47212,6 +48562,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -47333,6 +48689,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -47460,6 +48822,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -47581,6 +48949,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -47708,6 +49082,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -47829,6 +49209,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -47956,6 +49342,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -48077,6 +49469,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -48204,6 +49602,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -48325,6 +49729,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -48452,6 +49862,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -48573,6 +49989,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -48700,6 +50122,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -48821,6 +50249,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -48948,6 +50382,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49069,6 +50509,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -49196,6 +50642,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49317,6 +50769,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -49444,6 +50902,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49565,6 +51029,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -49692,6 +51162,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49813,6 +51289,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -49940,6 +51422,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -50061,6 +51549,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -50188,6 +51682,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -50309,6 +51809,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -50436,6 +51942,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -50557,6 +52069,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -50684,6 +52202,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -50805,6 +52329,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -50932,6 +52462,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -51053,6 +52589,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -51180,6 +52722,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -51301,6 +52849,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -51428,6 +52982,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -51549,6 +53109,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -51676,6 +53242,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -51797,6 +53369,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -51924,6 +53502,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -52048,6 +53632,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -52084,6 +53674,9 @@ func (s *Event) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "application.client_secret.rotated":
+					s.Type = ApplicationClientSecretRotatedEventEvent
+					found = true
 				case "application.created":
 					s.Type = ApplicationCreatedEventEvent
 					found = true
@@ -52263,6 +53856,10 @@ func (s *Event) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case ApplicationClientSecretRotatedEventEvent:
+		if err := s.ApplicationClientSecretRotatedEvent.Decode(d); err != nil {
+			return err
+		}
 	case ApplicationCreatedEventEvent:
 		if err := s.ApplicationCreatedEvent.Decode(d); err != nil {
 			return err
@@ -52518,6 +54115,12 @@ func (s *EventMetadata) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.TraceID.Set {
+			e.FieldStart("trace_id")
+			s.TraceID.Encode(e)
+		}
+	}
+	{
 		if s.Client.Set {
 			e.FieldStart("client")
 			s.Client.Encode(e)
@@ -52532,9 +54135,10 @@ func (s *EventMetadata) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfEventMetadata = [2]string{
+var jsonFieldsNameOfEventMetadata = [3]string{
 	0: "authorization",
-	1: "client",
+	1: "trace_id",
+	2: "client",
 }
 
 // Decode decodes EventMetadata from json.
@@ -52555,6 +54159,16 @@ func (s *EventMetadata) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"authorization\"")
+			}
+		case "trace_id":
+			if err := func() error {
+				s.TraceID.Reset()
+				if err := s.TraceID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"trace_id\"")
 			}
 		case "client":
 			if err := func() error {
@@ -58992,6 +60606,12 @@ func (s *FlowSignupChallengeConsumedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -59003,7 +60623,7 @@ func (s *FlowSignupChallengeConsumedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [23]string{
+var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -59025,8 +60645,9 @@ var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowSignupChallengeConsumedEvent from json.
@@ -59258,6 +60879,16 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -59269,7 +60900,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -59290,7 +60921,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -59594,6 +61225,12 @@ func (s *FlowSignupChallengeIssuedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -59605,7 +61242,7 @@ func (s *FlowSignupChallengeIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [23]string{
+var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -59627,8 +61264,9 @@ var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowSignupChallengeIssuedEvent from json.
@@ -59860,6 +61498,16 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -59871,7 +61519,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -59892,7 +61540,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -61824,6 +63472,12 @@ func (s *FlowdefCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -61835,7 +63489,7 @@ func (s *FlowdefCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefCreatedEvent = [23]string{
+var jsonFieldsNameOfFlowdefCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -61857,8 +63511,9 @@ var jsonFieldsNameOfFlowdefCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowdefCreatedEvent from json.
@@ -62090,6 +63745,16 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -62101,7 +63766,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -62122,7 +63787,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -62426,6 +64091,12 @@ func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -62437,7 +64108,7 @@ func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefDeletedEvent = [23]string{
+var jsonFieldsNameOfFlowdefDeletedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -62459,8 +64130,9 @@ var jsonFieldsNameOfFlowdefDeletedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowdefDeletedEvent from json.
@@ -62692,6 +64364,16 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -62703,7 +64385,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -62724,7 +64406,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -64808,6 +66490,12 @@ func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -64819,7 +66507,7 @@ func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefUpdatedEvent = [23]string{
+var jsonFieldsNameOfFlowdefUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -64841,8 +66529,9 @@ var jsonFieldsNameOfFlowdefUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowdefUpdatedEvent from json.
@@ -65074,6 +66763,16 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -65085,7 +66784,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -65106,7 +66805,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -78846,6 +80545,12 @@ func (s *IdpCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -78857,7 +80562,7 @@ func (s *IdpCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpCreatedEvent = [23]string{
+var jsonFieldsNameOfIdpCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -78879,8 +80584,9 @@ var jsonFieldsNameOfIdpCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes IdpCreatedEvent from json.
@@ -79112,6 +80818,16 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -79123,7 +80839,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -79144,7 +80860,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -80052,6 +81768,12 @@ func (s *IdpIdentityLinkCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -80063,7 +81785,7 @@ func (s *IdpIdentityLinkCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [23]string{
+var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -80085,8 +81807,9 @@ var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes IdpIdentityLinkCreatedEvent from json.
@@ -80318,6 +82041,16 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -80329,7 +82062,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -80350,7 +82083,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -82088,6 +83821,12 @@ func (s *IdpUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -82099,7 +83838,7 @@ func (s *IdpUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpUpdatedEvent = [23]string{
+var jsonFieldsNameOfIdpUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -82121,8 +83860,9 @@ var jsonFieldsNameOfIdpUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes IdpUpdatedEvent from json.
@@ -82354,6 +84094,16 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -82365,7 +84115,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -82386,7 +84136,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -84920,6 +86670,12 @@ func (s *InvitationAcceptedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -84931,7 +86687,7 @@ func (s *InvitationAcceptedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationAcceptedEvent = [23]string{
+var jsonFieldsNameOfInvitationAcceptedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -84953,8 +86709,9 @@ var jsonFieldsNameOfInvitationAcceptedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes InvitationAcceptedEvent from json.
@@ -85186,6 +86943,16 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -85197,7 +86964,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -85218,7 +86985,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -86317,6 +88084,12 @@ func (s *InvitationCancelledEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -86328,7 +88101,7 @@ func (s *InvitationCancelledEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationCancelledEvent = [23]string{
+var jsonFieldsNameOfInvitationCancelledEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -86350,8 +88123,9 @@ var jsonFieldsNameOfInvitationCancelledEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes InvitationCancelledEvent from json.
@@ -86583,6 +88357,16 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -86594,7 +88378,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -86615,7 +88399,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -87025,6 +88809,12 @@ func (s *InvitationCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -87036,7 +88826,7 @@ func (s *InvitationCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationCreatedEvent = [23]string{
+var jsonFieldsNameOfInvitationCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -87058,8 +88848,9 @@ var jsonFieldsNameOfInvitationCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes InvitationCreatedEvent from json.
@@ -87291,6 +89082,16 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -87302,7 +89103,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -87323,7 +89124,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -89599,6 +91400,12 @@ func (s *InvitationRejectedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -89610,7 +91417,7 @@ func (s *InvitationRejectedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationRejectedEvent = [23]string{
+var jsonFieldsNameOfInvitationRejectedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -89632,8 +91439,9 @@ var jsonFieldsNameOfInvitationRejectedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes InvitationRejectedEvent from json.
@@ -89865,6 +91673,16 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -89876,7 +91694,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -89897,7 +91715,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -106968,6 +108786,138 @@ func (s *NilWebhookEvent54Entity) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes WebhookEvent55Actor as json.
+func (o NilWebhookEvent55Actor) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent55Actor from json.
+func (o *NilWebhookEvent55Actor) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent55Actor to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent55Actor
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent55Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent55Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent55ActorType as json.
+func (o NilWebhookEvent55ActorType) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookEvent55ActorType from json.
+func (o *NilWebhookEvent55ActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent55ActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent55ActorType
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent55ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent55ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent55Entity as json.
+func (o NilWebhookEvent55Entity) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent55Entity from json.
+func (o *NilWebhookEvent55Entity) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent55Entity to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent55Entity
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent55Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent55Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes WebhookEvent5Actor as json.
 func (o NilWebhookEvent5Actor) Encode(e *jx.Encoder) {
 	if o.Null {
@@ -108051,6 +110001,12 @@ func (s *OAuthSettingsCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -108062,7 +110018,7 @@ func (s *OAuthSettingsCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOAuthSettingsCreatedEvent = [23]string{
+var jsonFieldsNameOfOAuthSettingsCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -108084,8 +110040,9 @@ var jsonFieldsNameOfOAuthSettingsCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes OAuthSettingsCreatedEvent from json.
@@ -108317,6 +110274,16 @@ func (s *OAuthSettingsCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -108328,7 +110295,7 @@ func (s *OAuthSettingsCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -108349,7 +110316,7 @@ func (s *OAuthSettingsCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -109233,6 +111200,40 @@ func (s *OptAppFieldImmutableDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes AppIdempotencyKeyReusedDetails as json.
+func (o OptAppIdempotencyKeyReusedDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppIdempotencyKeyReusedDetails from json.
+func (o *OptAppIdempotencyKeyReusedDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppIdempotencyKeyReusedDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppIdempotencyKeyReusedDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppIdempotencyKeyReusedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppIdempotencyKeyReusedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes AppInvalidDetails as json.
 func (o OptAppInvalidDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -109399,6 +111400,39 @@ func (s OptAppRevisionConflictDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptAppRevisionConflictDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationClientSecretRotatedEventDelegationType as json.
+func (o OptApplicationClientSecretRotatedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes ApplicationClientSecretRotatedEventDelegationType from json.
+func (o *OptApplicationClientSecretRotatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptApplicationClientSecretRotatedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptApplicationClientSecretRotatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptApplicationClientSecretRotatedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -115208,6 +117242,55 @@ func (s OptLimit) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptLimit) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationClientSecretRotatedEventActorType as json.
+func (o OptNilApplicationClientSecretRotatedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes ApplicationClientSecretRotatedEventActorType from json.
+func (o *OptNilApplicationClientSecretRotatedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilApplicationClientSecretRotatedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v ApplicationClientSecretRotatedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilApplicationClientSecretRotatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilApplicationClientSecretRotatedEventActorType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -124394,6 +126477,12 @@ func (s *OriginAddedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -124405,7 +126494,7 @@ func (s *OriginAddedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOriginAddedEvent = [23]string{
+var jsonFieldsNameOfOriginAddedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -124427,8 +126516,9 @@ var jsonFieldsNameOfOriginAddedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes OriginAddedEvent from json.
@@ -124660,6 +126750,16 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -124671,7 +126771,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -124692,7 +126792,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -126087,6 +128187,12 @@ func (s *OriginRemovedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -126098,7 +128204,7 @@ func (s *OriginRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOriginRemovedEvent = [23]string{
+var jsonFieldsNameOfOriginRemovedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -126120,8 +128226,9 @@ var jsonFieldsNameOfOriginRemovedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes OriginRemovedEvent from json.
@@ -126353,6 +128460,16 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -126364,7 +128481,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -126385,7 +128502,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -130451,6 +132568,12 @@ func (s *PolicyCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -130462,7 +132585,7 @@ func (s *PolicyCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPolicyCreatedEvent = [23]string{
+var jsonFieldsNameOfPolicyCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -130484,8 +132607,9 @@ var jsonFieldsNameOfPolicyCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes PolicyCreatedEvent from json.
@@ -130717,6 +132841,16 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -130728,7 +132862,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -130749,7 +132883,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -131319,6 +133453,12 @@ func (s *PolicyUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -131330,7 +133470,7 @@ func (s *PolicyUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPolicyUpdatedEvent = [23]string{
+var jsonFieldsNameOfPolicyUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -131352,8 +133492,9 @@ var jsonFieldsNameOfPolicyUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes PolicyUpdatedEvent from json.
@@ -131585,6 +133726,16 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -131596,7 +133747,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -131617,7 +133768,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -132247,6 +134398,12 @@ func (s *PreviewRemovedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -132258,7 +134415,7 @@ func (s *PreviewRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPreviewRemovedEvent = [23]string{
+var jsonFieldsNameOfPreviewRemovedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -132280,8 +134437,9 @@ var jsonFieldsNameOfPreviewRemovedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes PreviewRemovedEvent from json.
@@ -132513,6 +134671,16 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -132524,7 +134692,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -132545,7 +134713,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -135145,6 +137313,12 @@ func (s *ProjectCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -135156,7 +137330,7 @@ func (s *ProjectCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectCreatedEvent = [23]string{
+var jsonFieldsNameOfProjectCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -135178,8 +137352,9 @@ var jsonFieldsNameOfProjectCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ProjectCreatedEvent from json.
@@ -135411,6 +137586,16 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -135422,7 +137607,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -135443,7 +137628,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -135747,6 +137932,12 @@ func (s *ProjectDeletedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -135758,7 +137949,7 @@ func (s *ProjectDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectDeletedEvent = [23]string{
+var jsonFieldsNameOfProjectDeletedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -135780,8 +137971,9 @@ var jsonFieldsNameOfProjectDeletedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ProjectDeletedEvent from json.
@@ -136013,6 +138205,16 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -136024,7 +138226,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -136045,7 +138247,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -137644,6 +139846,12 @@ func (s *ProjectUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -137655,7 +139863,7 @@ func (s *ProjectUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectUpdatedEvent = [23]string{
+var jsonFieldsNameOfProjectUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -137677,8 +139885,9 @@ var jsonFieldsNameOfProjectUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ProjectUpdatedEvent from json.
@@ -137910,6 +140119,16 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -137921,7 +140140,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -137942,7 +140161,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -138295,6 +140514,22 @@ func (s PublishApplicationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case AppIdempotencyKeyReusedPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.idempotency_key_reused")
+		{
+			s := s.AppIdempotencyKeyReused
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AppInvalidPublishApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.invalid")
@@ -138490,6 +140725,9 @@ func (s *PublishApplicationErrorResponse) Decode(d *jx.Decoder) error {
 				case "app.field_immutable":
 					s.Type = AppFieldImmutablePublishApplicationErrorResponse
 					found = true
+				case "app.idempotency_key_reused":
+					s.Type = AppIdempotencyKeyReusedPublishApplicationErrorResponse
+					found = true
 				case "app.invalid":
 					s.Type = AppInvalidPublishApplicationErrorResponse
 					found = true
@@ -138544,6 +140782,10 @@ func (s *PublishApplicationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AppFieldImmutablePublishApplicationErrorResponse:
 		if err := s.AppFieldImmutable.Decode(d); err != nil {
+			return err
+		}
+	case AppIdempotencyKeyReusedPublishApplicationErrorResponse:
+		if err := s.AppIdempotencyKeyReused.Decode(d); err != nil {
 			return err
 		}
 	case AppInvalidPublishApplicationErrorResponse:
@@ -138753,6 +140995,44 @@ func (s *PublishApplicationUnauthorized) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PublishApplicationUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishApplicationUnprocessableEntity as json.
+func (s *PublishApplicationUnprocessableEntity) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishApplicationUnprocessableEntity from json.
+func (s *PublishApplicationUnprocessableEntity) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationUnprocessableEntity to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishApplicationUnprocessableEntity(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishApplicationUnprocessableEntity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationUnprocessableEntity) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -149142,6 +151422,12 @@ func (s *ReleaseCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -149153,7 +151439,7 @@ func (s *ReleaseCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfReleaseCreatedEvent = [23]string{
+var jsonFieldsNameOfReleaseCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -149175,8 +151461,9 @@ var jsonFieldsNameOfReleaseCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ReleaseCreatedEvent from json.
@@ -149408,6 +151695,16 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -149419,7 +151716,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -149440,7 +151737,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -150540,6 +152837,12 @@ func (s *ReleaseRevokedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -150551,7 +152854,7 @@ func (s *ReleaseRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfReleaseRevokedEvent = [23]string{
+var jsonFieldsNameOfReleaseRevokedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -150573,8 +152876,9 @@ var jsonFieldsNameOfReleaseRevokedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ReleaseRevokedEvent from json.
@@ -150806,6 +153110,16 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -150817,7 +153131,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -150838,7 +153152,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -152364,6 +154678,12 @@ func (s *RequestAPIEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -152375,7 +154695,7 @@ func (s *RequestAPIEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfRequestAPIEvent = [23]string{
+var jsonFieldsNameOfRequestAPIEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -152397,8 +154717,9 @@ var jsonFieldsNameOfRequestAPIEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes RequestAPIEvent from json.
@@ -152630,6 +154951,16 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -152641,7 +154972,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -152662,7 +154993,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -157988,6 +160319,12 @@ func (s *SchemaCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -157999,7 +160336,7 @@ func (s *SchemaCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSchemaCreatedEvent = [23]string{
+var jsonFieldsNameOfSchemaCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -158021,8 +160358,9 @@ var jsonFieldsNameOfSchemaCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes SchemaCreatedEvent from json.
@@ -158254,6 +160592,16 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -158265,7 +160613,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -158286,7 +160634,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -161789,6 +164137,12 @@ func (s *SessionDeletedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -161800,7 +164154,7 @@ func (s *SessionDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSessionDeletedEvent = [23]string{
+var jsonFieldsNameOfSessionDeletedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -161822,8 +164176,9 @@ var jsonFieldsNameOfSessionDeletedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes SessionDeletedEvent from json.
@@ -162055,6 +164410,16 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -162066,7 +164431,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -162087,7 +164452,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -162454,6 +164819,12 @@ func (s *SessionEstablishedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -162465,7 +164836,7 @@ func (s *SessionEstablishedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSessionEstablishedEvent = [23]string{
+var jsonFieldsNameOfSessionEstablishedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -162487,8 +164858,9 @@ var jsonFieldsNameOfSessionEstablishedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes SessionEstablishedEvent from json.
@@ -162720,6 +165092,16 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -162731,7 +165113,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -162752,7 +165134,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -166959,6 +169341,12 @@ func (s *TeamCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -166970,7 +169358,7 @@ func (s *TeamCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamCreatedEvent = [23]string{
+var jsonFieldsNameOfTeamCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -166992,8 +169380,9 @@ var jsonFieldsNameOfTeamCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes TeamCreatedEvent from json.
@@ -167225,6 +169614,16 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -167236,7 +169635,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -167257,7 +169656,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -167561,6 +169960,12 @@ func (s *TeamDeactivatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -167572,7 +169977,7 @@ func (s *TeamDeactivatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamDeactivatedEvent = [23]string{
+var jsonFieldsNameOfTeamDeactivatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -167594,8 +169999,9 @@ var jsonFieldsNameOfTeamDeactivatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes TeamDeactivatedEvent from json.
@@ -167827,6 +170233,16 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -167838,7 +170254,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -167859,7 +170275,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -169643,6 +172059,12 @@ func (s *TeamUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -169654,7 +172076,7 @@ func (s *TeamUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamUpdatedEvent = [23]string{
+var jsonFieldsNameOfTeamUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -169676,8 +172098,9 @@ var jsonFieldsNameOfTeamUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes TeamUpdatedEvent from json.
@@ -169909,6 +172332,16 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -169920,7 +172353,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -169941,7 +172374,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -174668,6 +177101,12 @@ func (s *UserCreateFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -174679,7 +177118,7 @@ func (s *UserCreateFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserCreateFailedEvent = [23]string{
+var jsonFieldsNameOfUserCreateFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -174701,8 +177140,9 @@ var jsonFieldsNameOfUserCreateFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes UserCreateFailedEvent from json.
@@ -174934,6 +177374,16 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -174945,7 +177395,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -174966,7 +177416,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -175706,6 +178156,12 @@ func (s *UserCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -175717,7 +178173,7 @@ func (s *UserCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserCreatedEvent = [23]string{
+var jsonFieldsNameOfUserCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -175739,8 +178195,9 @@ var jsonFieldsNameOfUserCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes UserCreatedEvent from json.
@@ -175972,6 +178429,16 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -175983,7 +178450,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -176004,7 +178471,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -176476,6 +178943,12 @@ func (s *UserDeletedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -176487,7 +178960,7 @@ func (s *UserDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserDeletedEvent = [23]string{
+var jsonFieldsNameOfUserDeletedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -176509,8 +178982,9 @@ var jsonFieldsNameOfUserDeletedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes UserDeletedEvent from json.
@@ -176742,6 +179216,16 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -176753,7 +179237,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -176774,7 +179258,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -180043,6 +182527,12 @@ func (s *UserUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -180054,7 +182544,7 @@ func (s *UserUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserUpdatedEvent = [23]string{
+var jsonFieldsNameOfUserUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -180076,8 +182566,9 @@ var jsonFieldsNameOfUserUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes UserUpdatedEvent from json.
@@ -180309,6 +182800,16 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -180320,7 +182821,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -180341,7 +182842,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -182491,6 +184992,12 @@ func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -182502,7 +185009,7 @@ func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfVariableRemovedEvent = [23]string{
+var jsonFieldsNameOfVariableRemovedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -182524,8 +185031,9 @@ var jsonFieldsNameOfVariableRemovedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes VariableRemovedEvent from json.
@@ -182757,6 +185265,16 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -182768,7 +185286,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -182789,7 +185307,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -183255,6 +185773,12 @@ func (s *VariableSetEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -183266,7 +185790,7 @@ func (s *VariableSetEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfVariableSetEvent = [23]string{
+var jsonFieldsNameOfVariableSetEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -183288,8 +185812,9 @@ var jsonFieldsNameOfVariableSetEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes VariableSetEvent from json.
@@ -183521,6 +186046,16 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -183532,7 +186067,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -183553,7 +186088,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -184922,7 +187457,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 	switch s.Type {
 	case WebhookEvent0WebhookEvent:
 		e.FieldStart("type")
-		e.Str("application.created")
+		e.Str("application.client_secret.rotated")
 		{
 			s := s.WebhookEvent0
 			{
@@ -184952,7 +187487,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent1WebhookEvent:
 		e.FieldStart("type")
-		e.Str("application.updated")
+		e.Str("application.created")
 		{
 			s := s.WebhookEvent1
 			{
@@ -184982,7 +187517,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent2WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.attempt.created")
+		e.Str("application.updated")
 		{
 			s := s.WebhookEvent2
 			{
@@ -185012,7 +187547,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent3WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.attempt.handed_off")
+		e.Str("auth.attempt.created")
 		{
 			s := s.WebhookEvent3
 			{
@@ -185042,7 +187577,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent4WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.check.failed")
+		e.Str("auth.attempt.handed_off")
 		{
 			s := s.WebhookEvent4
 			{
@@ -185072,7 +187607,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent5WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.check.succeeded")
+		e.Str("auth.check.failed")
 		{
 			s := s.WebhookEvent5
 			{
@@ -185102,7 +187637,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent6WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.factor.passkey.enrolled")
+		e.Str("auth.check.succeeded")
 		{
 			s := s.WebhookEvent6
 			{
@@ -185132,7 +187667,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent7WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.factor.password.set")
+		e.Str("auth.factor.passkey.enrolled")
 		{
 			s := s.WebhookEvent7
 			{
@@ -185162,7 +187697,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent8WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.request.created")
+		e.Str("auth.factor.password.set")
 		{
 			s := s.WebhookEvent8
 			{
@@ -185192,7 +187727,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent9WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.request.exchange.failed")
+		e.Str("auth.request.created")
 		{
 			s := s.WebhookEvent9
 			{
@@ -185222,7 +187757,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent10WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.sso.authorization.failed")
+		e.Str("auth.request.exchange.failed")
 		{
 			s := s.WebhookEvent10
 			{
@@ -185252,7 +187787,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent11WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.sso.exchange.failed")
+		e.Str("auth.sso.authorization.failed")
 		{
 			s := s.WebhookEvent11
 			{
@@ -185282,7 +187817,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent12WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.sso.exchange.succeeded")
+		e.Str("auth.sso.exchange.failed")
 		{
 			s := s.WebhookEvent12
 			{
@@ -185312,7 +187847,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent13WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.token.issued")
+		e.Str("auth.sso.exchange.succeeded")
 		{
 			s := s.WebhookEvent13
 			{
@@ -185342,7 +187877,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent14WebhookEvent:
 		e.FieldStart("type")
-		e.Str("auth.token.revoked")
+		e.Str("auth.token.issued")
 		{
 			s := s.WebhookEvent14
 			{
@@ -185372,7 +187907,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent15WebhookEvent:
 		e.FieldStart("type")
-		e.Str("authz.granted")
+		e.Str("auth.token.revoked")
 		{
 			s := s.WebhookEvent15
 			{
@@ -185402,7 +187937,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent16WebhookEvent:
 		e.FieldStart("type")
-		e.Str("authz.revoked")
+		e.Str("authz.granted")
 		{
 			s := s.WebhookEvent16
 			{
@@ -185432,7 +187967,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent17WebhookEvent:
 		e.FieldStart("type")
-		e.Str("branding.created")
+		e.Str("authz.revoked")
 		{
 			s := s.WebhookEvent17
 			{
@@ -185462,7 +187997,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent18WebhookEvent:
 		e.FieldStart("type")
-		e.Str("deployment.created")
+		e.Str("branding.created")
 		{
 			s := s.WebhookEvent18
 			{
@@ -185492,7 +188027,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent19WebhookEvent:
 		e.FieldStart("type")
-		e.Str("flow.signup_challenge.consumed")
+		e.Str("deployment.created")
 		{
 			s := s.WebhookEvent19
 			{
@@ -185522,7 +188057,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent20WebhookEvent:
 		e.FieldStart("type")
-		e.Str("flow.signup_challenge.issued")
+		e.Str("flow.signup_challenge.consumed")
 		{
 			s := s.WebhookEvent20
 			{
@@ -185552,7 +188087,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent21WebhookEvent:
 		e.FieldStart("type")
-		e.Str("flowdef.created")
+		e.Str("flow.signup_challenge.issued")
 		{
 			s := s.WebhookEvent21
 			{
@@ -185582,7 +188117,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent22WebhookEvent:
 		e.FieldStart("type")
-		e.Str("flowdef.deleted")
+		e.Str("flowdef.created")
 		{
 			s := s.WebhookEvent22
 			{
@@ -185612,7 +188147,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent23WebhookEvent:
 		e.FieldStart("type")
-		e.Str("flowdef.updated")
+		e.Str("flowdef.deleted")
 		{
 			s := s.WebhookEvent23
 			{
@@ -185642,7 +188177,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent24WebhookEvent:
 		e.FieldStart("type")
-		e.Str("idp.created")
+		e.Str("flowdef.updated")
 		{
 			s := s.WebhookEvent24
 			{
@@ -185672,7 +188207,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent25WebhookEvent:
 		e.FieldStart("type")
-		e.Str("idp.identity_link.created")
+		e.Str("idp.created")
 		{
 			s := s.WebhookEvent25
 			{
@@ -185702,7 +188237,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent26WebhookEvent:
 		e.FieldStart("type")
-		e.Str("idp.updated")
+		e.Str("idp.identity_link.created")
 		{
 			s := s.WebhookEvent26
 			{
@@ -185732,7 +188267,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent27WebhookEvent:
 		e.FieldStart("type")
-		e.Str("invitation.accepted")
+		e.Str("idp.updated")
 		{
 			s := s.WebhookEvent27
 			{
@@ -185762,7 +188297,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent28WebhookEvent:
 		e.FieldStart("type")
-		e.Str("invitation.cancelled")
+		e.Str("invitation.accepted")
 		{
 			s := s.WebhookEvent28
 			{
@@ -185792,7 +188327,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent29WebhookEvent:
 		e.FieldStart("type")
-		e.Str("invitation.created")
+		e.Str("invitation.cancelled")
 		{
 			s := s.WebhookEvent29
 			{
@@ -185822,7 +188357,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent30WebhookEvent:
 		e.FieldStart("type")
-		e.Str("invitation.rejected")
+		e.Str("invitation.created")
 		{
 			s := s.WebhookEvent30
 			{
@@ -185852,7 +188387,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent31WebhookEvent:
 		e.FieldStart("type")
-		e.Str("oauth_settings.created")
+		e.Str("invitation.rejected")
 		{
 			s := s.WebhookEvent31
 			{
@@ -185882,7 +188417,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent32WebhookEvent:
 		e.FieldStart("type")
-		e.Str("origin.added")
+		e.Str("oauth_settings.created")
 		{
 			s := s.WebhookEvent32
 			{
@@ -185912,7 +188447,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent33WebhookEvent:
 		e.FieldStart("type")
-		e.Str("origin.removed")
+		e.Str("origin.added")
 		{
 			s := s.WebhookEvent33
 			{
@@ -185942,7 +188477,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent34WebhookEvent:
 		e.FieldStart("type")
-		e.Str("policy.created")
+		e.Str("origin.removed")
 		{
 			s := s.WebhookEvent34
 			{
@@ -185972,7 +188507,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent35WebhookEvent:
 		e.FieldStart("type")
-		e.Str("policy.updated")
+		e.Str("policy.created")
 		{
 			s := s.WebhookEvent35
 			{
@@ -186002,7 +188537,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent36WebhookEvent:
 		e.FieldStart("type")
-		e.Str("preview.removed")
+		e.Str("policy.updated")
 		{
 			s := s.WebhookEvent36
 			{
@@ -186032,7 +188567,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent37WebhookEvent:
 		e.FieldStart("type")
-		e.Str("project.created")
+		e.Str("preview.removed")
 		{
 			s := s.WebhookEvent37
 			{
@@ -186062,7 +188597,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent38WebhookEvent:
 		e.FieldStart("type")
-		e.Str("project.deleted")
+		e.Str("project.created")
 		{
 			s := s.WebhookEvent38
 			{
@@ -186092,7 +188627,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent39WebhookEvent:
 		e.FieldStart("type")
-		e.Str("project.updated")
+		e.Str("project.deleted")
 		{
 			s := s.WebhookEvent39
 			{
@@ -186122,7 +188657,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent40WebhookEvent:
 		e.FieldStart("type")
-		e.Str("release.created")
+		e.Str("project.updated")
 		{
 			s := s.WebhookEvent40
 			{
@@ -186152,7 +188687,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent41WebhookEvent:
 		e.FieldStart("type")
-		e.Str("release.revoked")
+		e.Str("release.created")
 		{
 			s := s.WebhookEvent41
 			{
@@ -186182,7 +188717,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent42WebhookEvent:
 		e.FieldStart("type")
-		e.Str("request.api")
+		e.Str("release.revoked")
 		{
 			s := s.WebhookEvent42
 			{
@@ -186212,7 +188747,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent43WebhookEvent:
 		e.FieldStart("type")
-		e.Str("schema.created")
+		e.Str("request.api")
 		{
 			s := s.WebhookEvent43
 			{
@@ -186242,7 +188777,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent44WebhookEvent:
 		e.FieldStart("type")
-		e.Str("session.deleted")
+		e.Str("schema.created")
 		{
 			s := s.WebhookEvent44
 			{
@@ -186272,7 +188807,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent45WebhookEvent:
 		e.FieldStart("type")
-		e.Str("session.established")
+		e.Str("session.deleted")
 		{
 			s := s.WebhookEvent45
 			{
@@ -186302,7 +188837,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent46WebhookEvent:
 		e.FieldStart("type")
-		e.Str("team.created")
+		e.Str("session.established")
 		{
 			s := s.WebhookEvent46
 			{
@@ -186332,7 +188867,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent47WebhookEvent:
 		e.FieldStart("type")
-		e.Str("team.deactivated")
+		e.Str("team.created")
 		{
 			s := s.WebhookEvent47
 			{
@@ -186362,7 +188897,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent48WebhookEvent:
 		e.FieldStart("type")
-		e.Str("team.updated")
+		e.Str("team.deactivated")
 		{
 			s := s.WebhookEvent48
 			{
@@ -186392,7 +188927,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent49WebhookEvent:
 		e.FieldStart("type")
-		e.Str("user.create.failed")
+		e.Str("team.updated")
 		{
 			s := s.WebhookEvent49
 			{
@@ -186422,7 +188957,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent50WebhookEvent:
 		e.FieldStart("type")
-		e.Str("user.created")
+		e.Str("user.create.failed")
 		{
 			s := s.WebhookEvent50
 			{
@@ -186452,7 +188987,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent51WebhookEvent:
 		e.FieldStart("type")
-		e.Str("user.deleted")
+		e.Str("user.created")
 		{
 			s := s.WebhookEvent51
 			{
@@ -186482,7 +189017,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent52WebhookEvent:
 		e.FieldStart("type")
-		e.Str("user.updated")
+		e.Str("user.deleted")
 		{
 			s := s.WebhookEvent52
 			{
@@ -186512,7 +189047,7 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent53WebhookEvent:
 		e.FieldStart("type")
-		e.Str("variable.removed")
+		e.Str("user.updated")
 		{
 			s := s.WebhookEvent53
 			{
@@ -186542,9 +189077,39 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 		}
 	case WebhookEvent54WebhookEvent:
 		e.FieldStart("type")
-		e.Str("variable.set")
+		e.Str("variable.removed")
 		{
 			s := s.WebhookEvent54
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				e.FieldStart("actor")
+				s.Actor.Encode(e)
+			}
+			{
+				e.FieldStart("entity")
+				s.Entity.Encode(e)
+			}
+			{
+				e.FieldStart("data")
+				s.Data.Encode(e)
+			}
+		}
+	case WebhookEvent55WebhookEvent:
+		e.FieldStart("type")
+		e.Str("variable.set")
+		{
+			s := s.WebhookEvent55
 			{
 				e.FieldStart("id")
 				e.Str(s.ID)
@@ -186596,170 +189161,173 @@ func (s *WebhookEvent) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
-				case "application.created":
+				case "application.client_secret.rotated":
 					s.Type = WebhookEvent0WebhookEvent
 					found = true
-				case "application.updated":
+				case "application.created":
 					s.Type = WebhookEvent1WebhookEvent
 					found = true
-				case "auth.attempt.created":
+				case "application.updated":
 					s.Type = WebhookEvent2WebhookEvent
 					found = true
-				case "auth.attempt.handed_off":
+				case "auth.attempt.created":
 					s.Type = WebhookEvent3WebhookEvent
 					found = true
-				case "auth.check.failed":
+				case "auth.attempt.handed_off":
 					s.Type = WebhookEvent4WebhookEvent
 					found = true
-				case "auth.check.succeeded":
+				case "auth.check.failed":
 					s.Type = WebhookEvent5WebhookEvent
 					found = true
-				case "auth.factor.passkey.enrolled":
+				case "auth.check.succeeded":
 					s.Type = WebhookEvent6WebhookEvent
 					found = true
-				case "auth.factor.password.set":
+				case "auth.factor.passkey.enrolled":
 					s.Type = WebhookEvent7WebhookEvent
 					found = true
-				case "auth.request.created":
+				case "auth.factor.password.set":
 					s.Type = WebhookEvent8WebhookEvent
 					found = true
-				case "auth.request.exchange.failed":
+				case "auth.request.created":
 					s.Type = WebhookEvent9WebhookEvent
 					found = true
-				case "auth.sso.authorization.failed":
+				case "auth.request.exchange.failed":
 					s.Type = WebhookEvent10WebhookEvent
 					found = true
-				case "auth.sso.exchange.failed":
+				case "auth.sso.authorization.failed":
 					s.Type = WebhookEvent11WebhookEvent
 					found = true
-				case "auth.sso.exchange.succeeded":
+				case "auth.sso.exchange.failed":
 					s.Type = WebhookEvent12WebhookEvent
 					found = true
-				case "auth.token.issued":
+				case "auth.sso.exchange.succeeded":
 					s.Type = WebhookEvent13WebhookEvent
 					found = true
-				case "auth.token.revoked":
+				case "auth.token.issued":
 					s.Type = WebhookEvent14WebhookEvent
 					found = true
-				case "authz.granted":
+				case "auth.token.revoked":
 					s.Type = WebhookEvent15WebhookEvent
 					found = true
-				case "authz.revoked":
+				case "authz.granted":
 					s.Type = WebhookEvent16WebhookEvent
 					found = true
-				case "branding.created":
+				case "authz.revoked":
 					s.Type = WebhookEvent17WebhookEvent
 					found = true
-				case "deployment.created":
+				case "branding.created":
 					s.Type = WebhookEvent18WebhookEvent
 					found = true
-				case "flow.signup_challenge.consumed":
+				case "deployment.created":
 					s.Type = WebhookEvent19WebhookEvent
 					found = true
-				case "flow.signup_challenge.issued":
+				case "flow.signup_challenge.consumed":
 					s.Type = WebhookEvent20WebhookEvent
 					found = true
-				case "flowdef.created":
+				case "flow.signup_challenge.issued":
 					s.Type = WebhookEvent21WebhookEvent
 					found = true
-				case "flowdef.deleted":
+				case "flowdef.created":
 					s.Type = WebhookEvent22WebhookEvent
 					found = true
-				case "flowdef.updated":
+				case "flowdef.deleted":
 					s.Type = WebhookEvent23WebhookEvent
 					found = true
-				case "idp.created":
+				case "flowdef.updated":
 					s.Type = WebhookEvent24WebhookEvent
 					found = true
-				case "idp.identity_link.created":
+				case "idp.created":
 					s.Type = WebhookEvent25WebhookEvent
 					found = true
-				case "idp.updated":
+				case "idp.identity_link.created":
 					s.Type = WebhookEvent26WebhookEvent
 					found = true
-				case "invitation.accepted":
+				case "idp.updated":
 					s.Type = WebhookEvent27WebhookEvent
 					found = true
-				case "invitation.cancelled":
+				case "invitation.accepted":
 					s.Type = WebhookEvent28WebhookEvent
 					found = true
-				case "invitation.created":
+				case "invitation.cancelled":
 					s.Type = WebhookEvent29WebhookEvent
 					found = true
-				case "invitation.rejected":
+				case "invitation.created":
 					s.Type = WebhookEvent30WebhookEvent
 					found = true
-				case "oauth_settings.created":
+				case "invitation.rejected":
 					s.Type = WebhookEvent31WebhookEvent
 					found = true
-				case "origin.added":
+				case "oauth_settings.created":
 					s.Type = WebhookEvent32WebhookEvent
 					found = true
-				case "origin.removed":
+				case "origin.added":
 					s.Type = WebhookEvent33WebhookEvent
 					found = true
-				case "policy.created":
+				case "origin.removed":
 					s.Type = WebhookEvent34WebhookEvent
 					found = true
-				case "policy.updated":
+				case "policy.created":
 					s.Type = WebhookEvent35WebhookEvent
 					found = true
-				case "preview.removed":
+				case "policy.updated":
 					s.Type = WebhookEvent36WebhookEvent
 					found = true
-				case "project.created":
+				case "preview.removed":
 					s.Type = WebhookEvent37WebhookEvent
 					found = true
-				case "project.deleted":
+				case "project.created":
 					s.Type = WebhookEvent38WebhookEvent
 					found = true
-				case "project.updated":
+				case "project.deleted":
 					s.Type = WebhookEvent39WebhookEvent
 					found = true
-				case "release.created":
+				case "project.updated":
 					s.Type = WebhookEvent40WebhookEvent
 					found = true
-				case "release.revoked":
+				case "release.created":
 					s.Type = WebhookEvent41WebhookEvent
 					found = true
-				case "request.api":
+				case "release.revoked":
 					s.Type = WebhookEvent42WebhookEvent
 					found = true
-				case "schema.created":
+				case "request.api":
 					s.Type = WebhookEvent43WebhookEvent
 					found = true
-				case "session.deleted":
+				case "schema.created":
 					s.Type = WebhookEvent44WebhookEvent
 					found = true
-				case "session.established":
+				case "session.deleted":
 					s.Type = WebhookEvent45WebhookEvent
 					found = true
-				case "team.created":
+				case "session.established":
 					s.Type = WebhookEvent46WebhookEvent
 					found = true
-				case "team.deactivated":
+				case "team.created":
 					s.Type = WebhookEvent47WebhookEvent
 					found = true
-				case "team.updated":
+				case "team.deactivated":
 					s.Type = WebhookEvent48WebhookEvent
 					found = true
-				case "user.create.failed":
+				case "team.updated":
 					s.Type = WebhookEvent49WebhookEvent
 					found = true
-				case "user.created":
+				case "user.create.failed":
 					s.Type = WebhookEvent50WebhookEvent
 					found = true
-				case "user.deleted":
+				case "user.created":
 					s.Type = WebhookEvent51WebhookEvent
 					found = true
-				case "user.updated":
+				case "user.deleted":
 					s.Type = WebhookEvent52WebhookEvent
 					found = true
-				case "variable.removed":
+				case "user.updated":
 					s.Type = WebhookEvent53WebhookEvent
 					found = true
-				case "variable.set":
+				case "variable.removed":
 					s.Type = WebhookEvent54WebhookEvent
+					found = true
+				case "variable.set":
+					s.Type = WebhookEvent55WebhookEvent
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -186995,6 +189563,10 @@ func (s *WebhookEvent) Decode(d *jx.Decoder) error {
 		if err := s.WebhookEvent54.Decode(d); err != nil {
 			return err
 		}
+	case WebhookEvent55WebhookEvent:
+		if err := s.WebhookEvent55.Decode(d); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
@@ -187029,7 +189601,7 @@ func (s *WebhookEvent0) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("application.created")
+		e.Str("application.client_secret.rotated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -187481,7 +190053,7 @@ func (s *WebhookEvent1) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("application.updated")
+		e.Str("application.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -187671,7 +190243,7 @@ func (s *WebhookEvent10) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.sso.authorization.failed")
+		e.Str("auth.request.exchange.failed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -188123,7 +190695,7 @@ func (s *WebhookEvent11) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.sso.exchange.failed")
+		e.Str("auth.sso.authorization.failed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -188575,7 +191147,7 @@ func (s *WebhookEvent12) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.sso.exchange.succeeded")
+		e.Str("auth.sso.exchange.failed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -189027,7 +191599,7 @@ func (s *WebhookEvent13) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.token.issued")
+		e.Str("auth.sso.exchange.succeeded")
 	}
 	{
 		e.FieldStart("created_at")
@@ -189479,7 +192051,7 @@ func (s *WebhookEvent14) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.token.revoked")
+		e.Str("auth.token.issued")
 	}
 	{
 		e.FieldStart("created_at")
@@ -189931,7 +192503,7 @@ func (s *WebhookEvent15) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("authz.granted")
+		e.Str("auth.token.revoked")
 	}
 	{
 		e.FieldStart("created_at")
@@ -190383,7 +192955,7 @@ func (s *WebhookEvent16) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("authz.revoked")
+		e.Str("authz.granted")
 	}
 	{
 		e.FieldStart("created_at")
@@ -190835,7 +193407,7 @@ func (s *WebhookEvent17) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("branding.created")
+		e.Str("authz.revoked")
 	}
 	{
 		e.FieldStart("created_at")
@@ -191287,7 +193859,7 @@ func (s *WebhookEvent18) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("deployment.created")
+		e.Str("branding.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -191739,7 +194311,7 @@ func (s *WebhookEvent19) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("flow.signup_challenge.consumed")
+		e.Str("deployment.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -192453,7 +195025,7 @@ func (s *WebhookEvent2) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.attempt.created")
+		e.Str("application.updated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -192643,7 +195215,7 @@ func (s *WebhookEvent20) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("flow.signup_challenge.issued")
+		e.Str("flow.signup_challenge.consumed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -193095,7 +195667,7 @@ func (s *WebhookEvent21) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("flowdef.created")
+		e.Str("flow.signup_challenge.issued")
 	}
 	{
 		e.FieldStart("created_at")
@@ -193547,7 +196119,7 @@ func (s *WebhookEvent22) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("flowdef.deleted")
+		e.Str("flowdef.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -193999,7 +196571,7 @@ func (s *WebhookEvent23) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("flowdef.updated")
+		e.Str("flowdef.deleted")
 	}
 	{
 		e.FieldStart("created_at")
@@ -194451,7 +197023,7 @@ func (s *WebhookEvent24) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("idp.created")
+		e.Str("flowdef.updated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -194903,7 +197475,7 @@ func (s *WebhookEvent25) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("idp.identity_link.created")
+		e.Str("idp.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -195355,7 +197927,7 @@ func (s *WebhookEvent26) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("idp.updated")
+		e.Str("idp.identity_link.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -195807,7 +198379,7 @@ func (s *WebhookEvent27) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("invitation.accepted")
+		e.Str("idp.updated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -196259,7 +198831,7 @@ func (s *WebhookEvent28) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("invitation.cancelled")
+		e.Str("invitation.accepted")
 	}
 	{
 		e.FieldStart("created_at")
@@ -196711,7 +199283,7 @@ func (s *WebhookEvent29) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("invitation.created")
+		e.Str("invitation.cancelled")
 	}
 	{
 		e.FieldStart("created_at")
@@ -197425,7 +199997,7 @@ func (s *WebhookEvent3) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.attempt.handed_off")
+		e.Str("auth.attempt.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -197615,7 +200187,7 @@ func (s *WebhookEvent30) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("invitation.rejected")
+		e.Str("invitation.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -198067,7 +200639,7 @@ func (s *WebhookEvent31) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("oauth_settings.created")
+		e.Str("invitation.rejected")
 	}
 	{
 		e.FieldStart("created_at")
@@ -198519,7 +201091,7 @@ func (s *WebhookEvent32) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("origin.added")
+		e.Str("oauth_settings.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -198971,7 +201543,7 @@ func (s *WebhookEvent33) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("origin.removed")
+		e.Str("origin.added")
 	}
 	{
 		e.FieldStart("created_at")
@@ -199423,7 +201995,7 @@ func (s *WebhookEvent34) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("policy.created")
+		e.Str("origin.removed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -199875,7 +202447,7 @@ func (s *WebhookEvent35) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("policy.updated")
+		e.Str("policy.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -200327,7 +202899,7 @@ func (s *WebhookEvent36) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("preview.removed")
+		e.Str("policy.updated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -200779,7 +203351,7 @@ func (s *WebhookEvent37) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("project.created")
+		e.Str("preview.removed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -201231,7 +203803,7 @@ func (s *WebhookEvent38) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("project.deleted")
+		e.Str("project.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -201683,7 +204255,7 @@ func (s *WebhookEvent39) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("project.updated")
+		e.Str("project.deleted")
 	}
 	{
 		e.FieldStart("created_at")
@@ -202397,7 +204969,7 @@ func (s *WebhookEvent4) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.check.failed")
+		e.Str("auth.attempt.handed_off")
 	}
 	{
 		e.FieldStart("created_at")
@@ -202587,7 +205159,7 @@ func (s *WebhookEvent40) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("release.created")
+		e.Str("project.updated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -203039,7 +205611,7 @@ func (s *WebhookEvent41) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("release.revoked")
+		e.Str("release.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -203491,7 +206063,7 @@ func (s *WebhookEvent42) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("request.api")
+		e.Str("release.revoked")
 	}
 	{
 		e.FieldStart("created_at")
@@ -203943,7 +206515,7 @@ func (s *WebhookEvent43) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("schema.created")
+		e.Str("request.api")
 	}
 	{
 		e.FieldStart("created_at")
@@ -204395,7 +206967,7 @@ func (s *WebhookEvent44) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("session.deleted")
+		e.Str("schema.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -204847,7 +207419,7 @@ func (s *WebhookEvent45) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("session.established")
+		e.Str("session.deleted")
 	}
 	{
 		e.FieldStart("created_at")
@@ -205299,7 +207871,7 @@ func (s *WebhookEvent46) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("team.created")
+		e.Str("session.established")
 	}
 	{
 		e.FieldStart("created_at")
@@ -205751,7 +208323,7 @@ func (s *WebhookEvent47) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("team.deactivated")
+		e.Str("team.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -206203,7 +208775,7 @@ func (s *WebhookEvent48) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("team.updated")
+		e.Str("team.deactivated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -206655,7 +209227,7 @@ func (s *WebhookEvent49) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("user.create.failed")
+		e.Str("team.updated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -207369,7 +209941,7 @@ func (s *WebhookEvent5) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.check.succeeded")
+		e.Str("auth.check.failed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -207559,7 +210131,7 @@ func (s *WebhookEvent50) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("user.created")
+		e.Str("user.create.failed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -208011,7 +210583,7 @@ func (s *WebhookEvent51) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("user.deleted")
+		e.Str("user.created")
 	}
 	{
 		e.FieldStart("created_at")
@@ -208463,7 +211035,7 @@ func (s *WebhookEvent52) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("user.updated")
+		e.Str("user.deleted")
 	}
 	{
 		e.FieldStart("created_at")
@@ -208915,7 +211487,7 @@ func (s *WebhookEvent53) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("variable.removed")
+		e.Str("user.updated")
 	}
 	{
 		e.FieldStart("created_at")
@@ -209367,7 +211939,7 @@ func (s *WebhookEvent54) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("variable.set")
+		e.Str("variable.removed")
 	}
 	{
 		e.FieldStart("created_at")
@@ -209805,6 +212377,458 @@ func (s *WebhookEvent54Entity) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *WebhookEvent55) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent55) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("type")
+		e.Str("variable.set")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		e.FieldStart("actor")
+		s.Actor.Encode(e)
+	}
+	{
+		e.FieldStart("entity")
+		s.Entity.Encode(e)
+	}
+	{
+		e.FieldStart("data")
+		s.Data.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent55 = [7]string{
+	0: "id",
+	1: "type",
+	2: "created_at",
+	3: "project_id",
+	4: "actor",
+	5: "entity",
+	6: "data",
+}
+
+// Decode decodes WebhookEvent55 from json.
+func (s *WebhookEvent55) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent55 to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "type":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Type = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "actor":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Actor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor\"")
+			}
+		case "entity":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				if err := s.Entity.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity\"")
+			}
+		case "data":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				if err := s.Data.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"data\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent55")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b01111111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent55) {
+					name = jsonFieldsNameOfWebhookEvent55[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent55) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent55) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent55Actor) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent55Actor) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent55Actor = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent55Actor from json.
+func (s *WebhookEvent55Actor) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent55Actor to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent55Actor")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent55Actor) {
+					name = jsonFieldsNameOfWebhookEvent55Actor[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent55Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent55Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent55ActorType as json.
+func (s WebhookEvent55ActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookEvent55ActorType from json.
+func (s *WebhookEvent55ActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent55ActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookEvent55ActorType(v) {
+	case WebhookEvent55ActorTypeHuman:
+		*s = WebhookEvent55ActorTypeHuman
+	case WebhookEvent55ActorTypeService:
+		*s = WebhookEvent55ActorTypeService
+	case WebhookEvent55ActorTypeSystem:
+		*s = WebhookEvent55ActorTypeSystem
+	case WebhookEvent55ActorTypeAgent:
+		*s = WebhookEvent55ActorTypeAgent
+	default:
+		*s = WebhookEvent55ActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookEvent55ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent55ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent55Entity) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent55Entity) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent55Entity = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent55Entity from json.
+func (s *WebhookEvent55Entity) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent55Entity to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent55Entity")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent55Entity) {
+					name = jsonFieldsNameOfWebhookEvent55Entity[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent55Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent55Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *WebhookEvent5Actor) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -210081,7 +213105,7 @@ func (s *WebhookEvent6) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.factor.passkey.enrolled")
+		e.Str("auth.check.succeeded")
 	}
 	{
 		e.FieldStart("created_at")
@@ -210533,7 +213557,7 @@ func (s *WebhookEvent7) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.factor.password.set")
+		e.Str("auth.factor.passkey.enrolled")
 	}
 	{
 		e.FieldStart("created_at")
@@ -210985,7 +214009,7 @@ func (s *WebhookEvent8) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.request.created")
+		e.Str("auth.factor.password.set")
 	}
 	{
 		e.FieldStart("created_at")
@@ -211437,7 +214461,7 @@ func (s *WebhookEvent9) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("type")
-		e.Str("auth.request.exchange.failed")
+		e.Str("auth.request.created")
 	}
 	{
 		e.FieldStart("created_at")
