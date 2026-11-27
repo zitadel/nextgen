@@ -7,9 +7,9 @@ const order = (index: number) => ({ "--i": index }) as CSSProperties;
 
 /**
  * The end of the steps: the login is live, and the way on is the quickstart.
- * Its dot on the spine is a check in the stepper's last color, green; as the
+ * Its dot on the spine is a check in the stepper's last color; as the
  * spine's fill reaches it (spine.tsx sets data-reached), the check pops with
- * a ring, the card lights in green from above, and its lines rise in one
+ * a ring, the card lights from above and below, and its lines rise in one
  * after another (globals.css, .finish-*). Without script, or for reduced
  * motion, it simply stands there.
  */
@@ -48,17 +48,17 @@ export function Finish({ index, count }: { index: number; count: number }) {
 
       <div className="finish-card relative isolate overflow-hidden rounded-2xl border bg-window px-5 py-10 text-center shadow-(--window-shadow) md:px-10 md:py-14">
         <div aria-hidden="true" className="finish-glow absolute inset-0 -z-10" />
-        <p className="finish-reveal font-mono text-(--step) text-xs leading-4" style={order(0)}>
+        <p className="finish-reveal tag text-(--step)" style={order(0)}>
           That's the whole loop
         </p>
         <h2
-          className="finish-reveal mx-auto mt-4 max-w-xl text-balance text-3xl leading-tight md:text-5xl"
+          className="finish-reveal mx-auto mt-4 max-w-xl text-balance font-heading text-[2rem] leading-10 md:text-[2.5rem] md:leading-[3rem]"
           style={order(1)}
         >
-          <span className="display-title">Get started with Zitadel now.</span>
+          Get started with Zitadel now.
         </h2>
         <p
-          className="finish-reveal mx-auto mt-4 max-w-lg text-balance text-lg text-text-secondary leading-7"
+          className="finish-reveal mx-auto mt-4 max-w-2xl text-balance text-base text-text-secondary leading-6 md:text-2xl md:leading-8"
           style={order(2)}
         >
           <Sentences text="From the first command to a login that is yours in a minute. The quickstart walks you through it." />

@@ -12,7 +12,7 @@ const READING_LINE = 0.6;
  * and in the page's gutter on a phone, where it ends in the finish's card: a quiet track, and
  * over it the fill, drawn down to the reading line as the visitor scrolls.
  * The fill's gradient spans the whole track, Zitadel's orange to the
- * finish's green, so each stretch keeps its color as the fill grows, and
+ * finish's lighter one, so each stretch keeps its color as the fill grows, and
  * meets each dot in that dot's own color (stepColor).
  *
  * Each step whose dot the fill has passed gets data-reached, which lights

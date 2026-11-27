@@ -1,7 +1,7 @@
 import { CommandLine } from "./command-line";
 import { startCommand } from "./commands";
 import { links } from "./links";
-import { Logo } from "./logo";
+import { LOGO_SIZE, Logo } from "./logo";
 import { ThemeSwitch } from "./theme-toggle";
 
 const COLUMNS = [
@@ -50,7 +50,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-6xl gap-10 px-6 py-12 md:grid-cols-[1fr_auto] md:gap-16 md:py-16">
         <div className="flex max-w-sm flex-col items-start gap-4">
           <a href="/" aria-label="Zitadel preview home" className="rounded-sm">
-            <Logo id="footer-logo" className="h-6 w-auto" autoplay />
+            <Logo id="footer-logo" className={LOGO_SIZE} autoplay />
           </a>
           <p className="text-sm text-text-muted leading-6">
             Open-source auth that lives in your repo.
@@ -65,7 +65,7 @@ export function SiteFooter() {
         >
           {COLUMNS.map((column) => (
             <div key={column.title} className="flex flex-col gap-3">
-              <h2 className="font-mono text-text-muted text-xs leading-4">{column.title}</h2>
+              <h2 className="tag text-text-muted text-xs leading-4">{column.title}</h2>
               <ul className="flex flex-col gap-2">
                 {column.links.map((link) => (
                   <li key={link.label}>

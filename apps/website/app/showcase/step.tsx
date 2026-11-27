@@ -6,8 +6,7 @@ export const RAIL = "md:grid-cols-[2.5rem_minmax(0,1fr)] md:gap-x-8";
 
 /**
  * The `index`th of `count` steps' color, as --step: its place on the
- * stepper's ramp from orange to green (globals.css), mixed in OKLCH so it
- * warms through yellow rather than graying through brown.
+ * stepper's ramp along the brand's oranges (globals.css), mixed in OKLCH.
  */
 export function stepColor(index: number, count: number): CSSProperties {
   const share = count > 1 ? Math.round((index / (count - 1)) * 100) : 0;
@@ -94,10 +93,8 @@ export function Step({
             data-dot
             className="step-dot absolute top-1 -left-4 size-2 md:hidden"
           />
-          <span className="font-mono text-(--step) text-xs leading-4">Step {number}</span>
-          <h2 className="font-heading text-2xl leading-8 tracking-[-0.02em] lg:text-[2rem] lg:leading-10">
-            {label}
-          </h2>
+          <span className="tag text-(--step)">Step {number}</span>
+          <h2 className="font-heading text-[2rem] leading-10">{label}</h2>
           <p className="text-text-secondary leading-6">
             <Sentences text={description} />
           </p>

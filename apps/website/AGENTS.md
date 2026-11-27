@@ -55,13 +55,18 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   a token with a value on both sides, never a `white`/`black` literal.
 - `app/theme.ts` sets `data-theme` before the first paint, from the header
   toggle's choice or the system's; the login previews follow it.
+- Follow Lightbox's brand guide: orange is the only highlight (`text-accent`,
+  `bg-highlight`); its purple only shades the background. Add no hue for emphasis.
+- Set headings on the guide's scale (APK Futural 56/64, 40/48, 32/40) and labels
+  in `.tag`.
 
 ## The logo and the favicons
 
 - `app/logo.tsx` is the website's animated logo as inline SVG, its motion as
   CSS keyframes in `app/globals.css`. A hover plays it once to the end, and
   with `autoplay` it also plays now and then by itself (the header's and the
-  footer's); never for reduced motion. Give each copy its own `id`.
+  footer's); never for reduced motion. Give each copy its own `id`, and never
+  make it smaller than `LOGO_SIZE`, the guide's web minimum.
 - `apps/docs/components/logo.tsx` and `apps/console/src/app-shell/logo.tsx` are
   copies; change the copies together.
 - `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the docs
