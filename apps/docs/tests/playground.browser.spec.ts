@@ -218,7 +218,7 @@ test("optional project scope starts unset and can be set and unset explicitly", 
   const send = playground.getByRole("button", { name: /^Send/ });
 
   await expect(project).toHaveValue("");
-  await expect(sample).toContainText("client.queryUsers({})");
+  await expect(sample).toContainText("api.queryUsers({})");
   await send.click();
   await expect.poll(() => projects).toEqual([null]);
 
@@ -228,7 +228,7 @@ test("optional project scope starts unset and can be set and unset explicitly", 
   await expect.poll(() => projects).toEqual([null, "proj_docs_target"]);
 
   await playground.getByRole("button", { name: "Unset", exact: true }).click();
-  await expect(sample).toContainText("client.queryUsers({})");
+  await expect(sample).toContainText("api.queryUsers({})");
   await send.click();
   await expect.poll(() => projects).toEqual([null, "proj_docs_target", null]);
 });
@@ -314,7 +314,7 @@ test("a signed-out reader's sample starts with project-secret authentication", a
   ).toBeVisible();
   const sample = playground.locator("pre").filter({ hasText: "@zitadel/api/" });
   await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
-  await expect(sample).toContainText("client.queryUsers({})");
+  await expect(sample).toContainText("api.queryUsers({})");
 
   await playground
     .getByRole("combobox")

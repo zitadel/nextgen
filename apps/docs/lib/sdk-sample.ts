@@ -67,7 +67,7 @@ export function sdkSample(
   const lines = [
     ...setup(auth, csrf),
     "",
-    `${callExpression(`${result}await client.${method}`, args)};`,
+    `${callExpression(`${result}await api.${method}`, args)};`,
   ];
   return lines.join("\n");
 }
@@ -135,7 +135,7 @@ function setup(auth: Authentication, csrf: boolean): string[] {
         'import { configureZitadel, getApi } from "@zitadel/api/config";',
         "",
         "// In the browser, through the SDK proxy: the session cookie authenticates the call.",
-        `const client = getApi(${project});`,
+        `const api = getApi(${project});`,
       ];
     }
     return [
@@ -147,7 +147,7 @@ function setup(auth: Authentication, csrf: boolean): string[] {
       "",
       "// A write the session cookie authenticates carries the session's CSRF token.",
       "const { csrf_token } = await session.getMySessionCsrfToken();",
-      "const client = createZitadelApi(",
+      "const api = createZitadelApi(",
       "  session.client.with({",
       "    fetch: (input, init) => {",
       "      const headers = new Headers(init?.headers);",
@@ -162,7 +162,7 @@ function setup(auth: Authentication, csrf: boolean): string[] {
   return [
     'import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";',
     "",
-    "const client = createZitadelApi(",
+    "const api = createZitadelApi(",
     "  new ZitadelClient({",
     `    baseUrl: ${baseUrl},`,
     ...(auth === "secret"
@@ -291,7 +291,7 @@ function resultName(method: string): string {
   const noun = method.replace(verbs, "").replace(/By[A-Z][A-Za-z]*$/, "");
   if (noun === method || noun === "") return "result";
   const name = noun.charAt(0).toLowerCase() + noun.slice(1);
-  return name === "client" ? "result" : name;
+  return name === "api" ? "result" : name;
 }
 
 /** The call, laid out as a formatter lays it out in 80 columns. */

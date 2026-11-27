@@ -34,7 +34,7 @@ and framework double-mounts. The same handle is what you pass to the shared
 web components' `project` property.
 
 Every paged list method also walks its cursor for you, one page at a time as
-the loop asks: `client.listDeployments.items({ project_id })` yields every
+the loop asks: `api.listDeployments.items({ project_id })` yields every
 deployment, `.pages(...)` every page, and `.all(...)` collects them into one
 array. To change what every call returns, each page included, pass
 `onResponse` or `onError` to `createZitadelApi`.

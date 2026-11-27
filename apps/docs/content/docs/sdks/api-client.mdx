@@ -49,7 +49,7 @@ Call the API from server-side code. This script creates a client with the projec
 ```ts
 import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";
 
-const client = createZitadelApi(
+const api = createZitadelApi(
   new ZitadelClient({
     baseUrl: process.env.ZITADEL_URL ?? "http://localhost:8080",
     token: process.env.ZITADEL_PROJECT_SECRET!, // server-side only
@@ -57,7 +57,7 @@ const client = createZitadelApi(
   }),
 );
 
-const project = await client.getProject(process.env.ZITADEL_PROJECT_ID!);
+const project = await api.getProject(process.env.ZITADEL_PROJECT_ID!);
 ```
 
 A `ZitadelClient` is one immutable connection: the base URL, the token, and any deadline (`timeoutMs`), abort `signal`, `userAgent` or `fetch` to send through. `client.with({ ... })` returns a changed copy. `allowDestructive` has no default: with `false`, a `DELETE` or an operation the spec marks destructive is rejected with a `DestructiveOperationError` before anything is sent.
@@ -86,11 +86,11 @@ The package has no root export; import from its subpaths:
 A paged list method returns one page and its `next_page_token`. Each one also carries `items()`, `pages()` and `all()`, which take the same arguments and follow the cursor for you:
 
 ```ts
-for await (const deployment of client.listDeployments.items({ project_id })) {
+for await (const deployment of api.listDeployments.items({ project_id })) {
   if (deployment.status === "live") break; // later pages are never fetched
 }
 
-const schemas = await client.listSchemas.all({ project_id, limit: 100 });
+const schemas = await api.listSchemas.all({ project_id, limit: 100 });
 ```
 
 `items()` and `pages()` fetch the next page only when the loop reaches it, so a loop that stops early reads nothing more. `limit` sets the page size, and a `page_token` among the arguments is where the walk starts. To change what every call returns, each page included, pass `onResponse` or `onError` to `createZitadelApi`.
