@@ -475,6 +475,6 @@ describe("VariableService.set when the run is cancelled", () => {
           }),
         ),
       ),
-    ).toBeDefined();
+    ).toBe(cancelled);
   });
 });

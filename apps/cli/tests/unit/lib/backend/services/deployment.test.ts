@@ -784,6 +784,6 @@ describe("DeploymentService.deployToPrimary when the run is cancelled", () => {
           releaseId: "rel_1",
         }),
       ),
-    ).toBeDefined();
+    ).toBe(cancelled);
   });
 });

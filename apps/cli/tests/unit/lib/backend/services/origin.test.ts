@@ -403,6 +403,6 @@ describe("OriginService.remove when the run is cancelled", () => {
       "proj_1",
     );
 
-    expect(await rejectionOf(() => originService.remove(PRIMARY_ORIGIN))).toBeDefined();
+    expect(await rejectionOf(() => originService.remove(PRIMARY_ORIGIN))).toBe(cancelled);
   });
 });
