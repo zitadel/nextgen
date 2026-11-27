@@ -447,14 +447,15 @@ recommends for access tokens. With `prompt=none`, insufficient proof returns
   sign-in without
   `auth_time` ([§4.5](#45-external-sign-in)).
 
-- **Mandatory app validation:** Because authorization parameters transit the
-  browser and can be tampered with, the app/API must verify `acr`, compare
+- **Mandatory app validation:** The app/API must verify `acr`, compare
   `auth_time` against its own `max_age`, and compare `recent_check_at` against
   its own `recent_check` before allowing the action
   ([OpenID Connect Core §3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation)).
-  A missing claim counts as not satisfied. Completing a recent check does not
-  change `auth_time`, so a request altered from `max_age=0` to `recent_check=0`
-  still returns the old `auth_time`, and the app rejects the token. If
+  The API that receives a token did not see the request, so the claims are what
+  it can check. A missing claim counts as not satisfied. Completing a recent
+  check does not change `auth_time`, so the app compares the two limits
+  separately: a token from a request with `recent_check=0` in place of
+  `max_age=0` still carries the old `auth_time`, and the app rejects it. If
   insufficient, the API returns `insufficient_user_authentication` so the app
   initiates a new request ([RFC 9470](https://www.rfc-editor.org/rfc/rfc9470)).
 - **Session API:** Returns `factors` (each verified check with `verified_at`,
