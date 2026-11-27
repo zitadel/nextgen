@@ -27,7 +27,7 @@
   ],
   "scripts": {
     "prepack": "publint --strict",
-    "lint": "knip --directory ../.. --workspace @zitadel/server-linux-arm64 --reporter symbols --reporter ../../scripts/knip-annotations.mjs"
+    "lint": "knip --directory ../.. --workspace @zitadel/server-linux-arm64 --reporter symbols --reporter github-actions"
   },
   "publishConfig": {
     "access": "public"

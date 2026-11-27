@@ -33,7 +33,7 @@
     "build": "vite build --mode lib && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
-    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/sdk-qwik --reporter symbols --reporter ../../scripts/knip-annotations.mjs",
+    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/sdk-qwik --reporter symbols --reporter github-actions",
     "docs:api": "typedoc",
     "install-browsers": "playwright install chromium",
     "prepack": "publint --strict"
