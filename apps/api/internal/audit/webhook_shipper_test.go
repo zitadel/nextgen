@@ -202,6 +202,12 @@ type fakeWebhookSource struct {
 	// the webhook is enabled anew under a delivery.
 	loseLeaseOnProgress bool
 
+	// leases are the projects LeaseDueWebhooks was called for, and
+	// filterReads the calls to WebhookEventTypes.
+	leases      []string
+	filterReads int
+	filtersErr  error
+
 	progress int
 	disabled []fakeDisable
 	released []string
@@ -232,9 +238,10 @@ func (f *fakeWebhookSource) addEvents(projectID string, evs ...*domain.Event) {
 	f.events[projectID] = append(f.events[projectID], evs...)
 }
 
-func (f *fakeWebhookSource) LeaseDueWebhooks(_ context.Context, holder string, dueBy, now, leaseUntil time.Time, limit int) ([]*domain.Webhook, error) {
+func (f *fakeWebhookSource) LeaseDueWebhooks(_ context.Context, projectID, holder string, dueBy, now, leaseUntil time.Time, limit int) ([]*domain.Webhook, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.leases = append(f.leases, projectID)
 	if f.leaseErr != nil {
 		return nil, f.leaseErr
 	}
@@ -243,7 +250,7 @@ func (f *fakeWebhookSource) LeaseDueWebhooks(_ context.Context, holder string, d
 		if len(out) == limit {
 			break
 		}
-		if !hook.Enabled ||
+		if !hook.Enabled || (projectID != "" && hook.ProjectID != projectID) ||
 			(hook.NextAttemptAt != nil && hook.NextAttemptAt.After(dueBy)) ||
 			(hook.LeaseExpiresAt != nil && hook.LeaseExpiresAt.After(now)) {
 			continue
@@ -253,6 +260,30 @@ func (f *fakeWebhookSource) LeaseDueWebhooks(_ context.Context, holder string, d
 		out = append(out, &cp)
 	}
 	return out, nil
+}
+
+func (f *fakeWebhookSource) WebhookEventTypes(_ context.Context, projectID string) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.filterReads++
+	if f.filtersErr != nil {
+		return nil, f.filtersErr
+	}
+	var eventTypes []string
+	for _, hook := range f.hooks {
+		if hook.Enabled && hook.ProjectID == projectID {
+			eventTypes = append(eventTypes, hook.EventTypes...)
+		}
+	}
+	return eventTypes, nil
+}
+
+// leasesOf returns the projects the leases so far named, "" for every
+// project's.
+func (f *fakeWebhookSource) leasesOf() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.leases...)
 }
 
 func (f *fakeWebhookSource) WebhookEventsVisible(_ context.Context, projectID string) (bool, error) {
@@ -487,7 +518,7 @@ func TestWebhookShipper_DeliversTheEventSigned(t *testing.T) {
 	clock := &fakeClock{t: webhookT0.Add(time.Hour)}
 	delivered := metricstest.GrewOnly(t, metricsReader, metrics.WebhookDeliveries, nil, metrics.ResultKey, metrics.WebhookDelivered, metrics.WebhookFailed)
 
-	n, err := newTestWebhookShipper(src, endpoint.Client(), clock).runOnce(t.Context())
+	n, err := newTestWebhookShipper(src, endpoint.Client(), clock).runOnce(t.Context(), "")
 	require.NoError(t, err)
 	assert.Equal(t, 1, n)
 
@@ -520,7 +551,7 @@ func TestWebhookShipper_SignsWithBothSecretsDuringARotation(t *testing.T) {
 	src.secrets = []string{testWebhookSecret, testWebhookOldSecret}
 	src.addEvents("proj_a", testEvents("proj_a", domain.EventTypeUserCreated)...)
 
-	_, err := newTestWebhookShipper(src, endpoint.Client(), &fakeClock{t: webhookT0}).runOnce(t.Context())
+	_, err := newTestWebhookShipper(src, endpoint.Client(), &fakeClock{t: webhookT0}).runOnce(t.Context(), "")
 	require.NoError(t, err)
 
 	got := endpoint.deliveries()
@@ -547,7 +578,7 @@ func TestWebhookShipper_SendsNothingWithoutASecret(t *testing.T) {
 			src.addEvents("proj_a", testEvents("proj_a", domain.EventTypeUserCreated)...)
 			clock := &fakeClock{t: webhookT0}
 
-			_, err := newTestWebhookShipper(src, endpoint.Client(), clock).runOnce(t.Context())
+			_, err := newTestWebhookShipper(src, endpoint.Client(), clock).runOnce(t.Context(), "")
 			require.NoError(t, err)
 
 			assert.Empty(t, endpoint.deliveries())
@@ -575,7 +606,7 @@ func TestWebhookShipper_FilterSkipsAndTheCursorMovesOn(t *testing.T) {
 		domain.EventTypeRequestAPI,  // evt_5
 	)...)
 
-	_, err := newTestWebhookShipper(src, endpoint.Client(), &fakeClock{t: webhookT0}).runOnce(t.Context())
+	_, err := newTestWebhookShipper(src, endpoint.Client(), &fakeClock{t: webhookT0}).runOnce(t.Context(), "")
 	require.NoError(t, err)
 
 	sent := map[string][]string{}
@@ -609,7 +640,7 @@ func TestWebhookShipper_HeadOfLineStopsAtAFailure(t *testing.T) {
 	shipper := newTestWebhookShipper(src, endpoint.Client(), clock)
 	failed := metricstest.GrewOnly(t, metricsReader, metrics.WebhookDeliveries, nil, metrics.ResultKey, metrics.WebhookFailed)
 
-	_, err := shipper.runOnce(t.Context())
+	_, err := shipper.runOnce(t.Context(), "")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"evt_1", "evt_2"}, endpoint.eventIDs(), "evt_3 waits behind evt_2")
@@ -627,12 +658,12 @@ func TestWebhookShipper_HeadOfLineStopsAtAFailure(t *testing.T) {
 	// Not due inside the backoff; then the same event again, under the same
 	// id, and on from there.
 	clock.Set(clock.Now().Add(4 * time.Second))
-	n, err := shipper.runOnce(t.Context())
+	n, err := shipper.runOnce(t.Context(), "")
 	require.NoError(t, err)
 	assert.Zero(t, n)
 	endpoint.answer(nil)
 	clock.Set(clock.Now().Add(time.Second))
-	_, err = shipper.runOnce(t.Context())
+	_, err = shipper.runOnce(t.Context(), "")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"evt_1", "evt_2", "evt_2", "evt_3"}, endpoint.eventIDs())
 	stored = src.get("hook_1")
@@ -652,7 +683,7 @@ func TestWebhookShipper_WaitsForRetryAfter(t *testing.T) {
 	clock := &fakeClock{t: webhookT0.Add(time.Minute)}
 	shipper := newTestWebhookShipper(src, endpoint.Client(), clock)
 
-	_, err := shipper.runOnce(t.Context())
+	_, err := shipper.runOnce(t.Context(), "")
 	require.NoError(t, err)
 
 	failedAt := clock.Now()
@@ -661,7 +692,7 @@ func TestWebhookShipper_WaitsForRetryAfter(t *testing.T) {
 	assert.Equal(t, new(failedAt.Add(2*time.Minute)), stored.NextAttemptAt, "what the endpoint asked for, not the 5 seconds of a first failure")
 
 	clock.Set(failedAt.Add(2*time.Minute - time.Second))
-	n, err := shipper.runOnce(t.Context())
+	n, err := shipper.runOnce(t.Context(), "")
 	require.NoError(t, err)
 	assert.Zero(t, n, "not due before the time the endpoint named")
 	assert.Equal(t, []string{"evt_1"}, endpoint.eventIDs())
@@ -670,7 +701,7 @@ func TestWebhookShipper_WaitsForRetryAfter(t *testing.T) {
 	// webhook that has been failing for 2 minutes.
 	endpoint.askToRetryAfter("1")
 	clock.Set(failedAt.Add(2 * time.Minute))
-	_, err = shipper.runOnce(t.Context())
+	_, err = shipper.runOnce(t.Context(), "")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"evt_1", "evt_1"}, endpoint.eventIDs())
 	stored = src.get("hook_1")
@@ -690,7 +721,7 @@ func TestWebhookShipper_BacksOffAndASuccessResets(t *testing.T) {
 
 	attempt := func() time.Duration {
 		t.Helper()
-		_, err := shipper.runOnce(t.Context())
+		_, err := shipper.runOnce(t.Context(), "")
 		require.NoError(t, err)
 		stored := src.get("hook_1")
 		require.NotNil(t, stored.NextAttemptAt)
@@ -747,7 +778,7 @@ func TestWebhookShipper_GivesUp(t *testing.T) {
 			src.addEvents("proj_a", testEvents("proj_a", domain.EventTypeUserCreated)...)
 			shipper := newTestWebhookShipper(src, endpoint.Client(), clock)
 
-			_, err := shipper.runOnce(t.Context())
+			_, err := shipper.runOnce(t.Context(), "")
 			require.NoError(t, err)
 
 			stored := src.get("hook_1")
@@ -763,7 +794,7 @@ func TestWebhookShipper_GivesUp(t *testing.T) {
 
 			// Disabled, it is sent nothing more.
 			clock.Set(clock.Now().Add(24 * time.Hour))
-			n, err := shipper.runOnce(t.Context())
+			n, err := shipper.runOnce(t.Context(), "")
 			require.NoError(t, err)
 			assert.Zero(t, n)
 			assert.Len(t, endpoint.deliveries(), 1)
@@ -789,7 +820,7 @@ func TestWebhookShipper_TwoServersDeliverEachEventOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	for _, shipper := range []*WebhookShipper{a, b, a, b} {
 		wg.Go(func() {
-			_, err := shipper.runOnce(context.Background())
+			_, err := shipper.runOnce(context.Background(), "")
 			assert.NoError(t, err)
 		})
 	}
@@ -809,7 +840,7 @@ func TestWebhookShipper_StopsWhenTheLeaseIsLost(t *testing.T) {
 	src.loseLeaseOnProgress = true
 	src.addEvents("proj_a", testEvents("proj_a", domain.EventTypeUserCreated)...)
 
-	_, err := newTestWebhookShipper(src, endpoint.Client(), &fakeClock{t: webhookT0}).runOnce(t.Context())
+	_, err := newTestWebhookShipper(src, endpoint.Client(), &fakeClock{t: webhookT0}).runOnce(t.Context(), "")
 	require.NoError(t, err)
 
 	assert.Zero(t, src.progress)
@@ -827,7 +858,7 @@ func TestWebhookShipper_SkipsAProjectThePreClaimGateHides(t *testing.T) {
 	clock := &fakeClock{t: webhookT0.Add(time.Minute)}
 	shipper := newTestWebhookShipper(src, endpoint.Client(), clock)
 
-	_, err := shipper.runOnce(t.Context())
+	_, err := shipper.runOnce(t.Context(), "")
 	require.NoError(t, err)
 	assert.Empty(t, endpoint.deliveries())
 	stored := src.get("hook_1")
@@ -843,7 +874,7 @@ func TestWebhookShipper_SkipsAProjectThePreClaimGateHides(t *testing.T) {
 	src.hidden["proj_unclaimed"] = false
 	src.mu.Unlock()
 	clock.Set(clock.Now().Add(time.Second))
-	_, err = shipper.runOnce(t.Context())
+	_, err = shipper.runOnce(t.Context(), "")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"evt_1"}, endpoint.eventIDs())
 }
@@ -925,7 +956,7 @@ func TestWebhookShipper_ARedirectIsAFailure(t *testing.T) {
 	src := newFakeWebhookSource(testWebhook("hook_1", "proj_a", srv.URL+"/hooks"))
 	src.addEvents("proj_a", testEvents("proj_a", domain.EventTypeUserCreated)...)
 
-	_, err := newTestWebhookShipper(src, client, &fakeClock{t: webhookT0}).runOnce(t.Context())
+	_, err := newTestWebhookShipper(src, client, &fakeClock{t: webhookT0}).runOnce(t.Context(), "")
 	require.NoError(t, err)
 
 	mu.Lock()
@@ -962,7 +993,7 @@ func TestWebhookShipper_SendsOnlyToHTTPSWithoutUserinfo(t *testing.T) {
 			src.addEvents("proj_a", testEvents("proj_a", domain.EventTypeUserCreated)...)
 			clock := &fakeClock{t: webhookT0}
 
-			_, err := newTestWebhookShipper(src, webhookEgressClient(t, "127.0.0.0/8"), clock).runOnce(t.Context())
+			_, err := newTestWebhookShipper(src, webhookEgressClient(t, "127.0.0.0/8"), clock).runOnce(t.Context(), "")
 			require.NoError(t, err)
 
 			mu.Lock()
@@ -982,7 +1013,7 @@ func TestWebhookShipper_TheEgressPolicyDeniesAnInternalAddress(t *testing.T) {
 	src := newFakeWebhookSource(testWebhook("hook_1", "proj_a", endpoint.URL))
 	src.addEvents("proj_a", testEvents("proj_a", domain.EventTypeUserCreated)...)
 
-	_, err := newTestWebhookShipper(src, webhookEgressClient(t), &fakeClock{t: webhookT0}).runOnce(t.Context())
+	_, err := newTestWebhookShipper(src, webhookEgressClient(t), &fakeClock{t: webhookT0}).runOnce(t.Context(), "")
 	require.NoError(t, err)
 
 	assert.Empty(t, endpoint.deliveries())
@@ -1009,7 +1040,7 @@ func TestWebhookShipper_ASlowEndpointDelaysOnlyItself(t *testing.T) {
 	shipper := newTestWebhookShipper(src, fast.Client(), clock)
 
 	var running sync.WaitGroup
-	_, err := shipper.dispatch(t.Context(), &running)
+	_, err := shipper.dispatch(t.Context(), "", &running)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return len(fast.deliveries()) == 1 && src.get("hook_fast").LeaseHolder == nil },
 		5*time.Second, 5*time.Millisecond)
@@ -1018,7 +1049,7 @@ func TestWebhookShipper_ASlowEndpointDelaysOnlyItself(t *testing.T) {
 	more := testEvents("proj_fast", domain.EventTypeUserCreated, domain.EventTypeUserUpdated)[1:]
 	src.addEvents("proj_fast", more...)
 	clock.Set(clock.Now().Add(5 * time.Second))
-	_, err = shipper.dispatch(t.Context(), &running)
+	_, err = shipper.dispatch(t.Context(), "", &running)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return len(fast.deliveries()) == 2 }, 5*time.Second, 5*time.Millisecond)
 	assert.NotNil(t, src.get("hook_slow").LeaseHolder, "the slow webhook is still held, so no round takes it twice")

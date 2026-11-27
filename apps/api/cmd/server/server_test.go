@@ -215,6 +215,32 @@ func TestLoadConfigEventWebhooks(t *testing.T) {
 	assert.ErrorContains(t, err, "events.webhooks.trigger_secret must be at least 16 printable ASCII characters")
 }
 
+// The wake hook of a server that keeps no timer, from the file and from the
+// environment, and refused at startup when nothing could answer what it wakes.
+func TestLoadConfigEventWebhooksWake(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	for _, key := range []string{"TRIGGER_SECRET", "WAKE_URL", "WAKE_SECRET"} {
+		t.Setenv("NEXTGEN_EVENTS_WEBHOOKS_"+key, "")
+	}
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	const file = "events:\n  webhooks:\n    trigger_secret: '0123456789abcdef-file'\n    wake:\n      url: https://wake.example/hook\n      secret: '0123456789abcdef-wake'\n"
+	require.NoError(t, os.WriteFile(configPath, []byte(file), 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, audit.WebhookWakeConfig{URL: "https://wake.example/hook", Secret: "0123456789abcdef-wake"}, cfg.Events.Webhooks.Wake)
+
+	t.Setenv("NEXTGEN_EVENTS_WEBHOOKS_WAKE_URL", "https://env.example/hook")
+	t.Setenv("NEXTGEN_EVENTS_WEBHOOKS_WAKE_SECRET", "0123456789abcdef-env")
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, audit.WebhookWakeConfig{URL: "https://env.example/hook", Secret: "0123456789abcdef-env"}, cfg.Events.Webhooks.Wake)
+
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+	_, err = loadConfig(configPath)
+	assert.ErrorContains(t, err, "events.webhooks.wake.url needs events.webhooks.trigger_secret")
+}
+
 // The two settings the cloud's launcher makes for a server that runs only
 // while it serves a request, read as it writes them into the environment.
 func TestLoadConfigForAServerThatRunsOnlyWhileItServes(t *testing.T) {

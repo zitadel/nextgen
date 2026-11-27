@@ -6,6 +6,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // WebhookDeliveryAdapter implements audit.WebhookSource for the webhook
@@ -18,11 +19,30 @@ type WebhookDeliveryAdapter struct {
 	PlatformProjectID string
 }
 
-func (a WebhookDeliveryAdapter) LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit int) (_ []*domain.Webhook, err error) {
+func (a WebhookDeliveryAdapter) LeaseDueWebhooks(ctx context.Context, projectID, holder string, dueBy, now, leaseUntil time.Time, limit int) (_ []*domain.Webhook, err error) {
 	ctx, end := startSpan(ctx, "WebhookDeliveryAdapter.LeaseDueWebhooks")
 	defer end(&err)
 
-	return a.Pool.Statements().LeaseDueWebhooks(ctx, holder, dueBy, now, leaseUntil, uint32(limit))
+	return a.Pool.Statements().LeaseDueWebhooks(ctx, projectID, holder, dueBy, now, leaseUntil, uint32(limit))
+}
+
+// WebhookEventTypes reads the project's webhooks, which are at most
+// domain.WebhookProjectLimit, and returns the filters of the enabled ones.
+func (a WebhookDeliveryAdapter) WebhookEventTypes(ctx context.Context, projectID string) (_ []string, err error) {
+	ctx, end := startSpan(ctx, "WebhookDeliveryAdapter.WebhookEventTypes")
+	defer end(&err)
+
+	hooks, err := a.Pool.Statements().ListWebhooks(ctx, projectID, database.Page[domain.WebhookField]{Limit: domain.WebhookProjectLimit})
+	if err != nil {
+		return nil, err
+	}
+	var eventTypes []string
+	for _, hook := range hooks.Items {
+		if hook.Enabled {
+			eventTypes = append(eventTypes, hook.EventTypes...)
+		}
+	}
+	return eventTypes, nil
 }
 
 // WebhookEventsVisible is the pre-claim gate of ADR 049 §4 as a project's own
