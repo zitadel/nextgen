@@ -2,7 +2,11 @@ import { readFile } from "node:fs/promises";
 import { join, resolve as resolvePath } from "node:path";
 
 import { Flags } from "@oclif/core";
-import { webApplication } from "@zitadel/config/application-presets";
+import {
+  nativeApplication,
+  spaApplication,
+  webApplication,
+} from "@zitadel/config/application-presets";
 import { slugFromDisplayName } from "@zitadel/config/idp";
 import { z } from "zod";
 
@@ -119,13 +123,6 @@ const NAME = {
     max: NAME_MAX,
   },
 } as const satisfies Refused<string>;
-
-/** How spa/native is refused until the server accepts public clients. */
-const PUBLIC_CLIENTS_REFUSAL = {
-  message:
-    "The server does not support public clients yet (--preset {preset}). Use --preset web, or wait for public client support.",
-  hint: "Pass --preset web for a confidential client with a server-held secret.",
-} as const satisfies Refusal;
 
 /** How a derived slug that is empty is refused. */
 const EMPTY_SLUG_REFUSAL = {
@@ -273,10 +270,11 @@ type Intended = Readonly<{
  * `zitadel application create` — register an application and its first OIDC
  * client on the project through `publishApplication`.
  *
- * `web` is live against today's confidential-client API. `spa` and `native`
- * accept the same flags and prompts, then refuse until the server supports
- * public clients. Credentials are always printed as a pasteable `.env` block;
- * `--application-env-file` (or an interactive yes) writes them to a file.
+ * `--preset web` registers a confidential client with a one-shot secret.
+ * `--preset spa` and `--preset native` register public clients (PKCE, no
+ * secret); spa also requires `--origin`. Credentials are always printed as a
+ * pasteable `.env` block; `--application-env-file` (or an interactive yes)
+ * writes them to a file.
  */
 export default class ApplicationCreate extends Telemetered(Promptable(ChangeCommand)) {
   static override description = "Register an application and its first OIDC client on the project.";
@@ -285,7 +283,8 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
 
   static override examples = [
     '<%= config.bin %> application create --name "Acme Dashboard" --preset web --redirect-uri http://localhost:3000/auth/callback',
-    "<%= config.bin %> application create --name Acme --preset web --redirect-uri http://localhost:3000/callback --application-env-file .env.local",
+    "<%= config.bin %> application create --name Boards --preset spa --redirect-uri http://localhost:5173/callback --origin http://localhost:5173",
+    "<%= config.bin %> application create --name Tunes --preset native --redirect-uri com.acme.tunes:/callback",
   ];
 
   static override flags = {
@@ -317,7 +316,6 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
    */
   protected async preview({ flags }: Admitted<typeof ApplicationCreate>): Promise<CommandResult> {
     const intended = await this.intended(flags);
-    this.refusePublicClients(intended.preset);
     const body = this.body(intended);
 
     return dryRunResult({
@@ -336,7 +334,6 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
    */
   protected async apply({ flags }: Admitted<typeof ApplicationCreate>): Promise<CommandResult> {
     const intended = await this.intended(flags);
-    this.refusePublicClients(intended.preset);
     const { projectId } = await this.connect();
     const issuerBase = this.environment.values.ZITADEL_ISSUER?.value?.replace(/\/$/, "");
     if (issuerBase === undefined || issuerBase === "") {
@@ -359,11 +356,16 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
       return entry.client === client?.slug;
     });
     const clientId = client?.client_id ?? "";
+    const clientType = intended.preset === "web" ? "confidential" : "public";
+    const allowedOrigins = intended.preset === "spa" ? [...intended.origins] : null;
     const env: Record<string, string> = {
       ZITADEL_ISSUER: issuer,
       ZITADEL_CLIENT_ID: clientId,
       ...(secret === undefined ? {} : { ZITADEL_CLIENT_SECRET: secret.secret }),
       ZITADEL_CALLBACK_URL: intended.redirectUris[0],
+      ...(allowedOrigins === null
+        ? {}
+        : { ZITADEL_ALLOWED_ORIGINS: allowedOrigins.join(" ") }),
     };
 
     const wrotePath = await this.writeEnv(intended, env);
@@ -379,6 +381,14 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
         return `  ${key}=${value}`;
       })
       .join("\n");
+    const clientKindLabel =
+      clientType === "confidential" ? "(confidential)" : "(public · PKCE · no secret)";
+    const wroteLabel =
+      intended.preset === "spa"
+        ? "Wrote issuer, client id, callback, and origins"
+        : intended.preset === "native"
+          ? "Wrote issuer, client id, and callback"
+          : "Wrote issuer, client id, secret, and callback";
 
     return {
       status: "ok",
@@ -391,14 +401,14 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
         },
         client: {
           id: clientId,
-          slug: client?.slug ?? "web",
+          slug: client?.slug ?? intended.preset,
           preset: intended.preset,
-          type: "confidential",
+          type: clientType,
           ...(secret === undefined ? {} : { secret: secret.secret }),
         },
         issuer,
         redirect_uris: [...intended.redirectUris],
-        allowed_origins: null,
+        allowed_origins: allowedOrigins,
         env,
         wrote_env_file: wrotePath,
       },
@@ -407,26 +417,31 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
         sections: [],
         lines: [
           `Application  ${escapeControlCharacters(published.id)}`,
-          `Client       ${escapeControlCharacters(clientId)}  (confidential)`,
+          `Client       ${escapeControlCharacters(clientId)}  ${clientKindLabel}`,
           "",
           `Issuer              ${escapeControlCharacters(issuer)}`,
           `Client ID           ${escapeControlCharacters(clientId)}`,
           ...(secret === undefined
-            ? []
+            ? clientType === "public"
+              ? ["Client secret       none needed. PKCE protects sign-in instead."]
+              : []
             : [`Client secret       ${escapeControlCharacters(secret.secret)}  (shown only once)`]),
           `Sign-in callbacks   ${intended.redirectUris.map((uri) => escapeControlCharacters(uri)).join(", ")}`,
+          ...(allowedOrigins === null
+            ? []
+            : [
+                `Allowed origins     ${allowedOrigins.map((origin) => escapeControlCharacters(origin)).join(", ")}`,
+              ]),
           "",
           "Add to your app environment:",
           paste,
           "",
-          "Store the client secret on your server now. It will not be shown again.",
+          ...(secret === undefined
+            ? []
+            : ["Store the client secret on your server now. It will not be shown again.", ""]),
           ...(wrotePath === null
             ? []
-            : [
-                "",
-                `Wrote issuer, client id, secret, and callback to ${escapeControlCharacters(wrotePath)}`,
-              ]),
-          "",
+            : [`${wroteLabel} to ${escapeControlCharacters(wrotePath)}`, ""]),
           "Test it yourself:",
           "  1. Start your app and initiate sign-in",
           "  2. Confirm you return to your app successfully signed in",
@@ -437,31 +452,48 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
   }
 
   /**
-   * The publish body for a web create. Spa/native never reach here while gated.
+   * The publish body for the chosen preset.
    *
    * @param intended - The settled inputs.
    * @returns The request body.
    */
   private body(intended: Intended): {
-    application: ReturnType<typeof webApplication>;
+    application:
+      | ReturnType<typeof webApplication>
+      | ReturnType<typeof spaApplication>
+      | ReturnType<typeof nativeApplication>;
   } {
-    return {
-      application: webApplication({
-        slug: intended.slug,
-        name: intended.name,
-        redirectUris: [...intended.redirectUris] as [string, ...string[]],
-      }),
-    };
-  }
-
-  /**
-   * Refuses spa/native until public clients ship.
-   *
-   * @param preset - The chosen kind.
-   */
-  private refusePublicClients(preset: Preset): void {
-    if (preset === "spa" || preset === "native") {
-      throw refusalError(PUBLIC_CLIENTS_REFUSAL, { preset });
+    const redirectUris = [...intended.redirectUris] as [string, ...string[]];
+    switch (intended.preset) {
+      case "web":
+        return {
+          application: webApplication({
+            slug: intended.slug,
+            name: intended.name,
+            redirectUris,
+          }),
+        };
+      case "spa":
+        return {
+          application: spaApplication({
+            slug: intended.slug,
+            name: intended.name,
+            redirectUris,
+            allowedOrigins: [...intended.origins] as [string, ...string[]],
+          }),
+        };
+      case "native":
+        return {
+          application: nativeApplication({
+            slug: intended.slug,
+            name: intended.name,
+            redirectUris,
+          }),
+        };
+      default: {
+        const _exhaustive: never = intended.preset;
+        throw new Error(`unexpected preset: ${_exhaustive}`);
+      }
     }
   }
 
