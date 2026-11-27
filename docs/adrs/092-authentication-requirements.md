@@ -640,7 +640,8 @@ session, and the following rules apply to it:
    [Open question 1](#open-questions)).
 6. Changing or removing a method ends all other sessions of the user, whichever
    methods they used. The session in which the user makes the change stays.
-   Adding a method leaves every session as it is. A change of this kind is a security event
+   Adding a method leaves every session as it is. A change of this kind is a
+   security event
    ([ADR 037](037-token-lifecycle.md#revocation-propagation--invalidation-semantics)):
    an ended session loses its session token at once and its refresh tokens are
    revoked. An access token cannot be revoked and expires at the end of its
