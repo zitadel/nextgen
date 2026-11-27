@@ -10,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/application"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 )
 
@@ -216,6 +217,32 @@ func (s applicationStatements) getOne(ctx context.Context, filter database.Filte
 		return nil, err
 	}
 	return entity, nil
+}
+
+// ListApplications implements [service.ApplicationStatements].
+func (s applicationStatements) ListApplications(ctx context.Context, opts *database.ListOptions[domain.ApplicationField]) (*database.ListResult[*domain.Application], error) {
+	items, nextCursor, err := pagination.Page(opts.Pagination, application.Schema, func(limit uint32) ([]*domain.Application, error) {
+		opts := opts.WithLimit(limit)
+		var compiler statementCompiler
+		// The permission check compares a.id, the application's id. It takes
+		// the alias because the query joins applications as `a`.
+		if err := compileList(ctx, &compiler, applicationQuery, opts, application.Schema, application.TableAlias, application.IDColumn, newestApplicationRevision); err != nil {
+			return nil, err
+		}
+		var items []*domain.Application
+		if err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			items, err = collectRows(iter, scanApplication)
+			return err
+		}); err != nil {
+			return nil, err
+		}
+		return items, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.Application]{Items: items, NextCursor: nextCursor}, nil
 }
 
 // ListApplicationRevisions implements [service.ApplicationStatements].

@@ -239,6 +239,70 @@ func TestApplicationStatements_ListRevisionsNewestFirst(t *testing.T) {
 	})
 }
 
+// The list returns declared and registered applications of one project, each
+// once at its newest revision, and pages through them by cursor.
+func TestApplicationStatements_List(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		web := &domain.ApplicationClient{Slug: "web"}
+		registered := createApplication(t, d.stmts, projectID, "a-"+suffix, web)
+		declared := &domain.Application{ProjectID: projectID, Slug: "b-" + suffix, IsDeclared: true, Document: applicationDocument("b-" + suffix)}
+		require.NoError(t, d.stmts.CreateApplication(t.Context(), declared, nil))
+		revised := createApplication(t, d.stmts, projectID, "c-"+suffix)
+		revised.Document = applicationDocument(revised.Slug, web)
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), revised, nil))
+		createApplication(t, d.stmts, ensureProject(t, d.stmts), "other-"+suffix)
+
+		list := func(t *testing.T, cursor []byte, limit uint32, filters ...database.Filter[domain.ApplicationField]) *database.ListResult[*domain.Application] {
+			t.Helper()
+			result, err := d.stmts.ListApplications(unfilteredListCtx(t), &database.ListOptions[domain.ApplicationField]{
+				Filter: database.And(append(filters, database.Equal(database.Col(domain.ApplicationFieldProjectID), projectID))...),
+				Pagination: database.Page[domain.ApplicationField]{
+					Limit:  limit,
+					Cursor: cursor,
+					OrderBy: database.OrderBy[domain.ApplicationField]{
+						Columns: []database.Column[domain.ApplicationField]{
+							database.Col(domain.ApplicationFieldSlug),
+							database.Col(domain.ApplicationFieldID),
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			return result
+		}
+
+		all := list(t, nil, 10)
+		require.Len(t, all.Items, 3)
+		assert.Empty(t, all.NextCursor)
+		assert.Equal(t, registered.ID, all.Items[0].ID)
+		assert.False(t, all.Items[0].IsDeclared)
+		assert.Equal(t, declared.ID, all.Items[1].ID)
+		assert.True(t, all.Items[1].IsDeclared)
+		assert.Equal(t, revised.ID, all.Items[2].ID)
+		assert.Equal(t, revised.RevisionID, all.Items[2].RevisionID)
+		assert.JSONEq(t, string(revised.Document), string(all.Items[2].Document))
+
+		var paged []string
+		var cursor []byte
+		for {
+			page := list(t, cursor, 2)
+			for _, item := range page.Items {
+				paged = append(paged, item.ID)
+			}
+			if cursor = page.NextCursor; len(cursor) == 0 {
+				break
+			}
+		}
+		assert.Equal(t, []string{registered.ID, declared.ID, revised.ID}, paged)
+
+		bySlug := list(t, nil, 10, database.Equal(database.Col(domain.ApplicationFieldSlug), declared.Slug))
+		require.Len(t, bySlug.Items, 1)
+		assert.Equal(t, declared.ID, bySlug.Items[0].ID)
+	})
+}
+
 // A secret variable name is claimed once per project, by one client.
 func TestApplicationStatements_SecretVariableClaims(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
