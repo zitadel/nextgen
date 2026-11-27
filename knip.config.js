@@ -6,7 +6,14 @@ import { parse } from "yaml";
 const root = import.meta.dirname;
 const { packages } = parse(readFileSync(join(root, "pnpm-workspace.yaml"), "utf8"));
 
-const workspaces = {};
+const workspaces = {
+  ".": {
+    entry: [],
+    project: [],
+    ignoreDependencies: [/.*/],
+    ignoreBinaries: [/.*/],
+  },
+};
 const ignoreWorkspaces = [];
 for (const dir of globSync(packages, { cwd: root })) {
   if (!existsSync(join(root, dir, "package.json"))) {
@@ -21,6 +28,7 @@ for (const dir of globSync(packages, { cwd: root })) {
 }
 
 export default {
+  exclude: ["catalog"],
   ignoreWorkspaces,
   workspaces,
 };
