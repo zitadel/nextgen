@@ -74,7 +74,7 @@ The table shows the policy setting and the request parameter for each property.
   `acr` claim
   ([OpenID Connect Core §3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest)).
 - **Age applies to every required check:** Under `mfa` with a 5-minute limit, a
-  2-hour-old password must be repeated even if the TOTP code is 1 minute old.
+  2-hour-old password verification must be repeated even if the TOTP code is 1 minute old.
 - **A recent check preserves older checks:** Only one check needs to be within
   the limit, and it must be a qualifying check. Under `mfa` with a 5-minute
   `recent_check`, a user whose password and TOTP code are both 2 hours old only
@@ -277,7 +277,7 @@ enrolled methods:
   rate-limits for failed checks per user and method as defined in
   [ADR 078](078-abuse-prevention-in-layers.md#3-layer-2-guards-are-built-in-and-always-on).
 - **Uniform failures:** Checking an unenrolled method (e.g., password or TOTP)
-  returns the same error and takes the same time as an incorrect credential.
+  returns the same error and takes the constant time as an incorrect credential.
 
 ### 4. How Requirements Apply
 
@@ -615,7 +615,7 @@ enrollment so the user enrolls the method themselves
 ([First Enrollment](#43-first-enrollment)). The server records each
 authorization, each method change, and each resulting session revocation as an
 event, with who performed it and when
-([#3202](https://github.com/zitadel/nextgen/issues/3202)).
+([ADR-048](048-wide-events-internal-audit-primitive.md)).
 
 ## Risks
 
