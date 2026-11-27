@@ -408,9 +408,7 @@ export default class Api extends Telemetered(
     if (destructive && consent === undefined) {
       return this.cancelled("call", [`${operation.id} was not called.`]);
     }
-    const operationService = new OperationService(
-      consent === undefined ? client : consent.unlock(client),
-    );
+    const operationService = new OperationService(client);
     const response = await (flags.paginate
       ? operationService.callAll(request)
       : operationService.call(request)

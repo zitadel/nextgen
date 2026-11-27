@@ -71,7 +71,7 @@ describe("substituteOnce", () => {
 
 describe("the generated operations", () => {
   it("take the client as a required first argument", () => {
-    const client = new ZitadelClient({ baseUrl: "http://127.0.0.1:1", allowDestructive: false });
+    const client = new ZitadelClient({ baseUrl: "http://127.0.0.1:1" });
 
     // @ts-expect-error -- an operation called without its client does not compile.
     const without = () => getProject("proj_1");
@@ -90,7 +90,7 @@ describe("the generated module", () => {
 
   it("encodes a path parameter and leaves the base URL as it is", async () => {
     const { base, seen } = await paths();
-    const client = new ZitadelClient({ baseUrl: base, allowDestructive: false });
+    const client = new ZitadelClient({ baseUrl: base });
 
     await getUser(client, "usr_01");
 
@@ -107,7 +107,7 @@ describe("the generated module", () => {
     ["a/b", "a%2Fb"],
   ])("sends the schema id %j as one path segment", async (id, encoded) => {
     const { base, seen } = await paths();
-    const client = new ZitadelClient({ baseUrl: base, allowDestructive: false });
+    const client = new ZitadelClient({ baseUrl: base });
 
     await getSchema(client, id);
 

@@ -43,8 +43,7 @@ array. To change what every call returns, each page included, pass
 
 A `ZitadelClient` (from `@zitadel/api/client` or `@zitadel/api/runtime/client`)
 is one connection: the base URL, the bearer token, the deadline, the abort
-signal, the `User-Agent`, the `fetch` it sends through, and whether it may run
-destructive operations. It is immutable; `client.with({ ... })` returns a new
+signal, the `User-Agent` and the `fetch` it sends through. It is immutable; `client.with({ ... })` returns a new
 one. Nothing about a request is kept anywhere but in the client it was made
 with, so two clients on one page never see each other's settings.
 
@@ -58,7 +57,6 @@ import { getProject } from "@zitadel/api/generated/endpoints/zitadelNextGen";
 const client = new ZitadelClient({
   baseUrl: "https://zitadel.example.com",
   token: process.env.ZITADEL_PROJECT_SECRET,
-  allowDestructive: false,
 });
 const project = await getProject(client, projectId);
 ```
@@ -66,11 +64,6 @@ const project = await getProject(client, projectId);
 `createZitadelApi(client)` binds every operation to one client instead, with
 paging; it imports all of them. `getApi(project)` is that for the configured
 project, and `getClient(project)` its client.
-
-`allowDestructive` has no default. A client that sets it to `false` rejects a
-destructive operation (every `DELETE`, and what the spec marks
-`x-zitadel-destructive`) with a `DestructiveOperationError` before anything is
-sent. The configured project's client allows them: signing out is a `DELETE`.
 
 ## Entry points
 
@@ -85,7 +78,7 @@ sent. The configured project's client allows them: signing out is a `DELETE`.
 | `@zitadel/api/generated/endpoints/zitadelNextGen.msw` | MSW handlers for tests |
 | `@zitadel/api/generated/operations` | Every operation as data: method, path, parameters, authentication, paging |
 | `@zitadel/api/runtime/base-url` | `API_PREFIX` and `apiBaseUrl()`, which put `/api/v1` after a base |
-| `@zitadel/api/runtime/fetch` | `customFetch`, the transport every operation sends through; `ApiError`, `NetworkError`, `DestructiveOperationError` |
+| `@zitadel/api/runtime/fetch` | `customFetch`, the transport every operation sends through; `ApiError`, `NetworkError` |
 | `@zitadel/api/runtime/paging` | `Paging`, the cursor walk behind every paged function's `pages`, `items` and `all`: it reads a page's items and cursor, and walks and gathers a list's pages |
 
 ### Adding what only your app needs
@@ -104,6 +97,11 @@ const client = getClient(project).with({
   },
 });
 ```
+
+Give the client `onRequest` to run something before every request: it receives
+the operation's name (`deleteUser`), the full URL and the request, and throwing
+stops the request before anything is sent. A command line can refuse a
+destructive operation there, a test can record what was sent.
 
 `apiErrorCode(error)` from `@zitadel/api/runtime/fetch` reads the code of an
 `ApiError`.

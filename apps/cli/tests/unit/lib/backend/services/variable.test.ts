@@ -13,7 +13,7 @@ import {
   VariableService,
   VariableWrite,
 } from "@/lib/backend/services/variable";
-import { createZitadelClient, type ZitadelClient, allowDestructive } from "@/lib/backend";
+import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { answering, type Reply, refusal } from "@tests/helpers/api-answers";
 
@@ -120,7 +120,7 @@ describe("VariableService.inventory", () => {
       PREVIEW_ONLY: { preview: "x" },
     });
 
-    const variables = await new VariableService(allowDestructive(client), "proj_1").inventory();
+    const variables = await new VariableService(client, "proj_1").inventory();
 
     expect(
       listed.map(({ url }) => {
@@ -140,7 +140,7 @@ describe("VariableService.previews", () => {
       API_URL: { preview: "https://preview.acme.com" },
     });
 
-    const variables = await new VariableService(allowDestructive(client), "proj_1").previews();
+    const variables = await new VariableService(client, "proj_1").previews();
 
     expect(
       listed.map(({ url }) => {
@@ -155,10 +155,7 @@ describe("VariableService.get", () => {
   it("answers the value the name holds in the kind asked for", async ({ server, client }) => {
     const read = answering(server, "getVariable", { primary: "999-prod" });
 
-    const variable = await new VariableService(allowDestructive(client), "proj_1").get(
-      "CLIENT_ID",
-      "primary",
-    );
+    const variable = await new VariableService(client, "proj_1").get("CLIENT_ID", "primary");
 
     expect(
       read.map(({ params, url }) => {
@@ -175,7 +172,7 @@ describe("VariableService.get", () => {
     answering(server, "getVariable", {});
 
     const error = await rejectionOf(() =>
-      new VariableService(allowDestructive(client), "proj_1").get("CLIENT_ID", "preview"),
+      new VariableService(client, "proj_1").get("CLIENT_ID", "preview"),
     );
 
     expect(error).toBeInstanceOf(NotFoundError);
@@ -194,9 +191,7 @@ describe("VariableService.heldByName", () => {
       API_URL: { primary: "https://acme.com" },
     });
 
-    const held = await new VariableService(allowDestructive(client), "proj_1").heldByName(
-      "primary",
-    );
+    const held = await new VariableService(client, "proj_1").heldByName("primary");
 
     expect([...held]).toEqual([
       ["TOKEN", true],
@@ -208,7 +203,7 @@ describe("VariableService.heldByName", () => {
     answering(server, "listVariables", refusal(403, "variable.permission_denied"));
 
     const error = await rejectionOf(() =>
-      new VariableService(allowDestructive(client), "proj_1").heldByName("primary"),
+      new VariableService(client, "proj_1").heldByName("primary"),
     );
 
     expect(error).toBeInstanceOf(ForbiddenError);
@@ -278,7 +273,7 @@ describe("VariableService.set", () => {
     answering(server, "getVariable", primary);
     answering(server, "listVariables", {});
     answering(server, "setVariables", { API_KEY: { preview: "x" } });
-    return new VariableService(allowDestructive(client), "proj_1").set(
+    return new VariableService(client, "proj_1").set(
       "API_KEY",
       "x",
       VariableWrite.of({ secret: false, preview: true }),
@@ -292,7 +287,7 @@ describe("VariableService.set", () => {
     answering(server, "setVariables", {});
     const { listed, inFlight } = readsHeldUntilBoth(server);
 
-    await new VariableService(allowDestructive(client), "proj_1").set(
+    await new VariableService(client, "proj_1").set(
       "API_KEY",
       "x",
       VariableWrite.of({ secret: false, preview: false }),
@@ -306,7 +301,7 @@ describe("VariableService.set", () => {
     const written = answering(server, "setVariables", { API_KEY: { primary: SECRET } });
     answering(server, "listVariables", {});
 
-    await new VariableService(allowDestructive(client), "proj_1").set(
+    await new VariableService(client, "proj_1").set(
       "API_KEY",
       "s3cret",
       VariableWrite.of({ secret: true, preview: false }),
@@ -324,7 +319,7 @@ describe("VariableService.set", () => {
     answering(server, "getVariable", { primary: "x" });
     answering(server, "listVariables", {});
 
-    await new VariableService(allowDestructive(client), "proj_1").set(
+    await new VariableService(client, "proj_1").set(
       "API_KEY",
       "x",
       VariableWrite.of({ secret: false, preview: true }),
@@ -341,7 +336,7 @@ describe("VariableService.set", () => {
     answering(server, "setVariables", { API_KEY: { primary: "new" } });
     answering(server, "listVariables", { API_KEY: { preview: "old-preview" } });
 
-    const written = await new VariableService(allowDestructive(client), "proj_1").set(
+    const written = await new VariableService(client, "proj_1").set(
       "API_KEY",
       "new",
       VariableWrite.of({ secret: false, preview: false }),
@@ -364,7 +359,7 @@ describe("VariableService.set", () => {
     answering(server, "setVariables", { API_KEY: { primary: "new" } });
     answering(server, "listVariables", refusal(403, "variable.permission_denied"));
 
-    const written = await new VariableService(allowDestructive(client), "proj_1").set(
+    const written = await new VariableService(client, "proj_1").set(
       "API_KEY",
       "new",
       VariableWrite.of({ secret: true, preview: false }),
@@ -387,7 +382,7 @@ describe("VariableService.set", () => {
     answering(server, "setVariables", { API_KEY: { primary: "new" } });
     answering(server, "listVariables", {});
 
-    const written = await new VariableService(allowDestructive(client), "proj_1").set(
+    const written = await new VariableService(client, "proj_1").set(
       "API_KEY",
       "new",
       VariableWrite.of({ secret: true, preview: false }),
@@ -467,7 +462,7 @@ describe("VariableService.remove", () => {
   it("clears both kinds for a plain removal", async ({ server, client }) => {
     const deleted = answering(server, "deleteVariable", undefined);
 
-    await new VariableService(allowDestructive(client), "proj_1").remove(
+    await new VariableService(client, "proj_1").remove(
       "API_KEY",
       VariableRemoval.of({ preview: false }),
     );
@@ -482,7 +477,7 @@ describe("VariableService.remove", () => {
   it("clears the preview kind alone for a preview removal", async ({ server, client }) => {
     const deleted = answering(server, "deleteVariable", undefined);
 
-    await new VariableService(allowDestructive(client), "proj_1").remove(
+    await new VariableService(client, "proj_1").remove(
       "API_KEY",
       VariableRemoval.of({ preview: true }),
     );

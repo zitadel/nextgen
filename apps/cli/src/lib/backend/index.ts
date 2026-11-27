@@ -10,7 +10,6 @@
  */
 
 export {
-  allowDestructive,
   createZitadelClient,
   isCancelled,
   type OperationName,

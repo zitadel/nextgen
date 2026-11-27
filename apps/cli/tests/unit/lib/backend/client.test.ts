@@ -1,5 +1,5 @@
 import { destructiveOperations, operations } from "@zitadel/api/generated/operations";
-import { DestructiveOperationError, NetworkError } from "@zitadel/api/runtime/fetch";
+import { NetworkError } from "@zitadel/api/runtime/fetch";
 import { HttpResponse, http, type JsonBodyType } from "msw";
 import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
@@ -7,12 +7,7 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-import {
-  allowDestructive,
-  createZitadelClient,
-  responseFailure,
-  type ZitadelClient,
-} from "@/lib/backend";
+import { createZitadelClient, responseFailure } from "@/lib/backend";
 import { connectionOf, REQUEST_TIMEOUT_MS, translateFailure } from "@/lib/backend/client";
 import { InvalidError } from "@/lib/backend";
 
@@ -45,7 +40,7 @@ function answering(
 }
 
 describe("createZitadelClient", () => {
-  const client = () =>
+  const aClient = () =>
     createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
 
   it("answers a body exactly as the server sent it", async ({ server }) => {
@@ -57,7 +52,7 @@ describe("createZitadelClient", () => {
     };
     answering(server, 200, body);
 
-    await expect(client().getProject("p1")).resolves.toEqual(body);
+    await expect(aClient().getProject("p1")).resolves.toEqual(body);
   });
 
   it("raises a refused response as a BackendError carrying the server's text as it came", async ({
@@ -69,7 +64,7 @@ describe("createZitadelClient", () => {
       details: { details: "\u001b]52;c;cHduZWQ=\u0007" },
     });
 
-    const error = await client()
+    const error = await aClient()
       .getProject("p1")
       .catch((err: unknown) => err);
 
@@ -87,7 +82,7 @@ describe("createZitadelClient", () => {
   it("carries the server's request id, which finds the request in its logs", async ({ server }) => {
     answering(server, 400, { code: "invalid_argument" }, { "x-request-id": "req_1" });
 
-    const error = await rejectionOf(() => client().getProject("p1"));
+    const error = await rejectionOf(() => aClient().getProject("p1"));
 
     expect(error).toBeInstanceOf(InvalidError);
     expect(error).toMatchObject({
@@ -96,56 +91,18 @@ describe("createZitadelClient", () => {
   });
 });
 
-describe("a client's destructive operations", () => {
-  const client = () =>
-    createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
-
-  it("are refused before anything is sent", async ({ server }) => {
-    const arrived = answering(server, 204, null);
-
-    expect(
-      await rejectionOf(() => client().deleteVariable("NAME", { project_id: "proj_1" })),
-    ).toBeInstanceOf(DestructiveOperationError);
-    expect(arrived).toEqual([]);
-  });
-
-  it("are refused by name, whichever one is called", async () => {
-    expect(
-      await rejectionOf(() => client().revokeRelease("rel_1", { project_id: "proj_1" })),
-    ).toMatchObject({
-      operation: "revokeRelease",
-    });
-  });
-
-  it("leave every other operation reachable, updates included", () => {
-    expect(typeof client().getVariable).toBe("function");
-    expect(typeof client().setVariables).toBe("function");
-  });
-
-  it("are handed back by allowDestructive, on the same connection", () => {
-    const allowed = allowDestructive(client());
-
-    expect(allowed.client.allowDestructive).toBe(true);
-    expect(connectionOf(allowed)).toMatchObject({ baseUrl: "http://localhost:8080", token: "t" });
-  });
-
-  it("are not handed back for a client createZitadelClient did not make", () => {
-    expect(() => allowDestructive({} as ZitadelClient)).toThrow(
-      "Only a client createZitadelClient made can allow its destructive operations",
-    );
-  });
-
+describe("the destructive operations", () => {
   /**
-   * The gate has two halves reading two generated shapes: this client narrows
-   * itself by `destructiveOperations`, a list of client function names, while
-   * `OperationService` asks each operation's own `destructive` flag. They are
+   * The spec's destructive marker is generated into two shapes:
+   * `destructiveOperations`, a list of client function names, and each
+   * operation's own `destructive` flag, which the `api` command asks. They are
    * generated from the one marker in the spec, and nothing else holds them
-   * together, so an operation withheld from one caller and not the other would
+   * together, so an operation marked in one list and not the other would
    * otherwise go unnoticed. Compared without case, because a client function is
    * named after the operation id with its first letter lower-cased.
    */
-  it("are the same operations the raw sender refuses", () => {
-    const withheld = destructiveOperations.map((name) => {
+  it("are the same operations the api command asks about", () => {
+    const destructive = destructiveOperations.map((name) => {
       return name.toLowerCase();
     });
     const flagged = operations
@@ -157,8 +114,8 @@ describe("a client's destructive operations", () => {
       });
 
     // Both sides are named, so two empty lists cannot agree their way past this.
-    expect(withheld).not.toHaveLength(0);
-    expect([...withheld].sort()).toEqual([...flagged].sort());
+    expect(destructive).not.toHaveLength(0);
+    expect([...destructive].sort()).toEqual([...flagged].sort());
   });
 });
 

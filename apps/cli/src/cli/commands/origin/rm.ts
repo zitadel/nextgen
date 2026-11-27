@@ -67,8 +67,8 @@ export default class OriginRm extends Telemetered(
       message: async () => {
         return `Remove ${args.pattern} from ${await this.projectOnServer()}?`;
       },
-      apply: async (consent) => {
-        const originService = await this.service(OriginService, consent);
+      apply: async () => {
+        const originService = await this.service(OriginService);
         const removal = await originService.remove(args.pattern);
         const removed = `Removed ${escapeControlCharacters(removal.pattern)} from the project's origins`;
         const emptied = `Removed ${escapeControlCharacters(removal.pattern)}`;

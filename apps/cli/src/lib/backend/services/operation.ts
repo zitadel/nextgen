@@ -448,8 +448,8 @@ export class Operation {
  * @remarks
  * A Service Layer (Fowler, PoEAA) over the generated API client, which plays
  * the Gateway: it sends a request for an operation the way the client sends its
- * own, with the same server, credential, signal and timeout. A destructive
- * operation is sent only through a client that may reach them. Which operation
+ * own, with the same server, credential, signal and timeout. It asks no
+ * consent: the `api` command does, from `operation.destructive`. Which operation
  * to send is {@link Operation}'s to answer, and needs no client.
  */
 export class OperationService extends ApiService {
@@ -461,7 +461,6 @@ export class OperationService extends ApiService {
    * @param request - The request.
    * @returns The status and the body, as the server sent it.
    * @throws BackendError for any failure the server or the transport answered.
-   * @throws Error for a destructive request through a client that may not reach them.
    */
   async call(request: ApiRequest): Promise<ApiResponse> {
     const response = await this.send(request);
@@ -523,22 +522,14 @@ export class OperationService extends ApiService {
   }
 
   /**
-   * Send one request and answer it as it came off the wire. Every request goes
-   * out here, so a destructive one through a client that may not reach them is
-   * refused here, whichever call sent it.
+   * Send one request and answer it as it came off the wire.
    *
    * @param request - The request.
    * @returns The status and the body, not yet escaped.
    * @throws BackendError for any failure the server or the transport answered.
-   * @throws Error for a destructive request on a client that may not reach
-   * them, which is a caller that did not ask for consent rather than anything
-   * that went wrong at run time — as reaching one on the client itself is.
    */
   private async send(request: ApiRequest): Promise<RawResponse> {
     const connection = connectionOf(this.client);
-    if (request.operation.destructive && !connection.destructive) {
-      throw new Error(`${request.operation.id} is destructive: reach it through allowDestructive`);
-    }
     const url = request.operation.urlOn(connection.baseUrl, request);
     const headers = new Headers({
       accept: "application/json",

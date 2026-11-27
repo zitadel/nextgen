@@ -3,14 +3,8 @@ import { createServer, type AddressInfo, type Server, type Socket } from "node:n
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ZitadelClient, type ZitadelClientSettings } from "./client";
-import {
-  ApiError,
-  DestructiveOperationError,
-  NetworkError,
-  apiErrorCode,
-  customFetch,
-} from "./fetch";
+import { ZitadelClient, type ZitadelClientSettings, type ZitadelRequest } from "./client";
+import { ApiError, NetworkError, apiErrorCode, customFetch } from "./fetch";
 
 const servers: Server[] = [];
 const sockets: Socket[] = [];
@@ -40,9 +34,9 @@ function silent(): Promise<string> {
   return listening(createServer((socket) => sockets.push(socket)));
 }
 
-/** A client on `baseUrl` that may not run destructive operations, with `settings`. */
+/** A client on `baseUrl`, with `settings`. */
 function clientOf(baseUrl: string, settings: Partial<ZitadelClientSettings> = {}): ZitadelClient {
-  return new ZitadelClient({ baseUrl, allowDestructive: false, ...settings });
+  return new ZitadelClient({ ...settings, baseUrl });
 }
 
 /** `path` sent by `client` as the generated `createTeam` sends it. */
@@ -263,40 +257,6 @@ describe("customFetch with two clients", () => {
   });
 });
 
-describe("customFetch destructive guard", () => {
-  it("refuses a destructive operation before anything is sent", async () => {
-    const { base, seen } = await recording();
-
-    const error = await customFetch(clientOf(base), "deleteUser")("/users/usr_1", {
-      method: "DELETE",
-    }).catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(DestructiveOperationError);
-    expect(error).toMatchObject({ operation: "deleteUser" });
-    expect(seen).toEqual([]);
-  });
-
-  it("runs a destructive operation for a client that allows it", async () => {
-    const { base, seen } = await recording();
-
-    await customFetch(clientOf(base, { allowDestructive: true }), "deleteUser")("/users/usr_1", {
-      method: "DELETE",
-    });
-
-    expect(seen.map(({ method, path }) => [method, path])).toEqual([
-      ["DELETE", "/api/v1/users/usr_1"],
-    ]);
-  });
-
-  it("runs any other operation for a client that does not allow destructive ones", async () => {
-    const { base, seen } = await recording();
-
-    await send(clientOf(base), "/teams", { method: "POST" });
-
-    expect(seen).toHaveLength(1);
-  });
-});
-
 describe("customFetch through the client's fetch", () => {
   /** A `fetch` that adds `name: value` to every request it sends. */
   function adding(name: string, value: string): typeof fetch {
@@ -344,6 +304,60 @@ describe("customFetch through the client's fetch", () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect(apiErrorCode(error)).toBe("team.permission_denied");
+  });
+});
+
+describe("customFetch through the client's onRequest", () => {
+  it("shows it the operation, the full URL and the request before sending", async () => {
+    const { base, seen } = await recording();
+    const shown: ZitadelRequest[] = [];
+    const client = clientOf(base, {
+      token: "tok",
+      onRequest: (request) => {
+        shown.push(request);
+      },
+    });
+
+    await send(client, "/teams", { method: "POST" });
+
+    expect(
+      shown.map(({ operation, url, init }) => [
+        operation,
+        url,
+        init.method,
+        init.headers.get("authorization"),
+      ]),
+    ).toEqual([["createTeam", `${base}/api/v1/teams`, "POST", "Bearer tok"]]);
+    expect(seen).toHaveLength(1);
+  });
+
+  it("sends nothing when it throws, and rejects with what it threw", async () => {
+    const { base, seen } = await recording();
+    const refused = new Error("not allowed");
+    const client = clientOf(base, {
+      onRequest: () => {
+        throw refused;
+      },
+    });
+
+    const error = await send(client, "/teams", { method: "POST" }).catch((e: unknown) => e);
+
+    expect(error).toBe(refused);
+    expect(seen).toEqual([]);
+  });
+
+  it("sends the request as the client built it whatever it changes", async () => {
+    const { base, seen } = await recording();
+    const client = clientOf(base, {
+      token: "tok",
+      onRequest: ({ init }) => {
+        init.headers.set("authorization", "Bearer other");
+      },
+    });
+
+    await send(client, "/teams", { method: "POST" });
+
+    expect(seen.map(({ headers }) => headers.authorization)).toEqual(["Bearer tok"]);
   });
 });
 

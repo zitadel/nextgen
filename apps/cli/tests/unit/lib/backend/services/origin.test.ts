@@ -8,7 +8,7 @@ import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
-import { createZitadelClient, type ZitadelClient, allowDestructive } from "@/lib/backend";
+import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { answering, refusal } from "@tests/helpers/api-answers";
 import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
@@ -33,7 +33,7 @@ function serviceHolding(
   origins: readonly { pattern: string; kind: "primary" | "preview" }[],
 ): OriginService {
   answering(server, "getProject", { origins });
-  return new OriginService(allowDestructive(client), PROJECT);
+  return new OriginService(client, PROJECT);
 }
 
 describe("Origin.isPrimary", () => {
@@ -209,9 +209,7 @@ describe("OriginService.list", () => {
   it("answers an empty collection for a project that holds none", async ({ server, client }) => {
     answering(server, "getProject", {});
 
-    await expect(
-      new OriginService(allowDestructive(client), PROJECT).list(),
-    ).resolves.toMatchObject({
+    await expect(new OriginService(client, PROJECT).list()).resolves.toMatchObject({
       isEmpty: true,
     });
   });
@@ -252,10 +250,7 @@ describe("OriginService.add", () => {
   it("adds the pattern to the project it is bound to", async ({ server, client }) => {
     const added = answering(server, "addProjectOrigin", stored(ISSUER, "primary"));
 
-    const origin = await new OriginService(allowDestructive(client), PROJECT).add(
-      ISSUER,
-      "primary",
-    );
+    const origin = await new OriginService(client, PROJECT).add(ISSUER, "primary");
 
     expect(added.map(({ params, body }) => [params.project_id, body])).toEqual([
       ["proj_1", { pattern: ISSUER, kind: "primary" }],
@@ -269,7 +264,7 @@ describe("OriginService.promote", () => {
     const removed = answering(server, "removeProjectOrigin", undefined);
     const added = answering(server, "addProjectOrigin", stored(ISSUER, "primary"));
 
-    await new OriginService(allowDestructive(client), PROJECT).promote(ISSUER);
+    await new OriginService(client, PROJECT).promote(ISSUER);
 
     expect(removed.map(({ params, body }) => [params.project_id, body])).toEqual([
       ["proj_1", { pattern: ISSUER }],
@@ -288,9 +283,7 @@ describe("OriginService.promote", () => {
         : stored(ISSUER, "preview");
     });
 
-    const error = await rejectionOf(() =>
-      new OriginService(allowDestructive(client), PROJECT).promote(ISSUER),
-    );
+    const error = await rejectionOf(() => new OriginService(client, PROJECT).promote(ISSUER));
 
     expect(error).toBeInstanceOf(ConflictError);
     expect(error).toMatchObject({ status: 409 });
@@ -307,9 +300,7 @@ describe("OriginService.promote", () => {
     answering(server, "removeProjectOrigin", undefined);
     answering(server, "addProjectOrigin", refusal(409, "proj.origin_conflict"));
 
-    const error = await rejectionOf(() =>
-      new OriginService(allowDestructive(client), PROJECT).promote(ISSUER),
-    );
+    const error = await rejectionOf(() => new OriginService(client, PROJECT).promote(ISSUER));
 
     expect(error).toBeInstanceOf(ConflictError);
     expect(error).toMatchObject({ status: 409 });
@@ -322,7 +313,7 @@ describe("OriginService.remove", () => {
     answering(server, "getProject", { origins: [{ pattern: ISSUER, kind: "primary" }] });
 
     await expect(
-      new OriginService(allowDestructive(client), PROJECT).remove("https://gone.acme.com"),
+      new OriginService(client, PROJECT).remove("https://gone.acme.com"),
     ).resolves.toEqual({
       pattern: "https://gone.acme.com",
       outcome: "removed",
@@ -336,9 +327,7 @@ describe("OriginService.remove", () => {
     answering(server, "removeProjectOrigin", undefined);
     answering(server, "getProject", { origins: [] });
 
-    await expect(
-      new OriginService(allowDestructive(client), PROJECT).remove(ISSUER),
-    ).resolves.toEqual({
+    await expect(new OriginService(client, PROJECT).remove(ISSUER)).resolves.toEqual({
       pattern: ISSUER,
       outcome: "emptied",
     });
@@ -351,9 +340,7 @@ describe("OriginService.remove", () => {
     answering(server, "removeProjectOrigin", undefined);
     answering(server, "getProject", refusal(503, "unavailable"));
 
-    await expect(
-      new OriginService(allowDestructive(client), PROJECT).remove(ISSUER),
-    ).resolves.toMatchObject({
+    await expect(new OriginService(client, PROJECT).remove(ISSUER)).resolves.toMatchObject({
       pattern: ISSUER,
       outcome: "unverified",
       cause: expect.any(Error),
@@ -363,9 +350,7 @@ describe("OriginService.remove", () => {
   it("raises a removal the server refused, which removed nothing", async ({ server, client }) => {
     answering(server, "removeProjectOrigin", refusal(403, "proj.permission_denied"));
 
-    const error = await rejectionOf(() =>
-      new OriginService(allowDestructive(client), PROJECT).remove(ISSUER),
-    );
+    const error = await rejectionOf(() => new OriginService(client, PROJECT).remove(ISSUER));
 
     expect(error).toBeInstanceOf(ForbiddenError);
     expect(error).toMatchObject({ status: 403 });
@@ -419,7 +404,7 @@ describe("OriginService.remove when the run is cancelled", () => {
       }),
     );
     const originService = new OriginService(
-      allowDestructive(createZitadelClient({ baseUrl: CANCEL_SERVER, signal: controller.signal })),
+      createZitadelClient({ baseUrl: CANCEL_SERVER, signal: controller.signal }),
       PROJECT,
     );
 

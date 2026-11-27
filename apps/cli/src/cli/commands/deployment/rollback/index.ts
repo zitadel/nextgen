@@ -251,9 +251,8 @@ export default class DeploymentRollback extends Telemetered(
       prepare: async () => {
         return target.expectedDeploymentId ?? (await deploymentService.newestPrimary())?.id;
       },
-      apply: async (consent, guard) => {
-        const unlocked = await this.service(DeploymentService, consent);
-        const deployment = await unlocked.rollback(target.id, {
+      apply: async (_consent, guard) => {
+        const deployment = await deploymentService.rollback(target.id, {
           ...(flags.message === undefined ? {} : { message: flags.message }),
           ...(guard === undefined ? {} : { expected_deployment_id: guard }),
         });

@@ -121,12 +121,6 @@ describe("getApi", () => {
     expect(typeof api.getMySession).toBe("function");
   });
 
-  test("lets the app's own client run destructive operations", () => {
-    const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
-
-    expect(getApi(project).client.allowDestructive).toBe(true);
-  });
-
   test("returns the same instance for the same project handle", () => {
     const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
     const api1 = getApi(project);

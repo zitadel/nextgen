@@ -304,19 +304,17 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       const granted = consent === undefined || consent === "refused" ? undefined : consent;
       const removal =
         replacing && granted !== undefined
-          ? await new OriginService(granted.unlock(client), secret.data.project_id)
-              .remove(previousIssuer)
-              .then(
-                () => {
-                  return undefined;
-                },
-                (error: unknown) => {
-                  if (isCancellation(error)) {
-                    throw error;
-                  }
-                  return previousIssuer;
-                },
-              )
+          ? await new OriginService(client, secret.data.project_id).remove(previousIssuer).then(
+              () => {
+                return undefined;
+              },
+              (error: unknown) => {
+                if (isCancellation(error)) {
+                  throw error;
+                }
+                return previousIssuer;
+              },
+            )
           : previousIssuer;
       const staleOrigin = replacing ? removal : undefined;
       if (!(await pathExists(join(this.deps.cwd, RECOVERY_ENV_FILE)))) {

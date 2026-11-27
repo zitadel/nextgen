@@ -1,7 +1,6 @@
 /**
- * What a {@link ZitadelClient} is made from. Only `baseUrl` and
- * `allowDestructive` must be decided by every caller; everything else has a
- * meaning when left out, written on each property.
+ * What a {@link ZitadelClient} is made from. Only `baseUrl` must be given;
+ * everything else has a meaning when left out, written on each property.
  */
 export type ZitadelClientSettings = Readonly<{
   /**
@@ -10,14 +9,6 @@ export type ZitadelClientSettings = Readonly<{
    * a base that already ends in it keeps one; trailing slashes go.
    */
   baseUrl: string;
-  /**
-   * Whether this client may run a destructive operation: every `DELETE`, and
-   * any operation the spec marks `x-zitadel-destructive`. A client that may
-   * not rejects such a call with a {@link DestructiveOperationError} before
-   * anything is sent, whichever way the operation was reached. There is no
-   * default, so every caller says which it wants.
-   */
-  allowDestructive: boolean;
   /**
    * The bearer token sent on every request that does not set its own
    * `Authorization` header. Left out, requests carry none: cookie-authenticated
@@ -51,17 +42,48 @@ export type ZitadelClientSettings = Readonly<{
    * response is read as the server's.
    */
   fetch?: typeof fetch;
+  /**
+   * Called before every request the client sends, with the operation, its URL
+   * and the request as it will go out. Throwing stops the request: nothing is
+   * sent, and the call rejects with what was thrown. Left out, every request
+   * is sent. Its headers are a copy, so changing them changes nothing that is sent;
+   * its body is the one sent, so it must not read a stream body. It
+   * runs before the client's signal and deadline apply: it must return on
+   * its own.
+   *
+   * This is where the code that owns a client adds a rule of its own without
+   * the client knowing it: a command line that refuses a destructive operation
+   * the person has not agreed to, a test that records what was sent, a log.
+   */
+  onRequest?: (request: ZitadelRequest) => void | Promise<void>;
 }>;
 
 /**
- * What {@link ZitadelClient.with} may change: any setting, where `baseUrl` and
- * `allowDestructive`, which a client cannot be without, may not be cleared.
+ * One request as {@link ZitadelClientSettings.onRequest} sees it, before it
+ * is sent.
+ */
+export type ZitadelRequest = Readonly<{
+  /**
+   * The generated function that sends it, such as `deleteUser`: the
+   * operation's id with its first letter lowercased.
+   */
+  operation: string;
+  /**
+   * The full URL, the client's base URL and the API prefix included.
+   */
+  url: string;
+  /**
+   * The request, its headers as the client set them.
+   */
+  init: Omit<RequestInit, "headers"> & { headers: Headers };
+}>;
+
+/**
+ * What {@link ZitadelClient.with} may change: any setting, where `baseUrl`,
+ * which a client cannot be without, may not be cleared.
  */
 export type ZitadelClientChanges = Readonly<
-  Partial<Omit<ZitadelClientSettings, "baseUrl" | "allowDestructive">> & {
-    baseUrl?: string;
-    allowDestructive?: boolean;
-  }
+  Partial<Omit<ZitadelClientSettings, "baseUrl">> & { baseUrl?: string }
 >;
 
 /**
@@ -83,7 +105,6 @@ export type ZitadelClientChanges = Readonly<
  * const client = new ZitadelClient({
  *   baseUrl: "https://example.com",
  *   token: process.env.ZITADEL_SECRET,
- *   allowDestructive: false,
  * });
  * const project = await getProject(client, projectId);
  */
@@ -99,11 +120,6 @@ export class ZitadelClient {
    * The server's origin or a same-origin proxy path, without trailing slashes.
    */
   readonly baseUrl: string;
-
-  /**
-   * Whether this client may run a destructive operation.
-   */
-  readonly allowDestructive: boolean;
 
   /**
    * The bearer token, or `undefined` when requests carry none.
@@ -131,6 +147,11 @@ export class ZitadelClient {
   readonly fetch: typeof fetch | undefined;
 
   /**
+   * What runs before every request, or `undefined` for nothing.
+   */
+  readonly onRequest: ((request: ZitadelRequest) => void | Promise<void>) | undefined;
+
+  /**
    * @param settings - Where the server is, what to authenticate with, and
    * what every request is bound by.
    */
@@ -141,12 +162,12 @@ export class ZitadelClient {
     }
     this.#settings = Object.freeze({ ...settings });
     this.baseUrl = baseUrl;
-    this.allowDestructive = settings.allowDestructive === true;
     this.token = settings.token;
     this.signal = settings.signal;
     this.timeoutMs = settings.timeoutMs;
     this.userAgent = settings.userAgent;
     this.fetch = settings.fetch;
+    this.onRequest = settings.onRequest;
     Object.freeze(this);
   }
 
@@ -157,7 +178,7 @@ export class ZitadelClient {
    * @param changes - The settings to change.
    * @returns The new client.
    * @example
-   * const admin = client.with({ allowDestructive: true });
+   * const elsewhere = client.with({ baseUrl: "https://other.example.com" });
    * const anonymous = client.with({ token: undefined });
    */
   with(changes: ZitadelClientChanges): ZitadelClient {
@@ -165,7 +186,6 @@ export class ZitadelClient {
       ...this.#settings,
       ...changes,
       baseUrl: changes.baseUrl ?? this.#settings.baseUrl,
-      allowDestructive: changes.allowDestructive ?? this.#settings.allowDestructive,
     });
   }
 }

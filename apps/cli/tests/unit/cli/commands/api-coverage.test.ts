@@ -1,11 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import {
-  destructiveOperations,
-  operations as specOperations,
-} from "@zitadel/api/generated/operations";
-import ts from "typescript";
+import { operations as specOperations } from "@zitadel/api/generated/operations";
 import { describe, expect, it } from "vitest";
 
 import { RESOURCES } from "@/cli/commands/resources";
@@ -234,8 +230,8 @@ const PIPELINE_SOURCES: readonly string[] = [
 /**
  * The client operations each standalone command calls, read from its source
  * and keyed by its command (`variable set`). The registry's evidence is which
- * client properties its verbs touch; a `client.<operation>(` call site, or a
- * destructive one's `consent.unlock(client).<operation>(`, is the same evidence, so a command that stops calling an operation leaves that
+ * client properties its verbs touch; a `client.<operation>(` call site is the
+ * same evidence, so a command that stops calling an operation leaves that
  * operation unaccounted and this test fails. The release and deployment
  * commands reach their operations through the pipeline modules above.
  */
@@ -325,6 +321,9 @@ const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>
       const called = new Set<string>();
       const client = new Proxy({} as Record<string, unknown>, {
         get: (_target, property) => {
+          if (property === "client") {
+            return undefined;
+          }
           called.add(String(property));
           return () => Promise.resolve({});
         },
@@ -335,10 +334,8 @@ const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>
       // client call behind the untaken one would look unused. The recording
       // client resolves `{}`, so a call that inspects its response throws;
       // only the property that was reached matters, so the throw is discarded.
-      // A delete reaches the client through its consent, which hands it back.
-      const consent = { unlock: (unlocked: unknown) => unlocked };
       for (const ref of REFS) {
-        await spec.call(context, ref as never, consent as never).catch(() => undefined);
+        await spec.call(context, ref as never).catch(() => undefined);
       }
       // A delete may be named after what it does instead (`deactivate`).
       operations.set(`${topic} ${verb === "delete" ? (spec.verb ?? verb) : verb}`, called);
@@ -609,221 +606,5 @@ describe("the spec names the command behind each operation", () => {
       `The spec names commands that do not run these operations: ${wrong.join("; ")}. ` +
         "Correct the command, or remove the line from the operation.",
     ).toEqual([]);
-  });
-});
-
-/**
- * Every operation the CLI reaches with consent, read from its source: the ones
- * called straight off `consent.unlock(client)`, and the destructive ones the
- * backend services call on the client a command builds them on after unlocking
- * it (`consent.unlock(client)` is passed to the service, which calls
- * `this.client.<operation>(`).
- */
-const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
-  const src = join(import.meta.dirname, "../../../../src");
-  const files = (await readdir(src, { recursive: true })).filter((file) => file.endsWith(".ts"));
-  const called = await Promise.all(
-    files.map(async (file) => {
-      const source = await readFile(join(src, file), "utf8");
-      const direct = [...source.matchAll(/unlock\([\w.]+\)\s*\.(\w+)\(/g)].map(
-        (match) => match[1] as string,
-      );
-      const viaService = file.startsWith("lib/backend/")
-        ? [...source.matchAll(/\bclient\s*\.(\w+)\(/g)]
-            .map((match) => match[1] as string)
-            .filter((operation) => (destructiveOperations as readonly string[]).includes(operation))
-        : [];
-      return [...direct, ...viaService];
-    }),
-  );
-  return new Set(called.flat());
-};
-
-/**
- * Each backend service method whose body reaches a destructive operation, by
- * the class that declares it.
- *
- * @remarks
- * Read from the source, so a service that starts calling one is covered
- * without this test being edited, and read as syntax rather than as text: a
- * destructive operation named in a comment or a string is not a call, a method
- * owns the body the parser gives it rather than the one indentation suggests,
- * and a class is found however it is declared. The rule is a syntactic one and
- * would otherwise belong in `biome-plugins/`, but a plugin would have to spell
- * the destructive methods out, which is the list this derives.
- */
-const destructiveServiceMethods = async (): Promise<ReadonlyMap<string, readonly string[]>> => {
-  const services = join(import.meta.dirname, "../../../../src/lib/backend/services");
-  const files = (await readdir(services)).filter((file) => {
-    return file.endsWith(".ts");
-  });
-  const found = new Map<string, readonly string[]>();
-  for (const file of files) {
-    const parsed = ts.createSourceFile(
-      file,
-      await readFile(join(services, file), "utf8"),
-      ts.ScriptTarget.ESNext,
-      true,
-    );
-    for (const statement of parsed.statements) {
-      if (!ts.isClassDeclaration(statement) || statement.name === undefined) {
-        continue;
-      }
-      const reaching = statement.members.filter((member) => {
-        return ts.isMethodDeclaration(member) && callsADestructiveOperation(member);
-      });
-      if (reaching.length > 0) {
-        found.set(
-          statement.name.text,
-          reaching.map((member) => {
-            return member.name?.getText(parsed) ?? "";
-          }),
-        );
-      }
-    }
-  }
-  return found;
-};
-
-/**
- * Whether a service method sends one of the spec's destructive operations.
- *
- * Read from the syntax rather than the text, so a mention in a comment or a
- * string is not a call, a method is attributed by the body it owns rather than
- * by how far it happens to be indented, and the call has to be on the client
- * rather than on anything that shares a name with an operation.
- *
- * @param method - The method to look through.
- * @returns True when it calls a destructive operation on its client.
- */
-/**
- * Whether a call's receiver is the service's own client, so a local helper or a
- * double that happens to share a name with a destructive operation is not
- * mistaken for one.
- *
- * @param receiver - What the method was called on.
- * @returns True for `client` or `this.client`.
- */
-function onTheClient(receiver: ts.Expression): boolean {
-  if (ts.isIdentifier(receiver)) {
-    return receiver.text === "client";
-  }
-  return ts.isPropertyAccessExpression(receiver) && receiver.name.text === "client";
-}
-
-function callsADestructiveOperation(method: ts.MethodDeclaration): boolean {
-  const destructive: readonly string[] = destructiveOperations;
-  const calls = (node: ts.Node): boolean => {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      destructive.includes(node.expression.name.text) &&
-      onTheClient(node.expression.expression)
-    ) {
-      return true;
-    }
-    return node.getChildren().some((child) => {
-      return calls(child);
-    });
-  };
-  return method.body === undefined ? false : calls(method.body);
-}
-
-/**
- * Every name a file calls as a method, and every service it constructs, read
- * from the syntax so a comment or a string cannot stand in for a call.
- *
- * @param source - The file to read.
- * @returns What it constructs, what it calls, and whether it unlocks a client.
- */
-function reachesOf(source: string): {
-  constructs: ReadonlySet<string>;
-  calls: ReadonlySet<string>;
-  unlocks: boolean;
-} {
-  const parsed = ts.createSourceFile("file.ts", source, ts.ScriptTarget.ESNext, true);
-  const constructs = new Set<string>();
-  const calls = new Set<string>();
-  const walk = (node: ts.Node): void => {
-    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
-      constructs.add(node.expression.text);
-    }
-    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
-      calls.add(node.expression.name.text);
-    }
-    for (const child of node.getChildren()) {
-      walk(child);
-    }
-  };
-  walk(parsed);
-  return {
-    constructs,
-    calls,
-    unlocks: calls.has("unlock"),
-  };
-}
-
-describe("the CLI reaches a destructive service method only with consent", () => {
-  /**
-   * What this proves and what it does not: every file that builds one of these
-   * services and calls a destructive method on it also unlocks a client. It is
-   * per file, not per value, so it cannot prove the unlocked client is the one
-   * the service was built on — the compiler stopped proving that when the
-   * services stopped taking a Consent. What it does catch is the regression
-   * that change made possible: a command that reaches a destructive operation
-   * having never asked for consent at all.
-   */
-  it("unlocks a client in every file that calls one", async () => {
-    const methods = await destructiveServiceMethods();
-    const src = join(import.meta.dirname, "../../../../src");
-    const files = (await readdir(src, { recursive: true })).filter((file) => {
-      return file.endsWith(".ts") && !file.startsWith(join("lib", "backend"));
-    });
-
-    const unconsented = (
-      await Promise.all(
-        files.map(async (file) => {
-          const reaches = reachesOf(await readFile(join(src, file), "utf8"));
-          const reached = [...methods].flatMap(([service, names]) => {
-            return reaches.constructs.has(service)
-              ? names
-                  .filter((name) => {
-                    return reaches.calls.has(name);
-                  })
-                  .map((name) => {
-                    return `${file}: ${service}.${name}`;
-                  })
-              : [];
-          });
-          return reaches.unlocks ? [] : reached;
-        }),
-      )
-    ).flat();
-
-    expect(
-      unconsented,
-      "Build the service on `consent.unlock(client)` inside confirmed(), as the other destructive commands do.",
-    ).toEqual([]);
-  });
-
-  it("finds the destructive service methods to hold the commands to", async () => {
-    expect((await destructiveServiceMethods()).size).toBeGreaterThan(3);
-  });
-});
-
-describe("the spec marks what the CLI confirms as destructive", () => {
-  it("marks every operation the CLI calls only with consent", async () => {
-    const unmarked = [...(await unlockedOperations())].filter(
-      (operation) => !(destructiveOperations as readonly string[]).includes(operation),
-    );
-
-    expect(
-      unmarked,
-      "Give each in api/openapi/endpoints an `x-zitadel-destructive: true` line after its x-zitadel-cli, or stop asking for consent to run it.",
-    ).toEqual([]);
-  });
-
-  it("finds the operations the CLI calls with consent", async () => {
-    expect((await unlockedOperations()).size).toBeGreaterThan(5);
   });
 });

@@ -18,7 +18,7 @@ import { ZitadelClient } from "./client";
 import { paged } from "./paged";
 
 export { ZitadelClient };
-export type { ZitadelClientSettings } from "./client";
+export type { ZitadelClientSettings, ZitadelRequest } from "./client";
 
 /**
  * How each paged function pages, by name: typed readers of a page's items and
@@ -115,7 +115,7 @@ export type ZitadelApiHooks = Readonly<{
  * @param hooks - What to do to every result and every failure.
  * @returns The frozen convenience client.
  * @example
- * const api = createZitadelApi(new ZitadelClient({ baseUrl, token, allowDestructive: false }));
+ * const api = createZitadelApi(new ZitadelClient({ baseUrl, token }));
  * await api.publishSchema(body, { project_id });
  * for await (const deployment of api.listDeployments.items({ project_id })) { … }
  */

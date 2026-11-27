@@ -127,8 +127,8 @@ no command answers to.
   says so with `x-zitadel-destructive: true` after its `x-zitadel-cli`.
 - A `PATCH` is not marked, though a merge-patch `null` removes what it names:
   updates are not guarded yet, and need a follow-up of their own.
-- The CLI's client only exposes a destructive operation behind a confirmation
-  ([consent](../../../cli/src/lib/consent/consent.ts)).
+- The CLI asks before it runs an operation marked destructive: the `api` command and
+  each `Destructive` command ([consent](../../../cli/src/lib/consent/consent.ts)).
 
 ## Descriptions — the first sentence stands alone
 

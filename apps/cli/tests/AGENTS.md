@@ -30,6 +30,8 @@ reclassified until it is one.
 - **Specs** (`tests/integration/**/*.spec.ts`) drive the built CLI through
   `runCliForTest` against `@zitadel/api-mock`'s platform handlers and assert
   only what a developer could observe.
+- A destructive command's spec runs it without `--force` and with it, then reads
+  back with another command to show what changed.
 - One spec file per command, named after it (`variables-set.spec.ts`), the
   only spec that drives that command. No cross-command, "contract" or
   "round-trip" files.

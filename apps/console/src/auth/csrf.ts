@@ -25,7 +25,7 @@ const CSRF_INVALID = "auth.csrf_invalid";
  *
  * @example
  * const csrf = new SessionCsrf(window.location.origin);
- * const client = new ZitadelClient({ baseUrl: "", allowDestructive: true, fetch: csrf.fetch });
+ * const client = new ZitadelClient({ baseUrl: "", fetch: csrf.fetch });
  */
 export class SessionCsrf {
   /** The origin that issued the token; the only one it is sent to. */
