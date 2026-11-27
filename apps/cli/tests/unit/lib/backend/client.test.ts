@@ -91,20 +91,7 @@ describe("createZitadelClient", () => {
   });
 });
 
-describe("a client's destructive operations", () => {
-  const aClient = () =>
-    createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
-
-  it("are sent on the client's connection", async ({ server }) => {
-    const arrived = answering(server, 204, null);
-
-    await aClient().revokeRelease("rel_1", { project_id: "proj_1" });
-
-    expect(
-      arrived.map(({ url, headers }) => [new URL(url).origin, headers.get("authorization")]),
-    ).toEqual([["http://localhost:8080", "Bearer t"]]);
-  });
-
+describe("the destructive operations", () => {
   /**
    * The spec's destructive marker is generated into two shapes:
    * `destructiveOperations`, a list of client function names, and each

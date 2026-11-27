@@ -63,7 +63,6 @@ export const csrf = new SessionCsrf(apiOrigin);
 
 /**
  * Typed Zitadel API client: the project's client (base URL, no client-held
- * token, destructive operations allowed for the person's own deletes),
- * sending through {@link csrf}.
+ * token), sending through {@link csrf}.
  */
 export const api = createZitadelApi(getClient(project).with({ fetch: csrf.fetch }));
