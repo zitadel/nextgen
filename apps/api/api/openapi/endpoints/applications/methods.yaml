@@ -1,5 +1,6 @@
 post:
   operationId: publishApplication
+  x-zitadel-cli: application create
   summary: Create or revise a registered application
   description: |
     Creates or revises a registered application that authenticates its users

@@ -57,9 +57,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
-  // Registered applications are written through the API by other systems,
-  // not from `.zitadel/`; the CLI has no command for them yet (#2788).
-  applications: "registered applications are written through the API, not the CLI (#2788)",
   search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
   // OAuth settings are written only through a release, so there is nothing to
   // create or update here; reading them is `zitadel oauth`'s, which comes with
@@ -153,6 +150,9 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   lookupInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
   acceptInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
   rejectInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
+  // Registered applications: create is `application create`; the rest wait.
+  getApplication: "not yet exposed — follow-up after `application create` (#3294)",
+  getApplicationRevision: "not yet exposed — revision read; same follow-up as getApplication",
 };
 
 type ClientOperations = ReadonlyMap<string, string>;
@@ -215,6 +215,9 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   // An invitation is made, read and cancelled but never updated, and `create`
   // asks questions the registry's create does not (ADR 086 §8).
   invitations: ["invitation/create", "invitation/list", "invitation/get", "invitation/cancel"],
+  // A registered application is created through `application create`; list/get
+  // and revision reads are not CLI verbs yet (#3294 / #2788).
+  applications: ["application/create"],
 };
 
 /**
@@ -291,6 +294,7 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
     variables: ["services/variable.ts", "services/deployment.ts", "services/origin.ts"],
     previews: ["services/preview.ts", "services/origin.ts"],
     invitations: ["services/invitation.ts"],
+    applications: ["services/application.ts"],
   };
   return new Map(
     await Promise.all(

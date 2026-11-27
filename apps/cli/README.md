@@ -135,6 +135,7 @@ which ships in this package.
 <!-- commands -->
 * [`zitadel api [OPERATION]`](#zitadel-api-operation)
 * [`zitadel api ls [FILTER]`](#zitadel-api-ls-filter)
+* [`zitadel application create`](#zitadel-application-create)
 * [`zitadel auth-method passkey disable`](#zitadel-auth-method-passkey-disable)
 * [`zitadel auth-method passkey enable`](#zitadel-auth-method-passkey-enable)
 * [`zitadel auth-method password disable`](#zitadel-auth-method-password-disable)
@@ -331,6 +332,53 @@ EXAMPLES
   $ zitadel api ls --tag Users --json
 
   $ zitadel api ls --json | jq -r '.data.operations[] | select(.command == null) | .id'
+```
+
+## `zitadel application create`
+
+Register an application and its first OIDC client on the project.
+
+```
+USAGE
+  $ zitadel application create [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [-v] [--debug] [--color] [-e
+    <value>] [--env-file <value>] [--dry-run] [--telemetry] [--name <value>] [--preset web|spa|native] [--redirect-uri
+    <value>...] [--origin <value>...] [--application-env-file <value>]
+
+FLAGS
+  -c, --cwd=<value>                   Project directory to operate on.
+  -e, --env=<value>                   Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the
+                                      hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive               Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>                Override the resolved server URL.
+  -v, --verbose                       Verbose logging.
+      --application-env-file=<value>  Write credentials to this file after create.
+      --[no-]color                    Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+                                      honored too.
+      --debug                         Debug logging.
+      --dry-run                       Preview without mutating files or the platform.
+      --env-file=<value>              Read ZITADEL_* values from this file ahead of the process environment. A relative
+                                      path is read from the current directory, not from --cwd. Cannot be combined with
+                                      --env.
+      --input=<value>                 The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag
+                                      names; positional arguments go under "args". Only the global flags may stand
+                                      beside it.
+      --name=<value>                  Product name for the Application.
+      --origin=<value>...             Allowed browser origin; spa only (repeatable).
+      --preset=<option>               Client kind (website backend, browser-only, or installed app).
+                                      <options: web|spa|native>
+      --redirect-uri=<value>...       Sign-in callback URL (repeatable).
+      --[no-]telemetry                Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Register an application and its first OIDC client on the project.
+
+EXAMPLES
+  $ zitadel application create --name "Acme Dashboard" --preset web --redirect-uri http://localhost:3000/auth/callback
+
+  $ zitadel application create --name Acme --preset web --redirect-uri http://localhost:3000/callback --application-env-file .env.local
 ```
 
 ## `zitadel auth-method passkey disable`

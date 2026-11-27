@@ -30,6 +30,11 @@ export {
   type UnavailableReason,
 } from "./errors";
 export {
+  type ApplicationInput,
+  ApplicationService,
+  type PublishedApplication,
+} from "./services/application";
+export {
   type AttemptFactor,
   type AttemptProof,
   type AttemptProofResult,
