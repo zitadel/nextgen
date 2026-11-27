@@ -9460,7 +9460,7 @@
       "post": {
         "operationId": "acceptInvitation",
         "summary": "Accept an invitation",
-        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is claimed, and the\ncreator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nA user who already has access to the project gets\n`409 inv.already_member` with their strongest role as\n`details.details.relation`: no grant is written and the invitation stays\npending. `lookupInvitation` (`POST /invitations/lookup`) returns the same\nrole as `membership` before accept is called.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is claimed, and the\ncreator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9531,7 +9531,7 @@
             }
           },
           "409": {
-            "description": "The user already has access to the project (`inv.already_member`), the\nproject is unclaimed, or the server has no platform project.\n",
+            "description": "The user already has access to the project (`inv.already_member`,\nwith their strongest role as `details.details.relation`; the\ninvitation stays pending), the project is unclaimed, or the server has\nno platform project.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -9550,7 +9550,7 @@
       "post": {
         "operationId": "rejectInvitation",
         "summary": "Decline an invitation",
-        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. The\ninvitation keeps its metadata for administrators, but this response\nreturns `metadata` as null. The inviter cannot decline their own invitation; an administrator\ncancels it instead. A user who already has access to the project gets\n`409 inv.already_member`, and the invitation stays pending. Every unknown\nor finished token answers the same opaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. The\ninvitation keeps its metadata for administrators, but this response\nreturns `metadata` as null. The inviter cannot decline their own invitation; an administrator\ncancels it instead. Every unknown or finished token answers the same\nopaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9621,7 +9621,7 @@
             }
           },
           "409": {
-            "description": "The user already has access to the project (`inv.already_member`).",
+            "description": "The user already has access to the project (`inv.already_member`,\nwith their strongest role as `details.details.relation`); the\ninvitation stays pending.\n",
             "content": {
               "application/json": {
                 "schema": {

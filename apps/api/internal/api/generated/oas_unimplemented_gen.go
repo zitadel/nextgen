@@ -22,11 +22,6 @@ var _ Handler = UnimplementedHandler{}
 // claimed, and the creator still holds `admin` unless `created_by` is null. The inviter cannot accept
 // their own invitation. Every unknown or finished token answers the same opaque `404`.
 //
-// A user who already has access to the project gets `409 inv.already_member` with their strongest role
-// as `details.details.relation`: no grant is written and the invitation stays pending.
-// `lookupInvitation` (`POST /invitations/lookup`) returns the same role as `membership` before accept
-// is called.
-//
 // Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
 // that scheme's CSRF rules.
 //
@@ -1755,10 +1750,9 @@ func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersReque
 //
 // Send the plaintext token from the invitation link fragment. The invitation keeps its metadata for
 // administrators, but this response returns `metadata` as null. The inviter cannot decline their own
-// invitation; an administrator cancels it instead. A user who already has access to the project gets
-// `409 inv.already_member`, and the invitation stays pending. Every unknown or finished token answers
-// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
-// Cookie requests follow that scheme's CSRF rules.
+// invitation; an administrator cancels it instead. Every unknown or finished token answers the same
+// opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
+// requests follow that scheme's CSRF rules.
 //
 // POST /invitations/reject
 func (UnimplementedHandler) RejectInvitation(ctx context.Context, req *InvitationTokenRequest) (r RejectInvitationRes, _ error) {
