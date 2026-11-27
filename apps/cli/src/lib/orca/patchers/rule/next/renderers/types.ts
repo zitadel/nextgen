@@ -12,20 +12,20 @@ export type RendererId = "react" | "web-component";
  * declared as a placeholder (`not-implemented`); the latter is rejected by
  * `getRenderer` so unpublished renderers fail loudly instead of silently.
  */
-export type RendererStatus = "available" | "not-implemented";
+type RendererStatus = "available" | "not-implemented";
 
 /**
  * Output of the `authPage` template: the rendered file `contents` plus the
  * `mode` it was built for, echoed back so callers can branch without
  * re-deriving it.
  */
-export type RendererAuthPage = {
+type RendererAuthPage = {
   mode: "login" | "register";
   contents: string;
 };
 
 /** Output of the optional `profilePage` template: the rendered file contents. */
-export type RendererProfilePage = {
+type RendererProfilePage = {
   contents: string;
 };
 
@@ -34,7 +34,7 @@ export type RendererProfilePage = {
  * `custom-elements.d.ts` ambient declaration file that types the renderer's
  * JSX custom elements.
  */
-export type RendererCustomElementsDts = {
+type RendererCustomElementsDts = {
   contents: string;
 };
 
@@ -50,7 +50,7 @@ export type RendererCustomElementsDts = {
  * restoring `doctor --fix` then regenerates the same markup the original
  * setup wrote.
  */
-export type RendererAuthPageContext = {
+type RendererAuthPageContext = {
   readonly useCase: string | undefined;
   readonly posture: ScaffoldPosture | undefined;
 };
@@ -61,7 +61,7 @@ export type RendererAuthPageContext = {
  * because not all renderers need a provider wrapper, profile page, or JSX
  * type declarations.
  */
-export type RendererTemplates = {
+type RendererTemplates = {
   provider?: { filename: string; contents: string };
   authPage(mode: "login" | "register", context: RendererAuthPageContext): RendererAuthPage;
   profilePage?(context: RendererAuthPageContext): RendererProfilePage;

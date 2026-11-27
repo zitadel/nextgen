@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ServerCommand } from "@/cli/commands/server-command";
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import { Promptable } from "@/cli/core/promptable";
 
 /**

@@ -18,7 +18,7 @@ import { askConnectionEndpoints } from "./endpoints";
  * What a suggested retry names where the client id is still to be given: the
  * one value there that is not a client id, so it is the reader's to replace.
  */
-export const CLIENT_ID_PLACEHOLDER: FillIn = "<client-id>";
+const CLIENT_ID_PLACEHOLDER: FillIn = "<client-id>";
 
 /**
  * What {@link CredentialPrompt} asks about, and how.

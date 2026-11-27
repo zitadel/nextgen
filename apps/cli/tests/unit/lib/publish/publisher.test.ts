@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { ConflictError, ForbiddenError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
+import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish";
 import { Output } from "@/lib/ui";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";

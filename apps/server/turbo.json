@@ -100,7 +100,11 @@
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
         "$TURBO_ROOT$/biome.json",
-        "$TURBO_ROOT$/biome-plugins/*.grit"
+        "$TURBO_ROOT$/biome-plugins/*.grit",
+        "$TURBO_ROOT$/knip.config.js",
+        "package.json",
+        "knip.config.js",
+        "bin/**"
       ]
     },
     // The proof-of-work vectors and the component's solver fixture match what

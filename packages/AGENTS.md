@@ -44,9 +44,9 @@ change needs a changeset, and the whole train versions together.
 - **Never put the codename "nextgen" in a public name, header, configuration
   key or text;** use Zitadel. The one exception is the `/__nextgen` proxy path.
 - **Keep each package's build tool** (its `build` script). `sdk-next` builds
-  per file with `tsc` because bundlers merge `"use client"` modules into shared
-  chunks and strip the directive. Never unify the builds without re-testing
-  the App Router client/server split.
+  with Vite `preserveModules` (one file per module) because chunking merges
+  `"use client"` modules into shared chunks and strips the directive. Never
+  change it without re-running its edge specs and the demo-next build.
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
   through `/__nextgen/*` on the app's own origin
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs

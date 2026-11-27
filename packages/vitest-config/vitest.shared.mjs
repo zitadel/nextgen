@@ -137,7 +137,7 @@ function rejectNodeBuiltins(allowedPackages) {
  * its Node build, which would hide it. Add it as the last entry of a config's
  * `projects`:
  *
- *   projects: [..., edgeProject({ include: ["src/jwt.test.ts"] })]
+ *   projects: [..., edgeProject({ root: import.meta.dirname, include: ["src/jwt.test.ts"] })]
  *
  * Every project resolves with `workerd`, the condition Wrangler adds for
  * Cloudflare Workers, and `conditions` are extra ones for a package that
@@ -147,12 +147,13 @@ function rejectNodeBuiltins(allowedPackages) {
  * but a spec or its fixtures fails the run, unless the importing dependency
  * is in `polyfilledPackages` (Nitro polyfills it on the edge).
  *
- * Throws when `include` matches no file in the working directory.
+ * Throws when `include` matches no file under `root`, the package's own directory.
  *
  * @param {import("./vitest.shared.d.mts").EdgeProjectOptions} options
  * @returns {import("./vitest.shared.d.mts").EdgeProject}
  */
 export function edgeProject({
+  root,
   include = [],
   exclude = [],
   conditions = [],
@@ -163,8 +164,8 @@ export function edgeProject({
   // A pattern that matches nothing would leave the project running no spec
   // and every run green, so fail when the config loads instead.
   const specs = [edgeSpecs, ...include];
-  if (globSync(specs, { cwd: process.cwd() }).length === 0) {
-    throw new Error(`edgeProject: no spec matches ${specs.join(", ")} in ${process.cwd()}`);
+  if (globSync(specs, { cwd: root }).length === 0) {
+    throw new Error(`edgeProject: no spec matches ${specs.join(", ")} in ${root}`);
   }
   const resolved = ["workerd", ...conditions];
   return {

@@ -4,7 +4,7 @@ import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
+import { Origin, Origins, OriginService } from "@/lib/backend";
 import { allowDestructive, createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { fakeClient } from "@tests/helpers/fake-client";

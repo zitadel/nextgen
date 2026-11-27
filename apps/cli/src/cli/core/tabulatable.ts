@@ -76,14 +76,14 @@ export type ListFlags = {
  * issued it, so `listed` suggests the run again as typed with the token in
  * place of any it was given, and `--json` when the run was JSON.
  */
-export type ListPage = {
+type ListPage = {
   token: string | null;
   /** The envelope property the cursor is reported under, when the platform spells it differently. */
   cursorKey?: string;
 };
 
 /** Fields `--json` carries beside the canonical ones, which they may not replace. */
-export type ListExtra = Record<string, unknown> & {
+type ListExtra = Record<string, unknown> & {
   items?: never;
   count?: never;
   next_page_token?: never;

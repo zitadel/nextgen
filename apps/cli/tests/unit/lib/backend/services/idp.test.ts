@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ForbiddenError } from "@/lib/backend/errors";
+import { ForbiddenError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { IdpService } from "@/lib/backend/services/idp";
+import { IdpService } from "@/lib/backend";
 import { fakeClient } from "@tests/helpers/fake-client";
 
 describe("IdpService.list", () => {

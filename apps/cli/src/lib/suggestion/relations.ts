@@ -21,7 +21,7 @@ export const RELATIONS: unique symbol = Symbol("relations");
  * only while `when` holds for the parsed flags, such as an image beside a
  * runtime that runs none. Names are the CLI spelling.
  */
-export type FlagRelation<Name extends string> = Readonly<{
+type FlagRelation<Name extends string> = Readonly<{
   exclusive?: readonly (Name | "json")[];
   dependsOn?: readonly (Name | "json")[];
   excludedWhen?: Readonly<{
@@ -46,7 +46,7 @@ export type Flagged<Defs, Relations> = Requiring<Defs, Relations> & {
  * that is there, as oclif types a flag declared `required: true` inline, so
  * moving the declaration into {@link relatedFlags} costs the command nothing.
  */
-export type Requiring<Defs, Relations> = {
+type Requiring<Defs, Relations> = {
   [Key in keyof Defs]: Key extends keyof Relations
     ? Relations[Key] extends { readonly required: true }
       ? Defs[Key] extends Interfaces.OptionFlag<infer Value, infer Options>

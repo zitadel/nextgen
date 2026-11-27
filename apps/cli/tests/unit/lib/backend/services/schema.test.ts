@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { responseFailure } from "@/lib/backend/client";
-import { NotFoundError } from "@/lib/backend/errors";
-import { SchemaService } from "@/lib/backend/services/schema";
+import { responseFailure } from "@/lib/backend";
+import { NotFoundError } from "@/lib/backend";
+import { SchemaService } from "@/lib/backend";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A service answering `stubs`, bound to one project. */

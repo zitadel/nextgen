@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
-import { UserService } from "@/lib/backend/services/user";
+import { ForbiddenError, NotFoundError } from "@/lib/backend";
+import { UserService } from "@/lib/backend";
 import { fakeClient } from "@tests/helpers/fake-client";
 
 describe("UserService.exists", () => {

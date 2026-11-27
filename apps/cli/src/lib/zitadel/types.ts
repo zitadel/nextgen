@@ -7,8 +7,6 @@ import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import type { ConnectionEndpoints, ProviderSelection } from "@zitadel/config/idp";
 import type { JsonPrimitive } from "type-fest";
 
-export type { JsonPrimitive } from "type-fest";
-
 import type { Change } from "@/lib/zitadel/change";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";

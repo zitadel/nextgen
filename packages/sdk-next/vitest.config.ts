@@ -22,8 +22,22 @@ function clientReferences(): Plugin {
     name: "client-references",
     enforce: "post",
     transform(code) {
-      if (!/^\s*["']use client["']/.test(code)) return null;
-      const names = [...code.matchAll(/^export function (\w+)/gm)].map((match) => match[1]);
+      if (!/^\s*["']use client["']/.test(code)) {
+        return null;
+      }
+      // Read the names from the AST: the build emits `export { a, b }`, not
+      // `export function a`, so matching the source text would find none.
+      const names = this.parse(code).body.flatMap((node) => {
+        if (node.type !== "ExportNamedDeclaration") {
+          return [];
+        }
+        if (node.declaration?.type === "FunctionDeclaration" && node.declaration.id) {
+          return [node.declaration.id.name];
+        }
+        return node.specifiers.flatMap((specifier) =>
+          specifier.exported.type === "Identifier" ? [specifier.exported.name] : [],
+        );
+      });
       return names
         .map(
           (name) =>
@@ -55,6 +69,7 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
+        root: import.meta.dirname,
         // Next's edge bundler adds both.
         conditions: ["react-server", "edge-light"],
         plugins: [clientReferences()],

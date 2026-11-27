@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { PreviewService } from "@/lib/backend/services/preview";
+import { PreviewService } from "@/lib/backend";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A service answering `stubs`, bound to one project. */

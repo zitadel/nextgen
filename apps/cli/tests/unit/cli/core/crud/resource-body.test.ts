@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { describeBody } from "@/cli/core/crud";
-import { documentSchemaOf } from "@/cli/core/crud/fields";
+import { documentSchemaOf } from "@/cli/core/crud";
 import { resourceBody } from "@/cli/core/crud/resource-body";
 
 /** What a refusal suggests: the run again. */

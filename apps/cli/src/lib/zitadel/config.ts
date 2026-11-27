@@ -8,31 +8,31 @@ import { providerOf } from "@zitadel/config/idp";
 
 import { Change } from "@/lib/zitadel/change";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
-import { Branding } from "@/lib/zitadel/resources/branding/branding";
-import { Brandings } from "@/lib/zitadel/resources/branding/collection";
-import { Connection } from "@/lib/zitadel/resources/connections/connection";
-import { Connections } from "@/lib/zitadel/resources/connections/collection";
+import { Branding } from "@/lib/zitadel/resources/branding";
+import { Brandings } from "@/lib/zitadel/resources/branding";
+import { Connection } from "@/lib/zitadel/resources/connections";
+import { Connections } from "@/lib/zitadel/resources/connections";
 import {
   BrokenFilesError,
   ConfigError,
   ConnectionExistsError,
   FileExistsError,
 } from "@/lib/zitadel/errors";
-import { Flow } from "@/lib/zitadel/resources/flows/flow";
-import { Flows } from "@/lib/zitadel/resources/flows/collection";
-import { Policies } from "@/lib/zitadel/resources/policies/collection";
-import { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
-import type { Policy } from "@/lib/zitadel/resources/policies/policy";
-import { SignupPolicy } from "@/lib/zitadel/resources/policies/signup";
-import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
-import { POLICY_TEST_SUFFIX } from "@/lib/zitadel/resources/policies/types";
+import { Flow } from "@/lib/zitadel/resources/flows";
+import { Flows } from "@/lib/zitadel/resources/flows";
+import { Policies } from "@/lib/zitadel/resources/policies";
+import { PasswordPolicy } from "@/lib/zitadel/resources/policies";
+import type { Policy } from "@/lib/zitadel/resources/policies";
+import { SignupPolicy } from "@/lib/zitadel/resources/policies";
+import { PolicyTest } from "@/lib/zitadel/resources/policies";
+import { POLICY_TEST_SUFFIX } from "@/lib/zitadel/resources/policies";
 import { CONTRACT_RULES } from "@/lib/zitadel/rules/contracts";
 import { ENVIRONMENT_RULES } from "@/lib/zitadel/rules/environment";
 import { FLOW_RULES } from "@/lib/zitadel/rules/flows";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
-import { Schemas } from "@/lib/zitadel/resources/schemas/collection";
-import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import { Schemas } from "@/lib/zitadel/resources/schemas";
+import { UserSchema } from "@/lib/zitadel/resources/schemas";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import {

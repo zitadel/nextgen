@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import { PreviewExpiries } from "@/lib/preview";
-import { warnings } from "@/lib/ui/warnings";
+import { warnings } from "@/lib/ui";
 import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ProjectService } from "@/lib/backend/services/project";
+import { ProjectService } from "@/lib/backend";
 import { fakeClient } from "@tests/helpers/fake-client";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 

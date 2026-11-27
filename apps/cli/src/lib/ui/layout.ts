@@ -16,7 +16,7 @@ import type { Section } from "./summary";
 export const WIDTH = 80;
 
 /** Anything that can turn itself into the text that is printed. */
-export interface Renderable {
+interface Renderable {
   render(): string;
 }
 

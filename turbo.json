@@ -120,9 +120,9 @@
     // below reads a package's docs, and no build reads its tests. A negation
     // wins over any inclusion, so a task that reads one of these files
     // replaces `inputs` instead of extending them (cli#test). Every package
-    // lint is `biome check .`, which processes no Markdown.
+    // lint is `biome check .` and knip, which read no Markdown.
     "lint": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/biome-plugins/*.grit", "!**/*.md", "!**/*.mdx", "!**/LICENSE"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/biome-plugins/*.grit", "$TURBO_ROOT$/knip.config.js", "!**/*.md", "!**/*.mdx", "!**/LICENSE"]
     },
     "typecheck": {
       "inputs": [

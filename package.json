@@ -35,6 +35,7 @@
     "@redocly/openapi-core": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "knip": "catalog:",
     "p-map": "catalog:",
     "publint": "catalog:",
     "sharp": "catalog:",

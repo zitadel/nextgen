@@ -5,11 +5,11 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, vi } from "vitest";
 
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { COLUMN_MARK } from "@/lib/ui/layout";
 import { painted, rows } from "@/lib/oclif/rendering";
-import type { CommandResult, JsonEnvelope } from "@/cli/core/types";
+import type { CommandResult, JsonEnvelope } from "@/cli/core";
 import { it } from "@tests/fixtures";
 import { printing } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/fixtures/terminal";

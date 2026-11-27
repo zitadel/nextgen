@@ -4,8 +4,8 @@ import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
-import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
+import { ConflictError, ForbiddenError } from "@/lib/backend";
+import { Deployment, DeploymentService } from "@/lib/backend";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";

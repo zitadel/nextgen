@@ -47,7 +47,7 @@ export const ACME = anOidcConnection({
  * A second schema that lists `acme` but defines no `email`, as one of two
  * schemas the connection `acme.json` maps into.
  */
-export const NO_EMAIL_SCHEMA = aSchemaListing(["acme"], {
+const NO_EMAIL_SCHEMA = aSchemaListing(["acme"], {
   objectType: "contractor",
   properties: { phone: { "x-unique": "project" } },
 });

@@ -9,7 +9,7 @@ import {
   UserSchema,
   UnusableSettingError,
 } from "@/lib/zitadel";
-import { BrokenFile } from "@/lib/zitadel/resources/broken";
+import { BrokenFile } from "@/lib/zitadel";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { aFile, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { anAcmeSsoProvider, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";

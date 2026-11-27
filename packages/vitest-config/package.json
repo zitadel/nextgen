@@ -12,5 +12,11 @@
       "types": "./vitest.shared.d.mts",
       "default": "./vitest.shared.mjs"
     }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
   }
 }

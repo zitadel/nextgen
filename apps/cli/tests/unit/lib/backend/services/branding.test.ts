@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BrandingService } from "@/lib/backend/services/branding";
+import { BrandingService } from "@/lib/backend";
 import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 describe("BrandingService.list", () => {

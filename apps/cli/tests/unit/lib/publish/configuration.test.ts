@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { PublishedConfiguration } from "@/lib/publish/configuration";
+import { PublishedConfiguration } from "@/lib/publish";
 import { fakeClient } from "@tests/helpers/fake-client";
 import { aDeployment, PROJECT_ID } from "@tests/helpers/records";
 

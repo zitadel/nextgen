@@ -1,6 +1,6 @@
 import { describe, expect, onTestFinished } from "vitest";
 
-import { log } from "@/lib/ui/log";
+import { log } from "@/lib/ui";
 import { it } from "@tests/fixtures";
 import { recordLog } from "@tests/fixtures/log";
 

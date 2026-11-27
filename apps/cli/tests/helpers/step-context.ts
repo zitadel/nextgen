@@ -6,11 +6,6 @@ import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import { PROJECT_ID } from "@tests/helpers/records";
 
 /**
- * The environment selector every suggestion a step makes carries.
- */
-export const ENVIRONMENT_SELECTOR = "--env staging";
-
-/**
  * What a test changes of a step's context: any field of it, and the client
  * operations its services answer.
  */

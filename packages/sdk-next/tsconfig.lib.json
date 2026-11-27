@@ -7,8 +7,11 @@
       "DOM",
       "DOM.Iterable"
     ],
+    // `next` declares the "server-only" module (next/types/global.d.ts),
+    // which vite-plugin-dts otherwise reports as TS2882.
     "types": [
-      "node"
+      "node",
+      "next"
     ],
     "experimentalDecorators": true,
     "jsx": "react-jsx",

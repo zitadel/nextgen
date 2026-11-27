@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendError } from "@/lib/backend/errors";
-import { ClaimService } from "@/lib/backend/services/claim";
+import { BackendError } from "@/lib/backend";
+import { ClaimService } from "@/lib/backend";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
 /** A service answering `stubs`, bound to one project. */

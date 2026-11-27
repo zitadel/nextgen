@@ -4,13 +4,8 @@ import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/backend/errors";
-import {
-  Variable,
-  VariableRemoval,
-  VariableService,
-  VariableWrite,
-} from "@/lib/backend/services/variable";
+import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/backend";
+import { Variable, VariableRemoval, VariableService, VariableWrite } from "@/lib/backend";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";

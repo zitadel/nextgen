@@ -4,7 +4,7 @@ import { ZitadelError } from "@/lib/errors";
 import { resourceSuggestion } from "@/lib/suggestion";
 
 import { aConfigAt } from "@tests/helpers/suggestions";
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { printing, stripAnsi } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/fixtures/terminal";

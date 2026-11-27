@@ -7,6 +7,7 @@
     "url": "https://github.com/zitadel/nextgen/issues"
   },
   "license": "AGPL-3.0-only",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zitadel/nextgen.git",
@@ -25,7 +26,8 @@
     "bin"
   ],
   "scripts": {
-    "prepack": "publint --strict"
+    "prepack": "publint --strict",
+    "lint": "knip --directory ../.. --workspace @zitadel/server-win32-x64"
   },
   "publishConfig": {
     "access": "public"

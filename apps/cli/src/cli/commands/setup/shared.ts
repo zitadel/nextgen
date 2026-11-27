@@ -43,7 +43,7 @@ import {
   selectionFromFlags,
   ssoEnableFlags,
 } from "@/lib/idp";
-import type { GlobalOptions } from "@/cli/core/types";
+import type { GlobalOptions } from "@/cli/core";
 import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";

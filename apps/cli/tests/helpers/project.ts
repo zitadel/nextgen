@@ -15,7 +15,7 @@ import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./loca
 import { COMMANDS } from "@/index";
 import { EXIT_CODES } from "@/lib/errors";
 import { parseJsonOrUndefined } from "@/lib/json";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
@@ -2536,7 +2536,7 @@ const DRIVES_A_TERMINAL = new RegExp(
  * characters of its JSON escape is text, not a control character, so a payload
  * that carries one passes.
  */
-export function assertNothingDrivesTheTerminal(
+function assertNothingDrivesTheTerminal(
   // The two streams and nothing else, so a run the fixture spawns rather than
   // runs in process is held to this as well.
   result: { stdout: string; stderr: string },
@@ -2659,7 +2659,7 @@ function envelopeIn(result: CliResult): { next_commands?: string[]; data?: unkno
  * file only covers the commands somebody remembered to list, while this covers
  * every command any spec runs, and fails in the spec of the command that broke.
  */
-export function assertEnvelope(result: CliResult, args: string[] = []): void {
+function assertEnvelope(result: CliResult, args: string[] = []): void {
   const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\` --json`;
   // A JSON envelope must never carry a raw ANSI colour byte: one would break
   // `JSON.parse` and `jq` for every consumer. Checked on every spec's `--json`
@@ -2926,7 +2926,7 @@ export async function anApp({
 const VITE_CONFIG = "vite.config.ts";
 
 /** A React app as create-vite's react-ts template leaves it, before setup. */
-export async function aReactApp(): Promise<ScaffoldedApp> {
+async function aReactApp(): Promise<ScaffoldedApp> {
   const path = await scratchDir("zitadel-react-");
   await mkdir(join(path, "src"), { recursive: true });
   const files = {

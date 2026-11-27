@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { parentPort } from "node:worker_threads";
 
 import { qwikVite } from "@qwik.dev/core/optimizer";
@@ -17,7 +18,9 @@ const server = await createServer({
 let rendered;
 try {
   await server.pluginContainer.buildStart({});
-  rendered = await server.ssrLoadModule("/src/__tests__/server-login.tsx");
+  rendered = await server.ssrLoadModule(
+    fileURLToPath(new URL("./server-login.tsx", import.meta.url)),
+  );
 } finally {
   await server.close();
 }

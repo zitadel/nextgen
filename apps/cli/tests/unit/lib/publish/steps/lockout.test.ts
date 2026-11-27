@@ -5,7 +5,7 @@ import type {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Credential } from "@/lib/backend";
-import { NotFoundError } from "@/lib/backend/errors";
+import { NotFoundError } from "@/lib/backend";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { warnings } from "@/lib/ui";
 import type { JsonObject, JsonValue } from "@/lib/zitadel";

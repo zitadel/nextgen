@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { LocalServerCommand } from "@/cli/commands/server-command";
 import { BaseCommand } from "@/cli/core";
 import { LOCAL_SERVER_ADVICE } from "@/lib/suggestion/local-server-advice";
-import { Spelling } from "@/lib/suggestion/spelling";
+import { Spelling } from "@/lib/suggestion";
 import { LocalServerError, type LocalServerErrorKind } from "@/lib/server";
 import { aConfigAt } from "@tests/helpers/suggestions";
 

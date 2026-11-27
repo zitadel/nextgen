@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import type { Run } from "@/lib/server/local/ports";
+import type { Run } from "@/lib/server/local";
 import { discoverManagedRuntimeProcesses } from "@/lib/server/local/processes";
 import { it } from "@tests/fixtures";
 

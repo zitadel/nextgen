@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendError } from "@/lib/backend/errors";
-import { AuthAttemptService } from "@/lib/backend/services/auth-attempt";
+import { BackendError } from "@/lib/backend";
+import { AuthAttemptService } from "@/lib/backend";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
 const ORIGIN = "http://localhost:8080";

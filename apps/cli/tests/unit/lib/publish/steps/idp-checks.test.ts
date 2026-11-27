@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ForbiddenError } from "@/lib/backend/errors";
+import { ForbiddenError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";

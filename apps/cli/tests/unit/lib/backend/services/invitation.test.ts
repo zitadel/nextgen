@@ -1,7 +1,7 @@
 import type { CreateInvitation201, GetInvitation200 } from "@zitadel/api/generated/model";
 import { describe, expect, it, vi } from "vitest";
 
-import { InvitationService, invitationRole } from "@/lib/backend/services/invitation";
+import { InvitationService, invitationRole } from "@/lib/backend";
 import { fakeClient } from "@tests/helpers/fake-client";
 
 const PROJECT = "proj_1";

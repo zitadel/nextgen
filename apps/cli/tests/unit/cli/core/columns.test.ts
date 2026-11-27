@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { chosenColumns, readColumns } from "@/cli/core/columns";
-import { fieldPaths } from "@/cli/core/crud/paths";
+import { fieldPaths } from "@/cli/core/crud";
 
 describe("readColumns", () => {
   it("drops blanks between commas", () => {

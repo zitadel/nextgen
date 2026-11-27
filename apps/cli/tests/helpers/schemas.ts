@@ -1,6 +1,6 @@
 import type { JsonObject, UserSchema, ZitadelConfig } from "@/lib/zitadel";
-import { Flow } from "@/lib/zitadel/resources/flows/flow";
-import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
+import { Flow } from "@/lib/zitadel";
+import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel";
 import { aUserSchema } from "@tests/helpers/config";
 
 /**

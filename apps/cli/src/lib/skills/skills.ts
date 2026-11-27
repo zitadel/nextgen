@@ -4,9 +4,9 @@ import { dirname, join } from "node:path";
 import * as rosie from "rosie-skills";
 
 import { isCI } from "@/lib/ci";
-import type { BoxAction } from "@/lib/ui/box";
-import { log } from "@/lib/ui/log";
-import { style } from "@/lib/ui/style";
+import type { BoxAction } from "@/lib/ui";
+import { log } from "@/lib/ui";
+import { style } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { telemetryConfigDir } from "@/lib/telemetry/identity";
 

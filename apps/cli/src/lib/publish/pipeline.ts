@@ -5,7 +5,7 @@ import type { ConfigStore, ConfigurationBundle, ZitadelConfig } from "@/lib/zita
 /**
  * The publishes a step can run for. `preview` lands with the preview command.
  */
-export const PIPELINE_MODES = ["deploy", "preview"] as const;
+const PIPELINE_MODES = ["deploy", "preview"] as const;
 
 /**
  * Which publish a step runs for.
