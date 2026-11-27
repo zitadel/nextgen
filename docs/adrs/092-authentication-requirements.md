@@ -5,6 +5,7 @@
 > **Context:** [#3166](https://github.com/zitadel/nextgen/issues/3166) and
 > [#3202](https://github.com/zitadel/nextgen/issues/3202)  
 > **Related:** [ADR 010](010-session-auth-attempt-check-model.md),
+> [ADR 036](036-api-credential-planes.md),
 > [ADR 037](037-token-lifecycle.md),
 > [ADR 038](038-user-credential-migration-and-recovery.md),
 > [ADR 053](053-cross-project-principals.md),
@@ -749,8 +750,13 @@ event, with who performed it and when
     [ADR 038](038-user-credential-migration-and-recovery.md#magic-links-and-email-codes)
     defines both as methods and recovery routes. As a recovery route they follow
     [§4.4](#44-account-recovery). As a method, this ADR has no rules for them.
-    The server returns the code or the link in the API response and the
-    app delivers it, as `createInvitation` does for its link.
+    When the app's server side calls the API with the project secret
+    ([ADR 036](036-api-credential-planes.md#decision)), the server returns the
+    code or the link in the response and the app sends it to the user, as
+    `createInvitation` does for its link. When a browser calls the API with the
+    publishable key, the response must not contain the code, because whoever
+    entered the email address would receive it. How does the code reach the
+    user in that case?
     [#3166](https://github.com/zitadel/nextgen/issues/3166) names email only as
     an identifier. Does an email code count as possession, like an SMS code, or
     as no factor type?
