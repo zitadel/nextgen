@@ -101,8 +101,7 @@ export class IssuerOriginCheck implements SanityCheck {
     if (consent === undefined) {
       return;
     }
-    const originService = new OriginService(consent.unlock(client), held.project_id);
-    await originService.promote(pattern);
+    await new OriginService(client, held.project_id).promote(pattern);
     await secret
       .with({
         primary_origins: [...held.primary_origins, pattern],

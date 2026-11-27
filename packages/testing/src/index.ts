@@ -19,7 +19,6 @@ export function connectZitadel(handle: InstanceHandle): ConnectedZitadel {
     new ZitadelClient({
       baseUrl: handle.baseUrl,
       token: handle.projectSecret,
-      allowDestructive: true,
     }),
   );
   const context = { projectId: handle.projectId, schemaId: handle.schemaId };

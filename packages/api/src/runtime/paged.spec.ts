@@ -4,7 +4,7 @@ import { ZitadelClient } from "./client";
 import { paged } from "./paged";
 
 /** The client every page is fetched with. */
-const client = new ZitadelClient({ baseUrl: "http://127.0.0.1:1", allowDestructive: false });
+const client = new ZitadelClient({ baseUrl: "http://127.0.0.1:1" });
 
 /** Reads a page's `rows` and its cursor, as a generated table entry does. */
 const rows = {

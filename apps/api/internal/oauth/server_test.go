@@ -33,8 +33,8 @@ func TestOPEndpointsCarryTheTenant(t *testing.T) {
 	assert.Empty(t, rec.Header().Get("X-Test-Handler"), "the OP handler answers, not the root")
 	assert.Equal(t, []admitCall{{ProjectID: "proj_123", Origin: "https://api.example.com"}}, admitted.calls)
 
-	// A simple endpoint reaches the unimplemented server, which answers 404.
-	rec = send(t, mux, http.MethodGet, "/oauth/proj_123/jwks", "api.example.com", https)
+	// An endpoint not implemented yet answers the unimplemented server's 404.
+	rec = send(t, mux, http.MethodGet, "/oauth/proj_123/end_session", "api.example.com", https)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 	assert.Contains(t, rec.Body.String(), "not implemented")
 

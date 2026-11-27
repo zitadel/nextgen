@@ -23,7 +23,7 @@ import { ConflictError } from "@/lib/backend/errors";
  * a primary origin or a preview, which is freed differently: a primary origin
  * by putting another release live on it, a preview by removing it.
  */
-export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
+type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
 
 /**
  * What revoking a release came to: `revoked` with the release, or `in-use` with

@@ -6,22 +6,18 @@ import { NotFoundError } from "@/lib/backend/errors";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { FlowService } from "@/lib/backend/services/flow";
-import { answering, answeringPages, testClient } from "@tests/helpers/api-answers";
-
-/** A service on a test client, bound to one project. */
-function service(): FlowService {
-  return new FlowService(testClient(), "proj_1");
-}
+import { answering, answeringPages } from "@tests/helpers/api-answers";
 
 describe("FlowService.list", () => {
   it("lists every flow of the project it is bound to, narrowed by the query", async ({
     server,
+    client,
   }) => {
     const listed = answeringPages(server, "listFlowDefinitions", {
       flow_definitions: [{ id: "flowdef_1" }],
     });
 
-    const flows = await service().list({ name: "default-login" });
+    const flows = await new FlowService(client, "proj_1").list({ name: "default-login" });
 
     expect(
       listed.map(({ url }) => {
@@ -31,7 +27,7 @@ describe("FlowService.list", () => {
     expect(flows).toEqual([{ id: "flowdef_1" }]);
   });
 
-  it("drains past the first page, so a caller sees every flow", async ({ server }) => {
+  it("drains past the first page, so a caller sees every flow", async ({ server, client }) => {
     answeringPages(
       server,
       "listFlowDefinitions",
@@ -39,39 +35,39 @@ describe("FlowService.list", () => {
       { flow_definitions: [{ id: "flowdef_1" }] },
     );
 
-    const flows = await service().list();
+    const flows = await new FlowService(client, "proj_1").list();
 
     expect(flows).toEqual([{ id: "flowdef_2" }, { id: "flowdef_1" }]);
   });
 });
 
 describe("FlowService.page", () => {
-  it("reads one page and the cursor to the next", async ({ server }) => {
+  it("reads one page and the cursor to the next", async ({ server, client }) => {
     answering(server, "listFlowDefinitions", {
       flow_definitions: [{ id: "flowdef_2" }],
       next_page_token: "t2",
     });
 
-    const first = await service().page();
+    const first = await new FlowService(client, "proj_1").page();
 
     expect(first.items).toEqual([{ id: "flowdef_2" }]);
     expect(first.next).toBe("t2");
   });
 
-  it("answers no cursor when the server sent none", async ({ server }) => {
+  it("answers no cursor when the server sent none", async ({ server, client }) => {
     answeringPages(server, "listFlowDefinitions", { flow_definitions: [] });
 
-    const first = await service().page();
+    const first = await new FlowService(client, "proj_1").page();
 
     expect(first.next).toBeNull();
   });
 });
 
 describe("FlowService.get", () => {
-  it("fetches a revision id directly", async ({ server }) => {
+  it("fetches a revision id directly", async ({ server, client }) => {
     const fetched = answering(server, "getFlowDefinition", { id: "flowdef_1" });
 
-    await expect(service().get("flowdef_1")).resolves.toEqual({
+    await expect(new FlowService(client, "proj_1").get("flowdef_1")).resolves.toEqual({
       id: "flowdef_1",
     });
     expect(
@@ -81,12 +77,12 @@ describe("FlowService.get", () => {
     ).toEqual(["flowdef_1"]);
   });
 
-  it("takes the newest revision of a flow named by its name", async ({ server }) => {
+  it("takes the newest revision of a flow named by its name", async ({ server, client }) => {
     const listed = answeringPages(server, "listFlowDefinitions", {
       flow_definitions: [{ id: "flowdef_2" }, { id: "flowdef_1" }],
     });
 
-    const flow = await service().get("default-login");
+    const flow = await new FlowService(client, "proj_1").get("default-login");
 
     expect(flow).toEqual({ id: "flowdef_2" });
     expect(
@@ -98,10 +94,11 @@ describe("FlowService.get", () => {
 
   it("refuses a name that matches no flow, saying how to see what the project has", async ({
     server,
+    client,
   }) => {
     answeringPages(server, "listFlowDefinitions", { flow_definitions: [] });
 
-    const error = await rejectionOf(() => service().get("typo"));
+    const error = await rejectionOf(() => new FlowService(client, "proj_1").get("typo"));
 
     expect(error).toBeInstanceOf(NotFoundError);
     expect(error).toMatchObject({
@@ -113,7 +110,7 @@ describe("FlowService.get", () => {
 });
 
 describe("FlowService.create", () => {
-  it("sends the flow with the project it is bound to", async ({ server }) => {
+  it("sends the flow with the project it is bound to", async ({ server, client }) => {
     const published = answering(server, "publishFlowDefinition", { id: "flowdef_1" });
 
     const flowDefinition = {
@@ -123,7 +120,7 @@ describe("FlowService.create", () => {
       steps: [],
     };
 
-    await service().create({ flow_definition: flowDefinition });
+    await new FlowService(client, "proj_1").create({ flow_definition: flowDefinition });
 
     expect(
       published.map(({ body }) => {

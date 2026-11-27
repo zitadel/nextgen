@@ -21,7 +21,7 @@ type Arranging = {
  * What a test arranges in a project, and reads back from it, whichever store
  * the project is in.
  */
-export type Project = {
+type Project = {
   /**
    * Put files in the project, creating the directories they need.
    *
@@ -74,7 +74,7 @@ export type Project = {
 /**
  * A store opened for a test, with the project it keeps.
  */
-export type Opened = {
+type Opened = {
   /**
    * The store.
    */

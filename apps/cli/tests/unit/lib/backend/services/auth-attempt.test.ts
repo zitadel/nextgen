@@ -4,27 +4,23 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
+import type { ZitadelClient } from "@/lib/backend";
 import { AuthAttemptService } from "@/lib/backend/services/auth-attempt";
-import { answering, type Reply, refusal, testClient } from "@tests/helpers/api-answers";
+import { answering, type Reply, refusal } from "@tests/helpers/api-answers";
 
 const ORIGIN = "http://localhost:8080";
 
-/** A service on a test client, bound to the origin the attempt is made from. */
-function service(): AuthAttemptService {
-  return new AuthAttemptService(testClient(), ORIGIN);
-}
-
 describe("AuthAttemptService.open", () => {
-  it("answers the attempt the server opened", async ({ server }) => {
+  it("answers the attempt the server opened", async ({ server, client }) => {
     answering(server, "createAuthAttempt", { attempt_id: "att_1" });
 
-    await expect(service().open("proj_1")).resolves.toBe("att_1");
+    await expect(new AuthAttemptService(client, ORIGIN).open("proj_1")).resolves.toBe("att_1");
   });
 
-  it("names the origin the attempt is made from", async ({ server }) => {
+  it("names the origin the attempt is made from", async ({ server, client }) => {
     const opened = answering(server, "createAuthAttempt", { attempt_id: "att_1" });
 
-    await service().open("proj_1");
+    await new AuthAttemptService(client, ORIGIN).open("proj_1");
 
     expect(
       opened.map(({ body, headers }) => {
@@ -35,26 +31,40 @@ describe("AuthAttemptService.open", () => {
 });
 
 describe("AuthAttemptService.prove", () => {
-  /** An attempt whose challenge is issued, and whose proof is answered by `verify`. */
-  function proving(server: SetupServer, verify: Reply<"verifyAuthAttemptChallenge">) {
+  /**
+   * An attempt whose challenge is issued, and whose proof is answered by `verify`.
+   *
+   * @param server - The MSW server that answers the attempt's requests.
+   * @param client - The client the service sends through.
+   * @param verify - What the server answers the proof with.
+   * @returns The service, ready to prove the attempt.
+   */
+  function proving(
+    server: SetupServer,
+    client: ZitadelClient,
+    verify: Reply<"verifyAuthAttemptChallenge">,
+  ): AuthAttemptService {
     answering(server, "createAuthAttemptChallenge", { challenge_id: "chl_1" });
     answering(server, "verifyAuthAttemptChallenge", verify);
-    return service();
+    return new AuthAttemptService(client, ORIGIN);
   }
 
-  it("answers a proof the server accepted", async ({ server }) => {
+  it("answers a proof the server accepted", async ({ server, client }) => {
     await expect(
-      proving(server, { attempt_id: "att_1" }).prove("att_1", "password", {
+      proving(server, client, { attempt_id: "att_1" }).prove("att_1", "password", {
         password: "hunter2",
       }),
     ).resolves.toEqual({ outcome: "proved" });
   });
 
-  it("issues the challenge for the factor and answers that same challenge", async ({ server }) => {
+  it("issues the challenge for the factor and answers that same challenge", async ({
+    server,
+    client,
+  }) => {
     const issued = answering(server, "createAuthAttemptChallenge", { challenge_id: "chl_1" });
     const verified = answering(server, "verifyAuthAttemptChallenge", { attempt_id: "att_1" });
 
-    await service().prove("att_1", "identifier", {
+    await new AuthAttemptService(client, ORIGIN).prove("att_1", "identifier", {
       login_name: "ada@acme.com",
     });
 
@@ -72,9 +82,10 @@ describe("AuthAttemptService.prove", () => {
 
   it("answers a rejected proof as an outcome, carrying the server's failure", async ({
     server,
+    client,
   }) => {
     await expect(
-      proving(server, refusal(401, "att.proof_rejected")).prove("att_1", "password", {
+      proving(server, client, refusal(401, "att.proof_rejected")).prove("att_1", "password", {
         password: "wrong",
       }),
     ).resolves.toMatchObject({
@@ -83,10 +94,10 @@ describe("AuthAttemptService.prove", () => {
     });
   });
 
-  it("raises any failure that is not a rejected proof", async ({ server }) => {
+  it("raises any failure that is not a rejected proof", async ({ server, client }) => {
     expect(
       await rejectionOf(() =>
-        proving(server, refusal(500, "internal")).prove("att_1", "password", {
+        proving(server, client, refusal(500, "internal")).prove("att_1", "password", {
           password: "hunter2",
         }),
       ),
@@ -95,10 +106,10 @@ describe("AuthAttemptService.prove", () => {
 });
 
 describe("AuthAttemptService.handoff", () => {
-  it("answers the one-time token the attempt ended with", async ({ server }) => {
+  it("answers the one-time token the attempt ended with", async ({ server, client }) => {
     const handedOff = answering(server, "createAuthAttemptHandoff", { handoff_token: "ho_1" });
 
-    await expect(service().handoff("att_1")).resolves.toBe("ho_1");
+    await expect(new AuthAttemptService(client, ORIGIN).handoff("att_1")).resolves.toBe("ho_1");
     expect(
       handedOff.map(({ params, headers }) => {
         return [params.attempt_id, headers.get("origin")];

@@ -2,9 +2,9 @@ import { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { Telemetered } from "@/cli/telemetry/telemetered";
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import { CLI_COMMAND_STARTED } from "@/cli/telemetry/properties";
-import type { CommandResult } from "@/cli/core/types";
+import type { CommandResult } from "@/cli/core";
 import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { onTerminalReadingAFile } from "@tests/fixtures/terminal";

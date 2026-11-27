@@ -3,6 +3,8 @@ import { createServer, type RequestListener, type Server } from "node:http";
 import { setupServer } from "msw/node";
 import { test as base } from "vitest";
 
+import type { ZitadelClient } from "@/lib/backend";
+import { testClient } from "../helpers/api-answers";
 import { nextPort } from "../helpers/ports";
 
 /** Starts an HTTP server on a free port, answers with `handler`, and returns its base URL. */
@@ -63,6 +65,8 @@ class Servers {
  *   Each test adds its own handlers with `server.use(...)`.
  * - `serve` starts an HTTP server on a free port, answers with the handler, and gives back its
  *   base URL; every server it started is closed when the test ends.
+ * - `client` is a real CLI client on `TEST_SERVER` (`helpers/api-answers.ts`), for code that takes
+ *   one. It starts `server`, so a request the test did not answer there fails the test.
  * - `port` is a port from this worker's own block (see `ports.ts`). A test that needs a second one
  *   calls `nextPort()`. It is here, not in `ports.ts`, because `vitest.config.ts` reads that file's
  *   allocator while the config loads, where a Vitest `test` cannot be extended.
@@ -70,6 +74,7 @@ class Servers {
 export const test = base.extend<{
   server: ReturnType<typeof setupServer>;
   serve: Serve;
+  client: ZitadelClient;
   port: number;
 }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
@@ -87,6 +92,9 @@ export const test = base.extend<{
       return servers.start(handler, host);
     });
     await servers.dispose();
+  },
+  async client({ server: _listening }, use) {
+    await use(testClient());
   },
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   async port({}, use) {

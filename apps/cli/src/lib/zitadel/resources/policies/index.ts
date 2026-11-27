@@ -14,10 +14,7 @@ export {
   type PasswordMinLength,
   type PolicyCase,
   type PolicyCaseResult,
-  type PolicyConfig,
   type PolicyExpectation,
   type PolicyOperation,
-  type PolicySelection,
-  type PolicyVerdict,
   USER_CREATE_POLICY_OPERATION,
 } from "@/lib/zitadel/resources/policies/types";

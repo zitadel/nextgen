@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { vi } from "vitest";
 
-import { RepositoryError } from "@/lib/git/errors";
+import { RepositoryError } from "@/lib/git";
 import { Git, GitResult } from "@/lib/git/git";
 import { scratchDir } from "@tests/fixtures/scratch";
 

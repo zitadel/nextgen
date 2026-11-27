@@ -3,7 +3,7 @@ import type { JsonValue } from "@/lib/zitadel/types";
 /**
  * The JSON types of a claim's value, as OpenID Connect Core defines them.
  */
-export const CLAIM_TYPES = ["string", "number", "boolean", "object"] as const;
+const CLAIM_TYPES = ["string", "number", "boolean", "object"] as const;
 
 /**
  * The JSON type of a claim's value.
@@ -18,7 +18,7 @@ export const CLAIM_SCOPES = ["profile", "email", "address", "phone"] as const;
 /**
  * A scope that makes a provider return a standard claim.
  */
-export type ClaimScope = (typeof CLAIM_SCOPES)[number];
+type ClaimScope = (typeof CLAIM_SCOPES)[number];
 
 /**
  * A standard claim: the scope that makes a provider return it, and the type
@@ -74,13 +74,13 @@ export type StandardClaimName = keyof typeof STANDARD_CLAIMS;
  * The scopes OpenID Connect itself defines, which return only the standard
  * claims.
  */
-export const STANDARD_SCOPES = ["openid", ...CLAIM_SCOPES, "offline_access"] as const;
+const STANDARD_SCOPES = ["openid", ...CLAIM_SCOPES, "offline_access"] as const;
 
 /**
  * The JSON types a schema property may declare for a claim of each type to
  * fit it.
  */
-export const FITS = {
+const FITS = {
   string: ["string"],
   boolean: ["boolean"],
   number: ["number", "integer"],

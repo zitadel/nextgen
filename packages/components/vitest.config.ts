@@ -76,6 +76,7 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
+        root: import.meta.dirname,
         // The Lit-free server entry, loaded from `dist/` inside the edge VM.
         plugins: sharedPlugins(),
       }),

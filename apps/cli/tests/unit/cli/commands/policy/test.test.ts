@@ -9,10 +9,10 @@ import PolicyTestCommand, {
   type PolicySuiteResult,
   type PolicyUnderTest,
 } from "@/cli/commands/policy/test";
-import { PolicyService } from "@/lib/backend";
+import { PolicyService, type ZitadelClient } from "@/lib/backend";
 import { PolicyTest, SignupPolicy } from "@/lib/zitadel";
 import { PASSWORD_POLICY } from "@tests/helpers/config";
-import { answering, testClient } from "@tests/helpers/api-answers";
+import { answering } from "@tests/helpers/api-answers";
 import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { PROJECT_ID } from "@tests/helpers/records";
@@ -120,9 +120,14 @@ function aTestFile(path: string, passwords: readonly string[]): PolicyTest {
  *
  * @param server - The test's MSW server.
  * @param cases - How many cases will ask.
+ * @param client - The client it sends through.
  * @returns The service.
  */
-function answeringBackwards(server: SetupServer, cases: number): PolicyService {
+function answeringBackwards(
+  server: SetupServer,
+  cases: number,
+  client: ZitadelClient,
+): PolicyService {
   const waiting: { readonly length: number; readonly answer: () => void }[] = [];
   answering(server, "evaluatePolicy", ({ body }) => {
     const length = "password" in body.input ? body.input.password.length : 0;
@@ -144,18 +149,19 @@ function answeringBackwards(server: SetupServer, cases: number): PolicyService {
       }
     });
   });
-  return new PolicyService(testClient(), PROJECT_ID);
+  return new PolicyService(client, PROJECT_ID);
 }
 
 /**
  * A policy service whose server allows every case.
  *
  * @param server - The test's MSW server.
+ * @param client - The client it sends through.
  * @returns The service.
  */
-function allowingEverything(server: SetupServer): PolicyService {
+function allowingEverything(server: SetupServer, client: ZitadelClient): PolicyService {
   answering(server, "evaluatePolicy", { allowed: true });
-  return new PolicyService(testClient(), PROJECT_ID);
+  return new PolicyService(client, PROJECT_ID);
 }
 
 /**
@@ -179,9 +185,9 @@ const POLICIES = new Map([[PASSWORD_POLICY, { config: { min_length: 12 }, source
 
 describe("PolicyTestCommand.runPolicyTests", () => {
   describe("when the answers arrive out of order", () => {
-    it("keeps the files in order", async ({ server }) => {
+    it("keeps the files in order", async ({ server, client }) => {
       const results = await aCommand().runCases(
-        answeringBackwards(server, 5),
+        answeringBackwards(server, 5, client),
         TWO_FILES,
         new Map(),
       );
@@ -193,9 +199,9 @@ describe("PolicyTestCommand.runPolicyTests", () => {
       ).toEqual(["one.test.json", "two.test.json"]);
     });
 
-    it("keeps each file's cases in order", async ({ server }) => {
+    it("keeps each file's cases in order", async ({ server, client }) => {
       const results = await aCommand().runCases(
-        answeringBackwards(server, 5),
+        answeringBackwards(server, 5, client),
         TWO_FILES,
         new Map(),
       );
@@ -212,9 +218,9 @@ describe("PolicyTestCommand.runPolicyTests", () => {
       ]);
     });
 
-    it("gives each case its own answer", async ({ server }) => {
+    it("gives each case its own answer", async ({ server, client }) => {
       const results = await aCommand().runCases(
-        answeringBackwards(server, 5),
+        answeringBackwards(server, 5, client),
         TWO_FILES,
         new Map(),
       );
@@ -228,20 +234,27 @@ describe("PolicyTestCommand.runPolicyTests", () => {
   });
 
   describe("with a policy for the operation", () => {
-    it("evaluates each case against the operation's policy", async ({ server }) => {
+    it("evaluates each case against the operation's policy", async ({ server, client }) => {
       const evaluated = answering(server, "evaluatePolicy", { allowed: true });
-      const service = new PolicyService(testClient(), PROJECT_ID);
+      const service = new PolicyService(client, PROJECT_ID);
 
       await aCommand().runCases(service, [aTestFile("one.test.json", ["long enough"])], POLICIES);
 
       expect(evaluated.map(({ url, body }) => [url.searchParams.get("project_id"), body])).toEqual([
-        [PROJECT_ID, expect.objectContaining({ config: { min_length: 12 } })],
+        [
+          PROJECT_ID,
+          {
+            operation: PASSWORD_POLICY,
+            config: { min_length: 12 },
+            input: { password: "long enough" },
+          },
+        ],
       ]);
     });
 
-    it("names where the policy came from", async ({ server }) => {
+    it("names where the policy came from", async ({ server, client }) => {
       const results = await aCommand().runCases(
-        allowingEverything(server),
+        allowingEverything(server, client),
         [aTestFile("one.test.json", ["long enough"])],
         POLICIES,
       );
@@ -253,9 +266,10 @@ describe("PolicyTestCommand.runPolicyTests", () => {
   describe("with a sign-up test file", () => {
     it("sends each case in the operation's own shape, with its policy and no facts", async ({
       server,
+      client,
     }) => {
       const evaluated = answering(server, "evaluatePolicy", { allowed: true });
-      const service = new PolicyService(testClient(), PROJECT_ID);
+      const service = new PolicyService(client, PROJECT_ID);
       const test = PolicyTest.of({
         path: PolicyTest.fileName(SignupPolicy.OPERATION),
         body: {
@@ -373,9 +387,16 @@ describe("PolicyTestCommand.execute", () => {
     it("still looks for the policy tests", async ({ dir }) => {
       await mkdir(join(dir, ".zitadel/schemas/unreadable.json"), { recursive: true });
 
-      const envelope = await PolicyTestCommand.run(["--cwd", dir, "--json"]);
+      const envelope = await PolicyTestCommand.run(["--cwd", dir, "--json"], CONFIG);
 
-      expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({ status: "skipped" });
+      expect(JSON.parse(JSON.stringify(envelope))).toEqual({
+        cli_version: CONFIG.version,
+        command: "policytestcommand",
+        status: "skipped",
+        reason: "no-policy-tests",
+        source: "",
+        data: { title: "No policy test files in .zitadel/policies" },
+      });
     });
   });
 });

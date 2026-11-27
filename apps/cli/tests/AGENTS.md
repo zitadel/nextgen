@@ -30,6 +30,8 @@ reclassified until it is one.
 - **Specs** (`tests/integration/**/*.spec.ts`) drive the built CLI through
   `runCliForTest` against `@zitadel/api-mock`'s platform handlers and assert
   only what a developer could observe.
+- A destructive command's spec runs it without `--force` and with it, then reads
+  back with another command to show what changed.
 - One spec file per command, named after it (`variables-set.spec.ts`), the
   only spec that drives that command. No cross-command, "contract" or
   "round-trip" files.
@@ -199,10 +201,11 @@ it stays here deliberately rather than by oversight.
 - Build a publish step's context with `aStepContext` (`helpers/step-context.ts`),
   a doctor check's with `aCheckContext` (`helpers/check-context.ts`), an API
   record or variables answer with `helpers/records.ts`.
-- Give code that takes a client a real one, `testClient()`, and answer what it
-  sends with `answering` / `answeringPages` / `answeringVariables`
-  (`helpers/api-answers.ts`) on the `server` fixture; never a hand-made client.
-  `records.ts` holds only the data those answers carry, so specs can import it.
+- Give code that takes a client the `client` fixture; answer what it sends with
+  `helpers/api-answers.ts` on `server`.
+- Never hand-make a client double; build a real one with `createZitadelClient`
+  only where a test needs its own signal, token or base URL.
+- `records.ts` holds only the data answers carry.
 - Extend the shared builders rather than adding one to a test file; a builder
   only one file needs stays in that file.
 - A test that must create something and clean it up asks for a fixture in its
@@ -252,6 +255,8 @@ it stays here deliberately rather than by oversight.
 - Catch a refusal with `thrownBy` or `rejectionOf` (`helpers/thrown-value.ts`),
   then assert its class with `toBeInstanceOf`, then the fields that matter with
   `toMatchObject`. No `toThrow`, no `rejects`, no `try`/`catch`.
+- Assert any other value whole with `toEqual` against a typed expected value,
+  never `toMatchObject` or `expect.objectContaining` on a few of its fields.
 - No casts, no non-null `!`, no `any`: a double that needs one is the wrong
   double; use a real class. `as const` is not a cast.
 - No sleeps or time-bounded waits: a test that orders work holds promises it

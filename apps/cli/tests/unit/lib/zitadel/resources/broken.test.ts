@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFile } from "@/lib/zitadel/resources/broken";
+import { BrokenFile } from "@/lib/zitadel";
 
 /**
  * Where the broken file in these tests sits.

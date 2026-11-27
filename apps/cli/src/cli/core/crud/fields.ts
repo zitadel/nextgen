@@ -33,15 +33,7 @@ import {
  */
 
 /** How a field is given on the command line. `json` has no flag of its own. */
-export type FieldKind =
-  | "string"
-  | "number"
-  | "integer"
-  | "boolean"
-  | "enum"
-  | "list"
-  | "record"
-  | "json";
+type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "list" | "record" | "json";
 
 export type BodyField = Readonly<{
   /** Dot path of the field in the document (`oidc.client_id`); the wire name at the top level. */

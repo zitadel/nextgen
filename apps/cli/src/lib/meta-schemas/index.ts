@@ -1,10 +1,2 @@
-export type {
-  MetaSchemaPath,
-  MetaSchemaState,
-  MetaSchemaWrites,
-  NewerPin,
-  ProjectMetaSchema,
-  UnreadableMetaSchema,
-  WrittenMetaSchema,
-} from "./types";
+export type { ProjectMetaSchema } from "./types";
 export { MetaSchemas } from "./meta-schemas";

@@ -2,7 +2,7 @@ import { realpath } from "node:fs/promises";
 import { describe, expect } from "vitest";
 
 import { RealMachine } from "@/lib/server";
-import type { Run } from "@/lib/server/local/ports";
+import type { Run } from "@/lib/server/local";
 import { it } from "@tests/fixtures";
 
 /** A port probe that holds the ports it is given and remembers every port it was asked about. */

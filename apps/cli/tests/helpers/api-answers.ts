@@ -38,7 +38,7 @@ type Resolves<K extends OperationName> = Awaited<ReturnType<ZitadelApi[K]>>;
  * sends (before any default is filled in): `createTeam` takes the input of
  * `CreateTeamBody`. `undefined` for an operation without a body.
  */
-export type BodyOf<K extends OperationName> = `${Capitalize<K>}Body` extends keyof typeof schemas
+type BodyOf<K extends OperationName> = `${Capitalize<K>}Body` extends keyof typeof schemas
   ? z.input<(typeof schemas)[`${Capitalize<K>}Body`]>
   : undefined;
 
@@ -72,7 +72,7 @@ export type Reply<K extends OperationName> =
  * operation through the same transport, URLs, paging and error translation as
  * in production, and a test answers what reaches the server.
  *
- * @returns The client, without its destructive operations until `allowDestructive`.
+ * @returns The client.
  */
 export function testClient(): ZitadelClient {
   return createZitadelClient({ baseUrl: TEST_SERVER, signal: new AbortController().signal });

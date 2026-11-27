@@ -14,7 +14,7 @@ import { CONFIG_DIRECTORIES, POLICY_TEST_SUFFIX } from "@/lib/zitadel";
  * whether the lockout step reads them.
  *
  * @remarks
- * Branding, policies and connections cannot lock anyone out.
+ * Branding, policies, connections, applications and OAuth settings cannot lock anyone out.
  */
 const LOCKOUT_DIRECTORIES = [CONFIG_DIRECTORIES.schemas, CONFIG_DIRECTORIES.flows] as const;
 
@@ -27,6 +27,8 @@ const CONFIGURATION_TYPES: readonly (readonly [string, ConfigurationType])[] = [
   [CONFIG_DIRECTORIES.connections, "identity_provider"],
   [CONFIG_DIRECTORIES.policies, "policy"],
   [CONFIG_DIRECTORIES.branding, "branding"],
+  [CONFIG_DIRECTORIES.applications, "application"],
+  [CONFIG_DIRECTORIES.oauth, "oauth"],
 ];
 
 /**
@@ -38,7 +40,7 @@ const SHORT_SHA = 12;
  * The diff as `--json` reports it, in `data.diff`: what the terminal shows,
  * split by file.
  */
-export type ConfigDiff = {
+type ConfigDiff = {
   /**
    * The commit of the release the primary origins serve: what the diff is against.
    */

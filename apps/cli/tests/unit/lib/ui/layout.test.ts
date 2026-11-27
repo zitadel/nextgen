@@ -2,7 +2,7 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { describe, expect, it } from "vitest";
 
 import { COLUMN_MARK, columnRow, Facts, Frame, Prose, WIDTH, wrapCommand } from "@/lib/ui/layout";
-import { section } from "@/lib/ui/summary";
+import { section } from "@/lib/ui";
 
 const plain = (text: string): string => stripAnsi(text);
 const widest = (text: string): number =>

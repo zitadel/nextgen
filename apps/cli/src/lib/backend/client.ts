@@ -103,67 +103,15 @@ export function responseFailure(
   return refusalOf(new ApiError(status, url, body, message));
 }
 
-/** Every client {@link createZitadelClient} made, so only those are trusted. */
-const made = new WeakSet<object>();
-
-/** Each client's counterpart that may run destructive operations, made once. */
-const destructive = new WeakMap<object, ZitadelClient>();
-
-/**
- * The client functions for one {@link Client}, failing as the backend fails:
- * the error hook applies to every call, each page of a paged one included.
- */
-function bind(client: Client): ZitadelClient {
-  const api = createZitadelApi(client, {
-    onError: (error: unknown): never => {
-      throw translateFailure(error);
-    },
-  });
-  made.add(api);
-  return api;
-}
-
-/**
- * The client with its destructive operations: every `DELETE`, and what the spec
- * marks `x-zitadel-destructive`. A client made by `createZitadelClient` refuses
- * them in the transport, before anything is sent and however the operation is
- * reached, so nothing deletes, revokes or rolls back until a caller asks for
- * them here.
- *
- * Updates are not withheld: a merge-patch `null` (`setVariables`, the user and
- * project patches) still removes what it names.
- *
- * @param client - A client `createZitadelClient` made.
- * @returns A client on the same connection that may run destructive operations.
- */
-export function allowDestructive(client: ZitadelClient): ZitadelClient {
-  if (!made.has(client)) {
-    throw new Error("Only a client createZitadelClient made can allow its destructive operations");
-  }
-  if (client.client.allowDestructive) {
-    return client;
-  }
-  const known = destructive.get(client);
-  if (known !== undefined) {
-    return known;
-  }
-  const full = bind(client.client.with({ allowDestructive: true }));
-  destructive.set(client, full);
-  return full;
-}
-
 /** The typed Zitadel client: every operation of the API. */
 export type ZitadelClient = ZitadelApi;
 
 /**
  * What the CLI makes a client from: the run's signal is required, the rest
- * optional. No `fetch`: `OperationService` sends its own requests from the
- * connection, so every request must go through the runtime's `fetch`.
+ * optional. No `fetch` and no `onRequest`: `OperationService` sends its own
+ * requests from the connection, so neither would see every request.
  */
-export type ZitadelClientOptions = Omit<
-  ZitadelClientSettings,
-  "allowDestructive" | "fetch" | "signal"
-> & {
+export type ZitadelClientOptions = Omit<ZitadelClientSettings, "fetch" | "onRequest" | "signal"> & {
   signal: AbortSignal;
 };
 
@@ -182,25 +130,32 @@ export type ZitadelClientOptions = Omit<
  * cancelled when the `signal` the caller passes aborts. A command passes its
  * own, so Ctrl-C stops what it has in flight.
  *
+ * The timeout is settled once, so the client and the connection a service
+ * reads cannot disagree: spreading `opts` over a default would let an explicit
+ * `undefined` wipe it, leaving the client unbounded while the connection said
+ * 30s.
+ *
  * @param opts - Where to point the client, what to authenticate with, and the run's signal.
- * @returns The client, without its destructive operations until {@link allowDestructive}.
+ * @returns The client.
  */
 export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
-  // Settled once, so the client and the connection a service reads cannot
-  // disagree: spreading `opts` over a default lets an explicit `undefined`
-  // wipe it, which would leave the client unbounded while this still said 30s.
-  const timeoutMs = opts.timeoutMs ?? REQUEST_TIMEOUT_MS;
-  return bind(new Client({ ...opts, timeoutMs, allowDestructive: false }));
+  return createZitadelApi(
+    new Client({ ...opts, timeoutMs: opts.timeoutMs ?? REQUEST_TIMEOUT_MS }),
+    {
+      onError: (error: unknown): never => {
+        throw translateFailure(error);
+      },
+    },
+  );
 }
 
-/** Where a client was pointed, and whether it may reach destructive operations. */
+/** Where a client was pointed. */
 export type Connection = Readonly<{
   baseUrl: string;
   token: string | undefined;
   signal: AbortSignal;
   timeoutMs: number;
   userAgent: string | undefined;
-  destructive: boolean;
 }>;
 
 /**
@@ -208,12 +163,9 @@ export type Connection = Readonly<{
  * client has no function for, and so must send it the way the client does.
  *
  * @param client - A client `createZitadelClient` made.
- * @returns The server, the credential, the signal and whether destructive operations are allowed.
+ * @returns The server, the credential, the signal and the deadline.
  */
 export function connectionOf(client: ZitadelClient): Connection {
-  if (!made.has(client)) {
-    throw new Error("Only a client createZitadelClient made has a connection");
-  }
   const { signal, timeoutMs } = client.client;
   if (signal === undefined || timeoutMs === undefined) {
     throw new Error("Only a client createZitadelClient made has a connection");
@@ -224,7 +176,6 @@ export function connectionOf(client: ZitadelClient): Connection {
     signal,
     timeoutMs,
     userAgent: client.client.userAgent,
-    destructive: client.client.allowDestructive,
   };
 }
 
@@ -247,7 +198,7 @@ export function connectionOf(client: ZitadelClient): Connection {
  * @returns True when the run was cancelled.
  */
 export function isCancelled(client: ZitadelClient): boolean {
-  return made.has(client) && client.client.signal?.aborted === true;
+  return client.client.signal?.aborted === true;
 }
 
 export { pagedFunctions } from "@zitadel/api/client";

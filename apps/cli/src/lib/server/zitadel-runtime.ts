@@ -399,7 +399,7 @@ export type StartRequest = Readonly<{
 }>;
 
 /** What a start with Docker would do. */
-export type DockerStart = Readonly<{
+type DockerStart = Readonly<{
   backend: "docker";
   port: number;
   apiUrl: string;
@@ -409,7 +409,7 @@ export type DockerStart = Readonly<{
 }>;
 
 /** What a start with the CLI's own server binary would do; it has no image or container. */
-export type BinaryStart = Readonly<{
+type BinaryStart = Readonly<{
   backend: "binary";
   port: number;
   apiUrl: string;

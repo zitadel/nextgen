@@ -56,6 +56,7 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
+        root: import.meta.dirname,
         // Solid ships its server build under `worker`.
         conditions: ["worker"],
         plugins: [solid({ ssr: true })],

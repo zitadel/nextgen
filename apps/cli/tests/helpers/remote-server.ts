@@ -15,7 +15,7 @@ import { afterAll, beforeAll } from "vitest";
 export const REMOTE_HOST = "zitadel.test";
 
 /** A request as it reached the remote server. */
-export interface ReceivedRequest {
+interface ReceivedRequest {
   readonly method: string;
   readonly path: string;
   readonly headers: IncomingHttpHeaders;

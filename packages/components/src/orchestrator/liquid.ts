@@ -24,7 +24,7 @@ import { hookName } from "../internal/hook-name.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import defaultTemplate from "./templates/default.liquid";
 
-export const TEMPLATE_NAMES = {
+const TEMPLATE_NAMES = {
   default: "default",
 } as const;
 

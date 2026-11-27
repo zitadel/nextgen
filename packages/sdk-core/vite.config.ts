@@ -36,7 +36,7 @@ export default defineConfig({
         },
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
-      edgeProject({}),
+      edgeProject({ root: import.meta.dirname }),
     ],
   },
 });

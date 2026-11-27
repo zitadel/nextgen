@@ -26,9 +26,7 @@ export class ManualClock implements Clock {
 }
 
 /** What Vitest can be told to fake: the names a test passes to {@link TimeControls.only}. */
-export type FakedTimers = NonNullable<
-  NonNullable<Parameters<typeof vi.useFakeTimers>[0]>["toFake"]
->;
+type FakedTimers = NonNullable<NonNullable<Parameters<typeof vi.useFakeTimers>[0]>["toFake"]>;
 
 /** Time that moves only when a test moves it. */
 export interface TimeControls {

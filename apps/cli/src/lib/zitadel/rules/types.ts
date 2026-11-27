@@ -4,13 +4,13 @@
 
 import type { FlowRuleId, FlowValidationIssue } from "@zitadel/config/validate";
 
-import type { MethodUse } from "@/lib/zitadel/resources/flows/types";
+import type { MethodUse } from "@/lib/zitadel/resources/flows";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 
 /**
  * Every severity a finding can have: an error stops a deploy, a warning does not.
  */
-export const SEVERITIES = ["error", "warning"] as const;
+const SEVERITIES = ["error", "warning"] as const;
 
 /**
  * How serious a finding is.
@@ -40,12 +40,17 @@ export type ValidationContext = {
  * A flow is also held to the server's own flow rules, whose ids
  * {@link RuleId} adds.
  */
-export const RULE_IDS = [
+const RULE_IDS = [
   "contract/schema",
   "contract/flow",
   "contract/connection",
   "contract/policy",
   "contract/branding",
+  "contract/application",
+  "application/duplicate-slug",
+  "application/duplicate-client-id",
+  "application/shared-variable",
+  "contract/oauth",
   "connection/literal-secret",
   "connection/endpoints",
   "branding/legacy-template-key",

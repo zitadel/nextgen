@@ -57,6 +57,24 @@ type OAuthConfig struct {
 	// metadata at its well-known path and its endpoints under
 	// oauth.Prefix. Off by default while the server is being built.
 	Enabled bool `mapstructure:"enabled"`
+	// JWKSMaxAge is how long a verifier may cache a project's JWKS, sent as
+	// its Cache-Control max-age in whole seconds. It is the propagation
+	// window of ADR 039 §1. The server also caches each set for this long,
+	// so the rotation code must publish a new signing key at least twice
+	// this long before it signs, reading this same value, or a verifier's
+	// cached set misses its kid.
+	JWKSMaxAge time.Duration `mapstructure:"jwks_max_age"`
+}
+
+func (c OAuthConfig) Validate() error {
+	if c.JWKSMaxAge < 0 {
+		return fmt.Errorf("oauth.jwks_max_age %s must not be negative", c.JWKSMaxAge)
+	}
+	// A unitless number in the YAML file loads as nanoseconds: 300 is 300ns.
+	if c.JWKSMaxAge > 0 && c.JWKSMaxAge < time.Second {
+		return fmt.Errorf("oauth.jwks_max_age %s must be 0 or at least 1s; a number needs a unit, such as 300s", c.JWKSMaxAge)
+	}
+	return nil
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.
@@ -154,6 +172,7 @@ func (c Config) Validate() error {
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
 		c.Events.Retention.Validate,
+		c.OAuth.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
@@ -266,6 +285,10 @@ type KeysConfig struct {
 	// project and purpose. Nothing retires a signing key today; once something
 	// does, this cache needs an eviction path (see GetProjectSigningKey).
 	SigningKeyLRUCacheSize int `mapstructure:"signing_key_lru_cache_size"`
+	// PublicSigningKeyLRUCacheSize bounds the cache of the key sets the JWKS
+	// publishes, held by project and purpose for oauth.jwks_max_age; with a
+	// zero max age nothing is cached.
+	PublicSigningKeyLRUCacheSize int `mapstructure:"public_signing_key_lru_cache_size"`
 }
 
 type SchemaConfig struct {

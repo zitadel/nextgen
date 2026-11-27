@@ -120,15 +120,15 @@
     // below reads a package's docs, and no build reads its tests. A negation
     // wins over any inclusion, so a task that reads one of these files
     // replaces `inputs` instead of extending them (cli#test). Every package
-    // lint is `biome check .`, which processes no Markdown.
+    // lint is `biome check .` and knip, which read no Markdown.
     "lint": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/biome-plugins/*.grit", "!**/*.md", "!**/*.mdx", "!**/LICENSE"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/biome-plugins/*.grit", "$TURBO_ROOT$/knip.config.js", "$TURBO_ROOT$/scripts/knip-workspaces.mjs", "!**/*.md", "!**/*.mdx", "!**/LICENSE"]
     },
     "typecheck": {
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
-        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
+        "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -164,8 +164,8 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
-        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
+        "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -340,8 +340,8 @@
     "//#test": {
       "dependsOn": ["//#check-openapi-rules"],
       "inputs": [
-        "packages/vitest-config/vitest.shared.mjs",
-        "packages/vitest-config/vitest.shared.d.mts",
+        "packages/vitest-config/src/vitest.shared.mjs",
+        "packages/vitest-config/src/vitest.shared.d.mts",
         "scripts/cloud-setup.test.mjs",
         "scripts/deployment-suite.test.mjs",
         "apps/cloud/setup-secrets.sh",
@@ -353,6 +353,8 @@
         "scripts/generated-outputs.mjs",
         "scripts/map-all.mjs",
         "scripts/task-graph.test.mjs",
+        "scripts/knip-workspaces.mjs",
+        "scripts/knip-workspaces.test.mjs",
         "scripts/cloud-build.test.mjs",
         "vercel.json",
         "apps/cloud/build-launcher.sh",
@@ -404,8 +406,8 @@
     },
     "//#check-typecheck": {
       "inputs": [
-        "packages/vitest-config/vitest.shared.mjs",
-        "packages/vitest-config/vitest.shared.d.mts",
+        "packages/vitest-config/src/vitest.shared.mjs",
+        "packages/vitest-config/src/vitest.shared.d.mts",
         "scripts/check-typecheck-programs.mjs",
         "scripts/check-typecheck-programs.test.mjs",
         "scripts/assert-file.mjs",
@@ -424,8 +426,8 @@
     },
     "//#check-openapi-rules": {
       "inputs": [
-        "packages/vitest-config/vitest.shared.mjs",
-        "packages/vitest-config/vitest.shared.d.mts",
+        "packages/vitest-config/src/vitest.shared.mjs",
+        "packages/vitest-config/src/vitest.shared.d.mts",
         "scripts/openapi-casing-rules.test.mjs",
         "scripts/openapi-list-conventions.test.mjs",
         "scripts/assert-file.mjs",

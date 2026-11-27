@@ -3,21 +3,15 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 
 import { PreviewService } from "@/lib/backend/services/preview";
-import { allowDestructive } from "@/lib/backend";
-import { answering, answeringPages, testClient } from "@tests/helpers/api-answers";
-
-/** A service on a test client that may remove previews, bound to one project. */
-function service(): PreviewService {
-  return new PreviewService(allowDestructive(testClient()), "proj_1");
-}
+import { answering, answeringPages } from "@tests/helpers/api-answers";
 
 describe("PreviewService.list", () => {
-  it("lists every live preview of the project it is bound to", async ({ server }) => {
+  it("lists every live preview of the project it is bound to", async ({ server, client }) => {
     const listed = answeringPages(server, "listProjectPreviews", {
       previews: [{ origin: "https://pr-7.preview.acme.com" }],
     });
 
-    const previews = await service().list();
+    const previews = await new PreviewService(client, "proj_1").list();
 
     expect(
       listed.map(({ params }) => {
@@ -29,19 +23,19 @@ describe("PreviewService.list", () => {
 });
 
 describe("PreviewService.page", () => {
-  it("reads one page and the cursor to the next", async ({ server }) => {
+  it("reads one page and the cursor to the next", async ({ server, client }) => {
     answering(server, "listProjectPreviews", {
       previews: [{ origin: "https://pr-7.preview.acme.com" }],
       next_page_token: "t2",
     });
 
-    const page = await service().page();
+    const page = await new PreviewService(client, "proj_1").page();
 
     expect(page.items).toEqual([{ origin: "https://pr-7.preview.acme.com" }]);
     expect(page.next).toBe("t2");
   });
 
-  it("drains every page when asked for all of them", async ({ server }) => {
+  it("drains every page when asked for all of them", async ({ server, client }) => {
     answeringPages(
       server,
       "listProjectPreviews",
@@ -49,16 +43,19 @@ describe("PreviewService.page", () => {
       { previews: [{ origin: "https://pr-6.preview.acme.com" }] },
     );
 
-    const page = await service().page({}, { all: true });
+    const page = await new PreviewService(client, "proj_1").page({}, { all: true });
 
     expect(page.items).toHaveLength(2);
     expect(page.next).toBeNull();
   });
 
-  it("sends the query without the paging option the server does not take", async ({ server }) => {
+  it("sends the query without the paging option the server does not take", async ({
+    server,
+    client,
+  }) => {
     const listed = answeringPages(server, "listProjectPreviews", { previews: [] });
 
-    await service().page({ limit: 5 }, { all: true });
+    await new PreviewService(client, "proj_1").page({ limit: 5 }, { all: true });
 
     expect(
       listed.map(({ params, url }) => {
@@ -75,7 +72,10 @@ describe("PreviewService.expiries", () => {
   const SOON = "2026-02-01T00:00:00Z";
   const LATER = "2026-02-08T00:00:00Z";
 
-  it("answers the expiry of each origin it was asked for, and no other", async ({ server }) => {
+  it("answers the expiry of each origin it was asked for, and no other", async ({
+    server,
+    client,
+  }) => {
     answeringPages(server, "listProjectPreviews", {
       previews: [
         { origin: FIRST, expires_at: SOON },
@@ -84,7 +84,7 @@ describe("PreviewService.expiries", () => {
       ],
     });
 
-    const expiries = await service().expiries(new Set([FIRST, SECOND]));
+    const expiries = await new PreviewService(client, "proj_1").expiries(new Set([FIRST, SECOND]));
 
     expect(expiries).toEqual(
       new Map([
@@ -96,6 +96,7 @@ describe("PreviewService.expiries", () => {
 
   it("leaves out an origin whose preview is gone, reading every page to know", async ({
     server,
+    client,
   }) => {
     answeringPages(
       server,
@@ -104,12 +105,12 @@ describe("PreviewService.expiries", () => {
       { previews: [{ origin: OTHER, expires_at: LATER }] },
     );
 
-    const expiries = await service().expiries(new Set([FIRST, SECOND]));
+    const expiries = await new PreviewService(client, "proj_1").expiries(new Set([FIRST, SECOND]));
 
     expect(expiries).toEqual(new Map([[FIRST, SOON]]));
   });
 
-  it("finds an origin on a later page", async ({ server }) => {
+  it("finds an origin on a later page", async ({ server, client }) => {
     answeringPages(
       server,
       "listProjectPreviews",
@@ -117,12 +118,12 @@ describe("PreviewService.expiries", () => {
       { previews: [{ origin: FIRST, expires_at: SOON }] },
     );
 
-    const expiries = await service().expiries(new Set([FIRST]));
+    const expiries = await new PreviewService(client, "proj_1").expiries(new Set([FIRST]));
 
     expect(expiries).toEqual(new Map([[FIRST, SOON]]));
   });
 
-  it("stops reading once every origin it was asked for is found", async ({ server }) => {
+  it("stops reading once every origin it was asked for is found", async ({ server, client }) => {
     const listed = answeringPages(
       server,
       "listProjectPreviews",
@@ -130,15 +131,15 @@ describe("PreviewService.expiries", () => {
       { previews: [{ origin: OTHER, expires_at: LATER }] },
     );
 
-    await service().expiries(new Set([FIRST]));
+    await new PreviewService(client, "proj_1").expiries(new Set([FIRST]));
 
     expect(listed).toHaveLength(1);
   });
 
-  it("asks for the largest page the API gives", async ({ server }) => {
+  it("asks for the largest page the API gives", async ({ server, client }) => {
     const listed = answeringPages(server, "listProjectPreviews", { previews: [] });
 
-    await service().expiries(new Set([FIRST]));
+    await new PreviewService(client, "proj_1").expiries(new Set([FIRST]));
 
     expect(
       listed.map(({ url }) => {
@@ -147,18 +148,21 @@ describe("PreviewService.expiries", () => {
     ).toEqual([{ limit: "100" }]);
   });
 
-  it("makes no request when it was asked for no origin", async () => {
-    const expiries = await service().expiries(new Set());
+  it("makes no request when it was asked for no origin", async ({ client }) => {
+    const expiries = await new PreviewService(client, "proj_1").expiries(new Set());
 
     expect(expiries).toEqual(new Map());
   });
 });
 
 describe("PreviewService.remove", () => {
-  it("stops serving the origin it was given, on the project it is bound to", async ({ server }) => {
+  it("stops serving the origin it was given, on the project it is bound to", async ({
+    server,
+    client,
+  }) => {
     const removed = answering(server, "removeProjectPreview", undefined);
 
-    await service().remove("https://pr-7.preview.acme.com");
+    await new PreviewService(client, "proj_1").remove("https://pr-7.preview.acme.com");
 
     expect(
       removed.map(({ params, body }) => {

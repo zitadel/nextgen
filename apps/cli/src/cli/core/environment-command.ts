@@ -1,5 +1,4 @@
 import { createZitadelClient } from "@/lib/backend";
-import type { Consent } from "@/lib/consent";
 import { Environment, type ServerAddresses } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type Facts, type MetaOptions } from "./base";
@@ -94,20 +93,17 @@ export abstract class EnvironmentCommand extends BaseCommand {
 
   /**
    * The backend service for the project this run is about, on the connection
-   * {@link connect} opens, or on the client a {@link Consent} unlocks for a
-   * service that changes something destructively.
+   * {@link connect} opens. It asks no consent; a destructive command asks first.
    *
    * @param Service - The service class, built from the client and the project's id.
-   * @param consent - The consent that unlocks the client, for a destructive change.
    * @returns The service.
    */
   protected async service<Service>(
     Service: new (client: Connection["client"], projectId: string) => Service,
-    consent?: Consent,
   ): Promise<Service> {
     const { client, projectId } = await this.connect();
 
-    return new Service(consent === undefined ? client : consent.unlock(client), projectId);
+    return new Service(client, projectId);
   }
 
   /**

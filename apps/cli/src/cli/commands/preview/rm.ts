@@ -112,8 +112,8 @@ export default class PreviewRm extends Telemetered(
 
         return undefined;
       },
-      apply: async (consent) => {
-        const previewService = await this.service(PreviewService, consent);
+      apply: async () => {
+        const previewService = await this.service(PreviewService);
         await previewService.remove(args.url);
         const title = `Stopped serving ${escapeControlCharacters(args.url)}`;
         return {

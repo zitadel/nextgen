@@ -1,5 +1,4 @@
 import { once } from "node:events";
-import { resolve } from "node:path";
 import { MessageChannel, Worker } from "node:worker_threads";
 
 import type { BrowserCommand } from "vitest/node";
@@ -19,7 +18,7 @@ let serverBuild: Promise<Worker> | undefined;
  */
 function loadedServerBuild(): Promise<Worker> {
   serverBuild ??= (async () => {
-    const worker = new Worker(resolve("src/__tests__/server-markup.worker.mjs"));
+    const worker = new Worker(new URL("./server-markup.worker.mjs", import.meta.url));
     // Never keep Vitest from exiting, even if no spec closes the worker.
     worker.unref();
     await once(worker, "message");

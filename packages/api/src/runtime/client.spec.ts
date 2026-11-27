@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { ZitadelClient } from "./client";
 
-const settings = { baseUrl: "https://example.com", allowDestructive: false } as const;
+const settings = { baseUrl: "https://example.com" } as const;
 
 describe("ZitadelClient", () => {
   it("drops trailing slashes from its base URL", () => {
@@ -24,19 +24,19 @@ describe("ZitadelClient", () => {
   it("makes a new client for a change and leaves itself as it was", () => {
     const client = new ZitadelClient({ ...settings, token: "tok", timeoutMs: 10 });
 
-    const changed = client.with({ allowDestructive: true, timeoutMs: 20 });
+    const changed = client.with({ userAgent: "agent/2", timeoutMs: 20 });
 
     expect(changed).not.toBe(client);
-    expect([changed.allowDestructive, changed.timeoutMs, changed.token]).toEqual([true, 20, "tok"]);
-    expect([client.allowDestructive, client.timeoutMs]).toEqual([false, 10]);
+    expect([changed.userAgent, changed.timeoutMs, changed.token]).toEqual(["agent/2", 20, "tok"]);
+    expect([client.userAgent, client.timeoutMs]).toEqual([undefined, 10]);
   });
 
-  it("keeps the base URL and the destructive choice when a change names them undefined", () => {
-    const client = new ZitadelClient({ ...settings, allowDestructive: true });
+  it("keeps the base URL when a change names it undefined", () => {
+    const client = new ZitadelClient(settings);
 
-    const changed = client.with({ baseUrl: undefined, allowDestructive: undefined });
+    const changed = client.with({ baseUrl: undefined });
 
-    expect([changed.baseUrl, changed.allowDestructive]).toEqual(["https://example.com", true]);
+    expect(changed.baseUrl).toBe("https://example.com");
   });
 
   it("clears a setting changed to undefined", () => {
@@ -48,20 +48,15 @@ describe("ZitadelClient", () => {
   it("is only what its constructor made, never an object of the same shape", () => {
     const lookalike = {
       baseUrl: "https://example.com",
-      allowDestructive: true,
       token: undefined,
       signal: undefined,
       timeoutMs: undefined,
       userAgent: undefined,
       fetch: undefined,
+      onRequest: undefined,
       with: () => new ZitadelClient(settings),
     };
 
     expectTypeOf(lookalike).not.toExtend<ZitadelClient>();
-  });
-
-  it("makes every caller say whether destructive operations are allowed", () => {
-    // @ts-expect-error -- allowDestructive has no default.
-    expect(() => new ZitadelClient({ baseUrl: "https://example.com" })).not.toThrow();
   });
 });

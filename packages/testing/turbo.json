@@ -18,7 +18,7 @@
     // UI surfaces off — these tests drive the API and the app-embedded
     // login, not /ui/*.
     "test:integration": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.d.mts"],
       "dependsOn": ["install-browsers", "build", "@zitadel/cli#build", "@zitadel/server#build"],
       "env": ["ZITADEL_*", "NEXTGEN_*", "!ZITADEL_TELEMETRY*"],
       "passThroughEnv": ["ZITADEL_TELEMETRY*", "PLAYWRIGHT_*", "DEBUG", "RUNNER_TEMP", "GITHUB_*"]

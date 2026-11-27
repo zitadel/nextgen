@@ -1,6 +1,6 @@
 import { PreviewService, type ZitadelClient } from "@/lib/backend";
 import { isCancellation, toZitadelError } from "@/lib/errors";
-import { warnings } from "@/lib/ui/warnings";
+import { warnings } from "@/lib/ui";
 
 /**
  * When previews expire, read from the live previews.

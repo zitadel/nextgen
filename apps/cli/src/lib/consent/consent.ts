@@ -1,15 +1,14 @@
-import { allowDestructive, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import type { Confirmer } from "@/lib/ui/questions";
+import type { Confirmer } from "@/lib/ui";
 
 /**
  * What a destructive command does, as one word. It is the stable token of the
  * skipped envelope a declined prompt ends in (`remove-cancelled`), so it is a
  * closed list: a new action is added here, not spelled at the call site.
  */
-export type Verb =
+type Verb =
   | "call"
   | "cancel"
   | "deactivate"
@@ -72,11 +71,10 @@ const refusals = new WeakSet<object>();
 const granted = new WeakSet<object>();
 
 /**
- * Proof that a person, or `--force`, agreed to one destructive action. Every
- * destructive operation takes one: the client's (`deleteVariable`,
- * `revokeRelease`; the spec marks them) are reached only through
- * {@link Consent.unlock}, and the local ones (`LocalRuntime.reset`, `eject`'s
- * removals) take it as a parameter.
+ * Proof that a person, or `--force`, agreed to one destructive action. A
+ * command asks for it before it deletes, revokes or rolls back anything; the
+ * local actions (`LocalRuntime.reset`, `eject`'s removals) take it as a
+ * parameter.
  *
  * Only {@link Consent.request} makes one: the constructor is private, and a private
  * member makes the type nominal, so an object of the same shape is not a
@@ -161,17 +159,5 @@ export class Consent {
    */
   static isRefusal(error: unknown): boolean {
     return typeof error === "object" && error !== null && refusals.has(error);
-  }
-
-  /**
-   * The client with its destructive operations, which only consent reaches.
-   *
-   * @param client - The client to unlock.
-   * @returns The client with its destructive operations.
-   * @throws {Error} When this is not a consent {@link Consent.request} made.
-   */
-  unlock(client: ZitadelClient): ZitadelClient {
-    Consent.assert(this);
-    return allowDestructive(client);
   }
 }

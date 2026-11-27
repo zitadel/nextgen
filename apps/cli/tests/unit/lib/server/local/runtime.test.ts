@@ -24,7 +24,7 @@ import {
   sameLocalServer,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "@/lib/server/local/runtime";
+} from "@/lib/server/local";
 
 describe("local server runtime metadata", () => {
   it.each([

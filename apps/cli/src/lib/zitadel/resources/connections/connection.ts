@@ -45,7 +45,7 @@ import {
 } from "@/lib/zitadel/errors";
 import { type ClaimName, claimName, type PropertyName, propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
-import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import { CONFIG_DIRECTORIES, type JsonObject, type JsonValue } from "@/lib/zitadel/types";
 import { isJsonObject, objectAt, stringAt, toJsonObject } from "@/lib/zitadel/utils/json";

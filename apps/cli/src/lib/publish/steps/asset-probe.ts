@@ -4,7 +4,7 @@ import type { RequestOptions } from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Agent, type Dispatcher } from "undici";
 
-import { log } from "@/lib/ui/log";
+import { log } from "@/lib/ui";
 import { Runtime } from "@/lib/runtime";
 import { isJsonObject, type JsonObject, type JsonValue } from "@/lib/zitadel";
 
@@ -132,7 +132,7 @@ const EXTRA_IMAGE_TYPES: ReadonlySet<string> = new Set(["application/octet-strea
 /**
  * What probing one asset URL found.
  */
-export type AssetProbeVerdict =
+type AssetProbeVerdict =
   | { readonly kind: "ok" }
   /** The probe could not decide — no warning is worth a false alarm. */
   | { readonly kind: "inconclusive" }
@@ -221,7 +221,7 @@ export async function brandingAssetWarnings(
  * @param signal - The budget's abort signal, shared across every hop.
  * @returns What the probe found.
  */
-export async function probeAsset(
+async function probeAsset(
   url: string,
   timeoutMs: number,
   current?: URL,

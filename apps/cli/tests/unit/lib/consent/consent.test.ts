@@ -9,7 +9,6 @@ vi.mock("@clack/prompts", () => ({
 
 import { CANCEL_SYMBOL, confirm, isCancel } from "@clack/prompts";
 
-import { createZitadelClient } from "@/lib/backend";
 import { Consent, type Gate } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import { aSuggest } from "@tests/helpers/suggestions";
@@ -17,16 +16,12 @@ import { aSuggest } from "@tests/helpers/suggestions";
 /** Renders the commands these questions suggest, as a run does. */
 const suggest = aSuggest();
 
-const signal = new AbortController().signal;
-
 const GATE: Gate = {
   verb: "remove",
   name: "remove API_URL from the project",
   message: "Remove API_URL from the project?",
   retry: suggest({ id: "variable:rm", args: { name: "API_URL" }, flags: { force: true } }),
 };
-/** A client as every command gets one; nothing here sends a request. */
-const aClient = () => createZitadelClient({ signal, baseUrl: "http://localhost:8080" });
 const asked = { interactive: true, force: false, dryRun: false };
 const forced = { interactive: false, force: true, dryRun: false };
 const scripted = { interactive: false, force: false, dryRun: false };
@@ -72,9 +67,10 @@ describe("Consent", () => {
 
       await Consent.request(GATE, asked);
 
-      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toEqual({
         message: "Remove API_URL from the project?",
         initialValue: false,
+        withGuide: true,
       });
     });
 
@@ -146,25 +142,11 @@ describe("Consent", () => {
 
     it.each([
       ["nothing", undefined],
-      ["an object of the same shape", { verb: "remove", unlock: () => undefined }],
+      ["an object of the same shape", { verb: "remove" }],
       ["an object built from its prototype", Object.create(Consent.prototype)],
       ["one constructed around its private constructor", Reflect.construct(Consent, [])],
     ])("refuses %s", (_label, value) => {
       expect(() => Consent.assert(value)).toThrow("A destructive operation ran without consent");
-    });
-  });
-
-  describe("unlock", () => {
-    it("hands back the client's destructive operations", async () => {
-      const consent = await Consent.request(GATE, forced);
-
-      expect(typeof consent?.unlock(aClient()).deleteVariable).toBe("function");
-    });
-
-    it("refuses when called on something that is not a consent", () => {
-      const forged = Object.create(Consent.prototype) as Consent;
-
-      expect(() => forged.unlock(aClient())).toThrow("A destructive operation ran without consent");
     });
   });
 });

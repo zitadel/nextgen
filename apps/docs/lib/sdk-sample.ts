@@ -168,7 +168,6 @@ function setup(auth: Authentication, csrf: boolean): string[] {
     ...(auth === "secret"
       ? ["    token: process.env.ZITADEL_PROJECT_SECRET!, // server-side only"]
       : []),
-    "    allowDestructive: true,",
     "  }),",
     ");",
   ];

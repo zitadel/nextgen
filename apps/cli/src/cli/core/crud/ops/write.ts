@@ -18,7 +18,6 @@ import type {
   CreateSpec,
   Json,
   ResourceCommandOptions,
-  ResourceDescriptor,
   UpdateSpec,
   WriteResult,
   WriteShape,
@@ -446,5 +445,3 @@ export abstract class UpdateOperation<Ctx> extends Destructive(WriteOperation) {
     return check === undefined ? undefined : check(await this.context<Ctx>(), id ?? "", body);
   }
 }
-
-export type { ResourceDescriptor };

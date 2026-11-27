@@ -10,7 +10,7 @@ import { log } from "./log";
  * the invocation's list; `BaseCommand` clears it when a command starts and
  * drains it into the envelope when the command emits.
  */
-export class Warnings {
+class Warnings {
   /** Warnings reported during this invocation, as they came. */
   private readonly reported: string[] = [];
 

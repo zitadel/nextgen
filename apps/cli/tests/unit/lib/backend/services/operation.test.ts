@@ -6,7 +6,6 @@ import { it } from "@tests/fixtures";
 import { ApiCall } from "@/cli/core/crud/api-call";
 import { createZitadelClient, Operation, OperationService } from "@/lib/backend";
 import { toZitadelError } from "@/lib/errors";
-import { forcedConsent } from "@tests/helpers/consent";
 
 const signal = new AbortController().signal;
 
@@ -14,18 +13,15 @@ const SERVER = "http://localhost:8080";
 
 const OPERATIONS = Operation.all();
 
-/** Sends a request the way a command does: through a client, unlocked when consent was given. */
+/** Sends a request the way a command does: through a client. */
 const send = async (
   server: string,
   token: string | undefined,
   request: Parameters<OperationService["call"]>[0],
   abort: AbortSignal,
-  consent?: Awaited<ReturnType<typeof forcedConsent>>,
 ) => {
   const client = createZitadelClient({ baseUrl: server, token, signal: abort });
-  return new OperationService(consent === undefined ? client : consent.unlock(client)).call(
-    request,
-  );
+  return new OperationService(client).call(request);
 };
 
 const sendAll = async (
@@ -107,57 +103,28 @@ describe("OperationService.call", () => {
     );
 
     await expect(
-      send(
-        SERVER,
-        "s",
-        requestFor("deactivateTeam", [], ["team_1"]),
-        signal,
-        await forcedConsent(),
-      ),
+      send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal),
     ).resolves.toEqual({
       status: 204,
       body: undefined,
     });
   });
 
-  it("refuses a destructive operation without consent", async () => {
-    await expect(
-      send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal),
-    ).rejects.toThrow("deactivateTeam is destructive: reach it through allowDestructive");
-  });
-
-  it("sends nothing for a destructive operation without consent", async ({ server }) => {
-    const sent: string[] = [];
-    server.use(
-      http.delete(`${SERVER}/api/v1/teams/team_1`, ({ request }) => {
-        sent.push(request.url);
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-
-    await send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal).catch(
-      () => undefined,
-    );
-
-    expect(sent).toEqual([]);
-  });
-
-  it("sends a merge patch with a null without consent: updates are not guarded", async ({
-    server,
-  }) => {
+  it("sends a merge patch with a null", async ({ server }) => {
     server.use(
       http.patch(`${SERVER}/api/v1/variables`, () => HttpResponse.json({ variables: [] })),
     );
 
     await expect(
       send(SERVER, "s", requestFor("setVariables", ["FOO:=null", "project_id=proj_1"]), signal),
-    ).resolves.toMatchObject({ status: 200 });
+    ).resolves.toEqual({ status: 200, body: { variables: [] } });
   });
 
   it("answers text for a response that is not JSON", async ({ server }) => {
     server.use(http.get(`${SERVER}/api/v1/livez`, () => HttpResponse.text("alive")));
 
-    await expect(send(SERVER, undefined, requestFor("getLive"), signal)).resolves.toMatchObject({
+    await expect(send(SERVER, undefined, requestFor("getLive"), signal)).resolves.toEqual({
+      status: 200,
       body: "alive",
     });
   });
@@ -185,11 +152,12 @@ describe("OperationService.call", () => {
       ),
     );
 
-    await expect(
-      send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal),
-    ).resolves.toMatchObject({
-      body: { name: "\u001b[2Jwiped" },
-    });
+    await expect(send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal)).resolves.toEqual(
+      {
+        status: 200,
+        body: { name: "\u001b[2Jwiped" },
+      },
+    );
   });
 
   it("fails a refusal as the error the CLI maps to an exit code", async ({ server }) => {
@@ -276,7 +244,7 @@ describe("OperationService.callAll", () => {
       signal,
     );
 
-    expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
+    expect(response.body).toEqual({ passkeys: ["d", "e", "f", "g"], next_page_token: "" });
   });
 
   it("starts from the page the caller named in the body", async ({ server }) => {
@@ -298,7 +266,7 @@ describe("OperationService.callAll", () => {
       signal,
     );
 
-    expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
+    expect(response.body).toEqual({ users: ["d", "e", "f", "g"], next_page_token: "" });
   });
 
   it("sends a cursor back as the server wrote it, and gathers the items as they came", async ({

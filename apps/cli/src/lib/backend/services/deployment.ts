@@ -52,7 +52,7 @@ export type ExtendPrimaryResult = Readonly<
 >;
 
 /** The deployment a rollback re-applies, and the one it expects to be live. */
-export type RollbackTarget = Readonly<{
+type RollbackTarget = Readonly<{
   id: string;
   expectedDeploymentId: string | undefined;
 }>;

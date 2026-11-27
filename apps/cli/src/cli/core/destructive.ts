@@ -37,10 +37,10 @@ export type DestructiveChange<Ready = undefined> = Omit<Gate, "message"> & {
 };
 
 /**
- * Marks a command that does something destructive, and gives it the only way
- * to: a {@link Consent}, which every destructive operation takes and only a
- * confirmation makes. A command that does not extend this has no way to get
- * one, so it cannot delete, revoke or roll back anything.
+ * Marks a command that does something destructive, and is where it asks: a
+ * {@link Consent}, which only a confirmation makes, before it deletes, revokes
+ * or rolls back anything. The backend services do not check for one, so a
+ * destructive call belongs inside `confirmed()` or after `consent()`.
  *
  * ```ts
  * export default class VariableRm extends Destructive(EnvironmentCommand) {}
