@@ -142,6 +142,24 @@ func (s cryptoKeyStatements) GetSigningKey(ctx context.Context, filter database.
 	return key, nil
 }
 
+// ListSigningKeys implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) ListSigningKeys(ctx context.Context, filter database.Filter[domain.SigningKeyField]) ([]*domain.SigningKey, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, signingKeyQuery, &database.ListOptions[domain.SigningKeyField]{Filter: filter}, signingKeySchema); err != nil {
+		return nil, err
+	}
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	keys, err := collectRows(rows, scanSigningKey)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return keys, nil
+}
+
 func scanEncryptionKey(rows *sql.Rows) (*domain.EncryptionKey, error) {
 	key := new(domain.EncryptionKey)
 	var (

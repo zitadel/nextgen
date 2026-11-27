@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  Application,
   Change,
   CONFIG_DIRECTORIES,
   ZitadelConfigError,
@@ -16,6 +17,7 @@ import {
 import {
   aConfig,
   aFile,
+  anApplication,
   anOAuthSettings,
   aPasswordPolicy,
   aStore,
@@ -270,6 +272,17 @@ describe("Change.save", () => {
     expect(bodyAt(store, PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
   });
 
+  it("replaces an application file a new application is put over", async () => {
+    const path = `${CONFIG_DIRECTORIES.applications}/shop.json`;
+    const store = aStore({ applications: { "shop.json": anApplication() } });
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const edited = anApplication({ redirect_uris: ["https://shop.example.com/cb"] });
+
+    await config.applications.put(Application.create({ path, body: edited })).save(store);
+
+    expect(bodyAt(store, path)).toEqual(edited);
+  });
+
   it("replaces an OAuth settings file a new one is put over", async () => {
     const store = aStore({ oauth: { "oauth.json": anOAuthSettings({ enabled: false }) } });
     const config = await ZitadelConfig.loadUnchecked(store);
@@ -277,6 +290,37 @@ describe("Change.save", () => {
     await config.oauth.put(OAuthSettings.enabled()).save(store);
 
     expect(bodyAt(store, OAuthSettings.PATH)).toEqual(OAuthSettings.enabled().body);
+  });
+
+  it("preserves an application when OAuth settings are replaced", async () => {
+    const application = anApplication();
+    const path = `${CONFIG_DIRECTORIES.applications}/shop.json`;
+    const store = aStore({
+      applications: { "shop.json": application },
+      oauth: { "oauth.json": anOAuthSettings({ enabled: false }) },
+    });
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    await config.oauth.put(OAuthSettings.enabled()).save(store);
+
+    expect(bodyAt(store, path)).toEqual(application);
+  });
+
+  it("bundles and counts applications and OAuth settings loaded together", async () => {
+    const application = anApplication();
+    const oauth = anOAuthSettings();
+    const store = aStore({
+      applications: { "shop.json": application },
+      oauth: { "oauth.json": oauth },
+    });
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    const result = config.bundle(store);
+
+    expect(result).toMatchObject({
+      bundle: { applications: [application], oauth },
+      resourceCount: 2,
+    });
   });
 
   it("replaces a file whose document was removed earlier in the same edit", async () => {

@@ -201,6 +201,7 @@ const FILES_WRITTEN = [
   ".zitadel/meta/sso-auth-method.json",
   ".zitadel/meta/idp-connection.json",
   ".zitadel/meta/branding.json",
+  ".zitadel/meta/application.json",
   ".zitadel/meta/oauth-settings.json",
   ".zitadel/meta/policy.json",
   ".zitadel/meta/policy-test.json",
@@ -249,6 +250,7 @@ const FILES_WOULD_WRITE = [
   ".zitadel/meta/sso-auth-method.json",
   ".zitadel/meta/idp-connection.json",
   ".zitadel/meta/branding.json",
+  ".zitadel/meta/application.json",
   ".zitadel/meta/oauth-settings.json",
   ".zitadel/meta/policy.json",
   ".zitadel/meta/policy-test.json",
@@ -287,6 +289,7 @@ const FILES = [
   { path: ".zitadel/meta/sso-auth-method.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/idp-connection.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/branding.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/application.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/oauth-settings.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/policy.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/policy-test.json", kind: "file", action: "create" },
@@ -325,6 +328,7 @@ const NEW_APP_FILES_WRITTEN = [
   ".zitadel/meta/sso-auth-method.json",
   ".zitadel/meta/idp-connection.json",
   ".zitadel/meta/branding.json",
+  ".zitadel/meta/application.json",
   ".zitadel/meta/oauth-settings.json",
   ".zitadel/meta/policy.json",
   ".zitadel/meta/policy-test.json",
@@ -374,6 +378,7 @@ const NEW_APP_FILES = [
   { path: ".zitadel/meta/sso-auth-method.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/idp-connection.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/branding.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/application.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/oauth-settings.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/policy.json", kind: "file", action: "create" },
   { path: ".zitadel/meta/policy-test.json", kind: "file", action: "create" },
@@ -1904,6 +1909,8 @@ describe("setup", () => {
           const app = await anApp();
 
           const result = await provider.setUp(app);
+          // The connection is written after the schema and flow that offer it.
+          const afterFlow = FILES_WRITTEN.indexOf(".zitadel/flows/default-login.json") + 1;
 
           expect(app.envelopeOf(result)).toEqual({
             cli_version: cliVersion.version,
@@ -1916,9 +1923,9 @@ describe("setup", () => {
               framework: "next",
               server: MOCK_SERVER_URL,
               files_written: [
-                ...FILES_WRITTEN.slice(0, 30),
+                ...FILES_WRITTEN.slice(0, afterFlow),
                 `.zitadel/idps/${provider.slug}.json`,
-                ...FILES_WRITTEN.slice(30),
+                ...FILES_WRITTEN.slice(afterFlow),
               ],
               files: FILES,
               files_skipped: [],

@@ -227,6 +227,68 @@ export class PublishConnectionVariableKindError extends PublishError {
 }
 
 /**
+ * How a declared application names the variable it holds as a client's secret.
+ */
+export interface ApplicationSecretUse {
+  /** The variable the client names. */
+  readonly variable: string;
+  /** The client that names it. */
+  readonly client: string;
+  /** The application file. */
+  readonly file: string;
+  /** Whether the run looked it up among the preview values. */
+  readonly preview: boolean;
+}
+
+/**
+ * A declared application names a secret variable the project does not hold.
+ */
+export class PublishApplicationSecretMissingError extends PublishError {
+  override readonly category: ErrorCategory = "missing";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_CREDENTIAL_MISSING";
+
+  /** How the application names the variable. */
+  readonly use: ApplicationSecretUse;
+
+  /**
+   * Make the failure.
+   *
+   * @param use - How the application names the variable.
+   */
+  constructor(use: ApplicationSecretUse) {
+    super(
+      `${use.file}: client "${use.client}" names the variable ${use.variable} as its secret, which the project does not have`,
+    );
+    this.use = use;
+  }
+}
+
+/**
+ * A declared application names a variable as a client's secret that is held as a plain value.
+ */
+export class PublishApplicationSecretPlainError extends PublishError {
+  override readonly category: ErrorCategory = "invalid";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
+  /** How the application names the variable. */
+  readonly use: ApplicationSecretUse;
+
+  /**
+   * Make the failure.
+   *
+   * @param use - How the application names the variable.
+   */
+  constructor(use: ApplicationSecretUse) {
+    super(
+      `${use.file}: client "${use.client}" names the variable ${use.variable} as its secret, which is not a secret`,
+    );
+    this.use = use;
+  }
+}
+
+/**
  * A probed asset URL resolves to an address that is not public, so the probe does not send it a request.
  */
 export class PublishAssetTargetUnsafeError extends PublishError {

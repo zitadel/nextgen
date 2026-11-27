@@ -1,4 +1,7 @@
 import {
+  type ApplicationSecretUse,
+  PublishApplicationSecretMissingError,
+  PublishApplicationSecretPlainError,
   PublishConnectionSecretLiteralError,
   PublishConnectionVariableKindError,
   PublishConnectionVariableMissingError,
@@ -51,8 +54,66 @@ const VARIABLE_KIND_ADVICE = {
   },
 } as const satisfies Advice;
 
+/** How a declared application that names a secret the project does not hold is refused. */
+const APPLICATION_SECRET_MISSING_ADVICE = {
+  hint: "Publish it as a secret with the command below, then deploy again.",
+  next: ["{set}"],
+  details: {
+    variable: "{variable}",
+    client: "{client}",
+    file: "{file}",
+  },
+} as const satisfies Advice;
+
+/** How a declared application that names a plain variable as its secret is refused. */
+const APPLICATION_SECRET_PLAIN_ADVICE = {
+  hint: "A client secret must be a secret variable: publish it with the command below.",
+  next: ["{set}"],
+  details: {
+    variable: "{variable}",
+    client: "{client}",
+    file: "{file}",
+    secret: "{held}",
+  },
+} as const satisfies Advice;
+
+/**
+ * The values and next command of the advice on a declared application's secret.
+ *
+ * @param use - How the application names the variable.
+ * @returns What the advice fills in.
+ */
+function applicationSecretFill(use: ApplicationSecretUse) {
+  return {
+    values: {
+      variable: use.variable,
+      client: use.client,
+      file: use.file,
+      held: false,
+    },
+    next: {
+      set: {
+        id: "variable:set",
+        args: {
+          name: use.variable,
+        },
+        flags: {
+          secret: true,
+          preview: use.preview,
+        },
+      },
+    },
+  } as const;
+}
+
 /** How the errors of `@/lib/publish` are advised on, each for exactly its class. */
 export const PUBLISH_WORDINGS: readonly Wording[] = [
+  derived(PublishApplicationSecretMissingError, APPLICATION_SECRET_MISSING_ADVICE, (error) => {
+    return applicationSecretFill(error.use);
+  }),
+  derived(PublishApplicationSecretPlainError, APPLICATION_SECRET_PLAIN_ADVICE, (error) => {
+    return applicationSecretFill(error.use);
+  }),
   derived(PublishConnectionSecretLiteralError, SECRET_LITERAL_ADVICE, (error) => {
     return {
       values: {

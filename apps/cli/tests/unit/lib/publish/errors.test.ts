@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PublishApplicationSecretMissingError,
+  PublishApplicationSecretPlainError,
   PublishAssetTargetUnsafeError,
   PublishConfigInvalidError,
   PublishConnectionSecretLiteralError,
@@ -45,6 +47,28 @@ describe("the publish errors", () => {
     [
       "literal secret",
       new PublishConnectionSecretLiteralError("literal", [], false),
+      "invalid",
+      "E_VALIDATION",
+    ],
+    [
+      "missing application secret",
+      new PublishApplicationSecretMissingError({
+        variable: "SHOP_SECRET",
+        client: "web",
+        file: ".zitadel/applications/shop.json",
+        preview: false,
+      }),
+      "missing",
+      "E_CREDENTIAL_MISSING",
+    ],
+    [
+      "plain application secret",
+      new PublishApplicationSecretPlainError({
+        variable: "SHOP_SECRET",
+        client: "web",
+        file: ".zitadel/applications/shop.json",
+        preview: false,
+      }),
       "invalid",
       "E_VALIDATION",
     ],

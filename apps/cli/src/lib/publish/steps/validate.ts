@@ -6,6 +6,7 @@ import {
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
 
+import { validateApplications } from "./application-checks";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
 
@@ -24,7 +25,8 @@ export const DEPLOYED_DEPENDENT_RULE: RuleId = "sso/subject-claim-unstable";
  * pass: each file's contract, the server's flow rules, the variables the
  * environment must hold, and how the files agree. What stays here needs the
  * server: a flow pinning a schema only the project holds, the variables a
- * connection names, and whether a branding asset URL serves an image.
+ * connection or a declared client names, and whether a branding asset URL
+ * serves an image.
  */
 export const validateStep: Step = {
   name: "validate",
@@ -41,6 +43,7 @@ export const validateStep: Step = {
     refuseErrors(issues);
     refuseErrors(await unresolvedSchemas(ctx));
     await validateConnections(ctx);
+    await validateApplications(ctx);
     const branding = ctx.bundle.branding;
     const brandings = branding === undefined ? [] : [branding];
     const assetWarnings = await brandingAssetWarnings(brandings);

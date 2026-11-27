@@ -53,6 +53,8 @@ import {
 import { ProjectSecretMissingError } from "@/lib/project";
 import {
   PublishConnectionSecretLiteralError,
+  PublishApplicationSecretMissingError,
+  PublishApplicationSecretPlainError,
   PublishConnectionVariableKindError,
   PublishConnectionVariableMissingError,
 } from "@/lib/publish";
@@ -612,6 +614,44 @@ describe("ErrorSupport", () => {
         },
       ],
       [
+        "an application secret the project does not hold",
+        new PublishApplicationSecretMissingError({
+          variable: "SHOP_SECRET",
+          client: "web",
+          file: ".zitadel/applications/shop.json",
+          preview: false,
+        }),
+        {
+          hint: "Publish it as a secret with the command below, then deploy again.",
+          nextCommands: [
+            {
+              id: "variable:set",
+              args: { name: "SHOP_SECRET" },
+              flags: { secret: true, preview: false },
+            },
+          ],
+        },
+      ],
+      [
+        "an application secret held as a plain value",
+        new PublishApplicationSecretPlainError({
+          variable: "SHOP_SECRET",
+          client: "web",
+          file: ".zitadel/applications/shop.json",
+          preview: true,
+        }),
+        {
+          hint: "A client secret must be a secret variable: publish it with the command below.",
+          nextCommands: [
+            {
+              id: "variable:set",
+              args: { name: "SHOP_SECRET" },
+              flags: { secret: true, preview: true },
+            },
+          ],
+        },
+      ],
+      [
         "a variable a connection names that is not published",
         new PublishConnectionVariableMissingError("GOOGLE_SECRET is not published", {
           variable: "GOOGLE_SECRET",
@@ -887,7 +927,7 @@ describe("ErrorSupport", () => {
         "nothing to deploy",
         new ZitadelConfigNothingToDeployError(),
         {
-          hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+          hint: "Add a schema, flow, policy, branding, application or OAuth settings under .zitadel/, or run `zitadel setup` to scaffold one.",
           nextCommands: undefined,
         },
       ],

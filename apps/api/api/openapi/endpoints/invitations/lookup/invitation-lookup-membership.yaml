@@ -1,0 +1,17 @@
+title: LookupInvitationMembership
+description: |
+  The access the signed-in user already has to the project.
+type: object
+required:
+  - relation
+properties:
+  relation:
+    type: string
+    enum:
+      - viewer
+      - editor
+      - admin
+    description: |
+      The user's strongest role on the project, by any path: a grant to them
+      or to a team they're in, the owning team, or operating the deployment.
+      A stronger role includes the weaker ones.

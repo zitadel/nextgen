@@ -41,7 +41,7 @@ const FLOW_UNCHECKED_ADVICE = {
 
 /** How {@link ZitadelConfigNothingToDeployError} is refused. */
 const NOTHING_TO_DEPLOY_ADVICE = {
-  hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+  hint: "Add a schema, flow, policy, branding, application or OAuth settings under .zitadel/, or run `zitadel setup` to scaffold one.",
 } as const satisfies Advice;
 
 /** How {@link ZitadelConfigPasswordPolicyInvalidError} is refused. */

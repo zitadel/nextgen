@@ -451,7 +451,7 @@ describe("release create", () => {
       expect(app.envelopeOf(result)).toMatchObject({
         code: "E_VALIDATION",
         message: "There is nothing in .zitadel/ to deploy",
-        hint: `Add a schema, flow, policy or branding under .zitadel/, or run ${expectedPublicCliCommand("setup")} to scaffold one.`,
+        hint: `Add a schema, flow, policy, branding, application or OAuth settings under .zitadel/, or run ${expectedPublicCliCommand("setup")} to scaffold one.`,
       });
     });
   });
