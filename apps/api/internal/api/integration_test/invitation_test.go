@@ -661,31 +661,107 @@ func TestInvitationRedeem(t *testing.T) {
 		require.IsType(t, &api.ProjectDetailResponse{}, after, helpers.MustMarshal(t, after))
 	})
 
-	t.Run("accept keeps an identical active grant", func(t *testing.T) {
+	// refusedHolding checks that the client, who has access to the project,
+	// can neither accept nor decline the link: lookup, accept and decline all
+	// name the role held, and the link stays pending for its invitee.
+	refusedHolding := func(t *testing.T, client *helpers.ApiClient, token, held string) {
+		t.Helper()
+		found, ok := lookup(t, client, token).(*api.InvitationLookupResponse)
+		require.True(t, ok)
+		view, ok := found.GetInvitationLookupProjectMemberResponse()
+		require.True(t, ok)
+		membership, ok := view.Membership.Get()
+		require.True(t, ok, "lookup names the role held")
+		assert.Equal(t, held, string(membership.Relation))
+
+		conflict, ok := accept(t, client, token).(*api.AcceptInvitationConflict)
+		require.True(t, ok, "accept")
+		assert.Equal(t, "inv.already_member", string(conflict.Code))
+		assert.JSONEq(t, `{"relation":"`+held+`"}`, string(conflict.Details.Value["details"]), "the error names the role held")
+		declined, ok := reject(t, client, token).(*api.RejectInvitationConflict)
+		require.True(t, ok, "decline")
+		assert.Equal(t, "inv.already_member", string(declined.Code))
+	}
+
+	t.Run("a user with access can't redeem, whatever gives it", func(t *testing.T) {
 		t.Parallel()
-		colleagueID, colleague := newColleague(t)
-		held := seedGrant(t, colleagueID, "editor", nil)
-		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
+		for _, tc := range []struct {
+			name     string
+			relation api.InvitationProjectMemberPayloadRelation
+			// access gives the user access to the project and returns the role.
+			access func(t *testing.T, userID, teamID string) string
+		}{
+			{"a grant of the same role", api.InvitationProjectMemberPayloadRelationEditor, func(t *testing.T, userID, _ string) string {
+				seedGrant(t, userID, "editor", nil)
+				return "editor"
+			}},
+			{"a grant of a weaker role", api.InvitationProjectMemberPayloadRelationAdmin, func(t *testing.T, userID, _ string) string {
+				seedGrant(t, userID, "viewer", nil)
+				return "viewer"
+			}},
+			{"a grant of a stronger role", api.InvitationProjectMemberPayloadRelationViewer, func(t *testing.T, userID, _ string) string {
+				seedGrant(t, userID, "admin", nil)
+				return "admin"
+			}},
+			{"a grant to a team they're in", api.InvitationProjectMemberPayloadRelationViewer, func(t *testing.T, _, teamID string) string {
+				asgn := &domain.AuthzAssignment{
+					ProjectID:     project.ID,
+					CatalogID:     domain.SystemCatalogID,
+					PrincipalType: domain.AuthzPrincipalTypeTeam,
+					PrincipalID:   teamID,
+					ObjectType:    "project",
+					Relation:      "editor",
+				}
+				asgn.ApplyScope(domain.NewProjectAssignmentScope())
+				require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), asgn))
+				return "editor"
+			}},
+			{"operating the deployment", api.InvitationProjectMemberPayloadRelationViewer, func(t *testing.T, userID, _ string) string {
+				grantPlatformOperator(t, userID)
+				return "admin"
+			}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				userID, teamID := harness.CreateUserOwnedByTeam(t, platform.ID)
+				cleanupPlatformUserAndTeam(t, userID)
+				client := sessionClient(t, userID)
+				held := tc.access(t, userID, teamID)
+				before := grants(t, userID)
+				created, token := invite(t, owner, tc.relation)
 
-		accepted(t, accept(t, colleague, token))
+				refusedHolding(t, client, token, held)
+				assert.Equal(t, before, grants(t, userID), "no grant is written")
+				require.ElementsMatch(t, []string{"invitation.created"}, eventTypes(invitationEvents(t, owner, projectID, created.ID)))
 
-		editor := grants(t, colleagueID)["editor"]
-		require.Len(t, editor, 1)
-		assert.Equal(t, held, editor[0].ID)
+				// The person it was meant for still can.
+				_, invitee := newColleague(t)
+				accepted(t, accept(t, invitee, token))
+			})
+		}
 	})
 
-	t.Run("accept adds a relation beside another", func(t *testing.T) {
+	t.Run("an owning-team admin can't redeem a project secret's link", func(t *testing.T) {
 		t.Parallel()
-		colleagueID, colleague := newColleague(t)
-		viewer := seedGrant(t, colleagueID, "viewer", nil)
-		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationAdmin)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, project)
+		_, token := invite(t, secret, api.InvitationProjectMemberPayloadRelationAdmin)
 
-		accepted(t, accept(t, colleague, token))
+		refusedHolding(t, owner, token, "admin")
+		assert.Empty(t, grants(t, ownerID), "no grant beside the owning team")
+	})
 
-		held := grants(t, colleagueID)
-		require.Len(t, held["viewer"], 1)
-		assert.Equal(t, viewer, held["viewer"][0].ID)
-		require.Len(t, held["admin"], 1)
+	t.Run("a colleague without a role is not a member", func(t *testing.T) {
+		t.Parallel()
+		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationViewer)
+		_, colleague := newColleague(t)
+
+		found, ok := lookup(t, colleague, token).(*api.InvitationLookupResponse)
+		require.True(t, ok)
+		view, ok := found.GetInvitationLookupProjectMemberResponse()
+		require.True(t, ok)
+		assert.True(t, view.Membership.IsNull())
 	})
 
 	t.Run("of two concurrent accepts one wins", func(t *testing.T) {
@@ -722,7 +798,7 @@ func TestInvitationRedeem(t *testing.T) {
 		assert.Equal(t, 1, len(grants(t, firstID)["viewer"])+len(grants(t, secondID)["viewer"]))
 	})
 
-	t.Run("one user accepting two links at once gets one grant", func(t *testing.T) {
+	t.Run("one user accepting two links at once uses one", func(t *testing.T) {
 		t.Parallel()
 		_, firstToken := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
 		_, secondToken := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
@@ -739,9 +815,21 @@ func TestInvitationRedeem(t *testing.T) {
 		}
 		wg.Wait()
 
+		// The project lock orders them: the second finds a member.
+		var won, refused int
 		for _, resp := range results {
-			accepted(t, resp)
+			switch resp := resp.(type) {
+			case *api.Invitation:
+				won++
+			case *api.AcceptInvitationConflict:
+				assert.Equal(t, "inv.already_member", string(resp.Code))
+				refused++
+			default:
+				t.Errorf("unexpected answer: %s", helpers.MustMarshal(t, resp))
+			}
 		}
+		assert.Equal(t, 1, won)
+		assert.Equal(t, 1, refused)
 		assert.Len(t, grants(t, colleagueID)["editor"], 1)
 	})
 
@@ -765,8 +853,15 @@ func TestInvitationRedeem(t *testing.T) {
 		})
 		wg.Wait()
 
-		// The accept keeps whichever grant came first; a second create conflicts.
-		accepted(t, acceptResp)
+		// Whichever comes first grants: an accept after the grant finds a
+		// member, a create after the accept conflicts.
+		switch resp := acceptResp.(type) {
+		case *api.Invitation:
+		case *api.AcceptInvitationConflict:
+			assert.Equal(t, "inv.already_member", string(resp.Code))
+		default:
+			t.Errorf("unexpected accept answer: %s", helpers.MustMarshal(t, acceptResp))
+		}
 		switch grantResp.(type) {
 		case *api.Grant, *api.CreateGrantConflict:
 		default:

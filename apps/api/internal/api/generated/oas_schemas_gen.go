@@ -28,6 +28,7 @@ type AcceptInvitationErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	InvAlreadyMember    InvAlreadyMember
 	InvInviterNotAdmin  InvInviterNotAdmin
 	InvNotFound         InvNotFound
 	InvPlatformRequired InvPlatformRequired
@@ -47,6 +48,7 @@ const (
 	AuthUnauthorizedAcceptInvitationErrorResponse    AcceptInvitationErrorResponseType = "auth.unauthorized"
 	EvtInvalidAcceptInvitationErrorResponse          AcceptInvitationErrorResponseType = "evt.invalid"
 	InternalAcceptInvitationErrorResponse            AcceptInvitationErrorResponseType = "internal"
+	InvAlreadyMemberAcceptInvitationErrorResponse    AcceptInvitationErrorResponseType = "inv.already_member"
 	InvInviterNotAdminAcceptInvitationErrorResponse  AcceptInvitationErrorResponseType = "inv.inviter_not_admin"
 	InvNotFoundAcceptInvitationErrorResponse         AcceptInvitationErrorResponseType = "inv.not_found"
 	InvPlatformRequiredAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.platform_required"
@@ -75,6 +77,11 @@ func (s AcceptInvitationErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether AcceptInvitationErrorResponse is Internal.
 func (s AcceptInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalAcceptInvitationErrorResponse
+}
+
+// IsInvAlreadyMember reports whether AcceptInvitationErrorResponse is InvAlreadyMember.
+func (s AcceptInvitationErrorResponse) IsInvAlreadyMember() bool {
+	return s.Type == InvAlreadyMemberAcceptInvitationErrorResponse
 }
 
 // IsInvInviterNotAdmin reports whether AcceptInvitationErrorResponse is InvInviterNotAdmin.
@@ -198,6 +205,27 @@ func (s AcceptInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalAcceptInvitationErrorResponse(v Internal) AcceptInvitationErrorResponse {
 	var s AcceptInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetInvAlreadyMember sets AcceptInvitationErrorResponse to InvAlreadyMember.
+func (s *AcceptInvitationErrorResponse) SetInvAlreadyMember(v InvAlreadyMember) {
+	s.Type = InvAlreadyMemberAcceptInvitationErrorResponse
+	s.InvAlreadyMember = v
+}
+
+// GetInvAlreadyMember returns InvAlreadyMember and true boolean if AcceptInvitationErrorResponse is InvAlreadyMember.
+func (s AcceptInvitationErrorResponse) GetInvAlreadyMember() (v InvAlreadyMember, ok bool) {
+	if !s.IsInvAlreadyMember() {
+		return v, false
+	}
+	return s.InvAlreadyMember, true
+}
+
+// NewInvAlreadyMemberAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvAlreadyMember.
+func NewInvAlreadyMemberAcceptInvitationErrorResponse(v InvAlreadyMember) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInvAlreadyMember(v)
 	return s
 }
 
@@ -50161,6 +50189,59 @@ func (s *InternalDetails) init() InternalDetails {
 
 // Merged schema.
 // Ref: #
+type InvAlreadyMember struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvAlreadyMemberDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvAlreadyMember) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvAlreadyMember) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvAlreadyMember) GetDetails() OptInvAlreadyMemberDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvAlreadyMember) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvAlreadyMember) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvAlreadyMember) SetDetails(val OptInvAlreadyMemberDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvAlreadyMemberDetails map[string]jx.Raw
+
+func (s *InvAlreadyMemberDetails) init() InvAlreadyMemberDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type InvInvalid struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -52901,6 +52982,74 @@ func (s *InvitationExpand) UnmarshalText(data []byte) error {
 
 type InvitationID string
 
+// The access the signed-in user already has to the project.
+// Ref: #
+type InvitationLookupMembership struct {
+	// The user's strongest role on the project, by any path: a grant to them or to a team they're in, the
+	// owning team, or operating the deployment. A stronger role includes the weaker ones.
+	Relation InvitationLookupMembershipRelation `json:"relation"`
+}
+
+// GetRelation returns the value of Relation.
+func (s *InvitationLookupMembership) GetRelation() InvitationLookupMembershipRelation {
+	return s.Relation
+}
+
+// SetRelation sets the value of Relation.
+func (s *InvitationLookupMembership) SetRelation(val InvitationLookupMembershipRelation) {
+	s.Relation = val
+}
+
+// The user's strongest role on the project, by any path: a grant to them or to a team they're in, the
+// owning team, or operating the deployment. A stronger role includes the weaker ones.
+type InvitationLookupMembershipRelation string
+
+const (
+	InvitationLookupMembershipRelationViewer InvitationLookupMembershipRelation = "viewer"
+	InvitationLookupMembershipRelationEditor InvitationLookupMembershipRelation = "editor"
+	InvitationLookupMembershipRelationAdmin  InvitationLookupMembershipRelation = "admin"
+)
+
+// AllValues returns all InvitationLookupMembershipRelation values.
+func (InvitationLookupMembershipRelation) AllValues() []InvitationLookupMembershipRelation {
+	return []InvitationLookupMembershipRelation{
+		InvitationLookupMembershipRelationViewer,
+		InvitationLookupMembershipRelationEditor,
+		InvitationLookupMembershipRelationAdmin,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationLookupMembershipRelation) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationLookupMembershipRelationViewer:
+		return []byte(s), nil
+	case InvitationLookupMembershipRelationEditor:
+		return []byte(s), nil
+	case InvitationLookupMembershipRelationAdmin:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationLookupMembershipRelation) UnmarshalText(data []byte) error {
+	switch InvitationLookupMembershipRelation(data) {
+	case InvitationLookupMembershipRelationViewer:
+		*s = InvitationLookupMembershipRelationViewer
+		return nil
+	case InvitationLookupMembershipRelationEditor:
+		*s = InvitationLookupMembershipRelationEditor
+		return nil
+	case InvitationLookupMembershipRelationAdmin:
+		*s = InvitationLookupMembershipRelationAdmin
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Merged schema.
 // Ref: #
 type InvitationLookupProjectMemberResponse struct {
@@ -52918,6 +53067,11 @@ type InvitationLookupProjectMemberResponse struct {
 	Status        InvitationStatus                          `json:"status"`
 	Type          InvitationLookupProjectMemberResponseType `json:"type"`
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
+	// The access the signed-in user already has to the project. A user with access can neither accept nor
+	// decline the invitation: both answer `409 inv.already_member` and leave it pending for the person it
+	// was meant for. Its inviter gets `inv.self_accept` or `inv.self_reject` instead. Null when the user
+	// has no access.
+	Membership OptNilInvitationLookupMembership `json:"membership"`
 }
 
 // GetProjectID returns the value of ProjectID.
@@ -52965,6 +53119,11 @@ func (s *InvitationLookupProjectMemberResponse) GetProjectMember() InvitationPro
 	return s.ProjectMember
 }
 
+// GetMembership returns the value of Membership.
+func (s *InvitationLookupProjectMemberResponse) GetMembership() OptNilInvitationLookupMembership {
+	return s.Membership
+}
+
 // SetProjectID sets the value of ProjectID.
 func (s *InvitationLookupProjectMemberResponse) SetProjectID(val ProjectID) {
 	s.ProjectID = val
@@ -53008,6 +53167,11 @@ func (s *InvitationLookupProjectMemberResponse) SetType(val InvitationLookupProj
 // SetProjectMember sets the value of ProjectMember.
 func (s *InvitationLookupProjectMemberResponse) SetProjectMember(val InvitationProjectMemberPayload) {
 	s.ProjectMember = val
+}
+
+// SetMembership sets the value of Membership.
+func (s *InvitationLookupProjectMemberResponse) SetMembership(val OptNilInvitationLookupMembership) {
+	s.Membership = val
 }
 
 type InvitationLookupProjectMemberResponseCreatedByType string
@@ -69847,6 +70011,52 @@ func (o OptInternalDetails) Or(d InternalDetails) InternalDetails {
 	return d
 }
 
+// NewOptInvAlreadyMemberDetails returns new OptInvAlreadyMemberDetails with value set to v.
+func NewOptInvAlreadyMemberDetails(v InvAlreadyMemberDetails) OptInvAlreadyMemberDetails {
+	return OptInvAlreadyMemberDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvAlreadyMemberDetails is optional InvAlreadyMemberDetails.
+type OptInvAlreadyMemberDetails struct {
+	Value InvAlreadyMemberDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvAlreadyMemberDetails was set.
+func (o OptInvAlreadyMemberDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvAlreadyMemberDetails) Reset() {
+	var v InvAlreadyMemberDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvAlreadyMemberDetails) SetTo(v InvAlreadyMemberDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvAlreadyMemberDetails) Get() (v InvAlreadyMemberDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvAlreadyMemberDetails) Or(d InvAlreadyMemberDetails) InvAlreadyMemberDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInvInvalidDetails returns new OptInvInvalidDetails with value set to v.
 func NewOptInvInvalidDetails(v InvInvalidDetails) OptInvInvalidDetails {
 	return OptInvInvalidDetails{
@@ -73575,6 +73785,74 @@ func (o OptNilInvitationCreatedEventActorType) Get() (v InvitationCreatedEventAc
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilInvitationCreatedEventActorType) Or(d InvitationCreatedEventActorType) InvitationCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationLookupMembership returns new OptNilInvitationLookupMembership with value set to v.
+func NewOptNilInvitationLookupMembership(v InvitationLookupMembership) OptNilInvitationLookupMembership {
+	return OptNilInvitationLookupMembership{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationLookupMembership is optional nullable InvitationLookupMembership.
+type OptNilInvitationLookupMembership struct {
+	Value InvitationLookupMembership
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationLookupMembership was set.
+func (o OptNilInvitationLookupMembership) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationLookupMembership) Reset() {
+	var v InvitationLookupMembership
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationLookupMembership) SetTo(v InvitationLookupMembership) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationLookupMembership) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationLookupMembership) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationLookupMembership
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilInvitationLookupMembership) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationLookupMembership) Get() (v InvitationLookupMembership, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationLookupMembership) Or(d InvitationLookupMembership) InvitationLookupMembership {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -96212,6 +96490,10 @@ type RejectInvitationBadRequest ErrorDetails
 
 func (*RejectInvitationBadRequest) rejectInvitationRes() {}
 
+type RejectInvitationConflict ErrorDetails
+
+func (*RejectInvitationConflict) rejectInvitationRes() {}
+
 // RejectInvitationErrorResponse represents sum type.
 type RejectInvitationErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
@@ -96220,6 +96502,7 @@ type RejectInvitationErrorResponse struct {
 	AuthUnauthorized AuthUnauthorized
 	EvtInvalid       EvtInvalid
 	Internal         Internal
+	InvAlreadyMember InvAlreadyMember
 	InvNotFound      InvNotFound
 	InvSelfReject    InvSelfReject
 	NotImplemented   NotImplemented
@@ -96236,6 +96519,7 @@ const (
 	AuthUnauthorizedRejectInvitationErrorResponse RejectInvitationErrorResponseType = "auth.unauthorized"
 	EvtInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "evt.invalid"
 	InternalRejectInvitationErrorResponse         RejectInvitationErrorResponseType = "internal"
+	InvAlreadyMemberRejectInvitationErrorResponse RejectInvitationErrorResponseType = "inv.already_member"
 	InvNotFoundRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "inv.not_found"
 	InvSelfRejectRejectInvitationErrorResponse    RejectInvitationErrorResponseType = "inv.self_reject"
 	NotImplementedRejectInvitationErrorResponse   RejectInvitationErrorResponseType = "not_implemented"
@@ -96261,6 +96545,11 @@ func (s RejectInvitationErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether RejectInvitationErrorResponse is Internal.
 func (s RejectInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalRejectInvitationErrorResponse
+}
+
+// IsInvAlreadyMember reports whether RejectInvitationErrorResponse is InvAlreadyMember.
+func (s RejectInvitationErrorResponse) IsInvAlreadyMember() bool {
+	return s.Type == InvAlreadyMemberRejectInvitationErrorResponse
 }
 
 // IsInvNotFound reports whether RejectInvitationErrorResponse is InvNotFound.
@@ -96369,6 +96658,27 @@ func (s RejectInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalRejectInvitationErrorResponse(v Internal) RejectInvitationErrorResponse {
 	var s RejectInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetInvAlreadyMember sets RejectInvitationErrorResponse to InvAlreadyMember.
+func (s *RejectInvitationErrorResponse) SetInvAlreadyMember(v InvAlreadyMember) {
+	s.Type = InvAlreadyMemberRejectInvitationErrorResponse
+	s.InvAlreadyMember = v
+}
+
+// GetInvAlreadyMember returns InvAlreadyMember and true boolean if RejectInvitationErrorResponse is InvAlreadyMember.
+func (s RejectInvitationErrorResponse) GetInvAlreadyMember() (v InvAlreadyMember, ok bool) {
+	if !s.IsInvAlreadyMember() {
+		return v, false
+	}
+	return s.InvAlreadyMember, true
+}
+
+// NewInvAlreadyMemberRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from InvAlreadyMember.
+func NewInvAlreadyMemberRejectInvitationErrorResponse(v InvAlreadyMember) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetInvAlreadyMember(v)
 	return s
 }
 

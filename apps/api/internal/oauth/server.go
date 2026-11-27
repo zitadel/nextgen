@@ -3,6 +3,7 @@ package oauth
 import (
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/rs/cors"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
@@ -24,6 +25,10 @@ type Config struct {
 	Settings        SettingsSource
 	Clients         ClientResolver
 	AuthRequests    AuthRequestStore
+	SigningKeys     SigningKeys
+	// JWKSMaxAge is how long a verifier may cache a project's JWKS: the
+	// propagation window of ADR 039 §1.
+	JWKSMaxAge time.Duration
 }
 
 // Handlers are the two handlers of the OAuth server. Metadata answers the
@@ -48,6 +53,8 @@ type opServer struct {
 	settings        SettingsSource
 	clients         ClientResolver
 	authRequests    AuthRequestStore
+	signingKeys     SigningKeys
+	jwksMaxAge      time.Duration
 }
 
 // New builds the handlers. Both take the same tenant prefix and the same
@@ -61,7 +68,15 @@ func New(cfg Config) *Handlers {
 		op.WithHTTPMiddleware(httputil.WithForwardedNoStore, s.withIssuer),
 		op.WithServerCORSOptions(corsOptions()),
 	)
-	opHandler := op.RegisterServer(opServer{platformEnabled: cfg.PlatformEnabled, settings: cfg.Settings, clients: cfg.Clients, authRequests: cfg.AuthRequests}, opEndpoints(),
+	ops := opServer{
+		platformEnabled: cfg.PlatformEnabled,
+		settings:        cfg.Settings,
+		clients:         cfg.Clients,
+		authRequests:    cfg.AuthRequests,
+		signingKeys:     cfg.SigningKeys,
+		jwksMaxAge:      cfg.JWKSMaxAge,
+	}
+	opHandler := op.RegisterServer(ops, opEndpoints(),
 		op.WithTenantPrefix(Prefix),
 		op.WithHTTPMiddleware(httputil.WithForwardedNoStore, withoutLoggedState, withErrorPages, s.withIssuer),
 		op.WithServerCORSOptions(corsOptions()),

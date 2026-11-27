@@ -1,8 +1,10 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -29,6 +31,7 @@ type KeyService interface {
 	// GetProjectSigner returns a signer of the project's active key for
 	// purpose. opts may be nil.
 	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, opts *jose.SignerOptions) (jose.Signer, error)
+	GetProjectPublicSigningKeys(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) ([]jose.JSONWebKey, error)
 	GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error)
 	MigrateToLatestMasterKey(ctx context.Context) error
 }
@@ -36,10 +39,11 @@ type KeyService interface {
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
-	db              *DB
-	masterKeys      domain.MasterKeys
-	crypterCache    cache.Cache[CrypterCacheKey, op.Crypto]
-	signingKeyCache cache.Cache[SigningKeyCacheKey, domain.SigningKey]
+	db                    *DB
+	masterKeys            domain.MasterKeys
+	crypterCache          cache.Cache[CrypterCacheKey, op.Crypto]
+	signingKeyCache       cache.Cache[SigningKeyCacheKey, domain.SigningKey]
+	publicSigningKeyCache cache.Cache[SigningKeyCacheKey, []jose.JSONWebKey]
 }
 
 func NewKeyService(
@@ -47,12 +51,14 @@ func NewKeyService(
 	masterKeys domain.MasterKeys,
 	crypterCache cache.Cache[CrypterCacheKey, op.Crypto],
 	signingKeyCache cache.Cache[SigningKeyCacheKey, domain.SigningKey],
+	publicSigningKeyCache cache.Cache[SigningKeyCacheKey, []jose.JSONWebKey],
 ) KeyService {
 	return &keyService{
-		db:              db,
-		masterKeys:      masterKeys,
-		crypterCache:    crypterCache,
-		signingKeyCache: signingKeyCache,
+		db:                    db,
+		masterKeys:            masterKeys,
+		crypterCache:          crypterCache,
+		signingKeyCache:       signingKeyCache,
+		publicSigningKeyCache: publicSigningKeyCache,
 	}
 }
 
@@ -245,8 +251,11 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 	ctx, end := startSpan(ctx, "KeyService.GetProjectSigningKey")
 	defer end(&err)
 
-	if key, ok := s.signingKeyCache.Get(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}); ok {
-		return new(key), nil
+	cacheKey := SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}
+	cachedKey, ok := s.signingKeyCache.Get(cacheKey)
+	setCacheHit(ctx, ok)
+	if ok {
+		return new(cachedKey), nil
 	}
 
 	key, err := s.db.Statements().GetSigningKey(ctx, database.And(
@@ -261,7 +270,7 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 		return nil, domain.ErrInternal(err).WithMessage("failed to get signing key from the database")
 	}
 
-	s.signingKeyCache.Add(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}, *key)
+	s.signingKeyCache.Add(cacheKey, *key)
 	return key, nil
 }
 
@@ -283,6 +292,69 @@ func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, pur
 		return nil, err
 	}
 	return key.Signer(kek, opts)
+}
+
+func (s *keyService) GetProjectPublicSigningKeys(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ []jose.JSONWebKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectPublicSigningKeys")
+	defer end(&err)
+
+	cacheKey := SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}
+	cached, ok := s.publicSigningKeyCache.Get(cacheKey)
+	setCacheHit(ctx, ok)
+	if ok {
+		return slices.Clone(cached), nil
+	}
+
+	// Every key that is not removed, retired ones included: nothing rotates
+	// keys yet, so the purge of ADR 039 §1 that ends a retired key's grace
+	// period has to move it to removed for it to leave the set.
+	keys, err := s.db.Statements().ListSigningKeys(ctx, database.And(
+		database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.SigningKeyFieldPurpose), purpose),
+		database.Not(database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateRemoved)),
+	))
+	if err != nil {
+		if mapped := mapStorageError(err); mapped != err {
+			return nil, mapped
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to list signing keys from the database")
+	}
+	// Oldest first, so the set is the same bytes on every read.
+	slices.SortFunc(keys, func(a, b *domain.SigningKey) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), cmp.Compare(a.ID, b.ID))
+	})
+	public := make([]jose.JSONWebKey, 0, len(keys))
+	for _, key := range keys {
+		jwk, err := s.publicSigningKey(ctx, key)
+		if err != nil {
+			if domain.IsServerFault(err) {
+				return nil, err
+			}
+			// The server cannot read a key it stored: whatever the
+			// reason, that is its own fault, not the caller's.
+			return nil, domain.ErrInternal(err).
+				WithMessage("failed to read the public half of a signing key").
+				WithDetails(map[string]any{"keyID": key.ID})
+		}
+		public = append(public, jwk)
+	}
+
+	if len(public) > 0 {
+		s.publicSigningKeyCache.Add(cacheKey, slices.Clone(public))
+	}
+	return public, nil
+}
+
+func (s *keyService) publicSigningKey(ctx context.Context, key *domain.SigningKey) (jose.JSONWebKey, error) {
+	jweHeader, err := domain.DecodeJWEHeader(key.Key)
+	if err != nil {
+		return jose.JSONWebKey{}, err
+	}
+	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
+	if err != nil {
+		return jose.JSONWebKey{}, err
+	}
+	return key.PublicKey(kek)
 }
 
 // ------------------------------------------------------

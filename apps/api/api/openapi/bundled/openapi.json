@@ -9614,7 +9614,7 @@
       "post": {
         "operationId": "lookupInvitation",
         "summary": "Look up an invitation by token",
-        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do).\n",
+        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nIt also returns the access the signed-in user already has to the project\nas `membership`; a user with access can neither accept nor decline the\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do).\n",
         "tags": [
           "Invitations"
         ],
@@ -9755,7 +9755,7 @@
             }
           },
           "409": {
-            "description": "The project is unclaimed, or the server has no platform project.",
+            "description": "The user already has access to the project (`inv.already_member`,\nwith their strongest role as `details.details.relation`; the\ninvitation stays pending), the project is unclaimed, or the server has\nno platform project.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -9836,6 +9836,16 @@
           },
           "404": {
             "description": "Unknown or finished invitation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The user already has access to the project (`inv.already_member`,\nwith their strongest role as `details.details.relation`); the\ninvitation stays pending.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -23458,6 +23468,25 @@
           }
         }
       },
+      "invitation-lookup-membership": {
+        "title": "LookupInvitationMembership",
+        "description": "The access the signed-in user already has to the project.\n",
+        "type": "object",
+        "required": [
+          "relation"
+        ],
+        "properties": {
+          "relation": {
+            "type": "string",
+            "enum": [
+              "viewer",
+              "editor",
+              "admin"
+            ],
+            "description": "The user's strongest role on the project, by any path: a grant to them\nor to a team they're in, the owning team, or operating the deployment.\nA stronger role includes the weaker ones.\n"
+          }
+        }
+      },
       "invitation-lookup-project-member-response": {
         "title": "LookupProjectMemberInvitationResponse",
         "description": "Lean view of a project-member invitation for the accept page: project, role,\ninviter and expiry.\n",
@@ -23480,6 +23509,17 @@
               },
               "project_member": {
                 "$ref": "#/components/schemas/invitation-project-member-payload"
+              },
+              "membership": {
+                "description": "The access the signed-in user already has to the project. A user\nwith access can neither accept nor decline the invitation: both\nanswer `409 inv.already_member` and leave it pending for the person\nit was meant for. Its inviter gets `inv.self_accept` or\n`inv.self_reject` instead. Null when the user has no access.\n",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/invitation-lookup-membership"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           }
@@ -23530,6 +23570,26 @@
             "team_member": "#/components/schemas/invitation-lookup-team-member-response"
           }
         }
+      },
+      "inv-already_member": {
+        "description": "You already have access to this project\n\nError code: inv.already_member\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.already_member"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
       },
       "inv-inviter_not_admin": {
         "description": "The inviter no longer administers the project\n\nError code: inv.inviter_not_admin\n",
@@ -28319,6 +28379,13 @@
         "value": {
           "code": "inv.project_unclaimed",
           "message": "claim the project before inviting into it"
+        }
+      },
+      "inv-already_member": {
+        "summary": "inv.already_member",
+        "value": {
+          "code": "inv.already_member",
+          "message": "you already have access to this project"
         }
       },
       "inv-inviter_not_admin": {
@@ -37083,6 +37150,9 @@
                   "$ref": "#/components/schemas/internal"
                 },
                 {
+                  "$ref": "#/components/schemas/inv-already_member"
+                },
+                {
                   "$ref": "#/components/schemas/inv-inviter_not_admin"
                 },
                 {
@@ -37114,6 +37184,7 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
+                  "inv.already_member": "#/components/schemas/inv-already_member",
                   "inv.inviter_not_admin": "#/components/schemas/inv-inviter_not_admin",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.platform_required": "#/components/schemas/inv-platform_required",
@@ -37137,6 +37208,9 @@
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "inv.already_member": {
+                "$ref": "#/components/examples/inv-already_member"
               },
               "inv.inviter_not_admin": {
                 "$ref": "#/components/examples/inv-inviter_not_admin"
@@ -37185,6 +37259,9 @@
                   "$ref": "#/components/schemas/internal"
                 },
                 {
+                  "$ref": "#/components/schemas/inv-already_member"
+                },
+                {
                   "$ref": "#/components/schemas/inv-not_found"
                 },
                 {
@@ -37207,6 +37284,7 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
+                  "inv.already_member": "#/components/schemas/inv-already_member",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.self_reject": "#/components/schemas/inv-self_reject",
                   "not_implemented": "#/components/schemas/not_implemented",
@@ -37227,6 +37305,9 @@
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "inv.already_member": {
+                "$ref": "#/components/examples/inv-already_member"
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
