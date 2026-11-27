@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
-import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
+import { createZitadelApi, type ZitadelApi, ZitadelClient } from "@zitadel/api/client";
 import { identity, loginWithPassword } from "@zitadel/testing/playwright";
 
 import {
@@ -47,13 +47,13 @@ const userD = { username: "rollback-user", email: "rollback-user@example.com" };
 const { password } = identity();
 
 let metadata: JourneyMetadata & { localRuntimeUrl: string };
-let client: ZitadelClient;
+let client: ZitadelApi;
 let projectId: string;
 let objectType: string;
 let revision1: string;
 let revision2: string;
 let revision3: string;
-type UserRecord = Awaited<ReturnType<ZitadelClient["getUser"]>>;
+type UserRecord = Awaited<ReturnType<ZitadelApi["getUser"]>>;
 let recordA: UserRecord;
 let recordB: UserRecord;
 let recordC: UserRecord;
@@ -84,7 +84,13 @@ test.beforeAll(async () => {
     project_secret: string;
   };
   projectId = secret.project_id;
-  client = createZitadelClient({ baseUrl: metadata.localRuntimeUrl, token: secret.project_secret });
+  client = createZitadelApi(
+    new ZitadelClient({
+      baseUrl: metadata.localRuntimeUrl,
+      token: secret.project_secret,
+      allowDestructive: true,
+    }),
+  );
 });
 
 test("enables the mock provider", async () => {

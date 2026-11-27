@@ -17,14 +17,14 @@ import (
 )
 
 const authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-	` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal, aa.deployment_id, aa.release_id, aa.flow_id,` +
+	` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal, aa.deployment_id, aa.release_id, aa.flow_id, aa.correlation_id,` +
 	` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
 	` LEFT JOIN zitadel_nextgen.checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
 const createAuthAttemptStmt = `WITH inserted_attempt AS (` +
-	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, id, required_checks, time_to_live, session_id, internal, deployment_id, release_id, flow_id)` +
-	` VALUES ($1, $2, $3::SMALLINT[], $4::INTERVAL, $5, $6, $7, $8, $10)` +
+	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, id, required_checks, time_to_live, session_id, internal, deployment_id, release_id, flow_id, correlation_id)` +
+	` VALUES ($1, $2, $3::SMALLINT[], $4::INTERVAL, $5, $6, $7, $8, $10, $11)` +
 	` RETURNING project_id, id, created_at` +
 	`), inserted_checks AS (` +
 	` INSERT INTO zitadel_nextgen.checks (project_id, auth_attempt_id, id, type, challenge_payload, factor_payload, last_challenged_at, last_verified_at)` +
@@ -145,7 +145,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 		authAttempt.ProjectID, authAttempt.ID, requiredChecks, authAttempt.TimeToLive,
 		authattempt.SessionIDArg(authAttempt.SessionID), authAttempt.Internal,
 		authattempt.EmptyStringArg(authAttempt.DeploymentID), authattempt.EmptyStringArg(authAttempt.ReleaseID), checkRowsJSON,
-		authattempt.EmptyStringArg(authAttempt.FlowID))
+		authattempt.EmptyStringArg(authAttempt.FlowID), authattempt.EmptyStringArg(authAttempt.CorrelationID))
 	if err != nil {
 		return wrapError(err)
 	}
@@ -258,6 +258,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 			deploymentID     *string
 			releaseID        *string
 			flowID           *string
+			correlationID    *string
 			challengeID      *string
 			lastChallengedAt *time.Time
 			verifiedAt       *time.Time
@@ -269,7 +270,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 		err := rows.Scan(
 			&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID,
 			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLive, &attempt.Internal,
-			&deploymentID, &releaseID, &flowID,
+			&deploymentID, &releaseID, &flowID, &correlationID,
 			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return wrapError(err)
@@ -295,6 +296,9 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 		}
 		if flowID != nil {
 			attempt.FlowID = *flowID
+		}
+		if correlationID != nil {
+			attempt.CorrelationID = *correlationID
 		}
 
 		if checkType == nil {

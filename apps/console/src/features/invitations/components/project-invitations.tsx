@@ -91,7 +91,21 @@ export function ProjectInvitations({
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <section aria-label="Invitations" className="flex flex-col">
-      {"error" in read ? (
+      {"denied" in read ? (
+        <Card className="items-center gap-0 p-6">
+          <Empty className="w-full">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UserCog aria-hidden className="stroke-[1.5]" />
+              </EmptyMedia>
+              <EmptyTitle>Invitations are for admins</EmptyTitle>
+              <EmptyDescription>
+                Only project admins can see and create invitations.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </Card>
+      ) : "error" in read ? (
         <FormError message={read.error} />
       ) : (
         <InvitationsTable

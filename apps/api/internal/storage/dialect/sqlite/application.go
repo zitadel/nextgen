@@ -3,6 +3,8 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -50,6 +52,14 @@ JOIN application_revisions r
 	listApplicationClientSecretsStmt = `SELECT project_id, id, application_client_id, secret_hash, created_at` +
 		` FROM application_client_secrets` +
 		` WHERE project_id = ? AND application_client_id = ? ORDER BY created_at, id`
+
+	deleteApplicationClientSecretsStmt = `DELETE FROM application_client_secrets WHERE project_id = ? AND application_client_id = ?`
+
+	applicationIdempotencyKeyColumns    = `project_id, key_hash, request_hash, application_id, created, client_ids, created_at, expires_at`
+	getApplicationIdempotencyKeyStmt    = `SELECT ` + applicationIdempotencyKeyColumns + ` FROM application_idempotency_keys WHERE project_id = ? AND key_hash = ? AND expires_at > ?`
+	deleteApplicationIdempotencyKeyStmt = `DELETE FROM application_idempotency_keys WHERE project_id = ? AND key_hash = ? AND expires_at <= ?`
+	createApplicationIdempotencyKeyStmt = `INSERT INTO application_idempotency_keys (` + applicationIdempotencyKeyColumns + `)` +
+		` VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
 	getApplicationSecretVariableStmt = `SELECT project_id, name, application_client_id, created_at` +
 		` FROM application_secret_variables WHERE project_id = ? AND name = ?`
@@ -280,6 +290,57 @@ func (s applicationStatements) ListApplicationClientSecrets(ctx context.Context,
 		return nil, wrapError(err)
 	}
 	return secrets, nil
+}
+
+// DeleteApplicationClientSecrets implements [service.ApplicationStatements].
+func (s applicationStatements) DeleteApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) error {
+	_, err := s.client.Exec(ctx, deleteApplicationClientSecretsStmt, projectID, applicationClientID)
+	return wrapError(err)
+}
+
+// GetApplicationIdempotencyKey implements [service.ApplicationStatements].
+func (s applicationStatements) GetApplicationIdempotencyKey(ctx context.Context, projectID, keyHash string, now time.Time) (*domain.ApplicationIdempotencyKey, error) {
+	rows, err := s.client.Query(ctx, getApplicationIdempotencyKeyStmt, projectID, keyHash, now.UnixNano())
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	key, err := collectExactlyOneRow(rows, func(rows *sql.Rows) (*domain.ApplicationIdempotencyKey, error) {
+		var (
+			key                      domain.ApplicationIdempotencyKey
+			clientIDs                string
+			createdNano, expiresNano int64
+		)
+		if err := rows.Scan(&key.ProjectID, &key.KeyHash, &key.RequestHash, &key.ApplicationID, &key.Created, &clientIDs, &createdNano, &expiresNano); err != nil {
+			return nil, err
+		}
+		var err error
+		if key.ClientIDs, err = decodeJSONStrings(clientIDs); err != nil {
+			return nil, fmt.Errorf("decode application idempotency key client ids: %w", err)
+		}
+		key.CreatedAt, key.ExpiresAt = timeFromUnixNano(createdNano), timeFromUnixNano(expiresNano)
+		return &key, nil
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return key, nil
+}
+
+// CreateApplicationIdempotencyKey implements [service.ApplicationStatements].
+func (s applicationStatements) CreateApplicationIdempotencyKey(ctx context.Context, key *domain.ApplicationIdempotencyKey) error {
+	clientIDs, err := encodeJSON(key.ClientIDs)
+	if err != nil {
+		return wrapError(err)
+	}
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Exec(ctx, deleteApplicationIdempotencyKeyStmt, key.ProjectID, key.KeyHash, key.CreatedAt.UnixNano()); err != nil {
+			return wrapError(err)
+		}
+		_, err := tx.Exec(ctx, createApplicationIdempotencyKeyStmt,
+			key.ProjectID, key.KeyHash, key.RequestHash, key.ApplicationID, key.Created, clientIDs, key.CreatedAt.UnixNano(), key.ExpiresAt.UnixNano())
+		return wrapError(err)
+	})
 }
 
 // GetApplicationSecretVariable implements [service.ApplicationStatements].

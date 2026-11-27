@@ -175,6 +175,7 @@ describe("project members tabs", () => {
 
     await userEvent.click(inviteButton());
     const dialog = within(await screen.findByRole("dialog", { name: "Invite member" }));
+    await userEvent.click(dialog.getByRole("radio", { name: "Admin" }));
     await userEvent.click(dialog.getByRole("button", { name: "Create invitation" }));
 
     // The link is read first; closing lands on the table its row is in.
@@ -301,6 +302,29 @@ describe("project invitations", () => {
     expect(screen.getByRole("heading", { name: "acme-app" })).toBeInTheDocument();
   });
 
+  it.each([
+    [403, "inv.permission_denied", "insufficient permissions to manage invitations"],
+    // A narrower grant: the server answers as if there were nothing to list.
+    [404, "inv.not_found", "This invitation is no longer available."],
+  ])(
+    "offers no inviting and explains the tab to someone who is not an admin (%i %s)",
+    async (status, code, message) => {
+      stubPage(() => HttpResponse.json({ code, message }, { status }));
+      openMembers();
+      // The members stay readable, without the button.
+      await screen.findByRole("region", { name: "Members" });
+      expect(screen.queryByRole("button", { name: "Invite member" })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("tab", { name: "Invitations" }));
+      const section = within(await screen.findByRole("region", { name: "Invitations" }));
+      expect(
+        section.getByText("Only project admins can see and create invitations."),
+      ).toBeInTheDocument();
+      expect(section.queryByText(message)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Invite member" })).not.toBeInTheDocument();
+    },
+  );
+
   it("loads the next page with the token it was given", async () => {
     const reads = stubPage(({ pageToken }) =>
       pageToken
@@ -367,20 +391,28 @@ describe("inviting a member", () => {
     await waitFor(() => expect(reads.length).toBeGreaterThan(before));
   });
 
-  it("defaults to admin and sends no metadata without a name", async () => {
+  it("preselects no role, creates with the one picked and sends no metadata without a name", async () => {
     stubPage();
     const created = stubCreate();
     await openInvitations();
 
     await userEvent.click(inviteButton());
     const dialog = within(await screen.findByRole("dialog", { name: "Invite member" }));
-    expect(dialog.getByRole("radio", { name: "Admin" })).toBeChecked();
-    await userEvent.click(dialog.getByRole("button", { name: "Create invitation" }));
+    // No role is chosen for the administrator, and there is nothing to create yet.
+    for (const role of ["Admin", "Editor", "Viewer"]) {
+      expect(dialog.getByRole("radio", { name: role })).not.toBeChecked();
+    }
+    const create = dialog.getByRole("button", { name: "Create invitation" });
+    expect(create).toBeDisabled();
+
+    await userEvent.click(dialog.getByRole("radio", { name: "Viewer" }));
+    expect(create).toBeEnabled();
+    await userEvent.click(create);
 
     await screen.findByRole("dialog", { name: "Invitation created" });
     expect(created[0]?.body).toEqual({
       type: "project_member",
-      project_member: { relation: "admin" },
+      project_member: { relation: "viewer" },
     });
   });
 
@@ -392,6 +424,7 @@ describe("inviting a member", () => {
     await userEvent.click(inviteButton());
     const dialog = within(await screen.findByRole("dialog", { name: "Invite member" }));
     await userEvent.type(dialog.getByRole("textbox", { name: /Invitee name/ }), "Jane Doe");
+    await userEvent.click(dialog.getByRole("radio", { name: "Admin" }));
     await userEvent.click(dialog.getByRole("button", { name: "Create invitation" }));
     await screen.findByRole("dialog", { name: "Invitation created" });
 
@@ -418,6 +451,7 @@ describe("inviting a member", () => {
 
     await userEvent.click(inviteButton());
     const dialog = within(await screen.findByRole("dialog", { name: "Invite member" }));
+    await userEvent.click(dialog.getByRole("radio", { name: "Admin" }));
     await userEvent.click(dialog.getByRole("button", { name: "Create invitation" }));
 
     expect(

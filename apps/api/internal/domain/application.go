@@ -118,6 +118,28 @@ type ApplicationClient struct {
 	CreatedAt     time.Time
 }
 
+// ApplicationIdempotencyKeyTTL is how long a key of POST /applications is
+// kept, from the first request. A retry does not extend it.
+const ApplicationIdempotencyKeyTTL = 24 * time.Hour
+
+// ApplicationIdempotencyKey records a keyed POST /applications, so a retry
+// with the same key and body rotates the secrets of the clients the first
+// request created. KeyHash and RequestHash are [HashSecret] of the key and of
+// the document: no plaintext is stored.
+type ApplicationIdempotencyKey struct {
+	ProjectID     string
+	KeyHash       string
+	RequestHash   string
+	ApplicationID string
+	// Created is true when the first request answered 201.
+	Created bool
+	// ClientIDs are the row ids ([ApplicationClient.ID]) of the clients the
+	// first request created, in document order.
+	ClientIDs []string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
 type ApplicationSecretVariable struct {
 	ProjectID           string
 	Name                string
@@ -167,15 +189,24 @@ func NewRegisteredApplication(projectID string, doc ApplicationDocument, docbs [
 }
 
 func NewApplicationClient(projectID string, clientID *string, slug string, secretGen secrets.Generator) (client *ApplicationClient, plainSecret string, err error) {
-	secret, err := secretGen.New(string(PrefixApplicationClient))
+	secret, err := NewApplicationClientSecret(secretGen)
 	if err != nil {
-		return nil, "", ErrInternal(err).WithMessage("failed to generate client secret")
+		return nil, "", err
 	}
 	return &ApplicationClient{
 		ProjectID: projectID,
 		Slug:      slug,
 		ClientID:  gu.Value(clientID),
 	}, secret, nil
+}
+
+// NewApplicationClientSecret generates a registered client's secret, sk_client_….
+func NewApplicationClientSecret(secretGen secrets.Generator) (string, error) {
+	secret, err := secretGen.New(string(PrefixApplicationClient))
+	if err != nil {
+		return "", ErrInternal(err).WithMessage("failed to generate client secret")
+	}
+	return secret, nil
 }
 
 func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument, docBs []byte, secretGen secrets.Generator) (revisedApp *Application, clientsToAdd []*ApplicationClient, plainSecrets []string, err error) {
@@ -348,6 +379,12 @@ func ErrApplicationClientSecretInvalid() Error {
 // client of the project holds.
 func ErrApplicationClientIDTaken() Error {
 	return newError(PrefixApplication.ErrorCodePrefix("client_id_taken"), "application: another client of the project holds this client_id", nil, nil)
+}
+
+// ErrApplicationIdempotencyKeyReused refuses a request whose Idempotency-Key
+// an earlier request of the project sent with another body.
+func ErrApplicationIdempotencyKeyReused() Error {
+	return newError(PrefixApplication.ErrorCodePrefix("idempotency_key_reused"), "application: the Idempotency-Key was sent before with another body", nil, nil)
 }
 
 // ErrApplicationPermissionDenied rejects a caller whose project role does not
