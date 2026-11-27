@@ -40,8 +40,10 @@ function decodeJwtPayload(token: string): { sub: string } {
 const server = setupServer();
 let mock: MockHandle = setupMockHandlers();
 
-// Any absolute URL works — the orval-generated handlers match `*/flows*`
-// with a wildcard prefix.
+/**
+ * The client the flows are driven with. Any absolute URL works: the
+ * orval-generated handlers match `*\/flows*` with a wildcard prefix.
+ */
 const client = new ZitadelClient({ baseUrl: "http://localhost", allowDestructive: false });
 
 beforeAll(() => {

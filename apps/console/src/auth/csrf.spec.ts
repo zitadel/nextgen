@@ -134,8 +134,6 @@ describe("SessionCsrf.fetch refusal", () => {
     expect(sent).toEqual([null, "fresh"]);
   });
 
-  // The re-check hands back nothing when someone else, or nobody, is signed in
-  // now: the write is not replayed under a session it was not prepared for.
   it("does not retry when the re-check hands back no token", async () => {
     const sent = answering(API, [refused]);
 

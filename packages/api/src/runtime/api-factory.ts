@@ -105,7 +105,11 @@ export type ZitadelApiHooks = Readonly<{
 
 /**
  * Every generated operation bound to `client`, and the operations that page
- * with `pages`, `items` and `all`:
+ * with `pages`, `items` and `all`. Only what the spec's operation table names
+ * is bound, and the table is read on each call rather than at load, so a
+ * bundle that imports this module for something else keeps no operation. A
+ * paged function fetches each page as the server answered it, from the
+ * generated function's full arguments, its client first.
  *
  * @param client - The client every operation runs against.
  * @param hooks - What to do to every result and every failure.
@@ -123,18 +127,12 @@ export function createZitadelApi(client: ZitadelClient, hooks: ZitadelApiHooks =
   };
   const hooked = hooks.onResponse !== undefined || hooks.onError !== undefined;
   const api: Record<string, unknown> = { client };
-  // Each operation's generated function is named by its id, first letter
-  // lowercased: only what the spec's operation table names is bound. Read here
-  // rather than at load, so a bundle that imports this module for something
-  // else does not keep every operation.
   const names = new Set(operations.map(({ id }) => id.charAt(0).toLowerCase() + id.slice(1)));
   for (const [name, value] of Object.entries(endpoints)) {
     if (!names.has(name)) {
       continue;
     }
     const operation = value as (...args: unknown[]) => Promise<unknown>;
-    // The page a paged function fetches, as the server answered it, from the
-    // generated function's full arguments, its client first.
     const send = (...args: unknown[]) => operation(...args);
     const call = (...args: unknown[]) => {
       const result = operation(client, ...args);

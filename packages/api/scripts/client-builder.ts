@@ -59,7 +59,8 @@ const CLIENT_PROP: GetterProp = {
  *
  * `options` stays plain `RequestInit` for the per-call extras (headers,
  * `credentials`, a signal). The URL builder orval writes beside each operation
- * is kept private to the file, so the module exports only operations.
+ * (`getProject` → `getGetProjectUrl`) stays in the file for the operation to
+ * call, but is not exported, so the module exports only operations.
  *
  * @param clients - orval's built-in clients.
  * @returns The fetch client's builders, with its operation builder wrapped.
@@ -78,7 +79,6 @@ export const zitadelClient: OutputClientFunc = (clients: GeneratorClients) => {
       throw new Error(`${verbOptions.operationName}: the client needs orval's mutator to be set`);
     }
     const name = verbOptions.operationName;
-    // orval's name for the operation's URL builder: `getProject` → `getGetProjectUrl`.
     const urlBuilder = `get${name.charAt(0).toUpperCase()}${name.slice(1)}Url`;
     return {
       ...generated,
@@ -89,8 +89,6 @@ export const zitadelClient: OutputClientFunc = (clients: GeneratorClients) => {
       implementation: substituteOnce(name, generated.implementation, [
         { find: `${mutator}<`, replace: `${mutator}(client, ${JSON.stringify(name)})<` },
         { find: `Parameters<typeof ${mutator}>[1]`, replace: "RequestInit" },
-        // The URL builder stays in the file for the operation to call, but is
-        // not exported: the module exports operations and nothing else.
         { find: `export const ${urlBuilder} = `, replace: `const ${urlBuilder} = ` },
       ]),
     };

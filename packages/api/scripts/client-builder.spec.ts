@@ -88,10 +88,6 @@ describe("the generated module", () => {
     expectTypeOf<keyof typeof endpoints>().toEqualTypeOf<OperationName>();
   });
 
-  // The two halves of orval's `urlEncodeParameters`, pinned together because
-  // they regressed in opposite directions: 8.10 encoded neither, and turning
-  // the flag on before 8.37 encoded both — which mangles the server's origin
-  // (orval-labs/orval#4178).
   it("encodes a path parameter and leaves the base URL as it is", async () => {
     const { base, seen } = await paths();
     const client = new ZitadelClient({ baseUrl: base, allowDestructive: false });
@@ -101,8 +97,6 @@ describe("the generated module", () => {
     expect(seen).toEqual(["/api/v1/users/usr_01"]);
   });
 
-  // A schema's id is its `$id`, usually a URL. Sent raw, the `//` collapses on
-  // a redirect and the request 404s.
   it.each([
     [
       "https://zitadel.com/schemas/v1/default-human-user.json",

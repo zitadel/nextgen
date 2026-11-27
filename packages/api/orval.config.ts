@@ -22,26 +22,23 @@ export default defineConfig({
     output: {
       target: "./src/generated/endpoints",
       schemas: "./src/generated/model",
-      // orval's fetch client, every operation taking its ZitadelClient first
-      // (scripts/client-builder.ts).
       client: zitadelClient,
       mode: "split",
       mock: true,
       // A path parameter is any string the API accepts, and schema ids are
       // routinely `$id` URIs (`https://…/default-human-user.json`). Without
       // this, orval interpolates them raw and `/schemas/{schema_id}` collapses the
-      // `//` on a redirect and 404s. The server and the API prefix (ADR 077) are
-      // the client's, which the transport puts in front of the path.
+      // `//` on a redirect and 404s.
       urlEncodeParameters: true,
       override: {
         fetch: {
           includeHttpResponseReturnType: false,
         },
         mutator: {
-          // Every generated operation routes through `customFetch`, with
-          // its client and its name, so the URL, bearer auth, the
-          // destructive guard, non-2xx → throw and JSON body parsing
-          // happen in one place.
+          // Every generated operation routes through `customFetch` so
+          // bearer auth, non-2xx → throw, and JSON body parsing happen
+          // in one place. Callers consume the orval functions directly
+          // — no hand-written HTTP wrapper.
           path: "./src/runtime/fetch.ts",
           name: "customFetch",
         },

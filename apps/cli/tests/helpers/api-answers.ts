@@ -115,23 +115,6 @@ function routeOf(operation: OperationName) {
   };
 }
 
-/** A request before it is typed by its operation: the body as JSON. */
-type RawSent = Sent;
-
-/** The request as a test reads it. */
-async function sentOf(
-  request: Request,
-  params: Readonly<Record<string, string | readonly string[] | undefined>>,
-): Promise<RawSent> {
-  const text = await request.clone().text();
-  return {
-    url: new URL(request.url),
-    params,
-    body: text === "" ? undefined : JSON.parse(text),
-    headers: request.headers,
-  };
-}
-
 /**
  * The response a reply's value becomes. A `Response` is copied, because its
  * body can be read once and one reply may answer many requests.
@@ -165,25 +148,23 @@ export function answering(
   server: SetupServer,
   operation: OperationName,
   reply: unknown,
-): readonly RawSent[] {
-  const sent: RawSent[] = [];
+): readonly Sent[] {
+  const sent: Sent[] = [];
   const { handle, url } = routeOf(operation);
   server.use(
     handle(url, async ({ request, params }) => {
-      const received = await sentOf(request, params);
+      const text = await request.clone().text();
+      const received: Sent = {
+        url: new URL(request.url),
+        params,
+        body: text === "" ? undefined : JSON.parse(text),
+        headers: request.headers,
+      };
       sent.push(received);
       return responseOf(typeof reply === "function" ? await reply(received) : reply);
     }),
   );
   return sent;
-}
-
-/** The `page_token` a JSON body carries, if any. */
-function bodyToken(body: unknown): string | undefined {
-  if (typeof body === "object" && body !== null && "page_token" in body) {
-    return typeof body.page_token === "string" ? body.page_token : undefined;
-  }
-  return undefined;
 }
 
 /**
@@ -205,8 +186,13 @@ export function answeringPages<K extends PagedOperation & OperationName>(
 ): readonly Sent<K>[] {
   const { paging } = routeOf(operation);
   return answering(server, operation, (sent) => {
+    const { body } = sent;
     const token =
-      paging?.token === "body" ? bodyToken(sent.body) : sent.url.searchParams.get("page_token");
+      paging?.token !== "body"
+        ? sent.url.searchParams.get("page_token")
+        : typeof body === "object" && body !== null && "page_token" in body
+          ? body.page_token
+          : undefined;
     const index = token ? pages.findIndex((_, at) => `page-${at}` === token) : 0;
     const page = pages[index];
     if (page === undefined) {

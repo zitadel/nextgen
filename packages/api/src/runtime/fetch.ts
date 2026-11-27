@@ -118,9 +118,13 @@ const DESTRUCTIVE: ReadonlySet<string> = new Set(destructiveOperations);
  * - bearer auth and the `User-Agent`, from the client;
  * - the client's signal and deadline, combined with any signal on the call;
  * - the client's `fetch`, which sends the request;
- * - non-2xx → throw {@link ApiError}, so failures interrupt control flow;
+ * - non-2xx → throw {@link ApiError}, so failures interrupt control flow; a
+ *   `404 req.not_found` says the server has no such operation, since every
+ *   operation called is one the spec has: a server older than the API prefix;
  * - body parsing — the parsed JSON typed as `T`, or `undefined` for the
- *   spec's `204`/`205`/`304` no-body responses;
+ *   spec's `204`/`205`/`304` no-body responses. The body is trusted to have
+ *   the shape the generated types promise; should that change, check it here,
+ *   against the generated Zod response schemas, so every call is covered;
  * - no response → throw {@link NetworkError}, or the abort reason when the
  *   caller cancelled (see {@link request}).
  *
@@ -146,9 +150,6 @@ export function customFetch(client: ZitadelClient, operation: string) {
     const { res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody);
 
     if (!res.ok) {
-      // Every operation this client calls is one the spec has, so a server that
-      // knows no such path is another version, most likely one from before the
-      // API moved under its prefix.
       const message =
         res.status === 404 && apiErrorCode(parsed) === ROUTE_NOT_FOUND
           ? `${options.method ?? "GET"} ${url} returned 404 (${ROUTE_NOT_FOUND}): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
@@ -162,10 +163,6 @@ export function customFetch(client: ZitadelClient, operation: string) {
       );
     }
 
-    // The body is trusted to have the shape the generated types promise; no
-    // response is checked here or by the paged functions. Should that change,
-    // check it here, against the generated Zod response schemas, so every call
-    // is covered.
     return parsed as T;
   };
 }

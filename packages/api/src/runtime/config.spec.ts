@@ -121,7 +121,6 @@ describe("getApi", () => {
     expect(typeof api.getMySession).toBe("function");
   });
 
-  // Signing out of the app is `DELETE /sessions/me`.
   test("lets the app's own client run destructive operations", () => {
     const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
 

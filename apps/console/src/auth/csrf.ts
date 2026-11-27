@@ -89,7 +89,9 @@ export class SessionCsrf {
 
   /**
    * `fetch`, with the token on unsafe requests to the API's origin and one
-   * retry with a fresh token after a CSRF refusal. Bound, so it can be handed
+   * retry with a fresh token after a CSRF refusal. A body that can be read
+   * only once (a stream, or a `Request`'s body the first send consumed) is
+   * never sent again. Bound, so it can be handed
    * to a client as is.
    *
    * @param input - The URL.
@@ -109,8 +111,6 @@ export class SessionCsrf {
       headers.set(CSRF_HEADER, sent);
     }
     const res = await fetch(input, { ...init, headers });
-    // A body that can be read only once cannot be sent again: a stream, or the
-    // body of a Request, which the first send consumed.
     if (
       res.status !== 403 ||
       init.body instanceof ReadableStream ||

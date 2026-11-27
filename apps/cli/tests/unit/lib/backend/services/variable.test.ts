@@ -321,7 +321,6 @@ describe("VariableService.set", () => {
   it("reports a kind it could not read back as unverified, and the write as done", async ({
     server,
   }) => {
-    // The write names the primary kind, so only the preview kind is read back.
     answering(server, "setVariables", { API_KEY: { primary: "new" } });
     answering(server, "listVariables", refusal(403, "variable.permission_denied"));
 

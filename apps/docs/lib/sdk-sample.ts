@@ -286,12 +286,14 @@ function returnsContent(operation: OperationObject): boolean {
 const verbs =
   /^(?:accept|add|build|cancel|complete|create|deactivate|delete|exchange|get|list|lookup|publish|query|reject|remove|revoke|rollback|set|submit|update|verify)(?=[A-Z])/;
 
-// What the call returns, named after the operation: getUser's is `user`.
+/**
+ * What the call returns, named after the operation: getUser's is `user`, and
+ * `result` where that would take the sample's own `api` or `session`.
+ */
 function resultName(method: string): string {
   const noun = method.replace(verbs, "").replace(/By[A-Z][A-Za-z]*$/, "");
   if (noun === method || noun === "") return "result";
   const name = noun.charAt(0).toLowerCase() + noun.slice(1);
-  // `api` and `session` are the sample's own variables.
   return name === "api" || name === "session" ? "result" : name;
 }
 

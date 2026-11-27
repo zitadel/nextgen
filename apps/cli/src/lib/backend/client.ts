@@ -109,9 +109,11 @@ const made = new WeakSet<object>();
 /** Each client's counterpart that may run destructive operations, made once. */
 const destructive = new WeakMap<object, ZitadelClient>();
 
-/** The client functions for one {@link Client}, failing as the backend fails. */
+/**
+ * The client functions for one {@link Client}, failing as the backend fails:
+ * the error hook applies to every call, each page of a paged one included.
+ */
 function bind(client: Client): ZitadelClient {
-  // The hook applies to every call, each page of a paged one included.
   const api = createZitadelApi(client, {
     onError: (error: unknown): never => {
       throw translateFailure(error);
@@ -213,7 +215,6 @@ export function connectionOf(client: ZitadelClient): Connection {
     throw new Error("Only a client createZitadelClient made has a connection");
   }
   const { signal, timeoutMs } = client.client;
-  // createZitadelClient always sets both.
   if (signal === undefined || timeoutMs === undefined) {
     throw new Error("Only a client createZitadelClient made has a connection");
   }
