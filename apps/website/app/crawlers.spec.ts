@@ -29,6 +29,7 @@ describe("sitemapXml", () => {
       "https://preview.zitadel.com/operate",
       "https://preview.zitadel.com/investigate",
       "https://preview.zitadel.com/govern",
+      "https://preview.zitadel.com/platform",
       "https://preview.zitadel.com/platform/sign-in",
       "https://preview.zitadel.com/platform/login-ui",
       "https://preview.zitadel.com/platform/single-sign-on",

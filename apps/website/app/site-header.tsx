@@ -3,7 +3,7 @@ import { Disclosure } from "./disclosure";
 import { GitHubMark } from "./github-mark";
 import { links } from "./links";
 import { Logo } from "./logo";
-import { NAV, type NavGroup } from "./nav";
+import { NAV, type NavEntry, type NavGroup } from "./nav";
 import type { PhaseSlug } from "./phases";
 import type { FeatureSlug } from "./platform";
 import { ThemeToggle } from "./theme-toggle";
@@ -72,6 +72,35 @@ function Group({
   );
 }
 
+/** The page that lists a whole menu, at the menu's foot under a hairline. */
+function Overview({ entry, current }: { entry: NavEntry; current?: string }) {
+  return (
+    <div className="border-window-border border-t pt-2">
+      <a
+        href={entry.href}
+        aria-current={current !== undefined && entry.id === current ? "page" : undefined}
+        className="group flex items-center justify-between rounded-xl px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-tint/[0.05] hover:text-text-primary aria-[current=page]:text-text-primary"
+      >
+        {entry.label}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          fill="none"
+          className="size-4 transition-transform group-hover:translate-x-0.5"
+        >
+          <path
+            d="M3 8h10M9 4l4 4-4 4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </a>
+    </div>
+  );
+}
+
 function Chevron() {
   return (
     <svg
@@ -113,20 +142,15 @@ function MenuIcon() {
 // page as it scrolls: the logo, the preview's label and, from a laptop up,
 // the top level of app/nav.ts on the left; the theme (from sm up), GitHub
 // (from md up) and the one primary button on the right. Below a laptop one
-// menu holds the top level: every menu's groups under their headings, then
-// the links. The header keeps its place (h-16), so the hero below keeps its
-// measure.
-export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug | FeatureSlug }) {
-  // A phone's headings name the menu too, where a group's own does not.
-  const groups = NAV.flatMap((item) =>
-    item.kind === "menu"
-      ? item.groups.map((group) => ({
-          group,
-          heading:
-            group.heading === item.label ? group.heading : `${item.label} · ${group.heading}`,
-        }))
-      : [],
-  );
+// menu holds the top level: every menu's groups under their headings and the
+// page that lists them, then the links. The header keeps its place (h-16), so
+// the hero below keeps its measure.
+export function SiteHeader({
+  current,
+}: {
+  current?: "changelog" | "platform" | PhaseSlug | FeatureSlug;
+}) {
+  const menus = NAV.flatMap((item) => (item.kind === "menu" ? [item] : []));
   const navLinks = NAV.flatMap((item) => (item.kind === "link" ? [item] : []));
   return (
     <header className="sticky top-0 z-40 h-16 px-3 pt-3 sm:px-4">
@@ -172,6 +196,11 @@ export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug | Fe
                       />
                     ))}
                   </div>
+                  {item.overview && (
+                    <div className="mt-2">
+                      <Overview entry={item.overview} current={current} />
+                    </div>
+                  )}
                 </Disclosure>
               ),
             )}
@@ -199,8 +228,24 @@ export function SiteHeader({ current }: { current?: "changelog" | PhaseSlug | Fe
               panelClassName={`${PANEL} right-0 w-[calc(100vw-2.25rem)] max-w-[24rem]`}
             >
               <div className="flex max-h-[calc(100svh-5.5rem)] flex-col gap-2 overflow-y-auto">
-                {groups.map(({ group, heading }) => (
-                  <Group key={heading} group={group} heading={heading} current={current} />
+                {/* A phone's headings name the menu too, where a group's own
+                    does not. */}
+                {menus.map((menu) => (
+                  <div key={menu.label} className="flex flex-col gap-2">
+                    {menu.groups.map((group) => (
+                      <Group
+                        key={group.heading}
+                        group={group}
+                        heading={
+                          group.heading === menu.label
+                            ? group.heading
+                            : `${menu.label} · ${group.heading}`
+                        }
+                        current={current}
+                      />
+                    ))}
+                    {menu.overview && <Overview entry={menu.overview} current={current} />}
+                  </div>
                 ))}
                 <ul className="flex flex-col border-window-border border-t pt-2">
                   {navLinks.map((item) => (

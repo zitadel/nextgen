@@ -24,6 +24,7 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   MCP); a feature goes under Platform.
 - The header's links and menus of groups come from `app/nav.ts`: add a menu,
   a group or a link there, never in `site-header.tsx`.
+- The footer's menu columns, `/platform` and `/llms.txt` read the same data.
 - It ports `zitadel/new-website`'s narrative redesign
   (`docs/narrative-ia-proposal.md` on that repo's
   `claude/zitadel-narrative-redesign-377a49` branch) and follows that repo's

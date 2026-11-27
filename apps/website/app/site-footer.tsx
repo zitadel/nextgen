@@ -2,9 +2,28 @@ import { CommandLine } from "./command-line";
 import { startCommand } from "./commands";
 import { links } from "./links";
 import { Logo } from "./logo";
+import { NAV } from "./nav";
 import { ThemeSwitch } from "./theme-toggle";
 
+// The header's menus (nav.ts) as columns, each with every page of its groups
+// and the page that lists them, so the header and the footer never drift
+// apart; then the footer's own.
+const MENU_COLUMNS = NAV.flatMap((item) =>
+  item.kind === "menu"
+    ? [
+        {
+          title: item.label,
+          links: [
+            ...item.groups.flatMap(({ entries }) => entries),
+            ...(item.overview ? [item.overview] : []),
+          ].map(({ label, href }) => ({ label, href })),
+        },
+      ]
+    : [],
+);
+
 const COLUMNS = [
+  ...MENU_COLUMNS,
   {
     title: "Get started",
     links: [
@@ -40,14 +59,14 @@ const COLUMNS = [
 
 /**
  * The page's end: the logo with the line it stands for and the command that
- * starts Zitadel, to copy on the way out, beside the ways on into the docs
- * and the project and the legal pages; under them the theme switch with
- * System (theme-toggle.tsx).
+ * starts Zitadel, to copy on the way out, over (beside, on a wide screen) the
+ * ways on into the product's pages, the docs, the project and the legal
+ * pages; under them the theme switch with System (theme-toggle.tsx).
  */
 export function SiteFooter() {
   return (
     <footer className="border-border-primary border-t">
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-12 md:grid-cols-[1fr_auto] md:gap-16 md:py-16">
+      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-12 md:py-16 xl:grid-cols-[1fr_auto] xl:gap-16">
         <div className="flex max-w-sm flex-col items-start gap-4">
           <a href="/" aria-label="Zitadel preview home" className="rounded-sm">
             <Logo id="footer-logo" className="h-6 w-auto" autoplay />
@@ -61,7 +80,7 @@ export function SiteFooter() {
         </div>
         <nav
           aria-label="Footer"
-          className="grid grid-cols-2 gap-x-12 gap-y-8 text-sm sm:grid-cols-3 sm:gap-x-16"
+          className="grid grid-cols-2 gap-x-12 gap-y-8 text-sm sm:grid-cols-3 sm:gap-x-16 lg:grid-cols-5 lg:gap-x-12 xl:gap-x-8"
         >
           {COLUMNS.map((column) => (
             <div key={column.title} className="flex flex-col gap-3">

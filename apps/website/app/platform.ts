@@ -1,8 +1,9 @@
 import type { PhaseSlug } from "./phases";
 
 // The platform's features, a page each under /platform/ (feature-page.tsx),
-// in the groups the header's Platform menu shows (nav.ts); the sitemap reads
-// them from here too.
+// in the groups the header's Platform menu shows (nav.ts), and the overview
+// that lists them at /platform; the sitemap and /llms.txt read them from here
+// too.
 
 export type FeatureSlug =
   | "sign-in"
@@ -34,6 +35,17 @@ export type Feature = {
 };
 
 export const FEATURE_GROUPS: readonly FeatureGroup[] = ["Sign-in", "Access"];
+
+/** The overview of every feature, by group (app/platform/page.tsx). */
+export const PLATFORM = {
+  path: "/platform",
+  name: "Platform",
+  title: "Every piece your agent can run.",
+  line: "How people sign in, and who can do what. Each piece has a page of its own.",
+  metaTitle: "Sign-in, single sign-on, permissions and agents — Zitadel",
+  description:
+    "Sign-in, login screens, single sign-on, identity providers, permissions, agents and users: the pieces of Zitadel your agent can run.",
+} as const;
 
 export const FEATURES: readonly Feature[] = [
   {
