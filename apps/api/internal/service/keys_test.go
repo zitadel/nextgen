@@ -67,7 +67,9 @@ func newMockedKeyServiceWithCrypterCache(t testing.TB, crypters cache.Cache[serv
 	require.NoError(t, err)
 
 	_, signingKeys := newKeyCaches(t)
-	svc = service.NewKeyService(service.NewPool(pool), *pmasterKeys, crypters, signingKeys)
+	publicSigningKeys, err := cache.NewMeteredExpirableLRU[service.SigningKeyCacheKey, []jose.JSONWebKey](cache.NamePublicSigningKey, testKeyCacheSize, time.Minute)
+	require.NoError(t, err)
+	svc = service.NewKeyService(service.NewPool(pool), *pmasterKeys, crypters, signingKeys, publicSigningKeys)
 	return svc, statements, *pmasterKeys
 }
 
@@ -424,7 +426,7 @@ func newMigrationKeyService(t *testing.T, masterKeys ...domain.MasterKey) (servi
 	require.NoError(t, err)
 
 	crypters, signingKeys := newKeyCaches(t)
-	return service.NewKeyService(service.NewPool(pool), *allMasterKeys, crypters, signingKeys), statements
+	return service.NewKeyService(service.NewPool(pool), *allMasterKeys, crypters, signingKeys, cache.Disabled[service.SigningKeyCacheKey, []jose.JSONWebKey]{}), statements
 }
 
 // lookupsByCache sums the lookup counter per cache name, which is the only
@@ -937,14 +939,38 @@ func TestKeyService_GetProjectPublicSigningKeys(t *testing.T) {
 		assert.Equal(t, []string{"sig_key_a", "sig_key_b", "sig_key_new"}, ids)
 	})
 
-	t.Run("no keys is an empty list", func(t *testing.T) {
+	t.Run("no keys is an empty list, and is not cached", func(t *testing.T) {
 		t.Parallel()
 		svc, statements, _ := newMockedKeyService(t)
-		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return(nil, nil)
+		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return(nil, nil).Times(2)
 
-		public, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+		for range 2 {
+			public, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+			require.NoError(t, err)
+			assert.Empty(t, public)
+		}
+	})
+
+	t.Run("serves a project's set from the cache, decrypting no seed", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, masterKey := newMockedKeyService(t)
+		kek := newActiveKEK(t, "proj-1", masterKey)
+		kekCrypter, err := kek.Crypter(masterKey)
 		require.NoError(t, err)
-		assert.Empty(t, public)
+		key, err := domain.NewSigningKey("proj-1", domain.SigningKeyPurposeToken, jose.EdDSA, kekCrypter)
+		require.NoError(t, err)
+		key.ID = "sig_key_active"
+		// One read of the keys and of their KEK, for both calls.
+		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return([]*domain.SigningKey{key}, nil).Times(1)
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil).Times(1)
+
+		first, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+		require.NoError(t, err)
+		first[0].KeyID = "changed by the caller"
+		second, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)
+		require.NoError(t, err)
+		require.Len(t, second, 1)
+		assert.Equal(t, "sig_key_active", second[0].KeyID, "a caller cannot change the cached set")
 	})
 
 	t.Run("a storage failure is a fault", func(t *testing.T) {

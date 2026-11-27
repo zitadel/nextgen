@@ -20,6 +20,7 @@ import (
 	"unicode"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/go-viper/mapstructure/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
@@ -301,7 +302,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	if err != nil {
 		return fmt.Errorf("failed to build signing key cache: %w", err)
 	}
-	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache)
+	var publicSigningKeyCache cache.Cache[service.SigningKeyCacheKey, []jose.JSONWebKey] = cache.Disabled[service.SigningKeyCacheKey, []jose.JSONWebKey]{}
+	if cfg.OAuth.JWKSMaxAge > 0 {
+		publicSigningKeyCache, err = cache.NewMeteredExpirableLRU[service.SigningKeyCacheKey, []jose.JSONWebKey](
+			cache.NamePublicSigningKey, cfg.Keys.PublicSigningKeyLRUCacheSize, cfg.OAuth.JWKSMaxAge, cacheMeter)
+		if err != nil {
+			return fmt.Errorf("failed to build public signing key cache: %w", err)
+		}
+	}
+	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache, publicSigningKeyCache)
 
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	authAttemptSvc := service.NewAuthAttemptService(
@@ -873,6 +882,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("schema.lru_cache_size", 1000)                   // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
+	v.SetDefault("keys.public_signing_key_lru_cache_size", 1000)
 	// An identifier namespace, not an address: it is stamped into documents
 	// and stored rows, so moving it means adding the new base to
 	// domain.KnownBuiltinSchemaBases, which keeps every earlier one resolving.

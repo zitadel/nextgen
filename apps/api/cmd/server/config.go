@@ -59,9 +59,10 @@ type OAuthConfig struct {
 	Enabled bool `mapstructure:"enabled"`
 	// JWKSMaxAge is how long a verifier may cache a project's JWKS, sent as
 	// its Cache-Control max-age in whole seconds. It is the propagation
-	// window of ADR 039 §1: the rotation code must publish a new signing key
-	// at least this long before it signs, reading this same value, or a
-	// verifier's cached set misses its kid.
+	// window of ADR 039 §1. The server also caches each set for this long,
+	// so the rotation code must publish a new signing key at least twice
+	// this long before it signs, reading this same value, or a verifier's
+	// cached set misses its kid.
 	JWKSMaxAge time.Duration `mapstructure:"jwks_max_age"`
 }
 
@@ -284,6 +285,10 @@ type KeysConfig struct {
 	// project and purpose. Nothing retires a signing key today; once something
 	// does, this cache needs an eviction path (see GetProjectSigningKey).
 	SigningKeyLRUCacheSize int `mapstructure:"signing_key_lru_cache_size"`
+	// PublicSigningKeyLRUCacheSize bounds the cache of the key sets the JWKS
+	// publishes, held by project and purpose for oauth.jwks_max_age; with a
+	// zero max age nothing is cached.
+	PublicSigningKeyLRUCacheSize int `mapstructure:"public_signing_key_lru_cache_size"`
 }
 
 type SchemaConfig struct {

@@ -39,10 +39,11 @@ type KeyService interface {
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
-	db              *DB
-	masterKeys      domain.MasterKeys
-	crypterCache    cache.Cache[CrypterCacheKey, op.Crypto]
-	signingKeyCache cache.Cache[SigningKeyCacheKey, domain.SigningKey]
+	db                    *DB
+	masterKeys            domain.MasterKeys
+	crypterCache          cache.Cache[CrypterCacheKey, op.Crypto]
+	signingKeyCache       cache.Cache[SigningKeyCacheKey, domain.SigningKey]
+	publicSigningKeyCache cache.Cache[SigningKeyCacheKey, []jose.JSONWebKey]
 }
 
 func NewKeyService(
@@ -50,12 +51,14 @@ func NewKeyService(
 	masterKeys domain.MasterKeys,
 	crypterCache cache.Cache[CrypterCacheKey, op.Crypto],
 	signingKeyCache cache.Cache[SigningKeyCacheKey, domain.SigningKey],
+	publicSigningKeyCache cache.Cache[SigningKeyCacheKey, []jose.JSONWebKey],
 ) KeyService {
 	return &keyService{
-		db:              db,
-		masterKeys:      masterKeys,
-		crypterCache:    crypterCache,
-		signingKeyCache: signingKeyCache,
+		db:                    db,
+		masterKeys:            masterKeys,
+		crypterCache:          crypterCache,
+		signingKeyCache:       signingKeyCache,
+		publicSigningKeyCache: publicSigningKeyCache,
 	}
 }
 
@@ -248,8 +251,11 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 	ctx, end := startSpan(ctx, "KeyService.GetProjectSigningKey")
 	defer end(&err)
 
-	if key, ok := s.signingKeyCache.Get(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}); ok {
-		return new(key), nil
+	cacheKey := SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}
+	cachedKey, ok := s.signingKeyCache.Get(cacheKey)
+	setCacheHit(ctx, ok)
+	if ok {
+		return new(cachedKey), nil
 	}
 
 	key, err := s.db.Statements().GetSigningKey(ctx, database.And(
@@ -264,7 +270,7 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 		return nil, domain.ErrInternal(err).WithMessage("failed to get signing key from the database")
 	}
 
-	s.signingKeyCache.Add(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}, *key)
+	s.signingKeyCache.Add(cacheKey, *key)
 	return key, nil
 }
 
@@ -291,6 +297,13 @@ func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, pur
 func (s *keyService) GetProjectPublicSigningKeys(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ []jose.JSONWebKey, err error) {
 	ctx, end := startSpan(ctx, "KeyService.GetProjectPublicSigningKeys")
 	defer end(&err)
+
+	cacheKey := SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}
+	cached, ok := s.publicSigningKeyCache.Get(cacheKey)
+	setCacheHit(ctx, ok)
+	if ok {
+		return slices.Clone(cached), nil
+	}
 
 	// Every key that is not removed, retired ones included: nothing rotates
 	// keys yet, so the purge of ADR 039 §1 that ends a retired key's grace
@@ -324,6 +337,10 @@ func (s *keyService) GetProjectPublicSigningKeys(ctx context.Context, projectID 
 				WithDetails(map[string]any{"keyID": key.ID})
 		}
 		public = append(public, jwk)
+	}
+
+	if len(public) > 0 {
+		s.publicSigningKeyCache.Add(cacheKey, slices.Clone(public))
 	}
 	return public, nil
 }
