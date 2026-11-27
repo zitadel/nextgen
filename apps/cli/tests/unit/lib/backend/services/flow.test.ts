@@ -1,101 +1,110 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "@tests/fixtures";
+
+import { BackendNameUnknownError } from "@/lib/backend";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { FlowService } from "@/lib/backend/services/flow";
-import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
+import { answering, answeringPages, testClient } from "@tests/helpers/api-answers";
 
-/** A service answering `stubs`, bound to one project. */
-function service(stubs: ClientStubs): FlowService {
-  return new FlowService(fakeClient(stubs), "proj_1");
+/** A service on a test client, bound to one project. */
+function service(): FlowService {
+  return new FlowService(testClient(), "proj_1");
 }
 
 describe("FlowService.list", () => {
-  it("lists every flow of the project it is bound to, narrowed by the query", async () => {
-    const all = vi.fn(async () => [{ id: "flowdef_1" }]);
-
-    const flows = await service({ listFlowDefinitions: { all } }).list({ name: "default-login" });
-
-    expect(all).toHaveBeenCalledWith({
-      project_id: "proj_1",
-      name: "default-login",
+  it("lists every flow of the project it is bound to, narrowed by the query", async ({
+    server,
+  }) => {
+    const listed = answeringPages(server, "listFlowDefinitions", {
+      flow_definitions: [{ id: "flowdef_1" }],
     });
+
+    const flows = await service().list({ name: "default-login" });
+
+    expect(
+      listed.map(({ url }) => {
+        return Object.fromEntries(url.searchParams);
+      }),
+    ).toEqual([{ project_id: "proj_1", name: "default-login" }]);
     expect(flows).toEqual([{ id: "flowdef_1" }]);
   });
 
-  it("drains past the first page, so a caller sees every flow", async () => {
-    const flows = await service({
-      listFlowDefinitions: {
-        all: async () => [{ id: "flowdef_2" }, { id: "flowdef_1" }],
-      },
-    }).list();
+  it("drains past the first page, so a caller sees every flow", async ({ server }) => {
+    answeringPages(
+      server,
+      "listFlowDefinitions",
+      { flow_definitions: [{ id: "flowdef_2" }] },
+      { flow_definitions: [{ id: "flowdef_1" }] },
+    );
+
+    const flows = await service().list();
 
     expect(flows).toEqual([{ id: "flowdef_2" }, { id: "flowdef_1" }]);
   });
 });
 
 describe("FlowService.page", () => {
-  it("reads one page and the cursor to the next", async () => {
-    const first = await service({
-      listFlowDefinitions: {
-        pages: () =>
-          pagesOf(
-            { flow_definitions: [{ id: "flowdef_2" }], next_page_token: "t2" },
-            { flow_definitions: [{ id: "flowdef_1" }], next_page_token: null },
-          ),
-      },
-    }).page();
+  it("reads one page and the cursor to the next", async ({ server }) => {
+    answering(server, "listFlowDefinitions", {
+      flow_definitions: [{ id: "flowdef_2" }],
+      next_page_token: "t2",
+    });
+
+    const first = await service().page();
 
     expect(first.items).toEqual([{ id: "flowdef_2" }]);
     expect(first.next).toBe("t2");
   });
 
-  it("answers no cursor when the server sent none", async () => {
-    const first = await service({
-      listFlowDefinitions: {
-        pages: () => pagesOf({ flow_definitions: [], next_page_token: null }),
-      },
-    }).page();
+  it("answers no cursor when the server sent none", async ({ server }) => {
+    answeringPages(server, "listFlowDefinitions", { flow_definitions: [] });
+
+    const first = await service().page();
 
     expect(first.next).toBeNull();
   });
 });
 
 describe("FlowService.get", () => {
-  it("fetches a revision id directly", async () => {
-    const getFlowDefinition = vi.fn(async () => ({ id: "flowdef_1" }));
+  it("fetches a revision id directly", async ({ server }) => {
+    const fetched = answering(server, "getFlowDefinition", { id: "flowdef_1" });
 
-    await expect(service({ getFlowDefinition }).get("flowdef_1")).resolves.toEqual({
+    await expect(service().get("flowdef_1")).resolves.toEqual({
       id: "flowdef_1",
     });
-    expect(getFlowDefinition).toHaveBeenCalledWith("flowdef_1");
+    expect(
+      fetched.map(({ params }) => {
+        return params.flow_definition_id;
+      }),
+    ).toEqual(["flowdef_1"]);
   });
 
-  it("takes the newest revision of a flow named by its name", async () => {
-    const pages = vi.fn(() =>
-      pagesOf({
-        flow_definitions: [{ id: "flowdef_2" }, { id: "flowdef_1" }],
-        next_page_token: null,
-      }),
-    );
+  it("takes the newest revision of a flow named by its name", async ({ server }) => {
+    const listed = answeringPages(server, "listFlowDefinitions", {
+      flow_definitions: [{ id: "flowdef_2" }, { id: "flowdef_1" }],
+    });
 
-    const flow = await service({ listFlowDefinitions: { pages } }).get("default-login");
+    const flow = await service().get("default-login");
 
     expect(flow).toEqual({ id: "flowdef_2" });
-    expect(pages).toHaveBeenCalledWith({
-      project_id: "proj_1",
-      name: "default-login",
-      limit: 1,
-    });
+    expect(
+      listed.map(({ url }) => {
+        return Object.fromEntries(url.searchParams);
+      }),
+    ).toEqual([{ project_id: "proj_1", name: "default-login", limit: "1" }]);
   });
 
-  it("refuses a name that matches no flow", async () => {
-    await expect(
-      service({
-        listFlowDefinitions: {
-          pages: () => pagesOf({ flow_definitions: [], next_page_token: null }),
-        },
-      }).get("typo"),
-    ).rejects.toMatchObject({
-      name: "BackendNameUnknownError",
+  it("refuses a name that matches no flow, saying how to see what the project has", async ({
+    server,
+  }) => {
+    answeringPages(server, "listFlowDefinitions", { flow_definitions: [] });
+
+    const error = await rejectionOf(() => service().get("typo"));
+
+    expect(error).toBeInstanceOf(BackendNameUnknownError);
+    expect(error).toMatchObject({
       code: "E_NOT_FOUND",
       message: 'No flow definition named "typo"',
     });
@@ -103,8 +112,8 @@ describe("FlowService.get", () => {
 });
 
 describe("FlowService.create", () => {
-  it("sends the flow with the project it is bound to", async () => {
-    const publishFlowDefinition = vi.fn(async () => ({ id: "flowdef_1" }));
+  it("sends the flow with the project it is bound to", async ({ server }) => {
+    const published = answering(server, "publishFlowDefinition", { id: "flowdef_1" });
 
     const flowDefinition = {
       name: "default-login",
@@ -113,11 +122,12 @@ describe("FlowService.create", () => {
       steps: [],
     };
 
-    await service({ publishFlowDefinition }).create({ flow_definition: flowDefinition });
+    await service().create({ flow_definition: flowDefinition });
 
-    expect(publishFlowDefinition).toHaveBeenCalledWith({
-      flow_definition: flowDefinition,
-      project_id: "proj_1",
-    });
+    expect(
+      published.map(({ body }) => {
+        return body;
+      }),
+    ).toEqual([{ flow_definition: flowDefinition, project_id: "proj_1" }]);
   });
 });

@@ -148,6 +148,41 @@ func TestPasswordLoginFlow(t *testing.T) {
 	for _, want := range []domain.EventType{domain.EventTypeSessionEstablished, domain.EventTypeAuthTokenIssued} {
 		require.True(t, inFlow[want], "%s must carry the flow's ID; the flow has %v", want, inFlow)
 	}
+
+	// The sign-in is one chain: the flow's three requests from the browser
+	// and the app's exchange, a call with another credential and no cookie.
+	// The flow state carries the chain from request to request, and the
+	// attempt hands it to the exchange.
+	require.NotEmpty(t, page.Items)
+	require.NotNil(t, page.Items[0].CorrelationID, "an event of the flow names no chain")
+	chain := *page.Items[0].CorrelationID
+	require.Regexp(t, `^[0-9a-f]{32}$`, chain)
+	opts = events.ListOptions(project.ID, 100)
+	opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.EventFieldCorrelationID), chain))
+	page, err = harness.EnsureServiceDB(t).Statements().ListEvents(t.Context(), opts)
+	require.NoError(t, err)
+	inChain := map[domain.EventType]bool{}
+	for _, ev := range page.Items {
+		inChain[ev.EventType] = true
+	}
+	for _, want := range []domain.EventType{
+		domain.EventTypeAuthAttemptCreated,
+		domain.EventTypeAuthCheckSucceeded,
+		domain.EventTypeAuthAttemptHandedOff,
+		domain.EventTypeSessionEstablished,
+		domain.EventTypeAuthTokenIssued,
+	} {
+		require.True(t, inChain[want], "%s must carry the sign-in's chain; the chain has %v", want, inChain)
+	}
+
+	// A session is no carrier: what it authenticates afterwards is in no chain.
+	all, err := harness.EnsureServiceDB(t).Statements().ListEvents(t.Context(), events.ListOptions(project.ID, 100))
+	require.NoError(t, err)
+	for _, ev := range all.Items {
+		if ev.CorrelationID != nil {
+			require.Equal(t, chain, *ev.CorrelationID, "%s is in a second chain", ev.EventType)
+		}
+	}
 }
 
 // TestPasswordLoginFlow_UnknownEmail confirms an unknown identifier routes to

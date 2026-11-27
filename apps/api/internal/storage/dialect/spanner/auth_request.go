@@ -10,13 +10,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authattempt"
 )
 
 const (
 	authRequestTable      = "auth_requests"
 	createAuthRequestStmt = `INSERT INTO auth_requests` +
-		` (project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, expires_at)` +
-		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12) THEN RETURN created_at`
+		` (project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, expires_at, correlation_id)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13) THEN RETURN created_at`
 	setAuthRequestCodeStmt = `UPDATE auth_requests SET code_hash = @p3, user_id = @p4, session_id = @p5, code_expires_at = @p6` +
 		` WHERE project_id = @p1 AND id = @p2 AND code_hash IS NULL AND expires_at > @p7`
 )
@@ -24,7 +25,7 @@ const (
 var authRequestColumns = []string{
 	"project_id", "id", "client_id", "redirect_uri", "state", "scopes", "code_challenge",
 	"issuer", "deployment_id", "release_id", "binding_hash", "created_at", "expires_at",
-	"code_hash", "user_id", "session_id", "code_expires_at",
+	"code_hash", "user_id", "session_id", "code_expires_at", "correlation_id",
 }
 
 // FORCE_INDEX keeps the delete on the code index, so it does not lock the
@@ -64,6 +65,7 @@ func (s authRequestStatements) CreateAuthRequest(ctx context.Context, request *d
 		request.ReleaseID,
 		request.BindingHash,
 		request.ExpiresAt,
+		authattempt.EmptyStringArg(request.CorrelationID),
 	).statement()
 	return s.db.Write(ctx, stmt, scanReturnedTimestamp(&request.CreatedAt))
 }
@@ -115,6 +117,7 @@ func scanAuthRequest(row *spanner.Row) (*domain.AuthRequest, error) {
 	var (
 		request                     domain.AuthRequest
 		codeHash, userID, sessionID spanner.NullString
+		correlationID               spanner.NullString
 	)
 	if err := row.Columns(
 		&request.ProjectID,
@@ -134,9 +137,11 @@ func scanAuthRequest(row *spanner.Row) (*domain.AuthRequest, error) {
 		&userID,
 		&sessionID,
 		&request.CodeExpiresAt,
+		&correlationID,
 	); err != nil {
 		return nil, err
 	}
+	request.CorrelationID = correlationID.StringVal
 	request.CreatedAt = request.CreatedAt.UTC()
 	request.ExpiresAt = request.ExpiresAt.UTC()
 	request.CodeHash = codeHash.StringVal

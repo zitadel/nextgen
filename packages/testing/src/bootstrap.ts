@@ -1,4 +1,4 @@
-import { createZitadelClient } from "@zitadel/api/client";
+import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchemaBody,
@@ -46,7 +46,7 @@ export async function bootstrapProject(
   options: BootstrapProjectOptions,
 ): Promise<BootstrappedProject> {
   const { baseUrl } = options;
-  const unauthenticated = createZitadelClient({ baseUrl });
+  const unauthenticated = createZitadelApi(new ZitadelClient({ baseUrl, allowDestructive: true }));
   const project = await unauthenticated.createProject({
     name: options.projectName ?? DEFAULT_PROJECT_NAME,
     origins: (options.appOrigins?.length ? options.appOrigins : [FALLBACK_APP_ORIGIN]).map(
@@ -57,7 +57,9 @@ export async function bootstrapProject(
     ),
     seed_defaults: false,
   });
-  const client = createZitadelClient({ baseUrl, token: project.project_secret });
+  const client = createZitadelApi(
+    new ZitadelClient({ baseUrl, token: project.project_secret, allowDestructive: true }),
+  );
 
   const schemaBody = getDefaultHumanUserSchemaBody({
     preset: options.preset,

@@ -1,24 +1,19 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect } from "vitest";
 
-import { BackendUnreachableError } from "@/lib/backend";
+import { it } from "@tests/fixtures";
+
+import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { PreviewExpiries } from "@/lib/preview";
 import { warnings } from "@/lib/ui/warnings";
-import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
+import {
+  answering,
+  answeringPages,
+  refusal,
+  TEST_SERVER,
+  testClient,
+} from "@tests/helpers/api-answers";
 import { rejectionOf } from "@tests/helpers/thrown-value";
-
-/** A walk whose first read fails with `error`. */
-function failingWith(error: Error): AsyncIterable<never> {
-  return {
-    [Symbol.asyncIterator]() {
-      return {
-        next: () => {
-          return Promise.reject(error);
-        },
-      };
-    },
-  };
-}
 
 describe("PreviewExpiries.live", () => {
   const ORIGIN = "https://pr-7.preview.acme.com";
@@ -28,51 +23,36 @@ describe("PreviewExpiries.live", () => {
     warnings.take();
   });
 
-  it("answers the expiry of each origin it was asked for", async () => {
-    const client = fakeClient({
-      listProjectPreviews: {
-        pages: () =>
-          pagesOf({
-            previews: [{ origin: ORIGIN, expires_at: EXPIRES }],
-            next_page_token: null,
-          }),
-      },
+  it("answers the expiry of each origin it was asked for", async ({ server }) => {
+    answeringPages(server, "listProjectPreviews", {
+      previews: [{ origin: ORIGIN, expires_at: EXPIRES }],
     });
 
-    const expiries = await PreviewExpiries.of(client, "proj_1").live([ORIGIN]);
+    const expiries = await PreviewExpiries.of(testClient(), "proj_1").live([ORIGIN]);
 
     expect(expiries).toEqual(new Map([[ORIGIN, EXPIRES]]));
   });
 
-  it("answers no expiry when the previews cannot be read", async () => {
-    const client = fakeClient({
-      listProjectPreviews: {
-        pages: () => failingWith(new BackendUnreachableError("down")),
-      },
-    });
+  it("answers no expiry when the previews cannot be read", async ({ server }) => {
+    answering(server, "listProjectPreviews", refusal(503, "unavailable", "down"));
 
-    const expiries = await PreviewExpiries.of(client, "proj_1").live([ORIGIN]);
+    const expiries = await PreviewExpiries.of(testClient(), "proj_1").live([ORIGIN]);
 
     expect(expiries).toEqual(new Map());
   });
 
-  it("says why when the previews cannot be read", async () => {
-    const client = fakeClient({
-      listProjectPreviews: {
-        pages: () => failingWith(new BackendUnreachableError("down")),
-      },
-    });
+  it("says why when the previews cannot be read", async ({ server }) => {
+    answering(server, "listProjectPreviews", refusal(503, "unavailable", "down"));
 
-    await PreviewExpiries.of(client, "proj_1").live([ORIGIN]);
+    await PreviewExpiries.of(testClient(), "proj_1").live([ORIGIN]);
 
     expect(warnings.take()).toEqual(["Could not read when the previews expire: down"]);
   });
 
   it("does not hide a cancellation", async () => {
-    const client = fakeClient({
-      listProjectPreviews: {
-        pages: () => failingWith(new ZitadelError("E_CANCELLED", "Cancelled by user")),
-      },
+    const client = createZitadelClient({
+      baseUrl: TEST_SERVER,
+      signal: AbortSignal.abort(new ZitadelError("E_CANCELLED", "Cancelled by user")),
     });
 
     const thrown = await rejectionOf(() => PreviewExpiries.of(client, "proj_1").live([ORIGIN]));
@@ -80,14 +60,10 @@ describe("PreviewExpiries.live", () => {
     expect(thrown).toMatchObject({ code: "E_CANCELLED" });
   });
 
-  it("warns of nothing when the previews are read", async () => {
-    const client = fakeClient({
-      listProjectPreviews: {
-        pages: () => pagesOf({ previews: [], next_page_token: null }),
-      },
-    });
+  it("warns of nothing when the previews are read", async ({ server }) => {
+    answeringPages(server, "listProjectPreviews", { previews: [] });
 
-    await PreviewExpiries.of(client, "proj_1").live([ORIGIN]);
+    await PreviewExpiries.of(testClient(), "proj_1").live([ORIGIN]);
 
     expect(warnings.take()).toEqual([]);
   });

@@ -2,15 +2,18 @@ import type {
   QueryUsers200UsersItemMetadataStatus,
   QueryUsersBody,
 } from "@zitadel/api/generated/model";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { OperationName } from "@zitadel/api/client";
+import type { SetupServer } from "msw/node";
+import { beforeEach, describe, expect, vi } from "vitest";
 
-import type { Credential } from "@/lib/backend";
-import { BackendNotFoundError, BackendUnreachableError } from "@/lib/backend";
+import { it } from "@tests/fixtures";
+
+import { BackendUnreachableError, type Credential } from "@/lib/backend";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { warnings } from "@/lib/ui";
 import type { JsonObject, JsonValue } from "@/lib/zitadel";
 import { aConfig, aLoginFlow, aUserSchema } from "@tests/helpers/config";
-import { type ClientStubs, pagesOf } from "@tests/helpers/fake-client";
+import { answering, answeringPages, refusal, type Sent } from "@tests/helpers/api-answers";
 import { aDeployment } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
 import type { StepContext } from "@/lib/publish/pipeline";
@@ -98,6 +101,32 @@ type Platform = Readonly<{
 }>;
 
 /**
+ * The requests the fake platform received.
+ */
+type Received = Readonly<{
+  /**
+   * The user queries, one per page asked for.
+   */
+  queried: readonly Sent<"queryUsers">[];
+  /**
+   * The schema listings.
+   */
+  listed: readonly Sent[];
+  /**
+   * The password reads.
+   */
+  passwords: readonly Sent[];
+  /**
+   * The passkey reads.
+   */
+  passkeys: readonly Sent[];
+  /**
+   * The identity-link reads.
+   */
+  links: readonly Sent[];
+}>;
+
+/**
  * An active user of `objectType`, carrying `attributes`.
  *
  * @param id - The user's id.
@@ -130,12 +159,14 @@ function someUsers(
 }
 
 /**
- * The step's view of a project on the fake platform.
+ * The step's view of a project on the fake platform: answers every request
+ * the step sends.
  *
+ * @param server - The test's MSW server.
  * @param platform - What the platform holds.
- * @returns The client stubs that answer it.
+ * @returns The requests it received.
  */
-function aPlatform(platform: Platform = {}): ClientStubs {
+function aPlatform(server: SetupServer, platform: Platform = {}): Received {
   const {
     users = [],
     linked = [],
@@ -147,47 +178,75 @@ function aPlatform(platform: Platform = {}): ClientStubs {
     gone = [],
     credentialsUnreadableFor = [],
   } = platform;
-  const reachable = (userId: string) => {
+  const unreachable = (userId: string | readonly string[] | undefined) => {
+    if (typeof userId !== "string") {
+      return undefined;
+    }
     if (gone.includes(userId)) {
-      throw new BackendNotFoundError(`${userId} is gone`, {
-        status: 404,
-      });
+      return refusal(404, "user.not_found");
     }
     if (credentialsUnreadableFor.includes(userId)) {
-      throw new Error("forbidden");
+      return refusal(403, "user.permission_denied");
     }
+    return undefined;
+  };
+  answeringPages(server, "listDeployments", { deployments: liveOn(platform) });
+  return {
+    queried: answering(server, "queryUsers", ({ body }) => {
+      return pageOf(platform, users, body);
+    }),
+    links: answering(server, "listUserIdentityLinks", ({ params }) => {
+      return (
+        unreachable(params.user_id) ?? {
+          identity_links: linked.includes(String(params.user_id)) ? [{}] : [],
+        }
+      );
+    }),
+    passwords: answering(server, "getUserPasswordState", ({ params }) => {
+      return (
+        unreachable(params.user_id) ??
+        (held[String(params.user_id)]?.includes("password")
+          ? { set_at: "2026-01-01T00:00:00Z" }
+          : {})
+      );
+    }),
+    passkeys: answering(server, "listUserPasskeys", ({ params }) => {
+      return (
+        unreachable(params.user_id) ?? {
+          passkeys: held[String(params.user_id)]?.includes("passkey") ? [{}] : [],
+        }
+      );
+    }),
+    listed: answeringPages(server, "listSchemas", { schemas: listing }),
+  };
+}
+
+/**
+ * Has the platform refuse every request for `operation`.
+ *
+ * @param server - The test's MSW server.
+ * @param operation - The operation it refuses.
+ */
+function refusing(server: SetupServer, operation: OperationName): void {
+  answering(server, operation, refusal(403, "forbidden"));
+}
+
+/**
+ * The credentials the step read, by method, as the users it read them of.
+ *
+ * @param received - What the platform received.
+ * @returns The users each method was read for.
+ */
+function credentialsRead(received: Received) {
+  const users = (sent: readonly Sent[]) => {
+    return sent.map(({ params }) => {
+      return params.user_id;
+    });
   };
   return {
-    queryUsers: {
-      pages: (query) => {
-        return pagesOf(pageOf(platform, users, query));
-      },
-    },
-    listUserIdentityLinks: async (userId) => {
-      reachable(userId);
-      return { identity_links: linked.includes(userId) ? [{}] : [] };
-    },
-    getUserPasswordState: async (userId) => {
-      reachable(userId);
-      if (held[userId]?.includes("password")) {
-        return { set_at: "2026-01-01T00:00:00Z" };
-      }
-      return {};
-    },
-    listUserPasskeys: async (userId) => {
-      reachable(userId);
-      return { passkeys: held[userId]?.includes("passkey") ? [{}] : [] };
-    },
-    listSchemas: {
-      all: async () => {
-        return listing;
-      },
-    },
-    listDeployments: {
-      all: async () => {
-        return liveOn(platform);
-      },
-    },
+    password: users(received.passwords),
+    passkey: users(received.passkeys),
+    sso: users(received.links),
   };
 }
 
@@ -202,7 +261,7 @@ function aPlatform(platform: Platform = {}): ClientStubs {
 function pageOf(platform: Platform, users: readonly AUser[], query: QueryUsersBody) {
   const filter = query.filter ?? [];
   if (platform.refuses?.(filter)) {
-    throw new BackendUnreachableError("boom");
+    return refusal(403, "user.permission_denied");
   }
   const equals = filter.find((f) => {
     return f.field === "schema_object_type" && f.operation === "equals";
@@ -260,7 +319,7 @@ function liveOn(platform: Platform) {
 }
 
 /**
- * A client operation the platform refuses.
+ * A lookup that fails.
  *
  * @returns Never; it always throws.
  */
@@ -353,18 +412,18 @@ describe("lockoutStep", () => {
   });
 
   describe("when it finds users it would lock out", () => {
-    const context = () => {
+    const context = (server: SetupServer) => {
+      aPlatform(server, { users: [aUser("u1", "human-user", { email: "a@example.com" })] });
       return aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
     };
 
-    it("hands them back as lockouts", async () => {
-      const result = await lockoutStep.run(context());
+    it("hands them back as lockouts", async ({ server }) => {
+      const result = await lockoutStep.run(context(server));
 
       expect(result?.lockouts).toEqual([
         expect.objectContaining({
@@ -375,49 +434,50 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("does not only warn about them", async () => {
-      await lockoutStep.run(context());
+    it("does not only warn about them", async ({ server }) => {
+      await lockoutStep.run(context(server));
 
       expect(warnings.take()).toEqual([]);
     });
   });
 
   describe("when it cannot finish the check", () => {
-    const context = () => {
+    const context = (server: SetupServer) => {
+      aPlatform(server);
+      refusing(server, "queryUsers");
       return aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
         }),
-        client: { ...aPlatform(), queryUsers: { pages: refused } },
       });
     };
 
-    it("hands back no lockouts", async () => {
-      const result = await lockoutStep.run(context());
+    it("hands back no lockouts", async ({ server }) => {
+      const result = await lockoutStep.run(context(server));
 
       expect(result?.lockouts).toBeUndefined();
     });
 
-    it("warns that the check did not finish", async () => {
-      await lockoutStep.run(context());
+    it("warns that the check did not finish", async ({ server }) => {
+      await lockoutStep.run(context(server));
 
       expect(warnings.take()).toEqual([expect.stringContaining("Could not finish checking")]);
     });
   });
 
   describe("with users lacking the identifier their schema signs in with", () => {
-    it("warns with the count", async () => {
+    it("warns with the count", async ({ server }) => {
+      aPlatform(server, {
+        users: [
+          aUser("u1", "human-user", { email: "a@example.com" }),
+          aUser("u2", "human-user", { username: "b" }),
+        ],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
-        }),
-        client: aPlatform({
-          users: [
-            aUser("u1", "human-user", { email: "a@example.com" }),
-            aUser("u2", "human-user", { username: "b" }),
-          ],
         }),
       });
 
@@ -428,13 +488,15 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("hands back the update that moves each user to the revision that defines the identifier", async () => {
+    it("hands back the update that moves each user to the revision that defines the identifier", async ({
+      server,
+    }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user", { email: "a@example.com" })] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
       const result = await lockoutStep.run(context);
@@ -453,13 +515,13 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("hands back the dot-path form for a dotted identifier", async () => {
+    it("hands back the dot-path form for a dotted identifier", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "account.handle") },
           flows: { "1.json": aLoginFlow({ collects: ["account.handle"] }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
       const result = await lockoutStep.run(context);
@@ -473,13 +535,13 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("does not read an inherited property as the identifier", async () => {
+    it("does not read an inherited property as the identifier", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "constructor") },
           flows: { "1.json": aLoginFlow({ collects: ["constructor"] }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
       const said = await everythingSaid(context);
@@ -487,16 +549,16 @@ describe("lockoutStep", () => {
       expect(said).toHaveLength(1);
     });
 
-    it("counts only active users", async () => {
+    it("counts only active users", async ({ server }) => {
       const deactivated = someUsers("d", "human-user", 200).map((user) => {
         return { ...user, status: "deactivated" as const };
       });
+      aPlatform(server, { users: [...someUsers("a", "human-user", 3), ...deactivated] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users: [...someUsers("a", "human-user", 3), ...deactivated] }),
       });
 
       const said = await everythingSaid(context);
@@ -504,13 +566,13 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('3 of 3 existing users of "human-user"')]);
     });
 
-    it("stays quiet when every user carries the identifier", async () => {
+    it("stays quiet when every user carries the identifier", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user", { email: "a@example.com" })] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("human-user") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
       const said = await everythingSaid(context);
@@ -520,13 +582,15 @@ describe("lockoutStep", () => {
   });
 
   describe("when finding the identifier a flow collects", () => {
-    it("does not treat a login field the schema does not designate as a lookup", async () => {
+    it("does not treat a login field the schema does not designate as a lookup", async ({
+      server,
+    }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user", { email: "a@example.com" })] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
       const said = await everythingSaid(context);
@@ -534,13 +598,15 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("checks only the designated identifier among the fields a login step collects", async () => {
+    it("checks only the designated identifier among the fields a login step collects", async ({
+      server,
+    }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user", { email: "a@example.com" })] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": aLoginFlow({ collects: ["email", "nickname"] }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
       const said = await everythingSaid(context);
@@ -548,13 +614,13 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("finds the identifier on a later step of the login path", async () => {
+    it("finds the identifier on a later step of the login path", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": PASSKEY_FIRST },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
       const said = await everythingSaid(context);
@@ -562,7 +628,7 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
-    it.each([
+    it.for<[string, JsonObject]>([
       [
         "a null purpose and action on a transition as absent",
         {
@@ -594,13 +660,13 @@ describe("lockoutStep", () => {
           ],
         },
       ],
-    ])("treats %s", async (_shape, flow) => {
+    ])("treats %s", async ([_shape, flow], { server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": flow },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
       const said = await everythingSaid(context);
@@ -608,7 +674,7 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
-    it.each([
+    it.for<[string, JsonObject]>([
       ["a purpose change", SIGN_UP_ONLY_COLLECTS],
       [
         "a not-found outcome into a sign-up step",
@@ -640,13 +706,13 @@ describe("lockoutStep", () => {
           ],
         },
       ],
-    ])("does not follow %s off the login path", async (_transition, flow) => {
+    ])("does not follow %s off the login path", async ([_transition, flow], { server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": flow },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
       const said = await everythingSaid(context);
@@ -656,13 +722,13 @@ describe("lockoutStep", () => {
   });
 
   describe("when finding the schema a flow signs in with", () => {
-    it("checks a schema that is only in the project's listing", async () => {
+    it("checks a schema that is only in the project's listing", async ({ server }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user")],
+        listing: [{ id: HUMAN, schema: signingInWith("human-user", "email") }],
+      });
       const context = aStepContext({
         config: aConfig({ flows: { "1.json": aLoginFlow({ userSchema: HUMAN }) } }),
-        client: aPlatform({
-          users: [aUser("u1", "human-user")],
-          listing: [{ id: HUMAN, schema: signingInWith("human-user", "email") }],
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -670,13 +736,15 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
-    it("checks a flow whose schema exists only on the server, named by object type", async () => {
+    it("checks a flow whose schema exists only on the server, named by object type", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users: [aUser("e1", "employee")],
+        listing: [{ id: EMPLOYEE, schema: signingInWith("employee", "email") }],
+      });
       const context = aStepContext({
         config: aConfig({ flows: { "1.json": aLoginFlow({ userSchema: "employee" }) } }),
-        client: aPlatform({
-          users: [aUser("e1", "employee")],
-          listing: [{ id: EMPLOYEE, schema: signingInWith("employee", "email") }],
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -684,24 +752,26 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
-    it("uses the newest revision of a server-only schema for its identifier", async () => {
+    it("uses the newest revision of a server-only schema for its identifier", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users: [aUser("e1", "employee", { email: "a@example.com" })],
+        listing: [
+          {
+            id: "sch_new",
+            schema: signingInWith("employee", "email"),
+            metadata: { created_at: "2026-02-01T00:00:00Z" },
+          },
+          {
+            id: "sch_old",
+            schema: signingInWith("employee", "username"),
+            metadata: { created_at: "2026-01-01T00:00:00Z" },
+          },
+        ],
+      });
       const context = aStepContext({
         config: aConfig({ flows: { "1.json": aLoginFlow({ userSchema: "employee" }) } }),
-        client: aPlatform({
-          users: [aUser("e1", "employee", { email: "a@example.com" })],
-          listing: [
-            {
-              id: "sch_new",
-              schema: signingInWith("employee", "email"),
-              metadata: { created_at: "2026-02-01T00:00:00Z" },
-            },
-            {
-              id: "sch_old",
-              schema: signingInWith("employee", "username"),
-              metadata: { created_at: "2026-01-01T00:00:00Z" },
-            },
-          ],
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -709,26 +779,28 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("takes the identifier from the newest revision when a flow names an older one by id", async () => {
+    it("takes the identifier from the newest revision when a flow names an older one by id", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users: [aUser("e1", "employee", { email: "a@example.com" })],
+        listing: [
+          {
+            id: "sch_new",
+            schema: signingInWith("employee", "username"),
+            metadata: { created_at: "2026-02-01T00:00:00Z" },
+          },
+          {
+            id: "sch_old",
+            schema: signingInWith("employee", "email"),
+            metadata: { created_at: "2026-01-01T00:00:00Z" },
+          },
+        ],
+      });
       const context = aStepContext({
         config: aConfig({
           flows: { "1.json": aLoginFlow({ userSchema: "sch_old", collects: ["username"] }) },
         }),
-        client: aPlatform({
-          users: [aUser("e1", "employee", { email: "a@example.com" })],
-          listing: [
-            {
-              id: "sch_new",
-              schema: signingInWith("employee", "username"),
-              metadata: { created_at: "2026-02-01T00:00:00Z" },
-            },
-            {
-              id: "sch_old",
-              schema: signingInWith("employee", "email"),
-              metadata: { created_at: "2026-01-01T00:00:00Z" },
-            },
-          ],
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -736,26 +808,28 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('has no "username"')]);
     });
 
-    it("takes the first listed revision as the newest, whatever the timestamps' fractional digits", async () => {
+    it("takes the first listed revision as the newest, whatever the timestamps' fractional digits", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users: [aUser("e1", "employee", { email: "a@example.com" })],
+        listing: [
+          {
+            id: "sch_new",
+            schema: signingInWith("employee", "username"),
+            metadata: { created_at: "2026-01-01T00:00:00.123Z" },
+          },
+          {
+            id: "sch_old",
+            schema: signingInWith("employee", "email"),
+            metadata: { created_at: "2026-01-01T00:00:00.12Z" },
+          },
+        ],
+      });
       const context = aStepContext({
         config: aConfig({
           flows: { "1.json": aLoginFlow({ userSchema: "employee", collects: ["username"] }) },
         }),
-        client: aPlatform({
-          users: [aUser("e1", "employee", { email: "a@example.com" })],
-          listing: [
-            {
-              id: "sch_new",
-              schema: signingInWith("employee", "username"),
-              metadata: { created_at: "2026-01-01T00:00:00.123Z" },
-            },
-            {
-              id: "sch_old",
-              schema: signingInWith("employee", "email"),
-              metadata: { created_at: "2026-01-01T00:00:00.12Z" },
-            },
-          ],
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -763,22 +837,24 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('has no "username"')]);
     });
 
-    it("lets the bundle's schema drop the designation even if a listed revision still has one", async () => {
+    it("lets the bundle's schema drop the designation even if a listed revision still has one", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users: [aUser("e1", "employee")],
+        listing: [
+          {
+            id: "sch_old",
+            schema: signingInWith("employee", "email"),
+            metadata: { created_at: "2026-01-01T00:00:00Z" },
+          },
+        ],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "sch_old" }) },
         }),
-        client: aPlatform({
-          users: [aUser("e1", "employee")],
-          listing: [
-            {
-              id: "sch_old",
-              schema: signingInWith("employee", "email"),
-              metadata: { created_at: "2026-01-01T00:00:00Z" },
-            },
-          ],
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -786,43 +862,47 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("does not list the schemas when every flow names an object type, nobody is linked and nothing is deployed", async () => {
+    it("does not list the schemas when every flow names an object type, nobody is linked and nothing is deployed", async ({
+      server,
+    }) => {
+      const received = aPlatform(server, {
+        users: [aUser("u1", "human-user", { email: "a@example.com" })],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
-      const list = vi.spyOn(context.schemas, "list");
 
       await lockoutStep.run(context);
 
-      expect(list).not.toHaveBeenCalled();
+      expect(received.listed).toEqual([]);
     });
 
-    it("lists the schemas once when both resolving a flow and naming a user need them", async () => {
+    it("lists the schemas once when both resolving a flow and naming a user need them", async ({
+      server,
+    }) => {
+      const received = aPlatform(server, { users: [aUser("u1", "human-user")], linked: ["u1"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: EMPLOYEE }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
-      const list = vi.spyOn(context.schemas, "list");
 
       await lockoutStep.run(context);
 
-      expect(list).toHaveBeenCalledTimes(1);
+      expect(received.listed).toHaveLength(1);
     });
 
-    it("names the unserved schema from the one listing it read", async () => {
+    it("names the unserved schema from the one listing it read", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")], linked: ["u1"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: EMPLOYEE }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
       const said = await everythingSaid(context);
@@ -836,15 +916,15 @@ describe("lockoutStep", () => {
   });
 
   describe("with users of a schema no flow serves", () => {
-    it("warns about every one of them, counting the SSO ones on top", async () => {
+    it("warns about every one of them, counting the SSO ones on top", async ({ server }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
+        linked: ["u1"],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
-        }),
-        client: aPlatform({
-          users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
-          linked: ["u1"],
         }),
       });
 
@@ -857,13 +937,13 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("tells the reader to keep or restore a flow on their schema", async () => {
+    it("tells the reader to keep or restore a flow on their schema", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")], linked: ["u1"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
       const said = await everythingSaid(context);
@@ -871,15 +951,15 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('keep or restore a flow on "human-user"')]);
     });
 
-    it("counts the revisions of one schema together", async () => {
+    it("counts the revisions of one schema together", async ({ server }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
+        linked: ["u1", "u2"],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
-        }),
-        client: aPlatform({
-          users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
-          linked: ["u1", "u2"],
         }),
       });
 
@@ -892,13 +972,13 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("warns about those with no SSO link, such as password users", async () => {
+    it("warns about those with no SSO link, such as password users", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
       const said = await everythingSaid(context);
@@ -910,13 +990,13 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("says nothing of SSO links when none of them has one", async () => {
+    it("says nothing of SSO links when none of them has one", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
       const said = await everythingSaid(context);
@@ -924,7 +1004,13 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.not.stringContaining("SSO link")]);
     });
 
-    it("resolves a flow's schema given by its $id before checking either case", async () => {
+    it("resolves a flow's schema given by its $id before checking either case", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "employee", { email: "a@example.com" }), aUser("u2", "human-user")],
+        linked: ["u2", "u1"],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: {
@@ -936,10 +1022,6 @@ describe("lockoutStep", () => {
           },
           flows: { "1.json": aLoginFlow({ userSchema: EMPLOYEE, collects: ["username"] }) },
         }),
-        client: aPlatform({
-          users: [aUser("u1", "employee", { email: "a@example.com" }), aUser("u2", "human-user")],
-          linked: ["u2", "u1"],
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -950,10 +1032,12 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("warns about every user when the release carries no flow definitions, as it serves no sign-in", async () => {
+    it("warns about every user when the release carries no flow definitions, as it serves no sign-in", async ({
+      server,
+    }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")], linked: ["u1"] });
       const context = aStepContext({
         config: aConfig({ schemas: { "1.json": withoutIdentifier("employee") } }),
-        client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
       const said = await everythingSaid(context);
@@ -965,7 +1049,10 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("does not guess which schema is unserved when a flow's schema cannot be resolved", async () => {
+    it("does not guess which schema is unserved when a flow's schema cannot be resolved", async ({
+      server,
+    }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")], linked: ["u1"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
@@ -974,7 +1061,6 @@ describe("lockoutStep", () => {
             "2.json": aLoginFlow({ userSchema: "https://schemas.test/unknown.json" }),
           },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
       const said = await everythingSaid(context);
@@ -984,16 +1070,18 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("names a schema that really has an empty object type instead of calling it unnamed", async () => {
+    it("names a schema that really has an empty object type instead of calling it unnamed", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user")],
+        linked: ["u1"],
+        listing: [{ id: HUMAN, schema: aUserSchema({ objectType: "" }) }],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
-        }),
-        client: aPlatform({
-          users: [aUser("u1", "human-user")],
-          linked: ["u1"],
-          listing: [{ id: HUMAN, schema: aUserSchema({ objectType: "" }) }],
         }),
       });
 
@@ -1006,16 +1094,16 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("counts a user deleted since the query, without reporting a failure", async () => {
+    it("counts a user deleted since the query, without reporting a failure", async ({ server }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
+        linked: ["u2"],
+        gone: ["u1"],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
-        }),
-        client: aPlatform({
-          users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
-          linked: ["u2"],
-          gone: ["u1"],
         }),
       });
 
@@ -1028,13 +1116,13 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("counts every one of them", async () => {
+    it("counts every one of them", async ({ server }) => {
+      aPlatform(server, { users: someUsers("s", "human-user", 250), linked: ["s-249"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-249"] }),
       });
 
       const said = await everythingSaid(context);
@@ -1044,13 +1132,13 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("looks up the links of only the first ones", async () => {
+    it("looks up the links of only the first ones", async ({ server }) => {
+      aPlatform(server, { users: someUsers("s", "human-user", 250), linked: ["s-249"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-249"] }),
       });
 
       const said = await everythingSaid(context);
@@ -1058,13 +1146,13 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.not.stringContaining("SSO link")]);
     });
 
-    it("counts linked users among the first ones", async () => {
+    it("counts linked users among the first ones", async ({ server }) => {
+      aPlatform(server, { users: someUsers("s", "human-user", 250), linked: ["s-0"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-0"] }),
       });
 
       const said = await everythingSaid(context);
@@ -1072,13 +1160,13 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining("(at least 1 of them has an SSO link)")]);
     });
 
-    it("qualifies the SSO count when the user read was cut short", async () => {
+    it("qualifies the SSO count when the user read was cut short", async ({ server }) => {
+      aPlatform(server, { users: someUsers("s", "human-user", 1200), linked: ["s-0"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: someUsers("s", "human-user", 1200), linked: ["s-0"] }),
       });
 
       const said = await everythingSaid(context);
@@ -1088,8 +1176,12 @@ describe("lockoutStep", () => {
   });
 
   describe("when reading the users", () => {
-    it("reads no more than the scan limit in all, across schemas", async () => {
+    it("reads no more than the scan limit in all, across schemas", async ({ server }) => {
       const served: number[] = [];
+      aPlatform(server, {
+        users: [...someUsers("h", "human-user", 700), ...someUsers("e", "employee", 700)],
+        served,
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: {
@@ -1097,10 +1189,6 @@ describe("lockoutStep", () => {
             "2.json": signingInWith("employee", "email"),
           },
           flows: { "1.json": aLoginFlow(), "2.json": aLoginFlow({ userSchema: "employee" }) },
-        }),
-        client: aPlatform({
-          users: [...someUsers("h", "human-user", 700), ...someUsers("e", "employee", 700)],
-          served,
         }),
       });
 
@@ -1113,7 +1201,13 @@ describe("lockoutStep", () => {
       ).toBeLessThanOrEqual(1000);
     });
 
-    it("gives every schema its own share of the scan limit", async () => {
+    it("gives every schema its own share of the scan limit", async ({ server }) => {
+      aPlatform(server, {
+        users: [
+          ...someUsers("a", "human-user", 1200, { email: "a@example.com" }),
+          ...someUsers("e", "employee", 3),
+        ],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: {
@@ -1121,12 +1215,6 @@ describe("lockoutStep", () => {
             "2.json": signingInWith("employee", "email"),
           },
           flows: { "1.json": aLoginFlow(), "2.json": aLoginFlow({ userSchema: "employee" }) },
-        }),
-        client: aPlatform({
-          users: [
-            ...someUsers("a", "human-user", 1200, { email: "a@example.com" }),
-            ...someUsers("e", "employee", 3),
-          ],
         }),
       });
 
@@ -1138,13 +1226,13 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("reports an exact count when the read ends exactly at the limit", async () => {
+    it("reports an exact count when the read ends exactly at the limit", async ({ server }) => {
+      aPlatform(server, { users: someUsers("u", "human-user", 500) });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users: someUsers("u", "human-user", 500) }),
       });
 
       const said = await everythingSaid(context);
@@ -1152,20 +1240,14 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('500 of 500 existing users of "human-user"')]);
     });
 
-    it("stops asking when a page is empty but still offers another", async () => {
+    it("stops asking when a page is empty but still offers another", async ({ server }) => {
+      aPlatform(server);
+      answering(server, "queryUsers", { users: [], next_page_token: "again" });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: {
-          ...aPlatform(),
-          queryUsers: {
-            pages: () => {
-              return pagesOf({ users: [], next_page_token: "again" });
-            },
-          },
-        },
       });
 
       const said = await everythingSaid(context);
@@ -1175,29 +1257,28 @@ describe("lockoutStep", () => {
   });
 
   describe("with what the diff learned", () => {
-    it("reads no users when no schema or flow changed", async () => {
+    it("reads no users when no schema or flow changed", async ({ server }) => {
+      const received = aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
         learned: { schemasOrFlowsChanged: false },
       });
-      const page = vi.spyOn(context.users, "page");
 
       await lockoutStep.run(context);
 
-      expect(page).not.toHaveBeenCalled();
+      expect(received.queried).toEqual([]);
     });
 
-    it("warns about nothing when no schema or flow changed", async () => {
+    it("warns about nothing when no schema or flow changed", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
         learned: { schemasOrFlowsChanged: false },
       });
 
@@ -1206,13 +1287,13 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("checks the users when a schema or flow changed", async () => {
+    it("checks the users when a schema or flow changed", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
         learned: { schemasOrFlowsChanged: true },
       });
 
@@ -1221,10 +1302,12 @@ describe("lockoutStep", () => {
       expect(said).toHaveLength(1);
     });
 
-    it("still checks when a clean diff leaves a flow's schema to the server", async () => {
+    it("still checks when a clean diff leaves a flow's schema to the server", async ({
+      server,
+    }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")] });
       const context = aStepContext({
         config: aConfig({ flows: { "1.json": aLoginFlow({ userSchema: "employee" }) } }),
-        client: aPlatform({ users: [aUser("u1", "human-user")] }),
         learned: { schemasOrFlowsChanged: false },
       });
 
@@ -1235,13 +1318,14 @@ describe("lockoutStep", () => {
   });
 
   describe("when the platform cannot answer", () => {
-    it("never fails the deploy when users cannot be read", async () => {
+    it("never fails the deploy when users cannot be read", async ({ server }) => {
+      aPlatform(server);
+      refusing(server, "queryUsers");
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
         }),
-        client: { ...aPlatform(), queryUsers: { pages: refused } },
       });
 
       const result = await lockoutStep.run(context);
@@ -1249,13 +1333,14 @@ describe("lockoutStep", () => {
       expect(result).toBeUndefined();
     });
 
-    it("says the check could not finish when users cannot be read", async () => {
+    it("says the check could not finish when users cannot be read", async ({ server }) => {
+      aPlatform(server);
+      refusing(server, "queryUsers");
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
         }),
-        client: { ...aPlatform(), queryUsers: { pages: refused } },
       });
 
       const said = await everythingSaid(context);
@@ -1263,46 +1348,14 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining(UNFINISHED)]);
     });
 
-    it("keeps the other scans' warnings when one fails with an error that is not the backend's", async () => {
+    it("keeps the identifier warning when a link read fails", async ({ server }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user"), aUser("u2", "other")] });
+      refusing(server, "listUserIdentityLinks");
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
         }),
-        client: {
-          ...aPlatform(),
-          queryUsers: {
-            pages: (query) => {
-              const scansUnserved = (query.filter ?? []).some((f) => {
-                return f.operation === "not_equals";
-              });
-              if (scansUnserved) {
-                throw new TypeError("users is not iterable");
-              }
-              return pagesOf(pageOf({}, [aUser("u1", "human-user")], query));
-            },
-          },
-        },
-      });
-
-      const said = await everythingSaid(context);
-
-      expect(said).toEqual([
-        expect.stringContaining('has no "username"'),
-        expect.stringContaining(UNFINISHED),
-      ]);
-    });
-
-    it("keeps the identifier warning when a link read fails", async () => {
-      const context = aStepContext({
-        config: aConfig({
-          schemas: { "1.json": signingInWith("human-user", "username") },
-          flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
-        }),
-        client: {
-          ...aPlatform({ users: [aUser("u1", "human-user"), aUser("u2", "other")] }),
-          listUserIdentityLinks: refused,
-        },
       });
 
       const said = await everythingSaid(context);
@@ -1314,16 +1367,16 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("reports failed identity-link reads instead of counting the users as unlinked", async () => {
+    it("reports failed identity-link reads instead of counting the users as unlinked", async ({
+      server,
+    }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user")], linked: ["u1"] });
+      refusing(server, "listUserIdentityLinks");
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: {
-          ...aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
-          listUserIdentityLinks: refused,
-        },
       });
 
       const said = await everythingSaid(context);
@@ -1334,19 +1387,19 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("keeps one scan's warning when the other scan fails", async () => {
+    it("keeps one scan's warning when the other scan fails", async ({ server }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user")],
+        refuses: (filter) => {
+          return filter.some((f) => {
+            return f.operation === "not_equals";
+          });
+        },
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": aLoginFlow() },
-        }),
-        client: aPlatform({
-          users: [aUser("u1", "human-user")],
-          refuses: (filter) => {
-            return filter.some((f) => {
-              return f.operation === "not_equals";
-            });
-          },
         }),
       });
 
@@ -1358,7 +1411,15 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("keeps one schema's warning when another schema's read fails", async () => {
+    it("keeps one schema's warning when another schema's read fails", async ({ server }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user"), aUser("e1", "employee")],
+        refuses: (filter) => {
+          return filter.some((f) => {
+            return f.value === "employee";
+          });
+        },
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: {
@@ -1366,14 +1427,6 @@ describe("lockoutStep", () => {
             "2.json": signingInWith("employee", "email"),
           },
           flows: { "1.json": aLoginFlow(), "2.json": aLoginFlow({ userSchema: "employee" }) },
-        }),
-        client: aPlatform({
-          users: [aUser("u1", "human-user"), aUser("e1", "employee")],
-          refuses: (filter) => {
-            return filter.some((f) => {
-              return f.value === "employee";
-            });
-          },
         }),
       });
 
@@ -1385,16 +1438,16 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("still warns about missing identifiers when the schemas cannot be listed", async () => {
+    it("still warns about missing identifiers when the schemas cannot be listed", async ({
+      server,
+    }) => {
+      aPlatform(server, { users: [aUser("u1", "human-user", { email: "a@example.com" })] });
+      refusing(server, "listSchemas");
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
           flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
         }),
-        client: {
-          ...aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
-          listSchemas: { all: refused },
-        },
       });
 
       const said = await everythingSaid(context);
@@ -1402,13 +1455,16 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('has no "username"')]);
     });
 
-    it("says the schemas could not be read, not that a flow's schema is undefined", async () => {
+    it("says the schemas could not be read, not that a flow's schema is undefined", async ({
+      server,
+    }) => {
+      aPlatform(server);
+      refusing(server, "listSchemas");
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: EMPLOYEE }) },
         }),
-        client: { ...aPlatform(), listSchemas: { all: refused } },
       });
 
       const said = await everythingSaid(context);
@@ -1416,19 +1472,17 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining("the project's schemas could not be read")]);
     });
 
-    it("counts users together when their schemas cannot be named", async () => {
+    it("counts users together when their schemas cannot be named", async ({ server }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
+        linked: ["u1", "u2"],
+      });
+      refusing(server, "listSchemas");
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: {
-          ...aPlatform({
-            users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
-            linked: ["u1", "u2"],
-          }),
-          listSchemas: { all: refused },
-        },
       });
 
       const said = await everythingSaid(context);
@@ -1438,19 +1492,17 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("does not name a schema id when their schemas cannot be named", async () => {
+    it("does not name a schema id when their schemas cannot be named", async ({ server }) => {
+      aPlatform(server, {
+        users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
+        linked: ["u1", "u2"],
+      });
+      refusing(server, "listSchemas");
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
-        client: {
-          ...aPlatform({
-            users: [aUser("u1", "human-user"), aUser("u2", "human-user")],
-            linked: ["u1", "u2"],
-          }),
-          listSchemas: { all: refused },
-        },
       });
 
       const said = await everythingSaid(context);
@@ -1458,13 +1510,13 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.not.stringContaining(HUMAN)]);
     });
 
-    it("says so when resolving the flows throws before the scans start", async () => {
+    it("says so when resolving the flows throws before the scans start", async ({ server }) => {
+      aPlatform(server);
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "email") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform(),
       });
       vi.spyOn(context.config.flows, "findSchemaOf").mockImplementation(refused);
 
@@ -1500,17 +1552,19 @@ describe("lockoutStep", () => {
     ];
     const liveListing = [{ id: HUMAN, schema: enabling("password", "passkey") }];
 
-    it("warns when passkeys are disabled and some users hold only a passkey", async () => {
+    it("warns when passkeys are disabled and some users hold only a passkey", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users,
+        listing: liveListing,
+        pinned: [HUMAN],
+        held: { u1: ["passkey"], u2: ["passkey", "password"] },
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
-        }),
-        client: aPlatform({
-          users,
-          listing: liveListing,
-          pinned: [HUMAN],
-          held: { u1: ["passkey"], u2: ["passkey", "password"] },
         }),
       });
 
@@ -1521,21 +1575,21 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("counts a live revision the schema contract refuses", async () => {
+    it("counts a live revision the schema contract refuses", async ({ server }) => {
       const refusedByContract: JsonObject = {
         ...enabling("password", "passkey"),
         "x-identifier": "",
       };
+      aPlatform(server, {
+        users,
+        listing: [{ id: HUMAN, schema: refusedByContract }],
+        pinned: [HUMAN],
+        held: { u1: ["passkey"] },
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
-        }),
-        client: aPlatform({
-          users,
-          listing: [{ id: HUMAN, schema: refusedByContract }],
-          pinned: [HUMAN],
-          held: { u1: ["passkey"] },
         }),
       });
 
@@ -1571,29 +1625,31 @@ describe("lockoutStep", () => {
      * @returns The warnings reported.
      */
     const runAgainst = async (
+      server: SetupServer,
       live: JsonObject,
       linked: readonly string[],
       held: Readonly<Record<string, readonly Credential[]>>,
     ): Promise<readonly string[]> => {
+      aPlatform(server, {
+        users,
+        listing: [{ id: HUMAN, schema: live }],
+        pinned: [HUMAN],
+        linked,
+        held,
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling() },
           flows: { "1.json": aLoginFlow() },
-        }),
-        client: aPlatform({
-          users,
-          listing: [{ id: HUMAN, schema: live }],
-          pinned: [HUMAN],
-          linked,
-          held,
         }),
       });
 
       return everythingSaid(context);
     };
 
-    it("counts SSO on a refused live revision that lists a provider", async () => {
+    it("counts SSO on a refused live revision that lists a provider", async ({ server }) => {
       const warnings = await runAgainst(
+        server,
         refusedWith({ sso: { enabled: true, providers: ["google"] } }),
         ["u1"],
         {},
@@ -1604,32 +1660,44 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it.each([
+    it.for<[string, JsonValue]>([
       ["lists no provider", { enabled: true, providers: [] }],
       ["has no providers field", { enabled: true }],
       ["has providers that are not a list", { enabled: true, providers: "google" }],
-    ])("does not count SSO on a refused live revision that %s", async (_name, sso) => {
-      const warnings = await runAgainst(refusedWith({ sso }), ["u1"], {});
+    ])(
+      "does not count SSO on a refused live revision that %s",
+      async ([_name, sso], { server }) => {
+        const warnings = await runAgainst(server, refusedWith({ sso }), ["u1"], {});
 
-      expect(warnings).toEqual([]);
-    });
+        expect(warnings).toEqual([]);
+      },
+    );
 
-    it.each([
+    it.for<[string, JsonValue]>([
       ["is switched off", { enabled: false }],
       ["is enabled by something other than true", { enabled: "true" }],
       ["has no enabled field", {}],
-    ])("does not count a method on a refused live revision that %s", async (_name, password) => {
-      const warnings = await runAgainst(refusedWith({ password, passkey: { enabled: true } }), [], {
-        u1: ["password", "passkey"],
-      });
+    ])(
+      "does not count a method on a refused live revision that %s",
+      async ([_name, password], { server }) => {
+        const warnings = await runAgainst(
+          server,
+          refusedWith({ password, passkey: { enabled: true } }),
+          [],
+          {
+            u1: ["password", "passkey"],
+          },
+        );
 
-      expect(warnings).toEqual([
-        '1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
-      ]);
-    });
+        expect(warnings).toEqual([
+          '1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
+        ]);
+      },
+    );
 
-    it("names the methods of a refused live revision in a fixed order", async () => {
+    it("names the methods of a refused live revision in a fixed order", async ({ server }) => {
       const warnings = await runAgainst(
+        server,
         refusedWith({ password: { enabled: true }, passkey: { enabled: true } }),
         [],
         { u1: ["password"] },
@@ -1640,24 +1708,28 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("cannot compare with a refused live revision that has no string object type", async () => {
+    it("cannot compare with a refused live revision that has no string object type", async ({
+      server,
+    }) => {
       const live: JsonObject = {
         ...refusedWith({ password: { enabled: true } }),
         objectType: 5,
       };
 
-      const warnings = await runAgainst(live, [], { u1: ["password"] });
+      const warnings = await runAgainst(server, live, [], { u1: ["password"] });
 
       expect(warnings).toEqual([expect.stringContaining(CREDENTIALS_SKIPPED)]);
     });
 
-    it("takes the identifier of a refused live revision that designates one", async () => {
+    it("takes the identifier of a refused live revision that designates one", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users: [aUser("u9", "human-user")],
+        listing: [{ id: HUMAN, schema: { ...refusedWith({}), "x-identifier": "email" } }],
+      });
       const context = aStepContext({
         config: aConfig({ flows: { "1.json": aLoginFlow({ userSchema: "human-user" }) } }),
-        client: aPlatform({
-          users: [aUser("u9", "human-user")],
-          listing: [{ id: HUMAN, schema: { ...refusedWith({}), "x-identifier": "email" } }],
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -1665,16 +1737,16 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining('has no "email"')]);
     });
 
-    it.each([["   "], [""], [5]])(
+    it.for<[JsonValue]>([["   "], [""], [5]])(
       "takes no identifier from a refused live revision whose identifier is %j",
-      async (identifier) => {
+      async ([identifier], { server }) => {
+        aPlatform(server, {
+          users: [aUser("u9", "human-user")],
+          listing: [{ id: HUMAN, schema: { ...refusedWith({}), "x-identifier": identifier } }],
+        });
         const context = aStepContext({
           config: aConfig({
             flows: { "1.json": aLoginFlow({ userSchema: "human-user", collects: ["   "] }) },
-          }),
-          client: aPlatform({
-            users: [aUser("u9", "human-user")],
-            listing: [{ id: HUMAN, schema: { ...refusedWith({}), "x-identifier": identifier } }],
           }),
         });
 
@@ -1684,28 +1756,31 @@ describe("lockoutStep", () => {
       },
     );
 
-    it("reads only the credentials of the methods lost and kept", async () => {
+    it("reads only the credentials of the methods lost and kept", async ({ server }) => {
+      const received = aPlatform(server, {
+        users: users.slice(0, 1),
+        listing: liveListing,
+        pinned: [HUMAN],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users: users.slice(0, 1), listing: liveListing, pinned: [HUMAN] }),
       });
-      const credentials = vi.spyOn(context.users, "credentials");
 
       await lockoutStep.run(context);
 
-      expect(credentials.mock.calls).toEqual([["u1", ["passkey", "password"]]]);
+      expect(credentialsRead(received)).toEqual({ password: ["u1"], passkey: ["u1"], sso: [] });
     });
 
-    it("warns about no user who holds neither method", async () => {
+    it("warns about no user who holds neither method", async ({ server }) => {
+      aPlatform(server, { users: users.slice(0, 1), listing: liveListing, pinned: [HUMAN] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users: users.slice(0, 1), listing: liveListing, pinned: [HUMAN] }),
       });
 
       const said = await everythingSaid(context);
@@ -1713,43 +1788,41 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("reads no credentials when the release keeps every method", async () => {
+    it("reads no credentials when the release keeps every method", async ({ server }) => {
+      const received = aPlatform(server, { users, listing: liveListing, pinned: [HUMAN] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password", "passkey") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users, listing: liveListing, pinned: [HUMAN] }),
       });
-      const credentials = vi.spyOn(context.users, "credentials");
 
       await lockoutStep.run(context);
 
-      expect(credentials).not.toHaveBeenCalled();
+      expect(credentialsRead(received)).toEqual({ password: [], passkey: [], sso: [] });
     });
 
-    it("reads no credentials when nothing is deployed", async () => {
+    it("reads no credentials when nothing is deployed", async ({ server }) => {
+      const received = aPlatform(server, { users, listing: liveListing });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users, listing: liveListing }),
       });
-      const credentials = vi.spyOn(context.users, "credentials");
 
       await lockoutStep.run(context);
 
-      expect(credentials).not.toHaveBeenCalled();
+      expect(credentialsRead(received)).toEqual({ password: [], passkey: [], sso: [] });
     });
 
-    it("warns about nothing when the release keeps every method", async () => {
+    it("warns about nothing when the release keeps every method", async ({ server }) => {
+      aPlatform(server, { users, listing: liveListing, pinned: [HUMAN] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password", "passkey") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users, listing: liveListing, pinned: [HUMAN] }),
       });
 
       const said = await everythingSaid(context);
@@ -1757,13 +1830,13 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("warns about nothing when nothing is deployed", async () => {
+    it("warns about nothing when nothing is deployed", async ({ server }) => {
+      aPlatform(server, { users, listing: liveListing });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users, listing: liveListing }),
       });
 
       const said = await everythingSaid(context);
@@ -1771,20 +1844,22 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("compares with the revision the live release pins, not the newest one", async () => {
+    it("compares with the revision the live release pins, not the newest one", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users,
+        listing: [
+          { id: "sch_newest", schema: enabling("password") },
+          { id: "sch_live", schema: enabling("password", "passkey") },
+        ],
+        pinned: ["sch_live"],
+        held: { u1: ["passkey"] },
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
-        }),
-        client: aPlatform({
-          users,
-          listing: [
-            { id: "sch_newest", schema: enabling("password") },
-            { id: "sch_live", schema: enabling("password", "passkey") },
-          ],
-          pinned: ["sch_live"],
-          held: { u1: ["passkey"] },
         }),
       });
 
@@ -1793,18 +1868,20 @@ describe("lockoutStep", () => {
       expect(said).toEqual([expect.stringContaining("can only sign in with passkey")]);
     });
 
-    it("compares a schema the release does not carry with the newest revision the server pins for it", async () => {
+    it("compares a schema the release does not carry with the newest revision the server pins for it", async ({
+      server,
+    }) => {
+      aPlatform(server, {
+        users,
+        listing: [
+          { id: "sch_newest", schema: enabling("password") },
+          { id: "sch_live", schema: enabling("password", "passkey") },
+        ],
+        pinned: ["sch_live"],
+        held: { u1: ["passkey"] },
+      });
       const context = aStepContext({
         config: aConfig({ flows: { "1.json": aLoginFlow() } }),
-        client: aPlatform({
-          users,
-          listing: [
-            { id: "sch_newest", schema: enabling("password") },
-            { id: "sch_live", schema: enabling("password", "passkey") },
-          ],
-          pinned: ["sch_live"],
-          held: { u1: ["passkey"] },
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -1816,21 +1893,21 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("takes no method as live when the live release pins no flow", async () => {
+    it("takes no method as live when the live release pins no flow", async ({ server }) => {
+      aPlatform(server, {
+        users,
+        listing: [
+          { id: "sch_newest", schema: enabling("password", "passkey") },
+          { id: "sch_pinned", schema: enabling("password") },
+        ],
+        pinned: ["sch_pinned"],
+        pinsNoFlow: true,
+        held: { u1: ["passkey"] },
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
-        }),
-        client: aPlatform({
-          users,
-          listing: [
-            { id: "sch_newest", schema: enabling("password", "passkey") },
-            { id: "sch_pinned", schema: enabling("password") },
-          ],
-          pinned: ["sch_pinned"],
-          pinsNoFlow: true,
-          held: { u1: ["passkey"] },
         }),
       });
 
@@ -1839,15 +1916,15 @@ describe("lockoutStep", () => {
       expect(said).toEqual([]);
     });
 
-    it("asks to keep both methods when two are disabled", async () => {
+    it("asks to keep both methods when two are disabled", async ({ server }) => {
+      aPlatform(server, {
+        users,
+        listing: liveListing,
+        pinned: [HUMAN],
+        held: { u1: ["passkey"], u2: ["password"] },
+      });
       const context = aStepContext({
         config: aConfig({ schemas: { "1.json": enabling() }, flows: { "1.json": aLoginFlow() } }),
-        client: aPlatform({
-          users,
-          listing: liveListing,
-          pinned: [HUMAN],
-          held: { u1: ["passkey"], u2: ["password"] },
-        }),
       });
 
       const said = await everythingSaid(context);
@@ -1859,17 +1936,17 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("says the check could not finish when a credential read fails", async () => {
+    it("says the check could not finish when a credential read fails", async ({ server }) => {
+      aPlatform(server, {
+        users,
+        listing: liveListing,
+        pinned: [HUMAN],
+        credentialsUnreadableFor: ["u1", "u2", "u3"],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
-        }),
-        client: aPlatform({
-          users,
-          listing: liveListing,
-          pinned: [HUMAN],
-          credentialsUnreadableFor: ["u1", "u2", "u3"],
         }),
       });
 
@@ -1880,18 +1957,18 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("keeps the other users' counts when one user's read fails", async () => {
+    it("keeps the other users' counts when one user's read fails", async ({ server }) => {
+      aPlatform(server, {
+        users,
+        listing: liveListing,
+        pinned: [HUMAN],
+        held: { u1: ["passkey"], u3: ["passkey"] },
+        credentialsUnreadableFor: ["u3"],
+      });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
-        }),
-        client: aPlatform({
-          users,
-          listing: liveListing,
-          pinned: [HUMAN],
-          held: { u1: ["passkey"], u3: ["passkey"] },
-          credentialsUnreadableFor: ["u3"],
         }),
       });
 
@@ -1903,25 +1980,24 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it.each<[string, Platform, ClientStubs]>([
+    it.for<[string, Platform, readonly OperationName[]]>([
       [
         "a live revision is not in the listing",
         { listing: liveListing, pinned: ["sch_unlisted"] },
-        {},
+        [],
       ],
-      ["the schemas cannot be read", { pinned: [HUMAN] }, { listSchemas: { all: refused } }],
-      [
-        "the live release cannot be read",
-        { listing: liveListing },
-        { listDeployments: { all: refused } },
-      ],
-    ])("says the check was skipped when %s", async (_why, platform, failing) => {
+      ["the schemas cannot be read", { pinned: [HUMAN] }, ["listSchemas"]],
+      ["the live release cannot be read", { listing: liveListing }, ["listDeployments"]],
+    ])("says the check was skipped when %s", async ([_why, platform, failing], { server }) => {
+      aPlatform(server, { users, ...platform });
+      for (const operation of failing) {
+        refusing(server, operation);
+      }
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: { ...aPlatform({ users, ...platform }), ...failing },
       });
 
       const said = await everythingSaid(context);
@@ -1929,19 +2005,18 @@ describe("lockoutStep", () => {
       expect(said).toContain(CREDENTIALS_SKIPPED);
     });
 
-    it("reads no credentials when a live revision is not in the listing", async () => {
+    it("reads no credentials when a live revision is not in the listing", async ({ server }) => {
+      const received = aPlatform(server, { users, listing: liveListing, pinned: ["sch_unlisted"] });
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": enabling("password") },
           flows: { "1.json": aLoginFlow() },
         }),
-        client: aPlatform({ users, listing: liveListing, pinned: ["sch_unlisted"] }),
       });
-      const credentials = vi.spyOn(context.users, "credentials");
 
       await lockoutStep.run(context);
 
-      expect(credentials).not.toHaveBeenCalled();
+      expect(credentialsRead(received)).toEqual({ password: [], passkey: [], sso: [] });
     });
   });
 });
