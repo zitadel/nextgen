@@ -46,6 +46,7 @@ const RULE_IDS = [
   "contract/connection",
   "contract/policy",
   "contract/branding",
+  "contract/oauth",
   "connection/literal-secret",
   "connection/endpoints",
   "branding/legacy-template-key",

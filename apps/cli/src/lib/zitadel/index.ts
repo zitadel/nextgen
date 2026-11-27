@@ -55,6 +55,7 @@ export {
   schemaReference,
   stepName,
 } from "@/lib/zitadel/names";
+export { OAuthSettings } from "@/lib/zitadel/resources/oauth";
 export {
   PASSWORD_POLICY_OPERATION,
   PasswordPolicy,

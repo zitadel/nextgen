@@ -29,6 +29,7 @@ const DOCUMENT_KINDS = [
   "policy",
   "policy-test",
   "branding",
+  "oauth",
 ] as const;
 
 /**

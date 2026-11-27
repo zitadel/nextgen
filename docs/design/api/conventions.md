@@ -34,8 +34,13 @@ POST /auth_attempts/{id}/challenges/{challenge_id}/verify
 POST /auth_attempts/{id}/handoff
 ```
 
-Each endpoint documents its window in its description. No other endpoint
-accepts the header today.
+Each endpoint documents its window in its description.
+
+`POST /applications` (`publishApplication`) accepts the header too, with
+another meaning, set out in
+[`methods.yaml`](../../../apps/api/api/openapi/endpoints/applications/methods.yaml).
+
+No other endpoint accepts the header today.
 
 ## Direction (not shipped)
 

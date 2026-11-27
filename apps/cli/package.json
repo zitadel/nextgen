@@ -91,6 +91,12 @@
       "auth-method:sso": {
         "description": "Add or remove identity providers."
       },
+      "settings": {
+        "description": "Change the project's protocol settings."
+      },
+      "settings:oauth": {
+        "description": "Turn the OAuth authorization server on."
+      },
       "origin": {
         "description": "Manage the project's allowed origins."
       },
