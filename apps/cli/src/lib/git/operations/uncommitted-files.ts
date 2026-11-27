@@ -1,6 +1,6 @@
-import type { Git } from "../git";
-import type { Check, Operation } from "../operation";
-import type { UncommittedFile } from "../types";
+import type { Git } from "@/lib/git/git";
+import type { Check, Operation } from "@/lib/git/operation";
+import type { UncommittedFile } from "@/lib/git/types";
 
 /**
  * The uncommitted files under the directory, untracked ones included, each file of an untracked directory listed.
@@ -35,7 +35,7 @@ export class UncommittedFiles implements Operation<UncommittedFile[]> {
    * each file of an untracked directory rather than the directory alone.
    * `status` names paths from the repository root, so the prefix is taken off;
    * a rename or a copy carries a second entry, where it came from, which is
-   * skipped.
+   * reported as the file's `from` rather than as a file of its own.
    */
   async run(git: Git): Promise<UncommittedFile[]> {
     const result = await git.run([
@@ -49,17 +49,24 @@ export class UncommittedFiles implements Operation<UncommittedFile[]> {
     const unread = result.paths().values();
     const files: UncommittedFile[] = [];
     for (const entry of unread) {
-      const path = entry.slice(3);
+      const path = this.named(entry.slice(3));
       const untracked = entry.startsWith("??");
-      if (path.startsWith(this.prefix)) {
-        files.push({ path: path.slice(this.prefix.length), untracked });
+      if (/^(R|C|.R|.C)/.test(entry)) {
+        const source = unread.next().value;
+        files.push(
+          source === undefined
+            ? { path, untracked }
+            : { path, untracked, from: this.named(source) },
+        );
       } else {
         files.push({ path, untracked });
       }
-      if (/^(R|C|.R|.C)/.test(entry)) {
-        unread.next();
-      }
     }
     return files;
+  }
+
+  /** A path as `status` printed it, named from the directory when it is under it. */
+  private named(path: string): string {
+    return path.startsWith(this.prefix) ? path.slice(this.prefix.length) : path;
   }
 }

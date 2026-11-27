@@ -30,7 +30,7 @@ export const baseTest = {
   globals: true,
   // Run test files in parallel via the worker pool (Vitest's default, pinned
   // here so no project can silently regress to serial execution). Files within
-  // a project run concurrently; moon runs the projects concurrently on top.
+  // a project run concurrently; turbo runs the projects concurrently on top.
   fileParallelism: true,
   // Fail loud when a suite's include matches nothing (a broken glob or all tests
   // removed), restoring the pre-migration behavior. A genuinely test-less lane
@@ -42,7 +42,7 @@ export const baseTest = {
   // split into sub-projects override `include` in their own config.
   include: ["src/**/*.{test,spec}.{ts,tsx}"],
   // No shared globalSetup: the only setup work is package-specific (config syncs
-  // its meta-schemas; cli builds its dist via a moon dep). Forcing it here would
+  // its meta-schemas; cli builds its dist via a task dep). Forcing it here would
   // couple every project's tests to another package's inputs. A package that
   // needs setup declares its own `globalSetup` at its package root.
   // Console output plus a machine-readable result report at a uniform path.

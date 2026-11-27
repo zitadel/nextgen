@@ -1,7 +1,7 @@
-import { MANAGED_MARKER } from "../../../../paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
-import type { PatchContext } from "../../types";
-import { PROXY_PATH } from "../proxy";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 /**
  * The managed `src/App.svelte`: a minimal path-based router that renders the
@@ -34,7 +34,7 @@ export function appTemplate(ctx: PatchContext): string {
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
   return `<script lang="ts">
-${MANAGED_MARKER}
+${ManagedFile.MARKER}
 import { onMount } from "svelte";
 import { ${importNames} } from "@zitadel/sdk-svelte";${localesComment}
 
@@ -53,15 +53,15 @@ onMount(() => {
 </script>
 
 {#if path.startsWith("/profile")}
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <ZitadelSession {project} postSignOutUrl="/login" />
   </div>
 {:else if path.startsWith("/register")}
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <ZitadelLogin {project}${localesAttr} purpose="register" postSignInUrl="/profile" />
   </div>
 {:else if path !== "/"}
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <ZitadelLogin {project}${localesAttr} purpose="login" postSignInUrl="/profile" />
   </div>
 {/if}

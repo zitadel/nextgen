@@ -7,7 +7,7 @@ console share (ADR 055). Consumer docs: [`README.md`](README.md).
 
 1. The published Figma library (its file key is in `figma-tokens.lock`).
    Semantic colours come from the committed DTCG export in `figma-export/`
-   (`:sync-export`): the REST `:sync` cannot read variables without Figma
+   (`sync:export`): the REST `sync` cannot read variables without Figma
    Enterprise.
 2. `src/overrides.ts`, only for values Figma does not own (font fallbacks,
    motion curves, breakpoints), each with a doc comment saying why.
@@ -21,11 +21,11 @@ A value that belongs to the design system goes into Figma and is re-synced.
 - The Figma plugin pushes `figma-export/` to the branch
   `design-tokens/figma-sync`; CI (`sync-design-tokens.yml`) merges `main` into
   it and opens the sync PR.
-- `:sync-export` (`scripts/sync-from-export.ts`) resolves every `*.json` under
+- `sync:export` (`scripts/sync-from-export.ts`) resolves every `*.json` under
   `figma-export/` through one alias registry. Never pick exports by file name,
   and never downgrade an unresolved reference or an empty colour surface to a
   warning.
-- After any sync, run `:generate` and review the snapshot diff.
+- After any sync, run `generate` and review the snapshot diff.
 - Each collection's role is declared in [`src/collections.ts`](src/collections.ts),
   keyed by its Figma collection name, never inferred from its shape. The
   roles and what each emits are documented on `CollectionRole`.
@@ -33,7 +33,7 @@ A value that belongs to the design system goes into Figma and is re-synced.
   a warning, and the sync PR still opens; `sync-from-export.spec.ts` then
   fails `full-pr` until someone classifies it. A stale entry fails it the same
   way.
-- Never turn those failures into throws: `:sync-export` runs before the sync
+- Never turn those failures into throws: `sync:export` runs before the sync
   PR exists, so a throw leaves no check, only a log. The `semantic` role is
   the exception: anything but exactly one such collection throws, because
   there is no safe default.
@@ -54,7 +54,7 @@ A value that belongs to the design system goes into Figma and is re-synced.
 
 ## Changing the package
 
-- Never hand-edit `src/generated/`: `:sync`/`:sync-export` and `:generate`
+- Never hand-edit `src/generated/`: `sync`/`sync:export` and `generate`
   overwrite it. Fix the input (lock, export or overrides) and regenerate.
 - `figma-tokens.lock` changes only in a sync PR.
 - `scripts/build.ts` must stay deterministic. A new category in

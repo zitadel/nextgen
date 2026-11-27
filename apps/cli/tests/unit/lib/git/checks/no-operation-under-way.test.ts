@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { NoOperationUnderWay } from "../../../../../src/lib/git/checks/no-operation-under-way";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { NoOperationUnderWay } from "@/lib/git/checks/no-operation-under-way";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 /** A git that keeps each marker at `worktrees/w/<marker>`, as a linked worktree does, of which `existing` exist. */
 function gitWith(existing: string[]) {

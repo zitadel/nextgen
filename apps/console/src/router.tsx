@@ -2,7 +2,7 @@ import { type RouterHistory, createRouter } from "@tanstack/react-router";
 
 import { addon } from "./addon";
 import { mountAddonScreens, mountAddonSignedOutScreens } from "./addon/screens";
-import { ErrorState, NotFoundState, PendingState } from "./components/boundaries";
+import { ErrorState, NotFoundState, PendingState } from "@/app-shell/boundaries";
 import { basePath } from "./lib/base-path";
 import { routeTree } from "./routeTree.gen";
 

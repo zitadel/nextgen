@@ -49,7 +49,7 @@ the builds that leave it empty nothing:
 - `Root`, rendered once beside the routes on every page and told the page
   (`AddonPage`: the path and the matched route, deployment prefix included,
   and whether the signed-in layout's guard let it through);
-- `track`, which receives each custom event `src/lib/analytics.ts` reports;
+- `track`, which receives each custom event `src/addon/analytics.ts` reports;
 - `screens`, each mounted as a route beneath the signed-in layout
   (`src/addon/screens.tsx`). A screen's sidebar entry is its route's
   `staticData.nav`, as every screen's is (ADR 0001), so a build without the
@@ -73,8 +73,8 @@ rows, the primitives inside them, and the sign-in screen. Each name in it is a p
 add-on; one is added when a screen needs it, never a folder. The add-on never
 imports the console's source (`@/…`) or a path into its folder, so the
 console stays free to change everything behind the two exports. Its typecheck
-reads both from source and lists the console's `src` as an input (moon.yml,
-turbo.json).
+reads both from source and lists the console's `src` as an input
+(turbo.json).
 
 ### 4. Wiring
 

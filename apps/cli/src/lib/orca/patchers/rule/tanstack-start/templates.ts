@@ -1,7 +1,7 @@
-import { MANAGED_MARKER } from "../../../../paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
-import type { PatchContext } from "../../types";
-import { PROXY_PATH } from "../proxy";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 // Enforce the dark surface the Zitadel widgets are designed for, so pages never
 // follow the OS light/dark setting. Inlined as a React style object on each
@@ -11,7 +11,7 @@ import { PROXY_PATH } from "../proxy";
  * `src/start.ts` — the TanStack Start server entry that the framework auto-loads
  * (`#tanstack-start-entry`). It must export a `startInstance` from `createStart`;
  * we wire a global request middleware via `requestMiddleware`. The middleware is
- * built from `createNextgenRequestMiddleware`, which on every request proxies
+ * built from `createZitadelRequestMiddleware`, which on every request proxies
  * `/__nextgen/*` to the auth backend (attaching the project service-key from
  * `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
  * unauthenticated requests away from protected routes. `url` and `projectSecret`
@@ -25,16 +25,16 @@ import { PROXY_PATH } from "../proxy";
  * session work runs) rather than silently dropping CSRF protection.
  */
 export function startTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
-import { createNextgenRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
+import { createZitadelRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
 
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
 const authMiddleware = createMiddleware({ type: "request" }).server(
-  createNextgenRequestMiddleware({
+  createZitadelRequestMiddleware({
     protectedRoutes: ["/profile"],
     loginPath: "/login",
   }),
@@ -48,7 +48,7 @@ export const startInstance = createStart(() => ({
 
 /** `src/routes/index.tsx` — the landing chooser linking to login/register/profile. */
 export function indexRouteTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
@@ -83,7 +83,7 @@ function Home() {
  * A login/register route. Configures the SDK once at module scope with
  * `configureZitadel` from the `/client` entry and passes the returned project
  * handle straight to the typed `<ZitadelLogin>` React wrapper from
- * `@zitadel/sdk-tanstack-start/react` as its `project` prop. The public project
+ * `@zitadel/sdk-tanstack-start/components` as its `project` prop. The public project
  * id comes from Vite's `import.meta.env.VITE_ZITADEL_PROJECT_ID`; the backend URL
  * never reaches the browser (the widget talks to the same-origin `${PROXY_PATH}`
  * proxy). The wrapper mounts the widget on the client only, after hydration, so
@@ -106,9 +106,9 @@ function authRoute(purpose: "login" | "register", ctx: PatchContext): string {
 // fall back to the neutral wording.`
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createFileRoute } from "@tanstack/react-router";
-import { ${reactImports} } from "@zitadel/sdk-tanstack-start/react";
+import { ${reactImports} } from "@zitadel/sdk-tanstack-start/components";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";${localesComment}
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
@@ -121,7 +121,7 @@ export const Route = createFileRoute("${path}")({
 
 function ${componentName}() {
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelLogin project={project}${localesAttr} purpose="${purpose}" postSignInUrl="/profile" />
     </div>
   );
@@ -148,10 +148,10 @@ export function registerRouteTemplate(ctx: PatchContext): string {
  * does not carry it).
  */
 export function profileRouteTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
+import { ZitadelSession } from "@zitadel/sdk-tanstack-start/components";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 import { getAuth } from "@zitadel/sdk-tanstack-start/server";
 
@@ -179,7 +179,7 @@ export const Route = createFileRoute("/profile")({
 
 function ProfilePage() {
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
+    <div style={{ position: "fixed", inset: 0, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", boxSizing: "border-box", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelSession project={project} postSignOutUrl="/login" />
     </div>
   );

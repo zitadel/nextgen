@@ -14,7 +14,8 @@ building your own middleware or need the types without a framework wrapper.
 | `@zitadel/sdk-core` | The middleware, JWT, and runtime-resolution exports in one namespace. The `/types` widget contract is **not** re-exported from the root — import it from `@zitadel/sdk-core/types` |
 | `@zitadel/sdk-core/types` | The SPA widget contract (`ZitadelFlowStepDetail` and the other widget event/config/handler/props types the SPA SDKs re-export) |
 | `@zitadel/sdk-core/jwt` | `verifyJwt`, `decodeJwt`, `isJwtShaped`, `JWKS_TTL_MS` |
-| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), session judgement (`resolveSession`, the opaque session check `checkOpaqueSessionToken`), and the session cookie per project (`sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie`) |
+| `@zitadel/sdk-core/session` | The browser's view of the session: `getSession()`, one read of `GET /sessions/me` (which `@zitadel/sdk-next/session` wraps), and `sessionStore()`, the shared, subscribable read the SPA SDKs bind their hooks to |
+| `@zitadel/sdk-core/middleware` | The middleware layer: `ZitadelAuthSession`, `ZitadelAuthResult`, `ZitadelMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), session judgement (`resolveSession`, the opaque session check `checkOpaqueSessionToken`), and the session cookie per project (`sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
 `ZitadelRuntimeError` for resolving the runtime environment
@@ -81,7 +82,7 @@ for Safari and so cannot carry the prefix (`serverSessionCookieName`, ADR 083).
 A browser shares a host's cookies across every port, so under that name alone
 the Console of a local server and every app on `localhost` would keep their
 sessions in one slot and sign each other out. An app with a server SDK therefore
-keeps its session in a cookie of its own, `sessionCookieName(projectId, secure)`:
+keeps its session in a cookie of its own, `sessionCookieName({ projectId, secure })`:
 `__Host-zitadel_session_<projectId>`, or `zitadel_session_<projectId>` over
 plain http to a loopback host (ADR 073). The app reads only its scheme's names:
 over https it never reads an unprefixed cookie, which any sibling host can
@@ -94,9 +95,6 @@ plant.
   under the canonical `__Host-zitadel_session` (`SERVER_SESSION_COOKIE`),
   whichever transport it reaches the server over. No other session cookie, the
   Console's or another app's, goes up.
-- **Session cookies from before ADR 083** (`__nextgen_session` and
-  `__nextgen_session_<projectId>`) are never read, copied or passed on: the
-  proxy keeps them back and drops a `Set-Cookie` for them.
 - **The middleware** (`resolveSession`) reads the app's cookie, and clears only
   that cookie when the backend refuses its session.
 - **A session kept under the server's name**, on `localhost` by the Console, is
@@ -119,5 +117,4 @@ documented in each framework SDK's README on top of this pipeline.
 
 ## Requirements
 
-TypeScript ≥ 5.0 — the published type definitions re-export with
-`export type *`.
+TypeScript 5.0 or newer.

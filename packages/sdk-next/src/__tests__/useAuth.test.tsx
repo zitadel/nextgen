@@ -2,23 +2,24 @@ import { renderHook, act } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { describe, it, expect } from "vitest";
 
-import type { AuthResult, ClientAuthResult, NextgenSession } from "../types";
+import type { ZitadelAuthResult, ZitadelClientAuthResult, ZitadelAuthSession } from "../types";
 
 // useAuth/AuthContextProvider come through the public client entry — the same
-// path consumers use. NextgenProvider is server-only (it accepts the
+// path consumers use. ZitadelProvider is server-only (it accepts the
 // token-bearing auth() result), so its public homes are /server and the root;
 // tests import the defining module directly (the vitest alias stubs the
 // server-only guard).
-import { NextgenProvider } from "../provider";
+import { ZitadelProvider } from "../provider";
 import { AuthContextProvider, useAuth } from "../react";
 
-function wrapper(initialSession: AuthResult) {
-  let setSessionRef: ((s: AuthResult) => void) | null = null;
+function wrapper(initialSession: ZitadelAuthResult) {
+  let setSessionRef: ((s: ZitadelAuthResult) => void) | null = null;
 
+  // biome-ignore lint/correctness/noComponentHookFactories: a fixture each test builds once, so the component keeps one identity across its renders.
   function Wrapper({ children }: { children: ReactNode }) {
-    const [session, setSession] = useState<AuthResult>(initialSession);
+    const [session, setSession] = useState<ZitadelAuthResult>(initialSession);
     setSessionRef = setSession;
-    return <NextgenProvider session={session}>{children}</NextgenProvider>;
+    return <ZitadelProvider session={session}>{children}</ZitadelProvider>;
   }
 
   return { Wrapper, getSetSession: () => setSessionRef };
@@ -26,7 +27,7 @@ function wrapper(initialSession: AuthResult) {
 
 describe("useAuth()", () => {
   it("returns signed-out state when provider has unauthenticated session", () => {
-    const session: AuthResult = { isAuthenticated: false, session: null };
+    const session: ZitadelAuthResult = { isAuthenticated: false, session: null };
     const { Wrapper } = wrapper(session);
     const { result } = renderHook(() => useAuth(), { wrapper: Wrapper });
     expect(result.current.isAuthenticated).toBe(false);
@@ -34,7 +35,7 @@ describe("useAuth()", () => {
   });
 
   it("returns signed-in state when provider has authenticated session", () => {
-    const session: AuthResult = {
+    const session: ZitadelAuthResult = {
       isAuthenticated: true,
       session: {
         userId: "user-1",
@@ -54,7 +55,7 @@ describe("useAuth()", () => {
   });
 
   it("strips the raw token before the session reaches client state", () => {
-    const session: AuthResult = {
+    const session: ZitadelAuthResult = {
       isAuthenticated: true,
       session: {
         userId: "user-1",
@@ -82,8 +83,8 @@ describe("useAuth()", () => {
   });
 
   it("hook updates when session changes via re-render", () => {
-    const signedOut: AuthResult = { isAuthenticated: false, session: null };
-    const signedIn: AuthResult = {
+    const signedOut: ZitadelAuthResult = { isAuthenticated: false, session: null };
+    const signedIn: ZitadelAuthResult = {
       isAuthenticated: true,
       session: {
         userId: "u2",
@@ -100,18 +101,20 @@ describe("useAuth()", () => {
 
     act(() => {
       const setSession = getSetSession();
-      if (setSession) setSession(signedIn);
+      if (setSession) {
+        setSession(signedIn);
+      }
     });
 
     expect(result.current.isAuthenticated).toBe(true);
   });
 });
 
-describe("NextgenProvider input shapes", () => {
-  function renderWith(session: Parameters<typeof NextgenProvider>[0]["session"]) {
+describe("ZitadelProvider input shapes", () => {
+  function renderWith(session: Parameters<typeof ZitadelProvider>[0]["session"]) {
     return renderHook(() => useAuth(), {
       wrapper: ({ children }: { children: ReactNode }) => (
-        <NextgenProvider session={session}>{children}</NextgenProvider>
+        <ZitadelProvider session={session}>{children}</ZitadelProvider>
       ),
     });
   }
@@ -122,7 +125,7 @@ describe("NextgenProvider input shapes", () => {
   });
 
   it("passes an already client-safe result through unchanged", () => {
-    const clientResult: ClientAuthResult = {
+    const clientResult: ZitadelClientAuthResult = {
       isAuthenticated: true,
       session: { userId: "u3", identifier: null, identifierProperty: null, display: null },
     };
@@ -131,7 +134,7 @@ describe("NextgenProvider input shapes", () => {
   });
 
   it("wraps and strips a bare session object", () => {
-    const bare: NextgenSession = {
+    const bare: ZitadelAuthSession = {
       userId: "u4",
       identifier: "d@d.com",
       identifierProperty: "email",
@@ -148,7 +151,7 @@ describe("NextgenProvider input shapes", () => {
 
 describe("AuthContextProvider (client-side seeding)", () => {
   it("feeds a client-safe value straight to useAuth()", () => {
-    const seeded: ClientAuthResult = {
+    const seeded: ZitadelClientAuthResult = {
       isAuthenticated: true,
       session: { userId: "u5", identifier: "e@e.com", identifierProperty: "email", display: null },
     };

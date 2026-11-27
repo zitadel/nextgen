@@ -115,8 +115,10 @@ Notably absent from this list: anything that touches `project_id`, users, factor
 - **Capabilities.** Free-tier capabilities that require a human owner unlock — BYO email configuration, additional team members, the dashboard's billing surface.
 - **Billing eligibility.** Adding a card becomes possible. Pro-gated capabilities (managed email, SSO/SCIM/SAML, custom delivery) are now reachable.
 - **Audit trail.** Events are emitted and stored from project creation onward
-  (including the pre-claim window). List, get, and export stay gated until claim
-  succeeds — stored history becomes visible without a backfill (ADR 048 / 049).
+  (including the pre-claim window). List and get stay gated until claim
+  succeeds, for everyone but the deployment's platform operators, and the
+  deployment's export ships them from the start — stored history becomes
+  visible without a backfill (ADR 048 / 049).
 - **Recovery options.** Strong — tied to the auth provider used at claim (and any later-linked providers). Pre-claim, recovery was best-effort.
 - **Project secret.** Rotated from the pre-claim `sk_proj_…` value to a new claimed credential. Everything else — origin-scoped secret, `project_id`, config, resources — untouched.
 

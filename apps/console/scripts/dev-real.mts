@@ -7,7 +7,7 @@
  * from it is a fiction. This script boots the packaged server (binary runtime +
  * SQLite by default, no Docker) via `@zitadel/testing`, bootstraps a project
  * with the default schema and login flow, seeds users, and then starts
- * `console:dev` with the dev proxy pointed at that instance:
+ * `@zitadel/console#dev` with the dev proxy pointed at that instance:
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
  *
@@ -41,8 +41,6 @@ import { fileURLToPath } from "node:url";
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
 
-import { runnerCommand, runnerLabel } from "../../../scripts/task-runner.mjs";
-
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(appDir, "../..");
 
@@ -71,6 +69,11 @@ const PLATFORM_PROJECT_ID = "proj_platform";
 // pins the console's default project to `proj_platform` — which would leave
 // DEV_USER, seeded in the project this script bootstraps, unable to sign in.
 process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT = claimMode ? "true" : "false";
+// The browser opens the console on the Vite dev server, so the server counts it
+// as one of its console origins: a project that does not list it, the platform
+// project included, serves it the newest primary deployment, and its own Origin
+// reaches the server as is, for passkeys and SSO return targets alike.
+process.env.NEXTGEN_SERVER_CONSOLE_ORIGINS ??= consoleOrigin;
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -106,12 +109,10 @@ if (configuredServerBinary) {
     process.exit(1);
   });
 } else {
-  // Build (or cache-hit) the embedded server binary. Spawned here instead of
-  // declared as a task dep: server:build depends on console:build, so a
-  // dev-real -> server:build task dep would cycle the project graph.
-  const serverBuild = runnerCommand(["server:build"]);
+  // Build the embedded server binary, for a direct `pnpm run dev:real`;
+  // `turbo run dev:real` has built it already (turbo.json).
   await new Promise<void>((resolveBuild, rejectBuild) => {
-    const build = spawn(serverBuild.command, serverBuild.args, {
+    const build = spawn("turbo", ["run", "@zitadel/server#build"], {
       cwd: workspaceRoot,
       stdio: "inherit",
     });
@@ -122,7 +123,7 @@ if (configuredServerBinary) {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      rejectBuild(new Error(`${runnerLabel(["server:build"])} failed with ${detail}`));
+      rejectBuild(new Error(`turbo run @zitadel/server#build failed with ${detail}`));
     });
   });
 }
@@ -246,10 +247,10 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * so they carry the properties the seeded users already validate against.
  * `Employees` adds an optional boolean and integer, and one employee is seeded
  * with both set, so the user page shows a switch and a number field. The
- * client id and secret are `${{ VAR }}` references: no variable backs them, so
- * the connection renders but cannot complete a sign-in — which nothing here
- * asks of it. Best-effort, like the grant: a failure costs the screen its
- * data, not the instance.
+ * client id and secret are `${{ VAR }}` references to placeholder variables
+ * (`seedVariables`), so the connection renders but cannot complete a sign-in,
+ * which nothing here asks of it. Best-effort, like the grant: a failure costs
+ * the screen its data, not the instance.
  */
 const EMPLOYEE_EMAIL = "employee@zitadel.local";
 /** The revision the seeded connection was created as; a release pins it. */
@@ -355,6 +356,197 @@ if (!claimMode && !(await seedAuthentication())) {
 }
 
 /**
+ * A schema named by a URI in two revisions, with a user on the older one, so
+ * the revision pickers and the Users revision filter show the id shapes the
+ * minted schemas above never do: a long `$id` that holds an underscore, which
+ * a menu and a 375px trigger have to cut, and a history with an `In use`
+ * revision that is not the latest. Best-effort, like the schemas above.
+ */
+const PARTNER_SCHEMA_ID = (version: string) =>
+  `https://partners.example/user_schemas/partner/${version}/partner-profile.schema.json`;
+
+async function seedSchemaRevisions(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    const properties = (base.properties ?? {}) as Record<string, unknown>;
+    // Same object type, so the second is a revision of the first.
+    const revision = (version: string, extra: Record<string, unknown> = {}) =>
+      post("/schemas", {
+        ...base,
+        $id: PARTNER_SCHEMA_ID(version),
+        kind: "user-schema",
+        objectType: "partner",
+        title: "Partners",
+        properties: { ...properties, ...extra },
+      });
+    const older = await revision("v1");
+    if (!older.ok) return false;
+    const newer = await revision("v2", { company: { type: "string", title: "Company" } });
+    if (!newer.ok) return false;
+    const user = await post("/users", {
+      schema: PARTNER_SCHEMA_ID("v1"),
+      attributes: { email: "partner@zitadel.local", givenName: "Pat", familyName: "Partner" },
+    });
+    return user.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedSchemaRevisions())) {
+  console.warn(
+    "[console-dev-real] could not seed the Partners schema revisions; the revision pickers show no URI ids.",
+  );
+}
+
+/**
+ * A `Contractors` schema whose identifier and display name sit inside an object,
+ * with one user on it, so the forms and the Users list show what the flat schemas
+ * above never do: a nested `x-identifier` (`contact.email`), an object group, an
+ * array and a nullable property. It carries its own properties instead of the
+ * bootstrapped ones, and drops their `x-display`, which would name a property it
+ * no longer has. Best-effort, like the schemas above.
+ */
+async function seedNestedSchema(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    const { $id: _id, "x-display": _display, ...document } = base;
+    const schema = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "contractor",
+      title: "Contractors",
+      "x-identifier": "contact.email",
+      "x-display": ["contact.name"],
+      required: ["contact", "skills", "manager"],
+      properties: {
+        contact: {
+          type: "object",
+          title: "Contact",
+          description: "They sign in with this email.",
+          required: ["email"],
+          properties: {
+            email: { type: "string", format: "email", title: "Email", "x-unique": "project" },
+            name: { type: "string", title: "Name" },
+          },
+        },
+        preferences: {
+          type: "object",
+          title: "Preferences",
+          properties: {
+            nickname: { type: "string", title: "Nickname" },
+            newsletter: { type: "boolean", title: "Newsletter" },
+          },
+        },
+        skills: { type: "array", title: "Skills", minItems: 1, items: { type: "string" } },
+        manager: { type: ["string", "null"], title: "Manager" },
+      },
+    });
+    if (!schema.ok) return false;
+    const { id } = (await schema.json()) as { id: string };
+    const user = await post("/users", {
+      schema: id,
+      attributes: {
+        contact: { email: "contractor@zitadel.local", name: "Casey Contractor" },
+        preferences: { nickname: "casey", newsletter: false },
+        skills: ["design", "research"],
+        manager: null,
+      },
+    });
+    return user.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedNestedSchema())) {
+  console.warn(
+    "[console-dev-real] could not seed the Contractors schema; no screen shows a nested identifier.",
+  );
+}
+
+/**
+ * Two variables, so a project's Settings draw the Variables and Secrets table:
+ * a plain value that differs per kind and a secret, under the names the seeded
+ * connection references. Set before the releases are deployed: a deployment is
+ * refused when its release names a variable its kind has no value for.
+ * Best-effort, like the rest.
+ */
+async function seedVariables(): Promise<boolean> {
+  const set = (kind: "primary" | "preview", body: Record<string, unknown>) =>
+    fetch(`${api}/variables?${new URLSearchParams({ project_id: projectId, kind }).toString()}`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    }).then((response) => response.ok);
+  try {
+    // One kind at a time: both write the same project's variables.
+    const primary = await set("primary", {
+      GOOGLE_CLIENT_ID: "prod-client-123",
+      GOOGLE_CLIENT_SECRET: { value: "dev-real-primary", secret: true },
+    });
+    const preview = await set("preview", {
+      GOOGLE_CLIENT_ID: "preview-client-456",
+      GOOGLE_CLIENT_SECRET: { value: "dev-real-preview", secret: true },
+    });
+    return primary && preview;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedVariables())) {
+  console.warn(
+    "[console-dev-real] could not seed variables; the project's Variables and Secrets card may miss values and a seeded release may not deploy.",
+  );
+}
+
+/**
  * Two releases pinning the project's configuration, and their deployments, so
  * the release and deployment screens render against real data: one built from
  * a clean tree with a message, pinning the newest revision of every user
@@ -437,12 +629,12 @@ async function seedReleases(): Promise<string | null> {
     await post(origins, { pattern: "https://app.acme.com", kind: "primary" });
     await post(origins, { pattern: "https://www.acme.com", kind: "primary" });
     await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
-    await post("/deployments", { release_id: first.id, targets: ["primary"] });
-    await post("/deployments", { release_id: second.id, targets: ["primary"] });
+    await post("/deployments", { release_id: first.id, targets: "primary" });
+    await post("/deployments", { release_id: second.id, targets: "primary" });
     await post("/deployments", {
       release_id: first.id,
       targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
-      ttl: "168h",
+      ttl: "P7D",
     });
     return null;
   } catch (error) {

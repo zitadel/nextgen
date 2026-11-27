@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { nuxtConfigEdit } from "../../../../../../../src/lib/orca/patchers/rule/nuxt/nuxt-config";
+import { nuxtConfigEdit } from "@/lib/orca/patchers/rule/nuxt/nuxt-config";
 
 const edit = nuxtConfigEdit();
 
 describe("nuxtConfigEdit", () => {
-  it("merges modules, nextgen, and vue into an empty config", () => {
+  it("merges modules, zitadel, and vue into an empty config", () => {
     const out = edit("export default defineNuxtConfig({})");
     expect(out).toContain("@zitadel/sdk-nuxt/module");
     expect(out).toContain('loginPath: "/login"');
@@ -31,7 +31,7 @@ describe("nuxtConfigEdit", () => {
   it("recognises a config an earlier version wrote, entries and all", () => {
     const earlier = `export default defineNuxtConfig({
   modules: ["@zitadel/sdk-nuxt/module"],
-  nextgen: { loginPath: "/login", protectedRoutes: ["/profile"] },
+  zitadel: { loginPath: "/login", protectedRoutes: ["/profile"] },
   build: { transpile: ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"] },
   vue: { compilerOptions: { isCustomElement: (tag) => tag.startsWith("zitadel-") } },
 });
@@ -71,8 +71,8 @@ describe("nuxtConfigEdit", () => {
     expect(out).toContain("@zitadel/sdk-nuxt/module");
   });
 
-  it("throws E_VALIDATION when nextgen is not an inline object literal", () => {
-    expect(() => edit("export default defineNuxtConfig({ nextgen: base })")).toThrowError(
+  it("throws E_VALIDATION when zitadel is not an inline object literal", () => {
+    expect(() => edit("export default defineNuxtConfig({ zitadel: base })")).toThrowError(
       /E_VALIDATION|Could not edit/,
     );
   });

@@ -1,21 +1,46 @@
 import type { ClassList, HTMLElementAttrs } from "@qwik.dev/core";
-import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
+import type { ZitadelStandardAttributeProps } from "@zitadel/sdk-core/types";
 
 /**
- * Re-exports the shared SPA widget types from `@zitadel/sdk-core`.
+ * Re-exports the shared event detail types that the `on...$` callbacks receive.
  *
- * `export type *` keeps this surface in lockstep with the core SPA contract: a
- * type added there is re-exported here automatically, and none can be dropped by
- * hand. The server-middleware types live in a separate core module and stay out
- * of the browser SDK surface.
+ * The types are re-exported by name from `@zitadel/sdk-core` rather than through a barrel. Naming
+ * them keeps the public surface exactly this list, so an internal helper added to the core types
+ * never leaks into this package by accident. The server-middleware types live in a separate core
+ * module and stay out of the browser SDK surface.
  */
-export type * from "@zitadel/sdk-core/types";
+export type {
+  ZitadelFlowPurpose,
+  ZitadelFlowStep,
+  ZitadelFlowBehavior,
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowRedirectDetail,
+  ZitadelFlowStepDetail,
+  ZitadelSignoutDetail,
+} from "@zitadel/sdk-core/types";
 
 /**
- * The standard HTML attributes a widget wrapper accepts besides its own props,
- * and nothing else, so no prop the type accepts is dropped. They are passed to
- * the widget element.
+ * The standard HTML attributes a widget wrapper accepts besides its own props.
+ *
+ * They are passed to the widget element, and nothing else is, so no prop the type accepts is
+ * silently dropped. Use them for attributes such as `id`, `style`, `aria-*` and `data-*`.
  */
-export type ZitadelWidgetAttributes = StandardAttributeProps<
-  HTMLElementAttrs & { class?: ClassList }
+export type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
+  HTMLElementAttrs & {
+    /**
+     * The CSS classes for the widget element.
+     *
+     * Accepts any form Qwik's `class` accepts: a string, an array or an object. It is declared
+     * here because `class` is the Qwik spelling of the attribute and is not part of the base
+     * attribute type.
+     *
+     * @example
+     * ```tsx
+     * <ZitadelLogin project={project} class={["card", { wide: true }]} />;
+     * ```
+     */
+    class?: ClassList;
+  }
 >;

@@ -17,11 +17,16 @@
 > moves besides the mount and the base URL: the checks that decide by path,
 > which the proposal said needed no change, the versions clients and servers
 > must have, and the order of the rollout. `/healthz` is gone since #2308.
+>
+> **Amendment (2026-11-13):** the flow operations moved from `/flow` to
+> `/flows`, the API's last singular collection. §4 gains what happens to a
+> path renamed inside `/api/v1` before GA: the old one keeps answering,
+> deprecated, until 1.0.0.
 
 ## Context
 
 The server mounts the resource API as a catch-all at `/`
-([`buildHTTPMux`](../../cmd/server/server.go)). The few other paths it serves
+([`buildHTTPMux`](../../apps/api/cmd/server/server.go)). The few other paths it serves
 are registered ahead of it: the console (`/ui/console`),
 `/console/runtime.json` and the IdP callbacks
 (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`). The health probes
@@ -41,7 +46,7 @@ Whatever no other service claims goes to the server, so the API answers at
   take a name the API uses (`/events`, `/policies`, `/releases`, `/teams`,
   `/branding`, …), today or later;
 - the built-in schema documents at `/schemas/v1/*` and the API's `/schemas`
-  and `/schemas/{id}` share one path tree, kept apart only by the order of the
+  and `/schemas/{schema_id}` share one path tree, kept apart only by the order of the
   rewrites;
 - the planned protocol surfaces
   ([resource map](../design/api/resource-map.md#hosted-protocol-surfaces):
@@ -69,7 +74,7 @@ break on the scale of a new major, so now is the cheap time.
 
 ### 1. The resource API lives under `/api/v1/`
 
-Every operation in [`api/openapi/`](../../api/openapi/) is served under
+Every operation in [`api/openapi/`](../../apps/api/api/openapi/) is served under
 `/api/v1`: `POST /api/v1/users`, `GET /api/v1/teams/{team_id}`,
 `POST /api/v1/sessions/query`. The spec's paths stay as they are; the prefix
 is its `servers` URL. The cloud and self-hosted servers have the same shape,
@@ -125,6 +130,32 @@ version, not that the server isn't Zitadel. GA removes the alias with the
 other 0.x allowances, once the root-path traffic the server measures (§5)
 has died down.
 
+A path renamed inside `/api/v1` before GA keeps answering through 0.x for
+the same reason. There is one: the flow operations moved from `/flow` to
+`/flows` (`POST /flows`, `GET /flows/{flow_id}`,
+`POST /flows/{flow_id}/submit`), and the login component and every SDK
+released before that call `/flow`.
+
+- The server maps `/flow` and every path below it to `/flows` in front of
+  the generated server, under the prefix and at the root
+  ([`withLegacyFlowPath`](../../apps/api/internal/api/legacy_flow_path.go)),
+  so both spellings reach one operation. It matches the whole segment:
+  `/flow_definitions` is not `/flow`.
+- A response for an operation on the old path carries a `Deprecation`
+  header with the date `/flows` shipped and a `Link` with
+  `rel="deprecation"` to the API reference on flows. At the root it keeps
+  the root alias's earlier date and carries both links. A path or a method
+  that names no operation gets neither.
+- The access log keeps the path the client sent, which counts the traffic
+  the old path still takes.
+- The checks that decide by path accept both spellings for as long as the
+  server answers both: the no-store rule for flow responses, and the hosted
+  cloud's bot check on flow writes (§5).
+- The cloud's rule for the API's root paths keeps `/flow` and gains no
+  `/flows`: a client that knows `/flows` calls it under the prefix.
+
+GA removes it with the root alias.
+
 ### 5. What changes
 
 - **Spec:** the `servers` URL becomes `/api/v1`, and the API reference shows
@@ -136,8 +167,8 @@ has died down.
   own. Code that reads the request path before ogen does handles both
   spellings: the no-store rule for session responses, and the audit, which
   records the operation rather than the mount.
-- **Clients:** the generated TypeScript client adds the prefix to its runtime
-  base URL, and the Go client module (`go.zitadel.com/zitadel/v5`) gets a
+- **Clients:** the generated TypeScript client adds the prefix after each
+  client's base URL, and the Go client module (`go.zitadel.com/zitadel/v5`) gets a
   helper that adds it to an origin. The CLI, the console, the login
   components, the SDKs' own calls (`/sessions/me` in `@zitadel/sdk-core`),
   `@zitadel/api-mock` and the benchmark harness follow. `zitadel api` keeps

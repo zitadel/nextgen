@@ -29,10 +29,12 @@ test("local journey defaults to the full framework matrix", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
     runtime: "binary",
+    packed: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -61,10 +63,12 @@ test("local journey can select one framework and tune concurrency", () => {
       image: "nextgen:test",
       keep: true,
       matrix: "full",
+      only: "",
       preexistingApp: false,
       preset: "",
       remote: false,
       runtime: "docker",
+      packed: false,
       suite: "frameworks",
       tarballsDir: "/tmp/tarballs",
       workDir: "/tmp/journey",
@@ -80,10 +84,12 @@ test("local journey can scaffold with a sign-in preset", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "passkey-first",
     remote: false,
     runtime: "binary",
+    packed: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -99,10 +105,12 @@ test("the testkit suite pins the next framework and rejects an explicit one", ()
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
     runtime: "binary",
+    packed: false,
     suite: "testkit",
     tarballsDir: "",
     workDir: "",
@@ -122,10 +130,12 @@ test("local journey can request the binary runtime explicitly", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
     runtime: "binary",
+    packed: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -156,6 +166,16 @@ test("--ci runs the full CI journey set in one process", () => {
   const parsed = parseLocalJourneyArgs(["--ci"]);
   assert.equal(parsed.ci, true);
   assert.equal(parsed.matrix, "full");
+});
+
+test("--only picks one journey of the --ci set", () => {
+  assert.equal(parseLocalJourneyArgs(["--ci", "--only", "fresh-app/vue"]).only, "fresh-app/vue");
+  assert.throws(() => parseLocalJourneyArgs(["--only", "fresh-app/vue"]), /add --ci/);
+  assert.throws(() => parseLocalJourneyArgs(["--ci", "--only", "vue"]), /<variant>\/<framework>/);
+  assert.throws(
+    () => parseLocalJourneyArgs(["--ci", "--matrix", "single", "--only", "fresh-app/next"]),
+    /drop --matrix/,
+  );
 });
 
 test("--matrix validates its scope", () => {
@@ -253,7 +273,7 @@ test("the command line's arguments win over the JOURNEY_* variables", () => {
 });
 
 test("JOURNEY_CONCURRENCY reaches the CI lane, whose command line fixes the rest", () => {
-  // e2e:journey-local runs `--ci --runtime binary`; the pool size has to come
+  // @zitadel/e2e#journey-local runs `--ci --runtime binary`; the pool size has to come
   // from the environment.
   const parsed = parseLocalJourneyArgs([
     ...journeyArgsFromEnv({ JOURNEY_CONCURRENCY: "8" }),
@@ -281,20 +301,15 @@ test("in GitHub Actions the journey refuses to pack its own tarballs", () => {
   assert.doesNotThrow(() => assertPrebuiltTarballs(ci, {}));
 });
 
-test("the e2e:all lane refuses to pack beside the other lanes", () => {
-  const ci = parseLocalJourneyArgs(["--ci"]);
-  const lane = { JOURNEY_TARBALLS_REQUIRED: "1" };
-  assert.throws(() => assertPrebuiltTarballs(ci, lane), /runs beside the other e2e lanes/);
-  const handedOver = parseLocalJourneyArgs([
-    ...journeyArgsFromEnv({ JOURNEY_TARBALLS_DIR: "dist/release/1.0.0/npm" }),
-    "--ci",
-  ]);
-  assert.doesNotThrow(() => assertPrebuiltTarballs(handedOver, lane));
+test("--packed packs without a turbo run of its own", () => {
+  const lane = parseLocalJourneyArgs(["--ci", "--packed"]);
+  assert.equal(lane.packed, true);
+  assert.doesNotThrow(() => assertPrebuiltTarballs(lane, { GITHUB_RUN_ID: "1" }));
 });
 
 test("--ci refuses to run without the mock OIDC provider", () => {
   const missing = "/does/not/exist/oidc-mock";
-  assert.throws(() => assertOidcMock({ ci: true }, missing), /oidc-mock:build/);
+  assert.throws(() => assertOidcMock({ ci: true }, missing), /--filter=oidc-mock/);
   // Any existing file stands in for the built binary.
   assert.doesNotThrow(() => assertOidcMock({ ci: true }, process.execPath));
   // Run by hand, a missing binary only skips the mock.

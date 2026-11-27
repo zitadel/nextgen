@@ -1,6 +1,10 @@
 export default defineNuxtConfig({
-  buildDir: process.env.NEXTGEN_NUXT_BUILD_DIR ?? ".nuxt",
+  buildDir: process.env.ZITADEL_NUXT_BUILD_DIR ?? ".nuxt",
   modules: ["@zitadel/sdk-nuxt/module"],
+  // Otherwise Nuxt asks for telemetry consent whenever its output is a
+  // terminal, and turbo runs tasks in one it never answers: `build` and
+  // `typecheck` wait for good.
+  telemetry: false,
   typescript: {
     tsConfig: {
       // Generated into the build dir (`.nuxt/`), hence three levels up. Nuxt's
@@ -9,7 +13,7 @@ export default defineNuxtConfig({
       extends: "../../../tsconfig.base.json",
     },
   },
-  nextgen: {
+  zitadel: {
     protectedRoutes: ["/admin", "/admin/*"],
     loginPath: "/login",
   },
@@ -24,13 +28,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      nextgenProxyPath: "/__nextgen",
       zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo",
-    },
-  },
-  vite: {
-    optimizeDeps: {
-      include: ["lit"],
     },
   },
   nitro: {

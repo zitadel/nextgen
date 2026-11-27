@@ -2,59 +2,68 @@ import { describe, expect, it } from "vitest";
 
 import { pagingParameters, pagingSource } from "./operations";
 
-/** Signatures as orval writes them, one per argument order a paged function can have. */
+/**
+ * Signatures as orval writes them through scripts/client-builder.ts, the client
+ * first, one per argument order a paged function can have.
+ */
 const endpoints = `
-export const listThings = async (params?: ListThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<ListThings200> => {
-export const listUserThings = async (userId: string,
-    params?: ListUserThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<ListUserThings200> => {
-export const queryThings = async (queryThingsBody: QueryThingsBody,
-    params: QueryThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<QueryThings200> => {
-export const searchThings = async (params: SearchThingsParams,
-    searchThingsBody?: SearchThingsBody, options?: Parameters<typeof customFetch>[1]): Promise<SearchThings200> => {
-export const sortThings = async (order: ("asc" | "desc")[],
-    params?: SortThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<SortThings200> => {
-export const watchThings = async (onPage: (page: Page, params: Cursor) => void,
+export const listThings = async (client: ZitadelClient, params?: ListThingsParams, options?: RequestInit): Promise<ListThings200> => {
+export const listUserThings = async (client: ZitadelClient, userId: string,
+    params?: ListUserThingsParams, options?: RequestInit): Promise<ListUserThings200> => {
+export const queryThings = async (client: ZitadelClient, queryThingsBody: QueryThingsBody,
+    params: QueryThingsParams, options?: RequestInit): Promise<QueryThings200> => {
+export const searchThings = async (client: ZitadelClient, params: SearchThingsParams,
+    searchThingsBody?: SearchThingsBody, options?: RequestInit): Promise<SearchThings200> => {
+export const sortThings = async (client: ZitadelClient, order: ("asc" | "desc")[],
+    params?: SortThingsParams, options?: RequestInit): Promise<SortThings200> => {
+export const watchThings = async (client: ZitadelClient, onPage: (page: Page, params: Cursor) => void,
     labels: Record<string, string>, params?: WatchThingsParams): Promise<WatchThings200> => {
-export const listWidgets = async (params?: ListWidgetsParams, options?: Parameters<typeof customFetch>[1]): Promise<ListWidgets200> => {
-export const brokenThings = async (params?: BrokenThingsParams
+export const listWidgets = async (client: ZitadelClient, params?: ListWidgetsParams, options?: RequestInit): Promise<ListWidgets200> => {
+export const brokenThings = async (client: ZitadelClient, params?: BrokenThingsParams
 `;
 
 describe("pagingParameters", () => {
   it.each([
-    ["the query parameters alone", "listThings", "query", ["params", "options"], "params"],
+    [
+      "the query parameters alone",
+      "listThings",
+      "query",
+      ["client", "params", "options"],
+      "params",
+    ],
     [
       "the query parameters after a path parameter",
       "listUserThings",
       "query",
-      ["userId", "params", "options"],
+      ["client", "userId", "params", "options"],
       "params",
     ],
     [
       "the body before the query parameters",
       "queryThings",
       "body",
-      ["queryThingsBody", "params", "options"],
+      ["client", "queryThingsBody", "params", "options"],
       "queryThingsBody",
     ],
     [
       "the body after required query parameters",
       "searchThings",
       "body",
-      ["params", "searchThingsBody", "options"],
+      ["client", "params", "searchThingsBody", "options"],
       "searchThingsBody",
     ],
     [
       "the query parameters after a type in brackets",
       "sortThings",
       "query",
-      ["order", "params", "options"],
+      ["client", "order", "params", "options"],
       "params",
     ],
     [
       "the query parameters after types with commas inside",
       "watchThings",
       "query",
-      ["onPage", "labels", "params"],
+      ["client", "onPage", "labels", "params"],
       "params",
     ],
   ] as const)("finds %s", (_, id, token, names, carrier) => {
@@ -120,7 +129,7 @@ describe("pagingSource", () => {
     );
 
     expect(source).toContain(
-      'withToken: ([userId, params, options]: Parameters<(typeof endpoints)["listUserThings"]>, page_token: string): Parameters<(typeof endpoints)["listUserThings"]> => [userId, { ...params, page_token }, options],',
+      'withToken: ([client, userId, params, options]: Parameters<(typeof endpoints)["listUserThings"]>, page_token: string): Parameters<(typeof endpoints)["listUserThings"]> => [client, userId, { ...params, page_token }, options],',
     );
   });
 

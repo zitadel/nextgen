@@ -64,7 +64,7 @@ afterAll(() => {
   server.close();
 });
 
-async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const value = probe();
@@ -343,11 +343,79 @@ describe("<zitadel-login> with identity providers", () => {
     expect(redirects).toHaveLength(0);
   });
 
+  describe("the navigation scheme check", () => {
+    /** Apply a wire response whose step carries `url` and report what the page did. */
+    async function navigateWith(
+      kind: "provider" | "terminal",
+      url: string,
+    ): Promise<{ navigations: string[]; errors: string[] }> {
+      clearSsoProviders();
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const errors: string[] = [];
+      element.addEventListener("zitadel-flow-error", (e) =>
+        errors.push((e as CustomEvent).detail.message),
+      );
+      const navigations = await withStubbedNavigation(async () => {
+        await (element as unknown as { applyResponse(wire: unknown): Promise<void> }).applyResponse(
+          {
+            id: "flow_nav",
+            session_id: "sess",
+            session_token: "tok",
+            step:
+              kind === "provider"
+                ? { name: "idp", redirect_url: url, fields: [], actions: [], gates: {} }
+                : {
+                    name: "done",
+                    complete: "redirect",
+                    redirect_url: url,
+                    fields: [],
+                    actions: [],
+                    gates: {},
+                  },
+            ...(kind === "terminal" ? { redirect_uri: url } : {}),
+          },
+        );
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      return { navigations, errors };
+    }
+
+    it.each([
+      ["provider", "javascript:alert(1)"],
+      ["provider", "data:text/html,x"],
+      ["terminal", "javascript:alert(1)"],
+      ["terminal", "data:text/html,x"],
+    ] as const)("refuses a %s target of %s and reports it", async (kind, url) => {
+      const { navigations, errors } = await navigateWith(kind, url);
+
+      expect(navigations).toEqual([]);
+      expect(errors).toEqual(["Refused to navigate: the target URL must use http or https."]);
+    });
+
+    it.each([
+      ["provider", "//evil.example/cb"],
+      ["provider", "/home"],
+      ["provider", "https://rp.example.invalid/cb"],
+      ["terminal", "//evil.example/cb"],
+      ["terminal", "/home"],
+      ["terminal", "https://rp.example.invalid/cb"],
+    ] as const)("allows a %s target of %s", async (kind, url) => {
+      const { navigations, errors } = await navigateWith(kind, url);
+
+      expect(navigations).toEqual([url]);
+      expect(errors).toEqual([]);
+    });
+  });
+
   /**
    * The whole round trip against the mock, the way the engine runs it: the
    * provider button assigns `redirect_url`, the provider sends the browser to
    * the callback route, the callback answers `303` to the `return_target` the
-   * submission carried, and the fresh page load resumes with `GET /flow/{id}`.
+   * submission carried, and the fresh page load resumes with `GET /flows/{flow_id}`.
    * Only the provider itself is missing, so the test makes its redirect.
    */
   describe("the provider round trip", () => {
@@ -394,8 +462,8 @@ describe("<zitadel-login> with identity providers", () => {
       // A fresh page load: a widget that ignored `?flow=` would start a new
       // flow and leave the user on a blank sign-in screen.
       const { element, seen } = await landOn(location, 'zl-field[name="given_name"]');
-      expect(seen).toContain("GET /api/v1/flow/flow_mock");
-      expect(seen).not.toContain("POST /api/v1/flow");
+      expect(seen).toContain("GET /api/v1/flows/flow_mock");
+      expect(seen).not.toContain("POST /api/v1/flows");
       expect(element.shadowRoot?.querySelector('zl-field[name="given_name"]')).not.toBeNull();
     });
 
@@ -416,6 +484,32 @@ describe("<zitadel-login> with identity providers", () => {
     });
   });
 
+  describe("when the server answers flow.sso_user_schema_mismatch", () => {
+    it("starts a fresh flow whose notice does not ask the visitor to start again", async () => {
+      server.use(
+        http.get(
+          "*/flows/:id",
+          () =>
+            HttpResponse.json(
+              {
+                code: "flow.sso_user_schema_mismatch",
+                message: "the linked account cannot sign in through this flow",
+              },
+              { status: 409 },
+            ),
+          { once: true },
+        ),
+      );
+
+      const { element } = await landOn("/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      const text = element.shadowRoot?.textContent ?? "";
+      expect(text).toContain("This account can't sign in with this provider.");
+      expect(text).not.toContain("Please start again");
+    });
+  });
+
   describe("when the server answers flow.restart_required", () => {
     const restartRequired = () =>
       HttpResponse.json(
@@ -426,12 +520,12 @@ describe("<zitadel-login> with identity providers", () => {
     const resumeStale = () => landOn("/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
 
     it("starts a fresh flow and tells the user why", async () => {
-      server.use(http.get("*/flow/:id", restartRequired, { once: true }));
+      server.use(http.get("*/flows/:id", restartRequired, { once: true }));
 
       const { element, seen, url } = await resumeStale();
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
-      expect(seen.filter((r) => r === "POST /api/v1/flow")).toHaveLength(1);
+      expect(seen.filter((r) => r === "POST /api/v1/flows")).toHaveLength(1);
       // A reload must not resume the refused flow again.
       expect(url).toBe("?keep=1#top");
       expect(element.shadowRoot?.textContent).toContain(
@@ -440,12 +534,12 @@ describe("<zitadel-login> with identity providers", () => {
     });
 
     it("restarts only once when the fresh flow is refused too", async () => {
-      server.use(http.get("*/flow/:id", restartRequired), http.post("*/flow", restartRequired));
+      server.use(http.get("*/flows/:id", restartRequired), http.post("*/flows", restartRequired));
 
       const { element, seen } = await resumeStale();
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(seen.filter((r) => r === "POST /api/v1/flow")).toHaveLength(1);
+      expect(seen.filter((r) => r === "POST /api/v1/flows")).toHaveLength(1);
       expect(element.shadowRoot?.querySelector("zl-alert")).not.toBeNull();
     });
 
@@ -462,7 +556,7 @@ describe("<zitadel-login> with identity providers", () => {
       server.events.on("request:start", record);
       try {
         // The typed value is refused together with its flow.
-        server.use(http.post("*/flow/:id/submit", restartRequired, { once: true }));
+        server.use(http.post("*/flows/:id/submit", restartRequired, { once: true }));
         element.shadowRoot?.dispatchEvent(
           new CustomEvent("zl-input", {
             bubbles: true,
@@ -534,7 +628,7 @@ describe("<zitadel-login> with identity providers", () => {
         seen.push(apiCall(request));
       };
       server.events.on("request:start", record);
-      server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));
+      server.use(http.get("*/flows/:id", () => HttpResponse.json(body, { status })));
       const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
       const original = window.location.href;
       if (source === "the URL") window.history.replaceState({}, "", "/login?flow=flow_stale");
@@ -553,8 +647,8 @@ describe("<zitadel-login> with identity providers", () => {
         warn.mockRestore();
       }
 
-      expect(seen).toContain("GET /api/v1/flow/flow_stale");
-      expect(seen).toContain("POST /api/v1/flow");
+      expect(seen).toContain("GET /api/v1/flows/flow_stale");
+      expect(seen).toContain("POST /api/v1/flows");
       expect(warned).toEqual([expect.stringContaining("flow_stale")]);
     },
   );

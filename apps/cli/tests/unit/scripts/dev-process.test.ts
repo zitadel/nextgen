@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 const execFile = promisify(execFileCallback);
 

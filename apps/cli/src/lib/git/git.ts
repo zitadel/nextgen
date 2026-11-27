@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-
 import { execa } from "execa";
 
 import { GitDidNotStartError, RepositoryError } from "./errors";
@@ -37,7 +36,9 @@ export class GitResult {
 
   /** The NUL-separated paths git printed, for a `-z` command. */
   paths(): string[] {
-    return this.stdout.split("\0").filter((path) => path !== "");
+    return this.stdout.split("\0").filter((path) => {
+      return path !== "";
+    });
   }
 
   /**
@@ -176,6 +177,26 @@ export class Git {
    */
   static literal(path: string): string {
     return `:(literal)${path}`;
+  }
+
+  /**
+   * `pattern` as a pathspec that matches what the glob does, with `*` stopping at a `/`.
+   *
+   * `glob` rather than a plain pathspec, whose `*` also matches `/`, so
+   * `dir/*.json` would take in `dir/nested/x.json` as well.
+   */
+  static glob(pattern: string): string {
+    return `:(glob)${pattern}`;
+  }
+
+  /** {@link glob}, leaving out what it matches. */
+  static excluded(pattern: string): string {
+    return `:(exclude,glob)${pattern}`;
+  }
+
+  /** {@link literal}, leaving out only `path` itself. */
+  static excludedLiteral(path: string): string {
+    return `:(exclude,literal)${path}`;
   }
 
   /** Whether `path`, relative to the directory, names something that exists. */

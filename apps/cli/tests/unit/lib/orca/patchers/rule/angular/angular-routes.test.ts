@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { angularRoutesEdit } from "../../../../../../../src/lib/orca/patchers/rule/angular/angular-routes";
+import { angularRoutesEdit } from "@/lib/orca/patchers/rule/angular/angular-routes";
 
 const edit = angularRoutesEdit();
 

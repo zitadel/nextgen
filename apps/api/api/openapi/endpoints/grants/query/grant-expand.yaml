@@ -1,0 +1,20 @@
+type: string
+description: |
+  Ask for extra fields on the bound user or team. Those extras land on
+  `user` or `team` themselves; there is no sibling `principal` object.
+
+  `principal` adds `schema`, `attributes`, and `metadata` on `user`, or
+  `status`, `created_at`, and `updated_at` on `team`. The id (`user_id` /
+  `team_id`) is always present. If the user or team cannot be loaded, the
+  object stays id-only — the same shape as not expanding.
+
+  Expanding requires read on the whole of the principal's home project (the
+  platform project when the server has one), checked once per home project.
+  A project secret of another project never has it, and a session has it
+  only with a grant that covers the whole of that project. A caller without
+  it gets 403 `user.permission_denied`; extras
+  are never omitted silently. Without `expand`, every caller who may read
+  the grants sees `user_id`, `identifier` and `display`, or the team's
+  `name`.
+enum:
+  - principal

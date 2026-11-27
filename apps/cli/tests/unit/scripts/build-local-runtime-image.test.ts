@@ -118,7 +118,8 @@ describe("build-local-runtime-image", () => {
         ".",
       ],
       options: {
-        cwd: "/repo",
+        // The server builds in its module, apps/api; the image builds at the root.
+        cwd: "/repo/apps/api",
         env: {
           CUSTOM_ENV: "1",
           CGO_ENABLED: "0",

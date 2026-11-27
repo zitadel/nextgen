@@ -1,0 +1,108 @@
+import { Flags } from "@oclif/core";
+
+import { VariableService } from "@/lib/backend";
+import { CommandGroups } from "@/cli/commands/groups";
+import type { Admitted, CommandResult } from "@/cli/core";
+import { fieldsFlag, plainFlag } from "@/cli/core/tabulatable";
+import { VariableView } from "@/lib/variable";
+import { ReadCommand } from "@/cli/commands/bases";
+import { Telemetered } from "@/cli/telemetry/telemetered";
+
+/** The columns `list` renders, in order; `--preview` leaves out the preview column. */
+const COLUMNS = ["name", "value", "preview"] as const;
+const PREVIEW_COLUMNS = ["name", "value"] as const;
+
+/**
+ * `zitadel variable list` — show the variables entered on the project.
+ *
+ * The project's own set. A secret is reported as held without its value, because
+ * the platform never discloses one. Without `--preview` it lists every name with
+ * its primary value and whether a preview value exists beside it; with
+ * `--preview` it lists the preview values alone, which are never merged with the
+ * primary ones — only the names that hold one.
+ */
+export default class VariableList extends Telemetered(ReadCommand) {
+  static override description = "List the variables entered on the project.";
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
+
+  static override examples = [
+    "<%= config.bin %> variable list",
+    "<%= config.bin %> variable list --preview",
+    "<%= config.bin %> variable list --json",
+  ];
+  static override flags = {
+    preview: Flags.boolean({
+      default: false,
+      description: "List the preview values instead of the primary ones.",
+    }),
+    fields: fieldsFlag({
+      fallback: ["name"],
+      shape: {
+        known: new Set(["name", "secret", "value", "preview", "preview.secret", "preview.value"]),
+        open: [],
+      },
+    }),
+    plain: plainFlag,
+  };
+
+  /**
+   * Lists the variables entered on the project.
+   *
+   * @param input - The flags the command accepts.
+   * @returns The variables, as a list.
+   */
+  protected async execute({ flags }: Admitted<typeof VariableList>): Promise<CommandResult> {
+    const variableService = await this.service(VariableService);
+
+    if (flags.preview) {
+      const items = await variableService.previews();
+      this.annotate({
+        variable_count: items.length,
+      });
+      const rows = items.map((item) => {
+        return VariableView.of(item).cell();
+      });
+      const columns = PREVIEW_COLUMNS;
+      const empty = "No preview variables found";
+      const footer: string[] = [];
+      const page = null;
+      const extra = {};
+
+      return this.listed(flags, {
+        columns,
+        rows,
+        items,
+        singular: "variable",
+        empty,
+        footer,
+        page,
+        extra,
+      });
+    }
+
+    const items = await variableService.inventory();
+    this.annotate({
+      variable_count: items.length,
+    });
+    const rows = items.map((item) => {
+      return VariableView.of(item).inventoryCell();
+    });
+    const columns = COLUMNS;
+    const empty = "No variables found";
+    const footer: string[] = [];
+    const page = null;
+    const extra = {};
+
+    return this.listed(flags, {
+      columns,
+      rows,
+      items,
+      singular: "variable",
+      empty,
+      footer,
+      page,
+      extra,
+    });
+  }
+}

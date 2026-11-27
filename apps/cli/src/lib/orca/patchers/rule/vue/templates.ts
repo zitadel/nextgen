@@ -1,6 +1,6 @@
-import { MANAGED_MARKER } from "../../../../paths";
-import type { PatchContext } from "../../types";
-import { PROXY_PATH } from "../proxy";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 /**
  * The managed `src/App.vue`: a minimal path-based router that renders the
@@ -33,7 +33,7 @@ export function appTemplate(ctx: PatchContext): string {
     : "";
   const localesAttr = business ? ' :locales="businessLocales"' : "";
   return `<script setup lang="ts">
-${MANAGED_MARKER}
+${ManagedFile.MARKER}
 import { onMounted } from "vue";
 import { ${importNames} } from "@zitadel/sdk-vue";${localesComment}
 
@@ -54,17 +54,17 @@ onMounted(() => {
 <template>
   <div
     v-if="path.startsWith('/profile')"
-    style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark"
+    style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark"
   >
     <ZitadelSession :project="project" postSignOutUrl="/login" />
   </div>
   <div
     v-else-if="path.startsWith('/register')"
-    style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark"
+    style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark"
   >
     <ZitadelLogin :project="project"${localesAttr} purpose="register" postSignInUrl="/profile" />
   </div>
-  <div v-else-if="path !== '/'" style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
+  <div v-else-if="path !== '/'" style="position:fixed;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box;background:#0f0f11;color-scheme:dark">
     <ZitadelLogin :project="project"${localesAttr} purpose="login" postSignInUrl="/profile" />
   </div>
 </template>

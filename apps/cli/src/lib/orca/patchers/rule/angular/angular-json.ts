@@ -1,5 +1,5 @@
-import { ZitadelError } from "../../../../errors";
-import { isObject, parseJsonObject } from "../../../../json";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, parseJsonObject } from "@/lib/json";
 
 /**
  * Builds the pure `edit` transform the file-writer applies to `angular.json`:

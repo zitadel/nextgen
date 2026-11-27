@@ -1,56 +1,111 @@
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  Children,
+  createContext,
+  Fragment,
+  isValidElement,
+  type ReactNode,
+  useContext,
+} from "react";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
+import { IdText } from "@/components/id-text";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
-import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
-import { MetaCard } from "./detail-meta";
-import { EYEBROW, SECTION_HEADING, PAGE_TITLE } from "./typography";
+import { SECTION_HEADING, PAGE_TITLE } from "./typography";
 
 /**
- * Shared geometry for the console's resource detail screens (Users, Teams,
- * Project settings) — the detail counterpart of `resource-list.tsx`.
+ * Shared geometry for the console's detail screens, the detail counterpart of
+ * `resource-list.tsx`. Resources (Users, Teams, Project settings) and
+ * configuration (Login flows, Identity providers, Releases) draw the same
+ * shell: a header, then body cards of labelled rows.
  *
- * One shell draws all three; its measurements live in "Resource detail layout"
- * in `docs/styling.md`, which a change to a value here updates too.
+ * Its measurements live in "Resource detail layout" in `docs/styling.md`,
+ * which a change to a value here updates too.
  *
- * The user-schema screen heads the same body with {@link DetailTitle}: the
- * title over one line of identity, with no icon tile or meta card. The
- * login-flow, identity-provider and release screens are a different
- * composition — the whole screen is one panel ({@link DetailPanel}) — and keep
- * it. They share the icon tile ({@link ICON_PLATE}) and the header card
- * (`MetaCard`) with the resource screens.
+ * Every one is headed by {@link DetailHeader}: the title, then one line of
+ * identity values. Only resources (projects, teams, users, releases) lead
+ * the title with an icon tile; configuration has none.
  */
 
-/** The 24px gap between the header row and the first body element. */
-export const DETAIL_BODY = "mt-6";
+/** The 36px gap between the header's identity line and the first body element. */
+export const DETAIL_BODY = "mt-9";
+
+/**
+ * The 16px between a detail body's parts: the tab row and the first card, and
+ * card and card.
+ */
+export const DETAIL_STACK = "flex flex-col gap-4";
 
 /** A detail screen's title: the 24/24 display face. */
 export const DETAIL_TITLE = PAGE_TITLE;
 
-/** The icon tile a detail title leads with. */
-export const ICON_PLATE =
-  "bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-md";
+/** The icon tile a detail title leads with: 24px, the title's line, a 16px glyph. */
+const ICON_PLATE =
+  "bg-muted text-foreground flex size-6 shrink-0 items-center justify-center rounded-sm";
+
+/**
+ * The rule before an identity value that follows another: 1px by 16px, 8px
+ * either side, from `sm`. A pseudo-element, so the `<dl>` holds only its
+ * groups.
+ */
+const META_RULE =
+  "sm:before:bg-border sm:before:mx-2 sm:before:h-4 sm:before:w-px sm:before:shrink-0 sm:before:content-['']";
 
 /** A card's or tab row's small action: 12px text, a 14px glyph. */
 export const CARD_ACTION_BUTTON = "gap-1 px-2.5 text-xs [&_svg]:size-3.5!";
+
+/** A row's read-only value: 14/20, wrapping anywhere rather than widening the card. */
+export const DETAIL_VALUE = "min-w-0 text-sm leading-5 text-foreground wrap-anywhere";
+
+/** A row's placeholder value (`—`, `Not used`): the value line, muted. */
+export const DETAIL_VALUE_EMPTY = "text-sm leading-5 text-muted-foreground";
 
 /** A body card: the stock `Card` with its own gap and padding removed. */
 export const DETAIL_CARD = "gap-0 py-0";
 
 /**
- * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`), an
- * optional action beside it, an optional note under them, a rule, then
- * `children`. Inset 24px, 20px top and bottom, 16px between parts.
+ * The label column of a card row from `sm`: 218px from the card's content
+ * edge to the value, on every detail card.
+ *
+ * Tailwind reads class names whole, so the rail is spelled out wherever a
+ * variant needs it: here, the section aside's `@md/field-group:w-54.5`, and
+ * the container rows' `@md/detail-rows:w-54.5`. The two field rails below
+ * are this one less a field's gap. A change to one is a change to all five.
+ */
+const DETAIL_LABEL_RAIL = "sm:w-54.5";
+
+/**
+ * The same column for a label beside a form control: the rail less the 12px
+ * gap a horizontal `Field` puts between label and control, so an input starts
+ * where a read-only value does.
+ */
+export const FIELD_LABEL_RAIL = "sm:w-51.5";
+
+/**
+ * {@link FIELD_LABEL_RAIL} for a responsive `Field` inside a `FieldGroup`,
+ * which lays out on the group's width rather than the viewport. The `!` beats
+ * the responsive Field's own `flex-auto` on its label.
+ */
+export const FIELD_GROUP_LABEL_RAIL = "@md/field-group:flex-[0_0_206px]!";
+
+/**
+ * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`),
+ * then `aside` on the label rail (a value the title names, such as a login
+ * flow's or a user's schema) and `action` at the row's end, an optional
+ * `description` under them, a rule, then `children`. Inset 24px, 20px top
+ * and bottom, 16px between parts. Like a form's fields, the title row lays out
+ * on the card's width (`@md/field-group`), not the viewport's, so the aside
+ * starts level with the values and controls below it.
  */
 export function DetailSection({
   title,
   titleId,
+  aside,
   action,
-  note,
+  description,
   className,
   children,
   ...props
@@ -58,29 +113,42 @@ export function DetailSection({
   title: string;
   /** Sets the title's id, for a card labelled by it. */
   titleId?: string;
+  aside?: ReactNode;
   action?: ReactNode;
-  /** A line between the header and the rule. */
-  note?: ReactNode;
+  /** A sentence about the whole section, muted, between the title and the rule. */
+  description?: ReactNode;
 }) {
   const heading = (
     <h2 id={titleId} className={SECTION_HEADING}>
       {title}
     </h2>
   );
+  const lead = aside ? (
+    <div className="flex min-w-0 flex-col gap-2 @md/field-group:flex-row @md/field-group:items-center @md/field-group:gap-0">
+      <div className="shrink-0 @md/field-group:w-54.5">{heading}</div>
+      {aside}
+    </div>
+  ) : (
+    heading
+  );
   return (
     <Card className={cn(DETAIL_CARD, className)} {...props}>
       <CardContent className="flex flex-col gap-4 px-6 py-5">
-        {action ? (
-          // Wraps so a wide action drops under the title instead of widening
-          // the card.
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {heading}
-            {action}
-          </div>
-        ) : (
-          heading
-        )}
-        {note}
+        {/* The container the aside lays out on: the full row's width, the
+            same as a form's `FieldGroup` below it. */}
+        <div className={aside ? "@container/field-group" : "contents"}>
+          {action ? (
+            // Wraps so a wide action drops under the title instead of widening
+            // the card.
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {lead}
+              {action}
+            </div>
+          ) : (
+            lead
+          )}
+        </div>
+        {description && <CardDescription>{description}</CardDescription>}
         <Separator />
         {children}
       </CardContent>
@@ -89,173 +157,257 @@ export function DetailSection({
 }
 
 /**
- * A card row with a label rail: the label, and a badge beside it, on a 192px
- * column, then the value 24px after it, stacked under `sm`. The rail is 216px
- * less the gap, so the value starts on the column an inline field's input
- * does. `divider` closes the row with the rule the next one sits under.
+ * Whether the rows of the nearest {@link DetailRows} lay out on that list's
+ * own width rather than the viewport's.
+ */
+const RowsOnContainer = createContext(false);
+
+/** Row layout on the viewport: the rail from `sm`. */
+const ROW_VIEWPORT = {
+  row: "flex flex-col gap-1 sm:flex-row sm:gap-0",
+  center: "sm:items-center",
+  start: "sm:items-start",
+  rail: DETAIL_LABEL_RAIL,
+  control: "sm:min-h-6",
+};
+
+/**
+ * Row layout on the list's width (`@md/detail-rows`, 448px): for rows nested
+ * in a narrower column, where the viewport says nothing about the room left.
+ */
+const ROW_CONTAINER = {
+  row: "flex flex-col gap-1 @md/detail-rows:flex-row @md/detail-rows:gap-0",
+  center: "@md/detail-rows:items-center",
+  start: "@md/detail-rows:items-start",
+  rail: "@md/detail-rows:w-54.5",
+  control: "@md/detail-rows:min-h-6",
+};
+
+/**
+ * A card row: the label (and a badge beside it) in the label rail, the value
+ * from its end, stacked under `sm` (or, inside `<DetailRows container>`, below
+ * 448px of the list's own width). A 20px line with 4px above and below; rows
+ * sit in {@link DetailRows}, which rules between them.
  */
 export function DetailRow({
   label,
   align = "start",
-  divider = false,
-  as: Tag = "div",
   children,
 }: {
   label: ReactNode;
-  /** `center` for a one-line value, as a row with a trailing menu. */
-  align?: "start" | "center";
-  divider?: boolean;
-  as?: "div" | "li";
+  /**
+   * `center` for a one-line value, as a row with a trailing menu. `control`
+   * for a value whose first line is a 24px control (an accordion trigger, an
+   * origin link): the label centres on that line instead of sitting 2px above
+   * its text.
+   */
+  align?: "start" | "center" | "control";
   children: ReactNode;
 }) {
+  const layout = useContext(RowsOnContainer) ? ROW_CONTAINER : ROW_VIEWPORT;
   return (
-    <Tag
-      className={cn(
-        "flex flex-col gap-1 sm:flex-row sm:gap-6",
-        align === "center" ? "sm:items-center" : "sm:items-start",
-        divider && "border-b border-border py-3",
-      )}
-    >
-      <div className="flex shrink-0 items-center gap-2 text-sm leading-5 text-muted-foreground sm:w-48">
+    <div className={cn(layout.row, align === "center" ? layout.center : layout.start, "py-1")}>
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-2 text-sm leading-5 font-medium text-muted-foreground",
+          layout.rail,
+          align === "control" && layout.control,
+        )}
+      >
         {label}
       </div>
       {children}
-    </Tag>
-  );
-}
-
-/** The single panel card of a configuration detail screen (inside `<Page inset="panel">`). */
-export function DetailPanel({ children }: { children: ReactNode }) {
-  return <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">{children}</Card>;
-}
-
-/**
- * A panel's title lockup: the icon tile, an optional eyebrow, and the heading —
- * the `h1` of a configuration screen, or an `h2` on a body card under a
- * {@link DetailHeader}, which already owns the `h1`.
- */
-export function PanelTitle({
-  icon: Icon,
-  eyebrow,
-  title,
-  as: Heading = "h1",
-}: {
-  icon: LucideIcon;
-  eyebrow?: string;
-  title: string;
-  as?: "h1" | "h2";
-}) {
-  const heading = (
-    <Heading className="truncate font-serif text-lg leading-6 text-foreground">{title}</Heading>
-  );
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span aria-hidden className={ICON_PLATE}>
-        <Icon className="size-4" strokeWidth={1.5} />
-      </span>
-      {eyebrow ? (
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className={EYEBROW}>{eyebrow}</span>
-          {heading}
-        </div>
-      ) : (
-        heading
-      )}
     </div>
   );
 }
 
 /**
- * A detail screen's header as the design draws the user-schema screen: the
- * title over one line of identity, the resource's id (copyable) and its created
- * date, with no icon tile and no meta card. The line stacks under `sm`, where
- * the id alone fills it, and the rule between the two values exists only in the
- * row layout.
+ * The rule between rows takes no height: the design draws it as a zero-height
+ * line, so the 16px either side is all the space between two rows. The
+ * negative margin takes back `Separator`'s 1px from the gap above, where the
+ * design's line renders: on the last pixel of that gap.
  */
-export function DetailTitle({
-  title,
-  idLabel,
-  id,
-  createdAt,
+const ROW_RULE = "-mt-px";
+
+/**
+ * A card's list of rows ({@link DetailRow}, or a row of its own shape): 16px,
+ * a rule, 16px between each, and no rule after the last. `as="ul"` makes it a
+ * list: each row is wrapped in its `li`, the rule above it inside that item.
+ * `container` lays its rows out on the list's own width, for rows nested
+ * inside another row's value (a policy's settings in a release). `dense` puts
+ * 8px either side of the rule instead, for a client's settings in an
+ * application.
+ */
+export function DetailRows({
+  as = "div",
+  container = false,
+  dense = false,
+  children,
 }: {
-  title: string;
-  /** The id's label, e.g. `Schema ID`; the copy button's name follows it. */
-  idLabel: string;
-  id: string;
-  createdAt?: string;
+  as?: "div" | "ul";
+  container?: boolean;
+  dense?: boolean;
+  children: ReactNode;
 }) {
+  const rows = Children.toArray(children);
+  const Tag = as;
+  const gap = dense ? "gap-2" : "gap-4";
   return (
-    <header className="flex flex-col gap-2 px-2">
-      <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
-      <div className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center">
-        <span className="flex flex-wrap items-center gap-x-1">
-          <span className="whitespace-nowrap">{idLabel}</span>
-          <span className="flex min-w-0 items-center gap-1">
-            {/* `break-all`: a URI id has no break point and must not widen the page. */}
-            <span className="text-foreground min-w-0 break-all">{id}</span>
-            <CopyButton value={id} label={`Copy ${idLabel}`} size="inline" />
-          </span>
-        </span>
-        {createdAt && (
-          <>
-            <span aria-hidden className="bg-border mx-4.5 hidden h-4 w-px shrink-0 sm:block" />
-            <span className="flex items-center gap-1">
-              <span>Created</span>
-              <span>{formatDate(createdAt)}</span>
-            </span>
-          </>
-        )}
-      </div>
-    </header>
+    <RowsOnContainer.Provider value={container}>
+      <Tag className={cn("flex flex-col", gap, container && "@container/detail-rows")}>
+        {rows.map((row, index) => {
+          // `Children.toArray` has keyed every element row.
+          const key = isValidElement(row) && row.key !== null ? row.key : index;
+          // In a list the rule opens the row's own item, above it, so the
+          // list holds nothing but its items.
+          return as === "ul" ? (
+            <li key={key} className={cn("flex flex-col", gap)}>
+              {index > 0 && <Separator className={ROW_RULE} />}
+              {row}
+            </li>
+          ) : (
+            <Fragment key={key}>
+              {index > 0 && <Separator className={ROW_RULE} />}
+              {row}
+            </Fragment>
+          );
+        })}
+      </Tag>
+    </RowsOnContainer.Provider>
   );
 }
 
+/** One value on a detail header's identity line. */
+export interface DetailMetaItem {
+  /** Unique on the line: it names the value and keys it. */
+  label: string;
+  /** Left out of the line when there is none, as a user's unread created date. */
+  value?: string;
+  /**
+   * The value stands alone, in the foreground, its label read only by screen
+   * readers: a user's email, which names itself.
+   */
+  labelHidden?: boolean;
+  /**
+   * Shown in the foreground with a copy button, and cut in the middle rather
+   * than widening the page: an id, or anything else a person copies.
+   */
+  copyable?: boolean;
+}
+
 /**
- * A detail screen's header row: the title lockup on the left, the meta card on
- * the right.
- *
- * It wraps rather than overflows — the meta card's width is set by the id, so
- * when the title and the card do not fit on one line the card drops below
- * instead of pushing off the page edge.
+ * A detail screen's header: an optional link up to the screen's list, the
+ * title row (a resource's icon tile, the title, a status beside it, an action
+ * at the row's end), then one 12/16 identity line, each value after its muted
+ * label and ruled off from the next. The line stacks under `sm`, where the
+ * rules go.
  */
 export function DetailHeader({
   icon: Icon,
+  parent,
   title,
   status,
   subtitle,
   meta,
+  action,
 }: {
-  icon: LucideIcon;
+  /** A resource's tile: the glyph of its sidebar entry. Configuration has none. */
+  icon?: LucideIcon;
+  /**
+   * 8px over the title, 14/20 muted: a link to the list this screen opens
+   * from, where that list is not a sidebar entry (identity providers, a tab
+   * of Authentication).
+   */
+  parent?: ReactNode;
   title: string;
   /** Beside the title, e.g. a `StatusBadge`. */
   status?: ReactNode;
-  /** A second identity line under the title, e.g. a user's identifier. */
+  /** A second line under the title, e.g. the site a project signs people into. */
   subtitle?: string;
-  /** The `MetaValue`s for the header card. */
-  meta: ReactNode;
+  meta: DetailMetaItem[];
+  /** At the title row's end, e.g. the resource's actions menu. */
+  action?: ReactNode;
 }) {
+  const items = meta.filter((item): item is DetailMetaItem & { value: string } =>
+    Boolean(item.value),
+  );
   return (
-    // Top-aligned, not centred against the meta card: the 36px icon tile is the
-    // title row (`PAGE_TITLE_ROW`), so the title lands on the same line as
-    // every list's and settings screen's.
-    <div className="flex flex-col gap-4 px-2 lg:flex-row lg:flex-wrap lg:items-start lg:justify-between">
-      <div className="flex min-h-9 min-w-0 items-center gap-3">
-        <span className={ICON_PLATE}>
-          <Icon className="size-4" strokeWidth={1.5} aria-hidden />
-        </span>
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
-            {/* `wrap-anywhere`, not `break-words`: only `anywhere` lowers the
-                flex item's minimum width, so a title with no break point — a
-                user's email address — wraps on a phone instead of widening the
-                page past the viewport. */}
-            <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
-            {status}
+    <header className="flex items-start justify-between gap-4 px-2">
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-2">
+          {parent && <div className="text-muted-foreground text-sm leading-5">{parent}</div>}
+          <div className="flex min-w-0 items-start gap-2">
+            {Icon && (
+              <span className={ICON_PLATE}>
+                <Icon className="size-4" strokeWidth={1.5} aria-hidden />
+              </span>
+            )}
+            {/* The subtitle shares the title's left edge, not the tile's. */}
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {/* `wrap-anywhere`, not `break-words`: only `anywhere` lowers the
+                  flex item's minimum width, so a title with no break point (a
+                  user's email address) wraps on a phone instead of widening
+                  the page past the viewport. */}
+                <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
+                {status}
+              </div>
+              {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
+            </div>
           </div>
-          {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
         </div>
+        {items.length > 0 && (
+          // One line from `sm`, never wrapped: a long id is cut in the middle
+          // to make room rather than pushing the next value onto a line that
+          // would start with a rule.
+          <dl className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center sm:gap-0">
+            {items.map((item, index) => (
+              <div
+                key={item.label}
+                className={cn(
+                  "flex items-center",
+                  item.copyable || item.labelHidden ? "min-w-0" : "shrink-0",
+                  index > 0 && META_RULE,
+                )}
+              >
+                <dt className={item.labelHidden ? "sr-only" : "shrink-0 whitespace-nowrap"}>
+                  {item.label}
+                </dt>
+                {/* `gap-0.5`: the copy glyph sits 2px inside its 16px button, so
+                  it lands 4px after the id. */}
+                <dd
+                  className={cn(
+                    "flex min-w-0 items-center gap-0.5",
+                    item.labelHidden ? "text-foreground" : "ml-1",
+                  )}
+                >
+                  {item.copyable ? (
+                    <>
+                      {/* One line, cut in the middle: a URI id must not widen the page. */}
+                      <IdText id={item.value} title={item.value} className="text-foreground" />
+                      <CopyButton value={item.value} label={`Copy ${item.label}`} size="inline" />
+                    </>
+                  ) : (
+                    // A long email wraps on a phone, where the line stacks, and
+                    // is cut at its end from `sm`, as the id beside it is cut.
+                    <span
+                      className={
+                        item.labelHidden ? "wrap-anywhere sm:truncate" : "whitespace-nowrap"
+                      }
+                      title={item.labelHidden ? item.value : undefined}
+                    >
+                      {item.value}
+                    </span>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
-      <MetaCard>{meta}</MetaCard>
-    </div>
+      {/* Beside the title and the identity line together, so it never pushes
+          the line down. */}
+      {action && <div className="shrink-0">{action}</div>}
+    </header>
   );
 }

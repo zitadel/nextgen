@@ -4,7 +4,7 @@
  * A `logo_url` / `hero_url` that is well-formed but unreachable clears every
  * gate on the way in — the CLI's zod shape check, the server's save gate —
  * and then renders as a 0×0 `<img>`: a silent hole where the brand should
- * be, with nothing in the console and nothing in `plan` output. The split
+ * be, with nothing in the console to show it. The split
  * designs are the worst case, because their `.zl-split__placeholder` is
  * keyed on *no asset being configured*, so a configured-but-dead asset
  * leaves the whole brand pane blank.

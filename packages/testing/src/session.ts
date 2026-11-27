@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelApi } from "@zitadel/api/client";
 import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
@@ -75,7 +75,7 @@ export function sessionCookieName(projectId: string, url?: string | URL): string
 const MAX_FLOW_STEPS = 6;
 
 export interface MintSessionOptions {
-  /** Forwarded to `POST /flow`; the project's default flow when omitted. */
+  /** Forwarded to `POST /flows`; the project's default flow when omitted. */
   flowDefinitionName?: string;
   /** Origin header for flow calls (the project's origin check enforces it). */
   origin?: string;
@@ -94,7 +94,7 @@ export interface MintSessionOptions {
  * without it. Browsers round-trip it implicitly; here a one-cookie jar does.
  */
 export async function mintSession(
-  client: ZitadelClient,
+  client: ZitadelApi,
   handle: Pick<InstanceHandle, "baseUrl" | "projectSecret">,
   context: SeedContext,
   user: SeededUser,
@@ -104,7 +104,7 @@ export async function mintSession(
   const jar = new FlowCookieJar();
   const origin = options.origin;
 
-  let response = await flowFetch(handle, jar, origin, "/flow", {
+  let response = await flowFetch(handle, jar, origin, "/flows", {
     project_id: context.projectId,
     purpose: "login",
     ...(options.flowDefinitionName ? { flow_definition_name: options.flowDefinitionName } : {}),
@@ -134,7 +134,7 @@ export async function mintSession(
       handle,
       jar,
       origin,
-      `/flow/${encodeURIComponent(response.id)}/submit`,
+      `/flows/${encodeURIComponent(response.id)}/submit`,
       {
         session_token: response.session_token,
         action: "submit",
@@ -191,8 +191,9 @@ async function flowFetch(
   if (!response.ok || !parsed) {
     const detail = parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
     // An origin-allowlist rejection without an Origin header is a
-    // configuration gap, not a flow problem — say how to close it. (No eager
-    // check: a project with an empty allowlist may accept originless calls.)
+    // configuration gap, not a flow problem — say how to close it. A request
+    // with no Origin is served the newest primary deployment, which a project
+    // may not have.
     const hint =
       !origin && /origin/i.test(detail)
         ? "\nNo Origin header was sent: pass `origin` to seedSession() (the Playwright " +

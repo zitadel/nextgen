@@ -1,11 +1,11 @@
 import { chmod, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GitDidNotStartError, RepositoryError } from "../../../../src/lib/git/errors";
-import { Git, GitResult } from "../../../../src/lib/git/git";
-import { GitScratch, isolateGit, write } from "../../../helpers/git-repo";
+import { GitDidNotStartError, RepositoryError } from "@/lib/git/errors";
+import { Git, GitResult } from "@/lib/git/git";
+import { GitScratch, isolateGit, write } from "@tests/helpers/git-repo";
 
 const scratch = new GitScratch();
 
@@ -15,10 +15,6 @@ async function git(cwd: string, args: string[]): Promise<string> {
 }
 
 beforeEach(isolateGit);
-
-afterEach(async () => {
-  await scratch.cleanup();
-});
 
 describe("Git", () => {
   it("returns an exit code it was told to accept as an answer", async () => {
@@ -44,6 +40,32 @@ describe("Git", () => {
     await git(cwd, ["add", "--", Git.literal("app/[id].tsx")]);
 
     expect(await git(cwd, ["diff", "--cached", "--name-only"])).toBe("app/[id].tsx\n");
+  });
+
+  it("takes in what a glob matches, but not below a further /", async () => {
+    const cwd = await scratch.committed({ "p/a.json": "", "p/b.md": "", "p/sub/c.json": "" });
+
+    expect(await git(cwd, ["ls-files", "--", Git.glob("p/*.json")])).toBe("p/a.json\n");
+  });
+
+  it("leaves out only the path an excluded literal names", async () => {
+    const cwd = await scratch.committed({ "app/[id].tsx": "", "app/i.tsx": "" });
+
+    expect(await git(cwd, ["ls-files", "--", ".", Git.excludedLiteral("app/[id].tsx")])).toBe(
+      "app/i.tsx\n",
+    );
+  });
+
+  it("leaves out what an excluded glob matches, but not below a further /", async () => {
+    const cwd = await scratch.committed({
+      "p/a.json": "",
+      "p/a.test.json": "",
+      "p/sub/b.test.json": "",
+    });
+
+    expect(await git(cwd, ["ls-files", "--", ".", Git.excluded("p/*.test.json")])).toBe(
+      "p/a.json\np/sub/b.test.json\n",
+    );
   });
 
   it("acts on the repository an inherited GIT_DIR names, as git does", async () => {

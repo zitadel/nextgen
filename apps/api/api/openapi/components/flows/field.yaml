@@ -1,0 +1,111 @@
+type: object
+required: [name, type, text_key]
+description: |
+  A field is one input a step collects from the user. It describes what the
+  user must provide. It carries no display text, only a `text_key` that the
+  client resolves.
+properties:
+  name:
+    type: string
+    description: |
+      Field name, matching a property in the flow's user schema. Carries
+      the submitted value back to the server.
+    example: email
+  type:
+    type: string
+    enum: [text, email, password, tel, number, url, date, date_time, hidden, checkbox, select]
+    description: |
+      The input kind the client should render. Encodes the formats and
+      JSON types that map to a familiar HTML input: `email`, `url`,
+      `date`, `date_time` come from `format`; `checkbox` from JSON
+      `type: boolean`; `select` from a closed `enum`. For other formats (for
+      example uuid) the type is `text` and `validation.format` carries the
+      rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+      submitted, which a `datetime-local` input neither shows nor produces on
+      its own.
+  text_key:
+    type: string
+    description: Localization key for the field label.
+    example: login.field.email
+  autocomplete:
+    type: string
+    description: |
+      Value for the HTML `autocomplete` attribute of the input rendered
+      for this field, so password managers and browser autofill
+      recognize it. A space-separated token list; put it on the
+      attribute verbatim and do not reinterpret it.
+
+      The server sends `username` on the field carrying the user's
+      identifier, whatever that field's `type` is. `username` is the
+      token a password manager pairs with a password, while `email`
+      means contact information, so an email-typed identifier still
+      takes `username` and matches the `identifier` a later password
+      step carries. On a password field it sends `current-password`
+      where the submitted value is verified against the stored
+      credential, and `new-password` where the value is saved as the
+      user's password, so a manager offers to fill on sign-in and to
+      generate on registration. A flow whose purpose does not yet
+      establish or verify a password sends neither.
+
+      Omitted when no token applies, in which case render no attribute
+      rather than an empty one.
+
+      Autofill only: it says nothing about validation, and the input's
+      `type` still comes from `type`.
+    example: current-password
+  required:
+    type: boolean
+    default: false
+    description: |
+      The field MUST be present and non-empty on submit. Mirrors the
+      schema's top-level `required` array.
+  value:
+    description: Pre-filled value, for example an identifier carried over from a pivot.
+  read_only:
+    type: boolean
+    default: false
+    description: |
+      The server refuses a submitted value that differs from `value`, so
+      render the input read-only. Submit the value unchanged: a read-only
+      input is still sent with the form, unlike a disabled one.
+
+      Set on a step that creates the user from an SSO identity, for a
+      field prefilled from a provider claim that is verified and unique.
+  validation:
+    type: object
+    description: |
+      Schema-derived rules the frontend SHOULD apply at input time. The
+      server runs the same rules on submit and is the only authority on
+      whether the step advances. These rules are a UX hint to reduce
+      round trips, not a contract guarantee.
+
+      Omitted entirely when the field has no rules beyond its `type`.
+      Each key mirrors a JSON Schema keyword on the underlying user
+      property; absent keys mean no rule.
+    properties:
+      format:
+        type: string
+        enum: [email, date-time, uuid, uri]
+        description: |
+          Semantic format the value must match. Values mirror the user
+          meta-schema. When `type` already encodes the format (email,
+          url, date), this key is informative and the input type is
+          sufficient for client-side validation. When `type` is `text`
+          (for example `format: uuid`), this key is the only signal.
+      min_length:
+        type: integer
+        minimum: 0
+        description: Minimum length in characters (inclusive). Mirrors `minLength`.
+      max_length:
+        type: integer
+        minimum: 0
+        description: Maximum length in characters (inclusive). Mirrors `maxLength`.
+      enum:
+        type: array
+        items:
+          type: string
+        description: |
+          Closed list of allowed values. Mirrors the JSON Schema `enum`
+          keyword on the underlying user property. When `type` is
+          `select` the client renders these as options; for other types
+          the rule still applies as a membership check.

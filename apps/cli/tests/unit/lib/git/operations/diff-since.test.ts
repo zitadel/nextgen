@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { CommitIsHere } from "../../../../../src/lib/git/checks/commit-is-here";
-import { DiffSince } from "../../../../../src/lib/git/operations/diff-since";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { CommitIsHere } from "@/lib/git/checks/commit-is-here";
+import { DiffSince } from "@/lib/git/operations/diff-since";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 const SHA = "a".repeat(40);
 
@@ -67,6 +67,31 @@ describe("DiffSince", () => {
       SHA,
       "--",
       ":(literal).",
+    ]);
+  });
+
+  it("diffs what `globs` match beside the paths, ahead of what `excluded` leaves out", async () => {
+    const calls: string[][] = [];
+
+    await new DiffSince(SHA, ["."], { globs: ["a/*.json"], excluded: ["a/*.test.json"] }).run(
+      gitDiffing("", calls),
+    );
+
+    expect(calls.find((args) => args[0] === "diff")?.slice(-3)).toEqual([
+      ":(literal).",
+      ":(glob)a/*.json",
+      ":(exclude,glob)a/*.test.json",
+    ]);
+  });
+
+  it("leaves out what `excluded` matches, after the paths", async () => {
+    const calls: string[][] = [];
+
+    await new DiffSince(SHA, ["."], { excluded: ["a/*.test.json"] }).run(gitDiffing("", calls));
+
+    expect(calls.find((args) => args[0] === "diff")?.slice(-2)).toEqual([
+      ":(literal).",
+      ":(exclude,glob)a/*.test.json",
     ]);
   });
 

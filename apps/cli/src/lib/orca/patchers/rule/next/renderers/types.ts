@@ -1,4 +1,4 @@
-import type { ScaffoldPosture } from "../../../../../sync/types";
+import type { ScaffoldPosture } from "@/lib/sync/types";
 
 /**
  * The closed set of renderer identifiers the CLI supports. Persisted into
@@ -78,7 +78,7 @@ export type RendererSpec = {
   displayName: string;
   status: RendererStatus;
   frameworks: string[];
-  /** The SDK package; its version is the CLI's own pin (`sdkVersionForCli`). */
+  /** The SDK package; its version is the CLI's own pin (`PatchContext.sdkVersion`). */
   dependency: { name: string };
   templates: RendererTemplates;
 };

@@ -1,13 +1,13 @@
 /**
- * Adds a second project to a running `console:dev-real` instance and grants the
+ * Adds a second project to a running `@zitadel/console#dev:real` instance and grants the
  * dev account access to it, so screens that list what a person can act on —
- * the project pill, Projects, each project's admins — have more than one project
+ * the project pill, Projects, each project's members — have more than one project
  * to show.
  *
  * `dev-real` boots one project and signs the console into it. A second project
  * is one `POST /projects` away (unauthenticated; the server answers with the
- * new project's secret exactly once), and access is the same grant a
- * project's admins section creates: `POST /grants?project_id=<new>` with the
+ * new project's secret exactly once), and access is a grant its Members
+ * page then lists: `POST /grants?project_id=<new>` with the
  * new project's secret, binding the dev user by id. The server allows a user homed in the
  * seeded project to be bound on another one because dev-real pins no platform
  * project (`internal/service/grant.go`, `resolvePrincipalHome`).
@@ -16,7 +16,7 @@
  * seeding (ids and emails only — the project secret never leaves `dev-real`).
  * So `dev-real` must be up:
  *
- *   moon run console:dev-real                              # terminal 1
+ *   turbo run dev:real --filter=@zitadel/console           # terminal 1
  *   corepack pnpm --filter @zitadel/console exec tsx \
  *     scripts/dev-real-add-project.mts --name Beacon       # terminal 2
  *
@@ -37,10 +37,7 @@
  *   --relation <r>          viewer | editor | admin (default: admin)
  *   --project-id <proj_…>   grant on an existing project instead of creating
  *   --secret <secret>       that project's secret (printed when this script
- *                           created it); required with --project-id. For the
- *                           seeded project, use the Admins section on the
- *                           project's page in the console instead: it grants
- *                           with your session.
+ *                           created it); required with --project-id.
  *
  * Environment (all optional, same defaults as dev-real):
  *   CONSOLE_DEV_ORIGIN        console dev server, default http://localhost:5174
@@ -110,7 +107,9 @@ async function resolveUserId(identifier: string): Promise<string> {
   try {
     users = JSON.parse(await readFile(file, "utf8")) as Array<{ id: string; email: string }>;
   } catch {
-    fail(`cannot read ${file} — is console:dev-real running? (pass --user-id to skip the lookup)`);
+    fail(
+      `cannot read ${file} — is the console's dev:real running? (pass --user-id to skip the lookup)`,
+    );
   }
   const user = users.find((candidate) => candidate.email === identifier);
   if (!user) {

@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../../src/lib/errors";
-import AuthMethodSsoEnable from "../../../../src/commands/auth-method/sso/enable";
-import Setup from "../../../../src/commands/setup";
+import { ZitadelError } from "@/lib/errors";
+import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
+import Setup from "@/cli/commands/setup";
 import {
   checkGivenCustomFlags,
   customExample,
-  customFlagText,
   ENABLE_FLAG_KEYS,
-  flagText,
   SETUP_FLAG_KEYS,
   customFlagValues,
   ENABLE_FLAG_NAMES,
@@ -16,8 +14,7 @@ import {
   loopbackIssuerWarning,
   SETUP_FLAG_NAMES,
   selectionFromFlags,
-} from "../../../../src/lib/idp";
-import { displayName, issuer, slug } from "../../../helpers/idp-values";
+} from "@/lib/idp";
 
 const flag = ENABLE_FLAG_NAMES;
 
@@ -143,29 +140,15 @@ describe("selectionFromFlags for a catalog provider", () => {
   });
 });
 
-describe("customFlagText", () => {
-  it("restates the connection as flags a shell reads back as the same arguments", () => {
-    expect(
-      customFlagText(
-        {
-          slug: slug("acme-sso"),
-          displayName: displayName("Acme's SSO; rm -rf"),
-          issuer: issuer("https://sso.acme.example"),
-          scopes: ["openid", "email"],
-        },
-        flag,
-      ),
-    ).toBe(
-      "--slug acme-sso --display-name 'Acme'\\''s SSO; rm -rf' --issuer https://sso.acme.example --scopes 'openid email'",
-    );
-  });
-});
-
 describe("customFlagValues", () => {
-  it("reads the settings under the keys the command defines them by", () => {
+  it("reads the settings as a command reads its flags, by the key each defines", () => {
     expect(
       customFlagValues(
-        { slug: "a", "display-name": "A", issuer: "https://a.example" },
+        {
+          slug: "a",
+          displayName: "A",
+          issuer: "https://a.example",
+        },
         ENABLE_FLAG_KEYS,
       ),
     ).toEqual({
@@ -177,7 +160,15 @@ describe("customFlagValues", () => {
   });
 
   it("reads setup's own keys, not enable's", () => {
-    expect(customFlagValues({ "sso-slug": "a", "sso-scopes": "openid" }, SETUP_FLAG_KEYS)).toEqual({
+    expect(
+      customFlagValues(
+        {
+          ssoSlug: "a",
+          ssoScopes: "openid",
+        },
+        SETUP_FLAG_KEYS,
+      ),
+    ).toEqual({
       slug: "a",
       displayName: undefined,
       issuer: undefined,
@@ -239,18 +230,6 @@ describe("checkGivenCustomFlags", () => {
   });
 });
 
-describe("flagText", () => {
-  it("writes only the settings that were given, quoted as shell words", () => {
-    expect(flagText({ slug: "acme-sso", displayName: "Acme SSO" }, SETUP_FLAG_NAMES)).toBe(
-      "--sso-slug acme-sso --sso-display-name 'Acme SSO'",
-    );
-  });
-
-  it("writes nothing when nothing was given", () => {
-    expect(flagText({}, SETUP_FLAG_NAMES)).toBe("");
-  });
-});
-
 describe("loopbackIssuerWarning", () => {
   it("warns about an issuer on this machine and names the allow list", () => {
     const selection = selectionFromFlags(
@@ -283,8 +262,22 @@ describe("loopbackIssuerWarning", () => {
       "e.g.",
     );
 
-    expect(loopbackIssuerWarning(selection, "container")).toContain("--runtime binary");
+    expect(loopbackIssuerWarning(selection, "container")).toContain("binary runtime");
   });
+
+  it.each(["container", "unknown"] as const)(
+    "spells no command in backticks when the reach is %s",
+    (reach) => {
+      const selection = selectionFromFlags(
+        "custom",
+        { ...valid, issuer: "http://localhost:9100" },
+        flag,
+        "e.g.",
+      );
+
+      expect(loopbackIssuerWarning(selection, reach)).not.toContain("`");
+    },
+  );
 
   it("says nothing about an issuer elsewhere or about a catalog provider", () => {
     expect(

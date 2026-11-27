@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { TanStackStartPatcher } from "../../../../../../../src/lib/orca/patchers/rule/tanstack-start";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { TanStackStartPatcher } from "@/lib/orca/patchers/rule/tanstack-start";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import { CliPackage } from "@/lib/upgrade";
 
 function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
@@ -20,8 +18,10 @@ function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
-    server: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
     scaffoldedFramework,
   };
 }
@@ -38,9 +38,9 @@ describe("TanStackStartPatcher.plan", () => {
   it("writes the request-middleware start entry and file-based routes under src/", () => {
     const plan = new TanStackStartPatcher().plan(ctx());
 
-    expect(writeContents(plan, "src/start.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/start.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/start.ts")).toContain("@zitadel/sdk-tanstack-start/server");
-    expect(writeContents(plan, "src/start.ts")).toContain("createNextgenRequestMiddleware");
+    expect(writeContents(plan, "src/start.ts")).toContain("createZitadelRequestMiddleware");
     // src/start.ts is TanStack's reserved server entry: it must export a
     // `startInstance` from `createStart`, not call `registerGlobalMiddleware`.
     expect(writeContents(plan, "src/start.ts")).toContain("createStart");
@@ -49,10 +49,10 @@ describe("TanStackStartPatcher.plan", () => {
     // CSRF middleware, so the managed entry must restore it explicitly.
     expect(writeContents(plan, "src/start.ts")).toContain("createCsrfMiddleware");
 
-    expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "src/routes/login.tsx")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/index.tsx")).toContain(ManagedFile.MARKER);
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain(
-      "@zitadel/sdk-tanstack-start/react",
+      "@zitadel/sdk-tanstack-start/components",
     );
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
@@ -68,7 +68,7 @@ describe("TanStackStartPatcher.plan", () => {
     // another auth provider's) still conflicts, which is the intended refusal.
     expect(writeContents(plan, "src/routes/index.tsx")).toBeUndefined();
     // The auth boundary and the auth routes are still written.
-    expect(writeContents(plan, "src/start.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/start.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
@@ -157,7 +157,7 @@ describe("TanStackStartPatcher.plan", () => {
       expect(
         writeContents(new TanStackStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
       ).toContain(
-        'import { ZitadelLogin, businessLocales } from "@zitadel/sdk-tanstack-start/react";',
+        'import { ZitadelLogin, businessLocales } from "@zitadel/sdk-tanstack-start/components";',
       );
     },
   );

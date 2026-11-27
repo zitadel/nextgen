@@ -3,7 +3,7 @@
   "project": {
     "name": "bench-local",
     "origins": [
-      { "pattern": "http://localhost:3000", "kind": "preview" }
+      { "pattern": "http://localhost:3000", "kind": "primary" }
     ],
     "seed_defaults": true
   },

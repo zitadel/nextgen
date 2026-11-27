@@ -18,6 +18,31 @@
 > Postgres stamps `clock_timestamp()`, not `now()`, and Spanner the commit
 > timestamp.
 >
+> **Amendment (2026-11-10):** `events` gains seven indexes, for the list by
+> category, type, actor and resource and for following one request, session or
+> login flow, and a list over several categories or types is read one value at
+> a time. A filter no index holds is matched over a bounded number of events a
+> request. See
+> [the amendment](#amendment-2026-11-10-indexes-for-the-reads-the-console-makes).
+>
+> **Amendment (2026-11-10, request filters):** `events` gains `status_class`
+> and `operation_status` columns and three more indexes, so the list by
+> resource type, by an API request's operation and by its status class is
+> read from an index too. See
+> [the amendment](#amendment-2026-11-10-the-resource-type-and-api-requests-by-operation-and-status).
+>
+> **Amendment (2026-11-11):** `events` gains a `user_id` column, the user an
+> event concerns whoever acted, and an index for it, and `GET /events`
+> filters on it. See
+> [the amendment](#amendment-2026-11-11-the-user-an-event-concerns).
+>
+> **Amendment (2026-11-26):** `events` gains a `correlation_id` column, the
+> chain of requests an event belongs to, and an index and a `GET /events`
+> filter for it. A request inherits the ID from the stored thing that brought
+> it: an authorization request, a login flow, an auth attempt, an invitation
+> or a claim challenge. See
+> [the amendment](#amendment-2026-11-26-a-correlation-id-that-requests-inherit).
+>
 > **Proposed amendment — [ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
 > if ADR 053 is accepted, the emit-time rule for `team_id` changes. Today the
 > column captures the resolved credential's `ScopeContext` team, which for a
@@ -44,13 +69,13 @@ like:
 - Which admin changed this flow definition?
 
 OpenTelemetry distributed tracing solves **latency debugging across services**,
-not business-dimension queries. Operational logs via [`zlog`](../../internal/instrumentation/zlog/)
+not business-dimension queries. Operational logs via [`zlog`](../../apps/api/internal/instrumentation/zlog/)
 are ephemeral and not tenant-queryable. We need a first-class, append-only,
 queryable audit stream stored in the database.
 
 **Scope boundary:** Event emission is defined on **v2 `AllStatements` / statement
-TX only** ([`internal/storage/`](../../internal/storage/),
-[`internal/service/statement.go`](../../internal/service/statement.go)). The v1
+TX only** ([`internal/storage/`](../../apps/api/internal/storage/),
+[`internal/service/statement.go`](../../apps/api/internal/service/statement.go)). The v1
 repository and dialect tree under `internal/storage/database/` is **retired**
 ([ADR 028](028-storage-v2-statements-and-dialects.md)). Product persistence is
 fully on `AllStatements`. Mutating statement methods that need an audit record
@@ -143,7 +168,7 @@ Events are **not** registered in `resource_scope_index`. That table stays a
 small map for durable globally-addressable resources
 ([ADR 033](033-internal-permission-management.md),
 [url-architecture.md](../design/api/url-architecture.md)); high-volume TTL audit
-rows do not belong there. `GET /events/{id}` is **project-scoped** (see ADR 049).
+rows do not belong there. `GET /events/{event_id}` is **project-scoped** (see ADR 049).
 
 Per-sink export delivery is tracked with per-(sink, project) watermark cursors;
 see [ADR 049 §3](049-events-api-retention-export.md).
@@ -158,7 +183,11 @@ see [ADR 049 §3](049-events-api-retention-export.md).
   satisfy the tuple predicate as an efficient index range scan.
 - **Deferred:** Additional indexes when concrete query paths and predicates are
   measured. Avoid speculative partial indexes on `NOT NULL DEFAULT ''` columns
-  unless predicates exclude empty strings.
+  unless predicates exclude empty strings. The first seven were measured and
+  added on 2026-11-10
+  ([amendment](#amendment-2026-11-10-indexes-for-the-reads-the-console-makes)),
+  and three more the same day
+  ([amendment](#amendment-2026-11-10-the-resource-type-and-api-requests-by-operation-and-status)).
 
 **Ordering:** List and export use keyset pagination on `(created_at, id)` within
 `project_id` per [ADR 027](027-cursor-based-pagination.md). Forensic "when did
@@ -179,6 +208,7 @@ tenancy. Primary correlation columns are **server-authoritative** (see §4).
 | **Device** | `fingerprint` | All events from a device |
 | **App** | `client_id` | All events from an application or AI agent |
 | **User** | `actor_id` | All events by a user |
+| **Account** | `user_id` | All events that concern a user, whoever acted (amendment of 2026-11-11) |
 
 Admin and forensic queries use these scopes directly:
 
@@ -250,7 +280,7 @@ flowchart TB
 #### Path A — Request-wide events (`project_id` known)
 
 Extend the existing request-ID middleware
-([`internal/api/middleware/request_id.go`](../../internal/api/middleware/request_id.go))
+([`internal/api/middleware/request_id.go`](../../apps/api/internal/api/middleware/request_id.go))
 into a **RequestContext** middleware:
 
 - Extract or generate `request_id` (W3C traceparent-compatible 128-bit hex).
@@ -260,7 +290,7 @@ into a **RequestContext** middleware:
   - `fingerprint` — server-derived device binding when available; otherwise omit
     (empty string)
 - Optional `X-SDK-Name` and `X-SDK-Version` headers may be read for operational
-  logging ([`zlog`](../../internal/instrumentation/zlog/)) and OTEL Tier 3
+  logging ([`zlog`](../../apps/api/internal/instrumentation/zlog/)) and OTEL Tier 3
   export — they are **not persisted** on audit event rows.
 - Client headers named `session_id`, `flow_id`, or `fingerprint`, if accepted at
   all, go into `metadata.client_hints` as untrusted hints only.
@@ -325,14 +355,14 @@ VALUES (..., now() - $wait_interval, now(), ...);
 8. Domain events (Path B) stay **in-TX with the mutation** — only
    `category=request` is batched.
 
-[`zlog`](../../internal/instrumentation/zlog/) masking
+[`zlog`](../../apps/api/internal/instrumentation/zlog/) masking
 ([ADR 030](030-error-model-mapping-and-reporting.md)) remains acceptable for
 operational logs only — not for audit durability. A durable outbox + worker is
 a future optimization beyond this in-process buffer.
 
 #### Path B — Domain events on statement mutations
 
-Add to [`internal/service/statement.go`](../../internal/service/statement.go):
+Add to [`internal/service/statement.go`](../../apps/api/internal/service/statement.go):
 
 ```go
 type EventStatements interface {
@@ -344,7 +374,7 @@ type EventStatements interface {
 interfaces.
 
 - `InsertEvent` executes on the same `queryExecutor` / transaction as entity SQL
-  ([`internal/storage/dialect/postgres/tx.go`](../../internal/storage/dialect/postgres/tx.go)).
+  ([`internal/storage/dialect/postgres/tx.go`](../../apps/api/internal/storage/dialect/postgres/tx.go)).
 - Each `statement_<entity>.go` method that **mutates state** and needs an audit
   record calls `InsertEvent` with a **semantic** `event_type` (e.g.
   `project.created`, `user.deactivated`) — not row diffs or generic `UPDATE`
@@ -494,7 +524,7 @@ payloads use a **deny-by-default** model:
    input masking, and config normalize still use it. These mechanisms are
    complementary, not replacements. See
    [user-schema.md](../design/flowengine/user-schema.md).
-5. **Not log masking:** [`zlog`](../../internal/instrumentation/zlog/) /
+5. **Not log masking:** [`zlog`](../../apps/api/internal/instrumentation/zlog/) /
    [ADR 030](030-error-model-mapping-and-reporting.md) MaskConfig redacts
    operational log attributes; it does **not** define audit allowlists.
 
@@ -534,8 +564,8 @@ Wide Event (internal)  ──→  OTEL Span (Tier 3 export)
 - Internal model uses `request_id`, not `trace_id`.
 - `span_id` and `parent_span_id` live in `metadata` JSON for OTEL export
   projection only.
-- [`zlog`](../../internal/instrumentation/zlog/) and
-  [`zotel`](../../internal/instrumentation/zotel/) remain operational telemetry
+- [`zlog`](../../apps/api/internal/instrumentation/zlog/) and
+  [`zotel`](../../apps/api/internal/instrumentation/zotel/) remain operational telemetry
   separate from the audit stream. SDK name/version headers may appear in
   operational logs but not in the `events` table.
 
@@ -612,3 +642,492 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 | [027 Cursor-Based Pagination](027-cursor-based-pagination.md) | List API pagination over events |
 | [008 Users EAV Store](008-users-eav-store.md) | User event payload rules |
 | [019 Captcha Gate](019-captcha-gate-and-bot-signals.md) | `signal` category alignment |
+
+## Amendment (2026-11-10): indexes for the reads the console makes
+
+§1 kept one secondary index, `(project_id, created_at, id)`, and deferred the
+rest until a query path was measured. The console's Events screen is that path:
+it opens on a project's audit events, every category but `request`, narrows
+them by type, actor or resource, and follows one request, session or login
+flow from an event. The one index serves none of those. A filtered
+`GET /events` walked the project's events, newest first, until it had a page,
+or read the whole table and sorted the matches.
+
+**Measured** on Postgres 18 with 3,000,000 events (a project of 2,000,000,
+96% of them requests, and a project of 1,000,000 requests newer than its 40
+audit events), a page of 25, warm:
+
+| Read | Before | After |
+| --- | --- | --- |
+| One category, where requests are newer than every audit event | 139 ms, 1,000,000 rows read | 0.03 ms |
+| A category the project has no event of | 145 ms | 0.01 ms |
+| One type, where requests are newer than every event of it | 147 ms, 1,000,000 rows read | 0.04 ms |
+| A type the project has no event of | 124 ms, the whole table read | 0.02 ms |
+| One actor in one category, next page | 9 ms | 0.05 ms |
+| One resource | 43 ms | 0.04 ms |
+| One request | 109 ms, the whole table read | 0.02 ms |
+| One session | 361 ms, 1,984,013 rows read | 0.02 ms |
+| One login flow | 107 ms, the whole table read | 0.06 ms |
+| The unfiltered list | 0.04 ms | unchanged |
+
+**Indexes.** Each read is a range of one index, already in the page's order:
+
+| Index | Serves |
+| --- | --- |
+| `(project_id, category, created_at, id)` | the list by one category |
+| `(project_id, event_type, created_at, id)` | the list by one type |
+| `(project_id, actor_id, category, created_at, id)` | what one actor did, in one category |
+| `(project_id, entity_id, category, created_at, id)` | what happened to one resource, in one category |
+| `(project_id, session_id, category, created_at, id)` | the events of one session, in one category |
+| `(project_id, request_id, created_at, id)` | the events of one HTTP request |
+| `(project_id, flow_id, created_at, id)` | the events of one login flow |
+
+- The actor, resource and session indexes have the category before the time.
+  Each of them can hold as many events as the project, most of one category:
+  an actor's and a session's API requests, a user's sign-ins. With the time
+  first, the events of any other category would be what is left after walking
+  past those.
+- Every index ends in `(created_at, id)`, so the `created_at` bounds narrow
+  any of these ranges.
+- On Postgres and SQLite the indexes on a nullable id leave out the rows that
+  carry none (`WHERE … IS NOT NULL`). A filter by equality implies the id is
+  not null, so the planner still uses them; SQLite's plans are pinned by
+  `TestListEvents_FilterPlans`.
+- On Spanner they index every row and keep `created_at` and `id` descending.
+  Its documentation promises a `NULL_FILTERED` index only to a query that says
+  `IS NOT NULL`, and declares keys `DESC` for a descending read. These were
+  not measured: no local Spanner shows a plan.
+
+**How a list is read.** `EventService.List` puts each list onto the index
+that holds the most of its filter (`planEventRead`):
+
+- Of the ids asked for, one reads: a request, else a login flow, else a
+  session, else a resource, else an actor. A request and a login flow are one
+  range each. A session, a resource and an actor are a range per category,
+  the ones named or every one, merged in the page's order
+  (`events.ListEach`).
+- With no id, several types or several categories are a range each, merged
+  the same way. With the category index in place, one statement over five
+  categories still walked the `created_at` index (176 ms in the measurement
+  above): no single range holds several values in time order. The page token
+  stays the list's own, the last row's `(created_at, id)`.
+- Everything else asked for is matched, as below: the other ids, a type
+  beside an id, a category beside a type, and the application, fingerprint,
+  resource type and team, which no index holds.
+
+**Cost.** `events` takes a row per API request, and every index is a write on
+that path. On the measured data the table is 1,344 MB with 398 MB of indexes
+before, and the seven add 1,351 MB (the flow and resource indexes 7 and 9 MB,
+since few rows carry either). A bulk insert of 200,000 request rows took 1.3
+to 1.8 s with the one index, 2.2 to 2.6 s with the first four and 3.7 to
+6.5 s with all seven.
+
+The session and resource indexes gained the category after this was measured.
+
+**A budget for what no index holds.** An index for each filter is not enough.
+In one WHERE, a filter beside an indexed id is matched row by row over that
+id's events, and a session or a resource can hold as many as the project; the
+planner may also pick the other filter's index and walk further still. So
+what a read's index does not hold is never part of its WHERE:
+
+- `ScanEvents` reads the index range in order, at most `eventScanBudget`
+  (1,000) rows, and returns each row's `(created_at, id)` and whether it
+  matched, a `CASE` in the select list. The database has nothing to choose
+  another index by, so what a statement costs is fixed by construction.
+- `events.ScanEach` merges the ranges and the page's events are loaded by id.
+- When a budget runs out before the page is full, the page holds what matched
+  so far, possibly nothing, and `next_page_token` is the last row read rather
+  than the last row returned. With several ranges the page ends at the first
+  cut in its order, since a range cut short may hold rows that belong before
+  what the others read behind it. A client follows the token until a response
+  has none: the API reference says so, the console's button reads
+  `Keep looking`, and the CLI names the next page under an empty one.
+
+Measured through the API on Postgres 18 with 2,700,000 events, where one
+session, one resource and one actor hold 300,000 events each and the few
+events a narrower filter asks for are older than all of them. Every
+combination of the console's filters was sent, 960 requests, with Postgres
+logging each statement's plan:
+
+| | Most rows one statement read | Slowest statement |
+| --- | --- | --- |
+| Every filter in one WHERE | 300,012, to return 12 | 82 ms |
+| A budget | 1,000 | 0.53 ms |
+
+- With every filter in one WHERE, 116 of 1,015 calls read past their page.
+  With the budget none of 1,164 read past it, each on the index its range
+  names, with nothing sorted. A request is at most six ranges.
+- 911 of the 960 have an answer of at most 500 events. Each was followed to
+  its end and returned exactly the events one unbounded read under the whole
+  filter finds, in order: 9,185 calls, the slowest 6.8 ms.
+- The longest took 301 calls, 362 ms in all: a type that no event of one
+  resource has, matched over that resource's 300,000 events. That is what a
+  budget costs. A rare match deep in a large range takes many calls, each
+  cheap, where one statement took one call that could be arbitrarily slow.
+- For the requests' view Postgres chose the time index and skipped the few
+  audit events between (33 rows read for 26). On a project whose newest
+  300,000 events are all audit events it chose the category index. That
+  choice is the planner's, from table-wide statistics, and is the one read
+  here that is not a range by construction.
+
+**What would turn a matched filter into a range.** An index that ends in
+`(created_at, id)`, and its place in `planEventRead`. The server does not
+know which category an event type belongs to; if it did, a type beside an id
+would read that id's one range of the type's category rather than six.
+
+## Amendment (2026-11-10): a server that runs only while it serves a request
+
+§4's Path A writes a request event up to T after the response, from a
+background flusher. A Vercel function is paused once its last response ends,
+so that write waits for the instance's next request, and is lost with an
+instance that gets none. On the hosted cloud a flush also failed as its
+instance woke although the database had committed it, and its retries then
+met the batch's own rows and logged it as dropped.
+
+- **A request can wait for its event.** `events.request.flush_wait` makes a
+  request wait, up to that long, until its event is written. The buffer then
+  flushes as soon as it holds an event, and requests in flight together
+  share a write. Unset, the default, Path A is as §4 has it. The hosted
+  cloud sets two seconds.
+- **Path A stays best-effort.** Past the wait, or when the flush gives up,
+  the request ends without its event.
+- **A duplicate after a failed attempt is a written batch.** An event keeps
+  the id its first insert minted and a batch is one transaction, so the
+  failed attempt was committed and only its answer was lost. A duplicate on
+  the first attempt is dropped without a retry.
+
+## Amendment (2026-11-10): the resource type, and API requests by operation and status
+
+The console's Events screen also narrows its list to one type of resource, and
+the API requests to one operation or to the failed ones. The first amendment
+left the resource type matched over a budget, and a request's operation and
+status were only in its payload, which no index holds.
+
+**Columns.** A `request.api` event stores the class of its `payload.status`
+in `status_class` (`1xx` to `5xx`), and its `payload.operation_id` with that
+class in `operation_status` (`createUser 4xx`), both written by the request
+middleware (`RequestAPIPayload.Indexed`, `events.OperationStatus`). Every
+other event leaves them NULL. A request refused before an operation ran has a
+class and no operation; a status outside 100 to 599, which the payload's
+schema rules out, sets neither, so every operation stored has its class.
+
+**Indexes.**
+
+| Index | Serves |
+| --- | --- |
+| `(project_id, entity_type, category, created_at, id)` | the events on one type of resource, in one category |
+| `(project_id, operation_status, created_at, id)` | the requests to one operation, in one status class |
+| `(project_id, status_class, created_at, id)` | the requests of one status class |
+
+- The resource type holds the category before the time, as the resource,
+  actor and session do: a type's events are mostly one category's, a user's
+  sign-ins beside the changes made to users.
+- The operation is held with its status class, so its failed calls are a
+  range apart from its successful ones, however many of those there are. A
+  list by operation alone is a range per class, five, merged
+  (`events.ListEach`). `GET /events` takes at most ten operations.
+- The operation and its class are one column, not two. With
+  `operation_id = … AND status_class = …` in a WHERE, the status class's
+  index serves it too, matching the operation row by row over every request
+  of that class, and Postgres takes that smaller index whenever it expects at
+  most a row from either. Measured as below with two columns, 62 of 7,899
+  statements did. With statistics taken before a burst of 100,000 failed
+  calls of another operation, such a read removed 100,000 rows by filter to
+  return none (8 to 9 ms); on the one key column it read three buffers
+  (0.007 ms).
+- On Postgres and SQLite these leave out the rows without the value; on
+  Spanner they index every row and keep the time descending, as in the first
+  amendment. Spanner was not measured: no local Spanner shows a plan.
+
+**How a list is read.** `planEventRead` puts the resource type after every
+id: it reads, by category, only when no id does, and is matched beside one.
+With neither, operations read before status classes, and both before types
+and categories. An operation beside an id or a resource type is matched as
+its keys, in the classes named or every one.
+
+**No backfill.** The columns stay empty on the events stored before the
+migration, and the API reference says those requests are not matched.
+Filling them is an UPDATE of every request event, a row per API request kept
+for the retention period: one long write on Postgres, and past the mutation
+limit of a transaction on Spanner. Those events age out within the retention
+period instead.
+
+**Measured** through the API on Postgres 18 with 900,084 events in one
+project: 300,000 successful `getSession` calls in one session (the newest),
+300,000 changes to users, 300,000 sign-ins of users, and, older than all of
+them, 12 events each of `createUser` failing with 409, `createUser`
+succeeding, `getSession` failing with 503 or answering 302, a request refused
+before an operation ran, a change to a user and a change to a team. 24
+filters, each in four time windows and both orders, 192 requests and 1,418
+calls, with Postgres logging each statement's plan:
+
+- Every statement a page read ran on the index its range names, read at most
+  26 rows for a page of 25, and sorted nothing; no residual filter, no
+  sequential scan. Every statement a budget read stopped at 1,000 rows, the
+  slowest 0.46 ms.
+- 172 of the 192 have an answer of at most 500 events; each was followed to
+  its end and returned exactly the events one unbounded read under the whole
+  filter finds, in order. The others matched it as far as they were read.
+- The longest took 301 calls: an operation beside the session that holds
+  300,000 requests, matched over them. Before, a resource type was matched
+  over the time index the same way: a type with 12 events behind 900,000
+  others took 901 calls, and now takes one.
+
+**Cost.** A request event takes two more index entries, an event with a
+resource type one. On the measured data, after the burst (1,000,161 events,
+400,067 of them requests), the three indexes were 99 MB (resource type),
+38 MB (operation) and 61 MB (status class) beside the 224 MB table.
+
+## Amendment (2026-11-11): the user an event concerns
+
+An event named the user it concerns wherever its type happened to: the
+resource for a change to the user, the payload for a credential or an identity
+link, the actor for the token a sign-in minted, and nowhere for a sign-in
+check, a deleted session or a revoked token. No filter of `GET /events` reads
+a payload, so what happened to one user's account, a rejected password
+included, was not one read.
+
+**Column.** `user_id` is the user an event is about, whoever acted: the user
+a session, a token, a sign-in check or a credential belongs to, and the user
+a change or a grant was made to. The emitter sets it (`EmitSpec.UserID`). The
+[catalog](../design/api/events-catalog.md#the-user-an-event-concerns) lists
+the types that do, and `TestUserEventsSetUserID` holds every emitter to that
+list. Every other event leaves it NULL, and so does an event of a listed type
+that concerns no user: an anonymous session, a check before the identifier
+resolved, a grant to a team or a key. The actor is unchanged: `actor_id`
+answers what a principal did, `user_id` what happened to an account.
+
+**Index.**
+
+| Index | Serves |
+| --- | --- |
+| `(project_id, user_id, category, created_at, id)` | what happened to one user, in one category |
+
+- The category comes before the time for the reason the actor's does: a
+  user's sign-ins are a range apart from the changes made to the user.
+- On Postgres and SQLite it leaves out the rows that name no user; on Spanner
+  it indexes every row and keeps the time descending, as in the first
+  amendment.
+
+**How a list is read.** `planEventRead` puts the user after the resource and
+before the actor: it reads, by category, when no request, login flow, session
+or resource does, and is matched beside one. An actor beside it is matched.
+
+**No backfill.** The events stored before the migration keep no `user_id`,
+and the API reference says they are not matched. They age out within the
+retention period, as in the amendment before.
+
+**Measured** through the API on Postgres 18 with 600,048 events in one
+project: 300,000 sign-in checks of one user, 300,000 API requests newer than
+those, which concern no user, and, older than all of them, 12 changes to that
+user, 12 of its sessions, 12 of its checks made by an administrator and 12
+failed checks of another user. 11 filters (the user alone, in one and in two
+categories, another user, an unknown one, and the user beside an actor, a
+resource, a type and a session), each in both orders, 412 calls and 1,336
+statements on `events`, with Postgres logging each statement's plan:
+
+- Every statement a page read ran on the index its range names, read at most
+  26 rows for a page of 25, and sorted nothing; no residual filter, no
+  sequential scan. Every statement a budget read stopped at 1,000 rows.
+- Each list that ended returned exactly the events one unbounded read under
+  the whole filter finds, in order. The others, stopped after 40 calls,
+  matched it as far as they were read.
+- An actor beside the user is matched over the user's range: newest first,
+  with the actor's 12 events behind the user's 300,000, 40 calls read 40,000
+  rows and had returned none yet.
+
+Spanner was not measured: no local Spanner shows a plan.
+
+**Cost.** One more index entry for an event that names a user. On the
+measured data the index was 54 MB beside the 160 MB table, with 300,055 of
+600,074 events naming a user.
+
+## Amendment (2026-11-26): a correlation id that requests inherit
+
+§2's scopes each name one thing: a request, a session, a login flow. Work
+that takes several requests had no scope of its own, and each feature that
+needed one built it by hand:
+
+| Chain | How its requests were joined |
+| --- | --- |
+| A login flow, its SSO callback and its handoff exchange | `flow_id`, sealed in the `_zflow` cookie and stored on `auth_attempts` for the two requests that arrive without the cookie. Three emitters passed it through `EmitSpec.FlowID`. |
+| An invitation and its replacements | `journey_id`, stored on `invitations` and written to each event's payload, which no filter of `GET /events` reads. |
+| An authorization request, the sign-in it asks for and the token its code buys | Nothing. The flow state kept the request's ID and no event recorded it. `auth.request.created` named no session or flow, and the token a code bought named only the session. |
+| A project claim: the CLI's init, its polls and the browser's completion | Nothing. |
+
+Two more things followed from how the scopes reached an event:
+
+- **Path A and Path B read different context.** The request event read the
+  mutable actor slot; a domain event preferred the actor the security handler
+  stamped, a copy (`actorFromContext`). A flow bound on an authenticated
+  request reached its `request.api` and not its domain events. The exchange
+  and the SSO callback worked around that with `EmitSpec.FlowID`, and bound
+  the flow for Path A after their transaction.
+- **Nothing outside the API's middleware chain had a slot.** The OAuth
+  endpoints are mounted with the request ID and no more.
+
+**Column.** `correlation_id` is the chain an event belongs to: the requests
+that one piece of work took, whoever sent them. It is NULL on an event whose
+request is the whole of it, and `request_id` joins those.
+
+**Carriers.** A chain crosses requests through something the server stored or
+sealed, a carrier. The carrier holds the chain's ID:
+
+| Carrier | Holds the ID in | Read by |
+| --- | --- | --- |
+| Authorization request | `auth_requests.correlation_id` | the flow created for it, the issue of its code and the code's redemption |
+| Login flow | the sealed flow state (`FlowState.CorrelationID`) | every request of the flow |
+| Auth attempt | `auth_attempts.correlation_id` | every request that acts on the attempt: the SSO callback, through its state, the handoff exchange, and the calls of the auth attempts API |
+| Invitation | `invitations.journey_id`, as before | a read, a replace, a cancel, a look at the link, an accept and a decline |
+| Claim challenge | `claim_challenges.correlation_id` | the claim page's read, the status polls and the completion |
+
+**The rule.** Two calls apply it, and no emitter passes an ID:
+
+1. A request starts without a correlation ID.
+2. A request that reads a carrier it acts on takes the carrier's ID
+   (`audit.JoinCorrelation`). The first carrier read decides; a request never
+   changes chain. A list reads many carriers and joins none.
+3. A request that creates a carrier stores its ID on it, and mints one first
+   when it has none (`audit.EnsureCorrelation`). So a flow created for an
+   authorization request is in that request's chain, and its attempt with it.
+4. Every event the request writes from then on carries the ID, on both paths.
+   An event written before the carrier was read does not, so a handler reads
+   its carrier first.
+
+- `createFlow` kept the `auth_request_id` it was given without reading the
+  request. It reads it now, to join. A request the project does not hold
+  starts no chain and fails nothing: the flow gets a chain of its own.
+- A replacement invitation joins the original's chain inside the
+  transaction, so it does not start one before.
+- The status poll joins after its proof of possession, as it tells a caller
+  without the initiating secret nothing else either.
+
+**Where a chain ends.** A session and a token are not carriers. A chain ends
+with the events that create them, `session.established` and
+`auth.token.issued`, and the requests they authenticate afterwards each stand
+alone. If they inherited, every request of a session would be one chain,
+which `session_id` already is. A step-up flow on a session starts a chain of
+its own.
+
+**One holder a request.** The correlation ID and the flow ID live in one
+mutable holder, `middleware.Correlation`, planted with the request ID by the
+middleware every mount passes (`WithRequestContextMiddleware`), the OAuth
+endpoints and the IdP callback included. `FromContext` reads it on both
+paths, so the two cannot disagree.
+
+- `ActorContext.FlowID` and `EmitSpec.FlowID` are gone. The exchange and the
+  SSO callback bind the attempt's flow and join its chain before they emit.
+- `Session.FlowID` stays, with `Session.CorrelationID` beside it: the
+  exchange reads its attempt inside the storage statement, and the session
+  it returns is how the service learns both. Neither is stored.
+- `middleware.RequestContext` declared `SessionID`, `FlowID` and
+  `Fingerprint` and nothing wrote them. They are gone, with the security
+  handler's reads of them.
+- A server assembled without that middleware still gets a holder where the
+  actor slot or the actor is stamped, so a test harness need not mount it.
+
+**The ID.** The server mints it and reads it back only from a carrier, never
+from a request header, so §2's rule holds: a client cannot name a chain. What
+a client can do is present a carrier: the flow cookie, a handoff token, an
+authorization code, an invitation link, a claim challenge, each a secret, or
+the `auth_request_id` a login page was opened with, which is a handle. A
+flow created with someone else's handle joins that sign-in's chain. It names
+no resource, so it is not a managed ID of
+[ADR 047](047-dialect-id-generation.md) and takes no prefix. A new ID is 16
+random bytes as 32 hex digits, the shape of a W3C trace ID
+(`domain.NewCorrelationID`). An invitation's stored `journey_id` keeps its
+value; a new invitation's is a new ID of that shape.
+
+**OpenTelemetry.** The model is a trace's: the chain is the trace, a request
+a span in it, and a carrier is trace context kept at rest. The ID is still
+not the live trace ID of [ADR 080](080-incoming-trace-context.md):
+
+- A request learns its chain inside the handler, from a cookie or a row,
+  after its server span has started. A started span cannot change its trace.
+- With `trust_remote_spans` on, the caller chooses the trace ID.
+- With tracing off there is none, and the audit trail does not depend on it.
+
+What the two share:
+
+- A request that joins a chain sets the ID as the attribute
+  `zitadel.correlation_id` of its server span. Not a span link: the chain is
+  no recorded trace to link to.
+- A request whose server span is sampled writes that span's trace ID to
+  `metadata.trace_id`, so an event leads to its trace in the operator's
+  backend. It is observed context, as `metadata.client` is: not indexed, not
+  a filter, and on Path A only.
+- §9's export is to take `correlation_id` for the trace ID of an event that
+  has one, and `request_id` as before of one that has none; an ID that is not
+  32 hex digits is mapped to one, as a `request_id` is. Nothing projects
+  events to OTEL yet, so this is not built.
+
+**Index.**
+
+| Index | Serves |
+| --- | --- |
+| `(project_id, correlation_id, created_at, id)` | the events of one chain |
+
+- It holds the time and no category, as the request's and the login flow's
+  do: a chain holds few events.
+- On Postgres and SQLite it leaves out the rows without the value; on Spanner
+  it indexes every row and keeps the time descending, as in the first
+  amendment of 2026-11-10.
+
+**How a list is read.** `GET /events` takes `correlation_id`
+([ADR 049 §1](049-events-api-retention-export.md)). `planEventRead` puts it
+after the request and the login flow and before the session: it reads, as one
+range, when neither of those is named, and is matched beside one. The plan is
+pinned in `TestListEvents_FilterPlans`.
+
+**What stays.**
+
+- `flow_id` stays a scope of its own. One chain can hold several flows, a
+  sign-up that was restarted or an invitation link opened twice, and the ID
+  must match the path of `/flows/{flow_id}`.
+- `payload.journey_id` stays on the invitation events, equal to their
+  `correlation_id`. Retiring it changes their contract, as retiring
+  `payload.user_id` would have.
+- There is no parent pointer. A chain is flat and read as one range; a tree
+  needs a read per level. `request_id` already groups the events of one
+  request inside a chain.
+
+**Why NULL outside a chain.** Setting it on every event, to the request ID
+when nothing else, would let a reader group by one column. It would also add
+an index entry for every API request on Postgres and SQLite, where the
+partial index otherwise holds only the chains.
+
+**No backfill.** The events stored before the migration keep no
+`correlation_id`, and neither does a carrier stored or a flow in flight
+before it: a request that reads one joins no chain. They age out, as in the
+amendments before.
+
+**Not part of this.**
+
+- An ID a client supplies: a CLI run that takes several requests, an app's
+  own request ID. Those stay §2's `metadata.client_hints`, untrusted and
+  unbuilt.
+- The OAuth endpoints' request events. Their domain events carry the chain,
+  and their `request_id` still names a request with no `request.api` event,
+  so no `metadata.client`.
+- A background job. One that acts on a carrier, an invitation it expires,
+  is to join the carrier's chain; any other job event has none.
+  [ADR 065](065-background-jobs.md) has no emitter yet.
+
+**Measured** on Postgres 16 with 1,000,000 events in one project: 960,000 API
+requests in no chain, and 4,000 sign-ins, each a chain of ten events, four of
+them requests, that also share a `flow_id`:
+
+- The index is 5.6 MB, beside the 354 MB table and the login flow's index of
+  5.6 MB on the same 40,000 rows. The nine indexes that take every request
+  row are 101 to 143 MB each.
+- The events of one chain, newest first, are an index-only scan of that
+  index: ten rows, 13 buffers, 0.06 ms. A chain no event has is 3 buffers,
+  0.02 ms.
+- Three inserts of 200,000 request rows took 8.8 to 9.6 s with the index and
+  10.1 to 11.0 s without it, into a table that grew between the runs; three
+  of 200,000 chain rows took 6.8 to 8.6 s with it and 7.1 to 7.3 s without.
+  The index costs nothing that shows beside the spread of the runs.
+
+Spanner was not measured: no local Spanner shows a plan. Its statements and
+migrations pass the Spanner lane. There the index takes an entry for every
+event, as each index of the first amendment does.

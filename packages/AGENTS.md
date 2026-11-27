@@ -1,7 +1,9 @@
 # Agent Instructions — `packages/`
 
 Rules for the packages without an `AGENTS.md` of their own: the SDKs
-(`packages/sdk-*`), `packages/api` and `packages/config`.
+(`packages/sdk-*`), `packages/api` and `packages/config`. The SDKs that
+re-export widgets, or whose widgets are re-exported, also have a short
+`AGENTS.md` that says so; read it before changing their exports.
 
 ## The SDKs (`packages/sdk-*`)
 
@@ -10,8 +12,8 @@ Rules for the packages without an `AGENTS.md` of their own: the SDKs
 change needs a changeset, and the whole train versions together.
 
 - **`sdk-core` is the shared contract**: JWT verification (`verifyJwt`),
-  middleware primitives, runtime resolution, and the `NextgenSession` /
-  `AuthResult` types the SDKs re-export through `@zitadel/sdk-core/types`.
+  middleware primitives, runtime resolution, and the `ZitadelAuthSession` /
+  `ZitadelAuthResult` types the SDKs re-export from `@zitadel/sdk-core/middleware`.
   Change a shared type there; never fork it into a framework package.
 - **Exports are consumer contract**: removing or renaming an `exports` entry
   (`/server`, `/client`, `/types`, …) is a breaking change, and an addition
@@ -20,9 +22,27 @@ change needs a changeset, and the whole train versions together.
 - **Framework runtimes are `peerDependencies`**, never `dependencies`: an SDK
   never pins its host framework. `src/contract.spec.ts` in `sdk-core` checks
   each README lists its peers.
-- **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
-  points use `export type *`. This is the one statement of it; READMEs link
-  here.
+- **TypeScript floor**: consumers need TypeScript 5.0 or newer.
+  This is the one statement of it; READMEs link here.
+- **Name a server entry after its framework.** A meta-framework SDK exposes the
+  entry its framework asks for under the framework's own term, and a `create…`
+  name is a factory that returns the handler ([ADR 090](../docs/adrs/090-sdk-public-api-standard.md)).
+- **Write the reason for a handler name** in its `public-api.json` entry and in
+  the TSDoc of the function.
+- **Every meta-framework SDK re-exports the widgets of its UI SDK** from a
+  `./components` entry (kind `widgets`); never remove, narrow or "deduplicate" it
+  ([why](../docs/adrs/090-sdk-public-api-standard.md#widgets-come-through-the-framework-sdk)).
+- **Re-export widgets by name, never `export *`;** TanStack Start wraps the
+  three components so they mount in the browser only.
+- **Keep the UI SDK a runtime `dependency` of its framework SDK,** built first,
+  and out of `./server` and `./client`, which load on edge runtimes.
+- **Change `./components` in the same change** that adds or removes a widget name
+  in a UI SDK; `sdk-core`'s contract spec fails when a name is missing.
+- **Reach the API package only through `sdk-core`.** An SDK imports
+  `@zitadel/sdk-core/config`, never `@zitadel/api`, and a name an app can see is
+  declared by hand in `sdk-core`, never re-exported from the generated client.
+- **Never put the codename "nextgen" in a public name, header, configuration
+  key or text;** use Zitadel. The one exception is the `/__nextgen` proxy path.
 - **Keep each package's build tool** (its `build` script). `sdk-next` builds
   per file with `tsc` because bundlers merge `"use client"` modules into shared
   chunks and strip the directive. Never unify the builds without re-testing
@@ -47,12 +67,10 @@ change needs a changeset, and the whole train versions together.
   package's own tests, and imports the built package by its name, as a
   consumer's bundler resolves it, never the source. It needs the package's
   `build` before it typechecks or runs.
-  The contract spec in `sdk-core` holds the specs to one shape: the client
-  SDKs' `edge-entry` and `edge-render` blocks and the server SDKs'
-  `edge-server` block must carry the same titles and, byte for byte, the same
-  body, and every edge project declaration must read the same. Only the
-  glue above a block, which hands a request or a render to the framework, is
-  the framework's own.
+  Every edge project declaration reads the same; the contract spec in
+  `sdk-core` checks it.
+- **Write shared cases once**, in `@zitadel/server-sdk-contract` or
+  `@zitadel/client-sdk-contract`; an SDK's spec holds its glue and own cases.
 - **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
   plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
   top-level `skills/zitadel` routes to them. A new framework SDK adds its
@@ -62,11 +80,78 @@ change needs a changeset, and the whole train versions together.
   never listing them. A changed property updates the README or types; edit a
   skill only when the pattern changes.
 
+### Documenting an SDK
+
+The reference of every SDK is built from its doc comments, and a coding agent
+may have nothing else to read. Rules for those comments:
+
+- **Write every doc comment as a multi-line block**, never `/** text */`
+  on one line, for each export, property, parameter, prop and event.
+- **Say what it is, why it exists and when (not) to use it,** and what happens
+  when unset or invalid.
+- **Say which option wins** and what happens on the server, on the edge and
+  while hydrating.
+- **Put the caveats from the history in the comment, in words.** Read the
+  commits of the symbol (`git log -S'<name>'`); never cite an issue, pull
+  request or commit number.
+- **Give every exported function, component, hook and options type an
+  `@example`** that uses real imports and real prop names.
+- **State only what you verified in the code.** Unsure: leave it out and list
+  the symbol as "reason unknown" in the pull request.
+- **Document a property that `sdk-core` defines once, in `sdk-core`.** An SDK
+  documents only what is local to it, and links the rest with `{@link}`.
+- **Link a name only where every SDK that shows the comment exports it.**
+  Otherwise write it as a plain literal; TypeDoc fails on a dead link.
+- **Build the references with `pnpm run docs:api`** at the root; a warning
+  fails CI.
+- **Keep each SDK's `typedoc.json` to its `name` and `entryPoints`** (Svelte also
+  `tsconfig`); shared options live in the root `typedoc.base.json`.
+- **Name every exported type by the rules** in [Naming of types](../docs/adrs/090-sdk-public-api-standard.md#naming-of-types);
+  the prefix is `Zitadel`, without exception.
+- **Describe a change to an SDK's exports** in its `public-api.json` and in
+  [ADR 090](../docs/adrs/090-sdk-public-api-standard.md).
+
+### Reviewing a change to an SDK
+
+Check each rule on every SDK, and write its test once for all of them (see "Write
+shared cases once" above).
+
+- **A renamed string fails silently.** A renamed export breaks the build; an old
+  config key, env var, header, cookie, state key or file name is just ignored.
+- **List every name an app can set,** not only exports: config keys, `NUXT_*` and
+  `NUXT_PUBLIC_*` variables, runtime-config keys, `locals` keys, `useState` keys.
+- **Refuse the old name or call it out under `**Breaking:**`.** `sdk-nuxt` throws in
+  `refuseLegacyConfig` because an ignored `protectedRoutes` leaves pages open.
+- **A fork with a shared name passes name and type checks.** Assert the SDK exports
+  the shared function itself (`describeSharedConfigHelpers`, `describeClientEntry`).
+- **An exported `*Props` type must be what the component accepts,** in that
+  framework's idiom (props, Vue listeners, Angular inputs, Qwik `$` props).
+- **Read a file's header comment and history before deleting it,** because it may
+  record a constraint (`git log -S'<name>'`).
+- **Deleting a test deletes its guard.** Name the invariant it held and keep the
+  test if it still holds; drop it only when the behavior it pinned is gone.
+- **A test that reads other packages' files lists them in its turbo `inputs`,**
+  or a cached pass hides drift; `scripts/task-graph.test.mjs` proves it per SDK.
+- **`files` is an allowlist:** anything generated inside `dist` ships. Keep
+  `dist/api-docs` out with `!dist/api-docs`; the contract spec checks every SDK.
+- **`{@link module!name}` names the module after its file.** Renaming an entry file
+  breaks the cover page; `docs:api` runs in CI and catches it.
+- **Say "wrapper" for a component an SDK defines and "re-export" for one it passes
+  through** (TanStack Start wraps; the others re-export).
+- **A task added to the root `ci` script adds `<NONEXISTENT>` tasks** to every
+  package without it; `scripts/task-graph.test.mjs` must ignore them.
+- **Raising a peer floor moves the CLI detector floor,** the docs, the skill and the
+  changeset's `**Breaking:**` paragraph with it.
+- **Brace every control statement.** `biome lint --only=style/useBlockStatements`
+  finds the rest.
+
+`sdk-core` has rules of its own: [`sdk-core/AGENTS.md`](sdk-core/AGENTS.md).
+
 ## `packages/api`
 
 The generated TypeScript client: orval output under `src/generated/`.
 Regenerate it, never hand-edit it; the source is
-[`api/openapi/`](../api/openapi/AGENTS.md). The runtime helpers in
+[`apps/api/api/openapi/`](../apps/api/api/openapi/AGENTS.md). The runtime helpers in
 `src/runtime/` (`configureZitadel()` from `@zitadel/api/config`, proxy-path
 handling) are hand-written and the primary consumer surface.
 

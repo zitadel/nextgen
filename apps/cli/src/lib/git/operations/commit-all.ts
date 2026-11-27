@@ -1,13 +1,14 @@
-import { AuthorIdentity } from "../author-identity";
-import { HeadIsOnABranch } from "../checks/head-is-on-a-branch";
-import { NoOperationUnderWay } from "../checks/no-operation-under-way";
-import { NothingExcludedIsStaged } from "../checks/nothing-excluded-is-staged";
-import { SomethingIsStaged } from "../checks/something-is-staged";
-import { RepositoryError } from "../errors";
-import type { Git } from "../git";
-import type { Check, Operation } from "../operation";
-import { StagingArea } from "../staging-area";
-import type { CommitOptions, CommitOutcome } from "../types";
+import { AuthorIdentity } from "@/lib/git/author-identity";
+import { HeadIsOnABranch } from "@/lib/git/checks/head-is-on-a-branch";
+import { NoOperationUnderWay } from "@/lib/git/checks/no-operation-under-way";
+import { NothingExcludedIsStaged } from "@/lib/git/checks/nothing-excluded-is-staged";
+import { SomethingIsStaged } from "@/lib/git/checks/something-is-staged";
+import { RepositoryError } from "@/lib/git/errors";
+import type { Git } from "@/lib/git/git";
+import type { Check, Operation } from "@/lib/git/operation";
+import { StagingArea } from "@/lib/git/staging-area";
+import type { CommitOptions, CommitOutcome } from "@/lib/git/types";
+
 import { CurrentCommit } from "./current-commit";
 
 /**
@@ -94,7 +95,9 @@ export class CommitAll implements Operation<CommitOutcome> {
       if (sha === null) {
         throw new RepositoryError("the commit left no HEAD to record");
       }
-      await git.run(["reset", "--quiet", "--", "."]).catch(() => undefined);
+      await git.run(["reset", "--quiet", "--", "."]).catch(() => {
+        return undefined;
+      });
       return { committed: true, sha, author: identity.source };
     });
   }

@@ -81,7 +81,9 @@ users, sessions, tokens, events — is data: reached through the same
 contract, operated on rather than declared. The boundary is intent versus
 record. A bootstrap admin belongs in code; the users who register through
 your app are the record of its success, and no repository should try to
-hold them.
+hold them. The [user experience principles](docs/design/user-experience-principles.md)
+explain how this distinction should guide future product and engineering
+decisions.
 
 ### 3. Investigate — events answer questions
 
@@ -114,7 +116,7 @@ Shipped: the CLI takes an app from zero to working local auth
 [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) as the contract agents consume
 ([ADR 004](docs/adrs/004-agent-contract-and-agents-md.md)). Framework SDKs
 live under [packages/](packages/). The OpenAPI 3.1 sources under
-[api/openapi/](api/openapi/) are the contract of record, configuration is
+[apps/api/api/openapi/](apps/api/api/openapi/) are the contract of record, configuration is
 repo state with `plan` and `apply`
 ([ADR 035](docs/adrs/035-configuration-environments.md)), and the docs
 site publishes LLM-readable text at `/docs/llms.txt` and answers documentation

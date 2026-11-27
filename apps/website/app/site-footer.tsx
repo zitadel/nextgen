@@ -18,8 +18,22 @@ const COLUMNS = [
     links: [
       { label: "GitHub", href: links.github },
       { label: "Issues", href: links.issues },
+      { label: "Discord", href: links.discord },
       { label: "Changelog", href: links.changelog },
+      { label: "Choose a version", href: links.chooseVersion },
       { label: "zitadel.com", href: links.zitadel },
+    ],
+  },
+  {
+    // Zitadel's policies, how to report a vulnerability, and the split
+    // licensing: the server's AGPL beside the SDKs' and components' MIT
+    // (repo-root LICENSING.md).
+    title: "Legal",
+    links: [
+      { label: "Privacy", href: links.privacy },
+      { label: "Terms", href: links.terms },
+      { label: "Security", href: links.security },
+      { label: "Licensing", href: links.licensing },
     ],
   },
 ];
@@ -27,8 +41,8 @@ const COLUMNS = [
 /**
  * The page's end: the logo with the line it stands for and the command that
  * starts Zitadel, to copy on the way out, beside the ways on into the docs
- * and the project; under them what this preview is, and the theme switch
- * with System (theme-toggle.tsx).
+ * and the project and the legal pages; under them the theme switch with
+ * System (theme-toggle.tsx).
  */
 export function SiteFooter() {
   return (
@@ -45,7 +59,10 @@ export function SiteFooter() {
             <CommandLine command={startCommand} placement="footer" />
           </div>
         </div>
-        <nav aria-label="Footer" className="grid grid-cols-2 gap-x-16 gap-y-8 text-sm">
+        <nav
+          aria-label="Footer"
+          className="grid grid-cols-2 gap-x-12 gap-y-8 text-sm sm:grid-cols-3 sm:gap-x-16"
+        >
           {COLUMNS.map((column) => (
             <div key={column.title} className="flex flex-col gap-3">
               <h2 className="font-mono text-text-muted text-xs leading-4">{column.title}</h2>
@@ -66,10 +83,7 @@ export function SiteFooter() {
         </nav>
       </div>
       <div className="border-border-primary border-t">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5">
-          <p className="font-mono text-text-muted text-xs leading-4">
-            A preview of the next Zitadel: APIs, CLI flags and packages still change.
-          </p>
+        <div className="mx-auto flex max-w-6xl justify-end px-6 py-5">
           <ThemeSwitch />
         </div>
       </div>

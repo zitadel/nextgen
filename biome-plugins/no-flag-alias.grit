@@ -1,0 +1,14 @@
+language js
+
+// A parsed flag or argument is read where it is used. A local that only
+// renames one — `const releaseId = args.release_id` — is a second name for the
+// same thing, so a reader has to carry both and the command reads differently
+// from every other. A local that computes something keeps its name.
+`const $name = $source.$member` as $alias where {
+  $filename <: r".*/apps/cli/src/.*",
+  $source <: or {
+    `flags`,
+    `args`
+  },
+  register_diagnostic(span=$alias, message="Read the flag or argument where it is used, not through a local that only renames it.", severity="error")
+}

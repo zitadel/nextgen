@@ -20,6 +20,13 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
  * in `src-real/`, which runs the same screens through the Vite dev proxy.
  */
 
+test("serves the console's favicons from the binary", async ({ request }) => {
+  const response = await request.get("/ui/console/favicons/dark/favicon-32x32.png");
+  expect(response.ok()).toBe(true);
+  // The handler's SPA fallback answers an unknown path with index.html and a 200.
+  expect(response.headers()["content-type"]).toBe("image/png");
+});
+
 test("signs in end to end against the embedded API", async ({ page, seed }) => {
   const user = await seed.user();
   // The binary sends the console's policies with every page of it; the
@@ -34,7 +41,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // nothing. The widget below is what needs a live API.
   await expect(page).toHaveURL(/\/ui\/console\/login$/);
 
-  // `POST /api/v1/flow` — the first call whose result is visible on screen.
+  // `POST /api/v1/flows` — the first call whose result is visible on screen.
   // With a wrong base the widget renders "POST … returned 404" here.
   await expect(page.getByLabel("Email")).toBeVisible();
   await page.getByLabel("Email").fill(user.email);
@@ -54,8 +61,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  // `/` has no screen of its own and lands on Users, which acts on a selected
-  // project. The seeded user holds no grant, so `GET /users/me/projects` lists
+  // `/` is the project's Overview (D35), which acts on a selected project.
+  // The seeded user holds no grant, so `GET /users/me/projects` lists
   // nothing and there is no project to select for them
   // (`resolveDefaultProjectScope`): `/` lands on Projects instead, never on the
   // project the console signed into, which they could not manage.
@@ -66,10 +73,11 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   expect(new URL(page.url()).searchParams.get("project")).toBeNull();
 
   // The shell, not the screen: it is what shows the signed-in console was
-  // reached. Projects is the home, drawn without the sidebar.
+  // reached. Projects is the home, heading the account's list in the sidebar.
   await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Account" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(0);
-  await expect(page.getByText("No projects yet.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Create your first project" })).toBeVisible();
   expect(violations, "policy violations").toEqual([]);
 });
 

@@ -8,7 +8,7 @@ import { signIn } from "../support/sign-in";
  *
  * Read-only, so this leaves the instance exactly as it found it. What it covers
  * that the unit specs cannot is the *shape of the embed*: `expand=user_schema`
- * returns the same `{ id, schema, metadata }` envelope `GET /schemas/{id}`
+ * returns the same `{ id, schema, metadata }` envelope `GET /schemas/{schema_id}`
  * does, and the row has to read the display name one level inside it. A fixture
  * is only ever as right as the assumption that wrote it — this one was wrong
  * first, and the row silently fell back to printing the raw `sch_…` id under a
@@ -52,6 +52,37 @@ test("opens a flow and shows its steps and definition", async ({ page, zitadel, 
   await expect(page.getByRole("tab", { name: "JSON" })).toBeVisible();
   await page.getByRole("tab", { name: "YAML" }).click();
   await expect(page.getByText("name: default-login")).toBeVisible();
+
+  await expectNoErrorBoundary(page);
+});
+
+test("draws the flow as a canvas and opens it full screen", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel, await seed.user());
+
+  await page.goto("/flow-definitions");
+  await page.getByRole("link", { name: "Default login" }).click();
+
+  // What a laid-out browser shows and the unit spec's DOM cannot: every step of
+  // the stored definition is a measured card, and the canvas opens fitted, so
+  // all of them are inside the viewport with nothing to pan.
+  const canvas = page.getByRole("region", { name: "Flow canvas" });
+  await canvas.scrollIntoViewIfNeeded();
+  for (const step of ["identifier", "password", "register", "register-password", "done"]) {
+    await expect(
+      canvas.getByRole("article", { name: `Step ${step}`, exact: true }),
+    ).toBeInViewport();
+  }
+  await expect(canvas).not.toHaveCSS("cursor", "grab");
+
+  // Full screen is a modal: the page behind it is out of reach until Escape.
+  const behind = page.getByRole("link", { name: "Login flows" });
+  await expect(behind).toBeVisible();
+  await page.getByRole("button", { name: "Full screen" }).click();
+  const dialog = page.getByRole("dialog", { name: "Default login" });
+  await expect(dialog).toBeVisible();
+  await expect(behind).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
 
   await expectNoErrorBoundary(page);
 });

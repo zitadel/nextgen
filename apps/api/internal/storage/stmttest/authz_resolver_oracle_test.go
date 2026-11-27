@@ -1,0 +1,267 @@
+//go:build postgres_integration || spanner_integration || sqlite_integration
+
+package stmttest
+
+import (
+	"fmt"
+	"math/rand"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/internal/authz/resolver"
+	"github.com/zitadel/nextgen/internal/domain"
+)
+
+func TestAuthzResolver_OracleAgreement(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		persisted, err := d.stmts.LoadCatalogMutations(t.Context(), domain.SystemCatalogID)
+		require.NoError(t, err)
+
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		teamA := "team_ora_a_" + uniqueSuffix(t)
+		teamB := "team_ora_b_" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamA)))
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamB)))
+
+		rng := rand.New(rand.NewSource(42))
+		users := make([]string, 6)
+		for i := range users {
+			users[i] = newPrincipalUser(t, d.stmts, projectID, schemaURL, fmt.Sprintf("user_ora_%d_%s", i, uniqueSuffix(t)))
+		}
+
+		var assignments []*domain.AuthzAssignment
+		var memberships []*domain.AuthzMembershipEdge
+		var resources []*domain.ResourceScope
+
+		for i, u := range users {
+			scope := domain.NewUserResourceScope(projectID, u)
+			if i%2 == 1 {
+				tid := teamA
+				scope.TeamID = &tid
+			}
+			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), scope))
+			resources = append(resources, scope)
+		}
+
+		for _, u := range users {
+			if rng.Intn(2) == 0 {
+				e := domain.NewUserTeamMembershipEdge(projectID, teamA, u)
+				require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), e))
+				memberships = append(memberships, e)
+			}
+			if rng.Intn(3) == 0 {
+				e := domain.NewUserTeamMembershipEdge(projectID, teamB, u)
+				require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), e))
+				memberships = append(memberships, e)
+			}
+		}
+
+		for _, u := range users[:3] {
+			if rng.Intn(2) == 0 {
+				a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())
+				require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
+				assignments = append(assignments, a)
+			}
+		}
+		aTeam := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, teamA, "project", "viewer", domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), aTeam))
+		assignments = append(assignments, aTeam)
+
+		if rng.Intn(2) == 0 {
+			aTS := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, teamB, "project", "team", domain.NewProjectAssignmentScope())
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), aTS))
+			assignments = append(assignments, aTS)
+		}
+
+		scopedUser := users[0]
+		aScoped := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, scopedUser, "project", "viewer", domain.NewTeamAssignmentScope(teamA))
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), aScoped))
+		assignments = append(assignments, aScoped)
+
+		// Deactivate two users through the product statement: it deletes their
+		// membership edges and leaves their assignments, users[0]'s direct
+		// team-scoped grant among them, which only the status read stops.
+		deactivated := map[string]bool{users[0]: true, users[3]: true}
+		for u := range deactivated {
+			require.NoError(t, d.stmts.DeactivateUser(t.Context(), projectID, u))
+		}
+		active := map[resolver.UserKey]bool{}
+		for _, u := range users {
+			if !deactivated[u] {
+				active[resolver.UserKey{ProjectID: projectID, UserID: u}] = true
+			}
+		}
+		kept := memberships[:0]
+		for _, e := range memberships {
+			if !deactivated[e.MemberID] {
+				kept = append(kept, e)
+			}
+		}
+
+		g := resolver.GraphFromPersisted(persisted)
+		g.Assignments = assignments
+		g.Memberships = kept
+		g.Resources = resources
+		g.ActiveUsers = active
+
+		// Agreement on denials alone would prove nothing: the deactivated
+		// user's grant must be one that allows while the user is active.
+		asIfActive := g
+		asIfActive.ActiveUsers = map[resolver.UserKey]bool{{ProjectID: projectID, UserID: scopedUser}: true}
+		require.True(t, asIfActive.OracleCheckParams(domain.AuthzCheckParams{
+			ProjectID: projectID, PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: scopedUser,
+			ObjectType: "project", Relation: "viewer", ResourceID: users[1], ResourceTeamID: teamA,
+		}), "the deactivated user's team-scoped grant covers users[1]")
+
+		allowedAny := false
+		r := resolver.New()
+		for _, u := range users {
+			wantAllow := g.OracleCheck(projectID, projectID, domain.AuthzPrincipalTypeUser, u, "project", "viewer")
+			dec, err := r.Check(t.Context(), d.stmts, resolver.Request{
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   u,
+				ProjectID:     projectID,
+				ObjectType:    "project",
+				Relation:      "viewer",
+			})
+			require.NoError(t, err)
+			gotAllow := dec == resolver.DecisionAllow
+			assert.Equalf(t, wantAllow, gotAllow, "check viewer user=%s decision=%s", u, dec)
+			allowedAny = allowedAny || gotAllow
+
+			if !gotAllow {
+				wantFoot := g.OracleFoothold(projectID, "", domain.AuthzPrincipalTypeUser, u)
+				if wantFoot {
+					assert.Equal(t, resolver.DecisionForbidden, dec, "user=%s", u)
+				} else {
+					assert.Equal(t, resolver.DecisionNotFound, dec, "user=%s", u)
+				}
+			}
+
+			wantList := g.OracleList(projectID, projectID, domain.AuthzPrincipalTypeUser, u, domain.ResourceKindUser, "project", "viewer")
+			gotList, err := r.ListObjects(t.Context(), d.stmts, resolver.ListRequest{
+				Request: resolver.Request{
+					PrincipalType: domain.AuthzPrincipalTypeUser,
+					PrincipalID:   u,
+					ProjectID:     projectID,
+					ObjectType:    "project",
+					Relation:      "viewer",
+				},
+				ResourceKind: domain.ResourceKindUser,
+			})
+			require.NoError(t, err)
+			assert.ElementsMatchf(t, wantList, gotList, "list user=%s", u)
+		}
+
+		require.True(t, allowedAny, "some active user must be allowed, or agreement proves nothing")
+
+		// By id: the foothold narrows to the target (#2112), so the decision on
+		// every RSI row and team, for a relation held and one not held, must
+		// match the oracle's scoped arms.
+		targets := append([]*domain.ResourceScope{}, resources...)
+		targets = append(targets, domain.NewTeamResourceScope(projectID, teamA), domain.NewTeamResourceScope(projectID, teamB))
+		for _, u := range users {
+			for _, target := range targets {
+				for _, relation := range []string{"viewer", "editor"} {
+					req := resolver.Request{
+						PrincipalType: domain.AuthzPrincipalTypeUser,
+						PrincipalID:   u,
+						ProjectID:     projectID,
+						ObjectType:    "project",
+						Relation:      relation,
+						ResourceID:    target.ResourceID,
+					}
+					params := domain.AuthzCheckParams{
+						CatalogID:     domain.SystemCatalogID,
+						ProjectID:     projectID,
+						PrincipalType: domain.AuthzPrincipalTypeUser,
+						PrincipalID:   u,
+						ObjectType:    "project",
+						Relation:      relation,
+						ResourceID:    target.ResourceID,
+					}
+					if target.TeamID != nil {
+						req.ResourceTeamID = *target.TeamID
+						params.ResourceTeamID = *target.TeamID
+					}
+					want := resolver.DecisionNotFound
+					switch {
+					case g.OracleCheckParams(params):
+						want = resolver.DecisionAllow
+					case g.OracleFootholdParams(params):
+						want = resolver.DecisionForbidden
+					}
+					dec, err := resolver.New().Check(t.Context(), d.stmts, req)
+					require.NoError(t, err)
+					assert.Equalf(t, want, dec, "by-id %s user=%s target=%s", relation, u, target.ResourceID)
+				}
+			}
+		}
+	})
+}
+
+// TestAuthzResolver_OracleAgreementForeignTeamGrant pins SQL Check/List to the
+// in-memory oracle when membership lives in a different project than the grant
+// (the #1117 foothold-home contract). Platform home only: empty-home miss is
+// owned by TestAuthzResolver_Home.
+func TestAuthzResolver_OracleAgreementForeignTeamGrant(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		grant := seedForeignTeamGrant(t, d.stmts, true)
+		res := "usr_ora_ft_" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(grant.customer, res)))
+
+		persisted, err := d.stmts.LoadCatalogMutations(t.Context(), domain.SystemCatalogID)
+		require.NoError(t, err)
+		g := resolver.GraphFromPersisted(persisted)
+		asgns, err := d.stmts.ListAuthzAssignments(t.Context(), grant.customer, domain.AuthzPrincipalTypeTeam, grant.teamID, false)
+		require.NoError(t, err)
+		g.Assignments = asgns
+		memberships, err := d.stmts.ListAuthzMembershipEdgesByMember(t.Context(), grant.platform, domain.AuthzMemberTypeUser, grant.userID)
+		require.NoError(t, err)
+		g.Memberships = memberships
+		g.Resources = []*domain.ResourceScope{domain.NewUserResourceScope(grant.customer, res)}
+		g.ActiveUsers = map[resolver.UserKey]bool{{ProjectID: grant.platform, UserID: grant.userID}: true}
+
+		r := resolver.New()
+		viewer := resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   grant.userID,
+			ProjectID:     grant.customer,
+			HomeProjectID: grant.platform,
+			ObjectType:    "project",
+			Relation:      "viewer",
+		}
+
+		wantAllow := g.OracleCheck(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID, "project", "viewer")
+		require.True(t, wantAllow, "the fixture must allow, or agreement proves nothing")
+		dec, err := r.Check(t.Context(), d.stmts, viewer)
+		require.NoError(t, err)
+		assert.Equal(t, wantAllow, dec == resolver.DecisionAllow)
+
+		member := viewer
+		member.ObjectType = "team"
+		member.Relation = "member"
+		wantMember := g.OracleCheck(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID, "team", "member")
+		memberDec, err := r.Check(t.Context(), d.stmts, member)
+		require.NoError(t, err)
+		assert.Equal(t, wantMember, memberDec == resolver.DecisionAllow)
+		wantFoot := g.OracleFoothold(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID)
+		if !wantMember {
+			if wantFoot {
+				assert.Equal(t, resolver.DecisionForbidden, memberDec)
+			} else {
+				assert.Equal(t, resolver.DecisionNotFound, memberDec)
+			}
+		}
+
+		wantList := g.OracleList(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID, domain.ResourceKindUser, "project", "viewer")
+		gotList, err := r.ListObjects(t.Context(), d.stmts, resolver.ListRequest{
+			Request:      viewer,
+			ResourceKind: domain.ResourceKindUser,
+		})
+		require.NoError(t, err)
+		assert.ElementsMatch(t, wantList, gotList)
+	})
+}

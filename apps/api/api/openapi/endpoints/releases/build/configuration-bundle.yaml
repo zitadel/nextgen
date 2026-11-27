@@ -1,0 +1,144 @@
+title: ConfigurationBundle
+type: object
+description: |
+  The resources of a project's `.zitadel/` directory as authored on disk,
+  grouped by kind.
+
+  Resources reference each other by handle. A flow definition's
+  `user_schema` names a schema by its `objectType`. A flow step's
+  `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name
+  identity provider (IdP) connections by `slug`. A reference resolves to the
+  resource with that handle in this bundle. Failing that, it resolves to the
+  project's newest revision of it, which the release then pins as well. A
+  handle that neither holds refuses the release, naming the pointer and the
+  handle. A bundle that references only resources it carries builds the same
+  release on any project.
+
+  A handle names one resource of its kind in a bundle. The server refuses the
+  release with `rel.invalid`, with an entry for each such resource, when the
+  bundle holds:
+  - two schemas with the same `objectType`;
+  - two flow definitions with the same `name`;
+  - two IdP connections with the same `slug`;
+  - two applications with the same `slug`;
+  - two policies for the same `operation`;
+  - a schema without an `objectType`.
+
+  Each kind is optional, and the arrays may be empty: a project that never
+  ejected its branding omits `branding`, and one that never turned on its
+  OAuth authorization server omits `oauth`. `branding` and `oauth` are
+  single objects, because a project has one of each. The bundle carries at
+  least one resource. The release it builds pins at most 50 resources, which
+  counts the resources the bundle carries plus those resolved from the
+  project. The server refuses anything outside that with `rel.invalid`.
+  Unknown keys are refused.
+additionalProperties: false
+properties:
+  schemas:
+    type: array
+    maxItems: 50
+    description: |
+      User schemas, one per `.zitadel/schemas/*.json`, in either form
+      `POST /schemas` takes.
+
+      An inline `user-schema` must not declare `$id`: a schema's `$id` is
+      its revision's identity, so a changed schema under the same `$id`
+      could never become a new revision. Such a schema gets a `rel.invalid`
+      entry.
+
+      A `schema-url` entry's handle is the `objectType` of the document the
+      URL serves. Its revision is identified by the URL, so the release
+      reuses the project's revision for a URL the project already holds and
+      fetches the document only for a URL it does not.
+    items:
+      oneOf:
+        - $ref: ../../schemas/user-schema.yaml
+        - $ref: ../../schemas/schema-url.yaml
+      discriminator:
+        propertyName: kind
+        mapping:
+          user-schema: ../../schemas/user-schema.yaml
+          schema-url: ../../schemas/schema-url.yaml
+  flow_definitions:
+    type: array
+    maxItems: 50
+    description: Flow definitions, one per `.zitadel/flows/*.json`.
+    items:
+      $ref: ../../../components/flows/flow-definition.yaml
+  idps:
+    type: array
+    maxItems: 50
+    description: |
+      IdP connections, one per `.zitadel/idps/<slug>.json`, each the
+      connection document `POST /idps` takes as `idp`. Secrets appear only
+      as `${{ NAME }}` references to variables, never as values, so a bundle
+      carries no credentials.
+    items:
+      $ref: ../../idps/idp-connection.yaml
+  applications:
+    type: array
+    maxItems: 50
+    description: |
+      Declared applications, one per `.zitadel/applications/<slug>.json`,
+      each the document `POST /applications` takes as `application`. The
+      handle is `slug`. A release is the only writer of a declared
+      application: the build refuses a slug an application registered
+      through `POST /applications` holds, with an `app.registered` entry.
+
+      A declared application differs from a registered one in three ways,
+      each refused with an `app.invalid` entry naming the setting:
+      - every client sets its `client_id`, so the id is known before any
+        deploy;
+      - every confidential client names its secret as a `${{ NAME }}`
+        reference to a variable in `secret`, and no two clients in the
+        bundle name the same variable;
+      - no two clients in the bundle share a `client_id`.
+      Every client on either side of such a clash is refused.
+
+      A `client_id` another client of the project holds, or once held, gets
+      an `app.client_id_taken` entry, and a variable another client of the
+      project names, or once named, an `app.invalid` entry: a variable stays
+      the client's that first named it, so no other client is handed its
+      secret. A revision may not change a client's `client_id`
+      (`app.field_immutable`), even for a client an earlier release dropped.
+      Unlike on `POST /applications`, a revision may drop a client: the
+      deployments of that release stop serving it. A deploy is refused while
+      a variable a client names has no value for the target
+      (`dep.variables_missing`), or holds a plain value instead of a secret
+      (`dep.variables_not_secret`).
+
+      A declared application's clients are first-party unless their
+      `first_party` says otherwise.
+    items:
+      $ref: ../../schemas/application.yaml
+  policies:
+    type: array
+    maxItems: 50
+    description: |
+      Operation policies, one per `.zitadel/policies/<operation>.json`, each
+      the body `POST /policies` takes. The handle is `operation`: a project
+      has one policy per operation. An unknown setting or a value outside a
+      setting's bounds is refused while the request is decoded, with
+      `req.invalid` and no `details.resources`. A config the operation's
+      template refuses beyond that, such as settings that contradict each
+      other, gets a `rel.invalid` entry.
+
+      A request served this release reads the policy revision it pins for
+      the operation, as it reads the user schema, branding and identity
+      providers. That holds once the release pins a flow. A release that pins
+      a flow and no policy for an operation means no policy for it.
+    items:
+      $ref: ../../policies/publish-policy-request.yaml
+  branding:
+    $ref: ../../../components/flows/branding.yaml
+    description: |
+      The descriptor from `.zitadel/branding/branding.json` with its template
+      inlined, exactly as `POST /branding` takes it. A project has one
+      branding, so this is a single object.
+  oauth:
+    $ref: ../../../components/oauth/oauth-settings.yaml
+    description: |
+      The project's OAuth settings. A project has one set of them, so this is
+      a single object, and the release is its only writer: there is no
+      per-kind create endpoint. Omit it to leave the project's OAuth
+      authorization server off.

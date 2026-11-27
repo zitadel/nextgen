@@ -1,0 +1,42 @@
+package domain
+
+import "context"
+
+// FlowSSORedirectIssuer issues the redirect that begins an external sign-in
+// on an auth attempt: it pins the connection the slug names (the release's
+// revision when the request's release pins a flow, otherwise the newest),
+// issues the single-use state record and builds the authorize URL the
+// browser is sent to.
+//
+// errors: [ErrIDPConnectionNotFound] when no connection in the project has
+// the slug; [ErrFlowSSOUnavailable] when the connection cannot be served,
+// with the engine's error as the log-only cause; the attempt errors of
+// [FlowAuthAttemptService] and [ErrInternal] pass through.
+type FlowSSORedirectIssuer interface {
+	Issue(ctx context.Context, in FlowIssueSSORedirectInput) (FlowSSORedirectOutput, error)
+}
+
+// FlowSSOReturn is the browser-side context of an external sign-in,
+// derived from the HTTP request at the API edge: RedirectURI is the
+// callback route the provider sends the browser to, ReturnTarget the page
+// the callback hands the browser back to.
+type FlowSSOReturn struct {
+	RedirectURI  string
+	ReturnTarget string
+}
+
+// FlowIssueSSORedirectInput names the provider the user picked and what the
+// API derived from the request, the callback route and the return page.
+type FlowIssueSSORedirectInput struct {
+	ProjectID    string
+	AttemptID    string
+	ProviderSlug string
+	FlowSSOReturn
+}
+
+// FlowSSORedirectOutput is the authorize URL and the nonce the handler sets
+// as the browser-binding cookie; the state record keeps the nonce's hash.
+type FlowSSORedirectOutput struct {
+	RedirectURL  string
+	BindingNonce string
+}

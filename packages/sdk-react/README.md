@@ -44,6 +44,29 @@ export function ProfilePage() {
 The signed-in session card is `<ZitadelSession project={project} />` (exported
 as `ZitadelSession`).
 
+## Reading the session in your own UI
+
+`useSession()` tells your own components (header navigation, account menus, route guards) whether a user is signed in, and who. When the first component using it mounts, it asks the server with the same `GET /sessions/me` read the `ZitadelSession` card performs; every mounted component using the same project shares that read, and once the last one unmounts, the next mount reads again.
+
+```tsx
+import { useSession } from '@zitadel/sdk-react';
+
+export function AccountMenu() {
+  const { status, session } = useSession({ project });
+  if (status === 'loading') return null;
+  if (status === 'error') return <span role="alert">Session unavailable</span>;
+  return status === 'authenticated'
+    ? <a href="/profile">{session?.display ?? session?.identifier ?? 'Account'}</a>
+    : <a href="/login">Sign in</a>;
+}
+```
+
+`status` is `loading`, then the server's answer, `authenticated` or `unauthenticated`. `error` means there is no answer yet: `error.code` is `session.no_project` when no project id is known (a misconfiguration, not a signed-out visitor) or `session.read_failed` when the read failed, often a misrouted proxy. `session` holds `userId`, `identifier`, `identifierProperty` and `display`, never a token. Only this SDK exports session helpers (`useSession`, `getSession` and `sessionStore`); the other framework SDKs read the session through `@zitadel/sdk-core/session`. The hook takes the widgets' `project`, `projectId` and `proxyPath`, and falls back to `configureZitadel(...)`.
+
+Sign-in and sign-out navigate, so the next page reads the session again. To update in place, call the hook's `refresh()` from `onFlowComplete` or `onSignout`: it resolves with the new snapshot and never rejects. While it runs, `isRefreshing` is `true` and the last answer stays; a refresh that fails keeps it too and sets `error` beside it.
+
+Outside components, `sessionStore({ project })` returns the same shared read: `settled()` resolves with the first answer, for a route guard or loader, and `refresh()` reads again. `getSession({ projectId, proxyPath })` makes a single read that resolves to `{ isAuthenticated, session }`.
+
 ## Widget props and events
 
 `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
@@ -53,7 +76,7 @@ as `ZitadelSession`).
 | `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |
 | `projectId` | `string` | unset | Login, Logout, Session | Project id, read when no `project` handle is passed. |
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
-| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
+| `purpose` | `ZitadelFlowPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
 | `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
 | `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
@@ -95,9 +118,9 @@ When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zita
 
 ## Server rendering
 
-If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` to the `ZitadelLogin` wrapper as strings (they are written into the server markup as attributes), because a widget that starts before its configuration arrives shows an error instead of the flow.
+If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. The server markup also carries the `url` and `publishable-key` of a `project` handle (the key is browser-safe), the `variant`, `theme`, `lang`, `heading` and `logoutLabel` props and the `suppressHeader`, `suppressPasswordToggle` and `forcePostSignInUrl` flags as attributes, in every SDK alike. An unset, empty or `null` `resumeFlowId`, `postSignInUrl` and `postSignOutUrl` write no attribute, a `false` flag writes none, and an empty `proxyPath` is written as `/`.
 
-React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `project-id` and `proxy-path` as strings instead of a `project` handle.
+React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `projectId` and `proxyPath` as strings instead of a `project` handle.
 
 ### Edge runtimes
 
@@ -118,3 +141,7 @@ CLI dev proxy covers local development.
 For local development you can also skip the proxy and point `proxyPath`
 straight at the backend (cross-origin), e.g. `proxyPath: "http://localhost:8080"`
 (the `zitadel start` local runtime default port).
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

@@ -64,6 +64,8 @@ project serves. It also serves callers with no `Origin`, and there is no other
 target to deploy to or keep in step. The newest primary deployment is therefore
 always live, whatever the project lists, and its release cannot be revoked.
 `targets` on `POST /deployments` is `"primary"` or a list of preview URLs.
+`["primary"]`, the shape released clients send, is still accepted until 1.0.0
+with a `Deprecation` header, as the root path alias is (ADR 077 §4).
 
 ### Example
 
@@ -127,10 +129,11 @@ still read the newest revisions, because no release serves them.
 
 - `zitadel setup` deploys `.zitadel/` once the app is scaffolded and committed.
 - `zitadel deploy` and the console deploy to `primary`.
-- With platform bootstrap on, every start makes `server.public_base`'s origin
+- With platform bootstrap on, every seeding (a start, or the `seed` command
+  where servers start with `--seed=false`) makes `server.public_base`'s origin
   the platform project's one primary origin and deploys the configuration the
-  server ships to it. A start that changes nothing deploys nothing, and a server
-  older than the live release's leaves it alone.
+  server ships to it. A seeding that changes nothing deploys nothing, and a
+  server older than the live release's leaves it alone.
 
 ## Consequences
 
@@ -160,3 +163,20 @@ still read the newest revisions, because no release serves them.
   make it the one project not served through its own origins and deployments.
 - Deploying the platform project once, at deploy time, would leave a local
   `zitadel start` or a self-hosted server with nothing deployed.
+
+## Amendment (2026-11-05): `setUserPassword` follows its caller's `Origin`
+
+The decision above sent `setUserPassword` to the newest primary deployment
+because it does not come from a browser page. It can: its callers are the
+console, the CLI and a project's own frontend, and a frontend on a preview URL
+would otherwise set passwords under primary's policy while that preview's flow
+enforces its own.
+
+`setUserPassword` therefore resolves its release from `Origin` as the flow
+endpoints do. A frontend gets the deployment its origin serves, a preview URL
+included. The console's own origin, when the project does not list it, and a
+caller with no `Origin`, such as the CLI, get the newest primary deployment.
+An origin the project does not admit is refused as the flow refuses it.
+
+`createAuthAttempt` authenticates with the project secret, so only a backend
+calls it, and it keeps following the newest primary deployment.

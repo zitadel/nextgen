@@ -2,19 +2,19 @@ import { track } from "@vercel/analytics";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pageOf, snippetOf, trackEvent } from "./analytics";
-import { applyCommand, commands, planCommand, skillsCommand } from "./commands";
+import { commands, deployCommand, dryRunCommand, skillsCommand } from "./commands";
 
 vi.mock("@vercel/analytics", () => ({ track: vi.fn() }));
 
 describe("snippetOf", () => {
   it("names every command the website offers to copy", () => {
-    for (const command of [...commands, planCommand, applyCommand, skillsCommand]) {
+    for (const command of [...commands, dryRunCommand, deployCommand, skillsCommand]) {
       expect(snippetOf(command), command).toBeDefined();
     }
   });
 
   it("names no other text", () => {
-    expect(snippetOf("npx @zitadel/cli@latest deploy")).toBeUndefined();
+    expect(snippetOf("npx @zitadel/cli@latest doctor")).toBeUndefined();
   });
 });
 

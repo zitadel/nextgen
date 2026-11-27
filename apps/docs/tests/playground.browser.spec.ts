@@ -106,8 +106,8 @@ test("a read goes out with the session: a GET and a POST …/query", async ({
 test("the session sends no write: a POST and a DELETE", async ({ page, context, baseURL }) => {
   const { sent, sessionReads } = await stubSession(context, baseURL!, () => ada);
   const writes = [
-    { operation: "teams/createTeam", title: "Create team" },
-    { operation: "grants/deleteGrant", title: "Revoke grant" },
+    { operation: "teams/createTeam", title: "Create a team" },
+    { operation: "grants/deleteGrant", title: "Revoke a grant" },
   ];
   for (const { operation, title } of writes) {
     const { playground, readsOnly, send } = await openPlayground(page, operation, title);
@@ -129,7 +129,7 @@ test("a request with a bearer token goes as it is", async ({ page, context, base
   const { playground, readsOnly, send } = await openPlayground(
     page,
     "teams/createTeam",
-    "Create team",
+    "Create a team",
   );
   await expect(readsOnly).toBeVisible();
 
@@ -218,7 +218,7 @@ test("optional project scope starts unset and can be set and unset explicitly", 
   const send = playground.getByRole("button", { name: /^Send/ });
 
   await expect(project).toHaveValue("");
-  await expect(sample).toContainText("client.queryUsers({})");
+  await expect(sample).toContainText("api.queryUsers({})");
   await send.click();
   await expect.poll(() => projects).toEqual([null]);
 
@@ -228,14 +228,14 @@ test("optional project scope starts unset and can be set and unset explicitly", 
   await expect.poll(() => projects).toEqual([null, "proj_docs_target"]);
 
   await playground.getByRole("button", { name: "Unset", exact: true }).click();
-  await expect(sample).toContainText("client.queryUsers({})");
+  await expect(sample).toContainText("api.queryUsers({})");
   await send.click();
   await expect.poll(() => projects).toEqual([null, "proj_docs_target", null]);
 });
 
 for (const operation of [
   { section: "users", id: "queryUsers", title: "Query users" },
-  { section: "teams", id: "createTeam", title: "Create team" },
+  { section: "teams", id: "createTeam", title: "Create a team" },
 ]) {
   test(`${operation.title}: the TypeScript sample follows the selected authentication`, async ({
     page,
@@ -262,14 +262,14 @@ for (const operation of [
     await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
     // A session-authenticated write must show how to obtain and send CSRF.
     if (operation.id === "createTeam") {
-      await expect(sample).toContainText("setApiCsrfToken");
-      await expect(sample).toContainText("client.getMySessionCsrfToken()");
+      await expect(sample).toContainText('headers.set("X-Zitadel-CSRF", csrf_token)');
+      await expect(sample).toContainText("session.getMySessionCsrfToken()");
       // Required project parameters still start with their documented example.
       await expect(
         playground.getByRole("textbox", { name: "project_id", exact: true }),
       ).toHaveValue("proj_01KWH1P4MYS7F0N9WD3P2E4YM5");
     } else {
-      await expect(sample).not.toContainText("setApiCsrfToken");
+      await expect(sample).not.toContainText("csrf_token");
     }
 
     await playground
@@ -278,7 +278,7 @@ for (const operation of [
       .click();
     await page.getByRole("option", { name: "oauth2", exact: true }).click();
     await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
-    await expect(sample).not.toContainText("setApiCsrfToken");
+    await expect(sample).not.toContainText("csrf_token");
     const authorization = playground.getByRole("textbox", { name: "Authorization", exact: true });
     await authorization.fill("Bearer docs-test-secret");
     await expect(sample).not.toContainText("docs-test-secret");
@@ -314,7 +314,7 @@ test("a signed-out reader's sample starts with project-secret authentication", a
   ).toBeVisible();
   const sample = playground.locator("pre").filter({ hasText: "@zitadel/api/" });
   await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
-  await expect(sample).toContainText("client.queryUsers({})");
+  await expect(sample).toContainText("api.queryUsers({})");
 
   await playground
     .getByRole("combobox")

@@ -49,47 +49,6 @@ dialogs, drawers, alerts and tab strips (D18). Do not reach for `rounded-lg`,
 `rounded-xl` or `rounded-2xl`; the shadcn defaults that ship with them are
 overridden in `src/components/ui/`.
 
-## Sidebar navigation states — UI polishing (design-approved, code pending)
-
-This section defines the **visual state treatment only** for Console navigation.
-It does not change routes, navigation order, the Projects list, or the project
-switcher: the one frame and its sidebar are decided in D27, D29 and D40 of the
-[decisions log](../../../docs/design/decisions.md). Navigation architecture
-changes remain in [#2607](https://github.com/zitadel/nextgen/issues/2607).
-
-**Design source:** the design system's `SidebarZitadelv2` component, and the
-Console Profile screen as an example of it in use.
-
-| State | Menu label | Leading icon | Row appearance |
-| --- | --- | --- | --- |
-| Default / inactive | `text-muted-foreground` | `text-muted-foreground` | No selected background |
-| Hover | `text-sidebar-accent-foreground` | Same foreground treatment | `bg-sidebar-accent` |
-| Active (matches current route) | `text-sidebar-accent-foreground` | `text-sidebar-foreground` (or equivalent active foreground token) | `bg-sidebar-accent`, selected appearance |
-| Keyboard focus | Keep keyboard focus indicator and readable foreground | Same affordance as label | Existing `focus-visible:ring-2` / `sidebar-ring` behavior |
-| Disabled (where used) | Existing disabled styling | Existing disabled styling | No activation; do not invent a new Figma variant |
-
-Use semantic tokens and utilities, **not hard-coded hex values**. The Figma
-dark-theme inactive value currently resolves to `#A3A3A3` for both labels
-and icons; theme tokens remain authoritative for other modes.
-
-**Coverage:** project-level navigation, team-level navigation, personal/account
-settings, Search/Documentation/Back actions that are rendered as non-active
-navigation items, and the icon-only collapsed rail. An active icon must not
-remain muted while its label is highlighted.
-
-### Acceptance criteria for implementing sidebar states
-
-- [ ] Every inactive nav link's **label and icon** use `text-muted-foreground` in expanded sidebar variants; inactive icons use the same token in collapsed mode.
-- [ ] The **current route** determines the active item, including initial load, refresh, deep links and client-side navigation. Exactly the applicable item is active within each navigation level; do not merely highlight the first item.
-- [ ] The active item has the selected background and active foreground for both label and icon; no active item has a muted icon.
-- [ ] Hover and visible keyboard focus work consistently without replacing an active state; retain accessible focus cues.
-- [ ] Confirm both light and dark themes and expanded/collapsed sidebars, including settings navigation and footer items.
-- [ ] Check launch-relevant screens against the V2 master. Do **not** bulk-migrate historical V1 mock screens or change routes as part of this styling-only task.
-
-**Design status:** the Sidebar V2 visual color states are approved in Figma.
-**Engineering status:** implementation and visual regression checks are
-pending; this documentation is not evidence that the Console code has changed.
-
 ## Component resolution (design → code)
 
 **Inventory before building.** List every component a design uses and find where
@@ -149,7 +108,7 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| Users filters | `Select` (schema, then revision), in `ResourceTitle`'s `filter` slot |
+| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`), by the "List filters" recipe below |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
@@ -157,20 +116,40 @@ Canonical examples:
 | Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
 | Create or edit drawer | `FormSheet` (`src/components/form-sheet.tsx`) |
 | Mutation error inside a form or card | `FormError` (`src/components/form-error.tsx`) |
+| Field with a control inside its frame (a copy button under a message) | `InputGroup` (`src/components/ui/input-group.tsx`) |
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
+| Centred state in place of a screen's content (the project picker), or of a table with nothing to list yet (in a `Card`) | `Empty` (`src/components/ui/empty.tsx`) |
+
+### Status tones
+
+A status pill's dot (`StatusBadge`, `StatusDot` in `src/components/status-badge.tsx`)
+is coloured by what the status means, never per status. Add a new status to
+`STATUS_TONE` there, under the tone whose meaning it has; an unlisted one reads
+neutral.
+
+| Tone | Token | Meaning | Statuses |
+| --- | --- | --- | --- |
+| `positive` | `success` | in force and working | `active`, `live` |
+| `caution` | `warning` | held for now; someone can lift it | `suspended` |
+| `critical` | `destructive` | on its way out, or gone, not coming back by itself | `pending_purge`, `expired` |
+| `neutral` | `muted-foreground` | off, or not yet on | `deactivated`, `inactive`, `draft` |
+
+A hard stop that is not one state among several (a revoked release) is the
+tinted `destructive` `Badge` with no dot, not a tone.
 
 Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `OVERLINE`, `EYEBROW`, the panel table cells) live in
 `src/components/typography.ts`.
 
 - `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
-  and section title, the project page's Project Detail, Origins and Variables
+  and section title, the project page's Project details, Origins and Variables
   and Secrets cards included. `DetailSection` renders it as an `h2`; so do
-  Field definitions, Steps, Release content and the settings sections.
+  Field definitions, a login flow's User schema, Release content and the
+  settings sections.
 - `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
-  inside a card body, such as Sign-in methods on a schema.
+  inside a card body, such as an identity provider's Used by.
 - The overline is for meta labels, table heads and drill-down breadcrumbs,
   never a section title.
 
@@ -184,25 +163,18 @@ A mutation's pending and error state comes from `useSubmit`
 ## Page wrapper — one top for every screen
 
 Every console screen renders inside `Page` (`src/components/layout.tsx`): lists,
-resource details, configuration panels, settings and System. It owns the page
+details, settings and System. It owns the page
 gutter and, above all, the distance under the top bar, so no screen measures its
 own. Do not add a per-screen wrapper with its own padding.
 
 | Region | Value |
 | --- | --- |
 | Page top | 20px at `lg`, 16px below |
-| Page gutter | 16px; 24px from `sm` with `inset="panel"` |
+| Page gutter | 16px |
 | Page bottom | 32px |
-| Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
+| Title row | 36px, title centred: `PAGE_TITLE_ROW` in `typography.ts`, used by lists, settings and System; a detail screen's `DetailHeader` has its own 24px title row |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
-
-Projects, the home, has no sidebar (D24), so its content sits in `HomeColumn`
-inside `Page`: capped and centred, so the table does not stretch across the
-window.
-
-`inset="panel"` is for the configuration-panel screens (Login flows, Identity
-providers, Releases), whose single card the design insets by 24px on the
-sides. It changes the sides only, never the top.
+| Beside a sheet | `besideSheet`: while a sheet that is not modal stands open (Events' event drawer), the page ends a gutter before it from `xl`; narrower, the sheet covers the page's right. Never let page content sit under an open non-modal sheet at `xl` |
 
 ## Resource list layout — one shell for every list screen
 
@@ -213,9 +185,12 @@ compose it rather than restating the numbers per screen.
 Every list screen is a table on this shell, User schemas and Login flows
 included (D17; the earlier card of rows broke on narrow widths). A screen
 composes `Page`, `ResourceTitle` (with the Add button as its `action`,
-beside the title at every width, D19, and any list filter as its `filter`,
+beside the title at every width, D19, labelled with what it adds as the sheet
+it opens is titled: `Add user`, `New project`, never a bare `Add`, the list's search as its `filter`,
 beside the action on one 36px row and on its own row under the title on a
-phone), then `ResourceHeaderRow` +
+phone, where `filterBelow` keeps it at every width, as Events' search is, and
+the list's `ResourceFilter` as its `below` row, by "List filters" below),
+then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
 fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside
 its card below 576px rather than squeezing the cells.
@@ -224,10 +199,11 @@ its card below 576px rather than squeezing the cells.
 | --- | --- |
 | Page | `Page` — 16px gutter, the same inset as the table; 20px top at `lg` |
 | Header gutter | 24px at `lg`, the page gutter plus 8px; 16px below it |
-| Title row | 36px with or without the Add button (`PAGE_TITLE_ROW`) — every screen's title sits on this line |
+| Title row | 36px with or without the Add button (`PAGE_TITLE_ROW`), as settings and System; detail screens use `DetailHeader` |
 | Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |
+| Row density | `RESOURCE_DENSITY` on the table's card sets the height for every head and body cell: `comfortable` (56px, the default) or `compact` (40px, 4px block padding, `RowMenu size="icon-xs"`; Events). Never restate a height per cell |
 | Head label | display face, 12/16, 0.72px tracking, `foreground` |
 | Row icon | 16px, stroke 1.5, `muted-foreground`, 10px to its label |
 
@@ -254,52 +230,98 @@ glance; and the design's Lucide glyphs are drawn at **stroke 1.5**, where
 `lucide-react` defaults to 2 — a glyph at the default weight reads heavier than
 the design even though its box measures correctly.
 
+### List filters
+
+A list is narrowed through `ResourceFilter` (`src/components/resource-filter.tsx`):
+**Add filter** lists the resource's properties, then the chosen property's
+values by its type, and each set filter is a chip. The Users list
+(`src/routes/_authed/users/index.tsx`) is the shipped example. To add it to a
+list:
+
+1. Describe the properties as `FilterDefinition`s (`src/lib/resource-filter.ts`)
+   in `src/features/<resource>/filters.tsx`. A fixed set of values is
+   `type: "options"`, a moment `type: "date"`; a status takes `statusOptions`
+   (`status-badge.tsx`). A property that depends on another names it in the
+   other's `clears` and says why it is `unavailable` until then.
+2. Keep each value in the URL under its definition's `key`: accept only what
+   the filter could have set in the route's `validateSearch`
+   (`parseDateFilter` for a date), and leave the keys in `loaderDeps`.
+3. Turn the values into the query's criteria in the feature, as `userFilter`
+   (`src/features/users/list.ts`) does. The server narrows; nothing filters or
+   counts the rows already loaded. A date's start is `dateFilterStart`.
+4. Render it in `ResourceTitle`'s `below` row, merging each `onChange` patch
+   into the search. The search field stays in `filter`.
+5. In the empty state, tell "no match" from "none yet" with `isFiltered`, and
+   clear with `clearedFilters`.
+
+A new kind of value (a number, free text) is a new `type` in
+`FilterDefinition` and its values list in the component, not a control beside
+it.
+
 ## Resource detail layout — one shell for every detail screen
 
-Detail screens come in three compositions, and each has one shell:
+Resources (Users, Teams, Project settings) and configuration (Login flows,
+Identity providers, Releases) draw the same detail screen: a header over body
+cards of labelled rows. Compose `Page` + `DetailHeader` from
+`src/components/detail-page.tsx`, then the body under `DETAIL_BODY`, its tab
+row and cards 16px apart (`DETAIL_STACK`).
 
-- **Resource detail** (Users, Teams, Project settings): a title row over body
-  cards. Compose `Page` + `DetailHeader` from
-  `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
-  body card with a titled section is a `DetailSection`; a single name field with
-  its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
-  card the design titles by name rather than a section title (Users: the profile,
-  under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
-  `h1`.
-- **Resource detail, identity-line header** (User schemas): the resource
-  detail body under `DetailTitle` (`src/components/detail-page.tsx`) instead of
-  `DetailHeader`: the title over one 12/16 line with the id, its copy button
-  and the created date, no icon tile and no header card. The line stacks under
-  `sm`. Each tab is a `DetailSection`.
-- **Configuration panel** (Login flows, Identity providers, Releases): the whole
-  screen is one `DetailPanel` headed by a `PanelTitle` (both in
-  `src/components/detail-page.tsx`), inside `<Page inset="panel">`
-  (`src/components/layout.tsx`).
-- **Settings** (Profile): a bare title over one card of labelled rows, in a
-  centred column `--zl-container-settings` wide. Compose `Page` +
-  `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE` heading with
-  no header gutter, then `SettingsCard` (`src/components/settings-card.tsx`)
-  holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
-  and no header card: a settings screen is not a resource with an id.
+- A body card with a titled section is a `DetailSection`: the title, with an
+  optional `aside` on the label rail (a login flow's or a user's schema and
+  its `RevisionLink`) and `action` at the row's end, an optional
+  `description` (a muted sentence about the whole section) under them, a
+  rule, then the content. A single name field with its Save button is a
+  `RenameCard` (`src/components/rename-card.tsx`).
+- A labelled value is a `DetailRow`, its value in `DETAIL_VALUE`, and a card's
+  rows sit in `DetailRows`. Do not lay out a label and value by hand: every
+  card puts its values on the same 218px rail, and a label beside a form
+  control takes `FIELD_LABEL_RAIL` (or `FIELD_GROUP_LABEL_RAIL` in a
+  responsive `FieldGroup`) so the control starts there too.
 
-Resource detail and the configuration panel share the icon tile (`ICON_PLATE`)
-and the header card (`MetaCard`, holding `MetaValue`s split by `MetaRule`): the
-resource id, copyable, and the created date. The identity-line header carries
-the same two values in one line instead.
+- A row whose value is several items that each open to more (a release's
+  pinned revisions, an application's clients) is a `DetailRow` with
+  `align="control"` holding a `DetailAccordion` of `DetailAccordionItem`s
+  (`src/components/detail-accordion.tsx`): a 24px title line, a 48px row
+  pitch, and the opened content 16px under its title. A client's settings in
+  that content are `DetailRows container dense`: 28px rows, 8px either side
+  of the rule.
+
+Settings (Profile) is a different composition: a bare title over one card of
+labelled rows, in a centred column `--zl-container-settings` wide. Compose
+`Page` + `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE`
+heading with no header gutter, then `SettingsCard`
+(`src/components/settings-card.tsx`) holding `Field` rows: 24px inset, 20px
+block, 16px between rows. No icon tile and no identity line: a settings screen
+is not a resource with an id.
+
+`DetailHeader` is the title row (a resource's icon tile, carrying the glyph of
+its sidebar entry, the title, a status beside it) over one identity line: the `meta`
+items, each value after its muted label, the id `copyable` and cut in the
+middle, a rule between items. A `labelHidden` item (a user's email) stands
+alone in the foreground. A screen whose list is not a sidebar entry (an
+identity provider, listed in a tab of Authentication) takes a `parent` link to
+that list, 8px over the title. The line stacks under `sm`. An `action` (a
+release's menu) sits at the right, beside the title and the line together.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
 | Page          | `Page` — 16px gutter, 20px top at `lg`, as every screen |
 | Header gutter | 24px — the page gutter plus 8px                        |
-| Title lockup  | 36px icon tile, 12px to a 24/24 display-face title     |
-| Header card   | 20px inset, 14px block, values centred on the rule     |
-| Body          | 24px under the header row                              |
+| Parent link   | 14/20 muted, 8px over the title row; only where the list is not in the sidebar |
+| Title row     | 24px icon tile (`ICON_PLATE`) on a resource, 8px to a 24/24 display-face title, status 8px after |
+| Identity line | 16px under the title row; 12/16, value 4px after its label, a 1px by 16px rule with 8px either side |
+| Body          | 36px under the identity line; 16px between its parts   |
+| Body card     | 24px inset, 20px block, 16px from title to rule to content; the 1px stroke is drawn inside the edge (`Card`'s inset outline), as the design draws it |
+| Labelled row  | 218px label rail from `sm`, stacked below; 20px line, 4px block; 16px either side of a zero-height rule between rows |
 
-The title's icon is the glyph the resource's sidebar entry carries, at stroke
-1.5. Tabs are the body's first element when a resource has more than one
-section (Users: Overview / Authentication); a single-section resource renders
-its cards directly. A new resource's detail screen composes this shell rather
-than measuring its own frame.
+Only resources (projects, teams, users, releases) carry the icon tile, the
+glyph their sidebar entry carries at stroke 1.5; configuration (user schemas,
+login flows, identity providers) has none. A value with no data behind it is
+left out of the identity line rather than shown empty. Tabs are the body's
+first element when a resource has more than one section (Users: Overview /
+Authentication); a single-section resource renders its cards directly. A new
+resource's detail screen composes this shell rather than measuring its own
+frame.
 
 ## Traps that have already cost time
 

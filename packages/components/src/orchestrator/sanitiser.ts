@@ -107,6 +107,11 @@ function buildAllowedAttrList(): string[] {
 /**
  * Returns a sanitiser bound to the current manifest registry. Callers should
  * cache the result; rebuilding is cheap but allocates a fresh DOMPurify config.
+ * The output is meant for the `<zitadel-login>` shadow root and DOM clobbering
+ * protection (`SANITIZE_DOM`) is off, so callers must not inject it into the
+ * document itself.
+ *
+ * @internal
  */
 export function createSanitiser(): (html: string) => string {
   const config: Config = {
@@ -117,13 +122,17 @@ export function createSanitiser(): (html: string) => string {
     FORBID_ATTR: ["onerror", "onclick", "onload", "onfocus", "onblur"],
     CUSTOM_ELEMENT_HANDLING: {
       tagNameCheck: CUSTOM_TAG_PATTERN,
-      attributeNameCheck: /^(?:[a-z][a-z0-9-]*)$/,
+      attributeNameCheck: /^(?!on)[a-z][a-z0-9-]*$/,
       allowCustomizedBuiltInElements: false,
     },
     KEEP_CONTENT: true,
     ALLOW_DATA_ATTR: true,
     ALLOW_ARIA_ATTR: true,
     RETURN_TRUSTED_TYPE: false,
+    // The output renders inside the <zitadel-login> shadow root, which document and window
+    // named access cannot reach, and <form>/<input> are forbidden above. The clobbering guard
+    // would otherwise drop common field names such as "name" or "title" (#2532).
+    SANITIZE_DOM: false,
   };
 
   return function sanitise(html: string): string {

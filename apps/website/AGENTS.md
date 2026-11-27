@@ -1,7 +1,8 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/` and its changelog at `/changelog`, with
-a page per entry and a feed under it.
+The hosted cloud's front page at `/`, its changelog at `/changelog`, with a
+page per entry and a feed under it, and the guide to choosing it or Zitadel v4
+at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says the benefit, then proves it, and nothing else: the
@@ -61,9 +62,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   CSS keyframes in `app/globals.css`. A hover plays it once to the end, and
   with `autoplay` it also plays now and then by itself (the header's and the
   footer's); never for reduced motion. Give each copy its own `id`.
-- `apps/docs/components/logo.tsx` is a copy; change the copies together.
-- `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the
-  console and the docs link the same set, so a change here reaches them. A single `/favicon.ico` cannot replace the light/dark set.
+- `apps/docs/components/logo.tsx` and `apps/console/src/app-shell/logo.tsx` are
+  copies; change the copies together.
+- `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the docs
+  link the same set, so a change here reaches them. `apps/console/public/favicons/`
+  is a copy; change the copies together. A single `/favicon.ico` cannot replace
+  the light/dark set.
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
   host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
@@ -91,7 +95,7 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - Every window is `app/window.tsx` and every command line
   `app/command-line.tsx`; colors come from the `@theme` in `app/globals.css`.
 - Next resolves `@zitadel/components` to its `dist/`, so `build` and `dev`
-  depend on `components:build` in moon and in turbo.
+  depend on `@zitadel/components#build`.
 
 ## The changelog
 
@@ -100,8 +104,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   every change of each version; never list them all here.
 - `app/changelog/entries.ts` reads the entries when the site builds, and finds
   the release that ships each one's pull requests in the published packages'
-  `CHANGELOG.md`, which `build` lists as inputs in `moon.yml` and
-  `turbo.json`. A broken entry fails the build.
+  `CHANGELOG.md`, which `build` lists as inputs in `turbo.json`. A broken
+  entry fails the build.
 - Render an entry's Markdown only through `app/changelog/markdown.tsx`, as
   elements and never as HTML: this origin also serves the console's session.
   The feed carries each entry's plain-text summary instead.
@@ -113,6 +117,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - Send a custom event only through `app/analytics.ts`, and list it in
   [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
+
+## Choose a version
+
+- `app/choose-version/features.ts` holds every row, the guide above them
+  (`CHOOSE`) and the date shown (`UPDATED`). Change all three when a feature
+  ships or changes.
 
 ## Routing
 
@@ -128,12 +138,16 @@ nothing serves ([ADR 076](../../docs/adrs/076-error-pages-and-unmatched-routes.m
   which Next serves at the root.
 - Link another app with a plain `<a>` (`app/links.ts`), never `next/link`.
 - `/llms.txt` (`app/llms.txt/route.ts`) links paths on the same host.
+- `/robots.txt` and `/sitemap.xml` (`app/crawlers.ts`) speak for the whole
+  host; only production's build lets crawlers in. List a new page there.
+- `/.well-known/security.txt` redirects to zitadel.com's (`next.config.ts`),
+  the source `SECURITY.md` names; never serve a copy.
 
 ## Checks
 
 ```sh
-moon run website:typecheck website:lint website:test website:build
-moon run website:start   # the build on port 3004
+turbo run typecheck lint test build --filter=@zitadel/website
+turbo run start --filter=@zitadel/website   # the build on port 3004
 ```
 
 Vercel runs `turbo run build --filter=@zitadel/website`; the build's key

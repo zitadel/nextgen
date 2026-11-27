@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Change } from "../../../../src/lib/git/change";
+import { Change } from "@/lib/git/change";
 
 describe("Change.listedIn", () => {
   it("reads each status and path", () => {

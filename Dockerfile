@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.7
 #
-# Consumed by Moon release tasks. They pre-build the cross-compiled `nextgen`
-# binary for each platform and place it at `$TARGETPLATFORM/nextgen`
-# (for example, `linux/amd64/nextgen`) in the Docker build context.
+# Consumed by the release scripts (scripts/release-artifacts.mjs) and the
+# local runtime image. They pre-build the cross-compiled `nextgen` binary for
+# each platform and place it at `$TARGETPLATFORM/nextgen` (for example,
+# `linux/amd64/nextgen`) in the Docker build context.
 FROM debian:12-slim
 ARG TARGETPLATFORM
 

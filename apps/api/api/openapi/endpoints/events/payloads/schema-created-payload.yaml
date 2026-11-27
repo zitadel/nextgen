@@ -1,0 +1,17 @@
+title: SchemaCreatedPayload
+type: object
+description: |
+  Payload for `schema.created`. It leaves out the schema document, which the
+  customer writes and which has no size bound; the event's `entity_id`
+  identifies the schema that was created.
+properties:
+  kind:
+    type: string
+    description: |
+      The kind the stored document declares. `unknown` when the schema was
+      stored without parsing its document.
+  object_type:
+    type: string
+    description: |
+      The customer-chosen object type the schema describes. Absent when the
+      document declares none.

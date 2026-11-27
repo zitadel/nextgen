@@ -24,10 +24,10 @@ Create `src/middleware.ts` and register it via the `solidStart()` plugin in
 ```ts
 // src/middleware.ts
 import { createMiddleware } from '@solidjs/start/middleware';
-import { createNextgenMiddleware } from '@zitadel/sdk-solid-start/server';
+import { createZitadelMiddleware } from '@zitadel/sdk-solid-start/server';
 
 export default createMiddleware(
-  createNextgenMiddleware({
+  createZitadelMiddleware({
     protectedRoutes: ['/admin', '/dashboard*'],
     loginPath: '/login',
   }),
@@ -40,7 +40,7 @@ them only to override.
 
 SolidStart 2 registers this module's default export as an array of h3
 middleware, so the config must be wrapped in SolidStart's `createMiddleware`.
-Exporting the bare `createNextgenMiddleware(...)` object registers nothing and
+Exporting the bare `createZitadelMiddleware(...)` object registers nothing and
 `/__nextgen/*` 404s.
 
 ```ts
@@ -60,17 +60,17 @@ The middleware runs on every request and does three things in one pass:
    is attached as the bearer only on the `POST /sessions/exchange` handoff, and
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
-   result to `event.locals.nextgenAuth`.
+   result to `event.locals.zitadelAuth`.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 To compose with your own handlers, spread the config's `onRequest`:
 
 ```ts
 import { createMiddleware } from '@solidjs/start/middleware';
-import { createNextgenMiddleware } from '@zitadel/sdk-solid-start/server';
+import { createZitadelMiddleware } from '@zitadel/sdk-solid-start/server';
 
 export default createMiddleware({
-  onRequest: [...createNextgenMiddleware({ /* … */ }).onRequest, myOnRequest],
+  onRequest: [...createZitadelMiddleware({ /* … */ }).onRequest, myOnRequest],
 });
 ```
 
@@ -125,24 +125,20 @@ export default function Profile() {
 
 ### 3. Render the login widget
 
-Install the Solid component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-solid-start` is server-only; the widget comes from `@zitadel/sdk-solid`:
-
-```bash
-pnpm add @zitadel/sdk-solid@latest
-```
+Render `ZitadelLogin` from `@zitadel/sdk-solid-start/components`. It re-exports the widgets of
+`@zitadel/sdk-solid`, so this one package is all the app installs.
 
 Load it with SolidStart's `clientOnly`, so the widget is created in the browser
 with its config in place: its config is set as element properties, which
 server-rendered markup cannot carry. `clientOnly` also keeps
-`@zitadel/sdk-solid`, which registers the custom elements when its module is
+`@zitadel/sdk-solid-start/components`, which registers the custom elements when its module is
 imported, out of the server render:
 
 ```tsx
 import { clientOnly } from '@solidjs/start';
 
 const ZitadelLogin = clientOnly(() =>
-  import('@zitadel/sdk-solid').then((m) => ({ default: m.ZitadelLogin })),
+  import('@zitadel/sdk-solid-start/components').then((m) => ({ default: m.ZitadelLogin })),
 );
 
 export default function Login() {
@@ -158,8 +154,8 @@ export default function Login() {
 ```
 
 Pass `projectId` / `proxyPath` as props rather than a `configureZitadel`
-handle: building the handle means importing `@zitadel/sdk-solid` at module
-scope, outside the client-only boundary.
+handle: building the handle means importing `@zitadel/sdk-solid-start/components` at
+module scope, outside the client-only boundary.
 
 `ZitadelSession` renders the signed-in "signed in as" card with a sign-out
 button, and `ZitadelLogout` a sign-out control on its own. Load them the same
@@ -167,7 +163,7 @@ way:
 
 ```tsx
 const ZitadelSession = clientOnly(() =>
-  import('@zitadel/sdk-solid').then((m) => ({ default: m.ZitadelSession })),
+  import('@zitadel/sdk-solid-start/components').then((m) => ({ default: m.ZitadelSession })),
 );
 
 export default function Profile() {
@@ -185,11 +181,11 @@ The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
 `onSignout` on `ZitadelLogout` and `ZitadelSession`. To show work-email copy for
 a business audience, pass `locales={businessLocales}`; both come from
-`@zitadel/sdk-solid`, so wrap the widget inside the `clientOnly` loader:
+`@zitadel/sdk-solid-start/components`, so wrap the widget inside the `clientOnly` loader:
 
 ```tsx
 const ZitadelLogin = clientOnly(() =>
-  import('@zitadel/sdk-solid').then(({ ZitadelLogin: Login, businessLocales }) => ({
+  import('@zitadel/sdk-solid-start/components').then(({ ZitadelLogin: Login, businessLocales }) => ({
     default: (props: ComponentProps<typeof Login>) => (
       <Login {...props} locales={businessLocales} />
     ),
@@ -198,6 +194,8 @@ const ZitadelLogin = clientOnly(() =>
 ```
 
 ## Middleware options
+
+An empty `url` or `projectSecret`, whether in the options or in the environment, counts as unset and falls back to the next source and then to the default (`http://localhost:8080` for `url`). `projectSecret` is a plain option of every server SDK. A route in `protectedRoutes` matches the raw path and the percent-decoded path, so `/%61dmin` is protected like `/admin`.
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
@@ -214,3 +212,9 @@ const ZitadelLogin = clientOnly(() =>
 | `jwksTimeoutMs`     | `number`             | `5000`                       | Timeout in ms for JWKS endpoint requests                            |
 | `proxyTimeoutMs`    | `number`             | `5000`                       | Timeout in ms for upstream proxy requests                           |
 | `audience`          | `string \| string[]` | not validated                | Expected `aud` claim value(s)                                       |
+
+A signed-out request for a protected route is redirected with an absolute URL on the origin of the request, such as `https://app.example.com/login?next=%2Fadmin`. The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them from the request only when the client sent none. It cannot tell a trusted CDN or load balancer from a client, and the server builds the OAuth issuer and the `Secure` decision for session cookies from those headers, so strip them at the edge when clients can reach the app directly.
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

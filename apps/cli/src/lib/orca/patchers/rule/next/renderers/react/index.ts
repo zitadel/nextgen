@@ -1,5 +1,5 @@
-import { MANAGED_MARKER } from "../../../../../../paths";
-import type { RendererSpec } from "../types";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import type { RendererSpec } from "@/lib/orca/patchers/rule/next/renderers/types";
 
 /**
  * The Next.js App Router renderer scaffolds `/login`, `/register`, and
@@ -98,7 +98,7 @@ ${PAGE_WRAPPER_COMMENT}`;
       const wrapperClose = widget ? `</div>` : `</main>`;
       return {
         mode,
-        contents: `${MANAGED_MARKER}
+        contents: `${ManagedFile.MARKER}
 "use client";
 
 import dynamic from "next/dynamic";
@@ -165,7 +165,7 @@ ${PAGE_WRAPPER_COMMENT}`;
         : PAGE_WRAPPER_OPEN;
       const wrapperClose = widget ? `</div>` : `</main>`;
       return {
-        contents: `${MANAGED_MARKER}
+        contents: `${ManagedFile.MARKER}
 "use client";
 
 import dynamic from "next/dynamic";
@@ -210,7 +210,7 @@ ${postureComment}
     },
     customElementsDts() {
       return {
-        contents: `${MANAGED_MARKER}
+        contents: `${ManagedFile.MARKER}
 // React JSX declarations for the <zitadel-*> custom elements ship with the
 // SDK, so the scaffold stays aligned with the real element surface instead
 // of carrying a hand-maintained copy that drifts.

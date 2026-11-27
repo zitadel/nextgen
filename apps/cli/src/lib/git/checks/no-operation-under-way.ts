@@ -1,5 +1,5 @@
-import type { Git } from "../git";
-import type { Check } from "../operation";
+import type { Git } from "@/lib/git/git";
+import type { Check } from "@/lib/git/operation";
 
 /**
  * No merge, rebase, cherry-pick, revert or bisect is under way, so a commit lands where meant.
@@ -26,9 +26,13 @@ export class NoOperationUnderWay implements Check {
       { marker: "REVERT_HEAD", name: "a revert" },
       { marker: "BISECT_LOG", name: "a bisect" },
     ];
-    const args = operations.flatMap((operation) => ["--git-path", operation.marker]);
+    const args = operations.flatMap((operation) => {
+      return ["--git-path", operation.marker];
+    });
     const paths = (await git.run(["rev-parse", ...args])).text().split("\n");
-    const found = operations.find((_, index) => git.exists(paths[index] ?? ""));
+    const found = operations.find((_, index) => {
+      return git.exists(paths[index] ?? "");
+    });
     if (found === undefined) {
       return null;
     }

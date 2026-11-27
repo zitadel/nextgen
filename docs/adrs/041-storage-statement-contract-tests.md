@@ -8,8 +8,8 @@
 ## Decision
 
 Shared behavioral integration tests for v2 statement implementations live in
-[`internal/storage/stmttest`](../../internal/storage/stmttest/). They
-assert domain-visible behavior through [`service.AllStatements`](../../internal/service/statement.go),
+[`internal/storage/stmttest`](../../apps/api/internal/storage/stmttest/). They
+assert domain-visible behavior through [`service.AllStatements`](../../apps/api/internal/service/statement.go),
 not dialect SQL strings.
 
 ## Context
@@ -28,8 +28,8 @@ boundary without pulling in unrelated orchestration.
 - **`forEachDialect`:** suite cases call `forEachDialect(t, fn)` so the body
   runs once per dialect as a subtest (`postgres`, `spanner`, `sqlite`); use
   normal `t.Run` for case names inside.
-- **CI:** still one tag per job (`server:test-postgres` /
-  `server:test-spanner` / `server:test-sqlite`). Locally, multiple tags may be
+- **CI:** still one tag per task (`@zitadel/server`'s `test:postgres` /
+  `test:spanner` / `test:sqlite`). Locally, multiple tags may be
   set in one process.
 - **Assertions:** domain fields, list/filter/cursor behavior, and typed
   integrity errors (`database.ForeignKeyError`, etc.). No live cross-dialect
@@ -43,5 +43,5 @@ boundary without pulling in unrelated orchestration.
 - New portable statement behavior should gain a `stmttest` case (or extend an
   existing one) rather than only a dialect-package copy.
 - Engine-specific proof stays next to the engine.
-- Bring-up uses [`dbtest.Pool`](../../internal/storage/dbtest/dbtest.go)
+- Bring-up uses [`dbtest.Pool`](../../apps/api/internal/storage/dbtest/dbtest.go)
   (`database.Pool` + `service.Pool`).

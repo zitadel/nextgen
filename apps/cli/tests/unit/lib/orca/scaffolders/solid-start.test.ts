@@ -4,12 +4,9 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { SolidStartScaffolder } from "../../../../../src/lib/orca/scaffolders/solid-start";
-import {
-  SUPPORTED_NODE,
-  describeNodeEngines,
-  scaffoldingCalls,
-} from "../../../../helpers/node-engines";
+import { frameworkCli } from "@/lib/orca/scaffolders/framework-clis";
+import { SolidStartScaffolder } from "@/lib/orca/scaffolders/solid-start";
+import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn() }));
@@ -36,7 +33,7 @@ describe("SolidStartScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "-y",
-      "create-solid@latest",
+      frameworkCli("create-solid"),
       ".",
       "basic",
       "--solidstart",
@@ -53,7 +50,7 @@ describe("SolidStartScaffolder", () => {
     make: (node, platform) => new SolidStartScaffolder(node, platform),
     framework: "solid-start",
     label: "create-solid",
-    spec: "create-solid@latest",
+    spec: frameworkCli("create-solid"),
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],

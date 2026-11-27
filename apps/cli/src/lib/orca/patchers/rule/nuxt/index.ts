@@ -1,12 +1,11 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "../../../../public-cli";
-import { configCandidates } from "../config-paths";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { devScriptPortOp } from "../dev-script-port";
-import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
+import { configCandidates } from "@/lib/orca/patchers/rule/config-paths";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { nuxtConfigEdit } from "./nuxt-config";
 import {
   appVueTemplate,
@@ -46,7 +45,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
-    const src = (rel: string) => join(ctx.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(ctx.framework.appDir, rel);
+    };
     return [
       // app.vue/pages/plugins live under the Nuxt srcDir (`app/`, or the root for a root-layout app); nuxt.config,
       // env, and the dep stay at the project root.
@@ -82,7 +83,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
       // `nuxt dev` takes its port from the command line only, so without this
       // the app can serve a port the project does not allow as an origin.
@@ -91,7 +92,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
   }
 
   protected routeFiles(view: PatchView): ReadonlyArray<string> {
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     return [
       src("app.vue"),
       src("pages/index.vue"),
@@ -106,7 +109,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
   protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
     // Written only when setup created the app skeleton itself; on a
     // pre-existing app the shell and homepage stay user-owned (see routeOps).
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     // The retired plugins exist only in apps an older setup wrote.
     return [
       src("app.vue"),

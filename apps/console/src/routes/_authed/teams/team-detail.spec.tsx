@@ -62,10 +62,9 @@ describe("team detail", () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team({ status: "deactivated" }))));
     await renderDetail();
 
-    // The status sits on the detail as well as the list, so a deactivated team
-    // reads as deactivated on its own screen.
+    // The status sits on the detail as well as the list, in the list's word.
     await screen.findByRole("heading", { name: "Acme Web" });
-    expect(screen.getByText("deactivated")).toBeInTheDocument();
+    expect(screen.getByText("Inactive")).toBeInTheDocument();
   });
 
   it("leaves out the primary domain the API does not carry", async () => {
@@ -83,7 +82,8 @@ describe("team detail", () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     await renderDetail();
 
-    const field = await screen.findByLabelText("Tenant name");
+    const field = await screen.findByLabelText("Team name");
+    expect(screen.getByRole("heading", { name: "Team details" })).toBeInTheDocument();
     const save = screen.getByRole("button", { name: "Save" });
     expect(save).toBeDisabled();
 
@@ -102,7 +102,7 @@ describe("team detail", () => {
     );
     await renderDetail();
 
-    const field = await screen.findByLabelText("Tenant name");
+    const field = await screen.findByLabelText("Team name");
     await userEvent.clear(field);
     await userEvent.type(field, "Acme Group");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -126,7 +126,7 @@ describe("team detail", () => {
     const switcher = await screen.findByRole("button", { name: "Switch team" });
     await waitFor(() => expect(switcher).toHaveTextContent("Acme Web"));
 
-    const field = await screen.findByLabelText("Tenant name");
+    const field = await screen.findByLabelText("Team name");
     await userEvent.clear(field);
     await userEvent.type(field, "Acme Group");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));

@@ -1,4 +1,4 @@
-import { createZitadelClient } from "@zitadel/api/client";
+import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";
 
 import { applyAppEnvTemplate, nextAppEnv } from "./app-env";
 import { bootstrapProject, type BootstrapProjectOptions } from "./bootstrap";
@@ -15,7 +15,13 @@ export type StartLocalZitadelOptions = BootServerOptions & Omit<BootstrapProject
  * file) and, later, for seeding remote instances.
  */
 export function connectZitadel(handle: InstanceHandle): ConnectedZitadel {
-  const api = createZitadelClient({ baseUrl: handle.baseUrl, token: handle.projectSecret });
+  const api = createZitadelApi(
+    new ZitadelClient({
+      baseUrl: handle.baseUrl,
+      token: handle.projectSecret,
+      allowDestructive: true,
+    }),
+  );
   const context = { projectId: handle.projectId, schemaId: handle.schemaId };
   const connected: ConnectedZitadel = {
     handle,
@@ -85,7 +91,7 @@ export async function startLocalZitadel(
   };
 }
 
-export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
+export { applyAppEnvTemplate, nextAppEnv, viteAppEnv } from "./app-env";
 export type { AppEnvTemplate } from "./app-env";
 export { bootstrapProject } from "./bootstrap";
 export type { BootstrapProjectOptions, BootstrappedProject } from "./bootstrap";

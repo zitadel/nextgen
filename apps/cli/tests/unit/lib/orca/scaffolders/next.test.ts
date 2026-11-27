@@ -2,12 +2,9 @@ import { execaSync } from "execa";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { NextScaffolder } from "../../../../../src/lib/orca/scaffolders/next";
-import {
-  SUPPORTED_NODE,
-  describeNodeEngines,
-  scaffoldingCalls,
-} from "../../../../helpers/node-engines";
+import { frameworkCli } from "@/lib/orca/scaffolders/framework-clis";
+import { NextScaffolder } from "@/lib/orca/scaffolders/next";
+import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn() }));
 const mockSpawn = vi.mocked(execaSync);
@@ -31,7 +28,7 @@ describe("NextScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "--yes",
-      "create-next-app@16.4.2",
+      frameworkCli("create-next-app"),
       ".",
       "--ts",
       "--app",
@@ -77,7 +74,7 @@ describe("NextScaffolder", () => {
     make: (node, platform) => new NextScaffolder(node, platform),
     framework: "next",
     label: "create-next-app",
-    spec: "create-next-app@16.4.2",
+    spec: frameworkCli("create-next-app"),
     fallback: ">=20.9.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.9.0"],

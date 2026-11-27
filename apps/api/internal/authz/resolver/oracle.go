@@ -1,0 +1,395 @@
+package resolver
+
+import (
+	"time"
+
+	"github.com/zitadel/nextgen/internal/authz/compiler"
+	"github.com/zitadel/nextgen/internal/domain"
+)
+
+// Graph is an in-memory authz fact set for the L4 oracle.
+type Graph struct {
+	Closure     []compiler.Implication
+	Edges       []compiler.ExpressionEdge
+	Assignments []*domain.AuthzAssignment
+	Memberships []*domain.AuthzMembershipEdge
+	Resources   []*domain.ResourceScope
+	// ActiveUsers are the users whose status is active. Every path a user
+	// principal takes reads it in their home project (ADR 053 §4), the platform
+	// operator path in the platform project (ADR 075 §3). A user missing from
+	// it holds nothing.
+	ActiveUsers map[UserKey]bool
+}
+
+// UserKey names a user in its home project.
+type UserKey struct {
+	ProjectID string
+	UserID    string
+}
+
+// OracleCheck applies MVP rules: direct+closure, team membership expand, bounded TTU.
+func (g *Graph) OracleCheck(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID, objectType, relation string) bool {
+	home := domain.AuthzHomeProjectID(principalHomeProjectID, projectID)
+	if !g.principalActive(home, principalType, principalID) {
+		return false
+	}
+	now := time.Now()
+	if g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) {
+		return true
+	}
+	return g.ttuAllows(projectID, home, principalType, principalID, objectType, relation, now)
+}
+
+// OracleCheckParams applies OracleCheck, optional team/resource-scoped grant
+// arms (by-id Check), then the sk_team_ team constraint.
+func (g *Graph) OracleCheckParams(p domain.AuthzCheckParams) bool {
+	home := p.HomeProjectID()
+	if !g.principalActive(home, p.PrincipalType, p.PrincipalID) {
+		return false
+	}
+	now := time.Now()
+	allowed := g.OracleCheck(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation)
+	if !allowed && p.ResourceTeamID != "" {
+		allowed = g.closureAllowsScoped(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation, domain.AuthzScopeKindTeam, p.ResourceTeamID, now)
+	}
+	if !allowed && p.ResourceID != "" {
+		allowed = g.closureAllowsScoped(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation, domain.AuthzScopeKindResource, p.ResourceID, now)
+	}
+	if !allowed {
+		return false
+	}
+	return g.constraintTeamAllows(p)
+}
+
+// OracleList returns resource ids of kind authorized under project / team / resource scopes.
+func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID string, kind domain.ResourceKind, objectType, relation string) []string {
+	home := domain.AuthzHomeProjectID(principalHomeProjectID, projectID)
+	if !g.principalActive(home, principalType, principalID) {
+		return []string{}
+	}
+	now := time.Now()
+	projectWide := g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) ||
+		g.ttuAllows(projectID, home, principalType, principalID, objectType, relation, now)
+
+	out := make([]string, 0)
+	seen := map[string]struct{}{}
+	for _, r := range g.Resources {
+		if r.ProjectID != projectID || r.ResourceKind != kind {
+			continue
+		}
+		if !projectWide &&
+			!(r.TeamID != nil && g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindTeam, *r.TeamID, now)) &&
+			!g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindResource, r.ResourceID, now) {
+			continue
+		}
+		if _, ok := seen[r.ResourceID]; ok {
+			continue
+		}
+		seen[r.ResourceID] = struct{}{}
+		out = append(out, r.ResourceID)
+	}
+	return out
+}
+
+// OracleListParams applies OracleList, widened to every row of the kind for a
+// platform operator (ADR 075 §3), then the sk_team_ team constraint, which the
+// SQL applies to both halves of the list predicate.
+func (g *Graph) OracleListParams(p domain.AuthzListObjectsParams) []string {
+	var ids []string
+	if p.PlatformOperatorEligible() && g.OraclePlatformOperator(p.PlatformCheckParams()) {
+		ids = g.resourceIDs(p.ProjectID, p.ResourceKind)
+	} else {
+		ids = g.OracleList(p.ProjectID, p.HomeProjectID(), p.PrincipalType, p.PrincipalID, p.ResourceKind, p.ObjectType, p.Relation)
+	}
+	if p.ConstraintTeamID == "" {
+		return ids
+	}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if g.listedObjectInConstraintTeam(p, id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (g *Graph) constraintTeamAllows(p domain.AuthzCheckParams) bool {
+	if p.ConstraintTeamID == "" || p.ResourceID == "" {
+		return true
+	}
+	if p.ResourceID == p.ConstraintTeamID {
+		return true
+	}
+	if p.ResourceTeamID != "" && p.ResourceTeamID == p.ConstraintTeamID {
+		return true
+	}
+	return g.isMember(p.ProjectID, p.ConstraintTeamID, p.ResourceID)
+}
+
+func (g *Graph) listedObjectInConstraintTeam(p domain.AuthzListObjectsParams, id string) bool {
+	switch p.ResourceKind {
+	case domain.ResourceKindUser:
+		return g.isMember(p.ProjectID, p.ConstraintTeamID, id)
+	case domain.ResourceKindTeam:
+		return id == p.ConstraintTeamID
+	default:
+		for _, r := range g.Resources {
+			if r.ResourceID == id && r.TeamID != nil && *r.TeamID == p.ConstraintTeamID {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// OraclePlatformOperator mirrors CheckPlatformOperator (ADR 075 §3): a
+// tuple-to-userset edge on the implied platform tupleset whose relation closes
+// to the checked one, a direct, active user assignment in the platform project
+// that closes to the edge's source, and the user active there.
+func (g *Graph) OraclePlatformOperator(p domain.AuthzPlatformCheckParams) bool {
+	if !g.ActiveUsers[UserKey{ProjectID: p.PlatformProjectID, UserID: p.UserID}] {
+		return false
+	}
+	now := time.Now()
+	for _, edge := range g.Edges {
+		if edge.Kind != compiler.TermTupleToUserset ||
+			edge.Tupleset.Type != edge.Target.Type ||
+			edge.Tupleset.Name != domain.AuthzTuplesetPlatform ||
+			edge.Source.Type != domain.AuthzObjectTypePlatform ||
+			!g.implies(edge.Target.Type, edge.Target.Name, p.ObjectType, p.Relation) {
+			continue
+		}
+		for _, a := range g.Assignments {
+			if a.ProjectID == p.PlatformProjectID && assignmentActive(a, now) &&
+				a.ScopeKind == domain.AuthzScopeKindProject &&
+				a.PrincipalType == domain.AuthzPrincipalTypeUser && a.PrincipalID == p.UserID &&
+				g.implies(a.ObjectType, a.Relation, edge.Source.Type, edge.Source.Name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// resourceIDs lists every resource of kind in the project, once each.
+func (g *Graph) resourceIDs(projectID string, kind domain.ResourceKind) []string {
+	out := make([]string, 0)
+	seen := map[string]struct{}{}
+	for _, r := range g.Resources {
+		if r.ProjectID != projectID || r.ResourceKind != kind {
+			continue
+		}
+		if _, ok := seen[r.ResourceID]; ok {
+			continue
+		}
+		seen[r.ResourceID] = struct{}{}
+		out = append(out, r.ResourceID)
+	}
+	return out
+}
+
+// OracleFoothold mirrors HasAuthzProjectFoothold.
+// homeProjectID is the membership-edge project (empty falls back to projectID).
+func (g *Graph) OracleFoothold(projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) bool {
+	home := domain.AuthzHomeProjectID(homeProjectID, projectID)
+	if !g.principalActive(home, principalType, principalID) {
+		return false
+	}
+	now := time.Now()
+	for _, a := range g.Assignments {
+		if a.ProjectID != projectID || !assignmentActive(a, now) {
+			continue
+		}
+		if g.principalMatches(home, principalType, principalID, a) {
+			return true
+		}
+	}
+	if principalType != domain.AuthzPrincipalTypeUser {
+		return false
+	}
+	for _, e := range g.Memberships {
+		if e.ProjectID == projectID && e.MemberType == domain.AuthzMemberTypeUser && e.MemberID == principalID {
+			return true
+		}
+	}
+	return false
+}
+
+// OracleFootholdParams mirrors the foothold column of CheckAuthz: with a
+// target (ResourceID) only a path that could cover it counts (an assignment
+// scoped project-wide, to ResourceTeamID or to ResourceID, a membership in the
+// target team or the target's team, or the user's own record); without one it
+// is OracleFoothold.
+func (g *Graph) OracleFootholdParams(p domain.AuthzCheckParams) bool {
+	if p.ResourceID == "" {
+		return g.OracleFoothold(p.ProjectID, p.PrincipalHomeProjectID, p.PrincipalType, p.PrincipalID)
+	}
+	home := p.HomeProjectID()
+	if !g.principalActive(home, p.PrincipalType, p.PrincipalID) {
+		return false
+	}
+	isUser := p.PrincipalType == domain.AuthzPrincipalTypeUser
+	if isUser && p.ResourceID == p.PrincipalID {
+		return true
+	}
+	now := time.Now()
+	for _, a := range g.Assignments {
+		if a.ProjectID != p.ProjectID || !assignmentActive(a, now) || !assignmentCoversTarget(a, p) {
+			continue
+		}
+		if g.principalMatches(home, p.PrincipalType, p.PrincipalID, a) {
+			return true
+		}
+	}
+	if !isUser {
+		return false
+	}
+	for _, e := range g.Memberships {
+		if e.ProjectID == p.ProjectID && e.MemberType == domain.AuthzMemberTypeUser && e.MemberID == p.PrincipalID &&
+			e.SetType == domain.AuthzSetTypeTeam && (e.SetID == p.ResourceID || (p.ResourceTeamID != "" && e.SetID == p.ResourceTeamID)) {
+			return true
+		}
+	}
+	return false
+}
+
+func assignmentCoversTarget(a *domain.AuthzAssignment, p domain.AuthzCheckParams) bool {
+	switch a.ScopeKind {
+	case domain.AuthzScopeKindProject:
+		return true
+	case domain.AuthzScopeKindTeam:
+		return p.ResourceTeamID != "" && a.ScopeTeamID != nil && *a.ScopeTeamID == p.ResourceTeamID
+	case domain.AuthzScopeKindResource:
+		return a.ScopeResourceID != nil && *a.ScopeResourceID == p.ResourceID
+	default:
+		return false
+	}
+}
+
+func (g *Graph) closureAllowsScoped(projectID, home string, pType domain.AuthzPrincipalType, pID, objectType, relation string, scope domain.AuthzScopeKind, scopeID string, now time.Time) bool {
+	for _, a := range g.Assignments {
+		if a.ProjectID != projectID || !assignmentActive(a, now) || a.ScopeKind != scope {
+			continue
+		}
+		switch scope {
+		case domain.AuthzScopeKindTeam:
+			if a.ScopeTeamID == nil || *a.ScopeTeamID != scopeID {
+				continue
+			}
+		case domain.AuthzScopeKindResource:
+			if a.ScopeResourceID == nil || *a.ScopeResourceID != scopeID {
+				continue
+			}
+		}
+		if !g.implies(a.ObjectType, a.Relation, objectType, relation) {
+			continue
+		}
+		if g.principalMatches(home, pType, pID, a) {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Graph) ttuAllows(projectID, home string, pType domain.AuthzPrincipalType, pID, objectType, relation string, now time.Time) bool {
+	for _, edge := range g.Edges {
+		// The edge answers every relation its own relation closes to, the
+		// same way a direct assignment does (mirrors writeFullTTUExists).
+		if edge.Kind != compiler.TermTupleToUserset ||
+			edge.Target.Type != objectType ||
+			!g.implies(edge.Target.Type, edge.Target.Name, objectType, relation) {
+			continue
+		}
+		for _, ts := range g.Assignments {
+			if ts.ProjectID != projectID || !assignmentActive(ts, now) ||
+				ts.ObjectType != edge.Tupleset.Type || ts.Relation != edge.Tupleset.Name ||
+				ts.PrincipalType.String() != edge.Source.Type {
+				continue
+			}
+			if edge.Source.Type == "team" && edge.Source.Name == "member" &&
+				ts.PrincipalType == domain.AuthzPrincipalTypeTeam &&
+				pType == domain.AuthzPrincipalTypeUser &&
+				g.isMember(home, ts.PrincipalID, pID) {
+				return true
+			}
+			for _, a := range g.Assignments {
+				if a.ProjectID != projectID || !assignmentActive(a, now) ||
+					!g.implies(a.ObjectType, a.Relation, edge.Source.Type, edge.Source.Name) ||
+					!g.principalMatches(home, pType, pID, a) {
+					continue
+				}
+				switch a.ScopeKind {
+				case domain.AuthzScopeKindTeam:
+					if a.ScopeTeamID != nil && *a.ScopeTeamID == ts.PrincipalID {
+						return true
+					}
+				case domain.AuthzScopeKindResource:
+					if a.ScopeResourceID != nil && *a.ScopeResourceID == ts.PrincipalID {
+						return true
+					}
+				case domain.AuthzScopeKindProject:
+					if a.ObjectType == edge.Source.Type {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (g *Graph) implies(fromType, fromRel, toType, toRel string) bool {
+	for _, impl := range g.Closure {
+		if impl.Source.Type == fromType && impl.Source.Name == fromRel &&
+			impl.Implied.Type == toType && impl.Implied.Name == toRel {
+			return true
+		}
+	}
+	return fromType == toType && fromRel == toRel
+}
+
+// principalActive mirrors writePrincipalActiveAnd: a user principal counts only
+// while active in their home project (ADR 053 §4). Other principal types have
+// no user row to read.
+func (g *Graph) principalActive(home string, pType domain.AuthzPrincipalType, pID string) bool {
+	return pType != domain.AuthzPrincipalTypeUser || g.ActiveUsers[UserKey{ProjectID: home, UserID: pID}]
+}
+
+func (g *Graph) principalMatches(home string, pType domain.AuthzPrincipalType, pID string, a *domain.AuthzAssignment) bool {
+	if a.PrincipalType == pType && a.PrincipalID == pID {
+		return true
+	}
+	if pType == domain.AuthzPrincipalTypeUser && a.PrincipalType == domain.AuthzPrincipalTypeTeam {
+		return g.isMember(home, a.PrincipalID, pID)
+	}
+	return false
+}
+
+func (g *Graph) isMember(projectID, teamID, userID string) bool {
+	for _, e := range g.Memberships {
+		if e.ProjectID == projectID &&
+			e.SetType == domain.AuthzSetTypeTeam && e.SetID == teamID &&
+			e.MemberType == domain.AuthzMemberTypeUser && e.MemberID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func assignmentActive(a *domain.AuthzAssignment, now time.Time) bool {
+	if a.RevokedAt != nil {
+		return false
+	}
+	if a.ExpiresAt != nil && !a.ExpiresAt.After(now) {
+		return false
+	}
+	return true
+}
+
+// GraphFromPersisted builds an oracle graph catalog fragment from compiler output.
+func GraphFromPersisted(catalog compiler.PersistedCatalog) Graph {
+	return Graph{
+		Closure: catalog.Closure,
+		Edges:   catalog.ExpressionEdges,
+	}
+}

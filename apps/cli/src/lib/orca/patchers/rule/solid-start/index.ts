@@ -1,11 +1,10 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "../../../../public-cli";
-import { configCandidates } from "../config-paths";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { devScriptPortOp } from "../dev-script-port";
+import { configCandidates } from "@/lib/orca/patchers/rule/config-paths";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
 import { solidStartConfigEdit } from "./vite-config";
 import {
   indexPageTemplate,
@@ -17,10 +16,10 @@ import {
 
 const SDK_DEPENDENCY = "@zitadel/sdk-solid-start";
 /**
- * The idiomatic Solid component library that ships the `<ZitadelLogin>` /
- * `<ZitadelSession>` Solid components the routes render. The server SDK above is
- * plumbing only; the widget comes from here, so a SolidStart app gets the native
- * Solid component (typed props, callback events) rather than the bare element.
+ * The Solid UI SDK behind the widgets. The routes import the widgets from
+ * `@zitadel/sdk-solid-start/components`, which re-exports this package, yet the
+ * app still declares it as a direct dependency: Solid's Vite plugin finds the
+ * Solid libraries to compile in the app's own `package.json`.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-solid";
 
@@ -29,13 +28,14 @@ const VITE_CONFIG_PATHS = configCandidates("vite.config");
 /**
  * Rule-based patcher for a SolidStart app. Like Next.js and Nuxt, SolidStart
  * proxies the backend and verifies the session through server middleware — here
- * the `@zitadel/sdk-solid-start` `createNextgenMiddleware` in `src/middleware.ts`,
+ * the `@zitadel/sdk-solid-start` `createZitadelMiddleware` in `src/middleware.ts`,
  * registered via the `solidStart({ middleware })` plugin option in a
  * non-destructive `vite.config.*` edit (SolidStart 2 reads middleware from the
  * Vite plugin, not a top-level `app.config.ts` field). Contributes the
  * landing/login/register/profile file-based routes (the idiomatic
- * `<ZitadelLogin>`/`<ZitadelSession>` Solid components from `@zitadel/sdk-solid`),
- * the public project-id env var, and both deps.
+ * `<ZitadelLogin>`/`<ZitadelSession>` Solid components from
+ * `@zitadel/sdk-solid-start/components`), the public project-id env var, and
+ * both deps.
  */
 export class SolidStartPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
@@ -47,7 +47,9 @@ export class SolidStartPatcher extends AbstractRulePatcher {
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
-    const src = (rel: string) => join(ctx.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(ctx.framework.appDir, rel);
+    };
     return [
       // The auth boundary is written on every setup; a pre-existing middleware
       // at this exact path is a genuine conflict the file-writer refuses (and
@@ -83,18 +85,20 @@ export class SolidStartPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
       {
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
     ];
   }
 
   protected routeFiles(view: PatchView): ReadonlyArray<string> {
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     return [
       src("middleware.ts"),
       src("routes/index.tsx"),
@@ -130,7 +134,7 @@ export class SolidStartPatcher extends AbstractRulePatcher {
     return {
       title: "SolidStart integration",
       detail:
-        "Wrote src/middleware.ts (@zitadel/sdk-solid-start) plus landing/login/register/profile routes using @zitadel/sdk-solid components and wired the middleware via solidStart({ middleware }) in vite.config.*.",
+        "Wrote src/middleware.ts (@zitadel/sdk-solid-start) plus landing/login/register/profile routes that import the widgets from @zitadel/sdk-solid-start/components and wired the middleware via solidStart({ middleware }) in vite.config.*.",
     };
   }
 }

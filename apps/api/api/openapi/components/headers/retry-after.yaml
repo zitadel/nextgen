@@ -1,0 +1,9 @@
+description: |
+  Whole seconds to wait before retrying the request; at least 1. The server
+  sends it with every 429 it answers itself; a 429 from a proxy or edge in
+  front of it may come without one.
+required: false
+schema:
+  type: integer
+  minimum: 1
+example: 1

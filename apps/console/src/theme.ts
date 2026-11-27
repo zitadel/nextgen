@@ -12,6 +12,11 @@
  * The initial `data-theme` is applied by a tiny inline script in `index.html`
  * before React hydrates (no flash of the wrong theme). This module keeps it in
  * sync afterwards and reacts to OS changes while the preference is `system`.
+ *
+ * The theme is also declared to the browser, in `<meta name="color-scheme">`
+ * and `<meta name="theme-color">`: what a browser draws around the page (its
+ * toolbar, the overscroll area, the frame of a pane that embeds it) takes its
+ * colour from those, and is white beside a dark console without them.
  */
 import { useCallback, useEffect, useState } from "react";
 
@@ -43,7 +48,24 @@ export function resolveTheme(preference: ThemePreference): ResolvedTheme {
 }
 
 function apply(theme: ResolvedTheme): void {
-  document.documentElement.setAttribute("data-theme", theme);
+  const root = document.documentElement;
+  root.setAttribute("data-theme", theme);
+  setMeta("color-scheme", theme);
+  // The page background of the theme just set, read from the design tokens so
+  // no second copy of the colour lives here. Empty until the stylesheet loads.
+  const background = getComputedStyle(root).getPropertyValue("--zl-background").trim();
+  if (background) setMeta("theme-color", background);
+}
+
+/** Sets a `<meta name>` in the head, adding it when the page has none. */
+function setMeta(name: string, content: string): void {
+  let meta = document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = name;
+    document.head.append(meta);
+  }
+  meta.content = content;
 }
 
 export interface UseThemeResult {

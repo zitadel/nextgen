@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { HeadIsOnABranch } from "../../../../../src/lib/git/checks/head-is-on-a-branch";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { HeadIsOnABranch } from "@/lib/git/checks/head-is-on-a-branch";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 describe("HeadIsOnABranch", () => {
   it("passes when HEAD names a branch", async () => {

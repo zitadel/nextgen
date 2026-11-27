@@ -14,19 +14,47 @@ import { describe, expect, it } from "vitest";
  * is *called*, which is the part that reaches the analytics tools and cannot be
  * renamed later without breaking saved reports.
  */
-const commandsDir = join(import.meta.dirname, "../../../../src/commands/variable");
+const commandsDir = join(import.meta.dirname, "../../../../src/cli/commands/variable");
 
-/** The dimension names each command passes to `recordTelemetry`. */
+/** What a command's own directory holds beside its body, and never a command. */
+/**
+ * Every `variable` command's body: the file itself, or the `index.ts` of the
+ * directory a command becomes once it carries its own inputs. A file that
+ * declares no command, such as a validator several of them share, is not one.
+ */
+async function commandBodies(): Promise<Map<string, string>> {
+  const entries = await readdir(commandsDir, { withFileTypes: true });
+  const bodies = new Map<string, string>();
+  for (const entry of entries) {
+    const body = entry.isDirectory()
+      ? join(commandsDir, entry.name, "index.ts")
+      : join(commandsDir, entry.name);
+    if (!entry.isDirectory() && !entry.name.endsWith(".ts")) {
+      continue;
+    }
+    const source = await readFile(body, "utf8").catch(() => {
+      return "";
+    });
+    if (!source.includes("export default class")) {
+      continue;
+    }
+    bodies.set(entry.isDirectory() ? `${entry.name}.ts` : entry.name, body);
+  }
+  return bodies;
+}
+
+/** The dimension names each command passes to `annotate`. */
 async function recordedDimensions(): Promise<Map<string, string[]>> {
-  const files = (await readdir(commandsDir)).filter((name) => name.endsWith(".ts"));
   const entries = await Promise.all(
-    files.map(async (file) => {
-      const source = await readFile(join(commandsDir, file), "utf8");
-      const calls = [...source.matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
-      const keys = calls.flatMap((call) =>
-        [...(call[1] ?? "").matchAll(/(\w+)\s*:/g)].map((key) => key[1] as string),
-      );
-      return [file, keys] as const;
+    [...(await commandBodies())].map(async ([command, body]) => {
+      const source = await readFile(body, "utf8");
+      const calls = [...source.matchAll(/annotate\(\{([^}]*)\}/gs)];
+      const keys = calls.flatMap((call) => {
+        return [...(call[1] ?? "").matchAll(/(\w+)\s*:/g)].map((key) => {
+          return key[1] as string;
+        });
+      });
+      return [command, keys] as const;
     }),
   );
   return new Map(entries);

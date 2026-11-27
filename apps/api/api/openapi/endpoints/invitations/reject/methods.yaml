@@ -1,0 +1,68 @@
+post:
+  operationId: rejectInvitation
+  summary: Decline an invitation
+  description: |
+    Declines a pending invitation for the signed-in user and returns the
+    updated invitation with status `rejected`.
+
+    Send the plaintext token from the invitation link fragment. The
+    invitation keeps its metadata for administrators, but this response
+    returns `metadata` as null. The inviter cannot decline their own invitation; an administrator
+    cancels it instead. Every unknown or finished token answers the same
+    opaque `404`.
+    Authenticate with a platform-project user session cookie (`sessionCookie`).
+    Cookie requests follow that scheme's CSRF rules.
+  tags:
+    - Invitations
+  security:
+    - sessionCookie: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../invitation-token-request.yaml
+  responses:
+    '200':
+      description: The invitation was declined.
+      content:
+        application/json:
+          schema:
+            $ref: ../invitation.yaml
+    '400':
+      description: The request body was not acceptable.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid session.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: |
+        The inviter cannot decline their own invitation, or CSRF failed
+        (`auth.csrf_invalid`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Unknown or finished invitation token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: |
+        The user already has access to the project (`inv.already_member`,
+        with their strongest role as `details.details.relation`); the
+        invitation stays pending.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: rejectInvitation-error-response.yaml

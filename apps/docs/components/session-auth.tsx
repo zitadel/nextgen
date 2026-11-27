@@ -9,6 +9,8 @@ import {
 import { ShieldCheck, X } from "lucide-react";
 import { createContext, use, useEffect, useSyncExternalStore } from "react";
 
+import { SessionProjectPicker } from "./project-picker";
+
 // The playground sends a read that accepts the session cookie with the
 // reader's own session. On the cloud the docs, the Console and the API share
 // one origin (vercel.json), the spec's server is `/api/v1` on it (ADR 077),
@@ -151,29 +153,32 @@ function SessionNote() {
   const reads = isRead(useOperation());
 
   return (
-    <div className="flex gap-2 border-b px-4 py-2.5 text-xs text-fd-muted-foreground last:border-b-0">
-      <ShieldCheck className="mt-px size-3.5 shrink-0" />
-      <p className="min-w-0 flex-1 [&_a]:underline">
-        {!reads && readsOnly}
-        {reads && user === undefined && "Checking your session…"}
-        {reads && user === null && (
-          <>
-            Sign in to the <a href="/console/">Console</a> and this request is sent with your
-            session.
-          </>
-        )}
-        {reads && user && (
-          <>
-            Sent with your session to the API at{" "}
-            <span className="font-medium text-fd-foreground">{apiOrigin()}</span>, signed in as{" "}
-            <span className="font-medium text-fd-foreground">
-              {user.display ?? user.identifier ?? user.user_id}
-            </span>
-            .
-          </>
-        )}
-      </p>
-    </div>
+    <>
+      <div className="flex gap-2 border-b px-4 py-2.5 text-xs text-fd-muted-foreground last:border-b-0">
+        <ShieldCheck className="mt-px size-3.5 shrink-0" />
+        <p className="min-w-0 flex-1 [&_a]:underline">
+          {!reads && readsOnly}
+          {reads && user === undefined && "Checking your session…"}
+          {reads && user === null && (
+            <>
+              Sign in to the <a href="/console/">Console</a> and this request is sent with your
+              session.
+            </>
+          )}
+          {reads && user && (
+            <>
+              Sent with your session to the API at{" "}
+              <span className="font-medium text-fd-foreground">{apiOrigin()}</span>, signed in as{" "}
+              <span className="font-medium text-fd-foreground">
+                {user.display ?? user.identifier ?? user.user_id}
+              </span>
+              .
+            </>
+          )}
+        </p>
+      </div>
+      <SessionProjectPicker user={user} beforeRequest={withReaderSessionToListProjects} />
+    </>
   );
 }
 
@@ -215,6 +220,18 @@ export async function withReaderSession(
     );
   }
   return init;
+}
+
+// The picker's list of the reader's projects leaves as a read the session
+// authenticates, through the same account check as Send.
+const listMyProjects: PlaygroundOperation = {
+  method: "GET",
+  path: "/users/me/projects",
+  operation: { security: [{ [sessionScheme]: [] }] },
+};
+
+function withReaderSessionToListProjects(init: RequestInit): Promise<RequestInit> {
+  return withReaderSession(init, listMyProjects);
 }
 
 // The response panel's result. A request the playground did not send shows

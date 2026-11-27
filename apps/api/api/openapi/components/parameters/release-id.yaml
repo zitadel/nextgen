@@ -1,0 +1,8 @@
+name: release_id
+in: path
+required: true
+description: |
+  The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases` (`GET /releases`) lists.
+schema:
+  $ref: '../schemas/release-id.yaml'
+example: rel_01KX3RG8A7F0N9WD3P2E4YM5C1

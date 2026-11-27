@@ -1,4 +1,4 @@
-import { createZitadelClient } from "@zitadel/api/client";
+import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchemaBody,
@@ -36,36 +36,60 @@ const DEFAULT_PROJECT_NAME = "zitadel-testing";
  * bearer for everything else; the schema is uploaded without `$id` so the
  * server assigns an opaque id, which the flow must then reference.
  */
+/**
+ * A deployment needs a primary origin. A loopback origin is always admitted, so
+ * listing this one opens nothing up.
+ */
+const FALLBACK_APP_ORIGIN = "http://localhost:3000";
+
 export async function bootstrapProject(
   options: BootstrapProjectOptions,
 ): Promise<BootstrappedProject> {
   const { baseUrl } = options;
-  const unauthenticated = createZitadelClient({ baseUrl });
+  const unauthenticated = createZitadelApi(new ZitadelClient({ baseUrl, allowDestructive: true }));
   const project = await unauthenticated.createProject({
     name: options.projectName ?? DEFAULT_PROJECT_NAME,
-    origins: (options.appOrigins ?? []).map((pattern) => ({
-      pattern,
-      kind: "preview" as const,
-    })),
+    origins: (options.appOrigins?.length ? options.appOrigins : [FALLBACK_APP_ORIGIN]).map(
+      (pattern) => ({
+        pattern,
+        kind: "primary" as const,
+      }),
+    ),
     seed_defaults: false,
   });
-  const client = createZitadelClient({ baseUrl, token: project.project_secret });
+  const client = createZitadelApi(
+    new ZitadelClient({ baseUrl, token: project.project_secret, allowDestructive: true }),
+  );
 
   const schemaBody = getDefaultHumanUserSchemaBody({
     preset: options.preset,
     useCase: options.useCase,
   });
-  const schema = await client.createSchema(schemaBody, { project_id: project.id });
+  const schema = await client.publishSchema(schemaBody, { project_id: project.id });
 
   const flowBody = getDefaultLoginFlow({
     preset: options.preset,
     useCase: options.useCase,
   });
-  const flow = await client.createFlowDefinition({
+  const flow = await client.publishFlowDefinition({
     project_id: project.id,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
   });
+
+  const release = await client.createRelease(
+    {
+      pointers: [
+        { kind: "schema", revision_id: schema.id },
+        { kind: "flow_definition", revision_id: flow.id },
+      ],
+    },
+    { project_id: project.id },
+  );
+  await client.createDeployment(
+    { release_id: release.id, targets: "primary" },
+    { project_id: project.id },
+  );
 
   return {
     projectId: project.id,

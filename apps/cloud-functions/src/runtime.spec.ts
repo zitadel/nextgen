@@ -26,14 +26,24 @@ afterEach(() => {
 
 describe("starting a person's onboarding", () => {
   it("starts the CRM's even when every team has a Stripe customer, so HubSpot never waits on Stripe", async () => {
-    const team: Team = { id: "team_paid", name: "Paid", personal: false };
+    const team: Team = {
+      id: "team_paid",
+      name: "Paid",
+      personal: false,
+      joined_at: "2026-10-01T00:00:00Z",
+    };
     await onboardingSystems().stripe.ensureCustomer(team, MOCK_PERSON);
     expect(await ensure()(person("user_paid"), [team])).toBe(true);
     expect(started()).toEqual([provisionCrm]);
   });
 
   it("starts the CRM's before it asks Stripe, so a Stripe failure holds up only billing's", async () => {
-    const team: Team = { id: "team_stripe_down", name: "Down", personal: false };
+    const team: Team = {
+      id: "team_stripe_down",
+      name: "Down",
+      personal: false,
+      joined_at: "2026-10-01T00:00:00Z",
+    };
     vi.spyOn(onboardingSystems().stripe, "hasCustomer").mockRejectedValue(
       new Error("Stripe is down"),
     );
@@ -42,14 +52,24 @@ describe("starting a person's onboarding", () => {
   });
 
   it("hands the CRM's run the sign-up's source, for the contact it makes", async () => {
-    const team: Team = { id: "team_sourced", name: "Sourced", personal: true };
+    const team: Team = {
+      id: "team_sourced",
+      name: "Sourced",
+      personal: true,
+      joined_at: "2026-10-01T00:00:00Z",
+    };
     const sourced = person("user_sourced");
     await ensure()(sourced, [team], { via: "cli" });
     expect(vi.mocked(start).mock.calls[0]).toEqual([provisionCrm, [sourced, { via: "cli" }]]);
   });
 
   it("starts billing's for a team without a customer, and each only once per instance", async () => {
-    const team: Team = { id: "team_new", name: "New", personal: true };
+    const team: Team = {
+      id: "team_new",
+      name: "New",
+      personal: true,
+      joined_at: "2026-10-01T00:00:00Z",
+    };
     const newcomer = person("user_new");
     expect(await ensure()(newcomer, [team])).toBe(true);
     expect(started()).toEqual([provisionCrm, provisionBilling]);

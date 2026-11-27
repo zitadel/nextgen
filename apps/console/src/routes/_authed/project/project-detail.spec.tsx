@@ -17,18 +17,18 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
-// The page also reads the project's admins and grants for its admins tab (#1238,
-// #1462), its variables and its password policy; empty answers keep these tests
+// The project's Settings also read its members and grants on their Members page
+// (#1238, #2857), its variables and its password policy; empty answers keep these tests
 // about the project itself. The person can act on the project, so the context
 // switcher names it from their list rather than by its id while its own read is
 // in flight.
 beforeEach(() =>
   server.use(
-    http.get(`${PROJECT_URL}/admins`, () => HttpResponse.json({ admins: [] })),
+    http.get(`${PROJECT_URL}/members`, () => HttpResponse.json({ members: [] })),
     http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
     http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/v1/policies", () =>
-      HttpResponse.json({ policies: [], next_page_token: null }),
+    http.get("http://localhost/api/v1/deployments", () =>
+      HttpResponse.json({ deployments: [], next_page_token: null }),
     ),
     http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
@@ -59,11 +59,12 @@ describe("project detail", () => {
   it("opens the page a project link names, with that project selected", async () => {
     // `/projects/{id}` is kept for links that name a project; the page lives at
     // the scoped `/project`, so the sidebar and switcher follow the one named.
+    // Its Settings open on their first page, General (D40).
     server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
     const router = await renderDetail(`/projects/${PROJECT_ID}`);
 
     expect(await screen.findByRole("heading", { name: "River" })).toBeInTheDocument();
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/general"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
   });
 
@@ -75,6 +76,13 @@ describe("project detail", () => {
     expect(screen.getByText(PROJECT_ID)).toBeInTheDocument();
     expect(screen.getByText("Project ID")).toBeInTheDocument();
     expect(screen.getByText("Created")).toBeInTheDocument();
+  });
+
+  it("titles the card that holds the name for the project", async () => {
+    server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
+    await renderDetail();
+
+    expect(await screen.findByRole("heading", { name: "Project details" })).toBeInTheDocument();
   });
 
   it("leaves out the issuer the API does not carry", async () => {

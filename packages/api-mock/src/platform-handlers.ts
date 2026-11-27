@@ -25,57 +25,67 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { serverCanonicalFlow } from "./server-canonical-flow.js";
 
 import type {
-  AddOrigin201,
-  CompleteClaim200,
-  CreateFlowDefinition201,
+  AddProjectOrigin201,
+  CompleteProjectClaim200,
+  PublishFlowDefinition201,
   CreateProject201,
   CreateProject201OriginsItem,
-  CreateSchema201,
-  GetClaimWindow200,
-  GetClaimStatus200,
+  PublishSchema201,
+  GetProjectClaimWindow200,
+  GetProjectClaimStatus200,
   GetFlowDefinition200,
   GetProject200,
-  GetSchemaById200,
-  GetSchemaById200Schema,
-  InitClaim201,
+  GetSchema200,
+  GetSchema200Schema,
+  CreateProjectClaim201,
   ListFlowDefinitions200,
   ListSchemas200,
 } from "@zitadel/api/generated/model";
 import {
-  AddOriginBody,
-  AddOriginParams,
-  AddOriginResponse,
-  CompleteClaimResponse,
-  CreateFlowDefinitionBody,
-  CreateIdpBody,
-  CreateIdpQueryParams,
-  CreateIdpResponse,
+  AddProjectOriginBody,
+  AddProjectOriginParams,
+  AddProjectOriginResponse,
+  CompleteProjectClaimResponse,
+  PublishIdpBody,
+  PublishIdpQueryParams,
+  PublishIdpResponse,
   BuildReleaseBody,
+  buildReleaseBodyBundleFlowDefinitionsMax,
   BuildReleaseQueryParams,
+  CancelInvitationParams,
+  CancelInvitationQueryParams,
+  CreateInvitationBody,
+  CreateInvitationQueryParams,
+  CreateInvitationResponse,
   CreateDeploymentBody,
   CreateDeploymentQueryParams,
   CreateProjectBody,
   CreateReleaseBody,
   CreateReleaseQueryParams,
-  CreateSchemaBody,
-  CreateSchemaQueryParams,
+  PublishSchemaQueryParams,
   DeleteVariableParams,
   DeleteVariableQueryParams,
-  GetClaimStatusParams,
-  GetClaimStatusQueryParams,
-  GetClaimStatusResponse,
-  GetClaimWindowParams,
-  GetClaimWindowQueryParams,
-  GetClaimWindowResponse,
-  GetDeploymentByIdParams,
-  GetDeploymentByIdQueryParams,
-  GetDeploymentVariablesParams,
-  GetDeploymentVariablesQueryParams,
+  GetProjectClaimStatusParams,
+  GetProjectClaimStatusQueryParams,
+  GetProjectClaimStatusResponse,
+  GetProjectClaimWindowParams,
+  GetProjectClaimWindowQueryParams,
+  GetProjectClaimWindowResponse,
+  GetDeploymentParams,
+  GetDeploymentQueryParams,
+  ListDeploymentVariablesParams,
+  ListDeploymentVariablesQueryParams,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
-  GetIdpByIdParams,
-  GetIdpByIdQueryParams,
-  GetIdpByIdResponse,
+  GetApplicationRevisionParams,
+  GetApplicationRevisionQueryParams,
+  GetApplicationRevisionResponse,
+  GetIdpParams,
+  GetIdpQueryParams,
+  GetIdpResponse,
+  GetInvitationParams,
+  GetInvitationQueryParams,
+  GetInvitationResponse,
   GetPolicyParams,
   GetPolicyQueryParams,
   GetPolicyResponse,
@@ -84,22 +94,24 @@ import {
   GetPolicyRevisionResponse,
   GetProjectParams,
   GetProjectResponse,
-  GetReleaseByIdParams,
-  GetReleaseByIdQueryParams,
-  GetSchemaByIdParams,
-  GetSchemaByIdQueryParams,
+  GetReleaseParams,
+  GetReleaseQueryParams,
+  GetSchemaParams,
+  GetSchemaQueryParams,
   GetVariableParams,
   GetVariableQueryParams,
   GetVariableResponse,
-  GetVariablesQueryParams,
-  GetVariablesResponse,
-  InitClaimParams,
+  ListVariablesQueryParams,
+  ListVariablesResponse,
+  CreateProjectClaimParams,
   ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
+  ListInvitationsQueryParams,
+  ListInvitationsResponse,
   ListFlowDefinitionsResponse,
-  ListPreviewsParams,
-  ListPreviewsQueryParams,
-  ListPreviewsResponse,
+  ListProjectPreviewsParams,
+  ListProjectPreviewsQueryParams,
+  ListProjectPreviewsResponse,
   ListReleasesQueryParams,
   ListPoliciesQueryParams,
   ListPoliciesResponse,
@@ -116,25 +128,41 @@ import {
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
-  RemoveOriginBody,
-  RemoveOriginParams,
-  RemovePreviewBody,
-  RemovePreviewParams,
+  RemoveProjectOriginBody,
+  RemoveProjectOriginParams,
+  RemoveProjectPreviewBody,
+  RemoveProjectPreviewParams,
   RevokeReleaseParams,
   RevokeReleaseQueryParams,
   RollbackDeploymentBody,
   RollbackDeploymentParams,
   RollbackDeploymentQueryParams,
-  UpdateVariablesBody,
-  UpdateVariablesQueryParams,
-  UpdateVariablesResponse,
+  SetVariablesBody,
+  SetVariablesQueryParams,
+  SetVariablesResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
-import { policyConfigSchema } from "@zitadel/config/schemas";
+import { schemaFileIssues } from "@zitadel/config/meta-schemas";
+import {
+  createFlowDefinitionRequestSchema,
+  flowConfigSchema,
+  passwordSetPolicyFileSchema,
+  userCreatePolicyFileSchema,
+} from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
+
+/** The build body with each flow definition as strict as the server holds it. */
+const buildReleaseRequestSchema = BuildReleaseBody.extend({
+  bundle: BuildReleaseBody.shape.bundle.extend({
+    flow_definitions: z
+      .array(flowConfigSchema)
+      .max(buildReleaseBodyBundleFlowDefinitionsMax)
+      .optional(),
+  }),
+});
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -187,19 +215,40 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
   }
 }
 
-const INVALID_JSON = errorBody("invalid_json", "request body must be valid JSON");
+const INVALID_JSON = errorBody("req.invalid", "request body must be valid JSON");
 
 /**
  * Run `safeParse` against the generated Zod and return either the
- * parsed (and defaulted) value or a 400 `HttpResponse` carrying the
- * Zod issue list. The discriminant key (`ok`) lets the caller short-
- * circuit cleanly. One pattern, used uniformly for path params, query
- * params, request bodies, and responses-on-the-way-out.
+ * parsed (and defaulted) value or a 400 `req.invalid` `HttpResponse`
+ * carrying the Zod issue list, as the server answers a request that fails
+ * base validation. The discriminant key (`ok`) lets the caller short-
+ * circuit cleanly. Used uniformly for path params, query params and
+ * request bodies.
  */
 function parse<S extends z.ZodTypeAny>(
   schema: S,
   value: unknown,
+): { ok: true; data: z.output<S> } | { ok: false; response: HttpResponse<ErrorBody> } {
+  return check(schema, value, 400, "req.invalid", "request does not conform to spec");
+}
+
+/**
+ * `parse` for a response on its way out: a body the mock builds that breaks
+ * the spec is the mock's own fault, so it answers `500 internal`.
+ */
+function parseOut<S extends z.ZodTypeAny>(
+  schema: S,
+  value: unknown,
+): { ok: true; data: z.output<S> } | { ok: false; response: HttpResponse<ErrorBody> } {
+  return check(schema, value, 500, "internal", "mock response does not conform to spec");
+}
+
+function check<S extends z.ZodTypeAny>(
+  schema: S,
+  value: unknown,
+  status: number,
   code: string,
+  message: string,
 ): { ok: true; data: z.output<S> } | { ok: false; response: HttpResponse<ErrorBody> } {
   const result = schema.safeParse(value);
   if (result.success) {
@@ -207,12 +256,9 @@ function parse<S extends z.ZodTypeAny>(
   }
   return {
     ok: false,
-    response: HttpResponse.json(
-      errorBody(code, "request does not conform to spec", {
-        issues: result.error.issues,
-      }),
-      { status: 400 },
-    ),
+    response: HttpResponse.json(errorBody(code, message, { issues: result.error.issues }), {
+      status,
+    }),
   };
 }
 
@@ -281,7 +327,6 @@ type ProjectRecord = {
 type FlowDefinitionRecord = {
   id: string;
   projectId: string;
-  status: string;
   createdAt: string;
   updatedAt: string;
   seq: number;
@@ -290,9 +335,9 @@ type FlowDefinitionRecord = {
 
 /**
  * Server-side metadata wrapped around the schema body so the mock can answer
- * `POST /schemas` (returns id) and, for `GET /schemas/:id` and `GET /schemas`,
- * build the `{id, schema, metadata}` envelope around the stored document
- * (list filterable by object_type).
+ * `POST /schemas`, `GET /schemas/:schema_id` and `GET /schemas` with the
+ * `{id, schema, metadata}` envelope around the stored document (list
+ * filterable by object_type).
  */
 type SchemaRecord = {
   id: string;
@@ -300,7 +345,7 @@ type SchemaRecord = {
   objectType?: string;
   createdAt: string;
   seq: number;
-  body: GetSchemaById200Schema;
+  body: GetSchema200Schema;
 };
 
 /**
@@ -337,6 +382,22 @@ type ClaimRecord = {
  */
 type IdpConnectionRecord = {
   id: string;
+  revisionId: string;
+  projectId: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
+  seq: number;
+  body: Record<string, unknown>;
+};
+
+/**
+ * One revision of an application a release declares. Revisions of one
+ * application share `applicationId`; a build whose document for the slug
+ * equals the newest revision reuses it, any other adds one.
+ */
+type ApplicationRevisionRecord = {
+  applicationId: string;
   revisionId: string;
   projectId: string;
   slug: string;
@@ -436,15 +497,41 @@ type PreviewRecord = {
   seq: number;
 };
 
+/**
+ * An invitation as the server stores it: the token stays server-side, so no
+ * read can return the link again.
+ */
+type InvitationRecord = {
+  id: string;
+  projectId: string;
+  relation: "viewer" | "editor" | "admin";
+  metadata: { name: string } | null;
+  status: "pending" | "accepted" | "rejected";
+  createdAt: string;
+  expiresAt: string;
+  journeyId: string;
+  respondedBy: string | null;
+  respondedAt: string | null;
+  seq: number;
+};
+
+/** How long an invitation's link stays redeemable (`domain.InvitationExpiration`). */
+const INVITATION_TTL_MS = 72 * 60 * 60 * 1000;
+
+const INVITATION_NOT_FOUND = errorBody("inv.not_found", "invitation not found");
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
   idps: Map<string, IdpConnectionRecord>;
+  /** Declared application revisions, keyed by revision id. */
+  applicationRevisions: Map<string, ApplicationRevisionRecord>;
   releases: Map<string, ReleaseRecord>;
   deployments: Map<string, DeploymentRecord>;
   previews: Map<string, PreviewRecord>;
   policies: Map<string, PolicyRecord>;
+  invitations: Map<string, InvitationRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -467,10 +554,12 @@ function makeStore(): Store {
     schemas: new Map(),
     flowDefinitions: new Map(),
     idps: new Map(),
+    applicationRevisions: new Map(),
     releases: new Map(),
     deployments: new Map(),
     previews: new Map(),
     policies: new Map(),
+    invitations: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -512,16 +601,13 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     flow_definition: {
       audience: {},
       ...serverCanonicalFlow(r.body as Record<string, unknown>),
-      // After the spread: an update that omits `status` keeps the stored one,
-      // which is what the endpoint documents.
-      status: r.status,
     } as unknown as GetFlowDefinition200["flow_definition"],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
 }
 
-function defaultHumanUserSchema(): GetSchemaById200Schema {
+function defaultHumanUserSchema(): GetSchema200Schema {
   return getDefaultHumanUserSchema();
 }
 
@@ -540,7 +626,6 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
   store.flowDefinitions.set(id, {
     id,
     projectId: projectID,
-    status: "active",
     createdAt,
     updatedAt: createdAt,
     seq: ++store.lastSeq,
@@ -548,12 +633,12 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
   });
 }
 
-function schemaObjectType(body: GetSchemaById200Schema): string | undefined {
+function schemaObjectType(body: GetSchema200Schema): string | undefined {
   const value = (body as unknown as { objectType?: unknown }).objectType;
   return typeof value === "string" ? value : undefined;
 }
 
-function schemaKind(body: GetSchemaById200Schema): string | undefined {
+function schemaKind(body: GetSchema200Schema): string | undefined {
   const value = (body as unknown as { kind?: unknown }).kind;
   return typeof value === "string" ? value : undefined;
 }
@@ -598,8 +683,12 @@ function matchesIdpFilters(
   return true;
 }
 
+const IDP_FIELD_IMMUTABLE_MESSAGE =
+  "identity provider connection: the field is fixed for the life of the connection";
+
 /**
- * Which identity field a revision would change, or `undefined` when none would.
+ * The identity fields a revision would change, in the server's order, or empty
+ * when none would.
  *
  * `protocol`, `subject_claim` and the field naming the authority decide which
  * provider account a stored subject belongs to, so changing one repoints
@@ -607,22 +696,25 @@ function matchesIdpFilters(
  * for the life of the connection, and a mock that accepted it would let the CLI
  * pass a test the real service fails.
  */
-function immutableFieldClash(
+function immutableFieldsChanged(
   before: Record<string, unknown>,
   after: Record<string, unknown>,
-): string | undefined {
-  for (const field of ["protocol", "subject_claim"] as const) {
-    if (before[field] !== undefined && before[field] !== after[field]) {
-      return field;
-    }
+): string[] {
+  const changed: string[] = [];
+  if (before.protocol !== undefined && before.protocol !== after.protocol) {
+    changed.push("protocol");
   }
-  // The authority is the issuer.
+  // An absent subject_claim reads as `sub`, as the server resolves it.
+  if ((before.subject_claim ?? "sub") !== (after.subject_claim ?? "sub")) {
+    changed.push("subject_claim");
+  }
+  // The authority is the issuer, compared as the server does: exactly.
   const was = before.oidc;
   const now = after.oidc;
   if (isObject(was) && isObject(now) && was.issuer !== undefined && was.issuer !== now.issuer) {
-    return "oidc.issuer";
+    changed.push("oidc.issuer");
   }
-  return undefined;
+  return changed;
 }
 
 type VariableKind = "primary" | "preview";
@@ -752,16 +844,49 @@ function publishPolicyRevision(
 }
 
 /**
+ * The publish body as the server decodes it: one branch per operation, each
+ * with its own closed config, while an extra top-level key (the file's
+ * `$schema`) is ignored.
+ */
+const PublishPolicyLooseBody = z.discriminatedUnion("operation", [
+  passwordSetPolicyFileSchema.loose(),
+  userCreatePolicyFileSchema.loose(),
+]);
+
+const [passwordSetEvaluateBody, userCreateEvaluateBody] = EvaluatePolicyBody.options;
+
+/**
  * The evaluate body as the server decodes it. The generated schema is not
  * strict (orval's `strict.body: false`), so it would drop an unknown key the
  * server refuses with `req.invalid`: `config`, `input` and `facts` are closed
- * here, while an extra top-level key is ignored, as on publish.
+ * here, per operation, while an extra top-level key is ignored, as on publish.
  */
-const EvaluatePolicyStrictBody = EvaluatePolicyBody.extend({
-  config: policyConfigSchema.shape.config,
-  input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
-  facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
-});
+const EvaluatePolicyStrictBody = z.discriminatedUnion("operation", [
+  passwordSetEvaluateBody.extend({
+    config: passwordSetPolicyFileSchema.shape.config,
+    input: z.strictObject(passwordSetEvaluateBody.shape.input.shape),
+    facts: z.strictObject(passwordSetEvaluateBody.shape.facts.unwrap().shape).optional(),
+  }),
+  userCreateEvaluateBody.extend({
+    config: userCreatePolicyFileSchema.shape.config,
+    input: z.strictObject(userCreateEvaluateBody.shape.input.shape),
+  }),
+]);
+
+/**
+ * What `POST /policies/evaluate` answers for a sign-up: the server's
+ * `UserCreatePolicy.CheckSolved` (internal/service/user_create_policy.go). A
+ * challenge the policy names must be the one solved; without one, any is.
+ */
+function evaluateUserCreate(
+  config: { challenge?: string },
+  solved: string,
+): { allowed: boolean; code?: string } {
+  if (config.challenge !== undefined && config.challenge !== solved) {
+    return { allowed: false, code: "flow.proof_invalid" };
+  }
+  return { allowed: true };
+}
 
 /** The server's length cap on a password (`domain.MaxPasswordLength`). */
 const MAX_PASSWORD_LENGTH = 64;
@@ -968,6 +1093,41 @@ export function expireClaimChallenge(challengeId: string): void {
   }
 }
 
+/**
+ * Marks an invitation accepted, as redeeming its link would: final, and its
+ * metadata cleared. The mock serves no accept, so a test arranges it here.
+ */
+export function acceptInvitation(invitationId: string): void {
+  const invitation = store.invitations.get(invitationId);
+  if (invitation) {
+    invitation.status = "accepted";
+    invitation.metadata = null;
+    invitation.respondedBy = `user_${shortId()}`;
+    invitation.respondedAt = nowIso();
+  }
+}
+
+/**
+ * Marks an invitation declined, as the invitee's decline would: final, and it
+ * keeps its metadata. The mock serves no reject, so a test arranges it here.
+ */
+export function rejectInvitation(invitationId: string): void {
+  const invitation = store.invitations.get(invitationId);
+  if (invitation) {
+    invitation.status = "rejected";
+    invitation.respondedBy = `user_${shortId()}`;
+    invitation.respondedAt = nowIso();
+  }
+}
+
+/** Backdates an invitation past its expiry, as 72 hours passing would. */
+export function expireInvitation(invitationId: string): void {
+  const invitation = store.invitations.get(invitationId);
+  if (invitation) {
+    invitation.expiresAt = new Date(Date.now() - 1000).toISOString();
+  }
+}
+
 /** Backdates the project past the claim window, for window-expiry tests. */
 export function expireClaimWindow(projectId: string): void {
   const project = store.projects.get(projectId);
@@ -979,7 +1139,7 @@ export function expireClaimWindow(projectId: string): void {
 export function completeClaimChallenge(
   challengeId: string,
   projectId: string,
-): { status: number; body: CompleteClaim200 | ErrorBody } {
+): { status: number; body: CompleteProjectClaim200 | ErrorBody } {
   const challenge = store.claimChallenges.get(challengeId);
   if (!challenge || challenge.projectId !== projectId) {
     return {
@@ -1035,21 +1195,21 @@ export function completeClaimChallenge(
   store.claims.set(projectId, claim);
   challenge.status = "completed";
 
-  const responseBody: CompleteClaim200 = {
+  const responseBody: CompleteProjectClaim200 = {
     project_id: projectId,
     team_id: claim.teamId,
     claimed_at: claim.claimedAt,
   };
-  const out = CompleteClaimResponse.safeParse(responseBody);
+  const out = CompleteProjectClaimResponse.safeParse(responseBody);
   if (!out.success) {
     return {
       status: 500,
-      body: errorBody("mock_response_invalid", "mock response does not conform to spec", {
+      body: errorBody("internal", "mock response does not conform to spec", {
         issues: out.error.issues,
       }),
     };
   }
-  return { status: 200, body: out.data as CompleteClaim200 };
+  return { status: 200, body: out.data as CompleteProjectClaim200 };
 }
 
 /**
@@ -1073,15 +1233,11 @@ function invalidFlowDefinitionResponse(
   if (!firstError) {
     return null;
   }
-  // `details` is a bare string here — mirroring what the Go server actually
-  // emits for ErrFlowDefinitionInvalid (its Details field is `any`), which
-  // the CLI's pickDetailString handles alongside the spec's object shape.
+  // The server wraps a producer's details in the envelope's `details` object
+  // (`internal/api/error_handler.go`), so the reason arrives at
+  // `details.details`, as the spec's object-typed `details` allows.
   return HttpResponse.json(
-    {
-      code: "flowdef.invalid",
-      message: "flow definition: invalid",
-      details: firstError.message,
-    },
+    errorBody("flowdef.invalid", "flow definition: invalid", { details: firstError.message }),
     { status: 400 },
   );
 }
@@ -1122,7 +1278,7 @@ function contentDigest(entries: { kind: string; handle: string; content: unknown
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-/** The handle a schema, flow definition or branding declares. */
+/** The handle a schema, flow definition, branding or OAuth settings declare. */
 function bundleResourceHandle(kind: string, resource: Record<string, unknown>): string {
   if (kind === "schema") {
     return typeof resource.objectType === "string" ? resource.objectType : "schema";
@@ -1132,6 +1288,9 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
   }
   if (kind === "idp") {
     return typeof resource.slug === "string" ? resource.slug : "idp";
+  }
+  if (kind === "application") {
+    return typeof resource.slug === "string" ? resource.slug : "application";
   }
   if (kind === "policy") {
     return typeof resource.operation === "string" ? resource.operation : "policy";
@@ -1144,7 +1303,7 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
  * store the way the server allocates revisions from a bundle: a schema or flow
  * whose content matches the project's newest revision of the same handle reuses
  * it, anything else allocates a new one. This is what makes a deployed schema or
- * flow observable through `schemas list` / `flow-definitions list`. Branding has
+ * flow observable through `schema list` / `flow-definition list`. Branding has
  * no store here, so it keeps a synthesised revision id.
  */
 function materializeBundle(
@@ -1170,7 +1329,7 @@ function materializeBundle(
         objectType: handle,
         createdAt: nowIso(),
         seq: ++store.lastSeq,
-        body: resource as unknown as GetSchemaById200Schema,
+        body: resource as unknown as GetSchema200Schema,
       });
     }
     pointers.push({ kind: "schema", handle, revision_id: id });
@@ -1190,7 +1349,6 @@ function materializeBundle(
       store.flowDefinitions.set(id, {
         id,
         projectId,
-        status: typeof resource.status === "string" ? resource.status : "active",
         createdAt,
         updatedAt: createdAt,
         seq: ++store.lastSeq,
@@ -1236,6 +1394,34 @@ function materializeBundle(
     }
     pointers.push({ kind: "idp", handle, revision_id: record.revisionId });
   }
+  for (const item of asArray(bundle.applications)) {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("application", resource);
+    const revisions = [...store.applicationRevisions.values()]
+      .filter((record) => record.projectId === projectId && record.slug === handle)
+      .sort((a, b) => b.seq - a.seq);
+    const newest = revisions[0];
+    // Any revision with the same document is reused, the newest match first, as
+    // the service does: rebuilding an older bundle keeps its release id.
+    const match = revisions.find(
+      (record) => JSON.stringify(record.body) === JSON.stringify(resource),
+    );
+    const now = nowIso();
+    const record: ApplicationRevisionRecord = match ?? {
+      applicationId: newest?.applicationId ?? `app_${shortId()}`,
+      revisionId: `apprev_${shortId()}`,
+      projectId,
+      slug: handle,
+      createdAt: newest?.createdAt ?? now,
+      updatedAt: now,
+      seq: ++store.lastSeq,
+      body: resource,
+    };
+    if (!match) {
+      store.applicationRevisions.set(record.revisionId, record);
+    }
+    pointers.push({ kind: "application", handle, revision_id: record.revisionId });
+  }
   for (const item of isObject(bundle.branding) ? [bundle.branding] : []) {
     const resource = item;
     pointers.push({
@@ -1244,29 +1430,45 @@ function materializeBundle(
       revision_id: `branding_${shortId()}`,
     });
   }
+  if (isObject(bundle.oauth)) {
+    pointers.push({
+      kind: "oauth",
+      handle: bundleResourceHandle("oauth", bundle.oauth),
+      revision_id: `oauthset_${shortId()}`,
+    });
+  }
   return pointers;
 }
 
 /**
- * The first connection in the bundle that would change a field fixed for the
- * life of the connection, with the field it changes.
+ * Every connection in the bundle that would change a field fixed for the life
+ * of the connection, as the server reports it under `rel.invalid`: the fields
+ * sit in the resource's own `details`, where the CLI's hint reads them.
  */
-function bundleIdpClash(
+function bundleIdpFailures(
   projectId: string,
   bundle: Record<string, unknown>,
-): { slug: string; field: string } | undefined {
-  for (const item of asArray(bundle.idps)) {
+): Record<string, unknown>[] {
+  const failures: Record<string, unknown>[] = [];
+  asArray(bundle.idps).forEach((item, index) => {
     const resource = isObject(item) ? item : {};
     const slug = bundleResourceHandle("idp", resource);
     const existing = [...store.idps.values()].find(
       (record) => record.projectId === projectId && record.slug === slug,
     );
-    const field = existing === undefined ? undefined : immutableFieldClash(existing.body, resource);
-    if (field !== undefined) {
-      return { slug, field };
+    const fields = existing === undefined ? [] : immutableFieldsChanged(existing.body, resource);
+    if (fields.length > 0) {
+      failures.push({
+        kind: "idp",
+        index,
+        handle: slug,
+        code: "idp.field_immutable",
+        message: IDP_FIELD_IMMUTABLE_MESSAGE,
+        details: { details: { fields } },
+      });
     }
-  }
-  return undefined;
+  });
+  return failures;
 }
 
 /**
@@ -1342,6 +1544,7 @@ function bundleDigestEntries(
     ["schemas", "schema"],
     ["flow_definitions", "flow_definition"],
     ["idps", "idp"],
+    ["applications", "application"],
   ];
   for (const [field, kind] of groups) {
     const items = bundle[field];
@@ -1360,13 +1563,21 @@ function bundleDigestEntries(
       content: bundle.branding,
     });
   }
+  if (isObject(bundle.oauth)) {
+    entries.push({
+      kind: "oauth",
+      handle: bundleResourceHandle("oauth", bundle.oauth),
+      content: bundle.oauth,
+    });
+  }
   return entries;
 }
 
 /**
  * The handle a pinned revision declares. Resolved from the store so a release
  * records the identity of the revision it pins, as the server does; `default`
- * for branding, and the revision id itself when nothing in the store answers.
+ * for branding and OAuth settings, and the revision id itself when nothing in
+ * the store answers.
  */
 function pointerHandle(kind: string, revisionId: string): string {
   if (kind === "schema") {
@@ -1382,7 +1593,13 @@ function pointerHandle(kind: string, revisionId: string): string {
       return name;
     }
   }
-  if (kind === "branding") {
+  if (kind === "application") {
+    const record = store.applicationRevisions.get(revisionId);
+    if (record) {
+      return record.slug;
+    }
+  }
+  if (kind === "branding" || kind === "oauth") {
     return "default";
   }
   return revisionId;
@@ -1398,7 +1615,7 @@ const DEFAULT_PREVIEW_TTL = "P7D";
 
 /** The milliseconds an ISO-8601 duration spans, or undefined when it is not one. */
 function isoDurationMs(ttl: string): number | undefined {
-  // The same shapes the server's parser takes (internal/api/ogenx): whole days
+  // The same shapes the server's parser takes (packages/go/ogenx): whole days
   // and a time part in hours, minutes or fractional seconds. Weeks, months and
   // years are not among them, so the mock refuses what the server would.
   const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(ttl);
@@ -1436,6 +1653,39 @@ function primaryOrigins(project: ProjectRecord): string[] {
 }
 
 /**
+ * The primary origins a project lists now, none for a project that is gone.
+ *
+ * @param projectId - The project.
+ * @returns Its primary origins, as exact URLs, sorted.
+ */
+function listedPrimaries(projectId: string): string[] {
+  const project = store.projects.get(projectId);
+
+  return project === undefined ? [] : primaryOrigins(project);
+}
+
+/**
+ * Compares two strings by code unit, which for the ASCII URLs the mock holds is
+ * the byte order the server sorts them in (`strings.Compare`). `localeCompare`
+ * orders punctuation differently, so `https://a.test:3000` would come before
+ * `https://a.test.dev` here and after it on the server.
+ *
+ * @param a - The first string.
+ * @param b - The second string.
+ * @returns A negative number when `a` sorts first, a positive one when `b` does, else zero.
+ */
+function byteOrder(a: string, b: string): number {
+  if (a < b) {
+    return -1;
+  }
+  if (a > b) {
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
  * Whether a concrete origin matches one of the project's preview patterns. A
  * `*` in a pattern matches one or more characters that are not a dot, as the
  * origin rule (#1582) defines it.
@@ -1466,24 +1716,127 @@ function previewIsLive(preview: PreviewRecord | undefined): preview is PreviewRe
 }
 
 /**
- * The newest deployment to an origin, treating a preview that is gone as gone.
- * A preview's liveness is its preview row, not the expiry frozen onto the
- * deployment: `preview rm` deletes the row and a renewal moves its expiry, and
- * every endpoint has to agree on which previews are live.
+ * The newest deployment to an origin, whatever it went there as and whether or
+ * not it still serves it. The server's newest-per-origin read answers the
+ * `expected_deployment_id` guard this way, which the contract words as "the
+ * newest deployment to any of the preview URLs": a preview that was removed or
+ * has expired is still the deployment a new one replaces. What serves the
+ * origin now is a different question, which {@link servedOrigins} answers.
+ *
+ * @param projectId - The project.
+ * @param origin - The origin.
+ * @returns The newest deployment of the project that names the origin, if any.
  */
 function newestDeploymentForOrigin(
   projectId: string,
   origin: string,
 ): DeploymentRecord | undefined {
-  const previewLive = previewIsLive(store.previews.get(previewKey(projectId, origin)));
-  return [...store.deployments.values()]
-    .filter((deployment) => deployment.projectId === projectId)
-    .filter((deployment) =>
-      deployment.targets.some(
-        (target) => target.origin === origin && (target.expiresAt === null || previewLive),
-      ),
-    )
-    .sort((a, b) => b.seq - a.seq)[0];
+  return projectDeployments(projectId).find((deployment) => {
+    return deployment.targets.some((target) => {
+      return target.origin === origin;
+    });
+  });
+}
+
+/**
+ * An origin a deployment serves now.
+ */
+type ServedOrigin = {
+  /**
+   * The origin's URL.
+   */
+  origin: string;
+  /**
+   * The deployment that serves it.
+   */
+  deployment: DeploymentRecord;
+  /**
+   * Whether the deployment serves it as a primary origin or as a preview.
+   */
+  kind: "primary" | "preview";
+  /**
+   * The expiry of the preview the deployment serves it as, null for a primary
+   * origin.
+   */
+  expiresAt: string | null;
+};
+
+/**
+ * Where the deployments of a project are live now, one entry per origin a
+ * deployment serves (a row of the server's deployment origins), newest
+ * deployment first, decided row by row as the server's `RowServes` does.
+ *
+ * A primary row serves while its deployment is the project's newest primary
+ * deployment, on every origin it names, whatever the project lists now. A
+ * preview row serves while its deployment is the newest preview deployment to
+ * that origin, the origin is not a primary origin of the project, and the
+ * preview is live: removing the preview or letting it expire ends it without
+ * rewriting the deployment, and a renewed preview is reported on the clock it
+ * now runs on. One origin can be served by a primary row and a preview row at
+ * once, as on the server. The live deployment list, the check that refuses to
+ * revoke a served release and a deployment's status all read this.
+ *
+ * @param projectId - The project.
+ * @param deployments - The project's deployments, newest first, which the
+ * caller reads once.
+ * @returns One entry for each origin of each deployment of the project that is
+ * served.
+ */
+function servedOrigins(
+  projectId: string,
+  deployments: readonly DeploymentRecord[],
+): ServedOrigin[] {
+  const primaries = listedPrimaries(projectId);
+  const previewed = new Set<string>();
+  const served: ServedOrigin[] = [];
+  const newestPrimary = firstPrimary(deployments);
+  for (const deployment of deployments) {
+    for (const { origin, expiresAt } of deployment.targets) {
+      if (expiresAt === null) {
+        if (deployment.id === newestPrimary?.id) {
+          served.push({ origin, deployment, kind: "primary", expiresAt });
+        }
+        continue;
+      }
+      if (previewed.has(origin)) {
+        continue;
+      }
+      previewed.add(origin);
+      const preview = store.previews.get(previewKey(projectId, origin));
+      if (previewIsLive(preview) && !primaries.includes(origin)) {
+        served.push({ origin, deployment, kind: "preview", expiresAt: preview.expiresAt });
+      }
+    }
+  }
+  return served;
+}
+
+/**
+ * What serves one origin of a project, as the server answers a live list for
+ * an origin. It decides that with `OriginRowServes` rather than `RowServes`: a
+ * primary row counts only while the project still lists the origin as a
+ * primary origin, and a preview row only while it does not, so at most one row
+ * serves an origin.
+ *
+ * @param projectId - The project.
+ * @param origin - The origin asked about.
+ * @param served - What serves in the project now.
+ * @returns The entries that serve the origin: none, or one.
+ */
+function servedOn(
+  projectId: string,
+  origin: string,
+  served: readonly ServedOrigin[],
+): ServedOrigin[] {
+  const listed = listedPrimaries(projectId);
+
+  return served.filter((entry) => {
+    if (entry.origin !== origin) {
+      return false;
+    }
+
+    return entry.kind === "preview" || listed.includes(origin);
+  });
 }
 
 /** The release metadata block, nulls written explicitly as the server does. */
@@ -1519,36 +1872,136 @@ function deploymentKind(deployment: DeploymentRecord): "primary" | "preview" {
 }
 
 /**
- * Whether the deployment still serves its release: `live` while at least one
- * of its targets is served by it, `inactive` once a later deployment replaced
- * every one, or its previews expired or were removed.
+ * The deployments of a project, newest first.
+ *
+ * @param projectId - The project.
+ * @returns Its deployments ordered by sequence, newest first.
  */
-function deploymentStatus(deployment: DeploymentRecord): "live" | "inactive" {
-  return deployment.targets.some(
-    (target) =>
-      newestDeploymentForOrigin(deployment.projectId, target.origin)?.id === deployment.id,
-  )
-    ? "live"
-    : "inactive";
+function projectDeployments(projectId: string): DeploymentRecord[] {
+  return [...store.deployments.values()]
+    .filter((deployment) => {
+      return deployment.projectId === projectId;
+    })
+    .sort((a, b) => {
+      return b.seq - a.seq;
+    });
 }
 
-/** The wire shape of a deployment, optionally over a restricted target set. */
+/**
+ * The newest primary deployment among deployments ordered newest first.
+ *
+ * @param deployments - A project's deployments, newest first.
+ * @returns The newest one that went to the primary origins, if any.
+ */
+function firstPrimary(deployments: readonly DeploymentRecord[]): DeploymentRecord | undefined {
+  return deployments.find((deployment) => {
+    return deploymentKind(deployment) === "primary";
+  });
+}
+
+/**
+ * The project's newest primary deployment, what a deploy or rollback replaces.
+ *
+ * @param projectId - The project.
+ * @returns Its newest deployment that went to the primary origins, if any.
+ */
+function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefined {
+  return firstPrimary(projectDeployments(projectId));
+}
+
+/**
+ * A live deployment with every origin it serves.
+ */
+type LiveGroup = {
+  /**
+   * The deployment that serves the origins.
+   */
+  deployment: DeploymentRecord;
+  /**
+   * The origins it serves, with the expiry of each preview.
+   */
+  targets: DeploymentTargetRow[];
+};
+
+/**
+ * The deployments that serve what a live list asked about, each with every
+ * origin it serves, as the server attaches them.
+ *
+ * @param served - Everything that serves in the project now.
+ * @param asked - The entries the live list asked about, all of them or the
+ * ones for one origin.
+ * @returns One group per matching deployment, newest first, as `served` is.
+ */
+function liveGroups(served: readonly ServedOrigin[], asked: readonly ServedOrigin[]): LiveGroup[] {
+  const matched = new Set(
+    asked.map((entry) => {
+      return entry.deployment.id;
+    }),
+  );
+  const groups = new Map<string, LiveGroup>();
+  for (const entry of served) {
+    if (!matched.has(entry.deployment.id)) {
+      continue;
+    }
+    const group = groups.get(entry.deployment.id) ?? { deployment: entry.deployment, targets: [] };
+    group.targets.push({ origin: entry.origin, expiresAt: entry.expiresAt });
+    groups.set(entry.deployment.id, group);
+  }
+
+  return [...groups.values()];
+}
+
+/**
+ * The ids of the deployments that serve at least one origin.
+ *
+ * @param served - What serves in a project now.
+ * @returns The ids of the deployments in `served`.
+ */
+function servingIds(served: readonly ServedOrigin[]): ReadonlySet<string> {
+  return new Set(
+    served.map((entry) => {
+      return entry.deployment.id;
+    }),
+  );
+}
+
+/** Whether a deployment has this release and exactly these origins. */
+function repeats(deployment: DeploymentRecord, releaseId: string, origins: string[]): boolean {
+  const named = deployment.targets.map((target) => target.origin).sort();
+  const wanted = [...origins].sort();
+  return (
+    deployment.releaseId === releaseId &&
+    named.length === wanted.length &&
+    named.every((origin, index) => origin === wanted[index])
+  );
+}
+
+/**
+ * The wire shape of a deployment, optionally over a restricted target set.
+ *
+ * @param deployment - The deployment.
+ * @param serving - The ids of the deployments that serve an origin of its
+ * project now. It is `live` while it is among them, and `inactive` once a later
+ * deployment, or its previews expiring or being removed, leaves it serving
+ * nothing.
+ * @param targets - The targets to report, all of them when not given.
+ * @param expand - Whether to expand its release.
+ * @returns The deployment as the API answers it.
+ */
 function deploymentResponse(
   deployment: DeploymentRecord,
+  serving: ReadonlySet<string>,
   targets: DeploymentTargetRow[] = deployment.targets,
   expand?: { release: boolean },
 ): Record<string, unknown> {
+  const status = serving.has(deployment.id) ? "live" : "inactive";
   const body: Record<string, unknown> = {
     id: deployment.id,
     project_id: deployment.projectId,
     release_id: deployment.releaseId,
-    targets: targets.map((target) =>
-      target.expiresAt === null
-        ? { origin: target.origin }
-        : { origin: target.origin, expires_at: target.expiresAt },
-    ),
+    targets: targets.map((target) => ({ origin: target.origin })),
     kind: deploymentKind(deployment),
-    status: deploymentStatus(deployment),
+    status,
     deployed_at: deployment.deployedAt,
     metadata: {
       reason: deployment.reason,
@@ -1565,6 +2018,43 @@ function deploymentResponse(
     }
   }
   return body;
+}
+
+/**
+ * The wire shape of a deployment a write answers with. The server reports the
+ * deployment it wrote, or the one a refused write would have replaced, as live
+ * without asking what serves (`toAPIDeployment(..., api.DeploymentStatusLive)`
+ * in apps/api/internal/api/deployment.go), so this does too.
+ *
+ * @param deployment - The deployment the write answers with.
+ * @returns The deployment as the API answers it, `live`.
+ */
+function answeredLive(deployment: DeploymentRecord): Record<string, unknown> {
+  return deploymentResponse(deployment, new Set([deployment.id]));
+}
+
+/**
+ * The refusal of a write whose `expected_deployment_id` is not the deployment
+ * it replaces. It names that deployment, the newest to the targets whether or
+ * not a removed or expired preview still serves them, as live.
+ *
+ * @param newest - The deployment the write replaces, if there is one.
+ * @returns The `409 dep.conflict` answer, naming no deployment when there is none.
+ */
+function guardConflict(newest: DeploymentRecord | undefined) {
+  let named: Record<string, unknown> | null = null;
+  if (newest !== undefined) {
+    named = answeredLive(newest);
+  }
+
+  return HttpResponse.json(
+    errorBody(
+      "dep.conflict",
+      "deployment: the newest deployment to the targets does not match expected_deployment_id",
+      { deployment: named },
+    ),
+    { status: 409 },
+  );
 }
 
 /**
@@ -1602,6 +2092,40 @@ function upsertRelease(
   return HttpResponse.json(releaseResponse(record), { status: 201 });
 }
 
+/** An invitation's status on read: a pending one past its expiry is `expired`. */
+function invitationStatus(
+  invitation: InvitationRecord,
+): "pending" | "accepted" | "rejected" | "expired" {
+  return invitation.status === "pending" && Date.parse(invitation.expiresAt) <= Date.now()
+    ? "expired"
+    : invitation.status;
+}
+
+/** An invitation as every read answers it, without the link. */
+function invitationResponse(invitation: InvitationRecord): Record<string, unknown> {
+  return {
+    id: invitation.id,
+    project_id: invitation.projectId,
+    type: "project_member",
+    project_member: { relation: invitation.relation },
+    metadata: invitation.metadata,
+    status: invitationStatus(invitation),
+    created_by: null,
+    created_by_type: "service",
+    created_at: invitation.createdAt,
+    expires_at: invitation.expiresAt,
+    journey_id: invitation.journeyId,
+    responded_by: invitation.respondedBy,
+    responded_at: invitation.respondedAt,
+  };
+}
+
+/** The project's invitation `id`, if it holds one. */
+function projectInvitation(projectId: string, id: string): InvitationRecord | undefined {
+  const invitation = store.invitations.get(id);
+  return invitation?.projectId === projectId ? invitation : undefined;
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -1609,7 +2133,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateProjectBody, raw, "invalid_request");
+      const body = parse(CreateProjectBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -1641,14 +2165,16 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/projects/:project_id", ({ params }) => {
-      const path = parse(GetProjectParams, params, "invalid_request");
+      const path = parse(GetProjectParams, params);
       if (!path.ok) {
         return path.response;
       }
 
       const project = store.projects.get(path.data.project_id);
       if (!project) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+        return HttpResponse.json(errorBody("proj.not_found", "resource not found"), {
+          status: 404,
+        });
       }
       const responseBody: GetProject200 = {
         id: project.id,
@@ -1660,7 +2186,7 @@ export function setupPlatformHandlers() {
         // assignment does; null until the project is claimed.
         owning_team_id: store.claims.get(project.id)?.teamId ?? null,
       };
-      const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(GetProjectResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -1670,7 +2196,7 @@ export function setupPlatformHandlers() {
     // POST /projects/:project_id/origins/remove — drop one pattern. Missing
     // project is 404; removing an already-absent pattern is idempotent 204.
     http.post("*/projects/:project_id/origins/remove", async ({ params, request }) => {
-      const path = parse(RemoveOriginParams, params, "invalid_request");
+      const path = parse(RemoveProjectOriginParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -1678,7 +2204,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(RemoveOriginBody, raw, "invalid_request");
+      const body = parse(RemoveProjectOriginBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -1702,7 +2228,7 @@ export function setupPlatformHandlers() {
     // pattern+kind is idempotent 201; same pattern with a different kind is
     // origin.kind_conflict. No check/warning field on the response.
     http.post("*/projects/:project_id/origins", async ({ params, request }) => {
-      const path = parse(AddOriginParams, params, "invalid_request");
+      const path = parse(AddProjectOriginParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -1710,7 +2236,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(AddOriginBody, raw, "invalid_request");
+      const body = parse(AddProjectOriginBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -1742,8 +2268,8 @@ export function setupPlatformHandlers() {
         project.updatedAt = nowIso();
       }
 
-      const responseBody: AddOrigin201 = existing ?? origin;
-      const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
+      const responseBody: AddProjectOrigin201 = existing ?? origin;
+      const out = parseOut(AddProjectOriginResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -1758,7 +2284,7 @@ export function setupPlatformHandlers() {
     // `POST /releases/build` — the CLI's path: build a release from the
     // `.zitadel/` bundle, reusing matching revisions and allocating the rest.
     http.post("*/releases/build", async ({ request }) => {
-      const query = parse(BuildReleaseQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(BuildReleaseQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -1766,7 +2292,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(BuildReleaseBody, raw, "invalid_request");
+      const body = parse(buildReleaseRequestSchema, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -1785,21 +2311,11 @@ export function setupPlatformHandlers() {
       const bundle = data.bundle;
       // A connection's fixed fields are checked before anything is written, as
       // the service checks them inside the build's transaction: a bundle that
-      // would change one is refused whole rather than revising it.
-      const clash = bundleIdpClash(project.id, bundle);
-      if (clash) {
-        return HttpResponse.json(
-          errorBody(
-            "idp.field_immutable",
-            `release: ${clash.slug}: the field ${clash.field} is fixed for the life of the connection`,
-          ),
-          { status: 400 },
-        );
-      }
-      // The service validates each policy against its template and refuses two
-      // for one operation, reporting every refused resource under
+      // would change one is refused whole rather than revising it. The service
+      // also validates each policy against its template and refuses two for
+      // one operation. Every refused resource is reported at once under
       // `rel.invalid`.
-      const refused = bundlePolicyFailures(bundle);
+      const refused = [...bundleIdpFailures(project.id, bundle), ...bundlePolicyFailures(bundle)];
       if (refused.length > 0) {
         return HttpResponse.json(
           errorBody("rel.invalid", "release: the bundle has invalid resources", {
@@ -1835,7 +2351,7 @@ export function setupPlatformHandlers() {
     // `POST /releases` — pin pre-existing revision ids. Not a CLI flow, kept for
     // contract completeness.
     http.post("*/releases", async ({ request }) => {
-      const query = parse(CreateReleaseQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(CreateReleaseQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -1843,7 +2359,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateReleaseBody, raw, "invalid_request");
+      const body = parse(CreateReleaseBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -1853,13 +2369,10 @@ export function setupPlatformHandlers() {
           status: 404,
         });
       }
+      // The body's zod requires `pointers`, so a create without them is
+      // refused above as malformed.
       const data = body.data as Record<string, unknown>;
-      if (!Array.isArray(data.pointers)) {
-        return HttpResponse.json(errorBody("rel.invalid", "release: a create pins pointers"), {
-          status: 400,
-        });
-      }
-      const pointers = data.pointers.map((item) => {
+      const pointers = body.data.pointers.map((item) => {
         const pointer = item as { kind: string; revision_id: string };
         return {
           kind: pointer.kind,
@@ -1878,7 +2391,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/releases", ({ request }) => {
-      const query = parse(ListReleasesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(ListReleasesQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -1902,11 +2415,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/releases/:release_id", ({ params, request }) => {
-      const path = parse(GetReleaseByIdParams, params, "invalid_request");
+      const path = parse(GetReleaseParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetReleaseByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetReleaseQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -1918,11 +2431,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/releases/:release_id/revoke", ({ params, request }) => {
-      const path = parse(RevokeReleaseParams, params, "invalid_request");
+      const path = parse(RevokeReleaseParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(RevokeReleaseQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(RevokeReleaseQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -1934,24 +2447,22 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(releaseResponse(release), { status: 200 });
       }
 
-      // A release an origin still serves cannot be revoked: the live deployment
-      // to any origin must not pin it.
-      const servedBy: { origin: string; deployment_id: string }[] = [];
-      const origins = new Set(
-        [...store.deployments.values()]
-          .filter((deployment) => deployment.projectId === release.projectId)
-          .flatMap((deployment) => deployment.targets.map((target) => target.origin)),
-      );
-      for (const origin of origins) {
-        const newest = newestDeploymentForOrigin(release.projectId, origin);
-        if (newest?.releaseId === release.id) {
-          servedBy.push({ origin, deployment_id: newest.id });
-        }
-      }
+      // A release an origin still serves cannot be revoked: what is live on an
+      // origin must not pin it. Each origin names the deployment that pins the
+      // release there, and whether it is a primary origin or a preview.
+      const servedBy = servedOrigins(release.projectId, projectDeployments(release.projectId))
+        .filter((entry) => {
+          return entry.deployment.releaseId === release.id;
+        })
+        .map((entry) => {
+          return { origin: entry.origin, deployment_id: entry.deployment.id, kind: entry.kind };
+        });
       if (servedBy.length > 0) {
         return HttpResponse.json(
           errorBody("rel.in_use", "release: still served by an origin", {
-            origins: servedBy.sort((a, b) => a.origin.localeCompare(b.origin)),
+            origins: servedBy.sort((a, b) => {
+              return byteOrder(a.origin, b.origin);
+            }),
           }),
           { status: 409 },
         );
@@ -1968,7 +2479,7 @@ export function setupPlatformHandlers() {
     // freezes the variables of its kind; a rollback reuses the restored set.
 
     http.post("*/deployments", async ({ request }) => {
-      const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(CreateDeploymentQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -1976,7 +2487,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateDeploymentBody, raw, "invalid_request");
+      const body = parse(CreateDeploymentBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2012,41 +2523,36 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
       }
 
-      const requested = data.targets as string[];
-      // The contract's targets are unique items: a repeated one is a malformed
-      // request, not something to fold quietly.
-      if (new Set(requested).size !== requested.length) {
-        return HttpResponse.json(errorBody("dep.invalid", "deployment: targets must be unique"), {
+      const requested = data.targets as "primary" | string[];
+      const previewUrls = requested === "primary" ? [] : requested;
+      const sawPreview = requested !== "primary";
+      // The contract's preview URLs are unique items: a repeated one is a
+      // malformed request, not something to fold quietly.
+      if (new Set(previewUrls).size !== previewUrls.length) {
+        return HttpResponse.json(errorBody("req.invalid", "deployment: targets must be unique"), {
           status: 400,
         });
       }
       const primaries = primaryOrigins(project);
-      const resolved = new Set<string>();
-      let sawPreview = false;
-      let sawPrimary = false;
-      for (const target of requested) {
-        if (target === "primary") {
-          if (primaries.length === 0) {
-            return HttpResponse.json(
-              errorBody("dep.invalid", "deployment: the project has no primary origin"),
-              { status: 400 },
-            );
-          }
-          for (const origin of primaries) {
-            resolved.add(origin);
-          }
-          sawPrimary = true;
-          continue;
-        }
+      if (!sawPreview && primaries.length === 0) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: the project has no primary origin"),
+          { status: 400 },
+        );
+      }
+      const resolved = new Set<string>(sawPreview ? [] : primaries);
+      for (const target of previewUrls) {
         if (primaries.includes(target)) {
           return HttpResponse.json(
-            errorBody("dep.invalid", "deployment: deploy primary origins with the primary keyword"),
+            errorBody(
+              "dep.invalid",
+              "deployment: deploy to primary origins with the primary target",
+            ),
             { status: 400 },
           );
         }
         if (matchesPreviewPattern(project, target)) {
           resolved.add(target);
-          sawPreview = true;
           continue;
         }
         return HttpResponse.json(
@@ -2055,12 +2561,6 @@ export function setupPlatformHandlers() {
             `deployment: ${target} is neither a primary origin nor a preview URL of the project`,
           ),
           { status: 403 },
-        );
-      }
-      if (sawPreview && sawPrimary) {
-        return HttpResponse.json(
-          errorBody("dep.invalid", "deployment: primary origins and preview URLs cannot be mixed"),
-          { status: 400 },
         );
       }
       const requestedTtl = typeof data.ttl === "string" ? data.ttl : undefined;
@@ -2082,21 +2582,18 @@ export function setupPlatformHandlers() {
       const targets = [...resolved].sort();
       const expectedId =
         typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
-      // The contract's guard: the newest deployment to any of the targets.
+      // The contract's guard: the newest primary deployment, or the newest
+      // deployment to any of the preview URLs. An id given where there is no
+      // such deployment does not match either, and the answer names none.
       if (expectedId !== undefined) {
-        const newest = targets
-          .map((origin) => newestDeploymentForOrigin(project.id, origin))
-          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newest && newest.id !== expectedId) {
-          return HttpResponse.json(
-            errorBody(
-              "dep.conflict",
-              "deployment: the newest deployment to the targets does not match expected_deployment_id",
-              { deployment: deploymentResponse(newest) },
-            ),
-            { status: 409 },
-          );
+        const newest = sawPreview
+          ? targets
+              .map((origin) => newestDeploymentForOrigin(project.id, origin))
+              .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+              .sort((a, b) => b.seq - a.seq)[0]
+          : newestPrimaryDeployment(project.id);
+        if (newest?.id !== expectedId) {
+          return guardConflict(newest);
         }
       }
 
@@ -2123,25 +2620,13 @@ export function setupPlatformHandlers() {
         }
       }
 
-      // Idempotent on what is served: when every target already runs this
-      // release, the newest deployment to the targets is returned unchanged.
-      // Never for preview URLs: the contract has a preview deploy always write
-      // a new deployment (201), which is how its expiry is renewed.
-      const alreadyServed = targets.every(
-        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === release.id,
-      );
-      if (targets.length > 0 && alreadyServed && !sawPreview) {
-        const newest = [...store.deployments.values()]
-          .filter(
-            (deployment) =>
-              deployment.projectId === project.id &&
-              deployment.releaseId === release.id &&
-              deployment.targets.some((target) => targets.includes(target.origin)),
-          )
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newest) {
-          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
-        }
+      // Idempotent on what is served: when the newest primary deployment has
+      // this release and these origins it is returned unchanged. Never for
+      // preview URLs: the contract has a preview deploy always write a new
+      // deployment (201), which is how its expiry is renewed.
+      const newestPrimary = newestPrimaryDeployment(project.id);
+      if (!sawPreview && newestPrimary && repeats(newestPrimary, release.id, targets)) {
+        return HttpResponse.json(answeredLive(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2159,7 +2644,7 @@ export function setupPlatformHandlers() {
         variables: frozenVariables(store.variables, project.id, sawPreview ? "preview" : "primary"),
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+      return HttpResponse.json(answeredLive(record), { status: 201 });
     }),
 
     http.get("*/deployments", ({ request }) => {
@@ -2169,93 +2654,53 @@ export function setupPlatformHandlers() {
       const record = queryRecord(request);
       const expandRelease = (request.url.match(/[?&]expand=release\b/) ?? []).length > 0;
       const { live: liveRaw, limit, expand: _expand, ...rest } = record;
-      const query = parse(
-        ListDeploymentsQueryParams,
-        {
-          ...rest,
-          ...(liveRaw === undefined ? {} : { live: liveRaw === "true" }),
-          ...(limit === undefined ? {} : { limit: Number(limit) }),
-          ...(expandRelease ? { expand: ["release"] } : {}),
-        },
-        "invalid_query",
-      );
+      const query = parse(ListDeploymentsQueryParams, {
+        ...rest,
+        ...(liveRaw === undefined ? {} : { live: liveRaw === "true" }),
+        ...(limit === undefined ? {} : { limit: Number(limit) }),
+        ...(expandRelease ? { expand: ["release"] } : {}),
+      });
       if (!query.ok) {
         return query.response;
       }
       const origin = record.origin;
+      const releaseId = query.data.release_id;
       const live = liveRaw === "true";
+      const ofRelease = (deployment: DeploymentRecord): boolean => {
+        return releaseId === undefined || deployment.releaseId === releaseId;
+      };
 
-      let deployments = [...store.deployments.values()]
-        .filter((deployment) => deployment.projectId === query.data.project_id)
-        .sort((a, b) => b.seq - a.seq);
-      if (origin !== undefined) {
-        deployments = deployments.filter((deployment) =>
-          deployment.targets.some((target) => target.origin === origin),
-        );
-      }
-
+      const deployments = projectDeployments(query.data.project_id);
+      const served = servedOrigins(query.data.project_id, deployments);
+      const serving = servingIds(served);
       let items: Record<string, unknown>[];
       if (live) {
-        // What each target serves now: the newest deployment per origin, each
-        // carrying only the targets it still serves.
-        const serving = new Map<string, DeploymentTargetRow[]>();
-        const liveOrigins = new Set(
-          deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
-        );
-        for (const target of liveOrigins) {
-          if (origin !== undefined && target !== origin) {
-            continue;
-          }
-          // Pick the newest deployment targeting this origin by sequence,
-          // without applying the target's frozen historical expiry: a renewed
-          // preview extends its own row's clock (checked below), so filtering on
-          // the deployment's stale expiry here would wrongly drop a live preview.
-          const newest = [...store.deployments.values()]
-            .filter((deployment) => deployment.projectId === query.data.project_id)
-            .filter((deployment) => deployment.targets.some((t) => t.origin === target))
-            .sort((a, b) => b.seq - a.seq)[0];
-          if (!newest) {
-            continue;
-          }
-          const row = newest.targets.find((candidate) => candidate.origin === target);
-          if (!row) {
-            continue;
-          }
-          // A preview-origin target (one with an expiry) is admitted by its
-          // preview row, not by the expiry frozen onto the deployment: removing
-          // the preview drops the URL from this live view without the historical
-          // deployment being rewritten, and a renewed preview is reported on the
-          // clock it now runs on. A primary target has no preview row and stands
-          // on the deployment alone.
-          let served = row;
-          if (row.expiresAt !== null) {
-            const preview = store.previews.get(previewKey(query.data.project_id, target));
-            if (!previewIsLive(preview)) {
-              continue;
-            }
-            served = { origin: row.origin, expiresAt: preview.expiresAt };
-          }
-          const rows = serving.get(newest.id) ?? [];
-          rows.push(served);
-          serving.set(newest.id, rows);
+        let asked = served;
+        if (origin !== undefined) {
+          asked = servedOn(query.data.project_id, origin, served);
         }
-        items = [...serving.entries()]
-          .map(([id, rows]) => {
-            const deployment = store.deployments.get(id);
-            return deployment ? { deployment, rows } : undefined;
-          })
-          .filter(
-            (entry): entry is { deployment: DeploymentRecord; rows: DeploymentTargetRow[] } =>
-              entry !== undefined,
-          )
-          .sort((a, b) => b.deployment.seq - a.deployment.seq)
-          .map((entry) =>
-            deploymentResponse(entry.deployment, entry.rows, { release: expandRelease }),
-          );
+        const groups = liveGroups(served, asked).filter((group) => {
+          return ofRelease(group.deployment);
+        });
+        items = groups.map((group) => {
+          return deploymentResponse(group.deployment, serving, group.targets, {
+            release: expandRelease,
+          });
+        });
       } else {
-        items = deployments.map((deployment) =>
-          deploymentResponse(deployment, deployment.targets, { release: expandRelease }),
-        );
+        let named = deployments.filter(ofRelease);
+        if (origin !== undefined) {
+          named = named.filter((deployment) => {
+            return deployment.targets.some((target) => {
+              return target.origin === origin;
+            });
+          });
+        }
+        items = named.map((deployment) => {
+          return deploymentResponse(deployment, serving, deployment.targets, {
+            release: expandRelease,
+          });
+        });
       }
       // The real cursor is opaque; the mock's is the next start index, like the
       // schemas list. A target beyond the first page is only reachable by
@@ -2272,11 +2717,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/deployments/:deployment_id", ({ params, request }) => {
-      const path = parse(GetDeploymentByIdParams, params, "invalid_request");
+      const path = parse(GetDeploymentParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetDeploymentByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetDeploymentQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2286,38 +2731,43 @@ export function setupPlatformHandlers() {
           status: 404,
         });
       }
-      return HttpResponse.json(deploymentResponse(deployment));
+      const deployments = projectDeployments(deployment.projectId);
+      const serving = servingIds(servedOrigins(deployment.projectId, deployments));
+
+      return HttpResponse.json(deploymentResponse(deployment, serving));
     }),
 
     http.post("*/deployments/:deployment_id/rollback", async ({ params, request }) => {
-      const path = parse(RollbackDeploymentParams, params, "invalid_request");
+      const path = parse(RollbackDeploymentParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(RollbackDeploymentQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(RollbackDeploymentQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
       const raw = (await readJson(request)) ?? {};
-      const body = parse(RollbackDeploymentBody, raw, "invalid_request");
+      const body = parse(RollbackDeploymentBody, raw);
       if (!body.ok) {
         return body.response;
       }
-      const target = store.deployments.get(path.data.deployment_id);
-      if (!target || target.projectId !== query.data.project_id) {
-        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
-          status: 404,
-        });
-      }
+      // As on the server, project access is checked first: a write to a
+      // project it does not hold is env.project_not_found.
       const project = store.projects.get(query.data.project_id);
       if (!project) {
         return HttpResponse.json(errorBody("env.project_not_found", "project not found"), {
           status: 404,
         });
       }
+      const target = store.deployments.get(path.data.deployment_id);
+      if (!target || target.projectId !== project.id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
 
-      // Only a deployment to primary origins can be rolled back, and every
-      // target must still be a primary origin of the project.
+      // Only a deployment to primary origins can be rolled back. It restores
+      // the origins it froze, listed or not.
       if (target.targets.some((row) => row.expiresAt !== null)) {
         return HttpResponse.json(
           errorBody(
@@ -2327,17 +2777,6 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const primaries = primaryOrigins(project);
-      const removed = target.targets.find((row) => !primaries.includes(row.origin));
-      if (removed) {
-        return HttpResponse.json(
-          errorBody(
-            "proj.origin_not_allowed",
-            `project: ${removed.origin} is not a primary origin`,
-          ),
-          { status: 403 },
-        );
-      }
       const release = store.releases.get(target.releaseId);
       if (release?.revokedAt) {
         return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
@@ -2345,43 +2784,18 @@ export function setupPlatformHandlers() {
 
       const origins = target.targets.map((row) => row.origin);
       // The optimistic guard: the deployment the caller believes is the newest
-      // one to any of the targets. A mismatch is a deploy that raced in.
+      // primary one. A mismatch is a deploy that raced in.
       const rollbackData = body.data as Record<string, unknown>;
       const expectedRollbackId =
         typeof rollbackData.expected_deployment_id === "string"
           ? rollbackData.expected_deployment_id
           : undefined;
-      if (expectedRollbackId !== undefined) {
-        const newestToTargets = origins
-          .map((origin) => newestDeploymentForOrigin(project.id, origin))
-          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newestToTargets && newestToTargets.id !== expectedRollbackId) {
-          return HttpResponse.json(
-            errorBody(
-              "dep.conflict",
-              "deployment: the newest deployment to the targets does not match expected_deployment_id",
-              { deployment: deploymentResponse(newestToTargets) },
-            ),
-            { status: 409 },
-          );
-        }
+      const newestPrimary = newestPrimaryDeployment(project.id);
+      if (expectedRollbackId !== undefined && newestPrimary?.id !== expectedRollbackId) {
+        return guardConflict(newestPrimary);
       }
-      const alreadyServed = origins.every(
-        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === target.releaseId,
-      );
-      if (alreadyServed) {
-        const newest = [...store.deployments.values()]
-          .filter(
-            (deployment) =>
-              deployment.projectId === project.id &&
-              deployment.releaseId === target.releaseId &&
-              deployment.targets.some((row) => origins.includes(row.origin)),
-          )
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newest) {
-          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
-        }
+      if (newestPrimary && repeats(newestPrimary, target.releaseId, origins)) {
+        return HttpResponse.json(answeredLive(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2401,7 +2815,7 @@ export function setupPlatformHandlers() {
         variables: target.variables,
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+      return HttpResponse.json(answeredLive(record), { status: 201 });
     }),
 
     // --- previews --------------------------------------------------------
@@ -2412,7 +2826,7 @@ export function setupPlatformHandlers() {
     // works — the Go handlers are unimplemented stubs regardless.
 
     http.get("*/projects/:project_id/previews", ({ params, request }) => {
-      const path = parse(ListPreviewsParams, params, "invalid_request");
+      const path = parse(ListProjectPreviewsParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -2420,11 +2834,10 @@ export function setupPlatformHandlers() {
       // coerce, so build it before validating, as the deployments list does.
       const record = queryRecord(request);
       const { limit, ...rest } = record;
-      const query = parse(
-        ListPreviewsQueryParams,
-        { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) },
-        "invalid_query",
-      );
+      const query = parse(ListProjectPreviewsQueryParams, {
+        ...rest,
+        ...(limit === undefined ? {} : { limit: Number(limit) }),
+      });
       if (!query.ok) {
         return query.response;
       }
@@ -2449,11 +2862,10 @@ export function setupPlatformHandlers() {
       const previews = live.slice(start, start + query.data.limit);
       const nextPageToken =
         start + query.data.limit < live.length ? String(start + query.data.limit) : null;
-      const out = parse(
-        ListPreviewsResponse,
-        { previews, next_page_token: nextPageToken },
-        "mock_response_invalid",
-      );
+      const out = parseOut(ListProjectPreviewsResponse, {
+        previews,
+        next_page_token: nextPageToken,
+      });
       if (!out.ok) {
         return out.response;
       }
@@ -2461,7 +2873,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/projects/:project_id/previews/remove", async ({ params, request }) => {
-      const path = parse(RemovePreviewParams, params, "invalid_request");
+      const path = parse(RemoveProjectPreviewParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -2469,7 +2881,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(RemovePreviewBody, raw, "invalid_request");
+      const body = parse(RemoveProjectPreviewBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2488,7 +2900,7 @@ export function setupPlatformHandlers() {
     // mirrors the real server: the project secret is the bearer (as in GET
     // /users). First-claim-wins is a 409 derived from the existing claim.
     http.post("*/projects/:project_id/claim/init", ({ params, request }) => {
-      const path = parse(InitClaimParams, params, "invalid_request");
+      const path = parse(CreateProjectClaimParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -2533,7 +2945,7 @@ export function setupPlatformHandlers() {
         status: "pending",
         expiresAt,
       });
-      const responseBody: InitClaim201 = {
+      const responseBody: CreateProjectClaim201 = {
         claim_url: `${new URL(request.url).origin}/claim/${id}`,
         challenge_id: id,
         expires_at: expiresAt,
@@ -2546,11 +2958,11 @@ export function setupPlatformHandlers() {
     // that initiated the challenge (403 otherwise). Outbound-validated like
     // GET /projects/:id so the mock cannot lie about its own output.
     http.get("*/projects/:project_id/claim/status", ({ params, request }) => {
-      const path = parse(GetClaimStatusParams, params, "invalid_request");
+      const path = parse(GetProjectClaimStatusParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetClaimStatusQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetProjectClaimStatusQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2590,7 +3002,7 @@ export function setupPlatformHandlers() {
       // closed window alike. `authed` initiated this challenge (403 above),
       // so it is the challenge's own project.
       const claim = store.claims.get(challenge.projectId);
-      let responseBody: GetClaimStatus200;
+      let responseBody: GetProjectClaimStatus200;
       if (claim) {
         responseBody = {
           status: "completed",
@@ -2598,7 +3010,7 @@ export function setupPlatformHandlers() {
           claimed_at: claim.claimedAt,
           dashboard_url: claim.dashboardUrl,
         };
-        const completedOut = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+        const completedOut = parseOut(GetProjectClaimStatusResponse, responseBody);
         if (!completedOut.ok) {
           return completedOut.response;
         }
@@ -2622,7 +3034,7 @@ export function setupPlatformHandlers() {
       }
 
       responseBody = { status: "pending" };
-      const out = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(GetProjectClaimStatusResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -2635,11 +3047,11 @@ export function setupPlatformHandlers() {
     // capability. An unknown challenge is the only refusal, so a caller
     // learns nothing about which project ids exist.
     http.get("*/projects/:project_id/claim/window", ({ params, request }) => {
-      const path = parse(GetClaimWindowParams, params, "invalid_request");
+      const path = parse(GetProjectClaimWindowParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetClaimWindowQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetProjectClaimWindowQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2667,11 +3079,11 @@ export function setupPlatformHandlers() {
       // lapsed challenge still reports it, because the page shows the
       // deadline beside the outcome it is explaining.
       const expiresAt = new Date(new Date(project.createdAt).getTime() + CLAIM_WINDOW_MS);
-      const responseBody: GetClaimWindow200 = {
+      const responseBody: GetProjectClaimWindow200 = {
         expires_at: expiresAt.toISOString(),
         expired: expiresAt.getTime() < Date.now(),
       };
-      const out = parse(GetClaimWindowResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(GetProjectClaimWindowResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -2686,14 +3098,14 @@ export function setupPlatformHandlers() {
     http.post("*/users/query", async ({ request }) => {
       // The query body is JSON, so `limit` arrives already numeric — unlike the
       // query string this endpoint replaced, which needed it coerced by hand.
-      const body = parse(QueryUsersBody, await request.json(), "invalid_request");
+      const body = parse(QueryUsersBody, await request.json());
       if (!body.ok) {
         return body.response;
       }
       const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
       const project = [...store.projects.values()].find((p) => p.projectSecret === token);
       if (!project) {
-        return HttpResponse.json(errorBody("unauthenticated", "missing or invalid credentials"), {
+        return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
           status: 401,
         });
       }
@@ -2701,7 +3113,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/schemas", async ({ request }) => {
-      const query = parse(CreateSchemaQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(PublishSchemaQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2710,22 +3122,30 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateSchemaBody, raw, "invalid_schema");
-      if (!body.ok) {
-        return body.response;
+      const issues = schemaFileIssues(raw);
+      if (issues.length > 0) {
+        return HttpResponse.json(
+          errorBody("sch.invalid_request", "request does not conform to spec", { issues }),
+          { status: 400 },
+        );
       }
 
-      const schemaBody = raw as unknown as GetSchemaById200Schema;
+      const schemaBody = raw as unknown as GetSchema200Schema;
       const id = `sch_${shortId()}`;
+      const createdAt = nowIso();
       store.schemas.set(id, {
         id,
         projectId: query.data.project_id,
         objectType: schemaObjectType(schemaBody),
-        createdAt: nowIso(),
+        createdAt,
         seq: ++store.lastSeq,
         body: schemaBody,
       });
-      const responseBody: CreateSchema201 = { id };
+      const responseBody: PublishSchema201 = {
+        id,
+        schema: schemaBody,
+        metadata: { created_at: createdAt },
+      };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
@@ -2737,7 +3157,7 @@ export function setupPlatformHandlers() {
         ...listQueryRecord(request),
         ...(expand.length === 0 ? {} : { expand }),
       };
-      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
+      const query = parse(ListSchemasQueryParams, raw);
       if (!query.ok) {
         return query.response;
       }
@@ -2773,23 +3193,23 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody);
     }),
 
-    http.get("*/schemas/:id", ({ params, request }) => {
-      const path = parse(GetSchemaByIdParams, params, "invalid_request");
+    http.get("*/schemas/:schema_id", ({ params, request }) => {
+      const path = parse(GetSchemaParams, params);
       if (!path.ok) {
         return path.response;
       }
       // Flat-by-id: OpenAPI dropped required project_id; optional team_id may
       // still appear. Authz on the real server resolves ownership via RSI.
-      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetSchemaQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
 
-      const record = store.schemas.get(schemaID(path.data.id));
+      const record = store.schemas.get(schemaID(path.data.schema_id));
       if (!record) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+        return HttpResponse.json(errorBody("sch.not_found", "resource not found"), { status: 404 });
       }
-      const responseBody: GetSchemaById200 = {
+      const responseBody: GetSchema200 = {
         id: record.id,
         schema: record.body,
         metadata: { created_at: record.createdAt },
@@ -2797,31 +3217,12 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody);
     }),
 
-    http.delete("*/schemas/:id", ({ params, request }) => {
-      const path = parse(GetSchemaByIdParams, params, "invalid_request");
-      if (!path.ok) {
-        return path.response;
-      }
-      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
-      if (!query.ok) {
-        return query.response;
-      }
-
-      const key = schemaID(path.data.id);
-      const record = store.schemas.get(key);
-      if (!record) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      }
-      store.schemas.delete(key);
-      return new HttpResponse(null, { status: 204 });
-    }),
-
     http.post("*/flow_definitions", async ({ request }) => {
       const raw = await readJson(request);
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateFlowDefinitionBody, raw, "invalid_request");
+      const body = parse(createFlowDefinitionRequestSchema, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2837,7 +3238,6 @@ export function setupPlatformHandlers() {
       const record: FlowDefinitionRecord = {
         id,
         projectId: body.data.project_id,
-        status: "active",
         createdAt: now,
         updatedAt: now,
         seq: ++store.lastSeq,
@@ -2847,12 +3247,12 @@ export function setupPlatformHandlers() {
           : flowDefinition,
       };
       store.flowDefinitions.set(id, record);
-      const responseBody: CreateFlowDefinition201 = flowResponse(record);
+      const responseBody: PublishFlowDefinition201 = flowResponse(record);
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
     http.get("*/flow_definitions", ({ request }) => {
-      const query = parse(ListFlowDefinitionsQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(ListFlowDefinitionsQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2877,27 +3277,29 @@ export function setupPlatformHandlers() {
         flow_definitions: records.map(flowResponse),
         next_page_token: null,
       };
-      const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(ListFlowDefinitionsResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
       return HttpResponse.json(out.data);
     }),
 
-    http.get("*/flow_definitions/:id", ({ params }) => {
-      const path = parse(GetFlowDefinitionParams, params, "invalid_request");
+    http.get("*/flow_definitions/:flow_definition_id", ({ params }) => {
+      const path = parse(GetFlowDefinitionParams, params);
       if (!path.ok) {
         return path.response;
       }
 
       // Flat-by-id: no project_id query — ownership is resolved via RSI+Check
       // on the real server.
-      const record = store.flowDefinitions.get(path.data.id);
+      const record = store.flowDefinitions.get(path.data.flow_definition_id);
       if (!record) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+        return HttpResponse.json(errorBody("flowdef.not_found", "resource not found"), {
+          status: 404,
+        });
       }
       const responseBody: GetFlowDefinition200 = flowResponse(record);
-      const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(GetFlowDefinitionResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -2911,7 +3313,7 @@ export function setupPlatformHandlers() {
     // the real service fails.
 
     http.post("*/idps", async ({ request }) => {
-      const query = parse(CreateIdpQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(PublishIdpQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2919,7 +3321,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateIdpBody, raw, "invalid_request");
+      const body = parse(PublishIdpBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2948,13 +3350,10 @@ export function setupPlatformHandlers() {
         (record) => record.projectId === query.data.project_id && record.slug === slug,
       );
       if (existing) {
-        const clash = immutableFieldClash(existing.body, definition);
-        if (clash) {
+        const fields = immutableFieldsChanged(existing.body, definition);
+        if (fields.length > 0) {
           return HttpResponse.json(
-            errorBody(
-              "idp.field_immutable",
-              "identity provider connection: the field is fixed for the life of the connection",
-            ),
+            errorBody("idp.field_immutable", IDP_FIELD_IMMUTABLE_MESSAGE, { details: { fields } }),
             { status: 400 },
           );
         }
@@ -2980,7 +3379,7 @@ export function setupPlatformHandlers() {
       store.idps.set(record.id, record);
 
       const responseBody = idpResponse(record);
-      const out = parse(CreateIdpResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(PublishIdpResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -2988,7 +3387,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/idps/query", async ({ request }) => {
-      const query = parse(QueryIdpsQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(QueryIdpsQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2996,7 +3395,7 @@ export function setupPlatformHandlers() {
       // would let a CLI slug filter appear to work while returning every
       // connection in the project.
       const raw = (await readJson(request)) ?? {};
-      const body = parse(QueryIdpsBody, raw, "invalid_request");
+      const body = parse(QueryIdpsBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3013,30 +3412,30 @@ export function setupPlatformHandlers() {
         })
         .slice(0, body.data.limit ?? undefined);
       const responseBody = { idps: records.map(idpResponse), next_page_token: null };
-      const out = parse(QueryIdpsResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(QueryIdpsResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
       return HttpResponse.json(out.data);
     }),
 
-    http.get("*/idps/:id", ({ params, request }) => {
-      const path = parse(GetIdpByIdParams, params, "invalid_request");
+    http.get("*/idps/:idp_id", ({ params, request }) => {
+      const path = parse(GetIdpParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetIdpByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetIdpQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
-      const record = store.idps.get(path.data.id);
+      const record = store.idps.get(path.data.idp_id);
       if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(
           errorBody("idp.not_found", "identity provider connection: not found"),
           { status: 404 },
         );
       }
-      const out = parse(GetIdpByIdResponse, idpResponse(record), "mock_response_invalid");
+      const out = parseOut(GetIdpResponse, idpResponse(record));
       if (!out.ok) {
         return out.response;
       }
@@ -3046,12 +3445,12 @@ export function setupPlatformHandlers() {
     // --- operation policies ---------------------------------------------------
     // `setup` publishes the password policy here, a release build publishes
     // `.zitadel/policies/*.json` through the same revision helper, and
-    // `policies list|get` read them back. They mirror the server's answers: an
+    // `policy list|get` read them back. They mirror the server's answers: an
     // unknown setting is malformed (`req.invalid` there), and a minimum above
     // the maximum fails the template's config rule (`pol.invalid`).
 
     http.post("*/policies", async ({ request }) => {
-      const query = parse(PublishPolicyQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(PublishPolicyQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3061,7 +3460,7 @@ export function setupPlatformHandlers() {
       }
       // Like the server's decoder: unknown settings are refused, while an
       // extra top-level key (the file's `$schema`) is ignored.
-      const body = parse(policyConfigSchema.loose(), raw, "req.invalid");
+      const body = parse(PublishPolicyLooseBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3076,11 +3475,7 @@ export function setupPlatformHandlers() {
       }
       const { record, revision } = publishPolicyRevision(query.data.project_id, operation, config);
 
-      const out = parse(
-        PublishPolicyResponse,
-        policyResponse(record, revision),
-        "mock_response_invalid",
-      );
+      const out = parseOut(PublishPolicyResponse, policyResponse(record, revision));
       if (!out.ok) {
         return out.response;
       }
@@ -3090,7 +3485,7 @@ export function setupPlatformHandlers() {
     // A dry run: nothing is read or stored. The config is checked as a
     // publish checks it, then evaluated as the server's password set would.
     http.post("*/policies/evaluate", async ({ request }) => {
-      const query = parse(EvaluatePolicyQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(EvaluatePolicyQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3098,7 +3493,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(EvaluatePolicyStrictBody, raw, "req.invalid");
+      const body = parse(EvaluatePolicyStrictBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3110,11 +3505,14 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const decision = evaluatePasswordSet(body.data.config, body.data.input.password, {
-        self_service: body.data.facts?.self_service ?? true,
-        history_matches: body.data.facts?.history_matches ?? [],
-      });
-      const out = parse(EvaluatePolicyResponse, decision, "mock_response_invalid");
+      const decision =
+        body.data.operation === "user.create"
+          ? evaluateUserCreate(body.data.config, body.data.input.solved_challenge)
+          : evaluatePasswordSet(body.data.config, body.data.input.password, {
+              self_service: body.data.facts?.self_service ?? true,
+              history_matches: body.data.facts?.history_matches ?? [],
+            });
+      const out = parseOut(EvaluatePolicyResponse, decision);
       if (!out.ok) {
         return out.response;
       }
@@ -3122,7 +3520,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/policies", ({ request }) => {
-      const query = parse(ListPoliciesQueryParams, listQueryRecord(request), "invalid_query");
+      const query = parse(ListPoliciesQueryParams, listQueryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3139,21 +3537,55 @@ export function setupPlatformHandlers() {
         policies: paged.page.map((record) => policyResponse(record, newestRevision(record))),
         next_page_token: paged.next ?? null,
       };
-      const out = parse(ListPoliciesResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(ListPoliciesResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
       return HttpResponse.json(out.data);
     }),
 
-    // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"
-    // as a policy id.
-    http.get("*/policies/revisions/:revision_id", ({ params, request }) => {
-      const path = parse(GetPolicyRevisionParams, params, "invalid_request");
+    http.get("*/applications/revisions/:revision_id", ({ params, request }) => {
+      const path = parse(GetApplicationRevisionParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetPolicyRevisionQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetApplicationRevisionQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.applicationRevisions.get(path.data.revision_id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("app.not_found", "application: not found"), {
+          status: 404,
+        });
+      }
+      const out = parseOut(GetApplicationRevisionResponse, {
+        id: record.applicationId,
+        revision_id: record.revisionId,
+        slug: record.slug,
+        declared: true,
+        // A response carries each client's first_party in effect; a declared
+        // client is first-party unless its document says otherwise.
+        definition: {
+          ...record.body,
+          clients: asArray(record.body.clients).map((client) =>
+            isObject(client) ? { first_party: true, ...client } : client,
+          ),
+        },
+        created_at: record.createdAt,
+        updated_at: record.updatedAt,
+      });
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"
+    // as a policy id.
+    http.get("*/policies/revisions/:revision_id", ({ params, request }) => {
+      const path = parse(GetPolicyRevisionParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetPolicyRevisionQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3161,11 +3593,7 @@ export function setupPlatformHandlers() {
         if (record.projectId !== query.data.project_id) continue;
         const revision = record.revisions.find((r) => r.revisionId === path.data.revision_id);
         if (revision) {
-          const out = parse(
-            GetPolicyRevisionResponse,
-            policyResponse(record, revision),
-            "mock_response_invalid",
-          );
+          const out = parseOut(GetPolicyRevisionResponse, policyResponse(record, revision));
           return out.ok ? HttpResponse.json(out.data) : out.response;
         }
       }
@@ -3173,11 +3601,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/policies/:policy_id", ({ params, request }) => {
-      const path = parse(GetPolicyParams, params, "invalid_request");
+      const path = parse(GetPolicyParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetPolicyQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetPolicyQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3185,24 +3613,16 @@ export function setupPlatformHandlers() {
       if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
       }
-      const out = parse(
-        GetPolicyResponse,
-        policyResponse(record, newestRevision(record)),
-        "mock_response_invalid",
-      );
+      const out = parseOut(GetPolicyResponse, policyResponse(record, newestRevision(record)));
       return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
     http.get("*/policies/:policy_id/revisions", ({ params, request }) => {
-      const path = parse(ListPolicyRevisionsParams, params, "invalid_request");
+      const path = parse(ListPolicyRevisionsParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(
-        ListPolicyRevisionsQueryParams,
-        listQueryRecord(request),
-        "invalid_query",
-      );
+      const query = parse(ListPolicyRevisionsQueryParams, listQueryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3222,7 +3642,7 @@ export function setupPlatformHandlers() {
         revisions: paged.page.map((revision) => policyResponse(record, revision)),
         next_page_token: paged.next ?? null,
       };
-      const out = parse(ListPolicyRevisionsResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(ListPolicyRevisionsResponse, responseBody);
       return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
@@ -3233,11 +3653,11 @@ export function setupPlatformHandlers() {
 
     // Registered ahead of `*/variables`, which would otherwise match it.
     http.get("*/deployments/:deployment_id/variables", ({ params, request }) => {
-      const path = parse(GetDeploymentVariablesParams, params, "invalid_request");
+      const path = parse(ListDeploymentVariablesParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(ListDeploymentVariablesQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3251,7 +3671,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/variables", ({ request }) => {
-      const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(ListVariablesQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3260,7 +3680,7 @@ export function setupPlatformHandlers() {
         query.data.project_id,
         variableKinds(query.data.kind),
       );
-      const out = parse(GetVariablesResponse, body, "mock_response_invalid");
+      const out = parseOut(ListVariablesResponse, body);
       if (!out.ok) {
         return out.response;
       }
@@ -3270,15 +3690,11 @@ export function setupPlatformHandlers() {
     // One variable by name, which `variables get` and `variables delete`
     // address directly.
     http.get("*/variables/:variableName", ({ request, params }) => {
-      const path = parse(
-        GetVariableParams,
-        { variable_name: String(params.variableName) },
-        "invalid_request",
-      );
+      const path = parse(GetVariableParams, { variable_name: String(params.variableName) });
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetVariableQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetVariableQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3290,7 +3706,7 @@ export function setupPlatformHandlers() {
       if (body === undefined) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
       }
-      const out = parse(GetVariableResponse, body, "mock_response_invalid");
+      const out = parseOut(GetVariableResponse, body);
       if (!out.ok) {
         return out.response;
       }
@@ -3298,15 +3714,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.delete("*/variables/:variableName", ({ request, params }) => {
-      const path = parse(
-        DeleteVariableParams,
-        { variable_name: String(params.variableName) },
-        "invalid_request",
-      );
+      const path = parse(DeleteVariableParams, { variable_name: String(params.variableName) });
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(DeleteVariableQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(DeleteVariableQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3323,7 +3735,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.patch("*/variables", async ({ request }) => {
-      const query = parse(UpdateVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(SetVariablesQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3331,7 +3743,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(UpdateVariablesBody, raw, "invalid_request");
+      const body = parse(SetVariablesBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3369,11 +3781,146 @@ export function setupPlatformHandlers() {
       }
       // 200 with the variables read back, including what the write did not touch.
       const response = variablesResponse(store.variables, projectId, kinds);
-      const out = parse(UpdateVariablesResponse, response, "mock_response_invalid");
+      const out = parseOut(SetVariablesResponse, response);
       if (!out.ok) {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+    // Invitations (ADR 086), as `internal/service/invitation.go` keeps them.
+    http.post("*/invitations", async ({ request }) => {
+      const query = parse(CreateInvitationQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateInvitationBody, raw);
+      if (!body.ok) {
+        return body.response;
+      }
+      if (body.data.type !== "project_member") {
+        return HttpResponse.json(
+          errorBody("not_implemented", "This feature is not implemented yet."),
+          { status: 501 },
+        );
+      }
+      const projectId = query.data.project_id;
+      if (!store.projects.has(projectId)) {
+        return HttpResponse.json(errorBody("proj.not_found", "resource not found"), {
+          status: 404,
+        });
+      }
+      let journeyId: string = randomUUID();
+      let metadata = body.data.metadata ?? null;
+      const replaces = body.data.replaces_invitation_id;
+      if (replaces !== undefined) {
+        const original = projectInvitation(projectId, replaces);
+        // The server answers a replace of an accepted invitation as not found.
+        if (original === undefined || original.status === "accepted") {
+          return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
+        }
+        journeyId = original.journeyId;
+        metadata = body.data.metadata ?? original.metadata;
+        store.invitations.delete(original.id);
+      }
+      const now = Date.now();
+      const invitation: InvitationRecord = {
+        id: `inv_${shortId()}`,
+        projectId,
+        relation: body.data.project_member.relation,
+        metadata,
+        status: "pending",
+        createdAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + INVITATION_TTL_MS).toISOString(),
+        journeyId,
+        respondedBy: null,
+        respondedAt: null,
+        seq: ++store.lastSeq,
+      };
+      store.invitations.set(invitation.id, invitation);
+      const token = randomBytes(32).toString("base64url");
+      const out = parseOut(CreateInvitationResponse, {
+        ...invitationResponse(invitation),
+        link: `${new URL(request.url).origin}/invitations/accept#token=${token}`,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/invitations", ({ request }) => {
+      // `status` repeats, one per status, so every value is read, not the last.
+      const statuses = new URL(request.url).searchParams.getAll("status");
+      const query = parse(ListInvitationsQueryParams, {
+        ...listQueryRecord(request),
+        ...(statuses.length === 0 ? {} : { status: statuses }),
+      });
+      if (!query.ok) {
+        return query.response;
+      }
+      const { project_id: projectId, status, type, limit, page_token: pageToken } = query.data;
+      // The mock keeps project invitations only, so a `team_member` filter matches none.
+      const invitations = [...store.invitations.values()]
+        .filter((invitation) => invitation.projectId === projectId)
+        .filter(
+          (invitation) => status === undefined || status.includes(invitationStatus(invitation)),
+        )
+        .filter(() => type === undefined || type === "project_member")
+        .sort((a, b) => b.seq - a.seq);
+      const paged = pageOf(invitations, limit, pageToken);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const out = parseOut(ListInvitationsResponse, {
+        invitations: paged.page.map(invitationResponse),
+        next_page_token: paged.next ?? null,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.get("*/invitations/:invitation_id", ({ params, request }) => {
+      const path = parse(GetInvitationParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetInvitationQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const invitation = projectInvitation(query.data.project_id, path.data.invitation_id);
+      if (invitation === undefined) {
+        return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
+      }
+      const out = parseOut(GetInvitationResponse, invitationResponse(invitation));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/invitations/:invitation_id", ({ params, request }) => {
+      const path = parse(CancelInvitationParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(CancelInvitationQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const invitation = projectInvitation(query.data.project_id, path.data.invitation_id);
+      // An accepted invitation can't be cancelled; the server answers it as not found.
+      if (invitation === undefined || invitationStatus(invitation) === "accepted") {
+        return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
+      }
+      store.invitations.delete(invitation.id);
+      return new HttpResponse(null, { status: 204 });
     }),
   ];
 }

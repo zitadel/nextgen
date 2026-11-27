@@ -1,0 +1,17 @@
+title: CreateTeamMemberInvitationRequest
+description: |
+  Creates a team-member invitation. Declared now; creating one answers `501`
+  `not_implemented` until team invitations ship.
+allOf:
+  - $ref: create-invitation-common.yaml
+  - type: object
+    required:
+      - type
+      - team_member
+    properties:
+      type:
+        type: string
+        enum:
+          - team_member
+      team_member:
+        $ref: invitation-team-member-payload.yaml

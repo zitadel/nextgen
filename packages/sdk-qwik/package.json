@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-qwik",
-  "version": "0.4.0",
+  "version": "0.9.0",
   "description": "Qwik components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik#readme",
   "bugs": {
@@ -14,7 +14,8 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "!dist/api-docs"
   ],
   "main": "./dist/index.qwik.mjs",
   "qwik": "./dist/index.qwik.mjs",
@@ -29,17 +30,15 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build --mode lib && attw --pack . --profile=esm-only",
+    "build": "vite build --mode lib && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
-    "test:all": "vitest run",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "docs:api": "typedoc",
     "install-browsers": "playwright install chromium",
     "prepack": "publint --strict"
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*"
   },
@@ -53,7 +52,9 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/client-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "playwright": "catalog:",

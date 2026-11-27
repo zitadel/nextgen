@@ -6,14 +6,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/zitadel/nextgen/api/client"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 func newClient(t *testing.T, srv *httptest.Server) *api.Client {
 	t.Helper()
 	//egress:allow test client against an httptest server
-	c, err := client.New(srv.URL, NewCredentials("secret"), api.WithClient(http.DefaultClient))
+	c, err := api.New(srv.URL, NewCredentials("secret"), api.WithClient(http.DefaultClient))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +28,7 @@ func opError(t *testing.T, err error) *OpError {
 	return oe
 }
 
-// TestLoginClassifiesErrorDetails: a 400 error-details body on POST /flow
+// TestLoginClassifiesErrorDetails: a 400 error-details body on POST /flows
 // becomes an OpError carrying the body's code and the status class.
 func TestLoginClassifiesErrorDetails(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -52,7 +51,7 @@ func TestLoginClassifiesStepError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		http.SetCookie(w, &http.Cookie{Name: "_zflow", Value: "sealed", Path: "/"})
-		if r.URL.Path == "/api/v1/flow" {
+		if r.URL.Path == "/api/v1/flows" {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"id":"flow_1","session_id":"sess_1","step":{"name":"identifier","type":"form","fields":[],"actions":[],"gates":{}}}`))
 			return
@@ -98,7 +97,7 @@ func TestClassifyTransport(t *testing.T) {
 
 // TestClassifiesDefaultErrorResponse: a status the spec documents only
 // through the default error response — 403 on GET /users/{id}, 500 on POST
-// /flow — keeps the server's code instead of collapsing to
+// /flows — keeps the server's code instead of collapsing to
 // unexpected_response.
 func TestClassifiesDefaultErrorResponse(t *testing.T) {
 	for _, tc := range []struct {

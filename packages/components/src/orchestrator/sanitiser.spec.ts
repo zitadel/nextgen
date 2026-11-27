@@ -14,6 +14,14 @@ describe("DOMPurify sanitiser", () => {
     expect(out).toContain("required");
   });
 
+  it.each(["name", "title", "id", "action", "method", "length", "location", "body", "domain"])(
+    'keeps a field named "%s" that collides with a DOM property (#2532)',
+    (value) => {
+      const out = sanitise(`<zl-field name="${value}" label="x"></zl-field>`);
+      expect(out).toContain(`name="${value}"`);
+    },
+  );
+
   it("preserves <zl-button> with hierarchy, action, and label", () => {
     const out = sanitise(
       `<zl-button hierarchy="primary" size="medium" type="submit" action="submit" label="Continue"></zl-button>`,
@@ -33,6 +41,15 @@ describe("DOMPurify sanitiser", () => {
     const out = sanitise(`<img src="x" onerror="alert(1)" />`);
     expect(out).not.toContain("onerror");
   });
+
+  it.each(["onmouseover", "onpointerdown", "onanimationend"])(
+    "strips the %s handler from a custom element",
+    (handler) => {
+      const out = sanitise(`<zl-button ${handler}="alert(1)" action="submit">Go</zl-button>`);
+      expect(out).not.toContain(handler);
+      expect(out).toContain('action="submit"');
+    },
+  );
 
   it("strips <style> blocks (theming is orchestrator-owned)", () => {
     const out = sanitise(`<div><style>:host { color: red }</style>safe</div>`);

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/api",
-  "version": "0.4.0",
+  "version": "0.9.0",
   "description": "Generated TypeScript API client for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/api#readme",
   "bugs": {
@@ -52,10 +52,10 @@
       "types": "./dist/runtime/base-url.d.mts",
       "import": "./dist/runtime/base-url.mjs"
     },
-    "./runtime/auth": {
-      "@zitadel/source": "./src/runtime/auth.ts",
-      "types": "./dist/runtime/auth.d.mts",
-      "import": "./dist/runtime/auth.mjs"
+    "./runtime/client": {
+      "@zitadel/source": "./src/runtime/client.ts",
+      "types": "./dist/runtime/client.d.mts",
+      "import": "./dist/runtime/client.mjs"
     },
     "./runtime/paging": {
       "@zitadel/source": "./src/runtime/paging.ts",
@@ -79,13 +79,11 @@
     }
   },
   "scripts": {
-    "generate": "node ../../scripts/task-guard.mjs --mutex generated-sources -- orval --config orval.config.ts --clean",
-    "build": "tsdown && attw --pack . --profile=esm-only",
+    "generate": "orval --config orval.config.ts --clean",
+    "build": "tsdown && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
     "prepack": "publint --strict"
   },
   "devDependencies": {

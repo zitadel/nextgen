@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { AuthorIdentity } from "../../../../src/lib/git/author-identity";
-import { fakeGit } from "../../../helpers/git-repo";
+import { AuthorIdentity } from "@/lib/git/author-identity";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 /** A git that has its own identity when `own`, and can guess one when `guess`. */
 function gitWith(own: boolean, guess: boolean) {

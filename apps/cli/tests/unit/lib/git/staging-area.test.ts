@@ -4,12 +4,12 @@ import { chmod, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
-import { NothingExcludedIsStaged } from "../../../../src/lib/git/checks/nothing-excluded-is-staged";
-import { SomethingIsStaged } from "../../../../src/lib/git/checks/something-is-staged";
-import { Git } from "../../../../src/lib/git/git";
-import { StagingArea } from "../../../../src/lib/git/staging-area";
+import { NothingExcludedIsStaged } from "@/lib/git/checks/nothing-excluded-is-staged";
+import { SomethingIsStaged } from "@/lib/git/checks/something-is-staged";
+import { Git } from "@/lib/git/git";
+import { StagingArea } from "@/lib/git/staging-area";
 import {
   GitScratch,
   git,
@@ -17,17 +17,14 @@ import {
   isolateGit,
   stagedFiles,
   write,
-} from "../../../helpers/git-repo";
+} from "@tests/helpers/git-repo";
+import { removeTree } from "@tests/fixtures/scratch";
 
 const exec = promisify(execFile);
 
 const scratch = new GitScratch();
 
 beforeEach(isolateGit);
-
-afterEach(async () => {
-  await scratch.cleanup();
-});
 
 /** What `staging` holds staged against the last commit. */
 async function staged(staging: StagingArea): Promise<string[]> {
@@ -312,6 +309,19 @@ describe("StagingArea", () => {
     expect(files).toEqual(["b.txt"]);
   });
 
+  it("marks the untracked files a glob matches, beside a glob that matches none", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await write(cwd, { "p/b.json": "{}\n", "p/c.md": "c\n", "p/sub/d.json": "{}\n" });
+
+    const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead(new Git(cwd));
+      await staging.markAsAdded([], ["p/*.json", "q/*.json"]);
+      return (await staging.git.run(["ls-files", "-z"])).paths();
+    });
+
+    expect(files).toEqual(["a.txt", "p/b.json"]);
+  });
+
   it("marks nothing when no path exists", async () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
 
@@ -483,19 +493,17 @@ describe("StagingArea", () => {
       const cwd = await scratch.committed({ "a.txt": "a\n" });
       const folder = { path: "" };
 
-      try {
-        const result = await StagingArea.temporary(new Git(cwd), async (staging) => {
-          folder.path = dirname(await indexOf(staging));
-          await writeFile(join(folder.path, "held"), "");
-          await chmod(folder.path, 0o500);
-          return "done";
-        });
+      onTestFinished(() => {
+        return removeTree(folder.path);
+      });
+      const result = await StagingArea.temporary(new Git(cwd), async (staging) => {
+        folder.path = dirname(await indexOf(staging));
+        await writeFile(join(folder.path, "held"), "");
+        await chmod(folder.path, 0o500);
+        return "done";
+      });
 
-        expect(result).toBe("done");
-      } finally {
-        await chmod(folder.path, 0o755);
-        await rm(folder.path, { recursive: true, force: true });
-      }
+      expect(result).toBe("done");
     },
   );
 

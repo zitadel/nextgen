@@ -1,7 +1,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { Config } from "@oclif/core";
 import { expect } from "vitest";
+
+import {
+  declaredOf,
+  type LooseNext,
+  type Scope,
+  type Suggest,
+  type SuggestWords,
+  suggesterFor,
+  suggestionWords,
+} from "@/lib/suggestion";
 
 import { cliPackageRoot } from "./oclif-build";
 
@@ -27,33 +38,88 @@ const REFERENCE = JSON.parse(
 /** The CLI as a suggestion runs it: `npx @zitadel/cli@<version>` or `zitadel`. */
 const RUNNER = /^(?:@zitadel\/cli(?:@\S+)?|zitadel)$/;
 
+/** The words that ask for help rather than run a command. */
+const HELP: ReadonlySet<string> = new Set(["--help", "-h"]);
+
+/** One shell word: unquoted characters, escapes and quoted runs, up to the next blank. */
+const SHELL_WORD = /(?:[^\s'"\\]|\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*")+/g;
+/** A quoted run or an escape inside a word, which the shell replaces with its text. */
+const SHELL_QUOTING = /'([^']*)'|"((?:\\[\s\S]|[^"\\])*)"|\\([\s\S])/g;
+
 /** The words a POSIX shell splits a command into, and the operators between them. */
 function shellWords(command: string): string[] {
-  const words: string[] = [];
-  let word: string | undefined;
-  for (let at = 0; at < command.length; at++) {
-    const char = command[at] as string;
-    if (char === "'") {
-      const end = command.indexOf("'", at + 1);
-      word = (word ?? "") + command.slice(at + 1, end);
-      at = end;
-    } else if (char === '"') {
-      let text = "";
-      for (at++; at < command.length && command[at] !== '"'; at++) {
-        text += command[at] === "\\" ? (command[++at] ?? "") : command[at];
-      }
-      word = (word ?? "") + text;
-    } else if (char === "\\") {
-      word = (word ?? "") + (command[++at] ?? "");
-    } else if (/\s/.test(char)) {
-      if (word !== undefined) words.push(word);
-      word = undefined;
-    } else {
-      word = (word ?? "") + char;
-    }
+  return (command.match(SHELL_WORD) ?? []).map((word) =>
+    word.replaceAll(
+      SHELL_QUOTING,
+      (_, single?: string, double?: string, escaped?: string) =>
+        single ?? double?.replaceAll(/\\([\s\S])/g, "$1") ?? escaped ?? "",
+    ),
+  );
+}
+
+/** What a command's words hold after its name: how many arguments, and the first thing wrong with them. */
+type Walk = Readonly<{ positional: number; problem?: string }>;
+
+/** The flag a word names, and whether the word carries its own value (`--name=value`). */
+function flagFor(
+  token: string,
+  flags: readonly FlagReference[],
+): Readonly<{ flag?: FlagReference; isInline: boolean }> {
+  const isLong = token.startsWith("--");
+  const spelled = isLong ? (token.slice(2).split("=")[0] as string) : token.slice(1);
+  const isInline = isLong && token.includes("=");
+  const named =
+    flags.find(({ name }) => {
+      return name === spelled;
+    }) ??
+    flags.find(({ name, allowNo }) => {
+      return allowNo && `no-${name}` === spelled;
+    });
+  const flag = isLong
+    ? named
+    : flags.find(({ char }) => {
+        return char === spelled;
+      });
+
+  return { flag, isInline };
+}
+
+/**
+ * Reads a command's words in order: an option takes the word after it, `--`
+ * makes every word after it an argument, and a template's `...` stands for the
+ * rest, which it does not spell.
+ */
+function walk(
+  reference: CommandReference,
+  flags: readonly FlagReference[],
+  tokens: readonly string[],
+  seen: ReadonlySet<string> = new Set(),
+  positional = 0,
+): Walk {
+  const [token, ...rest] = tokens;
+
+  if (token === undefined || token === "...") {
+    return { positional };
   }
-  if (word !== undefined) words.push(word);
-  return words;
+  if (token === "--") {
+    return { positional: positional + rest.length };
+  }
+  if (!token.startsWith("-") || token === "-") {
+    return walk(reference, flags, rest, seen, positional + 1);
+  }
+
+  const { flag, isInline } = flagFor(token, flags);
+
+  if (flag === undefined) {
+    return { positional, problem: `${reference.id} takes no ${token}` };
+  }
+  if (!flag.multiple && seen.has(flag.name)) {
+    return { positional, problem: `${reference.id} takes --${flag.name} once` };
+  }
+
+  const remaining = flag.type === "option" && !isInline ? rest.slice(1) : rest;
+
+  return walk(reference, flags, remaining, new Set([...seen, flag.name]), positional);
 }
 
 /**
@@ -74,6 +140,16 @@ function problemWith(command: string): string | undefined {
     (word, at) => at > runner && ["|", "&&", "||", ";", "<", ">", "2>&1"].includes(word),
   );
   const rest = words.slice(runner + 1, end === -1 ? undefined : end);
+  // Help is oclif's own flag, on the CLI and on every command, so no command lists it.
+  if (rest.length > 0 && HELP.has(rest.at(-1) as string)) {
+    const named = rest.slice(0, -1);
+    return named.length === 0 ||
+      REFERENCE.commands.some(({ id }) => {
+        return id === named.join(" ");
+      })
+      ? undefined
+      : `names no command: ${named.slice(0, 2).join(" ")}`;
+  }
   const reference = REFERENCE.commands
     .filter(({ id }) => id.split(" ").every((part, at) => rest[at] === part))
     .sort((a, b) => b.id.split(" ").length - a.id.split(" ").length)[0];
@@ -81,45 +157,26 @@ function problemWith(command: string): string | undefined {
     return `names no command: ${rest.slice(0, 2).join(" ")}`;
   }
   const flags = [...reference.flags, ...REFERENCE.globalFlags];
-  const seen = new Map<string, number>();
-  let positional = 0;
   const tokens = rest.slice(reference.id.split(" ").length);
-  for (let at = 0; at < tokens.length; at++) {
-    const token = tokens[at] as string;
-    // A template's `...` stands for the rest, which it does not spell.
-    if (token === "...") {
-      break;
-    }
-    if (token === "--") {
-      positional += tokens.length - at - 1;
-      break;
-    }
-    if (!token.startsWith("-") || token === "-") {
-      positional++;
-      continue;
-    }
-    const [spelled, inline] = token.startsWith("--")
-      ? [token.slice(2).split("=")[0] as string, token.includes("=")]
-      : [token.slice(1), false];
-    const flag = token.startsWith("--")
-      ? (flags.find(({ name }) => name === spelled) ??
-        flags.find(({ name, allowNo }) => allowNo && `no-${name}` === spelled))
-      : flags.find(({ char }) => char === spelled);
-    if (flag === undefined) {
-      return `${reference.id} takes no ${token}`;
-    }
-    seen.set(flag.name, (seen.get(flag.name) ?? 0) + 1);
-    if (!flag.multiple && (seen.get(flag.name) ?? 0) > 1) {
-      return `${reference.id} takes --${flag.name} once`;
-    }
-    if (flag.type === "option" && !inline) {
-      at++;
-    }
+  const walked = walk(reference, flags, tokens);
+
+  if (walked.problem !== undefined) {
+    return walked.problem;
   }
-  if (!reference.variadic && positional > reference.args.length) {
-    return `${reference.id} takes ${reference.args.length} argument(s), not ${positional}`;
+  if (!reference.variadic && walked.positional > reference.args.length) {
+    return `${reference.id} takes ${reference.args.length} argument(s), not ${walked.positional}`;
   }
+
   return undefined;
+}
+
+/** Every command an envelope suggests, at its top level and in its data. */
+function suggestedBy(envelope: Readonly<{ next_commands?: string[]; data?: unknown }>): string[] {
+  const data = envelope.data as { next_commands?: unknown } | undefined;
+  return [
+    ...(envelope.next_commands ?? []),
+    ...(Array.isArray(data?.next_commands) ? (data.next_commands as string[]) : []),
+  ];
 }
 
 /**
@@ -137,11 +194,7 @@ export function assertRunnableSuggestions(
     data?: unknown;
   }>,
 ): void {
-  const data = envelope.data as { next_commands?: unknown } | undefined;
-  const suggested = [
-    ...(envelope.next_commands ?? []),
-    ...(Array.isArray(data?.next_commands) ? (data.next_commands as string[]) : []),
-  ];
+  const suggested = suggestedBy(envelope);
   for (const command of suggested) {
     expect(problemWith(command), `${where} suggests \`${command}\``).toBeUndefined();
   }
@@ -152,4 +205,126 @@ export function assertRunnableSuggestions(
       `${where}: a refusal for want of --force names no way to pass it`,
     ).toBe(true);
   }
+}
+
+/** The flags that pick which project a run acts on. */
+const SELECTORS: ReadonlySet<string> = new Set(["--server", "--env", "-e", "--env-file"]);
+
+/**
+ * The CLI command a suggestion runs, and every flag it names: `undefined` for
+ * a suggestion that is no command of the CLI's (`npm run dev`), or asks for help.
+ */
+function ownCommand(command: string): { id: string; flags: ReadonlySet<string> } | undefined {
+  const words = shellWords(command);
+  const runner = words.findIndex((word) => RUNNER.test(word));
+  if (runner === -1) {
+    return undefined;
+  }
+  const end = words.findIndex(
+    (word, at) => at > runner && ["|", "&&", "||", ";", "<", ">", "2>&1"].includes(word),
+  );
+  const rest = words.slice(runner + 1, end === -1 ? undefined : end);
+  const reference = REFERENCE.commands
+    .filter(({ id }) => id.split(" ").every((part, at) => rest[at] === part))
+    .sort((a, b) => b.id.split(" ").length - a.id.split(" ").length)[0];
+  if (reference === undefined || HELP.has(rest.at(-1) as string)) {
+    return undefined;
+  }
+
+  return {
+    id: reference.id.replaceAll(" ", ":"),
+    flags: new Set(
+      rest
+        .slice(reference.id.split(" ").length)
+        .filter((word) => word.startsWith("-"))
+        .map((word) => word.split("=")[0] as string),
+    ),
+  };
+}
+
+/**
+ * Every command an envelope suggests aims at the project the run did: it names
+ * the run's `--cwd`, and, for a command that takes an environment, a selector
+ * (`--server`, `--env` or `--env-file`), or it would act on the default
+ * project. A suggestion may name another selector, to aim elsewhere, but never
+ * none. Checked on every spec's `--json` run, for every command, so one that
+ * forgets fails in its own spec.
+ *
+ * @param where - The run, as a failure names it.
+ * @param envelope - What the run printed.
+ * @param ranWith - The whole command line the run was given, scope included.
+ */
+export function assertSuggestionsCarryTheRun(
+  where: string,
+  envelope: Readonly<{ next_commands?: string[]; data?: unknown }>,
+  ranWith: readonly string[],
+): void {
+  const given = new Set(ranWith.map((word) => word.split("=")[0]));
+  const selected = [...SELECTORS].some((flag) => given.has(flag));
+  for (const command of suggestedBy(envelope)) {
+    const own = ownCommand(command);
+    if (own === undefined) {
+      continue;
+    }
+    const declared = declaredOf(own.id, config.findCommand(own.id)).flags;
+    if (given.has("--cwd") && declared.has("cwd")) {
+      expect(own.flags.has("--cwd"), `${where} suggests \`${command}\`, which drops --cwd`).toBe(
+        true,
+      );
+    }
+    if (selected && declared.has("env-file")) {
+      expect(
+        [...own.flags].some((flag) => SELECTORS.has(flag)),
+        `${where} suggests \`${command}\`, which names no environment and so acts on the default project`,
+      ).toBe(true);
+    }
+  }
+}
+
+/** The release the commands a test renders are written for, unless it says otherwise. */
+export const SUGGEST_CLI_VERSION = "0.1.0";
+
+const config = await Config.load(cliPackageRoot);
+
+/**
+ * A {@link Suggest} as a run renders its suggestions, against the commands the
+ * CLI really declares: what a command suggests in a test is what it suggests
+ * for a person.
+ *
+ * @param scope - What the run puts back on each command: its directory and environment.
+ * @param cliVersion - The release the commands are written for.
+ * @returns The renderer.
+ */
+export function aSuggest(scope: Scope = {}, cliVersion: string = SUGGEST_CLI_VERSION): Suggest {
+  return suggesterFor(config, scope, cliVersion);
+}
+
+/**
+ * A {@link SuggestWords} as a run renders its suggestions: the words after the
+ * CLI, unquoted, for a result that reports argument lists too.
+ *
+ * @param scope - What the run puts back on each command: its directory and environment.
+ * @returns The renderer.
+ */
+export function aSuggestWords(scope: Scope = {}): SuggestWords {
+  return (next: LooseNext) => {
+    return suggestionWords(next.id, next, declaredOf(next.id, config.findCommand(next.id)), scope);
+  };
+}
+
+/**
+ * A config for a command built in a test: the release it reports is fixed, so
+ * what it renders reads the same on every build, and it finds the CLI's real
+ * commands, which its suggestions are rendered against.
+ *
+ * @param version - The release the run reports.
+ * @returns The config.
+ */
+export function aConfigAt(version: string): Config {
+  return {
+    version,
+    findCommand: (id: string) => {
+      return config.findCommand(id);
+    },
+  } as unknown as Config;
 }

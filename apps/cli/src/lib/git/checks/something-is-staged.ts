@@ -1,5 +1,5 @@
-import type { Git } from "../git";
-import type { Check } from "../operation";
+import type { Git } from "@/lib/git/git";
+import type { Check } from "@/lib/git/operation";
 
 /**
  * Something is staged, so a commit has something to record.

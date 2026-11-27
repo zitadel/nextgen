@@ -2,7 +2,13 @@ import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-r
 import { Box, Plus } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { AddTeamSheet } from "@/components/add-team-sheet";
+import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
+import {
+  TEAM_STATUS_LABEL,
+  TEAM_STATUSES,
+  type TeamStatus,
+  teamStatusLabel,
+} from "@/features/teams/status";
 import {
   LoadMore,
   RESOURCE_CELL,
@@ -26,17 +32,10 @@ import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
-import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
+import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
 import { Page } from "@/components/layout";
 import { PAGE_TITLE_ROW } from "@/components/typography";
-
-/**
- * The two states `team-status` defines. The tabs filter on exactly these, so the
- * screen never shows a state the API does not have — the design's table draws
- * the second one as `Inactive`, but its own tab already writes `Deactivated`.
- */
-const STATUSES = ["active", "deactivated"] as const;
-type TeamStatus = (typeof STATUSES)[number];
+import { LIST_PAGE_SIZE } from "@/lib/paging";
 
 type TeamsSearch = { status: TeamStatus };
 
@@ -48,25 +47,18 @@ export const Route = createFileRoute("/_authed/teams/")({
   // changing it re-runs the loader, which resets the paged-in rows the way a
   // create or a delete does.
   validateSearch: (search: Record<string, unknown>): TeamsSearch => ({
-    status: STATUSES.find((status) => status === search.status) ?? "active",
+    status: TEAM_STATUSES.find((status) => status === search.status) ?? "active",
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const page = await api.queryTeams(
-      { limit: PAGE_SIZE, filter: teamFilter(deps) },
+      { limit: LIST_PAGE_SIZE, filter: teamFilter(deps) },
       { project_id: requireProjectScope(deps.project) },
     );
     return { teams: page.teams, nextPageToken: page.next_page_token ?? undefined };
   },
   component: TeamsScreen,
 });
-
-/**
- * One page of teams. `POST /teams/query` is cursor-paginated, so this is a page
- * size rather than a cap on what the operator can reach — `Load more` walks the
- * rest (design decisions log D5: a button, not pagination controls).
- */
-const PAGE_SIZE = 25;
 
 /**
  * The design lays this table on a fixed 248px grid, so a long team name
@@ -97,7 +89,7 @@ function TeamsScreen() {
         // The same filter the token was issued under: a page token answers one
         // question, and asking a different one with it is not a narrower list
         // but a meaningless one.
-        { limit: PAGE_SIZE, page_token: pageToken, filter: teamFilter(search) },
+        { limit: LIST_PAGE_SIZE, page_token: pageToken, filter: teamFilter(search) },
         { project_id: projectId },
       );
       return { items: page.teams, nextPageToken: page.next_page_token ?? undefined };
@@ -129,29 +121,27 @@ function TeamsScreen() {
           <div className={PAGE_TITLE_ROW}>
             <h1 className={RESOURCE_TITLE}>Teams</h1>
             <AddTeamSheet onCreated={() => router.invalidate()}>
-              {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                  `px-2.5`, which renders the 68px control at 72px. */}
+              {/* Named for what it adds, as its sheet is titled. `px-2.5!` —
+                  `Button`'s `has-[>svg]:px-3` out-specifies a plain `px-2.5`. */}
               <Button className="shrink-0 gap-1.5 px-2.5!">
                 <Plus aria-hidden />
-                Add
+                Add team
               </Button>
             </AddTeamSheet>
           </div>
 
           <TabsList aria-label="Filter teams by status">
-            {/* `flex-none` — the triggers hug their labels, as the design draws
-                them at 56px and 92px; the shared component stretches them to
-                share the list evenly. */}
-            <TabsTrigger value="active" className="flex-none">
-              Active
-            </TabsTrigger>
-            <TabsTrigger value="deactivated" className="flex-none">
-              Deactivated
-            </TabsTrigger>
+            {/* `flex-none`: the triggers hug their labels; the shared component
+                stretches them to share the list evenly. */}
+            {TEAM_STATUSES.map((status) => (
+              <TabsTrigger key={status} value={status} className="flex-none">
+                {TEAM_STATUS_LABEL[status]}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
 
-        {STATUSES.map((status) => (
+        {TEAM_STATUSES.map((status) => (
           <TabsContent key={status} value={status}>
             <div className={RESOURCE_TABLE_WRAP}>
               {/* The design lays the table on a fixed 248px grid, so a long team
@@ -194,7 +184,7 @@ function TeamsScreen() {
                           </Link>
                         </TableCell>
                         <TableCell className={RESOURCE_CELL}>
-                          <StatusBadge status={team.status} />
+                          <StatusBadge status={team.status} label={teamStatusLabel(team.status)} />
                         </TableCell>
                         <TableCell className={RESOURCE_CELL_MUTED}>
                           {formatDate(team.created_at)}
@@ -219,7 +209,7 @@ function TeamsScreen() {
 
 /** What an empty table means depends on which tab asked for it. */
 function emptyMessage({ status }: TeamsSearch): string {
-  return status === "active" ? "No active teams yet." : "No deactivated teams.";
+  return status === "active" ? "No active teams yet." : "No inactive teams.";
 }
 
 /**

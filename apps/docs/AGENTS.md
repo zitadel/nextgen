@@ -37,6 +37,9 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Keep `assetPrefix`; never switch to `basePath`, or the URLs in `llms.txt`,
   the Markdown and the MCP answers lose their `/docs`.
 - Link content by full path: `/docs/reference/cli`, not `/reference/cli`.
+- A route that serves text to download (`.md`, `llms-full.txt`,
+  `openapi.json`) passes it through `absoluteDocsLinks` and sends `cdnCached`
+  (`lib/absolute-links.ts`): it then runs per request, so the CDN must keep it.
 - The favicons are the cloud's, which the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
 - `components/logo.tsx` copies `apps/website/app/logo.tsx` (its motion in
@@ -88,7 +91,7 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - `guides/` leads to one outcome; `get-started/` does the same for a reader
   new to Zitadel, from nothing to a working sign-in.
 - `reference/` describes the exact contract; operation pages come from the
-  spec ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone)).
+  spec ([`api/openapi/AGENTS.md`](../api/api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone)).
 - `sdks/` holds one page per package: install it, wire it up, check it works.
 - In a guide, list prerequisites before the first command, and say where each
   required input comes from: "the project ID that `zitadel setup` prints".
@@ -126,7 +129,9 @@ else, such as a customer's backend or a SaaS product's tenants.
   `next.config.mjs` redirects it and its `.md` twin, and a test follows each.
 - A page's URL is its path under `content/docs/`. The API reference pages per
   operation and per webhook come from the OpenAPI document (`lib/source.ts`);
-  `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
+  `turbo run generate --filter=@zitadel/docs` shapes the committed embed into
+  `.generated/openapi.mjs` (run the server's `generate` first when the OpenAPI
+  YAML changes).
 - An API tag's page is prose and `<Operations />`, its operations from that
   document; give its folder no `meta.json`, so the sidebar keeps their order.
 - The CLI reference pages come from the CLI's `command-reference.json`
@@ -135,10 +140,10 @@ else, such as a customer's backend or a SaaS product's tenants.
   release notes come from the CLI's `CHANGELOG.md`: fix an entry there.
 - The API reference's Errors page comes from the error schemas and each
   operation's error set (`lib/error-reference.ts`): change the server's errors,
-  never the page ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#error-codes)).
+  never the page ([`apps/api/api/openapi/AGENTS.md`](../api/api/openapi/AGENTS.md#error-codes)).
 - An operation's description is its page body; its first sentence is the
   page's description everywhere else (`lib/description.ts`). The spec's side
-  is in [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
+  is in [`apps/api/api/openapi/AGENTS.md`](../api/api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
 - Render an operation or webhook page through `openapiPageProps`
   (`lib/source.ts`), never `getOpenAPIPageProps()` directly, which hands the
   client component the whole OpenAPI document.
@@ -182,19 +187,18 @@ Fumadocs stories (`components/examples/`).
 ## Checks and tests
 
 ```sh
-moon run docs:typecheck docs:lint docs:build
-moon run docs:start   # the build on port 3003
-moon run docs:e2e     # tests/ against the local build
-CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
+turbo run typecheck lint build --filter=@zitadel/docs
+turbo run start --filter=@zitadel/docs   # the build on port 3003
+turbo run e2e --filter=@zitadel/docs     # tests/ against the local build
+CLOUD_URL=https://cloud-….vercel.app turbo run e2e-deployment --filter=@zitadel/docs
 ```
 
-- Try the API playground on `moon run workspace:cloud`: it sends reads to its
+- Try the API playground on `pnpm run cloud`: it sends reads to its
   page's origin with the reader's session, and no API answers on the docs'
   port 3003.
-- Vercel builds with `turbo run build --filter=@zitadel/docs`, never moon:
-  moon cannot archive the symlinks Vercel's Next.js adapter writes into
-  `.next/output`. The build's key holds the deployment's ID, so Vercel never
-  restores it ([turborepo.md](../../docs/design/build/turborepo.md)).
+- Vercel builds with `turbo run build --filter=@zitadel/docs`. The build's key
+  holds the deployment's ID, so Vercel never restores it
+  ([turborepo.md](../../docs/design/build/turborepo.md)).
 - `tests/` is a contract suite written against a URL, so the same specs check
   the local build and any deployment. A deployment run needs
   `VERCEL_AUTOMATION_BYPASS_SECRET`.

@@ -1,5 +1,137 @@
 # @zitadel/config
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.9.0
+
+## 0.8.0
+
+### Minor Changes
+
+- [#3076](https://github.com/zitadel/nextgen/pull/3076) [`a242dac`](https://github.com/zitadel/nextgen/commit/a242dacc9badeac3a451b89d2c6ef1e81031ccbf) - `@zitadel/config` exports `webApplication()`, which builds an application document for a web app: one confidential OAuth client that signs users in with the authorization code grant and returns them to the redirect URIs you pass. `APPLICATION_PRESETS` lists the preset names. Both are also exported from `@zitadel/config/application-presets`, which runs in the browser.
+
+### Patch Changes
+
+- [#3245](https://github.com/zitadel/nextgen/pull/3245) [`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d) - `zitadel api` reads its JSON body from `--file <path>` (or `--file -` for stdin), matching the body flag on the create and update commands and freeing `--input` for a whole invocation as JSON. The flows README that ships into customer projects names the new flag.
+  
+  **Breaking:** `api --input <path>` is now `api --file <path>`.
+
+- [#3179](https://github.com/zitadel/nextgen/pull/3179) [`224b845`](https://github.com/zitadel/nextgen/commit/224b8451c3ebd7ffa9c37eccf25e0d47cb9453d8) - A branding `typography.font_url` without a `typography.font_family` is now refused with the spec's own wording, "font_family is required when font_url is present", reported at `typography.font_family`. The rule is generated from the spec's `dependentRequired` instead of repeated by hand.
+- Updated dependencies [[`727e952`](https://github.com/zitadel/nextgen/commit/727e952a78b789189552b2cb77a683711790737c), [`51050fc`](https://github.com/zitadel/nextgen/commit/51050fc1b8d164c0a532db5ced883c887780326d), [`44bd34c`](https://github.com/zitadel/nextgen/commit/44bd34c0a460b658974566bc771af0ae15d041a1)]:
+  - @zitadel/api@0.8.0
+
+## 0.7.0
+
+### Minor Changes
+
+- [#2943](https://github.com/zitadel/nextgen/pull/2943) [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd) - Flow definitions no longer take a `status`: every flow a release pins is served, and the release alone decides which flows are live.
+  
+  **Breaking:** a flow definition that still sends `status` is refused. Delete the `"status"` line from each file in `.zitadel/flows/` before the next `zitadel deploy`. A `draft` flow is served as soon as a release pins it, including a release deployed before the upgrade, so move a draft out of `.zitadel/flows/` and deploy before upgrading if it should stay off.
+
+- [#2839](https://github.com/zitadel/nextgen/pull/2839) [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce) - `zitadel setup` now writes the sign-up policy, `.zitadel/policies/user.create.json`, beside the password policy. It names the challenge every password or passkey sign-up solves, Zitadel's built-in proof of work, which applies with or without the file. Deploy it like any [policy](https://preview.zitadel.com/docs/guides/deploy#policies); `POST /policies` and `zitadel policy test` take `user.create` too.
+
+### Patch Changes
+
+- [#3067](https://github.com/zitadel/nextgen/pull/3067) [`0c5c523`](https://github.com/zitadel/nextgen/commit/0c5c523d267b61b631f047ec4e29d8c0278ef462) - The branding README that `zitadel branding eject` writes into `.zitadel/branding/` now explains a logo per light and dark theme under `theme`, and that the component's `theme` attribute wins over `theme.mode`. It also says that a login already open keeps the release it started with, and that image URLs may use `http://` on loopback hosts while you develop.
+
+- [#2379](https://github.com/zitadel/nextgen/pull/2379) [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd) - `zitadel variable list`, `origin list`, `env list` and `resources` answer an empty result with `No <things> found.`, like every other list. A blank display name, client id or client secret is reported as empty rather than as an instruction to type one; it reaches `--json` only as an error `message`.
+
+- [#3109](https://github.com/zitadel/nextgen/pull/3109) [`80fc7e8`](https://github.com/zitadel/nextgen/commit/80fc7e8855d10e0127875c67bea19754864b4b79) - Every `zitadel` resource command names its resource in the singular, as
+  `zitadel release`, `zitadel deployment` and `zitadel variable` already did:
+  `zitadel user list`, `zitadel policy test`
+  ([CLI reference](https://preview.zitadel.com/docs/reference/cli)). The plural
+  of every noun still runs the same command, so `zitadel users list` keeps
+  working; help, completion and the reference show only the singular.
+  
+  **Breaking:** nothing you type stops running, but what the CLI prints names
+  the singular whichever spelling you typed. With `--json`, the envelope's
+  `command` is `user:list` where it was `users:list`, and the `topic` that
+  `zitadel resources` and a `--dry-run` report is `user`, for `users`, `teams`,
+  `sessions`, `events`, `grants`, `idps`, `projects`, `schemas`, `policies` and
+  `flow-definitions` alike. `zitadel commands` lists the singular ids only. A
+  script that compares one of those values needs the new name. A plural typed
+  alone, such as `zitadel users`, no longer prints that topic's help: it fails
+  as an unknown command and names `zitadel user --help` as its next command.
+
+- [#3150](https://github.com/zitadel/nextgen/pull/3150) [`b816f9d`](https://github.com/zitadel/nextgen/commit/b816f9d19de143c9765d1fe375469731d7847dc0) - Update dependencies to their latest minor and patch releases.
+
+- [#3152](https://github.com/zitadel/nextgen/pull/3152) [`9ffa302`](https://github.com/zitadel/nextgen/commit/9ffa302ac7c5b063fe1abe061ebd0ffba1c72728) - The flows README that `zitadel setup` writes into `.zitadel/flows/` now explains how to let a user who forgot their password back in: set a new one with `zitadel api setUserPassword`, since a flow can't offer a recovery step yet.
+
+- [#2643](https://github.com/zitadel/nextgen/pull/2643) [`9379df0`](https://github.com/zitadel/nextgen/commit/9379df0c077481ac9eecaa24d292239241422355) - The `.zitadel/policies/README.md` that `zitadel setup` writes no longer says a user can change their own password: `history_depth` is checked only then, which no sign-up or API call does yet. It also shows `max_length`'s lower bound as `min_length`, links the NIST guidance, and links the new guide, [Set the password policy](https://preview.zitadel.com/docs/guides/password-policy).
+- Updated dependencies [[`eedebf1`](https://github.com/zitadel/nextgen/commit/eedebf10695859770992487f65bdd73a1acb8ac4), [`92df356`](https://github.com/zitadel/nextgen/commit/92df35690cce6e742689556a1b9cce8f02bf9259), [`abe0207`](https://github.com/zitadel/nextgen/commit/abe02078fe2d7679a0bf76f7121ee74059e076fb), [`b816f9d`](https://github.com/zitadel/nextgen/commit/b816f9d19de143c9765d1fe375469731d7847dc0), [`050f361`](https://github.com/zitadel/nextgen/commit/050f361d28a0e6f900bc00e47a461b0938cd54e1), [`0860713`](https://github.com/zitadel/nextgen/commit/086071351ac81424f2b53e810d1173dd8389cd9e), [`3d6fba7`](https://github.com/zitadel/nextgen/commit/3d6fba7485989700f730319527f494899df6ab1a), [`f666929`](https://github.com/zitadel/nextgen/commit/f66692920e7d324dd74c33b7272de86b6424e4b7), [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd), [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32), [`15afc63`](https://github.com/zitadel/nextgen/commit/15afc6395b3f0f07a0578a2235c32c371fdfd5ab), [`b66b18f`](https://github.com/zitadel/nextgen/commit/b66b18f08de82f858fa5e3a8d4f703e4476e51e4), [`06d55b4`](https://github.com/zitadel/nextgen/commit/06d55b49e70b3193da5cc2bb668134772707488e), [`7d1dfa6`](https://github.com/zitadel/nextgen/commit/7d1dfa61b17b31c576eeb114eadd9bcb1662e696), [`8bac5fd`](https://github.com/zitadel/nextgen/commit/8bac5fde36160591dbff98e8d79be4d030484469), [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce)]:
+  - @zitadel/api@0.7.0
+
+## 0.6.0
+
+### Minor Changes
+
+- [#2888](https://github.com/zitadel/nextgen/pull/2888) [`8f2033e`](https://github.com/zitadel/nextgen/commit/8f2033e8404f2eddbf77fd4438fdb8a5421ca950) - `POST /applications` registers an application with its OAuth clients, or revises one by slug, and `GET /applications/{id}` reads it ([docs](https://preview.zitadel.com/docs/reference/api/applications)). Both return not implemented until the server implements them.
+
+- [#2889](https://github.com/zitadel/nextgen/pull/2889) [`4860117`](https://github.com/zitadel/nextgen/commit/486011736d8891f7527ae684b15b6b295fa8ad38) - Every command now reads, checks and writes `.zitadel/` through one configuration library, so they all hold the files to the same rules and refuse with the same errors. `@zitadel/config` adds `referencedClientIdVariable` and `referencedClientSecretVariable`, which read a credential reference as the variable it names.
+  
+  **Breaking:** `deploy`, `preview` and `release create` refuse an invalid configuration with one `E_VALIDATION`, "Configuration validation failed (N issues)", whose `details.issues` lists `{rule, path, steps?, message}`; the separate "Flow validation failed", "SSO configuration is not consistent" and "Missing environment variables" errors and the `handle` and `step` fields are gone, a missing variable is an `environment/missing-variable` issue for each file that references it, and warnings name the file. `setup` writes the configuration and publishes it in its first deploy instead of creating each resource on its own. When that deploy is refused, `setup` still succeeds, keeps the project and files, and suggests `deploy`. The `auth-method` commands refuse when any file under `.zitadel/` does not parse, fails its contract or fails the per-file checks `deploy` makes (a literal `client_secret`, a branding template or `$file` that cannot be read, an unknown connection field, endpoint problems), even a file the command does not change, and refuse to write or remove a file whose path resolves outside `.zitadel/`, through a symlink for one. `auth-method` results report `notices` instead of `kept` and `untouched`. New `.zitadel/state.json` files have no `resources` section, so an older CLI fails on them. `setup`, `branding eject` and `doctor --fix` never replace a `.zitadel/meta/` schema when the project pins a newer `@zitadel/*` package. `doctor`'s schema check validates every file under `.zitadel/`. `auth-method sso enable` now keeps a provider route it did not write and says so, instead of resetting it. `deploy` no longer only warns when a release would leave existing users unable to sign in: it asks first, and a non-interactive run, `deploy --dry-run` included, refuses with `E_CONFIRMATION_REQUIRED` unless it is given the new `--force`. A lockout check that could not finish still only warns. Deploy's lockout check no longer follows a transition into another flow, and a literal `client_secret` is refused by the `connection/literal-secret` rule. `deploy` also refuses a schema or flow step that lists the same provider twice (`sso/duplicate-provider`), a connection with a field its contract does not know (`sso/unknown-connection-field`) and a claim name with surrounding whitespace (`sso/claim-name-whitespace`). It warns about a claim whose scope the connection does not request (`sso/claim-needs-scope`), a claim mapped to a property of another type (`sso/claim-type-mismatch`), a verification source that is not a boolean claim (`sso/verification-source-not-boolean`) and a subject claim that can change (`sso/subject-claim-unstable`).
+  
+  `doctor`'s schema check may list the project's connections on the server, using `zitadel.json` and `.zitadel/secret`, when `sso/subject-claim-unstable` could apply; it and `deploy` leave that warning out when the listing cannot be read, and `doctor` checks no environment, so `environment/missing-variable` is `deploy`'s alone. A flow is matched to a local schema by `objectType`, `$id`, the id in `.zitadel/state.json` or the file name at the end of its `user_schema` URL, so flow and SSO rules can apply where they did not. `pull` refuses before it writes anything for an unsafe handle, two broken files holding one handle or two pinned handles resolving to one file. `setup --dev-port` lists providers by connection slug and stops when `.zitadel/idps` cannot be read, and `policies test` reports an invalid policy file in `details.issues`. A file under `.zitadel/` that cannot be written because a directory it needs is a file is refused with `<path> cannot be written (ENOTDIR)` and a hint to remove that file. A directory where a file is to be removed is refused with `<path> cannot be removed (EISDIR)`. A file under `.zitadel/` that is not valid JSON is refused with its path and the line and column of the error, such as `.zitadel/branding/branding.json: cannot be parsed: invalid JSON at line 5, column 18`, and never with a piece of the file.
+
+- [#2687](https://github.com/zitadel/nextgen/pull/2687) [`71a0eea`](https://github.com/zitadel/nextgen/commit/71a0eeaaa47a72a6ef3f35e78cb3fcf2a688124b) - User attributes must now match their schema's `format`. Creating a user, patching one and signing up all refuse a value like `not-an-email` for a `format: email` property, with `attributes_invalid` naming the attribute, so `zitadel users create` and `users update` do too. This covers the standard JSON Schema formats, such as `email`, `uri`, `uuid`, `date` and `date-time`. Any other format, such as `phone`, stays a label.
+  
+  **Breaking:** values stored before this change get no exception. A patch to a user holding a value that fails its `format` is refused until the same request corrects it, and a stored identifier that fails its `format` no longer signs in or starts recovery. Correct such values through `PATCH /users/{id}` or `zitadel users update`.
+  
+  In a login flow, a blank optional field with a format counts as unset, and a `date-time` field gets a date and time input.
+  
+  A `--user-file` document that creates a user with a bad value now stops the server from starting.
+
+### Patch Changes
+
+- [#2905](https://github.com/zitadel/nextgen/pull/2905) [`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e) - A value the API spec refuses by pattern (an ID, a slug, a URL, a colour or a font stack) is now refused in plain words that say what a valid value looks like, in place of a raw regex.
+
+- [#2905](https://github.com/zitadel/nextgen/pull/2905) [`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e) - `deploy` now says each refused branding value once, at its own field and in plain words (a font URL, a font stack, a logo URL or a palette colour), instead of a raw regex or a `(root)` finding, and still says so when another field in the file is also wrong.
+
+- [#2919](https://github.com/zitadel/nextgen/pull/2919) [`d2409a3`](https://github.com/zitadel/nextgen/commit/d2409a323308123f9881b752ffc292d7a475bad6) - `setup` now asks for the sign-in button's name before the connection's name, and suggests the connection's name from it: "Zitadel Cloud" offers `zitadel-cloud`, which the developer accepts or edits. A typed or flagged slug is still used as given.
+
+- [#2726](https://github.com/zitadel/nextgen/pull/2726) [`e741248`](https://github.com/zitadel/nextgen/commit/e741248d1f4447ecda85c05395d209a011946bed) - On a user schema's root or a property, a key JSON Schema does not define, such as a misspelt `minimumLength`, or an `x-` key Zitadel does not define, is now refused instead of silently constraining nothing. `zitadel deploy --dry-run` and `zitadel doctor` report it before upload, naming the schema, the property and the key.
+- Updated dependencies [[`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`c52126e`](https://github.com/zitadel/nextgen/commit/c52126ed0bad6656dc97d582628479075a476bb1), [`b665fe5`](https://github.com/zitadel/nextgen/commit/b665fe5229180cbc604b6e57085b73236160df94), [`81df24d`](https://github.com/zitadel/nextgen/commit/81df24d34accdf7a135d2930103a7812899b3401), [`d4e7203`](https://github.com/zitadel/nextgen/commit/d4e720361e3428eb0454aafff9c0d37e89ad2824)]:
+  - @zitadel/api@0.6.0
+
+## 0.5.0
+
+### Minor Changes
+
+- [#2533](https://github.com/zitadel/nextgen/pull/2533) [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db) - A login flow now chooses whether `<zitadel-login>` switches between sign-in and sign-up on its own, except on a step offering a provider that creates users, and `{ "purpose": "register" }` alone moves to another purpose. `zitadel deploy --dry-run` warns about a switch left out ([flows and schemas](https://preview.zitadel.com/docs/concepts/flows-and-schemas)).
+  
+  **Breaking:** a flow definition read back through the API (`GET` and list) leaves out a transition's `target` when the transition only names a `purpose`, and a client generated from an earlier API spec fails to read it because it requires `target`. Upgrade `@zitadel/api`, or regenerate your client from the new spec, before deploying a flow that uses the short form. A transition's `target` may no longer be `""`: leave it out instead.
+
+- [#2493](https://github.com/zitadel/nextgen/pull/2493) [`bbc6bc5`](https://github.com/zitadel/nextgen/commit/bbc6bc54255991e59d949553c95fe8ded17a7bd4) - Add the Node-only `@zitadel/config/bootstrap-user` export so setup tools can generate bootstrap user documents using the same password hashing and document format as `zitadel start`.
+
+### Patch Changes
+
+- [#2752](https://github.com/zitadel/nextgen/pull/2752) [`6777ed8`](https://github.com/zitadel/nextgen/commit/6777ed8c876124123732efc9f7887c2e5a056c63) - `zitadel auth-method password|passkey|sso disable --dry-run` now refuses to remove a schema's last way to sign in without `--force`, as the real run does, and `zitadel deploy` warns when a login flow can finish without verifying a password, passkey or SSO sign-in.
+
+- [#2757](https://github.com/zitadel/nextgen/pull/2757) [`2e14564`](https://github.com/zitadel/nextgen/commit/2e145640554b0a4ec4de20a7a02f47c01c1d1d90) - `zitadel deploy --dry-run` and `zitadel doctor` now refuse a user schema whose `x-auth-methods` holds a key that is not an authentication method, such as a misspelt `pasword`, and suggest the method it was likely meant to be. An unknown key inside a method and an empty `x-auth-methods` are refused too. Before, the dry run passed and the deploy failed with a generic request error.
+
+- [#2675](https://github.com/zitadel/nextgen/pull/2675) [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560) - `<zitadel-login>`'s error for an unknown `flow-name`, the `@zitadel/components` and `@zitadel/config` READMEs and the branding API reference now name `zitadel deploy` instead of the removed `zitadel apply` and `zitadel plan`.
+
+- [#2597](https://github.com/zitadel/nextgen/pull/2597) [`9b687fe`](https://github.com/zitadel/nextgen/commit/9b687fe88342b80349bea5fecfdce94044fa1799) - `zitadel deploy` now prints which schema or flow the server rejected and why, instead of only `release: invalid`. A schema that fails the meta-schema names the failing property path and keyword. The `warn/password-without-identifier` warning no longer fires for a password step reached through an SSO email collision, so the scaffolded flow deploys without a false `sso-conflict` warning.
+
+- [#2682](https://github.com/zitadel/nextgen/pull/2682) [`14d27d8`](https://github.com/zitadel/nextgen/commit/14d27d8ede0f092b9a7f2c09b374637cbcbb33e7) - The `.zitadel/flows/README.md` that `zitadel setup` writes now lists its edits by goal, each with the JSON to change, and says that a required schema property must be collected by a step. The docs add [Edit the login flow](https://preview.zitadel.com/docs/guides/edit-login-flow).
+
+- [#2824](https://github.com/zitadel/nextgen/pull/2824) [`db8ecc2`](https://github.com/zitadel/nextgen/commit/db8ecc2e5192d43e5042590462eeb7bbde544e31) - `zitadel policies test --help` now says that test cases go in `<operation>.test.json` beside the policy, not on the command line, and that the server evaluates them; the policies README that `setup` writes says that a policy applies once a deployed release carries it, for passwords set through the API too, that a pull request's `preview` applies it only on that pull request's preview URLs, and that a history case needs `history_depth` 2 or more.
+
+- [#2693](https://github.com/zitadel/nextgen/pull/2693) [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede) - Update dependencies that have published security advisories. `@zitadel/cli` now
+  requires `undici` 7.30.1 or later, which fixes TLS certificate validation being
+  skipped, cache poisoning across redirects and several denial-of-service bugs.
+  `@zitadel/cli`, `@zitadel/api` and `@zitadel/config` require `zod` 4.6.6 or
+  later, which stops oversized collections from exhausting memory during
+  validation. The console embedded in the server picks up the `seroval` and `zod`
+  fixes.
+
+- [#2756](https://github.com/zitadel/nextgen/pull/2756) [`aa65acf`](https://github.com/zitadel/nextgen/commit/aa65acf7a7f7e8ab7f5d319592d20479e1adb0e7) - The `.zitadel/schemas/README.md` and `.zitadel/flows/README.md` that `zitadel setup` writes now name the `zitadel auth-method password|passkey` commands and show how a flow step offers each method. The docs add [Turn password and passkey sign-in on and off](https://preview.zitadel.com/docs/guides/sign-in-methods).
+- Updated dependencies [[`1332c85`](https://github.com/zitadel/nextgen/commit/1332c85f4211617f19e1d49e02fa5f7c02e7223c), [`7f2568d`](https://github.com/zitadel/nextgen/commit/7f2568d166800273f7aaa42a3e5a2c6fcb5d5cf0), [`1746222`](https://github.com/zitadel/nextgen/commit/174622246ec30e7291ef86610599b865976fe87b), [`f818392`](https://github.com/zitadel/nextgen/commit/f81839289a21eb653f4dbabd361d97ad769efdf6), [`cbab822`](https://github.com/zitadel/nextgen/commit/cbab822b77f9c9dc5d53cf985a983df95cabfa99), [`3b7660e`](https://github.com/zitadel/nextgen/commit/3b7660e807ad5c97604b39ac8df3f0425705901a), [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db), [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede)]:
+  - @zitadel/api@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes

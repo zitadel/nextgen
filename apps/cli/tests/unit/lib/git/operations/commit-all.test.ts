@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { HeadIsOnABranch } from "../../../../../src/lib/git/checks/head-is-on-a-branch";
-import { NoOperationUnderWay } from "../../../../../src/lib/git/checks/no-operation-under-way";
-import { CommitAll } from "../../../../../src/lib/git/operations/commit-all";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { HeadIsOnABranch } from "@/lib/git/checks/head-is-on-a-branch";
+import { NoOperationUnderWay } from "@/lib/git/checks/no-operation-under-way";
+import { CommitAll } from "@/lib/git/operations/commit-all";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 const OPTIONS = { except: () => false, authorIfGitHasNone: { name: "n", email: "e" } };
 

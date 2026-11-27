@@ -1,0 +1,9 @@
+name: deployment_id
+in: path
+required: true
+description: |
+  The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
+  `listDeployments` (`GET /deployments`) lists.
+schema:
+  $ref: '../schemas/deployment-id.yaml'
+example: dep_01KX4SB9C8E1F0N9WD3P2E4YM5

@@ -1,7 +1,8 @@
-import { Change } from "../change";
-import type { Git } from "../git";
-import type { Check, Operation } from "../operation";
-import type { DiffedFile } from "../types";
+import { Change } from "@/lib/git/change";
+import type { Git } from "@/lib/git/git";
+import type { Check, Operation } from "@/lib/git/operation";
+import type { DiffedFile, DiffOptions } from "@/lib/git/types";
+
 import { DiffSince } from "./diff-since";
 
 /**
@@ -17,9 +18,14 @@ import { DiffSince } from "./diff-since";
 export class DiffFilesSince implements Operation<DiffedFile[] | null> {
   private readonly diff: DiffSince;
 
-  /** Diffs `paths` since `commit`, uncoloured, with the list of changed files ahead of the patch. */
-  constructor(commit: string, paths: readonly string[]) {
-    this.diff = new DiffSince(commit, paths, {}, ["--raw", "-z", "--patch", "--submodule=short"]);
+  /** Diffs `paths` as `options` narrow them since `commit`, uncoloured, with the list of changed files ahead of the patch. */
+  constructor(commit: string, paths: readonly string[], options: Omit<DiffOptions, "color"> = {}) {
+    this.diff = new DiffSince(commit, paths, { globs: options.globs, excluded: options.excluded }, [
+      "--raw",
+      "-z",
+      "--patch",
+      "--submodule=short",
+    ]);
   }
 
   /** Those of the diff. */
@@ -62,8 +68,8 @@ export class DiffFilesSince implements Operation<DiffedFile[] | null> {
         patches.push(section);
       }
     }
-    return Change.listedIn(output.slice(0, end).split("\0")).map((change, index) =>
-      change.diffedWith(patches[index] ?? ""),
-    );
+    return Change.listedIn(output.slice(0, end).split("\0")).map((change, index) => {
+      return change.diffedWith(patches[index] ?? "");
+    });
   }
 }

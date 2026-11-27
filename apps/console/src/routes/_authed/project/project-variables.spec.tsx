@@ -33,8 +33,8 @@ beforeEach(() =>
       }),
     ),
     http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
-    http.get("http://localhost/api/v1/policies", () =>
-      HttpResponse.json({ policies: [], next_page_token: null }),
+    http.get("http://localhost/api/v1/deployments", () =>
+      HttpResponse.json({ deployments: [], next_page_token: null }),
     ),
     http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
@@ -46,8 +46,8 @@ beforeEach(() =>
 function stubVariables(body: Record<string, unknown>, status = 200) {
   const projects: (string | null)[] = [];
   server.use(
-    http.get("http://localhost/api/v1/projects/:id/admins", () =>
-      HttpResponse.json({ admins: [] }),
+    http.get("http://localhost/api/v1/projects/:id/members", () =>
+      HttpResponse.json({ members: [] }),
     ),
     http.get(VARIABLES_URL, ({ request }) => {
       projects.push(new URL(request.url).searchParams.get("project_id"));
@@ -88,7 +88,9 @@ describe("project variables", () => {
     // A plain value is shown in full and copyable, per kind.
     const id = within(idRow!);
     expect(id.getByText("Variable")).toBeInTheDocument();
-    expect(id.getByText("prod-client-123")).toBeInTheDocument();
+    // A value is set in the monospace face; the name beside it is not.
+    expect(id.getByText("prod-client-123")).toHaveClass("font-mono");
+    expect(id.getByText("GOOGLE_CLIENT_ID")).not.toHaveClass("font-mono");
     expect(
       id.getByRole("button", { name: "Copy GOOGLE_CLIENT_ID primary value" }),
     ).toBeInTheDocument();
@@ -106,6 +108,15 @@ describe("project variables", () => {
     const count = within(countRow!);
     expect(count.getByText("Not configured")).toBeInTheDocument();
     expect(count.getByText("3")).toBeInTheDocument();
+  });
+
+  it("scrolls the table inside its card rather than crushing its columns", async () => {
+    stubVariables({ GOOGLE_CLIENT_ID: { primary: "prod-client-123" } });
+    await renderProject();
+
+    const table = (await variables()).getByRole("table");
+    expect(table).toHaveClass("min-w-[36rem]", "table-fixed");
+    expect(table.parentElement).toHaveClass("overflow-x-auto");
   });
 
   it("points at the CLI when no variable is set", async () => {

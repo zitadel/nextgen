@@ -1,15 +1,19 @@
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
-import { assertMountsRootComponent, type RootMount, viteEntry } from "../root-component";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { DevelopmentServerUrl, PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
+import {
+  assertMountsRootComponent,
+  type RootMount,
+  viteEntry,
+} from "@/lib/orca/patchers/rule/root-component";
 import {
   type ViteSupport,
   buildViteApiPrefixOp,
   buildViteProxyOp,
+  buildViteServerAddressOp,
   buildViteSessionCookieOp,
-} from "../vite-support";
+} from "@/lib/orca/patchers/rule/vite-support";
 import { appTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-svelte";
@@ -38,8 +42,7 @@ const ROOT: RootMount = {
  * Unlike Next.js — whose middleware runs the proxy and token exchange
  * server-side — a SPA has no server, so the dev proxy provides the same-origin
  * `/__nextgen` path locally. In production that path comes from a platform
- * rewrite or minimal worker (ADR 036); CLI scaffolding for it is tracked in
- * issue #560.
+ * rewrite or minimal worker (ADR 036).
  */
 export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
   canPatch(framework: string): boolean {
@@ -58,6 +61,10 @@ export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
     return buildViteApiPrefixOp();
   }
 
+  viteServerAddressOp(override?: DevelopmentServerUrl): FileOp {
+    return buildViteServerAddressOp(override);
+  }
+
   protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
     await assertMountsRootComponent(cwd, await viteEntry(cwd), ROOT);
   }
@@ -72,6 +79,7 @@ export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       this.viteSessionCookieOp(),
       this.viteApiPrefixOp(),
+      this.viteServerAddressOp(this.developmentServerUrl(ctx)),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
       {
         kind: "merge-env",
@@ -86,7 +94,7 @@ export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
     ];
   }

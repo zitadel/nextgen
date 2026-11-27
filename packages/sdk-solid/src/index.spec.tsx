@@ -17,30 +17,68 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
-  type WidgetTag,
-  type WidgetName,
-  widgetNames,
+  type ZitadelWidgetTag,
+  type ZitadelWidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 
 import {
   businessLocales,
   ZitadelLogin,
-  type ZitadelLoginSolidProps,
+  type ZitadelLoginProps,
   ZitadelLogout,
-  type ZitadelLogoutSolidProps,
+  type ZitadelLogoutProps,
   ZitadelSession,
-  type ZitadelSessionSolidProps,
+  type ZitadelSessionProps,
 } from "./index";
+
+import {
+  type Attributes,
+  cssProperties,
+  describeStandardAttributes,
+} from "@zitadel/client-sdk-contract/standard-attributes";
+import { describeSharedConfigHelpers } from "@zitadel/client-sdk-contract/config-helpers";
+import * as sdk from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+function widgetIn<Tag extends ZitadelWidgetTag>(
+  root: ParentNode,
+  tag: Tag,
+): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
-  if (!element) throw new Error(`no <${tag}> was rendered`);
+  if (!element) {
+    throw new Error(`no <${tag}> was rendered`);
+  }
   return element;
 }
+
+describeSharedConfigHelpers(sdk);
+
+describe("the exported props types describe what the components accept", () => {
+  it("ZitadelLoginProps is accepted by ZitadelLogin", () => {
+    type Accepted = Parameters<typeof ZitadelLogin>[0];
+
+    expectTypeOf<keyof ZitadelLoginProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLoginProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelLogoutProps is accepted by ZitadelLogout", () => {
+    type Accepted = Parameters<typeof ZitadelLogout>[0];
+
+    expectTypeOf<keyof ZitadelLogoutProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelLogoutProps>().toExtend<Accepted>();
+  });
+
+  it("ZitadelSessionProps is accepted by ZitadelSession", () => {
+    type Accepted = Parameters<typeof ZitadelSession>[0];
+
+    expectTypeOf<keyof ZitadelSessionProps>().toExtend<keyof Accepted>();
+    expectTypeOf<ZitadelSessionProps>().toExtend<Accepted>();
+  });
+});
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
@@ -416,8 +454,12 @@ describe("package manifest", () => {
   };
 
   function targets(value: unknown): string[] {
-    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
-    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    if (typeof value === "string") {
+      return value.startsWith("./") ? [value] : [];
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(targets);
+    }
     return [];
   }
 
@@ -447,22 +489,19 @@ type ForwardedAttributes = {
 };
 
 type WidgetProps = {
-  login: ZitadelLoginSolidProps;
-  logout: ZitadelLogoutSolidProps;
-  session: ZitadelSessionSolidProps;
+  login: ZitadelLoginProps;
+  logout: ZitadelLogoutProps;
+  session: ZitadelSessionProps;
 };
 
 const staleOnRemoval: readonly string[] = [];
 
-type Attributes = {
-  readonly [name: string]: string | boolean | null | undefined;
-};
-
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref`, the way a consumer does. `update` renders it
 // again with other attributes.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
+async function mountWidget(widget: ZitadelWidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  configureZitadel(project);
   const [current, setCurrent] = createSignal(attributes);
   const propsOf = ({ style, hidden, ...rest }: Attributes) => ({
     ...rest,
@@ -487,151 +526,13 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
   };
 }
 
-// standard-attributes:begin
-type StandardProps = {
-  [W in WidgetName]: {
-    [K in keyof ForwardedAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
-  };
-};
-
-function cssProperties(style: string): Record<string, string> {
-  const [property = "", value = ""] = style.split(":").map((part) => part.trim());
-  return { [property]: value };
-}
-
-describe.each(widgetNames)("%s standard attributes", (widget) => {
-  const tag = widgetTags[widget];
-
-  it("forwards the class to the widget element", async () => {
-    const { container } = await mountWidget(widget, { class: "probe" });
-    expect(container.querySelector(tag)?.classList.contains("probe")).toBe(true);
-  });
-
-  it("forwards the style to the widget element", async () => {
-    const { container } = await mountWidget(widget, { style: "color: red" });
-    expect(container.querySelector(tag)?.style.color).toBe("red");
-  });
-
-  it("forwards the id to the widget element", async () => {
-    const { container } = await mountWidget(widget, { id: "probe" });
-    expect(container.querySelector(tag)?.id).toBe("probe");
-  });
-
-  it("forwards data attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, { "data-testid": "probe" });
-    expect(container.querySelector(tag)?.getAttribute("data-testid")).toBe("probe");
-  });
-
-  it("forwards aria attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, { "aria-label": "probe" });
-    expect(container.querySelector(tag)?.getAttribute("aria-label")).toBe("probe");
-  });
-
-  it("forwards the remaining standard attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, {
-      title: "probe",
-      role: "region",
-      tabindex: "3",
-      hidden: "",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.title).toBe("probe");
-    expect(element?.getAttribute("role")).toBe("region");
-    expect(element?.getAttribute("tabindex")).toBe("3");
-    expect(element?.hidden).toBe(true);
-  });
-
-  it("forwards the slot to the widget element", async () => {
-    const { container } = await mountWidget(widget, { slot: "probe" });
-    expect(container.querySelector(tag)?.getAttribute("slot")).toBe("probe");
-  });
-
-  it("renders a false aria or data attribute as the string false", async () => {
-    const { container } = await mountWidget(widget, { "aria-hidden": false, "data-open": false });
-    expect(container.querySelector(tag)?.getAttribute("aria-hidden")).toBe("false");
-    expect(container.querySelector(tag)?.getAttribute("data-open")).toBe("false");
-  });
-
-  it("updates a forwarded attribute when the prop changes", async () => {
-    const { container, update } = await mountWidget(widget, {
-      class: "before",
-      id: "before",
-      title: "before",
-      slot: "before",
-      tabindex: "1",
-      "aria-label": "before",
-      "data-testid": "before",
-    });
-    await update({
-      class: "after",
-      id: "after",
-      title: "after",
-      slot: "after",
-      tabindex: "2",
-      "aria-label": "after",
-      "data-testid": "after",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.classList.contains("before")).toBe(false);
-    expect(element?.classList.contains("after")).toBe(true);
-    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
-      expect(element?.getAttribute(name)).toBe("after");
-    }
-    expect(element?.getAttribute("tabindex")).toBe("2");
-  });
-
-  it("removes a forwarded attribute when the prop is removed", async () => {
-    const { container, update } = await mountWidget(widget, {
-      class: "before",
-      id: "before",
-      title: "before",
-      slot: "before",
-      tabindex: "1",
-      "aria-label": "before",
-      "data-testid": "before",
-    });
-    const element = container.querySelector(tag);
-    expect(element?.classList.contains("before")).toBe(true);
-    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
-      expect(element?.getAttribute(name)).toBe("before");
-    }
-    expect(element?.getAttribute("tabindex")).toBe("1");
-    await update({});
-    expect(element?.classList.contains("before")).toBe(false);
-    for (const name of ["id", "title", "slot", "tabindex", "aria-label", "data-testid"]) {
-      if (!staleOnRemoval.includes(name)) expect(element?.hasAttribute(name)).toBe(false);
-    }
-  });
-
-  it("does not forward props outside the standard set", async () => {
-    const { container } = await mountWidget(widget, {
-      srcdoc: "probe",
-      onclick: "probe",
-      part: "probe",
-      dir: "probe",
-    });
-    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
-      expect(container.querySelector(tag)?.hasAttribute(name)).toBe(false);
-    }
-  });
-
-  it("gives access to the widget element through a ref", async () => {
-    const { container, ref } = await mountWidget(widget, {});
-    expect(ref()).toBe(container.querySelector(tag));
-    expect(ref()?.tagName.toLowerCase()).toBe(tag);
-  });
-
-  it("accepts the standard attributes in its props", () => {
-    const attributes: Partial<ForwardedAttributes> = {};
-    const accepted: StandardProps = { login: attributes, logout: attributes, session: attributes };
-    expect(accepted).toBeDefined();
-  });
-
-  it("rejects the attributes it does not forward in its props", () => {
-    type Rejected = {
-      [W in WidgetName]: Extract<"dir" | "classList" | "onClick", keyof WidgetProps[W]>;
-    };
-    expectTypeOf<Rejected>().toEqualTypeOf<Record<WidgetName, never>>();
-  });
+afterEach(() => {
+  _resetConfigForTesting();
 });
-// standard-attributes:end
+
+describeStandardAttributes<ForwardedAttributes, WidgetProps>({
+  mountWidget,
+  staleOnRemoval,
+  accepted: true,
+  rejected: true,
+});

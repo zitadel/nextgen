@@ -1,5 +1,101 @@
 # @zitadel/components
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/config@0.9.0
+
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [[`f3c80dc`](https://github.com/zitadel/nextgen/commit/f3c80dca6f51507ddcb9dcd884231ce8c2ff811d), [`224b845`](https://github.com/zitadel/nextgen/commit/224b8451c3ebd7ffa9c37eccf25e0d47cb9453d8), [`a242dac`](https://github.com/zitadel/nextgen/commit/a242dacc9badeac3a451b89d2c6ef1e81031ccbf)]:
+  - @zitadel/config@0.8.0
+
+## 0.7.0
+
+### Minor Changes
+
+- [#3107](https://github.com/zitadel/nextgen/pull/3107) [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32) - The flow operations now live under `/flows`, plural as every other collection:
+  `POST /flows`, `GET /flows/{flow_id}` and `POST /flows/{flow_id}/submit`
+  ([API reference](https://preview.zitadel.com/docs/reference/api/flows)).
+  `/flow` keeps answering until 1.0.0, with a `Deprecation` header and a `Link`
+  to that page.
+  
+  **Breaking:** `@zitadel/api`, the Go client, `<zitadel-login>`, the SDKs, the
+  CLI and `@zitadel/testing` of this version call `/flows`, which an earlier
+  server answers with `404`: upgrade a self-hosted server before the apps that
+  use them. If you call the HTTP API yourself, change `/flow` to `/flows` in the
+  three paths; nothing else in a request or a response changes. From 1.0.0 the
+  old paths answer `404` with `req.not_found`.
+
+- [#2626](https://github.com/zitadel/nextgen/pull/2626) [`d74c989`](https://github.com/zitadel/nextgen/commit/d74c989193ff87eca616365a0d5c66d1f5c3466c) - Protect Flow API password and passkey signup with built-in PBKDF2 proof of
+  work, a browser solver, single-use proofs and per-flow retry limits.
+  `<zitadel-login>` solves it, and `solveSignupPow` from `@zitadel/components`
+  solves it for a signup client of your own.
+  
+  **Breaking:** the server refuses a password signup, or a passkey registration
+  that creates the user, without a proof (`403 flow.proof_invalid`).
+  `<zitadel-login>` 0.5.0 and older sends none, so upgrade `@zitadel/components`,
+  or the SDK that pins it, together with the server. A custom or headless signup
+  client fetches the current step, solves `step.gates.signup_pow` and submits the
+  result as `gate_proofs.signup_pow`, with the password or with the passkey's
+  attestation.
+
+### Patch Changes
+
+- [#3150](https://github.com/zitadel/nextgen/pull/3150) [`b816f9d`](https://github.com/zitadel/nextgen/commit/b816f9d19de143c9765d1fe375469731d7847dc0) - Update dependencies to their latest minor and patch releases.
+
+- [#2881](https://github.com/zitadel/nextgen/pull/2881) [`8ff8273`](https://github.com/zitadel/nextgen/commit/8ff8273110523e15480118027b97b68ae3bbe3f6) - The package READMEs, the test kit's hints for running inside this repository, and the CLI skill's login-UI reference name the repository's Turborepo commands instead of moon's.
+- Updated dependencies [[`0c5c523`](https://github.com/zitadel/nextgen/commit/0c5c523d267b61b631f047ec4e29d8c0278ef462), [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd), [`80fc7e8`](https://github.com/zitadel/nextgen/commit/80fc7e8855d10e0127875c67bea19754864b4b79), [`b816f9d`](https://github.com/zitadel/nextgen/commit/b816f9d19de143c9765d1fe375469731d7847dc0), [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd), [`9ffa302`](https://github.com/zitadel/nextgen/commit/9ffa302ac7c5b063fe1abe061ebd0ffba1c72728), [`9379df0`](https://github.com/zitadel/nextgen/commit/9379df0c077481ac9eecaa24d292239241422355), [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce)]:
+  - @zitadel/config@0.7.0
+
+## 0.6.0
+
+### Minor Changes
+
+- [#2687](https://github.com/zitadel/nextgen/pull/2687) [`71a0eea`](https://github.com/zitadel/nextgen/commit/71a0eeaaa47a72a6ef3f35e78cb3fcf2a688124b) - User attributes must now match their schema's `format`. Creating a user, patching one and signing up all refuse a value like `not-an-email` for a `format: email` property, with `attributes_invalid` naming the attribute, so `zitadel users create` and `users update` do too. This covers the standard JSON Schema formats, such as `email`, `uri`, `uuid`, `date` and `date-time`. Any other format, such as `phone`, stays a label.
+  
+  **Breaking:** values stored before this change get no exception. A patch to a user holding a value that fails its `format` is refused until the same request corrects it, and a stored identifier that fails its `format` no longer signs in or starts recovery. Correct such values through `PATCH /users/{id}` or `zitadel users update`.
+  
+  In a login flow, a blank optional field with a format counts as unset, and a `date-time` field gets a date and time input.
+  
+  A `--user-file` document that creates a user with a bad value now stops the server from starting.
+
+### Patch Changes
+
+- [#2899](https://github.com/zitadel/nextgen/pull/2899) [`bcd9413`](https://github.com/zitadel/nextgen/commit/bcd9413e7f1065cde76afb4149fddadd3e843cb6) - `<zitadel-login>` keeps field names that collide with DOM property names, such as `name` or `title`, so a schema field named `name` no longer breaks registration. `createSanitiser()` no longer strips `id` or `name` values that match `document` or form properties, so do not insert its output into the main document.
+- Updated dependencies [[`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`8f2033e`](https://github.com/zitadel/nextgen/commit/8f2033e8404f2eddbf77fd4438fdb8a5421ca950), [`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`4860117`](https://github.com/zitadel/nextgen/commit/486011736d8891f7527ae684b15b6b295fa8ad38), [`d2409a3`](https://github.com/zitadel/nextgen/commit/d2409a323308123f9881b752ffc292d7a475bad6), [`71a0eea`](https://github.com/zitadel/nextgen/commit/71a0eeaaa47a72a6ef3f35e78cb3fcf2a688124b), [`e741248`](https://github.com/zitadel/nextgen/commit/e741248d1f4447ecda85c05395d209a011946bed)]:
+  - @zitadel/config@0.6.0
+
+## 0.5.0
+
+### Minor Changes
+
+- [#2533](https://github.com/zitadel/nextgen/pull/2533) [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db) - A login flow now chooses whether `<zitadel-login>` switches between sign-in and sign-up on its own, except on a step offering a provider that creates users, and `{ "purpose": "register" }` alone moves to another purpose. `zitadel deploy --dry-run` warns about a switch left out ([flows and schemas](https://preview.zitadel.com/docs/concepts/flows-and-schemas)).
+  
+  **Breaking:** a flow definition read back through the API (`GET` and list) leaves out a transition's `target` when the transition only names a `purpose`, and a client generated from an earlier API spec fails to read it because it requires `target`. Upgrade `@zitadel/api`, or regenerate your client from the new spec, before deploying a flow that uses the short form. A transition's `target` may no longer be `""`: leave it out instead.
+
+### Patch Changes
+
+- [#2675](https://github.com/zitadel/nextgen/pull/2675) [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560) - `<zitadel-login>`'s error for an unknown `flow-name`, the `@zitadel/components` and `@zitadel/config` READMEs and the branding API reference now name `zitadel deploy` instead of the removed `zitadel apply` and `zitadel plan`.
+
+- [#2677](https://github.com/zitadel/nextgen/pull/2677) [`1420ccb`](https://github.com/zitadel/nextgen/commit/1420ccb257b7acae0d055c81c3886f1e8155a268) - `<zitadel-login>` no longer carries a typed password or one-time code to the next step: after "Use another account", or on any later step that asks for one, the field starts empty. A value the same step refuses is kept so it can be corrected.
+
+- [#2681](https://github.com/zitadel/nextgen/pull/2681) [`f76173b`](https://github.com/zitadel/nextgen/commit/f76173bf6a4de80a8eb0c49692df1e21c1497e61) - `<zitadel-login>` checks a field's minimum and maximum length before submitting. `<zl-field>` shows only the error under a field while it has one, and its help text again once the error clears. A wrong password (`error.invalid_credentials`) now shows on the password field instead of in the form-level alert, so a custom template must render that field's error (`f.name | fieldError: errors`) to show it.
+
+- [#2676](https://github.com/zitadel/nextgen/pull/2676) [`48d8872`](https://github.com/zitadel/nextgen/commit/48d88726409a2e414c5b9d9999d2c5701493788a) - `<zitadel-login>` now says which attribute is wrong when it cannot start a flow: a `purpose` that is not a flow purpose (with the valid ones), a `flow-name` that is not a valid name, a project id the server refuses or does not have, and a purpose no active flow serves.
+
+- [#2553](https://github.com/zitadel/nextgen/pull/2553) [`e7799e9`](https://github.com/zitadel/nextgen/commit/e7799e933cd71dfea188724944d3f8369d952121) - A sign-in runs only what is deployed. `zitadel origin rm` warns that a project with no origins admits no origin except a loopback origin, and the test kit deploys the bootstrapped release to its primary origins, which default to a loopback origin. `zitadel setup --dev-port` deploys the release the old port ran to the new one, and `zitadel doctor --fix` does the same for the issuer it makes primary, or says to deploy. `<zitadel-login>` says to deploy when it cannot start a flow because nothing is deployed.
+  
+  **Breaking:** a project with no origins no longer serves a flow to an arbitrary host. A flow with no `Origin`, or from a console origin the project does not list, needs a primary deployment and otherwise answers `rel.no_default`. A listed origin or a live preview with nothing deployed answers `rel.not_deployed`, and so does a primary origin added since the last deploy. A loopback origin the project does not list is no longer served the newest primary deployment: it answers `rel.not_deployed` until it is added as a primary origin and deployed to. The test kit registers `appOrigins` as primary origins, so each must be an exact URL; a wildcard pattern is refused.
+
+- [#2598](https://github.com/zitadel/nextgen/pull/2598) [`503e27b`](https://github.com/zitadel/nextgen/commit/503e27b9017ac0bbf93e785f94b36c32ba361bfd) - An SSO sign-in whose provider account is linked to a user of a schema the flow does not serve now ends with `flow.sso_user_schema_mismatch` instead of `flow.restart_required`. `<zitadel-login>` shows "This account can't sign in with this provider. Please try another way to sign in, or contact your administrator." in English, Italian and German, rather than asking the visitor to start again, which could never succeed.
+- Updated dependencies [[`6777ed8`](https://github.com/zitadel/nextgen/commit/6777ed8c876124123732efc9f7887c2e5a056c63), [`2e14564`](https://github.com/zitadel/nextgen/commit/2e145640554b0a4ec4de20a7a02f47c01c1d1d90), [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560), [`9b687fe`](https://github.com/zitadel/nextgen/commit/9b687fe88342b80349bea5fecfdce94044fa1799), [`14d27d8`](https://github.com/zitadel/nextgen/commit/14d27d8ede0f092b9a7f2c09b374637cbcbb33e7), [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db), [`db8ecc2`](https://github.com/zitadel/nextgen/commit/db8ecc2e5192d43e5042590462eeb7bbde544e31), [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede), [`bbc6bc5`](https://github.com/zitadel/nextgen/commit/bbc6bc54255991e59d949553c95fe8ded17a7bd4), [`aa65acf`](https://github.com/zitadel/nextgen/commit/aa65acf7a7f7e8ab7f5d319592d20479e1adb0e7)]:
+  - @zitadel/config@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes

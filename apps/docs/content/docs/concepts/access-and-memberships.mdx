@@ -1,0 +1,20 @@
+---
+title: Access and memberships
+description: How people get project roles through owning teams, grants and invitations, and how team membership differs from user lifecycle ownership.
+---
+
+Two kinds of membership sit side by side in Zitadel. **Project membership** is who can administer or read a [project](/docs/concepts/project-team-user#project). **Team membership** is which [users](/docs/concepts/project-team-user#user) belong to a [team](/docs/concepts/project-team-user#team) inside a project. [Manage project access](/docs/guides/manage-project-access) shows the commands.
+
+## Project access
+
+Console accounts and the teams that own customer projects live in a reserved **platform project**. A customer project must be [claimed](/docs/concepts/project-team-user#claim) before it can invite collaborators or create grants when the server has a platform project. Claim attaches an owning team. Today every active member of that team inherits `admin` on the project.
+
+A project role is one of `viewer`, `editor`, or `admin`. Roles are additive: `admin` includes `editor`, and `editor` includes `viewer`. The strongest role wins when several paths apply. Roles are project-scoped, not per origin or environment.
+
+Besides the owning team, access comes from [grants](/docs/reference/api/grants). A grant binds a user or a team on the platform project to a role. An [invitation](/docs/reference/api/invitations) is a way to get a grant: a 72-hour link you send to the recipient yourself. Whoever opens it while signed in and accepts receives a grant for the offered role; a pending invitation gives no access. A project's members are the owning team's active members plus everyone its grants reach. A deployment can also configure platform operators with standing `admin` on every project; they are not listed as project members.
+
+## Team memberships vs. lifecycle ownership
+
+A team membership is a roster entry inside a project: whether a user belongs to that team right now. [User lifecycle ownership](/docs/concepts/project-team-user#user) is separate: which team may deprovision the user. Belonging to a team does not give that team lifecycle control over a self-owned user.
+
+Today a membership is created when you create a user with a team, or when the platform bootstraps a personal team for a console account. There is no standalone endpoint yet to add or remove an existing user from a team, or to invite someone into a team.

@@ -32,15 +32,7 @@
  * The build fails when a document refers to one under the base that is not a
  * built-in, so an editor following a `$ref` never meets a 404.
  */
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,7 +49,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 export const HOSTED_BASE = "https://zitadel.com/schemas/v1";
 
 /** The built-in schemas the server embeds, generated from the OpenAPI YAML. */
-export const SOURCE_DIR = join(ROOT, "api/openapi/endpoints/schemas");
+export const SOURCE_DIR = join(ROOT, "apps/api/api/openapi/endpoints/schemas");
 
 /** The `schemas` service's output directory (vercel.json, apps/cloud/turbo.json). */
 export const DEFAULT_OUT_DIR = join(ROOT, "apps/cloud/dist/cloud-schemas");
@@ -215,11 +207,21 @@ export function serveBuiltinSchemas(outDir, port) {
     } catch {
       // A malformed escape names no file.
     }
-    if (!file.startsWith(`${root}${sep}`) || !existsSync(file) || !statSync(file).isFile()) {
+    let body;
+    if (file.startsWith(`${root}${sep}`)) {
+      try {
+        // Read without checking first: a directory (EISDIR) or a missing file
+        // (ENOENT) throws, and nothing can change between a check and the read.
+        body = readFileSync(file);
+      } catch {
+        // Not a readable file.
+      }
+    }
+    if (body === undefined) {
       response.writeHead(404, { "content-type": "text/plain" }).end("Not Found\n");
       return;
     }
-    response.writeHead(200, { "content-type": "application/json" }).end(readFileSync(file));
+    response.writeHead(200, { "content-type": "application/json" }).end(body);
   });
   server.listen(port);
   return server;

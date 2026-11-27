@@ -47,6 +47,12 @@
 > example and the first consequence (one Console artifact for cloud and
 > self-host) hold only for the surfaces both builds share. Those still render
 > from effective permissions.
+>
+> **Amendment (2026-11-11) — [D42](../../../../docs/design/decisions.md):**
+> the reserved platform project is the Console's root level, not a project to
+> select. The runtime document names it (§3), and its surfaces render at the
+> root from effective permissions on it (§5). It holds who may use the
+> platform, and writing its configuration asks for its admin role (§1).
 
 ## Context
 
@@ -103,6 +109,32 @@ The reserved project is a **control project**, not a super-project:
   direct-user, team, or confidential-project assignment under ADRs 053 and
   054; and
 - it is never the project a customer's application signs its users into.
+
+> **Amendment (2026-11-11, D42):** the last point is for the people who own
+> the platform to keep, and the server holds them to it. The reserved project
+> manages who may use the platform. It is a project like any other in what
+> it has (users, teams, grants, and the configuration that signs them in),
+> and the server deploys its defaults at every start
+> (`internal/bootstrap/platform`).
+>
+> Writing its configuration asks for its admin role. On the reserved project
+> the API asks `admin` of every configuration write that asks `editor` on
+> another project: origins, releases, deployments and their rollback,
+> previews, variables, schemas, flow definitions, policies, branding,
+> identity provider connections and applications. A platform operator holds
+> it (root ADR 075).
+> Someone granted less is answered the resource's `permission_denied`. Reads,
+> and every write that says who may use the platform, ask what they ask on
+> any project.
+>
+> The reason is the principal home: every user of the reserved project can be
+> granted any project (root ADR 053 §2), gets a team at sign-up (root ADR 046
+> §4) and can claim. One admitted origin lets an application sign its end
+> users in there and makes each of them such an account.
+>
+> "Reserved" is the row bootstrap provisions (§2). A project the deployment
+> merely pins, and the first-created fallback, are ordinary projects and keep
+> the relations every project asks.
 
 Standalone remains the default product posture, not a different authorization
 model. Its bootstrap may create one initial customer project and one owner
@@ -266,12 +298,36 @@ it does not choose a different Console login project and does not grant access.
 
 > **Amendment (2026-09-30, asked in #1300, removed in #1345):**
 > `VITE_CONSOLE_PROJECT_ID` is removed. Development takes the sign-in project
-> from `runtime.json` like production: `console:dev-real` and the real e2e lane
+> from `runtime.json` like production: the console's `dev:real` and the real e2e lane
 > serve the document from their instance (the seeded project, or
 > `proj_platform` with bootstrap in claim mode), and the api-mock serves one
 > naming its platform project. The pin had also
 > preferred a default selection among the operator's projects; the default is
 > now their only project, or none.
+
+> **Amendment (2026-11-11, D42):** the document carries one more
+> sign-in fact, whether the sign-in target is the reserved platform project:
+>
+> ```json
+> { "mode": "standalone", "console_project_id": "proj_platform",
+>   "publishable_key": "pk_proj_...", "platform_project_id": "proj_platform" }
+> ```
+>
+> `platform_project_id` is present only when `console_project_id` names the
+> project bootstrap provisioned (§2), and then equals it. Until the cutover
+> the server derives it from the built-in id, which only the bootstrap
+> provisioner writes and `POST /projects` never mints. The pin to an ordinary
+> project and the first-created fallback leave it out, so the transitional
+> caveat above changes nothing for a self-hoster: with no
+> `platform_project_id` the Console hides no project and shows no root
+> surface. At cutover it is always present once bootstrap has run. The
+> Console reads the reserved project's id from this field only, never from a
+> written id, and never infers it from `console_project_id` alone.
+>
+> The Console never selects the reserved project: its lists ask
+> `listMyProjects` with `exclude_platform`, and a `?project=` naming it is
+> dropped. Without the parameter, `listMyProjects` is unchanged (root ADR 075
+> §6).
 
 ### 4. The embedded Console uses a first-party session credential
 
@@ -325,6 +381,18 @@ export const Route = createFileRoute("/_authed/billing/")({
 
 The sidebar and a route guard hide unavailable routes, but UI gating is never
 authorization. Each API operation performs its own target-scoped check.
+
+> **Amendment (2026-11-11, D42):** the reserved platform project's screens
+> are root surfaces: a project's own screens, rows of the root's sidebar
+> beside Projects, and the same rule governs them, with the reserved project
+> as the target. They are listed, and the project may be the Console's
+> selection, when the signed-in person can act on that project, which the
+> Console learns by reading it (`GET /projects/{platform_project_id}`) until
+> effective permissions are exposed. Each screen's own reads then decide what
+> it shows, and the server what it may write (§1). Being signed in to the
+> reserved project, or homed in it, lists none of them: §1's control project
+> grants nothing by itself, and root ADR 075's operators reach these surfaces
+> through `operator from platform`, as they reach every project.
 
 ### 6. Standalone and platform differ in defaults, not primitives
 

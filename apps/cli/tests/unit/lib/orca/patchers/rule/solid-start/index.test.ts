@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { SolidStartPatcher } from "../../../../../../../src/lib/orca/patchers/rule/solid-start";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { SolidStartPatcher } from "@/lib/orca/patchers/rule/solid-start";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import { CliPackage } from "@/lib/upgrade";
 
 function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
@@ -20,8 +18,10 @@ function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
-    server: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
+    defaultServer: "https://preview.zitadel.com",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
     scaffoldedFramework,
   };
 }
@@ -38,23 +38,28 @@ describe("SolidStartPatcher.plan", () => {
   it("writes the middleware and file-based routes under src/", () => {
     const plan = new SolidStartPatcher().plan(ctx());
 
-    expect(writeContents(plan, "src/middleware.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/middleware.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/middleware.ts")).toContain("@zitadel/sdk-solid-start/server");
-    expect(writeContents(plan, "src/middleware.ts")).toContain("createNextgenMiddleware");
+    expect(writeContents(plan, "src/middleware.ts")).toContain("createZitadelMiddleware");
     // SolidStart 2 registers the default export as an array of h3 middleware, so
     // the config object must be wrapped in SolidStart's createMiddleware — a bare
-    // createNextgenMiddleware(...) export registers nothing and /__nextgen/* 404s.
+    // createZitadelMiddleware(...) export registers nothing and /__nextgen/* 404s.
     expect(writeContents(plan, "src/middleware.ts")).toContain(
       'import { createMiddleware } from "@solidjs/start/middleware"',
     );
     expect(writeContents(plan, "src/middleware.ts")).toContain("export default createMiddleware(");
 
-    expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/index.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("background:#0f0f11");
-    expect(writeContents(plan, "src/routes/login.tsx")).toContain("@zitadel/sdk-solid");
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain(
+      "@zitadel/sdk-solid-start/components",
+    );
+    expect(plan.summary.map((entry) => entry.detail).join(" ")).toContain(
+      "@zitadel/sdk-solid-start/components",
+    );
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("ZitadelLogin");
     // The widget registers Lit custom elements (customElements.define) at import
     // time, which crashes SSR. It must be loaded via SolidStart's clientOnly, not
@@ -73,7 +78,7 @@ describe("SolidStartPatcher.plan", () => {
     // on it or overwrites it under --force.
     expect(writeContents(plan, "src/routes/index.tsx")).toBeUndefined();
     // The auth boundary and the auth routes are still written.
-    expect(writeContents(plan, "src/middleware.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/middleware.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
@@ -129,7 +134,7 @@ describe("SolidStartPatcher.plan", () => {
       expect(
         writeContents(new SolidStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
       ).toContain(
-        'import("@zitadel/sdk-solid").then(({ ZitadelLogin: Login, businessLocales }) =>',
+        'import("@zitadel/sdk-solid-start/components").then(({ ZitadelLogin: Login, businessLocales }) =>',
       );
     },
   );
@@ -141,13 +146,13 @@ describe("SolidStartPatcher.plan", () => {
   });
 
   // The overlay ships in the client-only module, so the loader must not pull
-  // @zitadel/sdk-solid in at module scope to reach it.
+  // @zitadel/sdk-solid-start/components in at module scope to reach it.
   it.each(businessPages)(
-    "keeps @zitadel/sdk-solid client-only in %s for business projects",
+    "keeps @zitadel/sdk-solid-start/components client-only in %s for business projects",
     (path) => {
       expect(
         writeContents(new SolidStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
-      ).not.toMatch(/^import .* from "@zitadel\/sdk-solid";$/m);
+      ).not.toMatch(/^import .* from "@zitadel\/sdk-solid-start\/components";$/m);
     },
   );
 });

@@ -67,7 +67,7 @@ export const optimizeDepsInclude = [
  *
  * Vite keys its pre-bundle cache on the lockfile and config, not on the files of
  * a linked workspace package, so a cached bundle goes stale after
- * `api:generate`. The Storybook server therefore keeps loading the client from
+ * `@zitadel/api#generate`. The Storybook server therefore keeps loading the client from
  * source (Vite pre-bundles a linked package only when it is listed), and the
  * Vitest run re-bundles on every start (`optimizeDeps.force`).
  */

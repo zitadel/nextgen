@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { UncommittedFiles } from "../../../../../src/lib/git/operations/uncommitted-files";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { UncommittedFiles } from "@/lib/git/operations/uncommitted-files";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 /** The files listed when `status` prints `stdout`, from the directory at `prefix`. */
 function listed(prefix: string, stdout: string) {
@@ -26,9 +26,9 @@ describe("UncommittedFiles", () => {
     ["a staged rename", "R  new\0old\0"],
     ["a rename in the working tree", " R new\0old\0"],
     ["a staged copy", "C  new\0old\0"],
-  ])("skips where %s came from, and only that", async (_, entry) => {
+  ])("reports where %s came from on the file, not as a file of its own", async (_, entry) => {
     expect(await listed("", `${entry}?? b.txt\0`)).toEqual([
-      { path: "new", untracked: false },
+      { path: "new", untracked: false, from: "old" },
       { path: "b.txt", untracked: true },
     ]);
   });

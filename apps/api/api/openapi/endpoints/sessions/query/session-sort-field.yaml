@@ -1,0 +1,7 @@
+type: string
+description: |
+  Field to sort sessions by. Only stored values are sortable, because a
+  computed value such as `state` could skip or repeat rows between pages.
+enum:
+  - created_at
+  - user_id

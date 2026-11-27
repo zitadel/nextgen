@@ -20,7 +20,7 @@ import { defineConfig } from "tsdown";
 export default defineConfig({
   entry: {
     "runtime/base-url": "src/runtime/base-url.ts",
-    "runtime/auth": "src/runtime/auth.ts",
+    "runtime/client": "src/runtime/client.ts",
     "runtime/fetch": "src/runtime/fetch.ts",
     "runtime/paging": "src/runtime/paging.ts",
     "runtime/api-factory": "src/runtime/api-factory.ts",

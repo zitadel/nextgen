@@ -17,7 +17,7 @@ import { gitConfig } from "./shared.ts";
 // (lib/markdown.ts). A command that calls the API links the operation it
 // calls. The telemetry page beside them is content (content/docs/reference/cli).
 
-/** A flag as apps/cli/src/lib/oclif/reference.ts describes it. */
+/** A flag as apps/cli/src/cli/core/reference.ts describes it. */
 export type CliFlag = {
   name: string;
   char?: string;
@@ -85,7 +85,7 @@ const taken = reference.commands.find((command) =>
 );
 if (taken) throw new Error(`zitadel ${taken.id} takes the URL of a CLI reference page`);
 
-/** A command's page: `users list` is /docs/reference/cli/users/list. */
+/** A command's page: `user list` is /docs/reference/cli/user/list. */
 export function cliCommandUrl(command: string) {
   return `${indexUrl}/${command.split(" ").join("/")}`;
 }
@@ -322,7 +322,7 @@ function indexMarkdown(cliReference: CliReference) {
     "A command that succeeds, or skips because there is nothing to do, exits `0`. One that fails exits with the code of the error its envelope names in `code`.",
     exitCodeTable(cliReference.exitCodes),
     ...groups,
-    `\`${cli} --help\` also lists oclif's own commands, such as \`help\` and \`version\`, under Diagnostics and utilities.`,
+    `\`${cli} --help\` also lists oclif's own commands, such as \`help\` and \`version\`, under CLI.`,
   ].join("\n\n");
 }
 

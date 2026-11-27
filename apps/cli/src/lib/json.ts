@@ -48,7 +48,11 @@ export function setTopLevelJsonKey(
         },
   }).map((edit) =>
     // The library writes a new member as `"key": value`; a compact document has no space there.
-    compact ? { ...edit, content: edit.content.replace(/^(,?"(?:[^"\\]|\\.)*"): /, "$1:") } : edit,
+    {
+      return compact
+        ? { ...edit, content: edit.content.replace(/^(,?"(?:[^"\\]|\\.)*"): /, "$1:") }
+        : edit;
+    },
   );
   const next = applyEdits(source, edits);
 
@@ -121,4 +125,37 @@ export function parseJsonOrUndefined(text: string): unknown {
  */
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A JSON value as one word on a command line.
+ *
+ * @param value - The value.
+ * @returns A string as it is, anything else as the JSON it is.
+ */
+export function wordOf(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+/**
+ * @param target - The object to lay a patch over. It is not changed.
+ * @param patch - What to lay over it.
+ * @returns A new object: `target` with `patch` over it, where objects found at
+ * the same key are merged and everything else, arrays included, is replaced.
+ */
+export function deepMerge(
+  target: Readonly<Record<string, unknown>>,
+  patch: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const entries = Object.entries(patch).map(([key, item]) => {
+    const existing = target[key];
+    const value = isObject(item) && isObject(existing) ? deepMerge(existing, item) : item;
+
+    return [key, value] as const;
+  });
+
+  return {
+    ...target,
+    ...Object.fromEntries(entries),
+  };
 }

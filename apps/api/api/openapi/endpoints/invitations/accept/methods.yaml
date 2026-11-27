@@ -1,0 +1,71 @@
+post:
+  operationId: acceptInvitation
+  summary: Accept an invitation
+  description: |
+    Accepts a pending invitation for the signed-in user and returns the updated
+    invitation.
+
+    Send the plaintext token from the invitation link fragment. Acceptance
+    grants the invitation's role (a project grant for `project_member`) when
+    the invitation is pending and unexpired, the project is claimed, and the
+    creator still holds `admin` unless `created_by` is null. The
+    inviter cannot accept their own invitation. Every unknown or finished token
+    answers the same opaque `404`.
+
+    Authenticate with a platform-project user session cookie (`sessionCookie`).
+    Cookie requests follow that scheme's CSRF rules.
+  tags:
+    - Invitations
+  security:
+    - sessionCookie: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../invitation-token-request.yaml
+  responses:
+    '200':
+      description: The invitation was accepted.
+      content:
+        application/json:
+          schema:
+            $ref: ../invitation.yaml
+    '400':
+      description: The request body was not acceptable.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid session.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: |
+        The inviter cannot accept their own invitation, the creator no longer
+        holds admin, or CSRF failed (`auth.csrf_invalid`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Unknown or finished invitation token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: |
+        The user already has access to the project (`inv.already_member`,
+        with their strongest role as `details.details.relation`; the
+        invitation stays pending), the project is unclaimed, or the server has
+        no platform project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: acceptInvitation-error-response.yaml

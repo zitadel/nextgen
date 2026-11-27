@@ -1,0 +1,4 @@
+type: string
+pattern: '^[a-zA-Z0-9_-]+$'
+x-zitadel-pattern-message: "must be one or more letters, digits, _ or -"
+example: proj_01KWH1P4MYS7F0N9WD3P2E4YM5

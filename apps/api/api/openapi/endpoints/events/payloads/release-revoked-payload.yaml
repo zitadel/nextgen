@@ -1,0 +1,11 @@
+title: ReleaseRevokedPayload
+type: object
+description: |
+  Payload for `release.revoked`. The release ID is the event's `entity_id`.
+  The payload repeats the content hash, which is how the CLI prints a
+  [release](/docs/concepts/repo-config) and how builds pin it.
+required:
+  - content_hash
+properties:
+  content_hash:
+    $ref: ../../../components/schemas/release-content-hash.yaml

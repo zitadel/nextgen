@@ -55,10 +55,23 @@ vi.mock("@zitadel/sdk-react", () => ({
  * need its data call answered — an empty list is enough to prove the redirect
  * landed.
  */
-// `/` lands on Users and the redirect test asks for `/schemas`; both are
-// project-scoped, so the guard selects the visitor's only project.
+// `/` is the project's Overview (D35) and the redirect test asks for
+// `/schemas`; both are project-scoped, so the guard selects the visitor's only
+// project.
 beforeEach(() =>
   server.use(
+    http.get("*/api/v1/projects/proj_test", () =>
+      HttpResponse.json({
+        id: "proj_test",
+        name: "Test",
+        origins: [],
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        owning_team_id: null,
+      }),
+    ),
+    http.get("*/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
+    http.get("*/api/v1/events", () => HttpResponse.json({ events: [] })),
     http.post("*/api/v1/users/query", () => HttpResponse.json({ users: [] })),
     http.get("*/api/v1/schemas", () => HttpResponse.json({ schemas: [] })),
     http.get("*/api/v1/users/me/projects", () =>
@@ -244,12 +257,12 @@ describe("authentication guard", () => {
           );
         }),
       );
-      const router = await renderAt("/settings/profile");
+      const router = await renderAt("/account");
 
       expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
       await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
       expect(router.state.resolvedLocation?.search).toMatchObject({
-        next: expect.stringMatching(/^\/settings\/profile/),
+        next: expect.stringMatching(/^\/account/),
       });
       expect(new URL(reads[0] ?? "").searchParams.get("project_id")).toBe("proj_test");
     } finally {

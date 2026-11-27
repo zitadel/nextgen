@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../src/lib/json";
+import {
+  deepMerge,
+  parseJsonObject,
+  setTopLevelJsonKey,
+  stableStringify,
+  wordOf,
+} from "@/lib/json";
 
 describe("setTopLevelJsonKey", () => {
   it("splices one value and leaves every other byte untouched", () => {
@@ -143,5 +149,45 @@ describe("parseJsonObject", () => {
 
   it("propagates the JSON.parse SyntaxError for invalid JSON", () => {
     expect(() => parseJsonObject("{ not json", "config.json")).toThrow(SyntaxError);
+  });
+});
+
+describe("deepMerge", () => {
+  it("merges objects found at the same key", () => {
+    expect(deepMerge({ a: { b: 1, c: 2 } }, { a: { c: 3, d: 4 } })).toEqual({
+      a: { b: 1, c: 3, d: 4 },
+    });
+  });
+
+  it("replaces everything that is not an object on both sides, arrays included", () => {
+    expect(deepMerge({ list: [1, 2], n: 1 }, { list: [9], n: { x: 1 } })).toEqual({
+      list: [9],
+      n: { x: 1 },
+    });
+  });
+
+  it("keeps the keys the patch does not name, and adds the ones it brings", () => {
+    expect(deepMerge({ keep: true }, { added: 1 })).toEqual({ keep: true, added: 1 });
+  });
+
+  it("changes neither argument", () => {
+    const target = { a: { b: 1 } };
+    const patch = { a: { c: 2 } };
+
+    deepMerge(target, patch);
+
+    expect([target, patch]).toEqual([{ a: { b: 1 } }, { a: { c: 2 } }]);
+  });
+});
+
+describe("wordOf", () => {
+  it("gives a string as it is, and anything else as the JSON it is", () => {
+    expect(wordOf("a b")).toBe("a b");
+    expect([wordOf(3), wordOf(true), wordOf({ a: 1 }), wordOf([1])]).toEqual([
+      "3",
+      "true",
+      '{"a":1}',
+      "[1]",
+    ]);
   });
 });

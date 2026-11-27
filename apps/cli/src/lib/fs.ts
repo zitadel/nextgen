@@ -1,6 +1,6 @@
-import { access, readdir, readFile, stat } from "node:fs/promises";
+import { access, lstat, readdir, readFile, stat } from "node:fs/promises";
 
-import { isErrno } from "./errors";
+import { isErrno } from "./errno";
 
 /**
  * Whether anything exists at `path`. Any failure to look, not only a missing
@@ -20,8 +20,8 @@ export async function pathExists(path: string): Promise<boolean> {
  * Reads a UTF-8 text file, treating a file that does not exist as "no text"
  * rather than as an error.
  *
- * It replaces the hand-written `try { await readFile(...) } catch` that every
- * optional-file read used to carry to recognise `ENOENT`. Only a missing file
+ * It spares every optional-file read a hand-written
+ * `try { await readFile(...) } catch` to recognise `ENOENT`. Only a missing file
  * gives `undefined`. A file that exists but cannot be read, such as one without
  * read permission or a directory, still throws, so it is not mistaken for an
  * absent one.
@@ -51,10 +51,10 @@ export async function readIfExists(path: string): Promise<string | undefined> {
  * Lists the names in a directory, treating a directory that does not exist as an
  * empty one.
  *
- * The CLI keeps optional folders in a project (`.zitadel/idps`,
- * `.zitadel/schemas`, ...) that a project has only once it uses the feature, so
- * "no such folder" and "no files in the folder" mean the same thing to the
- * caller. Only a missing directory (`ENOENT`) is treated that way. A directory
+ * Some directories the CLI lists may not exist yet, such as the directory
+ * `setup` is about to scaffold an app into, so "no such folder" and "no files in
+ * the folder" mean the same thing to the caller. Only a missing directory
+ * (`ENOENT`) is treated that way. A directory
  * that exists but cannot be listed, such as one without read permission, or a
  * file where a directory should be (`ENOTDIR`), still throws, so a broken layout
  * is reported and not mistaken for an empty folder.
@@ -95,12 +95,35 @@ export async function pathExistsStrict(path: string): Promise<boolean> {
 }
 
 /**
+ * Whether an entry exists at `path`, a link counting as an entry even when what
+ * it points at is missing. False only when nothing is there; any other failure
+ * to look throws.
+ *
+ * @param path - What to look for.
+ * @returns Whether an entry is there.
+ * @throws Any `lstat` error other than the entry being missing.
+ */
+export async function entryExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
  * A file's text, or `undefined` when it is absent or cannot be read. For a
  * report on the state of files, where one that cannot be read is shown as
  * missing instead of aborting the rest.
  */
 export function readIfReadable(path: string): Promise<string | undefined> {
-  return readIfExists(path).catch(() => undefined);
+  return readIfExists(path).catch(() => {
+    return undefined;
+  });
 }
 
 /**
@@ -119,7 +142,11 @@ export function readIfReadable(path: string): Promise<string | undefined> {
  */
 export async function isFile(path: string): Promise<boolean> {
   return stat(path).then(
-    (info) => info.isFile(),
-    () => false,
+    (info) => {
+      return info.isFile();
+    },
+    () => {
+      return false;
+    },
   );
 }

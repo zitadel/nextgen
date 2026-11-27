@@ -1,4 +1,4 @@
-import type { Property } from "../property";
+import type { Property } from "@/lib/telemetry/property";
 
 /** Maps `process.platform` to Mixpanel's canonical `$os` label. */
 class OperatingSystem implements Property<NodeJS.Platform, string> {

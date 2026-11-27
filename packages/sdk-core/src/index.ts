@@ -1,9 +1,12 @@
+import { ZitadelRuntimeError } from "./runtime-error.js";
+
+export { ZitadelRuntimeError };
 export type {
-  NextgenSession,
-  AuthState,
-  UnauthState,
-  AuthResult,
-  NextgenMiddlewareOptions,
+  ZitadelAuthSession,
+  ZitadelAuthState,
+  ZitadelUnauthState,
+  ZitadelAuthResult,
+  ZitadelMiddlewareOptions,
 } from "./middleware.js";
 export {
   HOP_BY_HOP,
@@ -11,8 +14,9 @@ export {
   matchesRoutes,
   filterResponseHeaders,
   requiresProjectSecret,
+  proxyRoute,
+  refusedProxyResponse,
   checkOpaqueSessionToken,
-  validateOpaqueSessionToken,
   jwtNamesProject,
   resolveSession,
   SESSION_PROJECT_MISMATCH,
@@ -25,17 +29,19 @@ export {
   SESSION_COOKIE_CACHE_CONTROL,
 } from "./middleware.js";
 export type {
-  OpaqueSession,
-  OpaqueSessionCheck,
-  SessionRequest,
-  SessionCookie,
-  ResolveSessionOptions,
-  ResolvedSession,
-  ProxiedRequest,
-  ProxiedAnswer,
-  ProxiedSessionCookies,
-  ProxyUpstream,
-  BrowserRequest,
+  ZitadelOpaqueSession,
+  ZitadelOpaqueSessionCheck,
+  ZitadelSessionRequest,
+  ZitadelSessionCookie,
+  ZitadelResolveSessionOptions,
+  ZitadelResolvedSession,
+  ZitadelProxiedRequest,
+  ZitadelProxiedAnswer,
+  ZitadelProxiedSessionCookies,
+  ZitadelProxyRoute,
+  ZitadelProxyRouteOptions,
+  ZitadelProxyUpstream,
+  ZitadelBrowserRequest,
 } from "./middleware.js";
 export {
   verifyJwt,
@@ -46,32 +52,103 @@ export {
   JWKS_MIN_REFRESH_MS,
   clearJwksCache,
 } from "./jwt.js";
-export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
+export type {
+  ZitadelJwtPayload,
+  ZitadelJwtHeader,
+  ZitadelDecodedJwt,
+  ZitadelVerifyJwtOptions,
+} from "./jwt.js";
 
+/**
+ * The deployment stage an app runs in.
+ *
+ * Only `production` demands an issuer, because a deployed app must name the auth backend it trusts
+ * while a local app can fall back to a development server. The stage is `development` when nothing
+ * names one.
+ *
+ * @see {@link resolveZitadelRuntime}
+ */
 export type ZitadelEnvironment = "development" | "preview" | "production";
 
-export type ZitadelRuntime = {
+/**
+ * The resolved runtime configuration: the project an app signs users in to and where it runs.
+ *
+ * {@link resolveZitadelRuntime} produces it, so every field has been validated. Use it instead of
+ * reading environment variables by hand, so that a missing value fails at startup and not on the
+ * first request.
+ */
+export interface ZitadelRuntime {
+  /**
+   * The project id that the app signs its users in to.
+   */
   projectId: string;
+  /**
+   * The stage that the app runs in.
+   */
   environment: ZitadelEnvironment;
+  /**
+   * The issuer URL of the auth backend.
+   *
+   * It is always set in `production` and optional in the other stages.
+   */
   issuer?: string;
-};
-
-export type ZitadelRuntimeInput = {
-  projectId?: string;
-  environment?: ZitadelEnvironment;
-  issuer?: string;
-};
-
-export class ZitadelRuntimeError extends Error {
-  readonly code: string;
-
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = "ZitadelRuntimeError";
-    this.code = code;
-  }
 }
 
+/**
+ * The unvalidated values that {@link resolveZitadelRuntime} turns into a {@link ZitadelRuntime}.
+ *
+ * Every field is optional, because each usually comes from an environment variable that may be
+ * unset.
+ */
+export interface ZitadelRuntimeOptions {
+  /**
+   * The project id.
+   *
+   * Resolution throws a {@link ZitadelRuntimeError} when it is missing or empty.
+   */
+  projectId?: string;
+  /**
+   * The stage.
+   *
+   * Resolution falls back to `development` when it is unset.
+   */
+  environment?: ZitadelEnvironment;
+  /**
+   * The issuer URL of the auth backend.
+   *
+   * It is required when the {@link ZitadelRuntimeOptions.environment} is `production`.
+   */
+  issuer?: string;
+}
+
+/**
+ * Resolves the runtime from environment variables.
+ *
+ * It reads `ZITADEL_PROJECT_ID`, `ZITADEL_ENVIRONMENT` and `ZITADEL_ISSUER`. The public variable,
+ * the one with the `NEXT_PUBLIC_` prefix, wins over the plain one. A framework that inlines public
+ * variables into the client bundle and a server that reads only the plain ones therefore agree on
+ * one value.
+ *
+ * On a runtime without `process`, such as an edge worker, the default environment is empty and the
+ * call throws, so pass the variables in explicitly there.
+ *
+ * @param env - The variables to read. Defaults to `process.env` where that exists and to an empty
+ * set on runtimes without it.
+ * @returns The validated runtime.
+ * @throws {@link ZitadelRuntimeError} When {@link resolveZitadelRuntime} rejects the values, or
+ * when the environment name is not `development`, `preview` or `production`.
+ *
+ * @example
+ * ```ts
+ * import { resolveZitadelRuntimeEnv } from "@zitadel/sdk-core";
+ *
+ * const runtime = resolveZitadelRuntimeEnv({
+ *   ZITADEL_PROJECT_ID: "296547382910273",
+ *   ZITADEL_ENVIRONMENT: "production",
+ *   ZITADEL_ISSUER: "https://auth.example.com",
+ * });
+ * ```
+ */
 export function resolveZitadelRuntimeEnv(
   env: Record<string, string | undefined> = currentEnv(),
 ): ZitadelRuntime {
@@ -82,7 +159,24 @@ export function resolveZitadelRuntimeEnv(
   });
 }
 
-export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntime {
+/**
+ * Validates runtime values and applies defaults.
+ *
+ * Use it when the values do not come from environment variables, for example from a config file.
+ * An empty project id counts as missing.
+ *
+ * @param input - The values to validate.
+ * @returns The runtime, with the environment defaulted to `development`.
+ * @throws {@link ZitadelRuntimeError} When the project id is missing, or when the environment is
+ * `production` and the issuer is missing.
+ *
+ * @example
+ * ```ts
+ * const runtime = resolveZitadelRuntime({ projectId: "296547382910273" });
+ * // { projectId: "296547382910273", environment: "development", issuer: undefined }
+ * ```
+ */
+export function resolveZitadelRuntime(input: ZitadelRuntimeOptions): ZitadelRuntime {
   const environment = input.environment ?? "development";
   if (!input.projectId) {
     throw new ZitadelRuntimeError(
@@ -100,12 +194,28 @@ export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntim
   };
 }
 
+/**
+ * Parses the name of an environment, treating an empty value as `development`.
+ *
+ * @param value - The raw variable value.
+ * @returns The environment.
+ * @throws {@link ZitadelRuntimeError} When the name is not a known environment.
+ */
 function parseEnvironment(value: string | undefined): ZitadelEnvironment {
-  if (!value || value === "development") return "development";
-  if (value === "preview" || value === "production") return value;
+  if (!value || value === "development") {
+    return "development";
+  }
+  if (value === "preview" || value === "production") {
+    return value;
+  }
   throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", `Unsupported ZITADEL_ENVIRONMENT "${value}".`);
 }
 
+/**
+ * Returns the process environment where it exists, and an empty set on runtimes without `process`.
+ *
+ * @returns The variables.
+ */
 function currentEnv(): Record<string, string | undefined> {
   const scope = globalThis as { process?: { env?: Record<string, string | undefined> } };
   return scope.process?.env ?? {};

@@ -26,14 +26,14 @@ functions, so restore it with `createCsrfMiddleware` and list it before auth:
 
 ```ts
 import { createCsrfMiddleware, createMiddleware, createStart } from '@tanstack/react-start';
-import { createNextgenRequestMiddleware } from '@zitadel/sdk-tanstack-start/server';
+import { createZitadelRequestMiddleware } from '@zitadel/sdk-tanstack-start/server';
 
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === 'serverFn',
 });
 
 const authMiddleware = createMiddleware({ type: 'request' }).server(
-  createNextgenRequestMiddleware({
+  createZitadelRequestMiddleware({
     url: process.env.ZITADEL_URL,
     projectSecret: process.env.ZITADEL_PROJECT_SECRET,
     protectedRoutes: ['/admin', '/dashboard*'],
@@ -52,12 +52,12 @@ The middleware runs on every request and does three things in one pass:
    is attached as the bearer only on the `POST /sessions/exchange` handoff, and
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and places the
-   result on the request context as `nextgenAuth`, which server functions
+   result on the request context as `zitadelAuth`, which server functions
    receive.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 The proxy/verify/protect decision is also exported as the framework-agnostic
-`handleNextgenRequest(request, options)` if you prefer to wire it into a custom
+`handleZitadelRequest(request, options)` if you prefer to wire it into a custom
 server entry.
 
 ### 2. Reading auth in a server function, and guarding a route
@@ -103,14 +103,14 @@ at `/login`. The `beforeLoad` guard above keeps the route from rendering at all.
 
 ### 3. Render the login widget
 
-Use the typed React wrappers from the `/react` entry. They are
+Use the typed React wrappers from the `/components` entry. They are
 `@zitadel/sdk-react`'s components, rendered on the client only: on the server and
 during hydration they render nothing, and right after hydration they mount the
 widget with every prop in place, so it never starts a flow with its defaults.
 The `/client` entry only configures the SDK; it exports no components.
 
 ```tsx
-import { ZitadelLogin } from '@zitadel/sdk-tanstack-start/react';
+import { ZitadelLogin } from '@zitadel/sdk-tanstack-start/components';
 import { configureZitadel } from '@zitadel/sdk-tanstack-start/client';
 
 const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
@@ -124,7 +124,7 @@ export function LoginPage() {
 button, and `ZitadelLogout` a sign-out control on its own:
 
 ```tsx
-import { ZitadelSession } from '@zitadel/sdk-tanstack-start/react';
+import { ZitadelSession } from '@zitadel/sdk-tanstack-start/components';
 
 export function ProfilePage() {
   return <ZitadelSession project={project} postSignOutUrl="/login" />;
@@ -134,19 +134,21 @@ export function ProfilePage() {
 The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
 `onSignout` on `ZitadelLogout` and `ZitadelSession`. Pass
-`locales={businessLocales}` (also exported from `/react`) to show work-email copy
+`locales={businessLocales}` (also exported from `/components`) to show work-email copy
 for a business audience.
 
-`/react` also exports every type `@zitadel/sdk-react` does, so a callback can be
+`/components` also exports every type `@zitadel/sdk-react` does, so a callback can be
 typed without installing `@zitadel/sdk-react`:
 
 ```tsx
-import type { ZitadelFlowCompleteDetail } from '@zitadel/sdk-tanstack-start/react';
+import type { ZitadelFlowCompleteDetail } from '@zitadel/sdk-tanstack-start/components';
 
 const onFlowComplete = (detail: ZitadelFlowCompleteDetail) => console.log(detail.redirect_uri);
 ```
 
 ## Middleware options
+
+An empty `url` or `projectSecret`, whether in the options or in the environment, counts as unset and falls back to the next source and then to the default (`http://localhost:8080` for `url`). `projectSecret` is a plain option of every server SDK. A route in `protectedRoutes` matches the raw path and the percent-decoded path, so `/%61dmin` is protected like `/admin`.
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
@@ -163,3 +165,9 @@ const onFlowComplete = (detail: ZitadelFlowCompleteDetail) => console.log(detail
 | `jwksTimeoutMs`     | `number`             | `5000`                       | Timeout in ms for JWKS endpoint requests                            |
 | `proxyTimeoutMs`    | `number`             | `5000`                       | Timeout in ms for upstream proxy requests                           |
 | `audience`          | `string \| string[]` | not validated                | Expected `aud` claim value(s)                                       |
+
+A signed-out request for a protected route is redirected with an absolute URL on the origin of the request, such as `https://app.example.com/login?next=%2Fadmin`. The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them from the request only when the client sent none. It cannot tell a trusted CDN or load balancer from a client, and the server builds the OAuth issuer and the `Secure` decision for session cookies from those headers, so strip them at the edge when clients can reach the app directly.
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

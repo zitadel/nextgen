@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { currentUser } from "../../../src/lib/uidgid";
+import { currentUser } from "@/lib/uidgid";
 
 describe("currentUser", () => {
   it("is this process's user and group", () => {

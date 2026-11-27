@@ -1,0 +1,50 @@
+package service
+
+import (
+	"context"
+
+	"github.com/zitadel/nextgen/internal/domain"
+)
+
+// Test helpers for resolve/reuse paths that stay unexported in production.
+
+func ResolveExistingIDP(
+	s *idpConnectionService,
+	ctx context.Context,
+	stmts AllStatements,
+	existing *domain.IDPConnection,
+	document []byte,
+) (*CreateIDPConnectionOutput, error) {
+	return s.resolveExistingIDP(ctx, stmts, existing, document)
+}
+
+func ResolveOrCreateIDP(
+	s *idpConnectionService,
+	ctx context.Context,
+	stmts AllStatements,
+	projectID, slug string,
+	document []byte,
+) (*CreateIDPConnectionOutput, error) {
+	return s.resolveOrCreate(ctx, stmts, projectID, slug, document)
+}
+
+func NewIDPConnectionServiceForTest(v2Pool *DB, schemas BuiltinSchemaProvider) *idpConnectionService {
+	return NewIDPConnectionService(v2Pool, schemas)
+}
+
+func ResolveOrPublishPolicy(
+	s *PolicyService,
+	ctx context.Context,
+	stmts AllStatements,
+	projectID, operation string,
+	raw []byte,
+) (*domain.Policy, error) {
+	return s.resolveOrPublish(ctx, stmts, projectID, operation, raw)
+}
+
+// NewSignupProtectionForTest fixes whether each issuance sweeps expired rows.
+func NewSignupProtectionForTest(db StatementPool, keys KeyService, policy *UserCreatePolicy, sweep bool) SignupProtection {
+	p := NewSignupProtection(db, keys, policy).(*signupProtection)
+	p.sweep = func() bool { return sweep }
+	return p
+}

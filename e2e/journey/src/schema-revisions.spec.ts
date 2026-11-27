@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
-import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
+import { createZitadelApi, type ZitadelApi, ZitadelClient } from "@zitadel/api/client";
 import { identity, loginWithPassword } from "@zitadel/testing/playwright";
 
 import {
@@ -47,13 +47,13 @@ const userD = { username: "rollback-user", email: "rollback-user@example.com" };
 const { password } = identity();
 
 let metadata: JourneyMetadata & { localRuntimeUrl: string };
-let client: ZitadelClient;
+let client: ZitadelApi;
 let projectId: string;
 let objectType: string;
 let revision1: string;
 let revision2: string;
 let revision3: string;
-type UserRecord = Awaited<ReturnType<ZitadelClient["getUserByID"]>>;
+type UserRecord = Awaited<ReturnType<ZitadelApi["getUser"]>>;
 let recordA: UserRecord;
 let recordB: UserRecord;
 let recordC: UserRecord;
@@ -84,7 +84,13 @@ test.beforeAll(async () => {
     project_secret: string;
   };
   projectId = secret.project_id;
-  client = createZitadelClient({ baseUrl: metadata.localRuntimeUrl, token: secret.project_secret });
+  client = createZitadelApi(
+    new ZitadelClient({
+      baseUrl: metadata.localRuntimeUrl,
+      token: secret.project_secret,
+      allowDestructive: true,
+    }),
+  );
 });
 
 test("enables the mock provider", async () => {
@@ -229,7 +235,7 @@ async function expectProviderSignIns(page: Page, users: { username: string }[]):
 /** Each user still has the revision, attributes and update time it was recorded with. */
 async function expectRecordsUnchanged(expected: (readonly [UserRecord, string])[]): Promise<void> {
   for (const [record, revision] of expected) {
-    const now = await client.getUserByID(record.id);
+    const now = await client.getUser(record.id);
     expect(now.schema).toBe(revision);
     expect(now.attributes).toEqual(record.attributes);
     expect(now.metadata.updated_at).toBe(record.metadata.updated_at);
@@ -293,5 +299,5 @@ async function registerThroughProvider(
   await client.setUserPassword(created.id, { password });
 
   await logout(page);
-  return client.getUserByID(created.id);
+  return client.getUser(created.id);
 }

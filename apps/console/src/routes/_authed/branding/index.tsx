@@ -1,24 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { publishedSides } from "@zitadel/components";
-import {
-  type LucideIcon,
-  Monitor,
-  Moon,
-  Paintbrush,
-  Smartphone,
-  Sun,
-  SunMoon,
-  Workflow,
-} from "lucide-react";
+import { Monitor, Paintbrush, Smartphone, Workflow } from "lucide-react";
 import { useState } from "react";
-
 import {
   LoginPreview,
   type PreviewJourney,
   type PreviewState,
-} from "@/components/branding/login-preview";
-import { PreviewStage } from "@/components/branding/preview-stage";
-import { SettingsPanel } from "@/components/branding/settings-panel";
+} from "@/features/branding/components/login-preview";
+import { PreviewStage } from "@/features/branding/components/preview-stage";
+import { SettingsPanel } from "@/features/branding/components/settings-panel";
 import { ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -39,12 +28,22 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { BrandingRevision } from "@/lib/branding-palette";
-import { flowDisplayName } from "@/lib/flow-definition";
-
+import type { BrandingRevision } from "@/features/branding/branding-palette";
+import { fetchLatestBranding } from "@/features/branding/api";
+import { flowDisplayName } from "@/features/flow-definitions/model";
 import { api } from "@/api/zitadel";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { Page } from "@/components/layout";
+import {
+  JOURNEYS,
+  type PreviewFlow,
+  type PreviewTheme,
+  STATE_LABELS,
+  THEMES,
+  revisionSide,
+  successStepName,
+  unpublishedSide,
+} from "@/features/branding/preview-options";
 
 export const Route = createFileRoute("/_authed/branding/")({
   // Order 6: right after Login flows, whose screens it styles, as the design's
@@ -55,13 +54,11 @@ export const Route = createFileRoute("/_authed/branding/")({
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
-    // Newest first, so the head of the list is what visitors see today. The
-    // list carries ids only, so the configuration itself is a second call. A
-    // project that has never published branding has no revision, and the
+    // A project that has never published branding has no revision, and the
     // panel then shows the maintained defaults.
     const projectId = requireProjectScope(deps.project);
-    const [revisions, flows] = await Promise.all([
-      api.listBranding({ project_id: projectId }),
+    const [revision, flows] = await Promise.all([
+      fetchLatestBranding(projectId),
       // One row per flow rather than per revision (#1246), as the Login
       // flows directory asks for it. The preview starts a flow by name, so a
       // second revision of one is an ambiguous row rather than another choice.
@@ -79,81 +76,10 @@ export const Route = createFileRoute("/_authed/branding/")({
       purposes: Object.keys(entry.flow_definition.purposes ?? {}),
       successStep: successStepName(entry.flow_definition.steps),
     }));
-    const latest = revisions[0];
-    if (!latest) return { revision: {} as BrandingRevision, flows: previewFlows };
-    const found = await api.getBrandingById(latest.id);
-    return { revision: found.branding as BrandingRevision, flows: previewFlows };
+    return { revision: revision ?? ({} as BrandingRevision), flows: previewFlows };
   },
   component: BrandingScreen,
 });
-
-/** A flow the preview can run, the purposes it serves, and its terminal screen. */
-type PreviewFlow = { name: string; label: string; purposes: string[]; successStep?: string };
-
-/**
- * The step a flow ends on a screen with: its one `complete: "show"` step. A
- * flow that declares none, or several, leaves the choice to the element.
- */
-function successStepName(steps: { name: string; complete?: string }[] = []): string | undefined {
-  const shown = steps.filter((step) => step.complete === "show");
-  return shown.length === 1 ? shown[0]?.name : undefined;
-}
-
-// Passkey is absent: it needs a step the flow only reaches after an
-// identifier, which the preview cannot ask for (the element shows the entry
-// step in a chosen state; a later step exists only once the server has walked
-// the flow to it), and a tab that renders the sign-in step under another name
-// claims a journey it does not preview.
-const JOURNEYS: { id: PreviewJourney; label: string }[] = [
-  { id: "register", label: "Sign up" },
-  { id: "login", label: "Sign in" },
-];
-
-// The states of the design's selector, in its order. All of them are the
-// element's own rendering of the step the project serves; none writes to it.
-// Keyed by state, so one the element gains has to be labelled here to compile.
-const STATE_LABELS: Record<PreviewState, string> = {
-  default: "Default",
-  validation_error: "Validation errors",
-  submission_error: "Submission error",
-  loading: "Loading",
-  success: "Success",
-};
-
-/**
- * Which side the preview paints: a fixed side, or `revision` to leave it to
- * the revision's own `theme.mode` — what a visitor gets.
- */
-type PreviewTheme = "light" | "dark" | "revision";
-
-// The menu's order, with the user menu's icons, so the trigger shows the side
-// on screen. Keyed like `STATE_LABELS`, so a new side has to be labelled here.
-const THEMES: Record<PreviewTheme, { label: string; icon: LucideIcon }> = {
-  revision: { label: "From branding", icon: SunMoon },
-  light: { label: "Light", icon: Sun },
-  dark: { label: "Dark", icon: Moon },
-};
-
-/**
- * The side a revision that publishes only the other one cannot paint. The
- * element then paints the published side whatever it is asked for
- * (`publishedSides`); with both or neither published, either side paints.
- */
-function unpublishedSide(revision: BrandingRevision): PreviewTheme | undefined {
-  const [only, second] = publishedSides(revision);
-  if (!only || second) return undefined;
-  return only === "light" ? "dark" : "light";
-}
-
-/** What "From branding" paints, resolved as the element does it. */
-function revisionSide(revision: BrandingRevision): string {
-  const [only, second] = publishedSides(revision);
-  if (only && !second) return THEMES[only].label;
-  const mode = revision.theme?.mode;
-  // `auto`, and an unset mode, which a widget treats as `auto`, follow the
-  // operator's operating system, not the console's own theme.
-  return mode === "light" || mode === "dark" ? THEMES[mode].label : "System";
-}
 
 function BrandingScreen() {
   const { revision, flows } = Route.useLoaderData();
@@ -268,10 +194,12 @@ function BrandingScreen() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* One name in both states: `aria-pressed` says which is on. */}
             <Button
               variant="outline"
               size="icon"
-              aria-label={narrow ? "Show at desktop width" : "Show at phone width"}
+              aria-label="Phone width"
+              title="Phone width"
               aria-pressed={narrow}
               onClick={() => setNarrow((value) => !value)}
             >
@@ -300,9 +228,11 @@ function BrandingScreen() {
                     <DropdownMenuRadioItem key={id} value={id} disabled={id === unpublished}>
                       <entry.icon aria-hidden />
                       {entry.label}
-                      {/* What a visitor gets, and why a side is not offered. */}
+                      {/* What a visitor gets, and why a side is not offered. Muted
+                          text fails contrast on the highlighted row's accent, so
+                          the hint takes the row's colour there. */}
                       {(id === "revision" || id === unpublished) && (
-                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground in-data-highlighted:text-accent-foreground">
                           {id === "revision" ? revisionSide(revision) : "Not published"}
                         </span>
                       )}
@@ -330,7 +260,17 @@ function BrandingScreen() {
             // Centred by auto margins, not the stage's alignment: a step
             // taller than the stage (an error banner) then starts at its top
             // and scrolls, instead of spilling above where it cannot.
-            <div className={narrow ? "m-auto w-96" : "m-auto w-full max-w-lg"}>
+            // Phone width is the card on a 375px screen, less the login page's
+            // padding either side (`--zl-spacing-6` below 48rem). The card
+            // stops at its own 384px maximum, so a phone frame must be
+            // narrower than that to show any change.
+            <div
+              className={
+                narrow
+                  ? "m-auto w-[calc(375px-2*var(--zl-spacing-6))] max-w-full"
+                  : "m-auto w-full max-w-lg"
+              }
+            >
               <LoginPreview
                 journey={activeJourney}
                 flowName={activeFlowName}
@@ -344,7 +284,7 @@ function BrandingScreen() {
           )}
         </PreviewStage>
 
-        <Card className="min-h-0 overflow-hidden border-foreground/10 p-0 shadow-xs">
+        <Card className="min-h-0 overflow-hidden p-0 shadow-xs outline-foreground/10">
           <SettingsPanel revision={revision} />
         </Card>
       </div>

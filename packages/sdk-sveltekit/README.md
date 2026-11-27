@@ -38,9 +38,9 @@ Then create (or extend) `src/hooks.server.ts`:
 
 ```ts
 import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from '$app/env/private';
-import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
+import { createZitadelHandle } from '@zitadel/sdk-sveltekit/server';
 
-export const handle = createNextgenHandle({
+export const handle = createZitadelHandle({
   url: ZITADEL_URL,
   projectSecret: ZITADEL_PROJECT_SECRET,
   projectId: ZITADEL_PROJECT_ID,
@@ -58,27 +58,27 @@ The hook runs on every request and does three things in one pass:
    is attached as the bearer only on the `POST /sessions/exchange` handoff, and
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
-   result to `event.locals.nextgenAuth`.
+   result to `event.locals.zitadelAuth`.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 Compose it with your existing hooks via `sequence()`:
 
 ```ts
 import { sequence } from '@sveltejs/kit/hooks';
-import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
+import { createZitadelHandle } from '@zitadel/sdk-sveltekit/server';
 
-export const handle = sequence(createNextgenHandle({ /* … */ }), myOtherHandle);
+export const handle = sequence(createZitadelHandle({ /* … */ }), myOtherHandle);
 ```
 
 ### 2. Type the auth locals
 
-`@zitadel/sdk-sveltekit/server` augments `App.Locals` with `nextgenAuth`
+`@zitadel/sdk-sveltekit/server` augments `App.Locals` with `zitadelAuth`
 automatically. Make sure your `src/app.d.ts` keeps the `App` namespace:
 
 ```ts
 declare global {
   namespace App {
-    // nextgenAuth is merged in by @zitadel/sdk-sveltekit
+    // zitadelAuth is merged in by @zitadel/sdk-sveltekit
     interface Locals {}
   }
 }
@@ -128,17 +128,13 @@ client-side navigation, where the hook's `locals` are not available.
 
 ### 4. Render the login widget
 
-Install the Svelte component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-sveltekit` is server-only; the widget comes from `@zitadel/sdk-svelte`:
-
-```bash
-pnpm add @zitadel/sdk-svelte@latest
-```
+Render `ZitadelLogin` from `@zitadel/sdk-sveltekit/components`. It re-exports the widgets of
+`@zitadel/sdk-svelte`, so this one package is all the app installs.
 
 ```svelte
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-svelte';
+  import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-sveltekit/components';
 
   const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
@@ -175,10 +171,12 @@ way:
 The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
 `onSignout` on `ZitadelLogout` and `ZitadelSession`. Pass
-`locales={businessLocales}` (exported from `@zitadel/sdk-svelte`) to show
+`locales={businessLocales}` (exported from `@zitadel/sdk-sveltekit/components`) to show
 work-email copy for a business audience.
 
 ## Middleware options
+
+An empty `url` or `projectSecret`, whether in the options or in the environment, counts as unset and falls back to the next source and then to the default (`http://localhost:8080` for `url`). `projectSecret` is a plain option of every server SDK. A route in `protectedRoutes` matches the raw path and the percent-decoded path, so `/%61dmin` is protected like `/admin`.
 
 | Option              | Type                 | Default              | Description                                                                                    |
 | ------------------- | -------------------- | -------------------- | ---------------------------------------------------------------------------------------------- |
@@ -196,6 +194,8 @@ work-email copy for a business audience.
 | `proxyTimeoutMs`    | `number`             | `5000`               | Timeout in ms for upstream proxy requests                                                       |
 | `audience`          | `string \| string[]` | not validated        | Expected `aud` claim value(s). When omitted, audience is not checked                           |
 
+A signed-out request for a protected route is redirected with an absolute URL on the origin of the request, such as `https://app.example.com/login?next=%2Fadmin`. The proxy forwards a client's `x-forwarded-host` and `x-forwarded-proto` unchanged and sets them from the request only when the client sent none. It cannot tell a trusted CDN or load balancer from a client, and the server builds the OAuth issuer and the `Secure` decision for session cookies from those headers, so strip them at the edge when clients can reach the app directly.
+
 ## How JWT verification works
 
 1. Bearer token from `Authorization` header is checked first; the app's session cookie, `__Host-zitadel_session_<projectId>` (`zitadel_session_<projectId>` over plain http to a loopback host), is the fallback
@@ -206,3 +206,7 @@ work-email copy for a business audience.
 6. `iss` must be present and must equal `url`
 7. `exp` must be present and in the future (with `clockSkewMs` tolerance); `nbf` and `iat` are validated when present
 8. Opaque (non-JWT) tokens fall back to validation via `GET /sessions/me`
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

@@ -1,0 +1,16 @@
+title: InvitationCancelledByAdministratorPayload
+description: |
+  An `invitation.cancelled` payload for an invitation an administrator
+  cancelled.
+type: object
+required:
+  - journey_id
+  - reason
+properties:
+  journey_id:
+    type: string
+    description: Shared by an invitation and every invitation that replaces it.
+  reason:
+    type: string
+    enum:
+      - cancelled

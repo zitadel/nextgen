@@ -1,9 +1,9 @@
-import { ZitadelError } from "../../../../errors";
-import { withLfLineEnds } from "../utils/line-ends";
-import { parseConfigModule } from "../utils/magicast";
+import { ZitadelError } from "@/lib/errors";
+import { withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
+import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 /**
- * The settings the hook passes to `createNextgenHandle`, read from
+ * The settings the hook passes to `createZitadelHandle`, read from
  * `$app/env/private`. SvelteKit keeps a declared variable server-only unless it
  * is marked `public`, and shows the description on hover.
  */
@@ -37,7 +37,9 @@ export function envTemplate(): string {
   return `import { defineEnvVars } from "@sveltejs/kit/env";
 
 export const variables = defineEnvVars({
-${HOOK_VARIABLES.map((variable) => `  ${entry(variable)},`).join("\n")}
+${HOOK_VARIABLES.map((variable) => {
+  return `  ${entry(variable)},`;
+}).join("\n")}
 });
 `;
 }
@@ -71,9 +73,11 @@ export function envVarsEdit(): (source: string | undefined) => string {
     return withLfLineEnds(source, (text) => {
       const object = variablesObject(text);
       const properties = object.properties ?? [];
-      const missing = HOOK_VARIABLES.filter(
-        (variable) => !properties.some((property) => keyOf(property) === variable.name),
-      );
+      const missing = HOOK_VARIABLES.filter((variable) => {
+        return !properties.some((property) => {
+          return keyOf(property) === variable.name;
+        });
+      });
       if (missing.length === 0) {
         return text;
       }
@@ -83,7 +87,11 @@ export function envVarsEdit(): (source: string | undefined) => string {
         const lineStart = text.lastIndexOf("\n", object.start - 1) + 1;
         const indent = /^[\t ]*/.exec(text.slice(lineStart))?.[0] ?? "";
         const unit = /^\t/m.test(text) ? "\t" : "  ";
-        const body = missing.map((variable) => `${indent}${unit}${entry(variable)},\n`).join("");
+        const body = missing
+          .map((variable) => {
+            return `${indent}${unit}${entry(variable)},\n`;
+          })
+          .join("");
         return `${text.slice(0, object.start)}{\n${body}${indent}}${text.slice(object.end)}`;
       }
       const lineStart = text.lastIndexOf("\n", last.start - 1) + 1;
@@ -92,7 +100,11 @@ export function envVarsEdit(): (source: string | undefined) => string {
         lineStart <= object.start
           ? ", "
           : `,\n${/^[\t ]*/.exec(text.slice(lineStart, last.start))?.[0] ?? ""}`;
-      const added = missing.map((variable) => `${separator}${entry(variable)}`).join("");
+      const added = missing
+        .map((variable) => {
+          return `${separator}${entry(variable)}`;
+        })
+        .join("");
       return `${text.slice(0, last.end)}${added}${text.slice(last.end)}`;
     });
   };
@@ -112,15 +124,19 @@ interface ProxyNode {
 function variablesObject(text: string): AstNode {
   // At tabWidth 1 the node offsets index the source itself; at recast's
   // default a tab counts as four, which a tab-indented file would expose.
-  const mod = parseConfigModule(text, ENV_LABEL, { tabWidth: 1 });
-  const variables = (mod.exports as { variables?: ProxyNode } | undefined)?.variables;
+  const file = ConfigModule.open(text, ENV_LABEL, { tabWidth: 1 });
+  const variables = (file.module.exports as { variables?: ProxyNode } | undefined)?.variables;
   const object = variables?.$type === "function-call" ? variables.$args?.[0] : variables;
   if (object?.$type !== "object") {
     throw new ZitadelError(
       "E_VALIDATION",
       `Could not find the env variables ${ENV_LABEL} declares`,
       {
-        hint: `Export them as \`export const variables = defineEnvVars({ ... })\` from @sveltejs/kit/env, or declare ${HOOK_VARIABLES.map((variable) => variable.name).join(", ")} there by hand.`,
+        hint: `Export them as \`export const variables = defineEnvVars({ ... })\` from @sveltejs/kit/env, or declare ${HOOK_VARIABLES.map(
+          (variable) => {
+            return variable.name;
+          },
+        ).join(", ")} there by hand.`,
       },
     );
   }

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-svelte",
-  "version": "0.4.0",
+  "version": "0.9.0",
   "description": "Svelte components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-svelte#readme",
   "bugs": {
@@ -15,6 +15,7 @@
   "type": "module",
   "files": [
     "dist",
+    "!dist/api-docs",
     "src/lib",
     "!src/lib/**/*.spec.ts"
   ],
@@ -31,16 +32,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build && attw --pack . --profile=esm-only",
+    "build": "vite build && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "typecheck": "svelte-check --tsconfig ./tsconfig.lib.json && svelte-check --tsconfig ./tsconfig.spec.json",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
-    "prepack": "publint --strict"
+    "prepack": "publint --strict",
+    "docs:api": "typedoc"
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*"
   },
@@ -50,16 +49,18 @@
   "devDependencies": {
     "@edge-runtime/vm": "catalog:",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "@testing-library/svelte": "^5.3.1",
+    "@testing-library/svelte": "^5.4.2",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/client-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
-    "svelte": "^5.0.0",
-    "svelte-check": "^4.0.0",
-    "svelte2tsx": "^0.7.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.8",
+    "svelte2tsx": "^0.7.63",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

@@ -1,0 +1,17 @@
+title: IdpIdentityLinkCreatedPayload
+type: object
+description: |
+  Payload for `idp.identity_link.created`, sent when a sign-in through an
+  identity provider (IdP) creates a user and links the provider account to it.
+  The link ID is the event's `entity_id`. The provider's subject and claims, the
+  profile data it sends about the account, are never included.
+required:
+  - connection_id
+  - user_id
+properties:
+  connection_id:
+    type: string
+    description: The IdP connection the account signed in through.
+  user_id:
+    type: string
+    description: The user the provider account is linked to.

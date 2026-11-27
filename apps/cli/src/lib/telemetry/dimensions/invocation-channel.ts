@@ -1,4 +1,4 @@
-import type { Property } from "../property";
+import type { Property } from "@/lib/telemetry/property";
 
 /** Package manager that launched the process, read from its user-agent. */
 class InvocationChannel implements Property<NodeJS.ProcessEnv, string> {
@@ -7,7 +7,11 @@ class InvocationChannel implements Property<NodeJS.ProcessEnv, string> {
 
   public value(env: NodeJS.ProcessEnv): string {
     const userAgent = env.npm_config_user_agent ?? "";
-    return InvocationChannel.managers.find((manager) => userAgent.startsWith(manager)) ?? "unknown";
+    return (
+      InvocationChannel.managers.find((manager) => {
+        return userAgent.startsWith(manager);
+      }) ?? "unknown"
+    );
   }
 }
 

@@ -1,0 +1,11 @@
+title: InvitationCreatedByType
+description: What kind of principal `created_by` names.
+oneOf:
+  - type: string
+    enum:
+      - human
+      - service
+      - system
+      - agent
+  - type: 'null'
+example: human

@@ -2,9 +2,16 @@
   "title": "Guides",
   "pages": [
     "local-runtime",
+    "edit-login-flow",
     "deploy",
+    "manage-project-access",
+    "password-policy",
+    "test-policies",
+    "test-your-app",
     "migrate-user-schema",
+    "sign-in-methods",
     "social-sign-in",
+    "enable-oauth",
     "customize-design",
     "customize-copy",
     "troubleshooting"

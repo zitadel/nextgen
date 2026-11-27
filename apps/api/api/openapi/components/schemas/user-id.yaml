@@ -1,0 +1,4 @@
+type: string
+pattern: '^user_[a-zA-Z0-9_-]+$'
+x-zitadel-pattern-message: "must be a user ID: user_ followed by letters, digits, _ or -"
+example: user_01KWH3B72K7M7F0N9WD3P2E4YM

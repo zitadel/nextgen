@@ -1,0 +1,73 @@
+import { useState } from "react";
+
+import {
+  Combobox,
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxPlaceholder,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox";
+import type { UserSchema } from "@/features/schemas/model";
+
+/** A schema plus the id needed to reference it in the created user's `schema`. */
+export interface SchemaOption {
+  id: string;
+  schema: UserSchema;
+  name: string;
+  /** The property names it collects, nested ones too, which search matches. */
+  keywords: string[];
+}
+
+/** Searchable schema picker, composed from the shared Combobox. */
+export function SchemaPicker({
+  id,
+  schemas,
+  selected,
+  onSelect,
+}: {
+  id: string;
+  schemas: SchemaOption[] | undefined;
+  selected: SchemaOption | undefined;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const loading = schemas === undefined;
+
+  return (
+    <Combobox open={open} onOpenChange={setOpen}>
+      <ComboboxAnchor asChild>
+        <ComboboxTrigger
+          id={id}
+          label="User Schema"
+          open={open}
+          disabled={loading}
+          className="w-full"
+          onOpen={() => setOpen(true)}
+        >
+          {selected ? (
+            <ComboboxValue>{selected.name}</ComboboxValue>
+          ) : (
+            <ComboboxPlaceholder>
+              {loading ? "Loading schemas…" : "Select schema"}
+            </ComboboxPlaceholder>
+          )}
+        </ComboboxTrigger>
+      </ComboboxAnchor>
+      <ComboboxContent
+        options={(schemas ?? []).map((option) => ({
+          value: option.id,
+          label: option.name,
+          // Typing a property name finds the schemas that collect it.
+          keywords: option.keywords,
+        }))}
+        selected={selected ? [selected.id] : []}
+        searchPlaceholder="Search schemas"
+        label="Schemas"
+        emptyLabel="No schemas found."
+        onSelect={onSelect}
+        onClose={() => setOpen(false)}
+      />
+    </Combobox>
+  );
+}

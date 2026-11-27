@@ -66,7 +66,7 @@ sk_team_… MUST NEVER:
                                       the token's own team is under MAY)
   billing.*
   idp.*
-  app.*
+  application.*
   app_group.*
   grant.*
   schema.*

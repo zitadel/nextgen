@@ -20,7 +20,7 @@ const sharedPlugins = () => [liquidRaw()];
  * - `edge` (Vercel's edge-runtime VM): `*.edge.spec.ts`, which load the built
  *   Lit-free `dist/server.mjs` where there is no DOM.
  *
- * The CI gate is `test:all` = `vitest run`, which runs every project in one
+ * The CI gate is `test` = `vitest run`, which runs every project in one
  * process and emits one aggregated junit.xml.
  */
 export default defineConfig({
@@ -41,6 +41,8 @@ export default defineConfig({
         test: {
           name: "unit",
           globals: true,
+          // The default 5s is too tight when the gate runs the whole graph on one runner.
+          testTimeout: 30_000,
           // Specs import atoms directly, past the entries that silence Lit's
           // dev-mode notice; load the same module first (see the module).
           setupFiles: ["src/internal/lit-dev-mode.ts"],

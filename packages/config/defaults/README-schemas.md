@@ -65,6 +65,10 @@ For example:
 Every property becomes available to the rest of the identity system,
 including login and registration flows.
 
+A property's `format` is enforced for the standard JSON Schema formats, such as
+`email`, `uri`, `uuid`, `date` and `date-time`. Any other format, such as `phone`,
+is only a label: use `pattern` if the value must match it.
+
 ## `required`
 
 Lists which properties every user must provide.
@@ -132,9 +136,20 @@ the schema revision they signed up under, so the name shows for those who
 sign up after you deploy it. The `consumer` and `business` use cases set it
 for you.
 
-## Enable passkeys
+## Turn password or passkey sign-in on and off
 
-Set `"passkey": { "enabled": true }` in `x-auth-methods`.
+Run `zitadel auth-method passkey enable` (or `disable`, or `password`
+instead of `passkey`). It sets `"enabled"` under `x-auth-methods` and
+edits nothing else. Pass `--schema` with the schema's file name or its
+`objectType` when this folder holds more than one schema.
+
+The login flow must offer the method too, so edit it in
+`.zitadel/flows/` as well. `enable` warns when no flow offers the method
+yet. `disable` refuses while a flow still uses it, and lists the steps to
+change first. Disabling the last way to sign in asks first in a
+terminal, and is refused elsewhere unless you pass `--force`.
+
+Guide: https://preview.zitadel.com/docs/guides/sign-in-methods
 
 ## Create another user type
 

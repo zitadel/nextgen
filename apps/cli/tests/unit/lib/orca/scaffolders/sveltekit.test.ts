@@ -4,12 +4,9 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { SvelteKitScaffolder } from "../../../../../src/lib/orca/scaffolders/sveltekit";
-import {
-  SUPPORTED_NODE,
-  describeNodeEngines,
-  scaffoldingCalls,
-} from "../../../../helpers/node-engines";
+import { frameworkCli } from "@/lib/orca/scaffolders/framework-clis";
+import { SvelteKitScaffolder } from "@/lib/orca/scaffolders/sveltekit";
+import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn() }));
@@ -27,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("SvelteKitScaffolder", () => {
-  it("runs `sv create` then removes the starter +page.svelte", async () => {
+  it("runs `sv create` without an install, then removes the starter +page.svelte", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new SvelteKitScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "sveltekit");
@@ -36,7 +33,7 @@ describe("SvelteKitScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "-y",
-      "sv@latest",
+      frameworkCli("sv"),
       "create",
       ".",
       "--template",
@@ -44,8 +41,7 @@ describe("SvelteKitScaffolder", () => {
       "--types",
       "ts",
       "--no-add-ons",
-      "--install",
-      "npm",
+      "--no-install",
     ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/routes/+page.svelte"), {
@@ -60,7 +56,7 @@ describe("SvelteKitScaffolder", () => {
     make: (node, platform) => new SvelteKitScaffolder(node, platform),
     framework: "sveltekit",
     label: "sv",
-    spec: "sv@latest",
+    spec: frameworkCli("sv"),
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],

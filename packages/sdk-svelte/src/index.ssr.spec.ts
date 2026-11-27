@@ -4,7 +4,12 @@ import { describe, expect, it } from "vitest";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
-import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
+import { type ZitadelWidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
+
+import {
+  describeServerRenderCases,
+  describeServerStandardAttributes,
+} from "@zitadel/client-sdk-contract/server-render";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(
@@ -126,7 +131,7 @@ describe("server-rendered widget options", () => {
 
 /** The attributes on the widget's element in the markup a server would send. */
 async function renderAttributes(
-  widget: WidgetName,
+  widget: ZitadelWidgetName,
   props: Readonly<Record<string, unknown>>,
 ): Promise<Record<string, string>> {
   return serverAttributes(
@@ -136,42 +141,8 @@ async function renderAttributes(
   );
 }
 
-// standard-attributes-server:begin
-describe.each(widgetNames)("%s server-rendered standard attributes", (widget) => {
-  it("puts the standard attributes into the server markup", async () => {
-    const attributes = await renderAttributes(widget, {
-      id: "probe",
-      title: "probe",
-      slot: "probe",
-      role: "region",
-      tabindex: "3",
-      "data-testid": "probe",
-      "aria-label": "probe",
-    });
-    expect(attributes).toMatchObject({
-      id: "probe",
-      title: "probe",
-      slot: "probe",
-      role: "region",
-      tabindex: "3",
-      "data-testid": "probe",
-      "aria-label": "probe",
-    });
-  });
-
-  it("leaves props outside the standard set out of the server markup", async () => {
-    const attributes = await renderAttributes(widget, {
-      srcdoc: "probe",
-      onclick: "probe",
-      part: "probe",
-      dir: "probe",
-    });
-    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
-      expect(attributes).not.toHaveProperty(name);
-    }
-  });
-});
-// standard-attributes-server:end
+describeServerRenderCases("svelte", renderAttributes);
+describeServerStandardAttributes(renderAttributes);
 
 describe("the package entry on a Node server", () => {
   it.each(widgetNames)(

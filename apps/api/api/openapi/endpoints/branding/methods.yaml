@@ -1,0 +1,93 @@
+post:
+  operationId: publishBranding
+  summary: Publish a branding revision
+  description: |
+    Publishes a new immutable branding revision for the project, and records a
+    `branding.created` event. Branding revisions cannot be updated or deleted.
+    Every edit publishes a new revision. Flow responses carry the branding
+    revision the request's release pins.
+
+    The `id` of the new revision is the revision ID a release pins for
+    `kind: branding`.
+
+    The `liquid_template` is validated lexically on save (size, encoding,
+    banned patterns such as `<script>` tags, inline event handlers, and the
+    `| raw` filter). Authoritative LiquidJS validation runs at authoring
+    time, in `zitadel deploy` and `zitadel deploy --dry-run`.
+  tags:
+    - Branding
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - branding.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../components/flows/branding.yaml
+  responses:
+    '201':
+      description: The created branding revision.
+      content:
+        application/json:
+          schema:
+            $ref: branding-revision-response.yaml
+    '400':
+      description: The branding configuration is not valid. Fix what the error reports and publish again.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: publishBranding-error-response.yaml
+
+get:
+  operationId: listBranding
+  x-zitadel-cli: branding list
+  summary: List branding revisions
+  description: |
+    Lists a project's branding revisions, newest first, paginated with a cursor.
+    The first entry of the first page is the newest revision.
+
+    Every publish adds a revision, so the list grows without bound. Pass
+    `next_page_token` back as `page_token` to read the next page.
+
+    The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and
+    that a release pins for `kind: branding`.
+  tags:
+    - Branding
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - branding.read
+    - sessionCookie: []
+  responses:
+    '200':
+      description: A page of the project's branding revisions.
+      content:
+        application/json:
+          schema:
+            $ref: list-branding-response.yaml
+          examples:
+            firstPage:
+              summary: A page with more results behind it
+              value:
+                branding:
+                  - id: brnd_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    created_at: '2026-07-14T09:11:00Z'
+                  - id: brnd_01KX2ZJ4B8C7F0N9WD3P2E4YM5
+                    created_at: '2026-07-02T15:40:00Z'
+                next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
+            lastPage:
+              summary: The last page
+              value:
+                branding:
+                  - id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    created_at: '2026-06-20T08:00:00Z'
+    default:
+      $ref: listBranding-error-response.yaml

@@ -1,0 +1,10 @@
+name: project_id
+in: query
+description: |
+  The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+  it as "Project id" in its summary and as `project_id` with `--json`, and
+  writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+required: true
+schema:
+  $ref: '../schemas/project-id.yaml'
+example: proj_01KWH1P4MYS7F0N9WD3P2E4YM5

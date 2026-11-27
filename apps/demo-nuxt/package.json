@@ -13,11 +13,12 @@
     "directory": "apps/demo-nuxt"
   },
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "nuxt dev --port 3001",
     "build": "nuxt build",
     "start": "nuxt start",
-    "typecheck": "NEXTGEN_NUXT_BUILD_DIR=.nuxt-typecheck nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json",
+    "typecheck": "ZITADEL_NUXT_BUILD_DIR=.nuxt-typecheck nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json",
     "lint": "biome check ."
   },
   "dependencies": {

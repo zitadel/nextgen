@@ -1,0 +1,15 @@
+title: CreateProjectMemberInvitationRequest
+description: Creates a project-member invitation, or replaces an existing one.
+allOf:
+  - $ref: create-invitation-common.yaml
+  - type: object
+    required:
+      - type
+      - project_member
+    properties:
+      type:
+        type: string
+        enum:
+          - project_member
+      project_member:
+        $ref: invitation-project-member-payload.yaml

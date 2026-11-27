@@ -1,10 +1,9 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { devScriptPortOp } from "../dev-script-port";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
 import { envVarsEdit } from "./env-vars";
 import {
   hooksServerTemplate,
@@ -17,10 +16,10 @@ import {
 
 const SDK_DEPENDENCY = "@zitadel/sdk-sveltekit";
 /**
- * The idiomatic Svelte component library that ships the `<ZitadelLogin>` /
- * `<ZitadelSession>` Svelte components the routes render. The server SDK above is
- * plumbing only; the widget comes from here, so a SvelteKit app gets the native
- * Svelte component (typed props, callback events) rather than the bare element.
+ * The Svelte UI SDK behind the widgets. The routes import the widgets from
+ * `@zitadel/sdk-sveltekit/components`, which re-exports this package, yet the
+ * app still declares it as a direct dependency: Vite's Svelte plugin finds the
+ * Svelte libraries to compile in the app's own `package.json`.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-svelte";
 
@@ -30,9 +29,9 @@ const COMPONENT_DEPENDENCY = "@zitadel/sdk-svelte";
  * here the `@zitadel/sdk-sveltekit` `handle` hook in `src/hooks.server.ts`.
  * Contributes the layout + landing/login/register/profile file-based routes (the
  * idiomatic `<ZitadelLogin>`/`<ZitadelSession>` Svelte components from
- * `@zitadel/sdk-svelte`), the public project-id env var, and both deps. No config
- * edit is needed — the hook is a plain file, so (like Next) every managed file
- * carries the marker.
+ * `@zitadel/sdk-sveltekit/components`), the public project-id env var, and
+ * both deps. No config edit is needed — the hook is a plain file, so (like
+ * Next) every managed file carries the marker.
  */
 export class SvelteKitPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
@@ -44,7 +43,9 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
-    const src = (rel: string) => join(ctx.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(ctx.framework.appDir, rel);
+    };
     return [
       // The auth boundary is written on every setup; a pre-existing hook at
       // this exact path is a genuine conflict the file-writer refuses (and
@@ -97,18 +98,20 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
       {
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
     ];
   }
 
   protected routeFiles(view: PatchView): ReadonlyArray<string> {
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     return [
       src("hooks.server.ts"),
       src("routes/+layout.svelte"),
@@ -130,7 +133,9 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     // Written only when setup created the app skeleton itself; on a
     // pre-existing app the shell and landing page stay user-owned (see routeOps),
     // so the managed-files check must not expect them on a manifest-less app.
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     return [src("routes/+layout.svelte"), src("routes/+page.svelte")];
   }
 
@@ -148,7 +153,7 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     return {
       title: "SvelteKit integration",
       detail:
-        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle), declared its settings in src/env.ts, plus layout and landing/login/register/profile routes using @zitadel/sdk-svelte.",
+        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle), declared its settings in src/env.ts, plus layout and landing/login/register/profile routes that import the widgets from @zitadel/sdk-sveltekit/components.",
     };
   }
 }

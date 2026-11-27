@@ -17,7 +17,7 @@
  *   ill-defined).
  *
  * Scope cuts (server/service-side, not portable): pivot/switch targets
- * must name an active flow definition in the same project (needs the
+ * must name a flow definition in the same project (needs the
  * DB); the user schema itself is assumed meta-schema-valid.
  *
  * Lifecycle: this port is a local-first interim, not a second source of
@@ -50,7 +50,7 @@ export const FLOW_PURPOSES = [
 ] as const;
 
 /**
- * The identifier half of `applyOutcomeFlip` in flow_state_machine.go: the
+ * The identifier half of `applyOutcomeFlip` in flowengine/routing.go: the
  * outcome that switches each purpose to the other. `sso_user_not_found`
  * also switches login to register but comes only from SSO resolution, so
  * it is left out here.
@@ -74,9 +74,12 @@ const RESERVED_PURPOSES = new Set(["recovery", "profiling", "reauth", "link_acco
 /** Action kinds a flow author may declare; `back` is engine-injected. */
 const DECLARABLE_ACTION_KINDS = new Set(["submit", "passkey", "passkey_register", "navigate"]);
 
+/** Action kinds that offer a passkey: an assertion, or an enrolment. */
+const PASSKEY_ACTION_KINDS = new Set(["passkey", "passkey_register"]);
+
 /**
  * Action names the engine claims, with the reason the validator reports.
- * Mirrors `flowBackActionName` and `FlowActionSSO` in flow_state_machine.go,
+ * Mirrors `FlowBackActionName` and `FlowActionSSO` in flow_definition.go,
  * and `reservedOutcomes` in flow_definition_validator.go.
  * A Map, not an object, so a name like `constructor` cannot match by accident.
  */
@@ -86,10 +89,10 @@ const RESERVED_ACTION_NAMES = new Map<string, string>([
   ...RESERVED_OUTCOMES.map((outcome): [string, string] => [outcome, "flow outcomes"]),
 ]);
 
-/** Mirrors `authMethodPrefix` in flow_definition.go. */
+/** Mirrors `AuthMethodPrefix` in flow_definition.go. */
 const AUTH_METHOD_PREFIX = "x-auth-methods#";
 
-/** Mirrors `ManifestForOnSuccess` in flow_on_success.go. */
+/** Mirrors the `Manifest` entries of `flowOnSuccessSpecs` in flow_on_success.go. */
 const ON_SUCCESS_MANIFESTS: Readonly<Record<string, readonly FieldChallenge[]>> = {
   create_user: ["identifier", "password"],
 };
@@ -438,11 +441,14 @@ function transitionTarget(def: FlowDef, t: FlowTransition): string {
 }
 
 /** Adjacency over local (current-flow) transitions: step → target steps. */
-function localAdjacency(def: FlowDef): Map<string, string[]> {
+function localAdjacency(
+  def: FlowDef,
+  skip: ReadonlySet<string> = new Set(),
+): Map<string, string[]> {
   const adj = new Map<string, string[]>();
   for (const step of def.steps) {
-    for (const t of step.transitions.values()) {
-      if (isCurrentFlow(t)) {
+    for (const [event, t] of step.transitions) {
+      if (!skip.has(event) && isCurrentFlow(t)) {
         const targets = adj.get(step.name) ?? [];
         targets.push(transitionTarget(def, t));
         adj.set(step.name, targets);
@@ -687,7 +693,7 @@ function schemaRequired(schema: Record<string, unknown>): string[] {
 }
 
 /**
- * Mirrors `schemaReader.RequiredPaths`: every name in `required`,
+ * Mirrors `SchemaReader.RequiredPaths`: every name in `required`,
  * recursed through the nested `required` of each required object. A
  * required object declaring no `required` of its own ends the descent at
  * the object itself.
@@ -784,7 +790,7 @@ function resolveFieldChallenge(
     return { challenge: null };
   }
 
-  // Mirrors schemaReader.JSONType: the nullable idiom `["null", X]`
+  // Mirrors SchemaReader.JSONType: the nullable idiom `["null", X]`
   // reduces to X; any other multi-entry union is unsupported. Go reduces
   // before it tests for a composite, so the union error wins and the
   // object/array test below reads the reduced type rather than the union.
@@ -889,7 +895,7 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
   if (!authMethodEnabled(raw, "passkey")) {
     for (const step of def.steps) {
       for (const action of step.actions) {
-        if (action.kind === "passkey" || action.kind === "passkey_register") {
+        if (PASSKEY_ACTION_KINDS.has(action.kind)) {
           issues.push(
             error(
               "schema/passkey-actions",
@@ -936,9 +942,12 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
   // (every route through it is covered), so an identifier on a
   // *different* route — e.g. only on the register-purpose chain into a
   // shared step — cannot mask a login route that never collects one.
+  // A `user_already_exists` transition is not walked: the collision itself
+  // tells the engine which user to challenge (an SSO email that matches an
+  // existing password user), so the step it reaches needs no identifier.
   const loginEntry = def.purposes.get("login");
   if (loginEntry !== undefined) {
-    const adj = localAdjacency(def);
+    const adj = localAdjacency(def, new Set(["user_already_exists"]));
     const identifierFree = new Set<string>();
     const queue = [loginEntry];
     for (let head = 0; head < queue.length; head += 1) {
@@ -959,7 +968,81 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
         ),
       );
     }
+    issues.push(...warnLoginWithoutCredential(def, loginEntry, challengesByStep));
   }
 
   return issues;
+}
+
+/** SSO outcomes: the provider signed the visitor in, so a route ends there. */
+const SSO_OUTCOMES = new Set(["sso_authenticated", "sso_user_not_found"]);
+
+/**
+ * CLI-only guidance (no Go counterpart): a terminal step the login reaches
+ * with a user resolved but no credential verified. The engine completes an
+ * attempt only on a password, passkey or SSO factor (`hasVerifiedCredential`
+ * in auth_attempt.go), so handoff stops there with `att.not_completed`; with
+ * no user resolved it renders the step and hands nothing off.
+ *
+ * Walked forward from the login entry, carrying the purpose and whether a
+ * user is resolved. A user is resolved by submitting an identifier while
+ * signing in, or by `user_already_exists`. A route ends at a password step's
+ * submit, a passkey action, or an SSO outcome. `user_not_found` and
+ * `user_already_exists` switch the purpose as {@link PURPOSE_FLIP_TARGETS}
+ * says, and a transition that names a purpose switches to it.
+ */
+function warnLoginWithoutCredential(
+  def: FlowDef,
+  loginEntry: string,
+  challengesByStep: ReadonlyMap<string, ReadonlySet<FieldChallenge>>,
+): FlowValidationIssue[] {
+  type Route = { step: string; purpose: string; resolved: boolean; from: string };
+  const byName = new Map(def.steps.map((step) => [step.name, step]));
+  const seen = new Set<string>();
+  // Each terminal reached with a user and no credential, and the steps it is
+  // reached from.
+  const stuck = new Map<string, Set<string>>();
+  const queue: Route[] = [{ step: loginEntry, purpose: "login", resolved: false, from: "" }];
+  for (let head = 0; head < queue.length; head += 1) {
+    const route = queue[head];
+    // The graph phase refused an unknown target: `undefined` is for the types.
+    const step = route === undefined ? undefined : byName.get(route.step);
+    if (route === undefined || step === undefined) continue;
+    if (step.terminal) {
+      if (route.resolved) {
+        stuck.set(step.name, (stuck.get(step.name) ?? new Set()).add(route.from));
+      }
+      continue;
+    }
+    const key = `${step.name}\n${route.purpose}\n${route.resolved}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const challenges = challengesByStep.get(step.name);
+    for (const [event, t] of step.transitions) {
+      const kind = step.actions.find((action) => action.name === event)?.kind;
+      const submits = kind === "submit";
+      if (
+        !isCurrentFlow(t) ||
+        SSO_OUTCOMES.has(event) ||
+        (kind !== undefined && PASSKEY_ACTION_KINDS.has(kind)) ||
+        (submits && challenges?.has("password"))
+      ) {
+        continue;
+      }
+      const purpose = t.purpose ?? PURPOSE_FLIP_TARGETS[route.purpose]?.[event] ?? route.purpose;
+      const resolved =
+        purpose === "login" &&
+        (route.resolved ||
+          event === "user_already_exists" ||
+          (submits && route.purpose === "login" && challenges?.has("identifier") === true));
+      queue.push({ step: transitionTarget(def, t), purpose, resolved, from: step.name });
+    }
+  }
+  return [...stuck].map(([terminal, from]) =>
+    warning(
+      "warn/login-without-credential",
+      `step ${q(terminal)} is reached from ${[...from].map(q).join(", ")} once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the ${AUTH_METHOD_PREFIX}password field, a passkey action or sso_providers on the way`,
+      terminal,
+    ),
+  );
 }

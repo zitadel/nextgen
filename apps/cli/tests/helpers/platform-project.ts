@@ -1,40 +1,63 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
+import { z } from "zod";
 
-import { DEFAULT_SERVER } from "../../src/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
+import type { JsonObject } from "@/lib/zitadel/types";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /** The platform the unit tests' msw server answers for. */
-export const PLATFORM_URL = DEFAULT_SERVER;
+export const PLATFORM_URL = ZitadelRuntime.DEFAULT;
 
-/** POSTs to the mock platform as a project's secret, and returns the parsed body. */
+/**
+ * POSTs to the mock platform as a project's secret, and returns the parsed
+ * body.
+ *
+ * @param path - The API path, from the platform's root.
+ * @param secret - The project secret to send as the bearer token, or `""`.
+ * @param body - The request body, sent as JSON.
+ * @returns The JSON object the platform answered with.
+ */
 export async function callPlatform(
   path: string,
   secret: string,
   body: object,
-): Promise<Record<string, unknown>> {
+): Promise<JsonObject> {
   const response = await fetch(`${PLATFORM_URL}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
     body: JSON.stringify(body),
   });
-  return (await response.json()) as Record<string, unknown>;
+  return toJsonObject(await response.json(), `The platform's answer to POST ${path}`);
 }
 
+/** What the platform answers a new project with, as far as these helpers read it. */
+const CreatedProject = z.object({
+  id: z.string(),
+  project_secret: z.string(),
+});
+
+/** What the platform answers a new release or deployment with: its id. */
+const Created = z.object({
+  id: z.string(),
+});
+
 /**
- * A Next.js app directory bound to a project through `.zitadel/secret`. The
- * caller removes it.
+ * A Next.js app directory bound to a project through `.zitadel/secret`. It is
+ * removed when the test ends.
  */
 export async function aProjectDirectory(
   prefix: string,
   project: { id: string; secret: string },
 ): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), prefix));
+  const cwd = await scratchDir(prefix);
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ framework: { id: "next" } }));
   await writeFile(
@@ -51,33 +74,153 @@ export async function aProjectDirectory(
 }
 
 /**
+ * A new project on the mock with {@link PRIMARY_ORIGIN} as its primary origin.
+ *
+ * @param name - The project's name.
+ * @returns The project's id and secret.
+ */
+async function aProjectWithPrimaryOrigin(name: string): Promise<{ id: string; secret: string }> {
+  const { id, project_secret: secret } = CreatedProject.parse(
+    await callPlatform("/projects", "", { name }),
+  );
+  await callPlatform(`/projects/${id}/origins`, secret, {
+    pattern: PRIMARY_ORIGIN,
+    kind: "primary",
+  });
+
+  return { id, secret };
+}
+
+/**
+ * Creates a release of the project on the mock that pins one schema revision.
+ *
+ * @param project - The project's id and secret.
+ * @param revision - The schema revision the release pins.
+ * @returns The release's id.
+ */
+async function createdRelease(
+  project: { id: string; secret: string },
+  revision: string,
+): Promise<string> {
+  const created = Created.parse(
+    await callPlatform(`/releases?project_id=${project.id}`, project.secret, {
+      pointers: [{ kind: "schema", revision_id: revision }],
+    }),
+  );
+
+  return created.id;
+}
+
+/**
+ * Creates a deployment of a release on the mock.
+ *
+ * @param project - The project's id and secret.
+ * @param releaseId - The release to make live.
+ * @param body - Where to make it live, as the API takes it: its targets and a preview's ttl.
+ * @returns The deployment's id.
+ */
+async function createdDeployment(
+  project: { id: string; secret: string },
+  releaseId: string,
+  body: object,
+): Promise<string> {
+  const created = Created.parse(
+    await callPlatform(`/deployments?project_id=${project.id}`, project.secret, {
+      release_id: releaseId,
+      ...body,
+    }),
+  );
+
+  return created.id;
+}
+
+/**
  * A project on the mock with two deploys to one primary origin, its
  * directory, and the second deployment's id. The caller removes the directory.
+ *
+ * @param prefix - The project's name, and the prefix of its directory.
+ * @returns The directory, and the id of the deployment a rollback would undo.
  */
 export async function aProjectWithTwoDeploys(
   prefix: string,
 ): Promise<{ cwd: string; undone: string }> {
-  const project = await callPlatform("/projects", "", { name: prefix });
-  const id = project.id as string;
-  const secret = project.project_secret as string;
-  await callPlatform(`/projects/${id}/origins`, secret, {
-    pattern: "https://app.acme.com",
-    kind: "primary",
+  const project = await aProjectWithPrimaryOrigin(prefix);
+  await createdDeployment(project, await createdRelease(project, "sch_a"), { targets: "primary" });
+  const undone = await createdDeployment(project, await createdRelease(project, "sch_b"), {
+    targets: "primary",
   });
-  const deploymentIds: string[] = [];
-  for (const revision of ["sch_a", "sch_b"]) {
-    const release = await callPlatform(`/releases?project_id=${id}`, secret, {
-      pointers: [{ kind: "schema", revision_id: revision }],
-    });
-    const deployment = await callPlatform(`/deployments?project_id=${id}`, secret, {
-      release_id: release.id,
-      targets: ["primary"],
-    });
-    deploymentIds.push(deployment.id as string);
+
+  return { cwd: await aProjectDirectory(prefix, project), undone };
+}
+
+/**
+ * The kinds of origin a release can be served on.
+ */
+type OriginKind = "primary" | "preview";
+
+/**
+ * A project on the mock with one release live on a primary origin, on a
+ * preview URL, or on both, its directory, and the deployments that serve it.
+ * The directory is made last, so a failure while arranging leaves none behind.
+ *
+ * @param prefix - The project's name, and the prefix of its directory.
+ * @param served - Where the release is live.
+ * @param more - Further origins the release is live on: `primaries` are
+ * patterns of primary origins that a primary deployment serves, `previews` are
+ * URLs the preview deployment serves (each must match the preview pattern).
+ * @returns The directory, the release, and `deploymentOn`, which names the
+ * deployment serving the release on an origin kind and throws for a kind it
+ * was not put live on. The caller removes the directory.
+ */
+export async function aReleaseServedOn(
+  prefix: string,
+  served: { primary: boolean; preview: boolean },
+  more: { primaries?: readonly string[]; previews?: readonly string[] } = {},
+): Promise<{ cwd: string; releaseId: string; deploymentOn(kind: OriginKind): string }> {
+  const project = await aProjectWithPrimaryOrigin(prefix);
+  await Promise.all([
+    ...(more.primaries ?? []).map((pattern) => {
+      return callPlatform(`/projects/${project.id}/origins`, project.secret, {
+        pattern,
+        kind: "primary",
+      });
+    }),
+    callPlatform(`/projects/${project.id}/origins`, project.secret, {
+      pattern: PREVIEW_PATTERN,
+      kind: "preview",
+    }),
+  ]);
+  const releaseId = await createdRelease(project, "sch_a");
+  const deployments: Partial<Record<OriginKind, string>> = {};
+  if (served.primary) {
+    deployments.primary = await createdDeployment(project, releaseId, { targets: "primary" });
   }
+  if (served.preview) {
+    deployments.preview = await createdDeployment(project, releaseId, {
+      targets: [PREVIEW_URL, ...(more.previews ?? [])],
+      ttl: "PT168H",
+    });
+  }
+  const cwd = await aProjectDirectory(prefix, project);
+
   return {
-    cwd: await aProjectDirectory(prefix, { id, secret }),
-    undone: deploymentIds[deploymentIds.length - 1] as string,
+    cwd,
+    releaseId,
+    /**
+     * The deployment serving the release on an origin kind.
+     *
+     * @param kind - The origin kind.
+     * @returns The deployment's ID.
+     * @throws Error when the release was not put live on that kind.
+     */
+    deploymentOn(kind: OriginKind): string {
+      const deployment = deployments[kind];
+      if (deployment === undefined) {
+        throw new Error(`The release is not served on a ${kind} origin`);
+      }
+
+      return deployment;
+    },
   };
 }
 
@@ -97,7 +240,8 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
             deployments: [
               {
                 ...primary,
-                targets: [{ origin: "https://app.acme.com", expires_at: null }],
+                kind: "primary",
+                targets: [{ origin: PRIMARY_ORIGIN }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-01T00:00:00.000Z",
               },
@@ -109,9 +253,8 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
               {
                 id: "dep_preview",
                 release_id: "rel_preview",
-                targets: [
-                  { origin: "https://pr-1.acme.com", expires_at: "2027-01-01T00:00:00.000Z" },
-                ],
+                kind: "preview",
+                targets: [{ origin: "https://pr-1.acme.com" }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-02T00:00:00.000Z",
               },
@@ -123,20 +266,18 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
 }
 
 /**
- * An msw server answering as the mock platform for the calling suite, and the
- * project directories it removes after each test.
+ * An msw server answering as the mock platform for the calling suite. The
+ * directories {@link aProjectDirectory} makes are removed when their test ends.
+ *
+ * @returns The server, to add per-test handlers to with `server.use`.
  */
-export function usePlatformServer(): { server: ReturnType<typeof setupServer>; dirs: string[] } {
+export function usePlatformServer(): { server: ReturnType<typeof setupServer> } {
   const server = setupServer(...setupPlatformHandlers());
-  const dirs: string[] = [];
   beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
   afterAll(() => server.close());
-  afterEach(async () => {
+  afterEach(() => {
     server.resetHandlers();
     resetPlatformStore();
-    for (const dir of dirs.splice(0)) {
-      await rm(dir, { recursive: true, force: true });
-    }
   });
-  return { server, dirs };
+  return { server };
 }

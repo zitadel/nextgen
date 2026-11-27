@@ -137,6 +137,16 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(input.value).toBe("seed");
   });
 
+  it("resets the owning form when a field is named reset", async () => {
+    host.innerHTML = `<form><input name="reset" value="seed" /><zl-button type="reset" label="Reset"></zl-button></form>`;
+    const input = host.querySelector("input") as HTMLInputElement;
+    const button = host.querySelector("zl-button") as ZlButton;
+    await button.updateComplete;
+    input.value = "changed";
+    button.shadowRoot?.querySelector("button")?.click();
+    expect(input.value).toBe("seed");
+  });
+
   it("delegates focus from the host to the inner button", async () => {
     host.innerHTML = `<zl-button label="Focus me"></zl-button>`;
     const button = host.querySelector("zl-button") as ZlButton;

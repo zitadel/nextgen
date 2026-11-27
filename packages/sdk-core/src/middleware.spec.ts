@@ -14,15 +14,16 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   jwtNamesProject,
+  proxyRoute,
   proxySessionCookies,
+  refusedProxyResponse,
   requiresProjectSecret,
   resolveSession,
   serializeSessionCookie,
   serverSessionCookieName,
   sessionCookieName,
-  validateOpaqueSessionToken,
-  type ProxiedRequest,
-  type ResolveSessionOptions,
+  type ZitadelProxiedRequest,
+  type ZitadelResolveSessionOptions,
 } from "./middleware.js";
 
 /** The upstream response headers for one proxied call. */
@@ -92,6 +93,20 @@ describe("filterResponseHeaders", () => {
     }
   });
 
+  it("keeps a path that starts with several slashes on this app", () => {
+    for (const location of [
+      "https://zitadel.internal//evil.com/x",
+      "https://zitadel.internal///evil.com/x",
+      "https://zitadel.internal/\\evil.com/x",
+      "//zitadel.internal//evil.com/x",
+    ]) {
+      expect(
+        filterResponseHeaders(upstream({ location }), CALLBACK).get("location"),
+        location,
+      ).toBe(`${APP}/evil.com/x`);
+    }
+  });
+
   it("drops a redirect when the caller names no request URL", () => {
     expect(filterResponseHeaders(upstream({ location: `${APP}/login` })).has("location")).toBe(
       false,
@@ -138,6 +153,12 @@ describe("matchesRoutes", () => {
     ["/", ["/"]],
     ["/admin/users", ["/admin*"]],
     ["/admin", ["/admin*"]],
+    ["/%61dmin", ["/admin*"]],
+    ["/%61dmin", ["/admin"]],
+    ["/%61dmin/", ["/admin"]],
+    ["/ad%6Din/x", ["/admin*"]],
+    ["/admin%2Fx", ["/admin*"]],
+    ["/%E0%A4%A", ["/%E0%A4%A"]],
   ])("matches %s against %j", (pathname, routes) => {
     expect(matchesRoutes(pathname, routes)).toBe(true);
   });
@@ -149,6 +170,10 @@ describe("matchesRoutes", () => {
     ["/profile", ["/"]],
     ["/other", ["/admin*"]],
     ["/profile", []],
+    ["/%2561dmin", ["/admin*"]],
+    ["/%2561dmin", ["/admin"]],
+    ["/admin%2Fx", ["/admin"]],
+    ["/%E0%A4%A", ["/admin*"]],
   ])("does not match %s against %j", (pathname, routes) => {
     expect(matchesRoutes(pathname, routes)).toBe(false);
   });
@@ -272,24 +297,225 @@ describe("a compressed upstream answer", () => {
   });
 });
 
+describe("proxyRoute", () => {
+  const options = { proxyPath: "/__nextgen", projectId: "proj_app", loginPath: "/login" };
+  const METADATA = "/.well-known/oauth-authorization-server";
+
+  it("sends a path under the proxy path to the server without the prefix", () => {
+    expect(proxyRoute("/__nextgen/api/v1/flows", options)).toMatchObject({
+      path: "/api/v1/flows",
+      refused: false,
+    });
+    expect(proxyRoute("/__nextgen", options)).toMatchObject({ path: "", refused: false });
+  });
+
+  it("leaves every other path to the app", () => {
+    expect(proxyRoute("/", options)).toBeUndefined();
+    expect(proxyRoute("/__nextgen-evil/resource", options)).toBeUndefined();
+    expect(proxyRoute("/.well-known/openid-configuration", options)).toBeUndefined();
+    expect(proxyRoute(METADATA, options)).toBeUndefined();
+    expect(proxyRoute(`${METADATA}/__nextgen/oauthx/proj_app`, options)).toBeUndefined();
+  });
+
+  it("forwards this project's OAuth issuer and what lies under it", () => {
+    for (const path of [
+      "/oauth/proj_app",
+      "/oauth/proj_app/authorize",
+      "/oauth/proj_app/.well-known/openid-configuration",
+    ]) {
+      expect(proxyRoute(`/__nextgen${path}`, options)).toMatchObject({ path, refused: false });
+    }
+    for (const path of [
+      `${METADATA}/oauth/proj_app`,
+      "/.well-known/openid-configuration/oauth/proj_app",
+      "/oauth/proj_app/a%20b",
+    ]) {
+      expect(proxyRoute(`/__nextgen${path}`, options)).toMatchObject({ path, refused: false });
+    }
+  });
+
+  it("forwards a path with a malformed escape that names no OAuth issuer", () => {
+    expect(proxyRoute("/__nextgen/api/v1/%E0%A4%A", options)).toMatchObject({ refused: false });
+    expect(proxyRoute("/__nextgen/oauth/proj_other/%E0%A4%A", options)?.refused).toBe(true);
+  });
+
+  it.each([
+    ["another project's issuer", "/__nextgen/oauth/proj_other/authorize"],
+    ["a project whose id starts with this one's", "/__nextgen/oauth/proj_app2/authorize"],
+    ["the platform project's issuer", "/__nextgen/oauth"],
+    ["the platform project's endpoints", "/__nextgen/oauth/authorize"],
+    ["another project's metadata", `${METADATA}/__nextgen/oauth/proj_other`],
+    ["the platform project's metadata", `${METADATA}/__nextgen/oauth`],
+    ["a path under this project's metadata", `${METADATA}/__nextgen/oauth/proj_app/more`],
+    ["another project's metadata under the proxy path", `/__nextgen${METADATA}/oauth/proj_other`],
+    [
+      "another project's discovery document under the proxy path",
+      "/__nextgen/.well-known/openid-configuration/oauth/proj_other",
+    ],
+    ["the platform project's metadata under the proxy path", `/__nextgen${METADATA}/oauth`],
+    ["an escaped oauth segment", "/__nextgen/%6Fauth/proj_other/authorize"],
+    ["an escaped slash after oauth", "/__nextgen/oauth%2Fproj_other"],
+    ["an escaped well-known segment", `/__nextgen/%2Ewell-known/x/oauth/proj_other`],
+    ["an escaped form of this project's issuer", "/__nextgen/%6Fauth/proj_app/authorize"],
+    [
+      "a dot segment that leaves this project's issuer",
+      "/__nextgen/oauth/proj_app/%2e%2e/proj_other",
+    ],
+  ])("refuses %s", (_name, pathname) => {
+    expect(proxyRoute(pathname, options)?.refused).toBe(true);
+  });
+
+  it("maps this project's issuer metadata onto the server's path", () => {
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, options)).toMatchObject({
+      path: `${METADATA}/oauth/proj_app`,
+      refused: false,
+    });
+  });
+
+  it("refuses every OAuth path when the app has no project", () => {
+    const anonymous = { ...options, projectId: undefined };
+    expect(proxyRoute("/__nextgen/oauth/proj_app/authorize", anonymous)?.refused).toBe(true);
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, anonymous)?.refused).toBe(true);
+    expect(proxyRoute("/__nextgen/api/v1/flows", anonymous)?.refused).toBe(false);
+  });
+
+  it("follows a proxy path of the app's own", () => {
+    const custom = { ...options, proxyPath: "/auth" };
+    expect(proxyRoute(`${METADATA}/auth/oauth/proj_app`, custom)).toMatchObject({
+      path: `${METADATA}/oauth/proj_app`,
+      refused: false,
+      headers: { "x-forwarded-prefix": "/auth" },
+    });
+    expect(proxyRoute(`${METADATA}/__nextgen/oauth/proj_app`, custom)).toBeUndefined();
+  });
+
+  it("names the proxy path and the login page's path in the headers", () => {
+    expect(
+      proxyRoute("/__nextgen/api/v1/flows", { ...options, loginPath: "/signin?from=app#top" })
+        ?.headers,
+    ).toEqual({ "x-forwarded-prefix": "/__nextgen", "x-zitadel-login-path": "/signin" });
+  });
+
+  describe("the app's server log", () => {
+    /** A fresh copy of the module, which has warned about nothing yet. */
+    async function fresh() {
+      vi.resetModules();
+      return (await import("./middleware.js")).proxyRoute;
+    }
+    let logged: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      logged.mockRestore();
+    });
+
+    it("says once that no project is configured when an OAuth path is asked for", async () => {
+      const route = await fresh();
+      const anonymous = { ...options, projectId: undefined };
+
+      route("/__nextgen/api/v1/flows", anonymous);
+      expect(logged).not.toHaveBeenCalled();
+
+      route("/__nextgen/oauth/proj_app/authorize", anonymous);
+      route(`${METADATA}/__nextgen/oauth/proj_app`, anonymous);
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged.mock.calls[0]?.[0]).toContain("ZITADEL_PROJECT_ID");
+    });
+
+    it("says once that a proxy path of the app's own makes it no issuer", async () => {
+      const route = await fresh();
+      const custom = { ...options, proxyPath: "/auth" };
+
+      route("/auth/api/v1/flows", custom);
+      route("/auth/oauth/proj_other/authorize", custom);
+      expect(logged).not.toHaveBeenCalled();
+
+      route("/auth/oauth/proj_app/authorize", custom);
+      route(`${METADATA}/auth/oauth/proj_app`, custom);
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged.mock.calls[0]?.[0]).toContain('"/auth"');
+    });
+
+    it("says nothing about another project's issuer", async () => {
+      const route = await fresh();
+
+      route("/__nextgen/oauth/proj_other/authorize", options);
+      route("/__nextgen/oauth/proj_app/authorize", options);
+      expect(logged).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("refusedProxyResponse", () => {
+  it("answers as the server does for an issuer it does not serve", async () => {
+    const response = refusedProxyResponse();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toBe("application/json");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      error: "invalid_request",
+      error_description: "no authorization server at this issuer",
+    });
+  });
+});
+
 describe("requiresProjectSecret", () => {
   it("allows the secret on the handoff exchange", () => {
-    expect(requiresProjectSecret("POST", "/sessions/exchange")).toBe(true);
+    expect(requiresProjectSecret("POST", "/sessions/exchange", new Headers())).toBe(true);
   });
 
   it("allows the secret on the handoff exchange under the API prefix", () => {
-    expect(requiresProjectSecret("POST", "/api/v1/sessions/exchange")).toBe(true);
+    expect(requiresProjectSecret("POST", "/api/v1/sessions/exchange", new Headers())).toBe(true);
   });
 
   it("matches the method case-insensitively", () => {
-    expect(requiresProjectSecret("post", "/sessions/exchange")).toBe(true);
+    expect(requiresProjectSecret("post", "/sessions/exchange", new Headers())).toBe(true);
   });
+
+  it("allows the secret on a handoff exchange that the app makes itself", () => {
+    const headers = new Headers({ "sec-fetch-site": "same-origin" });
+
+    expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(true);
+  });
+
+  it("allows the secret when an older browser sends the origin of the app", () => {
+    const headers = new Headers({
+      origin: "https://app.example",
+      "x-forwarded-host": "app.example",
+    });
+
+    expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(true);
+  });
+
+  it.each([
+    ["https://evil.example", "app.example"],
+    ["null", "app.example"],
+    ["https://app.example", undefined],
+  ])("withholds the secret when an older browser sends the origin %s to %s", (origin, host) => {
+    const headers = new Headers({ origin });
+    if (host !== undefined) {
+      headers.set("x-forwarded-host", host);
+    }
+
+    expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(false);
+  });
+
+  it.each(["cross-site", "same-site", "none"])(
+    "withholds the secret from a handoff exchange that the browser marks %s",
+    (site) => {
+      const headers = new Headers({ "sec-fetch-site": site });
+
+      expect(requiresProjectSecret("POST", "/sessions/exchange", headers)).toBe(false);
+    },
+  );
 
   it.each([
     ["GET", "/sessions/exchange"],
     ["PUT", "/sessions/exchange"],
-    ["POST", "/v1/flow"],
-    ["GET", "/v1/flow"],
+    ["POST", "/v1/flows"],
+    ["GET", "/v1/flows"],
     ["POST", "/sessions/exchange/"],
     ["POST", "/sessions/exchangex"],
     ["POST", "/sessions"],
@@ -301,7 +527,7 @@ describe("requiresProjectSecret", () => {
     ["POST", "/api/v1/api/v1/sessions/exchange"],
     ["POST", "/v1/sessions/exchange"],
   ])("withholds the secret from %s %s", (method, pathname) => {
-    expect(requiresProjectSecret(method, pathname)).toBe(false);
+    expect(requiresProjectSecret(method, pathname, new Headers())).toBe(false);
   });
 });
 
@@ -310,7 +536,9 @@ describe("opaque session tokens", () => {
 
   function backend(response: Response | Error) {
     const fetchMock = vi.fn(async () => {
-      if (response instanceof Error) throw response;
+      if (response instanceof Error) {
+        throw response;
+      }
       return response;
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -353,7 +581,14 @@ describe("opaque session tokens", () => {
         }),
       );
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "live",
         session: {
           userId: "u1",
@@ -368,7 +603,12 @@ describe("opaque session tokens", () => {
     it("asks the backend for the session the cookie names, in this app's project", async () => {
       const fetchMock = backend(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
-      await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(fetchMock).toHaveBeenCalledWith(
         "http://auth.test/api/v1/sessions/me?project_id=proj_app",
@@ -379,7 +619,12 @@ describe("opaque session tokens", () => {
     it("asks the backend at an address given with a trailing slash", async () => {
       const fetchMock = backend(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
-      await checkOpaqueSessionToken("tok", "http://auth.test/", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test/",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(fetchMock).toHaveBeenCalledWith(
         "http://auth.test/api/v1/sessions/me?project_id=proj_app",
@@ -394,7 +639,12 @@ describe("opaque session tokens", () => {
         backend(Response.json(body));
 
         expect(
-          await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT),
+          await checkOpaqueSessionToken({
+            token: "tok",
+            issuerUrl: "http://auth.test",
+            timeoutMs: 1000,
+            projectId: PROJECT,
+          }),
         ).toMatchObject({ verdict: "live", session: { userId: null } });
       },
     );
@@ -410,7 +660,14 @@ describe("opaque session tokens", () => {
     ])("reports a session of another project, when %s, as live with no user", async (_l, res) => {
       backend(res);
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "live",
         session: {
           userId: null,
@@ -426,7 +683,14 @@ describe("opaque session tokens", () => {
     it("reports no user, without asking the backend, when no project is configured", async () => {
       const fetchMock = backend(Response.json({ user_id: "u1" }));
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, "")).toMatchObject({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: "",
+        }),
+      ).toMatchObject({
         verdict: "live",
         session: { userId: null },
       });
@@ -445,7 +709,14 @@ describe("opaque session tokens", () => {
     ])("reports the cookie as refused for %s", async (_label, response) => {
       backend(response);
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "refused",
       });
       expect(warn).not.toHaveBeenCalled();
@@ -465,7 +736,14 @@ describe("opaque session tokens", () => {
     ])("gives no verdict for %s", async (_label, response) => {
       backend(response);
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "undecided",
       });
     });
@@ -473,7 +751,14 @@ describe("opaque session tokens", () => {
     it("gives no verdict when the backend does not answer in time", async () => {
       silentBackend();
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 10, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 10,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "undecided",
       });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("no answer within 10 ms"));
@@ -484,7 +769,12 @@ describe("opaque session tokens", () => {
         new TypeError("fetch failed", { cause: new Error("connect ECONNREFUSED 127.0.0.1:4000") }),
       );
 
-      await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -496,7 +786,14 @@ describe("opaque session tokens", () => {
     it("says a backend without the operation is older than the SDK", async () => {
       backend(Response.json({ code: "req.not_found" }, { status: 404 }));
 
-      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      expect(
+        await checkOpaqueSessionToken({
+          token: "tok",
+          issuerUrl: "http://auth.test",
+          timeoutMs: 1000,
+          projectId: PROJECT,
+        }),
+      ).toEqual({
         verdict: "undecided",
       });
       expect(warn).toHaveBeenCalledWith(
@@ -508,7 +805,12 @@ describe("opaque session tokens", () => {
       const fetchMock = vi.fn(async () => Response.json({ project_id: PROJECT, user_id: "u1" }));
       vi.stubGlobal("fetch", fetchMock);
 
-      await checkOpaqueSessionToken("tok", "http://auth.test/api/v1/", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test/api/v1/",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(fetchMock).toHaveBeenCalledWith(
         `http://auth.test/api/v1/sessions/me?project_id=${PROJECT}`,
@@ -519,7 +821,12 @@ describe("opaque session tokens", () => {
     it("logs the status of an answer that is no verdict", async () => {
       backend(new Response(null, { status: 502 }));
 
-      await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "tok",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("(HTTP 502)"));
     });
@@ -532,8 +839,18 @@ describe("opaque session tokens", () => {
       );
       vi.stubGlobal("fetch", fetchMock);
 
-      await checkOpaqueSessionToken("console", "http://auth.test", 1000, PROJECT);
-      const again = await checkOpaqueSessionToken("console", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "console",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
+      const again = await checkOpaqueSessionToken({
+        token: "console",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(again).toMatchObject({ verdict: "live", session: { userId: null } });
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -543,41 +860,20 @@ describe("opaque session tokens", () => {
       const fetchMock = vi.fn(async () => Response.json({ project_id: PROJECT }));
       vi.stubGlobal("fetch", fetchMock);
 
-      await checkOpaqueSessionToken("anon", "http://auth.test", 1000, PROJECT);
-      await checkOpaqueSessionToken("anon", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken({
+        token: "anon",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
+      await checkOpaqueSessionToken({
+        token: "anon",
+        issuerUrl: "http://auth.test",
+        timeoutMs: 1000,
+        projectId: PROJECT,
+      });
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("validateOpaqueSessionToken", () => {
-    it("returns the user of a live session", async () => {
-      backend(Response.json({ project_id: PROJECT, user_id: "u1", user: { identifier: "a@b.c" } }));
-
-      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
-        userId: "u1",
-        identifier: "a@b.c",
-        identifierProperty: null,
-        display: null,
-        expiresAt: null,
-      });
-    });
-
-    it("returns no user for a session of another project", async () => {
-      backend(Response.json({ code: "sess.project_mismatch" }, { status: 403 }));
-
-      expect(
-        await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT),
-      ).toMatchObject({ userId: null });
-    });
-
-    it.each([
-      ["a refusal", new Response(null, { status: 401 })],
-      ["no verdict", new Response(null, { status: 500 })],
-    ])("reports no live session for %s", async (_label, response) => {
-      backend(response);
-
-      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toBeNull();
     });
   });
 });
@@ -600,32 +896,38 @@ describe("jwtNamesProject", () => {
 
 describe("sessionCookieName", () => {
   it("appends the project id to the server's name where the cookie is Secure", () => {
-    expect(sessionCookieName("proj_01K7ZD3E", true)).toBe("__Host-zitadel_session_proj_01K7ZD3E");
-  });
-
-  it("appends the project id to the server's loopback name over loopback http", () => {
-    expect(sessionCookieName("proj_01K7ZD3E", false)).toBe("zitadel_session_proj_01K7ZD3E");
-  });
-
-  it("keeps the hyphens of a UUID", () => {
-    expect(sessionCookieName("proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f", true)).toBe(
-      "__Host-zitadel_session_proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f",
+    expect(sessionCookieName({ projectId: "proj_01K7ZD3E", secure: true })).toBe(
+      "__Host-zitadel_session_proj_01K7ZD3E",
     );
   });
 
+  it("appends the project id to the server's loopback name over loopback http", () => {
+    expect(sessionCookieName({ projectId: "proj_01K7ZD3E", secure: false })).toBe(
+      "zitadel_session_proj_01K7ZD3E",
+    );
+  });
+
+  it("keeps the hyphens of a UUID", () => {
+    expect(
+      sessionCookieName({ projectId: "proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f", secure: true }),
+    ).toBe("__Host-zitadel_session_proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f");
+  });
+
   it("percent-encodes what a cookie name cannot hold", () => {
-    expect(sessionCookieName("a b;c=ü", false)).toBe("zitadel_session_a%20b%3Bc%3D%C3%BC");
+    expect(sessionCookieName({ projectId: "a b;c=ü", secure: false })).toBe(
+      "zitadel_session_a%20b%3Bc%3D%C3%BC",
+    );
   });
 });
 
 describe("serverSessionCookieName", () => {
   it("is the canonical name where the cookie is Secure", () => {
-    expect(serverSessionCookieName(true)).toBe("__Host-zitadel_session");
-    expect(serverSessionCookieName(true)).toBe(SERVER_SESSION_COOKIE);
+    expect(serverSessionCookieName({ secure: true })).toBe("__Host-zitadel_session");
+    expect(serverSessionCookieName({ secure: true })).toBe(SERVER_SESSION_COOKIE);
   });
 
   it("drops the prefix over loopback http", () => {
-    expect(serverSessionCookieName(false)).toBe("zitadel_session");
+    expect(serverSessionCookieName({ secure: false })).toBe("zitadel_session");
   });
 });
 
@@ -657,15 +959,15 @@ describe("proxySessionCookies", () => {
   /** The server's session cookie on a loopback host, where the Console keeps its own. */
   const SHARED = "zitadel_session";
   const UPSTREAM = { url: "http://auth.test", timeoutMs: 1000 };
-  const HTTPS_APP = "https://app.example.com/__nextgen/flow";
+  const HTTPS_APP = "https://app.example.com/__nextgen/flows";
 
-  function proxied(overrides: Partial<ProxiedRequest> = {}): ProxiedRequest {
+  function proxied(overrides: Partial<ZitadelProxiedRequest> = {}): ZitadelProxiedRequest {
     return {
       method: "GET",
-      path: "/flow",
+      path: "/flows",
       search: "",
       cookie: null,
-      requestUrl: "http://localhost:3000/__nextgen/flow",
+      requestUrl: "http://localhost:3000/__nextgen/flows",
       ...overrides,
     };
   }
@@ -703,10 +1005,6 @@ describe("proxySessionCookies", () => {
     [
       "another project's",
       "zitadel_session_proj_other=other; __Host-zitadel_session_proj_other=other",
-    ],
-    [
-      "the old",
-      `__nextgen_session=old; __nextgen_session_${PROJECT}=old; __nextgen_session_proj_other=old`,
     ],
   ])("keeps %s session cookies back", (_label, sessions) => {
     const cookies = proxySessionCookies(
@@ -819,21 +1117,6 @@ describe("proxySessionCookies", () => {
     );
 
     expect(setCookies).toEqual([`${OWN}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`]);
-  });
-
-  // ADR 083: an old session cookie is neither renamed nor passed on.
-  it("drops a Set-Cookie of an old session cookie", async () => {
-    const cookies = proxySessionCookies(proxied(), PROJECT, UPSTREAM);
-
-    const { setCookies } = await cookies.toBrowser(
-      answer(200, {}, [
-        "__nextgen_session=tok; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax",
-        `__nextgen_session_${PROJECT}=tok; Path=/; HttpOnly`,
-        "_zflow=f; Path=/",
-      ]),
-    );
-
-    expect(setCookies).toEqual(["_zflow=f; Path=/"]);
   });
 
   it("passes the cookies through as they are without a project", async () => {
@@ -999,22 +1282,6 @@ describe("proxySessionCookies", () => {
       );
 
       expect(setCookies[0]).toBe(`${OWN_HTTPS}=old; Path=/; HttpOnly; SameSite=Lax; Secure`);
-    });
-
-    // ADR 083: an old session cookie is no credential and no source of one.
-    it("is never one kept under an old name", async () => {
-      const cookies = proxySessionCookies(
-        proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
-        PROJECT,
-        UPSTREAM,
-      );
-
-      const forBrowser = await cookies.toBrowser(
-        answer(200, { project_id: PROJECT, user_id: "u1" }),
-      );
-
-      expect(cookies.upstreamCookie).toBeNull();
-      expect(forBrowser.setCookies).toEqual([]);
     });
   });
 
@@ -1341,7 +1608,7 @@ describe("resolveSession", () => {
   const OWN_HTTPS = "__Host-zitadel_session_proj_app";
   /** The server's session cookie on a loopback host, where the Console keeps its own. */
   const SHARED = "zitadel_session";
-  const OPTIONS: ResolveSessionOptions = {
+  const OPTIONS: ZitadelResolveSessionOptions = {
     url: "http://auth.test",
     projectId: PROJECT,
     allowedAlgorithms: ["RS256"],

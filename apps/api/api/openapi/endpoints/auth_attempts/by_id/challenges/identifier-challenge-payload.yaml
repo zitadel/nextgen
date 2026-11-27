@@ -1,0 +1,4 @@
+title: IdentifierChallengePayload
+type: object
+description: An identifier challenge has no data beyond the base challenge fields.
+additionalProperties: false

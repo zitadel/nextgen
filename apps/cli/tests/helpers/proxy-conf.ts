@@ -1,10 +1,10 @@
-import { proxyConfTemplate } from "../../src/lib/orca/patchers/rule/angular/templates";
+import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
 import {
   indented,
   proxyConfSessionCookieStatements,
   proxyConfSessionCookieStatementsV1,
   SESSION_COOKIE_MARKER,
-} from "../../src/lib/orca/patchers/rule/session-cookie";
+} from "@/lib/orca/patchers/rule/session-cookie";
 
 /**
  * The managed `proxy.conf.cjs` as setup wrote it before it carried the

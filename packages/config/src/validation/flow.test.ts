@@ -32,7 +32,6 @@ type TestStep = {
 
 type TestFlow = {
   name: string;
-  status: string;
   user_schema: string;
   purposes: Record<string, string>;
   steps: Array<Partial<TestStep> & { name: string }>;
@@ -836,7 +835,6 @@ describe("schema-dependent rules", () => {
     // but no step on its path collects an identifier-challenge field.
     const def = {
       name: "register-only",
-      status: "active",
       user_schema: "sch_x",
       purposes: { register: "register-password" },
       steps: [
@@ -902,7 +900,6 @@ describe("warn/password-without-identifier", () => {
     // still cannot resolve which user to challenge.
     const def = {
       name: "login",
-      status: "active",
       user_schema: "sch_x",
       purposes: { login: "quick", register: "register" },
       steps: [
@@ -936,20 +933,226 @@ describe("warn/password-without-identifier", () => {
     expect(errors(issues)).toEqual([]);
     expect(warnings(issues).map((i) => i.step)).toEqual(["password"]);
   });
+
+  it("does not warn for a password step reached only through a user_already_exists collision", () => {
+    const def = {
+      name: "login",
+      user_schema: "sch_x",
+      purposes: { login: "start" },
+      steps: [
+        {
+          name: "start",
+          fields: [],
+          actions: [{ name: "go", kind: "navigate", primary: true }],
+          transitions: { go: { target: "done" }, user_already_exists: { target: "password" } },
+        },
+        {
+          name: "password",
+          fields: ["x-auth-methods#password"],
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: { submit: { target: "done" } },
+        },
+        { name: "done", complete: "show" },
+      ],
+    };
+    const relaxed = structuredClone(schema);
+    delete relaxed.required;
+    expect(
+      warnings(validateFlowDefinition(def, relaxed)).filter(
+        (i) => i.rule === "warn/password-without-identifier",
+      ),
+    ).toEqual([]);
+  });
+});
+
+// ── warning: login without a credential ──────────────────────────────────────
+
+describe("warn/login-without-credential", () => {
+  const credentialWarnings = (issues: FlowValidationIssue[]) =>
+    warnings(issues).filter((i) => i.rule === "warn/login-without-credential");
+
+  /** The default flow with its identifier step submitting straight to done. */
+  function identifierOnly(): TestFlow {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions = identifier.actions.filter((a) => a.kind === "submit");
+    identifier.transitions = { submit: { target: "done" } };
+    def.purposes = { login: "identifier" };
+    def.steps = def.steps.filter((s) => ["identifier", "done"].includes(s.name));
+    return def;
+  }
+
+  /** The default schema with no sign-in method, as a forced disable leaves it. */
+  function noMethods(): Record<string, unknown> {
+    const relaxed = structuredClone(schema);
+    relaxed["x-auth-methods"] = { password: { enabled: false }, passkey: { enabled: false } };
+    return relaxed;
+  }
+
+  it("warns when the identifier step submits straight to done", () => {
+    const issues = validateFlowDefinition(identifierOnly(), noMethods());
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([
+      {
+        severity: "warning",
+        rule: "warn/login-without-credential",
+        step: "done",
+        message:
+          'step "done" is reached from "identifier" once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the x-auth-methods#password field, a passkey action or sso_providers on the way',
+      },
+    ]);
+  });
+
+  it("does not warn for the default flow, which verifies a password", () => {
+    expect(credentialWarnings(validateFlowDefinition(flow(), schema))).toEqual([]);
+  });
+
+  it("does not warn when a passkey action leads to done", () => {
+    const def = identifierOnly();
+    const identifier = step(def, "identifier");
+    identifier.actions = [
+      { name: "submit", kind: "submit", primary: true },
+      { name: "passkey", kind: "passkey", primary: false },
+    ];
+    identifier.transitions = { submit: { target: "verify" }, passkey: { target: "done" } };
+    def.steps.splice(1, 0, {
+      name: "verify",
+      fields: ["x-auth-methods#password"],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    });
+    const enabled = structuredClone(schema);
+    enabled["x-auth-methods"] = { password: { enabled: true }, passkey: { enabled: true } };
+    const issues = validateFlowDefinition(def, enabled);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("does not warn when only an SSO sign-in leads to done", () => {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions = identifier.actions.filter((a) => a.kind === "submit");
+    identifier.sso_providers = ["google"];
+    identifier.transitions = {
+      submit: { target: "password" },
+      sso_authenticated: { target: "done" },
+    };
+    def.purposes = { login: "identifier" };
+    def.steps = def.steps.filter((s) => ["identifier", "password", "done"].includes(s.name));
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("warns when a step offering SSO also submits straight to done", () => {
+    const def = identifierOnly();
+    const identifier = step(def, "identifier");
+    identifier.sso_providers = ["google"];
+    identifier.transitions.sso_authenticated = { target: "done" };
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues).map((i) => i.step)).toEqual(["done"]);
+  });
+
+  it("does not warn for a terminal reached only when no user is found", () => {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions = identifier.actions.filter((a) => a.kind === "submit");
+    identifier.transitions = {
+      submit: { target: "password" },
+      user_not_found: { target: "no-account" },
+    };
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      ...def.steps.filter((s) => ["identifier", "password", "done"].includes(s.name)),
+      { name: "no-account", complete: "show" },
+    ];
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("warns when a password step navigates away to a route that ends without one", () => {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions = identifier.actions.filter((a) => a.kind === "submit");
+    identifier.transitions = { submit: { target: "password" } };
+    const password = step(def, "password");
+    password.actions.push({ name: "skip", kind: "navigate" });
+    password.transitions.skip = { target: "done" };
+    def.purposes = { login: "identifier" };
+    def.steps = def.steps.filter((s) => ["identifier", "password", "done"].includes(s.name));
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues).map((i) => i.message)).toEqual([
+      'step "done" is reached from "password" once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the x-auth-methods#password field, a passkey action or sso_providers on the way',
+    ]);
+  });
+
+  it("does not warn when an unknown identifier leads on to a step that ends", () => {
+    // `user_not_found` switches the attempt to sign-up (applyOutcomeFlip), so
+    // the email the next step collects identifies nobody.
+    const def = identifierOnly();
+    step(def, "identifier").transitions = {
+      submit: { target: "password" },
+      user_not_found: { target: "retry" },
+    };
+    def.steps.splice(1, 0, {
+      name: "password",
+      fields: ["x-auth-methods#password"],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    });
+    def.steps.splice(2, 0, {
+      name: "retry",
+      fields: ["email"],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    });
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("does not warn for an information page reached before anyone is identified", () => {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions.push({ name: "help", kind: "navigate" });
+    identifier.transitions.help = { target: "help" };
+    def.steps.push({ name: "help", complete: "show" });
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("does not warn for a sign-up route, which identifies nobody", () => {
+    const def = flow();
+    step(def, "register").transitions.submit = { target: "done" };
+    const issues = validateFlowDefinition(def, schema);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("does not run without a login purpose", () => {
+    const def = identifierOnly();
+    def.purposes = { register: "identifier" };
+    expect(credentialWarnings(validateFlowDefinition(def, noMethods()))).toEqual([]);
+  });
 });
 
 // ── drift audit against the Go source ────────────────────────────────────────
 
 describe("drift audit (Go validator)", () => {
-  const goSource = join(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../..",
-    "internal/domain/flow_definition_validator.go",
-  );
+  // The Go module of the server, apps/api in the monorepo. Outside it (the
+  // published package's own checkout) there is nothing to audit against, so
+  // the suites skip; inside it a Go file that moved or went missing fails
+  // them instead of skipping them.
+  const goModule = join(dirname(fileURLToPath(import.meta.url)), "../../../..", "apps/api");
+  const inMonorepo = existsSync(join(goModule, "go.mod"));
+  const goSource = join(goModule, "internal/domain/flow_definition_validator.go");
 
   const snake = (name: string) => name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 
-  it.skipIf(!existsSync(goSource))("every goRef function still exists in the Go source", () => {
+  it.skipIf(!inMonorepo)("every goRef function still exists in the Go source", () => {
     const source = readFileSync(goSource, "utf8");
     for (const [rule, { goRef }] of Object.entries(FLOW_VALIDATION_RULES)) {
       if (goRef === null) continue;
@@ -957,7 +1160,7 @@ describe("drift audit (Go validator)", () => {
     }
   });
 
-  it.skipIf(!existsSync(goSource))("the Go validator gained no unported functions", () => {
+  it.skipIf(!inMonorepo)("the Go validator gained no unported functions", () => {
     const source = readFileSync(goSource, "utf8");
     const goFuncs = [...source.matchAll(/^func (\w+)\(/gm)].map((m) => m[1]).sort();
     const ported = Object.values(FLOW_VALIDATION_RULES)
@@ -981,7 +1184,7 @@ describe("drift audit (Go validator)", () => {
     expect(goFuncs).toEqual([...ported, ...helpers].sort());
   });
 
-  it.skipIf(!existsSync(goSource))("shared literals still match the Go source", () => {
+  it.skipIf(!inMonorepo)("shared literals still match the Go source", () => {
     const source = readFileSync(goSource, "utf8");
     for (const outcome of RESERVED_OUTCOMES) {
       expect(source).toContain(`"${outcome}"`);
@@ -992,38 +1195,27 @@ describe("drift audit (Go validator)", () => {
     );
   });
 
-  const stateMachineSource = join(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../..",
-    "internal/domain/flow_state_machine.go",
-  );
+  const stateMachineSource = join(goModule, "internal/flowengine/routing.go");
 
-  it.skipIf(!existsSync(stateMachineSource))(
-    "the switch outcomes match the engine's applyOutcomeFlip",
-    () => {
-      const source = readFileSync(stateMachineSource, "utf8");
-      const body = source.match(/func applyOutcomeFlip[\s\S]*?\n}/)?.[0] ?? "";
-      // login → user_not_found → register, register → user_already_exists → login.
-      expect(body).toMatch(
-        /CurrentPurpose == FlowDefinitionPurposeLogin &&[\s\S]*?FlowImplicitOutcomeUserNotFound[\s\S]*?CurrentPurpose = FlowDefinitionPurposeRegister/,
-      );
-      expect(body).toMatch(
-        /CurrentPurpose == FlowDefinitionPurposeRegister && outcome == FlowImplicitOutcomeUserAlreadyExists:\s*state\.CurrentPurpose = FlowDefinitionPurposeLogin/,
-      );
-      expect(PURPOSE_FLIP_TARGETS).toEqual({
-        login: { user_not_found: "register" },
-        register: { user_already_exists: "login" },
-      });
-    },
-  );
+  it.skipIf(!inMonorepo)("the switch outcomes match the engine's applyOutcomeFlip", () => {
+    const source = readFileSync(stateMachineSource, "utf8");
+    const body = source.match(/func applyOutcomeFlip[\s\S]*?\n}/)?.[0] ?? "";
+    // login → user_not_found → register, register → user_already_exists → login.
+    expect(body).toMatch(
+      /CurrentPurpose == domain\.FlowDefinitionPurposeLogin &&[\s\S]*?domain\.FlowImplicitOutcomeUserNotFound[\s\S]*?CurrentPurpose = domain\.FlowDefinitionPurposeRegister/,
+    );
+    expect(body).toMatch(
+      /CurrentPurpose == domain\.FlowDefinitionPurposeRegister && outcome == domain\.FlowImplicitOutcomeUserAlreadyExists:\s*state\.CurrentPurpose = domain\.FlowDefinitionPurposeLogin/,
+    );
+    expect(PURPOSE_FLIP_TARGETS).toEqual({
+      login: { user_not_found: "register" },
+      register: { user_already_exists: "login" },
+    });
+  });
 
-  const purposesSource = join(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../..",
-    "internal/domain/flow_definition.go",
-  );
+  const purposesSource = join(goModule, "internal/domain/flow_definition.go");
 
-  it.skipIf(!existsSync(purposesSource))("purpose enum matches the Go source exactly", () => {
+  it.skipIf(!inMonorepo)("purpose enum matches the Go source exactly", () => {
     const source = readFileSync(purposesSource, "utf8");
     const block =
       source.match(/FlowDefinitionPurposeLogin FlowDefinitionPurpose = iota[\s\S]*?\n\)/)?.[0] ??
@@ -1036,7 +1228,7 @@ describe("drift audit (Go validator)", () => {
     expect(goPurposes).toEqual([...FLOW_PURPOSES]);
   });
 
-  it.skipIf(!existsSync(purposesSource))("action kinds match the Go enum exactly", () => {
+  it.skipIf(!inMonorepo)("action kinds match the Go enum exactly", () => {
     const source = readFileSync(purposesSource, "utf8");
     const block = source.match(/FlowActionKindUnset FlowActionKind = iota[\s\S]*?\n\)/)?.[0] ?? "";
     const goKinds = [
@@ -1047,27 +1239,20 @@ describe("drift audit (Go validator)", () => {
     expect(goKinds).toEqual(["unset", "submit", "passkey", "passkey_register", "navigate", "back"]);
   });
 
-  const onSuccessSource = join(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../..",
-    "internal/domain/flow_on_success.go",
-  );
+  const onSuccessSource = join(goModule, "internal/domain/flow_on_success.go");
 
-  it.skipIf(!existsSync(onSuccessSource))(
-    "on_success manifests match the Go source exactly",
-    () => {
-      const source = readFileSync(onSuccessSource, "utf8");
-      const body = source.match(/func ManifestForOnSuccess[\s\S]*?\n}/)?.[0] ?? "";
-      const cases = [...body.matchAll(/case FlowOnSuccess(\w+):/g)].map(([, name]) =>
-        snake(name ?? ""),
-      );
-      // Mirrors ON_SUCCESS_MANIFESTS in validate.ts (keys and kinds): an
-      // on_success gaining a manifest in Go without a port here skips its
-      // collected-upstream check at plan time.
-      expect(cases).toEqual(["create_user"]);
-      expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
-    },
-  );
+  it.skipIf(!inMonorepo)("on_success manifests match the Go source exactly", () => {
+    const source = readFileSync(onSuccessSource, "utf8");
+    const body = source.match(/var flowOnSuccessSpecs = [\s\S]*?\n}/)?.[0] ?? "";
+    const cases = [...body.matchAll(/^\tFlowOnSuccess(\w+): \{([\s\S]*?)^\t\},$/gm)]
+      .filter(([, , spec]) => spec?.includes("Manifest:"))
+      .map(([, name]) => snake(name ?? ""));
+    // Mirrors ON_SUCCESS_MANIFESTS in validate.ts (keys and kinds): an
+    // on_success gaining a manifest in Go without a port here skips its
+    // collected-upstream check at plan time.
+    expect(cases).toEqual(["create_user"]);
+    expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
+  });
 });
 
 describe("the rule id type names", () => {

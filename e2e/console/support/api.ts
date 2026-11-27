@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
+import type { Page } from "@playwright/test";
+import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";
 import type { ConnectedZitadel } from "@zitadel/testing/playwright";
+
+/** The header the session-bound CSRF token travels in (ADR 053 §5). */
+const CSRF_HEADER = "X-Zitadel-CSRF";
 
 /**
  * What the specs arrange through the API, from the test process, with the
@@ -15,13 +20,50 @@ import type { ConnectedZitadel } from "@zitadel/testing/playwright";
  * A seeded user can sign in to the console but holds no grant, and the console
  * lists only the projects a person can act on (`GET /users/me/projects`,
  * #1237) — so without this the project pill and the Projects screen are
- * honestly empty. The grant is the same one a project's admins section creates.
+ * honestly empty. The grant is one a project's Members page lists.
  */
 export async function grantProjectAdmin(zitadel: ConnectedZitadel, userId: string): Promise<void> {
   await withErrorBody(
     zitadel.api.createGrant(
       { user: { user_id: userId }, relation: "admin" },
       { project_id: zitadel.handle.projectId },
+    ),
+  );
+}
+
+/**
+ * Claims the instance's project for the person signed in on `page`, through
+ * the endpoints `zitadel claim` uses: `claim/init` with the project secret
+ * from the test process, then `claim/complete` on the page's session cookie
+ * and its CSRF token. The claimer is then admin through the owning team. A
+ * project must be claimed before it grants a platform user (ADR 054 §4).
+ *
+ * The lane runs without retries, so a second attempt would find the project
+ * already claimed.
+ */
+export async function claimProject(zitadel: ConnectedZitadel, page: Page): Promise<void> {
+  const { baseUrl, projectId } = zitadel.handle;
+  const origin = new URL(baseUrl).origin;
+  const { challenge_id } = await withErrorBody(
+    zitadel.api.createProjectClaim(projectId, { headers: { origin } }),
+  );
+
+  // `__Host-zitadel_session` on https, `zitadel_session` on loopback http (ADR 083).
+  const session = (await page.context().cookies(baseUrl)).find((cookie) =>
+    cookie.name.endsWith("zitadel_session"),
+  );
+  if (!session) {
+    throw new Error("the page holds no session cookie to claim with");
+  }
+  // No bearer on this client: claim/complete authenticates by the cookie.
+  const browser = createZitadelApi(new ZitadelClient({ baseUrl, allowDestructive: true }));
+  const headers = { origin, cookie: `${session.name}=${session.value}` };
+  const { csrf_token } = await withErrorBody(browser.getMySessionCsrfToken(undefined, { headers }));
+  await withErrorBody(
+    browser.completeProjectClaim(
+      projectId,
+      { challenge_id },
+      { headers: { ...headers, [CSRF_HEADER]: csrf_token } },
     ),
   );
 }
@@ -37,7 +79,7 @@ export async function createIdpConnection(
   idp: { slug: string; display_name: string; template?: string },
 ): Promise<{ id: string }> {
   return withErrorBody(
-    zitadel.api.createIdp(
+    zitadel.api.publishIdp(
       {
         idp: {
           ...idp,
@@ -55,7 +97,7 @@ export async function createIdpConnection(
   );
 }
 
-type SchemaDocument = Awaited<ReturnType<ConnectedZitadel["api"]["getSchemaById"]>>["schema"];
+type SchemaDocument = Awaited<ReturnType<ConnectedZitadel["api"]["getSchema"]>>["schema"];
 
 /**
  * Writes a schema cloned from the seeded one under its own `objectType`.
@@ -69,10 +111,10 @@ export async function createSchemaFromSeed(
   overrides: Record<string, unknown> | ((template: SchemaDocument) => Record<string, unknown>) = {},
 ): Promise<{ id: string }> {
   const { projectId, schemaId } = zitadel.handle;
-  const { schema: template } = await zitadel.api.getSchemaById(schemaId);
+  const { schema: template } = await zitadel.api.getSchema(schemaId);
   const extra = typeof overrides === "function" ? overrides(template) : overrides;
   return withErrorBody(
-    zitadel.api.createSchema(
+    zitadel.api.publishSchema(
       { ...template, objectType: `e2e-${randomUUID()}`, ...extra },
       { project_id: projectId },
     ),
@@ -146,7 +188,7 @@ export async function deployToPrimary(
   await addPrimaryOrigin(zitadel, origin);
   return withErrorBody(
     zitadel.api.createDeployment(
-      { release_id: releaseId, targets: ["primary"] },
+      { release_id: releaseId, targets: "primary" },
       { project_id: zitadel.handle.projectId },
     ),
   );
@@ -158,7 +200,7 @@ export async function deployToPrimary(
  */
 export async function addPrimaryOrigin(zitadel: ConnectedZitadel, origin: string): Promise<void> {
   await withErrorBody(
-    zitadel.api.addOrigin(zitadel.handle.projectId, { pattern: origin, kind: "primary" }),
+    zitadel.api.addProjectOrigin(zitadel.handle.projectId, { pattern: origin, kind: "primary" }),
   );
 }
 
@@ -177,7 +219,7 @@ export async function createDistinctRelease(
     withErrorBody(zitadel.api.listSchemas({ project_id: projectId, revisions: "latest" })),
     withErrorBody(zitadel.api.listFlowDefinitions({ project_id: projectId, revisions: "latest" })),
     withErrorBody(
-      zitadel.api.createBranding(
+      zitadel.api.publishBranding(
         { liquid_template: `<zl-page-shell>${message} {% mandatory_gates %}</zl-page-shell>` },
         { project_id: projectId },
       ),
@@ -200,4 +242,34 @@ export async function createDistinctRelease(
     ),
   );
   return { id: release.id, message: release.metadata.message ?? "" };
+}
+
+/**
+ * Registers an application through `POST /applications` with one confidential
+ * client, as an integrator's backend would. Returns the application's id.
+ */
+export async function registerApplication(
+  zitadel: ConnectedZitadel,
+  slug: string,
+): Promise<string> {
+  const application = await withErrorBody(
+    zitadel.api.publishApplication(
+      {
+        application: {
+          slug,
+          name: slug,
+          clients: [
+            {
+              slug: "web",
+              type: "confidential",
+              grant_types: ["authorization_code"],
+              redirect_uris: ["https://shop.e2e.acme.test/callback"],
+            },
+          ],
+        },
+      },
+      { project_id: zitadel.handle.projectId },
+    ),
+  );
+  return application.id;
 }

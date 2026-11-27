@@ -1,4 +1,7 @@
-import { configureZitadel, getApi } from "@zitadel/api/config";
+import { createZitadelApi } from "@zitadel/api/client";
+import { configureZitadel, getClient } from "@zitadel/api/config";
+
+import { SessionCsrf } from "@/auth/csrf";
 
 /**
  * Console SDK configuration (Console ADR 0002).
@@ -13,7 +16,7 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  *   #1300): the session cookie rides along, as in production.
  * - **Production** — the built console is embedded in the Go binary, which
  *   serves the API under `/api/v1` (`buildHTTPMux`, ADR 077). Requests go
- *   to `/api/v1/flow`, `/api/v1/sessions/me`, … on the same origin, carrying
+ *   to `/api/v1/flows`, `/api/v1/sessions/me`, … on the same origin, carrying
  *   the session cookie and (on public-plane calls) the
  *   runtime-discovered publishable key.
  *
@@ -25,7 +28,7 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  * No project id is configured here. The project the console signs into is
  * learnt at boot from `/console/runtime.json` (Console ADR 0004 §3), in
  * development as in production, and read through `getConsoleProjectId()`;
- * management calls name the selected project (`src/lib/project-scope.ts`).
+ * management calls name the selected project (`src/features/projects/project-scope.ts`).
  */
 /**
  * What every console request puts in front of the API's `/api/v1` (Console
@@ -45,5 +48,22 @@ export const apiBase = import.meta.env.VITE_CONSOLE_API_BASE || "";
  */
 export const project = configureZitadel({ proxyPath: apiBase, projectId: "" });
 
-/** Typed Zitadel API client, base URL pre-bound, no client-held token. */
-export const api = getApi(project);
+/**
+ * The origin the console's API requests go to: the page's own, unless
+ * `VITE_CONSOLE_API_BASE` names another. The session's CSRF token is sent only
+ * there.
+ */
+const apiOrigin = new URL(apiBase || "/", window.location.href).origin;
+
+/**
+ * The session's CSRF token, which `src/auth/session.ts` loads and drops and
+ * every write to the API's origin carries.
+ */
+export const csrf = new SessionCsrf(apiOrigin);
+
+/**
+ * Typed Zitadel API client: the project's client (base URL, no client-held
+ * token, destructive operations allowed for the person's own deletes),
+ * sending through {@link csrf}.
+ */
+export const api = createZitadelApi(getClient(project).with({ fetch: csrf.fetch }));
