@@ -45,6 +45,9 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 	if v, ok := params.FlowID.Get(); ok {
 		req.FlowID = v
 	}
+	if v, ok := params.CorrelationID.Get(); ok {
+		req.CorrelationID = v
+	}
 	if v, ok := params.RequestID.Get(); ok {
 		req.RequestID = v
 	}

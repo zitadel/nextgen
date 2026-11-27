@@ -6818,6 +6818,11 @@ type ListEventsParams struct {
 	SessionID OptString `json:",omitempty,omitzero"`
 	// Only events of this login flow ID.
 	FlowID OptString `json:",omitempty,omitzero"`
+	// Only events of this chain: the requests that one sign-in, invitation or project claim took, whoever
+	// sent them. Read the ID from the `correlation_id` of an event in the chain. Events recorded by a
+	// server version before this filter existed are not matched; they leave the list as retention removes
+	// them.
+	CorrelationID OptString `json:",omitempty,omitzero"`
 	// Only events of this HTTP request ID.
 	RequestID OptString `json:",omitempty,omitzero"`
 	// Only events with this device fingerprint ID.
@@ -6922,6 +6927,15 @@ func unpackListEventsParams(packed middleware.Parameters) (params ListEventsPara
 		}
 		if v, ok := packed[key]; ok {
 			params.FlowID = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "correlation_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.CorrelationID = v.(OptString)
 		}
 	}
 	{
@@ -7399,6 +7413,47 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "flow_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: correlation_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "correlation_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotCorrelationIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotCorrelationIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.CorrelationID.SetTo(paramsDotCorrelationIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "correlation_id",
 			In:   "query",
 			Err:  err,
 		}

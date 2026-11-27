@@ -3783,6 +3783,12 @@ func (s *ApplicationClientSecretRotatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -3794,7 +3800,7 @@ func (s *ApplicationClientSecretRotatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfApplicationClientSecretRotatedEvent = [23]string{
+var jsonFieldsNameOfApplicationClientSecretRotatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -3816,8 +3822,9 @@ var jsonFieldsNameOfApplicationClientSecretRotatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ApplicationClientSecretRotatedEvent from json.
@@ -4049,6 +4056,16 @@ func (s *ApplicationClientSecretRotatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -4060,7 +4077,7 @@ func (s *ApplicationClientSecretRotatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -4081,7 +4098,7 @@ func (s *ApplicationClientSecretRotatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -4423,6 +4440,12 @@ func (s *ApplicationCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -4434,7 +4457,7 @@ func (s *ApplicationCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfApplicationCreatedEvent = [23]string{
+var jsonFieldsNameOfApplicationCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -4456,8 +4479,9 @@ var jsonFieldsNameOfApplicationCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ApplicationCreatedEvent from json.
@@ -4689,6 +4713,16 @@ func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -4700,7 +4734,7 @@ func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -4721,7 +4755,7 @@ func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -5381,6 +5415,12 @@ func (s *ApplicationUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -5392,7 +5432,7 @@ func (s *ApplicationUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfApplicationUpdatedEvent = [23]string{
+var jsonFieldsNameOfApplicationUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -5414,8 +5454,9 @@ var jsonFieldsNameOfApplicationUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ApplicationUpdatedEvent from json.
@@ -5647,6 +5688,16 @@ func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -5658,7 +5709,7 @@ func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -5679,7 +5730,7 @@ func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -7527,6 +7578,12 @@ func (s *AuthAttemptCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -7538,7 +7595,7 @@ func (s *AuthAttemptCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthAttemptCreatedEvent = [23]string{
+var jsonFieldsNameOfAuthAttemptCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -7560,8 +7617,9 @@ var jsonFieldsNameOfAuthAttemptCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthAttemptCreatedEvent from json.
@@ -7793,6 +7851,16 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -7804,7 +7872,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -7825,7 +7893,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -8129,6 +8197,12 @@ func (s *AuthAttemptHandedOffEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -8140,7 +8214,7 @@ func (s *AuthAttemptHandedOffEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthAttemptHandedOffEvent = [23]string{
+var jsonFieldsNameOfAuthAttemptHandedOffEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -8162,8 +8236,9 @@ var jsonFieldsNameOfAuthAttemptHandedOffEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthAttemptHandedOffEvent from json.
@@ -8395,6 +8470,16 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -8406,7 +8491,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -8427,7 +8512,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -9052,6 +9137,12 @@ func (s *AuthCheckFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -9063,7 +9154,7 @@ func (s *AuthCheckFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthCheckFailedEvent = [23]string{
+var jsonFieldsNameOfAuthCheckFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -9085,8 +9176,9 @@ var jsonFieldsNameOfAuthCheckFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthCheckFailedEvent from json.
@@ -9318,6 +9410,16 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -9329,7 +9431,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -9350,7 +9452,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -9784,6 +9886,12 @@ func (s *AuthCheckSucceededEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -9795,7 +9903,7 @@ func (s *AuthCheckSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthCheckSucceededEvent = [23]string{
+var jsonFieldsNameOfAuthCheckSucceededEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -9817,8 +9925,9 @@ var jsonFieldsNameOfAuthCheckSucceededEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthCheckSucceededEvent from json.
@@ -10050,6 +10159,16 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -10061,7 +10180,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -10082,7 +10201,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -10574,6 +10693,12 @@ func (s *AuthFactorPasskeyEnrolledEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -10585,7 +10710,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [23]string{
+var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -10607,8 +10732,9 @@ var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthFactorPasskeyEnrolledEvent from json.
@@ -10840,6 +10966,16 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -10851,7 +10987,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -10872,7 +11008,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -11176,6 +11312,12 @@ func (s *AuthFactorPasswordSetEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -11187,7 +11329,7 @@ func (s *AuthFactorPasswordSetEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthFactorPasswordSetEvent = [23]string{
+var jsonFieldsNameOfAuthFactorPasswordSetEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -11209,8 +11351,9 @@ var jsonFieldsNameOfAuthFactorPasswordSetEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthFactorPasswordSetEvent from json.
@@ -11442,6 +11585,16 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -11453,7 +11606,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -11474,7 +11627,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -12129,6 +12282,12 @@ func (s *AuthRequestCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -12140,7 +12299,7 @@ func (s *AuthRequestCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthRequestCreatedEvent = [23]string{
+var jsonFieldsNameOfAuthRequestCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -12162,8 +12321,9 @@ var jsonFieldsNameOfAuthRequestCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthRequestCreatedEvent from json.
@@ -12395,6 +12555,16 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -12406,7 +12576,7 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -12427,7 +12597,7 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -12827,6 +12997,12 @@ func (s *AuthRequestExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -12838,7 +13014,7 @@ func (s *AuthRequestExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthRequestExchangeFailedEvent = [23]string{
+var jsonFieldsNameOfAuthRequestExchangeFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -12860,8 +13036,9 @@ var jsonFieldsNameOfAuthRequestExchangeFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthRequestExchangeFailedEvent from json.
@@ -13093,6 +13270,16 @@ func (s *AuthRequestExchangeFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -13104,7 +13291,7 @@ func (s *AuthRequestExchangeFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -13125,7 +13312,7 @@ func (s *AuthRequestExchangeFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -13594,6 +13781,12 @@ func (s *AuthSSOAuthorizationFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -13605,7 +13798,7 @@ func (s *AuthSSOAuthorizationFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [23]string{
+var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -13627,8 +13820,9 @@ var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthSSOAuthorizationFailedEvent from json.
@@ -13860,6 +14054,16 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -13871,7 +14075,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -13892,7 +14096,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -14196,6 +14400,12 @@ func (s *AuthSSOExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -14207,7 +14417,7 @@ func (s *AuthSSOExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [23]string{
+var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -14229,8 +14439,9 @@ var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthSSOExchangeFailedEvent from json.
@@ -14462,6 +14673,16 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -14473,7 +14694,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -14494,7 +14715,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -14798,6 +15019,12 @@ func (s *AuthSSOExchangeSucceededEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -14809,7 +15036,7 @@ func (s *AuthSSOExchangeSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [23]string{
+var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -14831,8 +15058,9 @@ var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthSSOExchangeSucceededEvent from json.
@@ -15064,6 +15292,16 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -15075,7 +15313,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -15096,7 +15334,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -15400,6 +15638,12 @@ func (s *AuthTokenIssuedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -15411,7 +15655,7 @@ func (s *AuthTokenIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthTokenIssuedEvent = [23]string{
+var jsonFieldsNameOfAuthTokenIssuedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -15433,8 +15677,9 @@ var jsonFieldsNameOfAuthTokenIssuedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthTokenIssuedEvent from json.
@@ -15666,6 +15911,16 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -15677,7 +15932,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -15698,7 +15953,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -16095,6 +16350,12 @@ func (s *AuthTokenRevokedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -16106,7 +16367,7 @@ func (s *AuthTokenRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthTokenRevokedEvent = [23]string{
+var jsonFieldsNameOfAuthTokenRevokedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -16128,8 +16389,9 @@ var jsonFieldsNameOfAuthTokenRevokedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthTokenRevokedEvent from json.
@@ -16361,6 +16623,16 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -16372,7 +16644,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -16393,7 +16665,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -16885,6 +17157,12 @@ func (s *AuthzGrantedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -16896,7 +17174,7 @@ func (s *AuthzGrantedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthzGrantedEvent = [23]string{
+var jsonFieldsNameOfAuthzGrantedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -16918,8 +17196,9 @@ var jsonFieldsNameOfAuthzGrantedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthzGrantedEvent from json.
@@ -17151,6 +17430,16 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -17162,7 +17451,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -17183,7 +17472,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -17584,6 +17873,12 @@ func (s *AuthzRevokedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -17595,7 +17890,7 @@ func (s *AuthzRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthzRevokedEvent = [23]string{
+var jsonFieldsNameOfAuthzRevokedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -17617,8 +17912,9 @@ var jsonFieldsNameOfAuthzRevokedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes AuthzRevokedEvent from json.
@@ -17850,6 +18146,16 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -17861,7 +18167,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -17882,7 +18188,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -18737,6 +19043,12 @@ func (s *BrandingCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -18748,7 +19060,7 @@ func (s *BrandingCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfBrandingCreatedEvent = [23]string{
+var jsonFieldsNameOfBrandingCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -18770,8 +19082,9 @@ var jsonFieldsNameOfBrandingCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes BrandingCreatedEvent from json.
@@ -19003,6 +19316,16 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -19014,7 +19337,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -19035,7 +19358,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -41304,6 +41627,12 @@ func (s *DeploymentCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -41315,7 +41644,7 @@ func (s *DeploymentCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfDeploymentCreatedEvent = [23]string{
+var jsonFieldsNameOfDeploymentCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -41337,8 +41666,9 @@ var jsonFieldsNameOfDeploymentCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes DeploymentCreatedEvent from json.
@@ -41570,6 +41900,16 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -41581,7 +41921,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -41602,7 +41942,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -45160,6 +45500,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -45281,6 +45627,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -45408,6 +45760,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -45529,6 +45887,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -45656,6 +46020,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -45777,6 +46147,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -45904,6 +46280,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -46025,6 +46407,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -46152,6 +46540,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -46273,6 +46667,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -46400,6 +46800,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -46521,6 +46927,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -46648,6 +47060,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -46769,6 +47187,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -46896,6 +47320,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -47017,6 +47447,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -47144,6 +47580,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -47265,6 +47707,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -47392,6 +47840,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -47513,6 +47967,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -47640,6 +48100,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -47761,6 +48227,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -47888,6 +48360,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -48009,6 +48487,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -48136,6 +48620,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -48257,6 +48747,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -48384,6 +48880,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -48505,6 +49007,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -48632,6 +49140,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -48753,6 +49267,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -48880,6 +49400,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49001,6 +49527,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -49128,6 +49660,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49249,6 +49787,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -49376,6 +49920,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49497,6 +50047,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -49624,6 +50180,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49745,6 +50307,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -49872,6 +50440,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -49993,6 +50567,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -50120,6 +50700,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -50241,6 +50827,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -50368,6 +50960,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -50489,6 +51087,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -50616,6 +51220,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -50737,6 +51347,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -50864,6 +51480,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -50985,6 +51607,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -51112,6 +51740,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -51233,6 +51867,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -51360,6 +52000,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -51481,6 +52127,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -51608,6 +52260,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -51729,6 +52387,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -51856,6 +52520,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
 				if s.Metadata.Set {
 					e.FieldStart("metadata")
 					s.Metadata.Encode(e)
@@ -51977,6 +52647,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.FlowID.Set {
 					e.FieldStart("flow_id")
 					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
 				}
 			}
 			{
@@ -52457,6 +53133,12 @@ func (s *EventMetadata) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.TraceID.Set {
+			e.FieldStart("trace_id")
+			s.TraceID.Encode(e)
+		}
+	}
+	{
 		if s.Client.Set {
 			e.FieldStart("client")
 			s.Client.Encode(e)
@@ -52471,9 +53153,10 @@ func (s *EventMetadata) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfEventMetadata = [2]string{
+var jsonFieldsNameOfEventMetadata = [3]string{
 	0: "authorization",
-	1: "client",
+	1: "trace_id",
+	2: "client",
 }
 
 // Decode decodes EventMetadata from json.
@@ -52494,6 +53177,16 @@ func (s *EventMetadata) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"authorization\"")
+			}
+		case "trace_id":
+			if err := func() error {
+				s.TraceID.Reset()
+				if err := s.TraceID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"trace_id\"")
 			}
 		case "client":
 			if err := func() error {
@@ -58931,6 +59624,12 @@ func (s *FlowSignupChallengeConsumedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -58942,7 +59641,7 @@ func (s *FlowSignupChallengeConsumedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [23]string{
+var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -58964,8 +59663,9 @@ var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowSignupChallengeConsumedEvent from json.
@@ -59197,6 +59897,16 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -59208,7 +59918,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -59229,7 +59939,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -59533,6 +60243,12 @@ func (s *FlowSignupChallengeIssuedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -59544,7 +60260,7 @@ func (s *FlowSignupChallengeIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [23]string{
+var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -59566,8 +60282,9 @@ var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowSignupChallengeIssuedEvent from json.
@@ -59799,6 +60516,16 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -59810,7 +60537,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -59831,7 +60558,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -61763,6 +62490,12 @@ func (s *FlowdefCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -61774,7 +62507,7 @@ func (s *FlowdefCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefCreatedEvent = [23]string{
+var jsonFieldsNameOfFlowdefCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -61796,8 +62529,9 @@ var jsonFieldsNameOfFlowdefCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowdefCreatedEvent from json.
@@ -62029,6 +62763,16 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -62040,7 +62784,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -62061,7 +62805,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -62365,6 +63109,12 @@ func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -62376,7 +63126,7 @@ func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefDeletedEvent = [23]string{
+var jsonFieldsNameOfFlowdefDeletedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -62398,8 +63148,9 @@ var jsonFieldsNameOfFlowdefDeletedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowdefDeletedEvent from json.
@@ -62631,6 +63382,16 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -62642,7 +63403,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -62663,7 +63424,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -64747,6 +65508,12 @@ func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -64758,7 +65525,7 @@ func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefUpdatedEvent = [23]string{
+var jsonFieldsNameOfFlowdefUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -64780,8 +65547,9 @@ var jsonFieldsNameOfFlowdefUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes FlowdefUpdatedEvent from json.
@@ -65013,6 +65781,16 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -65024,7 +65802,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -65045,7 +65823,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -78442,6 +79220,12 @@ func (s *IdpCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -78453,7 +79237,7 @@ func (s *IdpCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpCreatedEvent = [23]string{
+var jsonFieldsNameOfIdpCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -78475,8 +79259,9 @@ var jsonFieldsNameOfIdpCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes IdpCreatedEvent from json.
@@ -78708,6 +79493,16 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -78719,7 +79514,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -78740,7 +79535,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -79648,6 +80443,12 @@ func (s *IdpIdentityLinkCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -79659,7 +80460,7 @@ func (s *IdpIdentityLinkCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [23]string{
+var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -79681,8 +80482,9 @@ var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes IdpIdentityLinkCreatedEvent from json.
@@ -79914,6 +80716,16 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -79925,7 +80737,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -79946,7 +80758,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -81684,6 +82496,12 @@ func (s *IdpUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -81695,7 +82513,7 @@ func (s *IdpUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpUpdatedEvent = [23]string{
+var jsonFieldsNameOfIdpUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -81717,8 +82535,9 @@ var jsonFieldsNameOfIdpUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes IdpUpdatedEvent from json.
@@ -81950,6 +82769,16 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -81961,7 +82790,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -81982,7 +82811,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -84516,6 +85345,12 @@ func (s *InvitationAcceptedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -84527,7 +85362,7 @@ func (s *InvitationAcceptedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationAcceptedEvent = [23]string{
+var jsonFieldsNameOfInvitationAcceptedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -84549,8 +85384,9 @@ var jsonFieldsNameOfInvitationAcceptedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes InvitationAcceptedEvent from json.
@@ -84782,6 +85618,16 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -84793,7 +85639,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -84814,7 +85660,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -85913,6 +86759,12 @@ func (s *InvitationCancelledEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -85924,7 +86776,7 @@ func (s *InvitationCancelledEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationCancelledEvent = [23]string{
+var jsonFieldsNameOfInvitationCancelledEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -85946,8 +86798,9 @@ var jsonFieldsNameOfInvitationCancelledEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes InvitationCancelledEvent from json.
@@ -86179,6 +87032,16 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -86190,7 +87053,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -86211,7 +87074,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -86621,6 +87484,12 @@ func (s *InvitationCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -86632,7 +87501,7 @@ func (s *InvitationCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationCreatedEvent = [23]string{
+var jsonFieldsNameOfInvitationCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -86654,8 +87523,9 @@ var jsonFieldsNameOfInvitationCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes InvitationCreatedEvent from json.
@@ -86887,6 +87757,16 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -86898,7 +87778,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -86919,7 +87799,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -89195,6 +90075,12 @@ func (s *InvitationRejectedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -89206,7 +90092,7 @@ func (s *InvitationRejectedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationRejectedEvent = [23]string{
+var jsonFieldsNameOfInvitationRejectedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -89228,8 +90114,9 @@ var jsonFieldsNameOfInvitationRejectedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes InvitationRejectedEvent from json.
@@ -89461,6 +90348,16 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -89472,7 +90369,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -89493,7 +90390,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -99791,6 +100688,12 @@ func (s *OAuthSettingsCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -99802,7 +100705,7 @@ func (s *OAuthSettingsCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOAuthSettingsCreatedEvent = [23]string{
+var jsonFieldsNameOfOAuthSettingsCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -99824,8 +100727,9 @@ var jsonFieldsNameOfOAuthSettingsCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes OAuthSettingsCreatedEvent from json.
@@ -100057,6 +100961,16 @@ func (s *OAuthSettingsCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -100068,7 +100982,7 @@ func (s *OAuthSettingsCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -100089,7 +101003,7 @@ func (s *OAuthSettingsCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -116081,6 +116995,12 @@ func (s *OriginAddedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -116092,7 +117012,7 @@ func (s *OriginAddedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOriginAddedEvent = [23]string{
+var jsonFieldsNameOfOriginAddedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -116114,8 +117034,9 @@ var jsonFieldsNameOfOriginAddedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes OriginAddedEvent from json.
@@ -116347,6 +117268,16 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -116358,7 +117289,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -116379,7 +117310,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -117774,6 +118705,12 @@ func (s *OriginRemovedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -117785,7 +118722,7 @@ func (s *OriginRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOriginRemovedEvent = [23]string{
+var jsonFieldsNameOfOriginRemovedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -117807,8 +118744,9 @@ var jsonFieldsNameOfOriginRemovedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes OriginRemovedEvent from json.
@@ -118040,6 +118978,16 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -118051,7 +118999,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -118072,7 +119020,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -122138,6 +123086,12 @@ func (s *PolicyCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -122149,7 +123103,7 @@ func (s *PolicyCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPolicyCreatedEvent = [23]string{
+var jsonFieldsNameOfPolicyCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -122171,8 +123125,9 @@ var jsonFieldsNameOfPolicyCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes PolicyCreatedEvent from json.
@@ -122404,6 +123359,16 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -122415,7 +123380,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -122436,7 +123401,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -123006,6 +123971,12 @@ func (s *PolicyUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -123017,7 +123988,7 @@ func (s *PolicyUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPolicyUpdatedEvent = [23]string{
+var jsonFieldsNameOfPolicyUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -123039,8 +124010,9 @@ var jsonFieldsNameOfPolicyUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes PolicyUpdatedEvent from json.
@@ -123272,6 +124244,16 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -123283,7 +124265,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -123304,7 +124286,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -123934,6 +124916,12 @@ func (s *PreviewRemovedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -123945,7 +124933,7 @@ func (s *PreviewRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPreviewRemovedEvent = [23]string{
+var jsonFieldsNameOfPreviewRemovedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -123967,8 +124955,9 @@ var jsonFieldsNameOfPreviewRemovedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes PreviewRemovedEvent from json.
@@ -124200,6 +125189,16 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -124211,7 +125210,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -124232,7 +125231,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -126832,6 +127831,12 @@ func (s *ProjectCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -126843,7 +127848,7 @@ func (s *ProjectCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectCreatedEvent = [23]string{
+var jsonFieldsNameOfProjectCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -126865,8 +127870,9 @@ var jsonFieldsNameOfProjectCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ProjectCreatedEvent from json.
@@ -127098,6 +128104,16 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -127109,7 +128125,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -127130,7 +128146,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -127434,6 +128450,12 @@ func (s *ProjectDeletedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -127445,7 +128467,7 @@ func (s *ProjectDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectDeletedEvent = [23]string{
+var jsonFieldsNameOfProjectDeletedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -127467,8 +128489,9 @@ var jsonFieldsNameOfProjectDeletedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ProjectDeletedEvent from json.
@@ -127700,6 +128723,16 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -127711,7 +128744,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -127732,7 +128765,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -129331,6 +130364,12 @@ func (s *ProjectUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -129342,7 +130381,7 @@ func (s *ProjectUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectUpdatedEvent = [23]string{
+var jsonFieldsNameOfProjectUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -129364,8 +130403,9 @@ var jsonFieldsNameOfProjectUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ProjectUpdatedEvent from json.
@@ -129597,6 +130637,16 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -129608,7 +130658,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -129629,7 +130679,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -140890,6 +141940,12 @@ func (s *ReleaseCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -140901,7 +141957,7 @@ func (s *ReleaseCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfReleaseCreatedEvent = [23]string{
+var jsonFieldsNameOfReleaseCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -140923,8 +141979,9 @@ var jsonFieldsNameOfReleaseCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ReleaseCreatedEvent from json.
@@ -141156,6 +142213,16 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -141167,7 +142234,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -141188,7 +142255,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -142288,6 +143355,12 @@ func (s *ReleaseRevokedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -142299,7 +143372,7 @@ func (s *ReleaseRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfReleaseRevokedEvent = [23]string{
+var jsonFieldsNameOfReleaseRevokedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -142321,8 +143394,9 @@ var jsonFieldsNameOfReleaseRevokedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes ReleaseRevokedEvent from json.
@@ -142554,6 +143628,16 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -142565,7 +143649,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -142586,7 +143670,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -144112,6 +145196,12 @@ func (s *RequestAPIEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -144123,7 +145213,7 @@ func (s *RequestAPIEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfRequestAPIEvent = [23]string{
+var jsonFieldsNameOfRequestAPIEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -144145,8 +145235,9 @@ var jsonFieldsNameOfRequestAPIEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes RequestAPIEvent from json.
@@ -144378,6 +145469,16 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -144389,7 +145490,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -144410,7 +145511,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -149370,6 +150471,12 @@ func (s *SchemaCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -149381,7 +150488,7 @@ func (s *SchemaCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSchemaCreatedEvent = [23]string{
+var jsonFieldsNameOfSchemaCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -149403,8 +150510,9 @@ var jsonFieldsNameOfSchemaCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes SchemaCreatedEvent from json.
@@ -149636,6 +150744,16 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -149647,7 +150765,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -149668,7 +150786,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -153171,6 +154289,12 @@ func (s *SessionDeletedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -153182,7 +154306,7 @@ func (s *SessionDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSessionDeletedEvent = [23]string{
+var jsonFieldsNameOfSessionDeletedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -153204,8 +154328,9 @@ var jsonFieldsNameOfSessionDeletedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes SessionDeletedEvent from json.
@@ -153437,6 +154562,16 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -153448,7 +154583,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -153469,7 +154604,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -153836,6 +154971,12 @@ func (s *SessionEstablishedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -153847,7 +154988,7 @@ func (s *SessionEstablishedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSessionEstablishedEvent = [23]string{
+var jsonFieldsNameOfSessionEstablishedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -153869,8 +155010,9 @@ var jsonFieldsNameOfSessionEstablishedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes SessionEstablishedEvent from json.
@@ -154102,6 +155244,16 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -154113,7 +155265,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -154134,7 +155286,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -158341,6 +159493,12 @@ func (s *TeamCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -158352,7 +159510,7 @@ func (s *TeamCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamCreatedEvent = [23]string{
+var jsonFieldsNameOfTeamCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -158374,8 +159532,9 @@ var jsonFieldsNameOfTeamCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes TeamCreatedEvent from json.
@@ -158607,6 +159766,16 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -158618,7 +159787,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -158639,7 +159808,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -158943,6 +160112,12 @@ func (s *TeamDeactivatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -158954,7 +160129,7 @@ func (s *TeamDeactivatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamDeactivatedEvent = [23]string{
+var jsonFieldsNameOfTeamDeactivatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -158976,8 +160151,9 @@ var jsonFieldsNameOfTeamDeactivatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes TeamDeactivatedEvent from json.
@@ -159209,6 +160385,16 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -159220,7 +160406,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -159241,7 +160427,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -161025,6 +162211,12 @@ func (s *TeamUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -161036,7 +162228,7 @@ func (s *TeamUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamUpdatedEvent = [23]string{
+var jsonFieldsNameOfTeamUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -161058,8 +162250,9 @@ var jsonFieldsNameOfTeamUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes TeamUpdatedEvent from json.
@@ -161291,6 +162484,16 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -161302,7 +162505,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -161323,7 +162526,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -165499,6 +166702,12 @@ func (s *UserCreateFailedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -165510,7 +166719,7 @@ func (s *UserCreateFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserCreateFailedEvent = [23]string{
+var jsonFieldsNameOfUserCreateFailedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -165532,8 +166741,9 @@ var jsonFieldsNameOfUserCreateFailedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes UserCreateFailedEvent from json.
@@ -165765,6 +166975,16 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -165776,7 +166996,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -165797,7 +167017,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -166537,6 +167757,12 @@ func (s *UserCreatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -166548,7 +167774,7 @@ func (s *UserCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserCreatedEvent = [23]string{
+var jsonFieldsNameOfUserCreatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -166570,8 +167796,9 @@ var jsonFieldsNameOfUserCreatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes UserCreatedEvent from json.
@@ -166803,6 +168030,16 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -166814,7 +168051,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -166835,7 +168072,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -167307,6 +168544,12 @@ func (s *UserDeletedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -167318,7 +168561,7 @@ func (s *UserDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserDeletedEvent = [23]string{
+var jsonFieldsNameOfUserDeletedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -167340,8 +168583,9 @@ var jsonFieldsNameOfUserDeletedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes UserDeletedEvent from json.
@@ -167573,6 +168817,16 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -167584,7 +168838,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -167605,7 +168859,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -170874,6 +172128,12 @@ func (s *UserUpdatedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -170885,7 +172145,7 @@ func (s *UserUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserUpdatedEvent = [23]string{
+var jsonFieldsNameOfUserUpdatedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -170907,8 +172167,9 @@ var jsonFieldsNameOfUserUpdatedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes UserUpdatedEvent from json.
@@ -171140,6 +172401,16 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -171151,7 +172422,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -171172,7 +172443,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -173322,6 +174593,12 @@ func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -173333,7 +174610,7 @@ func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfVariableRemovedEvent = [23]string{
+var jsonFieldsNameOfVariableRemovedEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -173355,8 +174632,9 @@ var jsonFieldsNameOfVariableRemovedEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes VariableRemovedEvent from json.
@@ -173588,6 +174866,16 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -173599,7 +174887,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -173620,7 +174908,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -174086,6 +175374,12 @@ func (s *VariableSetEvent) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
 		if s.Metadata.Set {
 			e.FieldStart("metadata")
 			s.Metadata.Encode(e)
@@ -174097,7 +175391,7 @@ func (s *VariableSetEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfVariableSetEvent = [23]string{
+var jsonFieldsNameOfVariableSetEvent = [24]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -174119,8 +175413,9 @@ var jsonFieldsNameOfVariableSetEvent = [23]string{
 	18: "request_id",
 	19: "session_id",
 	20: "flow_id",
-	21: "metadata",
-	22: "payload",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
 }
 
 // Decode decodes VariableSetEvent from json.
@@ -174352,6 +175647,16 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_id\"")
 			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
 		case "metadata":
 			if err := func() error {
 				s.Metadata.Reset()
@@ -174363,7 +175668,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 6
+			requiredBitSet[2] |= 1 << 7
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -174384,7 +175689,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 	for i, mask := range [3]uint8{
 		0b01111011,
 		0b00010000,
-		0b01000000,
+		0b10000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

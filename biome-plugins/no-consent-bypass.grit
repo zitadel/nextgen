@@ -74,7 +74,8 @@ or {
   or {
     `"@zitadel/api/client"`,
     `"@zitadel/api/config"`,
-    `"@zitadel/api/generated/endpoints/zitadelNextGen"`
+    `"@zitadel/api/generated/endpoints/zitadelNextGen"`,
+    `"@zitadel/api/runtime/client"`
   } as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",

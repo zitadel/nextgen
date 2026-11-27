@@ -8,12 +8,13 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authattempt"
 )
 
 const (
-	createClaimChallengeStmt = `INSERT INTO claim_challenges (id, project_id, initiating_secret_hash, status, expires_at) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN created_at`
+	createClaimChallengeStmt = `INSERT INTO claim_challenges (id, project_id, initiating_secret_hash, status, expires_at, correlation_id) VALUES (@p1, @p2, @p3, @p4, @p5, @p6) THEN RETURN created_at`
 
-	getClaimChallengeStmt = `SELECT id, project_id, initiating_secret_hash, status, expires_at, created_at FROM claim_challenges WHERE id = @p1 AND project_id = @p2`
+	getClaimChallengeStmt = `SELECT id, project_id, initiating_secret_hash, status, expires_at, created_at, correlation_id FROM claim_challenges WHERE id = @p1 AND project_id = @p2`
 
 	markClaimChallengeCompletedStmt = `UPDATE claim_challenges SET status = 'completed' WHERE id = @p1 AND project_id = @p2 AND status = 'pending'`
 
@@ -56,6 +57,7 @@ func newClaimStatements(db queryExecutor) claimStatements {
 func (s claimStatements) CreateChallenge(ctx context.Context, entity *domain.ClaimChallenge) error {
 	stmt := buildStatement(createClaimChallengeStmt,
 		entity.ID, entity.ProjectID, entity.InitiatingSecretHash, entity.Status.String(), entity.ExpiresAt,
+		authattempt.EmptyStringArg(entity.CorrelationID),
 	).statement()
 	return s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
@@ -125,7 +127,10 @@ func (s claimStatements) GetEarliestTeamMembership(ctx context.Context, projectI
 
 func scanClaimChallenge(row *spanner.Row) (*domain.ClaimChallenge, error) {
 	challenge := new(domain.ClaimChallenge)
-	var status string
+	var (
+		status        string
+		correlationID spanner.NullString
+	)
 	if err := row.Columns(
 		&challenge.ID,
 		&challenge.ProjectID,
@@ -133,9 +138,11 @@ func scanClaimChallenge(row *spanner.Row) (*domain.ClaimChallenge, error) {
 		&status,
 		&challenge.ExpiresAt,
 		&challenge.CreatedAt,
+		&correlationID,
 	); err != nil {
 		return nil, err
 	}
+	challenge.CorrelationID = correlationID.StringVal
 	challenge.Status = domain.ClaimChallengeStatus(status)
 	return challenge, nil
 }
