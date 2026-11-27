@@ -20,10 +20,6 @@ type EmitSpec struct {
 	UserID    string
 	Payload   any
 	SessionID *string
-	// FlowID, when set and not empty, is the event's login flow in place of
-	// the request's own. The handoff exchange sets it: a service call whose
-	// flow is the one of the attempt it consumed.
-	FlowID *string
 	// ActorID and ActorType, when set, name the event's actor in place of the
 	// request's. token_id has no override: it is always the credential the
 	// request presented.
@@ -47,9 +43,6 @@ func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	}
 	if spec.SessionID != nil {
 		ev.SessionID = spec.SessionID
-	}
-	if spec.FlowID != nil && *spec.FlowID != "" {
-		ev.FlowID = spec.FlowID
 	}
 	if spec.ActorID != nil {
 		ev.ActorID = spec.ActorID

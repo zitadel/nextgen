@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"sync/atomic"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/events"
@@ -22,6 +24,8 @@ type actorSlotKey struct{}
 type authorizationKey struct{}
 
 // ActorContext holds server-authoritative WHO/HOW dimensions for event emission (ADR 048 §5).
+// The login flow and the chain of a request are not part of it: they are in
+// the request's [middleware.Correlation], which both emission paths read.
 type ActorContext struct {
 	ProjectID      string
 	TeamID         *string
@@ -34,7 +38,6 @@ type ActorContext struct {
 	Grantor        string
 	Fingerprint    string
 	SessionID      *string
-	FlowID         *string
 	RequestID      *string
 	Authenticated  bool
 }
@@ -47,12 +50,14 @@ type authorizationMark struct {
 
 // WithActorSlot plants a mutable actor slot on ctx so net/http middleware can
 // observe AuthGate enrichment that happens inside ogen on a child context. The
-// request's authorization mark goes beside it, for the same reason.
+// request's authorization mark goes beside it, for the same reason, and its
+// correlation when the request context middleware has not planted one.
 func WithActorSlot(ctx context.Context) context.Context {
 	if _, ok := ctx.Value(actorSlotKey{}).(*ActorContext); ok {
 		return ctx
 	}
-	return context.WithValue(withAuthorizationMark(ctx), actorSlotKey{}, &ActorContext{})
+	ctx = middleware.WithCorrelation(withAuthorizationMark(ctx))
+	return context.WithValue(ctx, actorSlotKey{}, &ActorContext{})
 }
 
 // withAuthorizationMark plants the request's authorization mark, unless ctx
@@ -69,9 +74,10 @@ func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
 	return v, ok && v != nil
 }
 
-// BindPublicRequest stamps project/flow/session onto the actor slot so Path A
-// can emit request.api without a token (the login flow). No-op when
-// projectID is empty or there is no slot. Does not set Authenticated.
+// BindPublicRequest stamps project and session onto the actor slot so Path A
+// can emit request.api without a token (the login flow), and names the
+// request's login flow. No-op when projectID is empty or there is no slot.
+// Does not set Authenticated.
 func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string) {
 	if projectID == "" {
 		return
@@ -81,10 +87,7 @@ func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string)
 		return
 	}
 	slot.ProjectID = projectID
-	if flowID != "" {
-		id := flowID
-		slot.FlowID = &id
-	}
+	middleware.CorrelationFromContext(ctx).SetFlow(flowID)
 	if sessionID != "" {
 		id := sessionID
 		slot.SessionID = &id
@@ -96,15 +99,58 @@ func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string)
 	}
 }
 
-// BindFlow stamps the login flow onto the actor slot of a request that names
-// none itself, so its request.api event joins the flow's. No-op when flowID is
-// empty, there is no slot, or the request already names a flow.
+// BindFlow names the login flow of a request that names none itself: the
+// handoff exchange and the provider's callback, which reach their flow only
+// through the attempt. Every event the request writes from then on carries
+// it, on both paths. No-op when flowID is empty, outside a request, or when
+// the request already names a flow.
 func BindFlow(ctx context.Context, flowID string) {
-	if flowID == "" {
+	middleware.CorrelationFromContext(ctx).JoinFlow(flowID)
+}
+
+// JoinCorrelation puts the request into the chain of a carrier it read: an
+// authorization request, a login flow, an auth attempt, an invitation or a
+// claim challenge (ADR 048, amendment of 2026-11-26). Every event the request
+// writes from then on carries the chain, on both paths, so call it before the
+// first emit. The first carrier read decides: a request never changes chain.
+// No-op when id is empty, the carrier of a time before chains, or outside a
+// request.
+func JoinCorrelation(ctx context.Context, id string) {
+	if id == "" {
 		return
 	}
-	if slot, ok := ActorSlotFromContext(ctx); ok && slot != nil && slot.FlowID == nil {
-		slot.FlowID = &flowID
+	markServerSpan(ctx, middleware.CorrelationFromContext(ctx).Join(id))
+}
+
+// EnsureCorrelation is the chain a carrier the request creates stores: the
+// one the request is in, or a new one, which the request then joins. Outside
+// a request it mints one for the carrier alone.
+func EnsureCorrelation(ctx context.Context) (string, error) {
+	correlation := middleware.CorrelationFromContext(ctx)
+	if id := correlation.Chain(); id != "" {
+		return id, nil
+	}
+	id, err := domain.NewCorrelationID()
+	if err != nil {
+		return "", err
+	}
+	if correlation == nil {
+		return id, nil
+	}
+	id = correlation.Join(id)
+	markServerSpan(ctx, id)
+	return id, nil
+}
+
+// markServerSpan names the chain on the request's server span, so a trace
+// leads to the events of the chain. Not a span link: a chain is no recorded
+// trace to link to.
+func markServerSpan(ctx context.Context, id string) {
+	if id == "" {
+		return
+	}
+	if span, ok := middleware.ServerSpan(ctx); ok {
+		span.SetAttributes(attribute.String(middleware.CorrelationAttribute, id))
 	}
 }
 
@@ -135,7 +181,8 @@ func WithActorContext(ctx context.Context, ac ActorContext) context.Context {
 	if slot, ok := ActorSlotFromContext(ctx); ok {
 		*slot = ac
 	}
-	return context.WithValue(withAuthorizationMark(ctx), contextKey{}, ac)
+	ctx = middleware.WithCorrelation(withAuthorizationMark(ctx))
+	return context.WithValue(ctx, contextKey{}, ac)
 }
 
 func ActorFromContext(ctx context.Context) (ActorContext, bool) {
@@ -185,8 +232,14 @@ func FromContext(ctx context.Context, eventType domain.EventType, category domai
 	ev.Grantor = ac.Grantor
 	ev.Fingerprint = ac.Fingerprint
 	ev.SessionID = ac.SessionID
-	ev.FlowID = ac.FlowID
 	ev.RequestID = ac.RequestID
+	correlation := middleware.CorrelationFromContext(ctx)
+	if flowID := correlation.Flow(); flowID != "" {
+		ev.FlowID = &flowID
+	}
+	if id := correlation.Chain(); id != "" {
+		ev.CorrelationID = &id
+	}
 	if authorization := AuthorizationFromContext(ctx); authorization != nil {
 		if meta, err := events.MarshalPayload(domain.EventMetadata{Authorization: authorization}); err == nil {
 			ev.Metadata = meta

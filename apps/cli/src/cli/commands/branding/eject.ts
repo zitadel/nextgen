@@ -20,6 +20,7 @@ import { MetaSchemas } from "@/lib/meta-schemas";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { filled, reads } from "@/cli/core/flags";
+import { refuseOutsideProject } from "@/cli/core/not-a-project";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Spelling, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -33,7 +34,6 @@ import {
   RETIRED_BRANDING_DESIGNS,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import { Project } from "@/lib/project";
 import { Promptable } from "@/cli/core/promptable";
 import { Previewable } from "@/cli/core/previewable";
 import { BaseCommand } from "@/cli/core";
@@ -41,13 +41,6 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /** The shipped designs, as a list for a hint to offer. */
 const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
-
-/** How a directory that `setup` has not made a project is refused. */
-const NOT_A_PROJECT_REFUSAL = {
-  message: "This directory is not a Zitadel project",
-  hint: "Run setup first; branding files live under .zitadel/.",
-  next: [{ id: "setup" }],
-} as const satisfies Refusal;
 
 /**
  * How a retired `--design` is refused, by name, with a pointer to where page
@@ -241,9 +234,7 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
     if (flags.design !== undefined && !isBrandingDesign(flags.design)) {
       throw refusalError(RETIRED_DESIGN_REFUSAL, { design: flags.design });
     }
-    if (!(await Project.at(this.cwd).hasConfig())) {
-      throw refusalError(NOT_A_PROJECT_REFUSAL, {});
-    }
+    await refuseOutsideProject(this.cwd, "branding files live under .zitadel/.");
     const design =
       flags.design ??
       (this.nonInteractive

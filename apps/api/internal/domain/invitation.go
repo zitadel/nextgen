@@ -15,12 +15,6 @@ func NewInvitationToken() (plain, hash string, err error) {
 	return plain, HashSecret(plain), nil
 }
 
-// NewInvitationJourneyID mints the random id that ties an invitation to its
-// replacements. It names no resource.
-func NewInvitationJourneyID() (string, error) {
-	return randomSecret(16)
-}
-
 // PrefixInvitation is the dialect-minted ID prefix for invitations (inv_<opaque>)
 // and the public error-code prefix (inv.not_found).
 const PrefixInvitation ResourcePrefix = "inv"
@@ -56,6 +50,17 @@ func ErrInvitationSelfAccept() Error {
 
 func ErrInvitationSelfReject() Error {
 	return newError(PrefixInvitation.ErrorCodePrefix("self_reject"), "the inviter cannot decline their own invitation", nil, nil)
+}
+
+// ErrInvitationAlreadyMember refuses redeeming an invitation for a user who
+// already holds relation on its project, from any source.
+func ErrInvitationAlreadyMember(relation string) Error {
+	return newError(PrefixInvitation.ErrorCodePrefix("already_member"), "you already have access to this project", InvitationAlreadyMemberDetails{Relation: relation}, nil)
+}
+
+// InvitationAlreadyMemberDetails names the role the user already holds.
+type InvitationAlreadyMemberDetails struct {
+	Relation string `json:"relation"`
 }
 
 // ErrInvitationInviterNotAdmin refuses an accept whose creator no longer

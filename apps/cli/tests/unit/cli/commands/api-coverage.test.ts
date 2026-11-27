@@ -1,9 +1,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
-import { destructiveOperations } from "@zitadel/api/generated/operations";
-import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+import {
+  destructiveOperations,
+  operations as specOperations,
+} from "@zitadel/api/generated/operations";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
@@ -14,10 +15,10 @@ import { RESOURCES } from "@/cli/commands/resources";
  * to the CLI until somebody adds an entry. This test is the thing that notices.
  *
  * Its source of truth is the generated client, because that is the real
- * constraint: the registry can only call what orval generated. Every operation
- * is an exported function paired with an exported URL builder, so both the
- * operations and the collection each belongs to are read by calling them —
- * nothing parses a specification, and nothing infers a verb from a function's
+ * constraint: the registry can only call what orval generated. The operations
+ * and the collection each belongs to are read from the generated operation
+ * table, which names every function the client exports and its path — nothing
+ * parses a specification here, and nothing infers a verb from a function's
  * name.
  *
  * What the CLI *uses* is read the same way: each registry verb is invoked
@@ -38,9 +39,11 @@ import { RESOURCES } from "@/cli/commands/resources";
  */
 const queryCollections = (operations: ClientOperations): ReadonlySet<string> =>
   new Set(
-    [...operations].flatMap(([operation, collection]) =>
-      urlOf(operation).endsWith("/query") ? collection : [],
-    ),
+    specOperations.flatMap((operation) => {
+      const name = operation.id.charAt(0).toLowerCase() + operation.id.slice(1);
+      const collection = operations.get(name);
+      return operation.path.endsWith("/query") && collection !== undefined ? [collection] : [];
+    }),
   );
 
 /** Collections with no resource commands at all, and why. */
@@ -152,38 +155,24 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   rejectInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
 };
 
-const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
-
 type ClientOperations = ReadonlyMap<string, string>;
 
 /**
- * Every operation the generated client exposes, mapped to its collection. The
- * collection comes from calling the operation's URL builder with placeholder
- * arguments and taking the first path segment, so a sub-resource
- * (`/users/{id}/passkeys`) counts against its parent.
+ * Every operation the generated client exposes, mapped to its collection: the
+ * first segment of its path in the spec, so a sub-resource
+ * (`/users/{user_id}/passkeys`) counts against its parent.
+ *
+ * @returns Each operation's client name, with its collection.
  */
-/** The spec's path of an operation, with placeholder path parameters and without the API prefix. */
-const urlOf = (operation: string): string => {
-  const module = endpoints as unknown as Record<string, unknown>;
-  const build = module[`get${capitalize(operation)}Url`];
-  expect(typeof build, `no URL builder paired with ${operation}`).toBe("function");
-  const url = String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
-  return url.startsWith(`${API_PREFIX}/`) ? url.slice(API_PREFIX.length) : url;
-};
-
 const clientOperations = (): ClientOperations => {
-  const module = endpoints as unknown as Record<string, unknown>;
-  const isUrlBuilder = (name: string) => /^get[A-Z].*Url$/.test(name);
-  const operations = Object.keys(module).filter(
-    (name) => typeof module[name] === "function" && !isUrlBuilder(name),
-  );
-  expect(operations.length, "no operations found in the generated client").toBeGreaterThan(20);
-
-  return new Map(
-    // orval pairs every operation with a URL builder; `urlOf` fails if that
-    // ever stops being true, rather than silently skipping the operation.
-    operations.map((operation) => [operation, urlOf(operation).split("/")[1] ?? ""]),
-  );
+  const named = specOperations.map((operation) => {
+    return [
+      operation.id.charAt(0).toLowerCase() + operation.id.slice(1),
+      operation.path.split("/")[1] ?? "",
+    ] as const;
+  });
+  expect(named.length, "no operations found in the generated client").toBeGreaterThan(20);
+  return new Map(named);
 };
 
 /**

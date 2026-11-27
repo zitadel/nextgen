@@ -9,13 +9,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authattempt"
 )
 
 const (
-	createAuthRequestColumns = `project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, created_at, expires_at`
+	createAuthRequestColumns = `project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, created_at, expires_at, correlation_id`
 	authRequestColumns       = createAuthRequestColumns + `, code_hash, user_id, session_id, code_expires_at`
 	createAuthRequestStmt    = `INSERT INTO auth_requests (` + createAuthRequestColumns + `)` +
-		` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	getAuthRequestStmt     = `SELECT ` + authRequestColumns + ` FROM auth_requests WHERE project_id = ? AND id = ?`
 	setAuthRequestCodeStmt = `UPDATE auth_requests SET code_hash = ?, user_id = ?, session_id = ?, code_expires_at = ?` +
 		` WHERE project_id = ? AND id = ? AND code_hash IS NULL AND expires_at > ?`
@@ -52,6 +53,7 @@ func (s authRequestStatements) CreateAuthRequest(ctx context.Context, request *d
 		request.BindingHash,
 		now,
 		request.ExpiresAt.UnixNano(),
+		authattempt.EmptyStringArg(request.CorrelationID),
 	); err != nil {
 		return wrapError(err)
 	}
@@ -114,6 +116,7 @@ func scanAuthRequest(rows *sql.Rows) (*domain.AuthRequest, error) {
 		createdNano                 int64
 		expiresNano                 int64
 		codeHash, userID, sessionID sql.NullString
+		correlationID               sql.NullString
 		codeExpiresNano             sql.NullInt64
 	)
 	if err := rows.Scan(
@@ -130,6 +133,7 @@ func scanAuthRequest(rows *sql.Rows) (*domain.AuthRequest, error) {
 		&request.BindingHash,
 		&createdNano,
 		&expiresNano,
+		&correlationID,
 		&codeHash,
 		&userID,
 		&sessionID,
@@ -146,6 +150,7 @@ func scanAuthRequest(rows *sql.Rows) (*domain.AuthRequest, error) {
 	request.CodeHash = codeHash.String
 	request.UserID = userID.String
 	request.SessionID = sessionID.String
+	request.CorrelationID = correlationID.String
 	if codeExpiresNano.Valid {
 		request.CodeExpiresAt = new(timeFromUnixNano(codeExpiresNano.Int64))
 	}

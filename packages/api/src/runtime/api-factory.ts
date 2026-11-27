@@ -1,28 +1,24 @@
 /**
- * Factory for the typed Zitadel client every consumer reaches for.
+ * The convenience client: every generated operation bound to one
+ * {@link ZitadelClient}, plus paging on the operations that page.
  *
- * Wraps the orval-generated endpoints in a {@link Proxy} so each
- * generated function sees the right base URL and (optionally) the
- * right bearer token at call time — without the caller having to
- * thread either through every operation, and without exposing the
- * module-globals (`setProxyPath` / `setApiAuthToken`) as part of the
- * public API.
+ * It imports every operation, so only code that wants all of them should use
+ * it; code that calls a handful (the sign-in widget) imports those functions
+ * from `@zitadel/api/generated/endpoints/zitadelNextGen` and passes its client
+ * to each, and a bundler leaves the rest out.
  *
- * Per-instance isolation: multiple clients can coexist in one process
- * (different servers, different tokens). Every call through a client,
- * each page of a paged one included, sets that client's globals
- * synchronously before invoking the underlying generated function,
- * which reads them at the top of `customFetch` before any `await`. So
- * clients can run in parallel across awaits without clobbering each
- * other.
+ * Nothing here holds state: each bound function calls the generated one with
+ * the same client, and the client carries everything a request needs.
  */
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
+import { operations } from "../generated/operations";
 import { paging } from "../generated/paging";
 
-import { setApiAuthToken } from "./auth";
-import { setProxyPath } from "./base-url";
-import { setRequestPolicy } from "./fetch";
+import { ZitadelClient } from "./client";
 import { paged } from "./paged";
+
+export { ZitadelClient };
+export type { ZitadelClientSettings } from "./client";
 
 /**
  * How each paged function pages, by name: typed readers of a page's items and
@@ -33,6 +29,24 @@ export { paging as pagedFunctions };
 
 type Endpoints = typeof endpoints;
 type Paging = typeof paging;
+
+/** The name of a generated function that runs an operation and resolves with its answer. */
+export type OperationName = {
+  [K in keyof Endpoints]: Endpoints[K] extends (
+    client: ZitadelClient,
+    ...rest: never[]
+  ) => Promise<unknown>
+    ? K
+    : never;
+}[keyof Endpoints];
+
+/** A generated operation with its client already given. */
+type Bound<F> = F extends (client: ZitadelClient, ...rest: infer A) => infer R
+  ? (...rest: A) => R
+  : never;
+
+/** The arguments of a generated operation after its client. */
+type ArgsOf<K extends OperationName> = Parameters<Bound<Endpoints[K]>>;
 
 /** The name of a client function that pages. */
 export type PagedOperation = keyof Paging;
@@ -51,136 +65,87 @@ export type ItemOf<K extends PagedOperation> =
  */
 export type Paged<K extends PagedOperation> = {
   /** Every page, fetched as the loop reaches it. */
-  pages(...args: Parameters<Endpoints[K]>): AsyncGenerator<PageOf<K>, void, undefined>;
+  pages(...args: ArgsOf<K>): AsyncGenerator<PageOf<K>, void, undefined>;
   /** Every item of every page, fetched a page at a time as the loop reaches it. */
-  items(...args: Parameters<Endpoints[K]>): AsyncGenerator<ItemOf<K>, void, undefined>;
+  items(...args: ArgsOf<K>): AsyncGenerator<ItemOf<K>, void, undefined>;
   /** Every item of every page, in one array. */
-  all(...args: Parameters<Endpoints[K]>): Promise<ItemOf<K>[]>;
+  all(...args: ArgsOf<K>): Promise<ItemOf<K>[]>;
 };
 
 /**
- * Typed Zitadel client returned by {@link createZitadelClient}: the
- * orval-generated endpoints, with {@link Paged} on every function that pages.
+ * The convenience client `createZitadelApi` returns: every generated
+ * operation bound to its `client`, with `pages`, `items` and `all` on every
+ * function that pages.
  */
-export type ZitadelClient = {
-  [K in keyof Endpoints]: K extends PagedOperation ? Endpoints[K] & Paged<K> : Endpoints[K];
+export type ZitadelApi = {
+  readonly [K in OperationName]: K extends PagedOperation
+    ? Bound<Endpoints[K]> & Paged<K>
+    : Bound<Endpoints[K]>;
+} & {
+  /** The client every operation runs against. */
+  readonly client: ZitadelClient;
 };
 
-/** Re-exported under the legacy name some consumers (`runtime/config.ts`) still import. */
-export type ZitadelApi = ZitadelClient;
-
-/** Options for {@link createZitadelClient}. */
-export type ZitadelClientOptions = {
-  /** Base URL of the Zitadel server. Trailing slashes are stripped. */
-  baseUrl: string;
+/** What a convenience client does to every result and every failure. */
+export type ZitadelApiHooks = Readonly<{
   /**
-   * Bearer token sent on every request. Optional — omit for the
-   * unauthenticated `POST /projects` call; set it (typically to the
-   * project secret returned by that call) before any subsequent
-   * mutation.
-   */
-  token?: string;
-  /**
-   * Aborts every request this client makes. A request it cuts off rejects
-   * with the signal's reason rather than a {@link NetworkError}.
-   */
-  signal?: AbortSignal;
-  /**
-   * Deadline for each request, response body included. A request that runs
-   * past it rejects with a {@link NetworkError} whose reason is `timeout`.
-   * Unset by default: no deadline beyond the runtime's own.
-   */
-  timeoutMs?: number;
-  /**
-   * The `User-Agent` every request this client makes carries, so a server and
-   * its logs can tell one caller from another. Unset: the runtime's own.
-   */
-  userAgent?: string;
-  /**
-   * Applied to every response this client resolves with, each page of a
-   * paged function's included, before the caller sees it. A paged function
-   * reads its cursor from the page as the server sent it, and its items from
-   * what this returns under the same field.
+   * Applied to every response, each page of a paged function's included,
+   * before the caller sees it. A paged function reads its cursor from the
+   * page as the server sent it, and its items from what this returns under
+   * the same field. Left out, responses are returned as they came.
    */
   onResponse?: (body: unknown) => unknown;
   /**
    * Applied to every failure of a call: the request's, `onResponse`'s, and a
-   * paged function's own. It throws what the caller sees.
+   * paged function's own. It throws what the caller sees. Left out, failures
+   * are thrown as they came.
    */
   onError?: (error: unknown) => never;
-};
+}>;
 
 /**
- * Build a typed Zitadel client pre-bound to a base URL and (optionally)
- * a bearer token. Every method on the returned object mirrors a
- * generated orval function, and one that pages also walks its pages:
+ * Every generated operation bound to `client`, and the operations that page
+ * with `pages`, `items` and `all`. Only what the spec's operation table names
+ * is bound, and the table is read on each call rather than at load, so a
+ * bundle that imports this module for something else keeps no operation. A
+ * paged function fetches each page as the server answered it, from the
+ * generated function's full arguments, its client first.
  *
- *     const client = createZitadelClient({ baseUrl, token });
- *     await client.createProject({ origins: [] });
- *     await client.publishSchema(body, { project_id });
- *     for await (const deployment of client.listDeployments.items({ project_id })) { … }
+ * @param client - The client every operation runs against.
+ * @param hooks - What to do to every result and every failure.
+ * @returns The frozen convenience client.
+ * @example
+ * const api = createZitadelApi(new ZitadelClient({ baseUrl, token, allowDestructive: false }));
+ * await api.publishSchema(body, { project_id });
+ * for await (const deployment of api.listDeployments.items({ project_id })) { … }
  */
-export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
-  let baseUrl = opts.baseUrl;
-  while (baseUrl.endsWith("/")) {
-    baseUrl = baseUrl.slice(0, -1);
-  }
-  const hooks = {
-    respond: (body: unknown) => (opts.onResponse ? opts.onResponse(body) : body),
-    fail: (error: unknown): never => {
-      opts.onError?.(error);
-      throw error;
-    },
+export function createZitadelApi(client: ZitadelClient, hooks: ZitadelApiHooks = {}): ZitadelApi {
+  const respond = (body: unknown) => (hooks.onResponse ? hooks.onResponse(body) : body);
+  const fail = (error: unknown): never => {
+    hooks.onError?.(error);
+    throw error;
   };
-  const hooked = opts.onResponse !== undefined || opts.onError !== undefined;
-  // Built once per function, not on every property read.
-  const bound = new Map<PropertyKey, unknown>();
-  return new Proxy(endpoints as unknown as ZitadelClient, {
-    get(target, prop, receiver) {
-      const known = bound.get(prop);
-      if (known !== undefined) {
-        return known;
-      }
-      const value = Reflect.get(target, prop, receiver);
-      if (typeof value !== "function") {
-        return value;
-      }
-      // Every request, each page included, sets this client's base URL and
-      // token again: another client may have run in between.
-      const send = (...args: unknown[]) => {
-        setProxyPath(baseUrl);
-        setApiAuthToken(opts.token);
-        setRequestPolicy({
-          signal: opts.signal,
-          timeoutMs: opts.timeoutMs,
-          userAgent: opts.userAgent,
-        });
-        return (value as (...a: unknown[]) => unknown)(...args);
-      };
-      // The URL builders orval exports beside the requests return strings, so
-      // only a pending result is hooked. A then-check rather than `instanceof`,
-      // which a replaced global `Promise` (zone.js) would fail.
-      const call = (...args: unknown[]) => {
-        const result = send(...args);
-        return hooked && typeof (result as { then?: unknown } | null)?.then === "function"
-          ? Promise.resolve(result).then(hooks.respond).catch(hooks.fail)
-          : result;
-      };
-      const fn = Object.hasOwn(paging, prop)
-        ? Object.assign(call, paged(send, paging[prop as PagedOperation], hooks))
-        : call;
-      bound.set(prop, fn);
-      return fn;
-    },
-  });
-}
-
-/**
- * Legacy entry point: builds a client with only the base URL set, no
- * token. Components and SDKs that don't carry an auth token (browser
- * flows authenticated by platform cookies) still consume this name.
- * Equivalent to `createZitadelClient({ baseUrl: apiBase })`.
- */
-export function createApi(apiBase: string): ZitadelClient {
-  return createZitadelClient({ baseUrl: apiBase });
+  const hooked = hooks.onResponse !== undefined || hooks.onError !== undefined;
+  const api: Record<string, unknown> = { client };
+  const names = new Set(operations.map(({ id }) => id.charAt(0).toLowerCase() + id.slice(1)));
+  for (const [name, value] of Object.entries(endpoints)) {
+    if (!names.has(name)) {
+      continue;
+    }
+    const operation = value as (...args: unknown[]) => Promise<unknown>;
+    const send = (...args: unknown[]) => operation(...args);
+    const call = (...args: unknown[]) => {
+      const result = operation(client, ...args);
+      return hooked ? result.then(respond).catch(fail) : result;
+    };
+    api[name] = Object.hasOwn(paging, name)
+      ? Object.freeze(
+          Object.assign(
+            call,
+            paged(client, send, paging[name as PagedOperation], { respond, fail }),
+          ),
+        )
+      : Object.freeze(call);
+  }
+  return Object.freeze(api) as ZitadelApi;
 }

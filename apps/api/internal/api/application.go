@@ -8,8 +8,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// PublishApplication ignores params.IdempotencyKey: rotating the secrets of the
-// clients a keyed request created comes in its own change.
 func (h *Handler) PublishApplication(ctx context.Context, req *api.CreateApplicationRequest, params api.PublishApplicationParams) (api.PublishApplicationRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), applicationAccess, opWrite); err != nil {
 		return nil, err
@@ -18,7 +16,7 @@ func (h *Handler) PublishApplication(ctx context.Context, req *api.CreateApplica
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to encode application")
 	}
-	result, err := h.applicationService.CreateOrReviseRegistered(ctx, string(params.ProjectID), document)
+	result, err := h.applicationService.CreateOrReviseRegistered(ctx, string(params.ProjectID), document, params.IdempotencyKey.Or(""))
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +104,8 @@ func applicationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrApplicationPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrApplicationIdempotencyKeyReused().Code:
+		return errorResponseWithStatusCode(http.StatusUnprocessableEntity, err)
 	case domain.ErrApplicationClientIDTaken().Code, domain.ErrApplicationRevisionConflict().Code,
 		domain.ErrApplicationDeclared().Code, domain.ErrApplicationRegistered().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
