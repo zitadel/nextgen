@@ -37,6 +37,9 @@ for (const match of globSync(packages, { cwd: root })) {
 
 export default {
   exclude: ["catalog"],
+  // An interface its own file uses may be exported only so another module can
+  // extend it (declaration merging), which knip does not count as a use.
+  ignoreExportsUsedInFile: { interface: true },
   ignoreWorkspaces,
   workspaces,
 };
