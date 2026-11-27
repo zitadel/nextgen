@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -301,7 +302,31 @@ func TestRequestEvent_sampledRequestIsTraced(t *testing.T) {
 	assert.Equal(t, trace.SpanKindConsumer, flush.SpanKind)
 	require.Len(t, flush.Links, 1)
 	assert.Equal(t, enqueue.SpanContext, flush.Links[0].SpanContext, "the flush links to the request it writes for")
+
+	// The event leads to the request's trace in the operator's backend.
+	var meta domain.EventMetadata
+	require.NoError(t, json.Unmarshal(ins.events[0].Metadata, &meta))
+	assert.Equal(t, server.TraceID().String(), meta.TraceID)
 }
+
+// A handler that joins a chain names it on the request's server span, so the
+// trace leads to the chain's events as the event leads to the trace.
+func TestJoinCorrelation_namesTheChainOnTheServerSpan(t *testing.T) {
+	spanExporter.Reset()
+	handler := middleware.WithServerSpan(otel.GetTracerProvider())(
+		middleware.WithRequestContextMiddleware(fixedRequestID{}, "", http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			JoinCorrelation(r.Context(), "chain_1")
+		})))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/flows", nil))
+
+	spans := spanExporter.GetSpans()
+	require.Len(t, spans, 1)
+	assert.Contains(t, spans[0].Attributes, attribute.String(middleware.CorrelationAttribute, "chain_1"))
+}
+
+type fixedRequestID struct{}
+
+func (fixedRequestID) New(prefix string) (string, error) { return prefix + "_1", nil }
 
 func TestRequestEvent_unsampledRequestsAreNotTraced(t *testing.T) {
 	spanExporter.Reset()
@@ -313,4 +338,8 @@ func TestRequestEvent_unsampledRequestsAreNotTraced(t *testing.T) {
 	require.Equal(t, 2, ins.count())
 
 	assert.Empty(t, spanExporter.GetSpans())
+	// No trace was recorded, so the events name none.
+	for _, ev := range ins.events {
+		assert.NotContains(t, string(ev.Metadata), "trace_id")
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -38,7 +39,7 @@ type ServedApplicationClient struct {
 }
 
 type ApplicationService interface {
-	CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte) (*CreateApplicationOutput, error)
+	CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte, idempotencyKey string) (*CreateApplicationOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Application, error)
 	// GetRevision reads one revision by its id, the one a release pins.
 	GetRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error)
@@ -79,10 +80,50 @@ func NewApplicationService(v2Pool *DB, schemas BuiltinSchemaProvider, generator 
 // registered application otherwise. Each client the write adds gets a secret,
 // returned once in the output. An application a release declares has the
 // release as its one writer, so its slug is refused.
-func (s *applicationService) CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte) (_ *CreateApplicationOutput, err error) {
+//
+// A non-empty idempotencyKey is kept for [domain.ApplicationIdempotencyKeyTTL].
+// A retry with the same key and document writes no revision: it replaces the
+// secrets of the clients the first request created and returns the new ones.
+// The same key with another document is app.idempotency_key_reused.
+func (s *applicationService) CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte, idempotencyKey string) (_ *CreateApplicationOutput, err error) {
 	ctx, end := startSpan(ctx, "ApplicationService.CreateOrReviseRegistered")
 	defer end(&err)
 
+	if idempotencyKey == "" {
+		return s.createOrReviseRegistered(ctx, projectID, document, nil)
+	}
+	now := time.Now().UTC()
+	key := &domain.ApplicationIdempotencyKey{
+		ProjectID:   projectID,
+		KeyHash:     domain.HashSecret(idempotencyKey),
+		RequestHash: domain.HashSecret(string(document)),
+		CreatedAt:   now,
+		ExpiresAt:   now.Add(domain.ApplicationIdempotencyKeyTTL),
+	}
+	stored, err := s.liveIdempotencyKey(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if stored == nil {
+		out, err := s.createOrReviseRegistered(ctx, projectID, document, key)
+		if err == nil {
+			return out, nil
+		}
+		// A request with the same key that stored its record first makes this
+		// one its retry.
+		if stored, _ = s.liveIdempotencyKey(ctx, key); stored == nil {
+			return nil, err
+		}
+	}
+	if stored.RequestHash != key.RequestHash {
+		return nil, domain.ErrApplicationIdempotencyKeyReused()
+	}
+	return s.replayIdempotencyKey(ctx, stored)
+}
+
+// createOrReviseRegistered is CreateOrReviseRegistered without the key
+// lookup. A non-nil key is stored in the write's transaction.
+func (s *applicationService) createOrReviseRegistered(ctx context.Context, projectID string, document []byte, key *domain.ApplicationIdempotencyKey) (*CreateApplicationOutput, error) {
 	next, document, err := s.validate(document, false)
 	if err != nil {
 		return nil, err
@@ -90,12 +131,99 @@ func (s *applicationService) CreateOrReviseRegistered(ctx context.Context, proje
 
 	existing, err := s.get(ctx, projectID, domain.ApplicationFieldSlug, next.Slug)
 	if err == nil {
-		return s.reviseRegistered(ctx, existing.ProjectID, existing.ID, next, document)
+		return s.reviseRegistered(ctx, existing.ProjectID, existing.ID, next, document, key)
 	}
 	if !errors.Is(err, domain.ErrApplicationNotFound()) {
 		return nil, err
 	}
-	return s.createRegistered(ctx, projectID, next, document)
+	return s.createRegistered(ctx, projectID, next, document, key)
+}
+
+// liveIdempotencyKey returns the stored record of key that has not expired,
+// or nil when there is none.
+func (s *applicationService) liveIdempotencyKey(ctx context.Context, key *domain.ApplicationIdempotencyKey) (*domain.ApplicationIdempotencyKey, error) {
+	stored, err := s.v2Pool.Statements().GetApplicationIdempotencyKey(ctx, key.ProjectID, key.KeyHash, key.CreatedAt)
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, applicationReadError(err)
+	}
+	return stored, nil
+}
+
+// replayIdempotencyKey answers a retry of the request that stored the record:
+// it replaces the secrets of the clients that request created and returns the
+// application at its newest revision.
+func (s *applicationService) replayIdempotencyKey(ctx context.Context, stored *domain.ApplicationIdempotencyKey) (*CreateApplicationOutput, error) {
+	var (
+		current      *domain.Application
+		rotated      []*domain.ApplicationClient
+		plainSecrets []string
+	)
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		rotated, plainSecrets = nil, nil
+		// The lock orders this replay after a concurrent replay or revision.
+		if err := stmts.LockApplication(ctx, stored.ProjectID, stored.ApplicationID); err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return domain.ErrApplicationNotFound().WithParent(err)
+			}
+			return err
+		}
+		var err error
+		if current, err = stmts.GetApplication(ctx, applicationBy(stored.ProjectID, domain.ApplicationFieldID, stored.ApplicationID)); err != nil {
+			return err
+		}
+		clients, err := stmts.ListApplicationClients(ctx, stored.ProjectID, stored.ApplicationID)
+		if err != nil {
+			return err
+		}
+		for _, id := range stored.ClientIDs {
+			i := slices.IndexFunc(clients, func(client *domain.ApplicationClient) bool { return client.ID == id })
+			if i < 0 {
+				return domain.ErrInternal(nil).WithMessage("a client of the idempotency key is missing")
+			}
+			secret, err := domain.NewApplicationClientSecret(s.secrets)
+			if err != nil {
+				return err
+			}
+			// shortcut: removes every secret of the client, track the rows of the keyed request once a credentials resource can add secrets.
+			if err := stmts.DeleteApplicationClientSecrets(ctx, stored.ProjectID, id); err != nil {
+				return err
+			}
+			rotated, plainSecrets = append(rotated, clients[i]), append(plainSecrets, secret)
+		}
+		if len(rotated) == 0 {
+			return nil
+		}
+		if err := storeClientSecrets(ctx, stmts, rotated, plainSecrets); err != nil {
+			return err
+		}
+		payload := domain.ApplicationPayload{RevisionID: current.RevisionID}
+		for _, client := range rotated {
+			payload.ClientIDs = append(payload.ClientIDs, client.ClientID)
+		}
+		return emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationClientSecretRotated, current, payload)
+	})
+	if err != nil {
+		return nil, applicationReadError(err)
+	}
+	return &CreateApplicationOutput{Application: current, Secrets: clientSecrets(rotated, plainSecrets), Created: stored.Created}, nil
+}
+
+// storeIdempotencyKey stores key, when the request has one, for the clients
+// the write added to app.
+func storeIdempotencyKey(ctx context.Context, stmts AllStatements, key *domain.ApplicationIdempotencyKey, app *domain.Application, clients []*domain.ApplicationClient, created bool) error {
+	if key == nil {
+		return nil
+	}
+	record := *key
+	record.ApplicationID, record.Created, record.ClientIDs = app.ID, created, nil
+	for _, client := range clients {
+		record.ClientIDs = append(record.ClientIDs, client.ID)
+	}
+	return stmts.CreateApplicationIdempotencyKey(ctx, &record)
 }
 
 func (s *applicationService) Get(ctx context.Context, projectID, id string) (_ *domain.Application, err error) {
@@ -141,7 +269,7 @@ func (s *applicationService) validate(document []byte, declared bool) (domain.Ap
 	return doc, document, domain.ValidateRegisteredApplication(doc)
 }
 
-func (s *applicationService) createRegistered(ctx context.Context, projectID string, next domain.ApplicationDocument, document []byte) (*CreateApplicationOutput, error) {
+func (s *applicationService) createRegistered(ctx context.Context, projectID string, next domain.ApplicationDocument, document []byte, key *domain.ApplicationIdempotencyKey) (*CreateApplicationOutput, error) {
 	app, clients, plainSecrets, err := domain.NewRegisteredApplication(projectID, next, document, s.secrets)
 	if err != nil {
 		return nil, err
@@ -153,6 +281,9 @@ func (s *applicationService) createRegistered(ctx context.Context, projectID str
 			return err
 		}
 		if err := storeClientSecrets(ctx, stmts, clients, plainSecrets); err != nil {
+			return err
+		}
+		if err := storeIdempotencyKey(ctx, stmts, key, app, clients, true); err != nil {
 			return err
 		}
 		return emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationCreated, app, domain.ApplicationPayloadSnapshot(app, next, clients))
@@ -187,13 +318,13 @@ func (s *applicationService) createRegistered(ctx context.Context, projectID str
 		return nil, domain.ErrInternal(err).WithMessage("failed to create application")
 	}
 
-	return s.reviseRegistered(ctx, existing.ProjectID, existing.ID, next, document)
+	return s.reviseRegistered(ctx, existing.ProjectID, existing.ID, next, document, key)
 }
 
 // reviseRegistered appends document as a new revision of existing. The row is locked
 // before the newest revision is read, so two concurrent revisions cannot both
 // treat the same client as new.
-func (s *applicationService) reviseRegistered(ctx context.Context, projectID string, applicationID string, newDoc domain.ApplicationDocument, newDocBs []byte) (*CreateApplicationOutput, error) {
+func (s *applicationService) reviseRegistered(ctx context.Context, projectID string, applicationID string, newDoc domain.ApplicationDocument, newDocBs []byte, key *domain.ApplicationIdempotencyKey) (*CreateApplicationOutput, error) {
 	var revisedApp *domain.Application
 	var addedClients []*domain.ApplicationClient
 	var plainSecrets []string
@@ -224,6 +355,9 @@ func (s *applicationService) reviseRegistered(ctx context.Context, projectID str
 			return err
 		}
 		if err := storeClientSecrets(ctx, stmts, addedClients, plainSecrets); err != nil {
+			return err
+		}
+		if err := storeIdempotencyKey(ctx, stmts, key, revisedApp, addedClients, false); err != nil {
 			return err
 		}
 		return emitApplicationEvent(ctx, stmts, domain.EventTypeApplicationUpdated, revisedApp, domain.ApplicationPayloadDelta(oldDoc, newDoc, revisedApp, addedClients))

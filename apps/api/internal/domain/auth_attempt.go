@@ -105,6 +105,13 @@ type AuthAttempt struct {
 	// FlowID is the login flow that created the attempt, so the handoff
 	// exchange can stamp it on the events it writes; empty outside a flow.
 	FlowID string
+
+	// CorrelationID is the chain of requests the attempt belongs to: the one
+	// of the request that created it. A request that acts on the attempt
+	// joins it, the provider's callback and the handoff exchange included
+	// (ADR 048, amendment of 2026-11-26). Empty for an attempt stored before
+	// chains.
+	CorrelationID string
 }
 
 const AuthAttemptTTL = 15 * time.Minute

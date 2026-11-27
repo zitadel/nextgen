@@ -13,6 +13,7 @@ export {
   allowDestructive,
   createZitadelClient,
   isCancelled,
+  type OperationName,
   pagedFunctions,
   REQUEST_TIMEOUT_MS,
   responseFailure,

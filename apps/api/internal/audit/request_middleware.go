@@ -71,8 +71,11 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		}
 		// The request's server span is on ctx and still open: the middleware
 		// that starts it runs outside this one. A request the sampler dropped
-		// starts no span here either.
-		if trace.SpanContextFromContext(ctx).IsSampled() {
+		// starts no span here either, and its event names no trace: there is
+		// none to find.
+		var traceID string
+		if server := trace.SpanContextFromContext(ctx); server.IsSampled() {
+			traceID = server.TraceID().String()
 			var span trace.Span
 			ctx, span = tracer.Start(ctx, "audit.EnqueueRequestEvent")
 			defer span.End()
@@ -107,8 +110,8 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		ev.ProjectID = ac.ProjectID
 		ev.Payload = payload
 		ev.OperationID, ev.StatusClass = request.Indexed()
-		if c := clientFromRequest(r); c != nil {
-			if meta, err := withClient(ev.Metadata, c); err == nil {
+		if c := clientFromRequest(r); c != nil || traceID != "" {
+			if meta, err := withObserved(ev.Metadata, c, traceID); err == nil {
 				ev.Metadata = meta
 			}
 		}
@@ -125,14 +128,16 @@ func isAPIMount(pattern string) bool {
 	return pattern == "/" || pattern == client.PathPrefix || pattern == client.PathPrefix+"/"
 }
 
-// withClient merges the requestor context into the metadata FromContext wrote,
-// so every metadata field has one writer.
-func withClient(raw json.RawMessage, client *domain.EventClientMetadata) (json.RawMessage, error) {
+// withObserved merges what the middleware observed of the request, its
+// requestor context and its trace, into the metadata FromContext wrote, so
+// every metadata field has one writer.
+func withObserved(raw json.RawMessage, client *domain.EventClientMetadata, traceID string) (json.RawMessage, error) {
 	var meta domain.EventMetadata
 	if err := json.Unmarshal(raw, &meta); err != nil {
 		return nil, err
 	}
 	meta.Client = client
+	meta.TraceID = traceID
 	return events.MarshalPayload(meta)
 }
 

@@ -152,6 +152,11 @@ type ClaimChallenge struct {
 	Status               ClaimChallengeStatus
 	ExpiresAt            time.Time
 	CreatedAt            time.Time
+	// CorrelationID is the chain of requests the claim takes: the init that
+	// created the challenge, the polls for its status and the completion in
+	// the browser join it (ADR 048, amendment of 2026-11-26). Empty for a
+	// challenge stored before chains.
+	CorrelationID string
 }
 
 // NewClaimChallenge builds a pending claim challenge. Unlike managed resources

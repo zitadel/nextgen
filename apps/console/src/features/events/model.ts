@@ -63,6 +63,7 @@ export function eventFields(event: ProjectEvent): EventField[] {
     { label: "Request ID", value: event.request_id, id: true },
     { label: "Session ID", value: event.session_id, id: true },
     { label: "Flow ID", value: event.flow_id, id: true },
+    { label: "Correlation ID", value: event.correlation_id, id: true },
     { label: "Device", value: event.fingerprint, id: true },
   ];
   return fields.filter((field): field is EventField => Boolean(field.value));
@@ -179,6 +180,7 @@ export function around(event: Pick<ProjectEvent, "created_at">): EventsSearch {
  * spec adds and this list lacks fails `console:typecheck`.
  */
 export const EVENT_TYPES = [
+  "application.client_secret.rotated",
   "application.created",
   "application.updated",
   "auth.attempt.created",
@@ -605,6 +607,9 @@ export const VALUE_FILTERS = [
   { key: "request", label: "Request", name: "request", prefix: "request" },
   { key: "session", label: "Session", name: "session", prefix: "session" },
   { key: "flow", label: "Login flow", name: "login flow", prefix: "flow" },
+  // The requests one sign-in, invitation or project claim took, whoever sent
+  // them: the event's `correlation_id`.
+  { key: "chain", label: "Chain", name: "chain", prefix: "chain" },
   { key: "device", label: "Device", name: "device", prefix: "device" },
 ] as const;
 export type ValueFilter = (typeof VALUE_FILTERS)[number];
@@ -629,6 +634,7 @@ const EVENT_VALUE: Record<ValueFilterKey, (event: ProjectEvent) => string | null
   request: (event) => event.request_id,
   session: (event) => event.session_id,
   flow: (event) => event.flow_id,
+  chain: (event) => event.correlation_id,
   device: (event) => event.fingerprint,
 };
 
@@ -796,7 +802,8 @@ export function isNarrowed(search: EventsSearch): boolean {
 
 /**
  * What an empty list adds under a filter the server has had only since a
- * later version: the user's, and a request's operation and status class.
+ * later version: the user's, the chain's, and a request's operation and
+ * status class.
  * Events it recorded before it had one are not matched by it (root ADR 048,
  * "No backfill"), yet an event of that age still offers the filter from its
  * drawer, and the list it leads to is empty. `undefined` under none of these
@@ -805,6 +812,7 @@ export function isNarrowed(search: EventsSearch): boolean {
 export function olderUnmatched(search: EventsSearch): string | undefined {
   const names = [
     search.user ? "user" : undefined,
+    search.chain ? "chain" : undefined,
     search.operation ? "operation" : undefined,
     search.status?.length ? "status" : undefined,
   ].filter((name) => name !== undefined);
@@ -840,6 +848,7 @@ export function eventsQuery(
   | "request_id"
   | "session_id"
   | "flow_id"
+  | "correlation_id"
   | "fingerprint"
   | "operation_id"
   | "status_class"
@@ -875,6 +884,7 @@ export function eventsQuery(
     request_id: served.request,
     session_id: served.session,
     flow_id: served.flow,
+    correlation_id: served.chain,
     fingerprint: served.device,
     operation_id: served.operation ? [served.operation] : undefined,
     status_class: served.status,
@@ -961,9 +971,9 @@ export function withStatus(current: EventsSearch, classes: readonly StatusClass[
  *   the view and the category: "what did this person change" is the audit
  *   view by one actor, "what happened to this user" the audit view by one
  *   resource.
- * - A request, a session and a login flow read every view: they tie audit
- *   events to the API requests behind them, and a request's own event is not
- *   an audit event.
+ * - A request, a session, a login flow and a chain read every view: they tie
+ *   audit events to the API requests behind them, and a request's own event
+ *   is not an audit event.
  * - A type reads every view too, with no category beside it, and replaces the
  *   types chosen before ({@link withTypes}).
  */
@@ -974,7 +984,7 @@ export function narrowedBy(
 ): EventsSearch {
   if (key === "type") return withTypes(current, value ? [value] : []);
   if (!value) return { ...current, [key]: undefined };
-  if (key === "request" || key === "session" || key === "flow") {
+  if (key === "request" || key === "session" || key === "flow" || key === "chain") {
     return servedSearch({ ...current, view: "all", [key]: value });
   }
   // An operation reads the requests view ({@link servedSearch}).
@@ -1008,17 +1018,24 @@ export type SearchMeaning =
   | { kind: "event"; id: string }
   | { kind: "filter"; filter: ValueFilter; value: string };
 
-/** A request id as a W3C trace id: 32 hex digits. */
+/**
+ * 32 hex digits, the shape of a W3C trace id: a chain's ID, as the server
+ * mints a `correlation_id`, or a request id a proxy assigned.
+ */
 const TRACE_ID = /^[0-9a-f]{32}$/i;
 /** An API operation: one camel-cased word, as `createUser`. IDs carry an underscore. */
 const OPERATION = /^[a-z]+(?:[A-Z][a-z0-9]*)+$/;
 
 /** A filter named before its value, as `actor:user_1`. */
 const NAMED = /^([a-z_]+):(\S+)$/;
-/** The prefixes a term may name a filter by: each filter's own, and `application` for the app. */
+/**
+ * The prefixes a term may name a filter by: each filter's own, `application`
+ * for the app, and `correlation` for the chain, as the API names its field.
+ */
 const PREFIXES: Record<string, ValueFilterKey> = {
   ...Object.fromEntries(VALUE_FILTERS.map((filter) => [filter.prefix, filter.key])),
   application: "client",
+  correlation: "chain",
 };
 
 /**
@@ -1030,8 +1047,11 @@ const PREFIXES: Record<string, ValueFilterKey> = {
  * - `actor:…`, `user:…`, `resource:…`, `resource_type:…`, `app:…`, `device:…`
  *   and the other filters' prefixes ({@link VALUE_FILTERS}) name the filter.
  * - `evt_…` is an event, and opens it.
- * - `req_…` (or a 32-digit trace id), `sess_…`, `flow_…` and `app_…` are a
- *   request, a session, a login flow and an application.
+ * - `req_…`, `sess_…`, `flow_…` and `app_…` are a request, a session, a
+ *   login flow and an application.
+ * - 32 hex digits may be a chain or a request, so they mean both, and the
+ *   person says which. An older invitation's chain has another shape: name
+ *   it, as `chain:…`.
  * - Words joined by dots are an event type, and one camel-cased word, as
  *   `createUser`, is an API operation.
  * - `user_…` may be whose account something happened to or who did
@@ -1056,7 +1076,8 @@ export function searchMeanings(term: string): SearchMeaning[] {
   if (named?.[2] && key) return [{ kind: "filter", filter: FILTER_BY_KEY[key], value: named[2] }];
   if (value.endsWith(":") && PREFIXES[value.slice(0, -1)]) return [];
   if (value.startsWith("evt_")) return [{ kind: "event", id: value }];
-  if (value.startsWith("req_") || TRACE_ID.test(value)) return [filter("request")];
+  if (value.startsWith("req_")) return [filter("request")];
+  if (TRACE_ID.test(value)) return [filter("chain"), filter("request")];
   if (value.startsWith("sess_")) return [filter("session")];
   if (value.startsWith("flow_")) return [filter("flow")];
   if (value.startsWith("app_")) return [filter("client")];
@@ -1082,6 +1103,7 @@ const CSV_COLUMNS = [
   ["request_id", (event: ProjectEvent) => event.request_id],
   ["session_id", (event: ProjectEvent) => event.session_id],
   ["flow_id", (event: ProjectEvent) => event.flow_id],
+  ["correlation_id", (event: ProjectEvent) => event.correlation_id],
   ["fingerprint", (event: ProjectEvent) => event.fingerprint],
   ["payload", (event: ProjectEvent) => JSON.stringify(event.payload)],
 ] as const;
