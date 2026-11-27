@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 
-import { minifyTemplateLiterals } from "rollup-plugin-minify-template-literals";
 import { defineConfig, type TsdownPlugin } from "tsdown";
 
 /**
@@ -54,13 +53,10 @@ const THIRD_PARTY = [
   /^lucide\//,
 ] as const;
 
-/**
- * Minifies the HTML and CSS inside the Lit templates. CSS inside an HTML template
- * is left alone: the minifier reads a `style=${…}` binding as CSS and appends a
- * `;` after it, which turns the binding into a two-part attribute that a
- * directive such as `styleMap` may refuse.
- */
-const MINIFY_TEMPLATES = { minify: { html: { minifyCSS: false } } } as const;
+// The HTML and CSS inside the Lit templates are intentionally not minified:
+// a template-literal minifier saved about 0.6 kB gzipped across the package,
+// too little to justify a build step that rewrites the templates (it once
+// broke the avatar's `style=${…}` binding).
 
 export default defineConfig([
   /**
@@ -69,7 +65,7 @@ export default defineConfig([
    * (no duplicate-Lit). This is what `import "@zitadel/components"` resolves to.
    */
   {
-    plugins: [liquidRaw(), minifyTemplateLiterals(MINIFY_TEMPLATES)],
+    plugins: [liquidRaw()],
     entry: {
       index: "src/index.ts",
       // Resolved instead of `index` under the edge export conditions (see
@@ -130,7 +126,7 @@ export default defineConfig([
    * inlined deps so no Node-only entry points leak in.
    */
   {
-    plugins: [liquidRaw(), minifyTemplateLiterals(MINIFY_TEMPLATES)],
+    plugins: [liquidRaw()],
     entry: { standalone: "src/index.ts" },
     outDir: "dist",
     format: ["esm"],
