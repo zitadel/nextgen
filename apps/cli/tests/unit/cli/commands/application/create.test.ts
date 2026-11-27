@@ -104,9 +104,9 @@ afterEach(async () => {
 
 describe("application create flags", () => {
   it("takes a name, trimmed", async () => {
-    await expect(parseFlag(ApplicationCreate.flags.name, "  Acme Dashboard ", "name")).resolves.toBe(
-      "Acme Dashboard",
-    );
+    await expect(
+      parseFlag(ApplicationCreate.flags.name, "  Acme Dashboard ", "name"),
+    ).resolves.toBe("Acme Dashboard");
   });
 
   it("refuses a blank name", async () => {
@@ -294,7 +294,7 @@ describe("application create --non-interactive", () => {
       SERVER,
     ]);
 
-        expect(parseJson(result.stdout)).toMatchObject({
+    expect(parseJson(result.stdout)).toMatchObject({
       status: "ok",
       data: { wrote_env_file: envPath },
     });
@@ -326,7 +326,12 @@ describe("application create, run by a person", () => {
     );
 
     await asTerminal(() => {
-      return runCommand(ApplicationCreate, "application:create", ["--cwd", cwd, "--server", SERVER]);
+      return runCommand(ApplicationCreate, "application:create", [
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
     });
 
     expect(talk.asked()).toEqual([

@@ -13,11 +13,7 @@ import { filled, reads, type Refused } from "@/cli/core/flags";
 import { Promptable } from "@/cli/core/promptable";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Telemetered } from "@/cli/telemetry/telemetered";
-import {
-  ApplicationService,
-  ConflictError,
-  type PublishedApplication,
-} from "@/lib/backend";
+import { ApplicationService, ConflictError } from "@/lib/backend";
 import { Project } from "@/lib/project";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
@@ -124,15 +120,12 @@ function isLoopbackHost(hostname: string): boolean {
  */
 function redirectUriProblem(value: string, preset: Preset): string | undefined {
   const trimmed = value.trim();
-  if (trimmed === "") {
-    return "Enter a sign-in callback URL";
+  if (trimmed === "" || !URL.canParse(trimmed)) {
+    return trimmed === ""
+      ? "Enter a sign-in callback URL"
+      : "Enter a full URL, starting with the scheme, e.g. com.acme.tunes:/callback";
   }
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    return "Enter a full URL, starting with the scheme, e.g. com.acme.tunes:/callback";
-  }
+  const parsed = new URL(trimmed);
   if (parsed.protocol === "") {
     return "Enter a full URL, starting with the scheme, e.g. com.acme.tunes:/callback";
   }
@@ -159,12 +152,10 @@ function originProblem(value: string): string | undefined {
   if (trimmed === "") {
     return "Enter an allowed origin";
   }
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
+  if (!URL.canParse(trimmed)) {
     return "Enter an allowed origin such as http://localhost:5173";
   }
+  const parsed = new URL(trimmed);
   if (parsed.pathname !== "/" || trimmed.includes("?") || trimmed.includes("#")) {
     return `An origin has no path. Use ${parsed.protocol}//${parsed.host} instead of ${trimmed}`;
   }
@@ -229,8 +220,7 @@ type Intended = Readonly<{
  * `--application-env-file` (or an interactive yes) writes them to a file.
  */
 export default class ApplicationCreate extends Telemetered(Promptable(ChangeCommand)) {
-  static override description =
-    "Register an application and its first OIDC client on the project.";
+  static override description = "Register an application and its first OIDC client on the project.";
   static override group = CommandGroups.signIn;
   static override groupOrder = 20;
 
@@ -291,20 +281,19 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
     const { projectId } = await this.connect();
     const issuerBase = this.environment.values.ZITADEL_ISSUER?.value?.replace(/\/$/, "");
     if (issuerBase === undefined || issuerBase === "") {
-      throw refusalError(MISSING_ISSUER_REFUSAL);
+      throw refusalError(MISSING_ISSUER_REFUSAL, {});
     }
     const issuer = `${issuerBase}/__nextgen/oauth/${projectId}`;
     const body = this.body(intended);
     const applicationService = await this.service(ApplicationService);
-    let published: PublishedApplication;
-    try {
-      published = await applicationService.publish({ application: body.application });
-    } catch (error) {
-      if (error instanceof ConflictError && error.serverCode === "app.declared") {
-        throw refusalError(DECLARED_SLUG_REFUSAL, { slug: intended.slug });
-      }
-      throw error;
-    }
+    const published = await applicationService
+      .publish({ application: body.application })
+      .catch((error: unknown) => {
+        if (error instanceof ConflictError && error.serverCode === "app.declared") {
+          throw refusalError(DECLARED_SLUG_REFUSAL, { slug: intended.slug });
+        }
+        throw error;
+      });
 
     const client = published.definition.clients[0];
     const secret = published.client_secrets?.find((entry) => {
@@ -365,9 +354,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
           `Client ID           ${escapeControlCharacters(clientId)}`,
           ...(secret === undefined
             ? []
-            : [
-                `Client secret       ${escapeControlCharacters(secret.secret)}  (shown only once)`,
-              ]),
+            : [`Client secret       ${escapeControlCharacters(secret.secret)}  (shown only once)`]),
           `Sign-in callbacks   ${intended.redirectUris.map((uri) => escapeControlCharacters(uri)).join(", ")}`,
           "",
           "Add to your app environment:",
@@ -403,7 +390,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
       application: webApplication({
         slug: intended.slug,
         name: intended.name,
-        redirectUris: intended.redirectUris,
+        redirectUris: [...intended.redirectUris] as [string, ...string[]],
       }),
     };
   }
@@ -426,10 +413,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
    * @param env - The variables to persist.
    * @returns The path written, or null when nothing was written.
    */
-  private async writeEnv(
-    intended: Intended,
-    env: Record<string, string>,
-  ): Promise<string | null> {
+  private async writeEnv(intended: Intended, env: Record<string, string>): Promise<string | null> {
     const path =
       intended.applicationEnvFile ??
       (this.nonInteractive
@@ -463,10 +447,13 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      throw refusalError({
-        message: `Could not write ${path}: ${reason}`,
-        hint: "Fix the path or permissions and run again with --application-env-file.",
-      });
+      throw refusalError(
+        {
+          message: `Could not write ${path}: ${reason}`,
+          hint: "Fix the path or permissions and run again with --application-env-file.",
+        },
+        {},
+      );
     }
     return path;
   }
@@ -478,9 +465,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
    * @param flags - The flags the command was given.
    * @returns The settled inputs.
    */
-  private async intended(
-    flags: Admitted<typeof ApplicationCreate>["flags"],
-  ): Promise<Intended> {
+  private async intended(flags: Admitted<typeof ApplicationCreate>["flags"]): Promise<Intended> {
     const originsGiven = flags.origin ?? [];
     const redirectsGiven = flags.redirectUri ?? [];
 
@@ -495,15 +480,17 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
       if (redirectsGiven.length === 0) {
         missing.push("--redirect-uri (repeat for more)");
       }
-      const preset = flags.preset;
-      if (preset === "spa" && originsGiven.length === 0) {
+      if (flags.preset === "spa" && originsGiven.length === 0) {
         missing.push("--origin (repeat for more; spa only)");
       }
       if (missing.length > 0) {
-        throw refusalError({
-          message: `Missing required flag ${missing.join(", ")}`,
-          hint: "Pass every required flag, or run without --non-interactive to be asked.",
-        });
+        throw refusalError(
+          {
+            message: `Missing required flag ${missing.join(", ")}`,
+            hint: "Pass every required flag, or run without --non-interactive to be asked.",
+          },
+          {},
+        );
       }
     }
 
@@ -531,7 +518,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
 
     const slug = slugFromDisplayName(name);
     if (slug === "") {
-      throw refusalError(EMPTY_SLUG_REFUSAL);
+      throw refusalError(EMPTY_SLUG_REFUSAL, {});
     }
 
     const preset =
@@ -595,26 +582,35 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
     for (const value of values) {
       const problem = redirectUriProblem(value, preset);
       if (problem !== undefined) {
-        throw refusalError({
-          message: problem,
-          hint: "Fix --redirect-uri and run again.",
-        });
+        throw refusalError(
+          {
+            message: problem,
+            hint: "Fix --redirect-uri and run again.",
+          },
+          {},
+        );
       }
       const trimmed = value.trim();
       if (uris.includes(trimmed)) {
-        throw refusalError({
-          message: "That redirect URI is already listed",
-          hint: "Pass each --redirect-uri only once.",
-        });
+        throw refusalError(
+          {
+            message: "That redirect URI is already listed",
+            hint: "Pass each --redirect-uri only once.",
+          },
+          {},
+        );
       }
       uris.push(trimmed);
     }
     const [first, ...rest] = uris;
     if (first === undefined) {
-      throw refusalError({
-        message: "Missing required flag --redirect-uri (repeat for more)",
-        hint: "Pass at least one --redirect-uri.",
-      });
+      throw refusalError(
+        {
+          message: "Missing required flag --redirect-uri (repeat for more)",
+          hint: "Pass at least one --redirect-uri.",
+        },
+        {},
+      );
     }
     return [first, ...rest];
   }
@@ -638,9 +634,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
             : "http://localhost:3000/auth/callback",
       parse: (raw) => {
         const problem = redirectUriProblem(raw, preset);
-        return problem === undefined
-          ? { ok: true, value: raw.trim() }
-          : { ok: false, problem };
+        return problem === undefined ? { ok: true, value: raw.trim() } : { ok: false, problem };
       },
     });
     const uris = [first];
@@ -683,10 +677,13 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
     for (const value of values) {
       const problem = originProblem(value);
       if (problem !== undefined) {
-        throw refusalError({
-          message: problem,
-          hint: "Fix --origin and run again.",
-        });
+        throw refusalError(
+          {
+            message: problem,
+            hint: "Fix --origin and run again.",
+          },
+          {},
+        );
       }
       origins.push(new URL(value.trim()).origin);
     }
