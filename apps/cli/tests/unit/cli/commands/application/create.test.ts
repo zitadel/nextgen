@@ -268,7 +268,10 @@ describe("application create --non-interactive", () => {
       SERVER,
     ]);
 
-    expect(parseJson(result.stdout)).toMatchObject({
+    const envelope = parseJson(result.stdout) as {
+      data: { client: { secret?: string }; env: Record<string, string> };
+    };
+    expect(envelope).toMatchObject({
       status: "ok",
       data: {
         client: {
@@ -286,8 +289,8 @@ describe("application create --non-interactive", () => {
         },
       },
     });
-    expect(parseJson(result.stdout).data.client.secret).toBeUndefined();
-    expect(parseJson(result.stdout).data.env.ZITADEL_CLIENT_SECRET).toBeUndefined();
+    expect(envelope.data.client.secret).toBeUndefined();
+    expect(envelope.data.env.ZITADEL_CLIENT_SECRET).toBeUndefined();
     expect(posted).toEqual([
       {
         application: {
