@@ -20966,7 +20966,7 @@
           },
           "declared": {
             "type": "boolean",
-            "description": "True when a release declares the application, from a file under\n`.zitadel/applications/`, and only a deploy revises it. False when it\nwas registered through `createApplication` (`POST /applications`).\n",
+            "description": "True when a release declares the application, from a file under\n`.zitadel/applications/`, and only a deploy revises it. False when it\nwas registered through `publishApplication` (`POST /applications`).\n",
             "example": false
           },
           "created_at": {

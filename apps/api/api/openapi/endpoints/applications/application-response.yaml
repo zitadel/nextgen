@@ -34,7 +34,7 @@ properties:
     description: |
       True when a release declares the application, from a file under
       `.zitadel/applications/`, and only a deploy revises it. False when it
-      was registered through `createApplication` (`POST /applications`).
+      was registered through `publishApplication` (`POST /applications`).
     example: false
   created_at:
     type: string

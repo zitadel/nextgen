@@ -2864,7 +2864,7 @@ type ApplicationResponse struct {
 	// application.
 	Slug string `json:"slug"`
 	// True when a release declares the application, from a file under `.zitadel/applications/`, and only a
-	// deploy revises it. False when it was registered through `createApplication` (`POST /applications`).
+	// deploy revises it. False when it was registered through `publishApplication` (`POST /applications`).
 	Declared bool `json:"declared"`
 	// When the application was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -17263,7 +17263,7 @@ type CreateApplicationResponse struct {
 	// application.
 	Slug string `json:"slug"`
 	// True when a release declares the application, from a file under `.zitadel/applications/`, and only a
-	// deploy revises it. False when it was registered through `createApplication` (`POST /applications`).
+	// deploy revises it. False when it was registered through `publishApplication` (`POST /applications`).
 	Declared bool `json:"declared"`
 	// When the application was created.
 	CreatedAt time.Time `json:"created_at"`
