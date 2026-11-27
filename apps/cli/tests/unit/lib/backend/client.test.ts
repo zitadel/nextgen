@@ -97,12 +97,12 @@ describe("the destructive operations", () => {
    * `destructiveOperations`, a list of client function names, and each
    * operation's own `destructive` flag, which the `api` command asks. They are
    * generated from the one marker in the spec, and nothing else holds them
-   * together, so an operation withheld from one caller and not the other would
+   * together, so an operation marked in one list and not the other would
    * otherwise go unnoticed. Compared without case, because a client function is
    * named after the operation id with its first letter lower-cased.
    */
   it("are the same operations the api command asks about", () => {
-    const withheld = destructiveOperations.map((name) => {
+    const destructive = destructiveOperations.map((name) => {
       return name.toLowerCase();
     });
     const flagged = operations
@@ -114,8 +114,8 @@ describe("the destructive operations", () => {
       });
 
     // Both sides are named, so two empty lists cannot agree their way past this.
-    expect(withheld).not.toHaveLength(0);
-    expect([...withheld].sort()).toEqual([...flagged].sort());
+    expect(destructive).not.toHaveLength(0);
+    expect([...destructive].sort()).toEqual([...flagged].sort());
   });
 });
 

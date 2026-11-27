@@ -13,8 +13,8 @@ export type { Serve } from "./http";
  *
  * - `dir` is a fresh temp directory, removed once every fixture is torn down.
  * - `other` is a second one, for a test that needs two apart.
- * - `server` and `serve` and `port` are in `http.ts`: an MSW server that fails a request nothing handled, an HTTP
- *   server on a free port, and a port from this worker's own block.
+ * - `server`, `serve`, `port` and `client` are in `http.ts`: an MSW server that fails a request nothing
+ *   handled, an HTTP server on a free port, a port from this worker's own block, and the CLI's client.
  * - `recorded` is in `log.ts`: what the code under test said through `log`.
  * - `terminal` is in `terminal.ts`: the terminal the run is at, and its controls.
  * - `clock` is in `clock.ts`: fake timers the test advances.
