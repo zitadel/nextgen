@@ -1015,6 +1015,16 @@ exports[`the flags each command takes > are pinned for every command 1`] = `
     "telemetry",
     "verbose",
   ],
+  "settings:oauth:enable": [
+    "color",
+    "cwd",
+    "debug",
+    "dry-run",
+    "input",
+    "non-interactive",
+    "telemetry",
+    "verbose",
+  ],
   "setup": [
     "color",
     "cwd",

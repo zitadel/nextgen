@@ -1278,7 +1278,7 @@ function contentDigest(entries: { kind: string; handle: string; content: unknown
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-/** The handle a schema, flow definition or branding declares. */
+/** The handle a schema, flow definition, branding or OAuth settings declare. */
 function bundleResourceHandle(kind: string, resource: Record<string, unknown>): string {
   if (kind === "schema") {
     return typeof resource.objectType === "string" ? resource.objectType : "schema";
@@ -1430,6 +1430,13 @@ function materializeBundle(
       revision_id: `branding_${shortId()}`,
     });
   }
+  if (isObject(bundle.oauth)) {
+    pointers.push({
+      kind: "oauth",
+      handle: bundleResourceHandle("oauth", bundle.oauth),
+      revision_id: `oauthset_${shortId()}`,
+    });
+  }
   return pointers;
 }
 
@@ -1556,13 +1563,21 @@ function bundleDigestEntries(
       content: bundle.branding,
     });
   }
+  if (isObject(bundle.oauth)) {
+    entries.push({
+      kind: "oauth",
+      handle: bundleResourceHandle("oauth", bundle.oauth),
+      content: bundle.oauth,
+    });
+  }
   return entries;
 }
 
 /**
  * The handle a pinned revision declares. Resolved from the store so a release
  * records the identity of the revision it pins, as the server does; `default`
- * for branding, and the revision id itself when nothing in the store answers.
+ * for branding and OAuth settings, and the revision id itself when nothing in
+ * the store answers.
  */
 function pointerHandle(kind: string, revisionId: string): string {
   if (kind === "schema") {
@@ -1584,7 +1599,7 @@ function pointerHandle(kind: string, revisionId: string): string {
       return record.slug;
     }
   }
-  if (kind === "branding") {
+  if (kind === "branding" || kind === "oauth") {
     return "default";
   }
   return revisionId;

@@ -24,6 +24,7 @@ import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with { typ
 import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "json" };
 import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with { type: "json" };
 import idpConnectionMetaSchema from "../meta-schemas/idp-connection.json" with { type: "json" };
+import oauthSettingsMetaSchema from "../meta-schemas/oauth-settings.json" with { type: "json" };
 import policyMetaSchema from "../meta-schemas/policy.json" with { type: "json" };
 import policyTestMetaSchema from "../meta-schemas/policy-test.json" with { type: "json" };
 import propertyNameMetaSchema from "../meta-schemas/property-name.json" with { type: "json" };
@@ -46,6 +47,12 @@ export const FLOW_FILE_SCHEMA_REF = "../meta/flow-definition.json";
  * `.zitadel/branding/` — resolves to `{@link META_SCHEMA_DIR}/branding.json`.
  */
 export const BRANDING_FILE_SCHEMA_REF = "../meta/branding.json";
+
+/**
+ * The `$schema` value the OAuth settings file carries, relative to
+ * `.zitadel/oauth/` — resolves to `{@link META_SCHEMA_DIR}/oauth-settings.json`.
+ */
+export const OAUTH_FILE_SCHEMA_REF = "../meta/oauth-settings.json";
 
 /**
  * The `$schema` value policy files carry, relative to `.zitadel/policies/` —
@@ -84,6 +91,7 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "sso-auth-method.json", body: ssoAuthMethodMetaSchema as object },
     { name: "idp-connection.json", body: idpConnectionMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
+    { name: "oauth-settings.json", body: oauthSettingsMetaSchema as object },
     { name: "policy.json", body: policyMetaSchema as object },
     { name: "policy-test.json", body: policyTestMetaSchema as object },
     { name: "project.json", body: projectConfigSchema as object },
