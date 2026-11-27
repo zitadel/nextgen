@@ -1,3 +1,4 @@
+// Probe: a change here must re-run every package's lint and nothing else (to be reverted).
 import { existsSync, globSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
