@@ -1,4 +1,3 @@
-import { QueryUsersBody as QueryUsersBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
   QueryUsers200UsersItemMetadataStatus,
   QueryUsersBody,
@@ -108,7 +107,7 @@ type Received = Readonly<{
   /**
    * The user queries, one per page asked for.
    */
-  queried: readonly Sent[];
+  queried: readonly Sent<"queryUsers">[];
   /**
    * The schema listings.
    */
@@ -194,7 +193,7 @@ function aPlatform(server: SetupServer, platform: Platform = {}): Received {
   answeringPages(server, "listDeployments", { deployments: liveOn(platform) });
   return {
     queried: answering(server, "queryUsers", ({ body }) => {
-      return pageOf(platform, users, QueryUsersBodySchema.parse(body));
+      return pageOf(platform, users, body);
     }),
     links: answering(server, "listUserIdentityLinks", ({ params }) => {
       return (

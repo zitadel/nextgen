@@ -115,28 +115,6 @@ function aTestFile(path: string, passwords: readonly string[]): PolicyTest {
 }
 
 /**
- * The length of the password a case sent for evaluation, or 0 for a case that
- * sent none.
- *
- * @param body - The evaluation the server received.
- * @returns The password's length.
- */
-function passwordLengthOf(body: unknown): number {
-  if (
-    typeof body === "object" &&
-    body !== null &&
-    "input" in body &&
-    typeof body.input === "object" &&
-    body.input !== null &&
-    "password" in body.input &&
-    typeof body.input.password === "string"
-  ) {
-    return body.input.password.length;
-  }
-  return 0;
-}
-
-/**
  * A policy service whose server allows a password longer than two characters,
  * and answers only once every case has asked, the shortest password last.
  *
@@ -147,7 +125,7 @@ function passwordLengthOf(body: unknown): number {
 function answeringBackwards(server: SetupServer, cases: number): PolicyService {
   const waiting: { readonly length: number; readonly answer: () => void }[] = [];
   answering(server, "evaluatePolicy", ({ body }) => {
-    const length = passwordLengthOf(body);
+    const length = "password" in body.input ? body.input.password.length : 0;
     return new Promise((resolve) => {
       waiting.push({
         length,

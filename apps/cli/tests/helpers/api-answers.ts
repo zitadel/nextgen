@@ -1,7 +1,9 @@
 import type { OperationName, PageOf, PagedOperation, ZitadelApi } from "@zitadel/api/client";
+import type * as schemas from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { operations } from "@zitadel/api/generated/operations";
 import { HttpResponse, http } from "msw";
 import type { SetupServer } from "msw/node";
+import type { z } from "zod";
 
 import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
 
@@ -30,14 +32,26 @@ export type Answer<T> = T extends readonly (infer E)[]
 /** What an operation resolves with when the server answers it. */
 type Resolves<K extends OperationName> = Awaited<ReturnType<ZitadelApi[K]>>;
 
-/** One request an operation was sent with, as the server received it. */
-export type Sent = Readonly<{
+/**
+ * The body an operation takes, as its generated schema types what a client
+ * sends (before any default is filled in): `createTeam` takes the input of
+ * `CreateTeamBody`. `undefined` for an operation without a body.
+ */
+export type BodyOf<K extends OperationName> = `${Capitalize<K>}Body` extends keyof typeof schemas
+  ? z.input<(typeof schemas)[`${Capitalize<K>}Body`]>
+  : undefined;
+
+/**
+ * One request an operation was sent with, as the server received it. Without
+ * an operation named, the body is `unknown`, for code that reads any request.
+ */
+export type Sent<K extends OperationName | undefined = undefined> = Readonly<{
   /** The full URL, its query included. */
   url: URL;
   /** The path parameters, by the names the spec gives them. */
   params: Readonly<Record<string, string | readonly string[] | undefined>>;
-  /** The JSON body, or `undefined` when there was none. */
-  body: unknown;
+  /** The JSON body the client sent, typed as the operation's body. */
+  body: K extends OperationName ? BodyOf<K> : unknown;
   /** The request's headers. */
   headers: Headers;
 }>;
@@ -50,7 +64,7 @@ export type Sent = Readonly<{
 export type Reply<K extends OperationName> =
   | Answer<Resolves<K>>
   | Response
-  | ((sent: Sent) => Answer<Resolves<K>> | Response | Promise<Answer<Resolves<K>> | Response>);
+  | ((sent: Sent<K>) => Answer<Resolves<K>> | Response | Promise<Answer<Resolves<K>> | Response>);
 
 /**
  * A real CLI client on {@link TEST_SERVER}: the code under test runs every
@@ -100,11 +114,14 @@ function routeOf(operation: OperationName) {
   };
 }
 
+/** A request before it is typed by its operation: the body as JSON. */
+type RawSent = Sent;
+
 /** The request as a test reads it. */
 async function sentOf(
   request: Request,
   params: Readonly<Record<string, string | readonly string[] | undefined>>,
-): Promise<Sent> {
+): Promise<RawSent> {
   const text = await request.clone().text();
   return {
     url: new URL(request.url),
@@ -142,8 +159,13 @@ export function answering<K extends OperationName>(
   server: SetupServer,
   operation: K,
   reply: Reply<K>,
-): readonly Sent[] {
-  const sent: Sent[] = [];
+): readonly Sent<K>[];
+export function answering(
+  server: SetupServer,
+  operation: OperationName,
+  reply: unknown,
+): readonly RawSent[] {
+  const sent: RawSent[] = [];
   const { handle, url } = routeOf(operation);
   server.use(
     handle(url, async ({ request, params }) => {
@@ -177,7 +199,7 @@ export function answeringPages<K extends PagedOperation & OperationName>(
   server: SetupServer,
   operation: K,
   ...pages: readonly Answer<PageOf<K>>[]
-): readonly Sent[] {
+): readonly Sent<K>[] {
   const { paging } = routeOf(operation);
   return answering(server, operation, (sent) => {
     const token =
