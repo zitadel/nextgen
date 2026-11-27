@@ -14,7 +14,7 @@ import {
   firstSeenProperties,
   vercelEventKeys,
 } from "@/cli/telemetry/properties";
-import type { GlobalOptions } from "@/cli/core/types";
+import type { GlobalOptions } from "@/cli/core";
 import { VERCEL_MAX_PROPERTIES } from "@/lib/telemetry/vercel";
 import { keysOf } from "@tests/helpers/declarations";
 

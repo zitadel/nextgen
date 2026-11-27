@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import VariableGet from "@/cli/commands/variable/get";
-import { Variable } from "@/lib/backend/services/variable";
+import { Variable } from "@/lib/backend";
 import { parseFlag } from "@tests/helpers/inputs";
 
 describe("variable get --fields", () => {

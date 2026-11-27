@@ -5,10 +5,5 @@
  * 16 and later, and in every SvelteKit adapter target. It is defined once in `@zitadel/sdk-core`,
  * so its documentation lives there.
  */
-export { JWKS_TTL_MS, base64UrlDecode, decodeJwt, verifyJwt } from "@zitadel/sdk-core/jwt";
-export type {
-  ZitadelJwtPayload,
-  ZitadelJwtHeader,
-  ZitadelDecodedJwt,
-  ZitadelVerifyJwtOptions,
-} from "@zitadel/sdk-core/jwt";
+export { base64UrlDecode, decodeJwt, verifyJwt } from "@zitadel/sdk-core/jwt";
+export type { ZitadelVerifyJwtOptions } from "@zitadel/sdk-core/jwt";

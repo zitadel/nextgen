@@ -10,7 +10,7 @@ import type { Issue, RuleId, Severity, ValidationContext } from "@/lib/zitadel/r
  *
  * @typeParam Fact - What the rule looks at.
  */
-export type StepGrouping<Fact> = {
+type StepGrouping<Fact> = {
   /**
    * The step a fact is about.
    */

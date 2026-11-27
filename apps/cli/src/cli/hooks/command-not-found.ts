@@ -3,9 +3,9 @@ import { distance } from "fastest-levenshtein";
 
 import { EXIT_CODES, ZitadelError } from "@/lib/errors";
 import { SERVER_FLAG } from "@/cli/commands/server-command";
-import { type Admitted, BaseCommand } from "@/cli/core/base";
+import { type Admitted, BaseCommand } from "@/cli/core";
 import { aliasedNouns } from "@/lib/oclif/plural-aliases";
-import type { CommandResult } from "@/cli/core/types";
+import type { CommandResult } from "@/cli/core";
 import { regularPlural } from "@/lib/plural";
 import { commandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { ServerCommand } from "@/cli/commands/server-command";

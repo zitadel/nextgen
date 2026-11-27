@@ -35,11 +35,9 @@ export {
   type SecretOutcome,
   type SecretPublisher,
   storeClientSecret,
-  type Unpublished,
   unpublished,
 } from "./credentials";
 export {
-  type CustomFlagNames,
   type CustomFlagValues,
   checkGivenCustomFlags,
   customExample,
@@ -47,7 +45,6 @@ export {
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
   givenCustomFlags,
-  type LoopbackReach,
   loopbackIssuerWarning,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
@@ -56,11 +53,5 @@ export {
 } from "./custom";
 export { CredentialDelivery, type DeliveryRun } from "./delivery";
 export { askConnectionEndpoints } from "./endpoints";
-export { CLIENT_ID_PLACEHOLDER, CredentialPrompt, type PromptRun } from "./prompt";
-export {
-  ProviderChoice,
-  type ProviderFlags,
-  type ProviderRun,
-  type ProviderTarget,
-  type StoredSettings,
-} from "./provider";
+export { CredentialPrompt, type PromptRun } from "./prompt";
+export { ProviderChoice } from "./provider";

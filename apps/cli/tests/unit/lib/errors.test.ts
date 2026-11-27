@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { responseFailure } from "@/lib/backend";
-import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
+import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend";
 import {
   EXIT_CODES,
   ZitadelError,

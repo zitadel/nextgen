@@ -34,7 +34,7 @@ import {
   REGISTER_SSO_STEP,
   SSO_CONFLICT_STEP,
 } from "@/lib/zitadel/resources/flows/types";
-import type { EnabledMethods } from "@/lib/zitadel/resources/schemas/types";
+import type { EnabledMethods } from "@/lib/zitadel/resources/schemas";
 import type { JsonArray, JsonObject, JsonValue } from "@/lib/zitadel/types";
 import {
   isJsonArray,

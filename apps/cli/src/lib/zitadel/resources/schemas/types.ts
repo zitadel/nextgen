@@ -18,7 +18,7 @@ export type SchemaValue = ContractValue<typeof schemaConfigSchema>;
  * What a user schema written out in its own file holds, as against one that
  * points at an external schema by URL.
  */
-export type InlineSchemaValue = Extract<SchemaValue, { readonly kind: "user-schema" }>;
+type InlineSchemaValue = Extract<SchemaValue, { readonly kind: "user-schema" }>;
 
 /**
  * The authentication methods a user schema written out in its own file

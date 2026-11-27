@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { deployMessage } from "@/lib/publish/message";
+import { deployMessage } from "@/lib/publish";
 import { it } from "@tests/fixtures";
 import { commitAll, git, write } from "@tests/helpers/git-repo";
 

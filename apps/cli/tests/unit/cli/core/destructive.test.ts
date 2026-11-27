@@ -2,11 +2,11 @@ import { Args, type Config, Flags, type Interfaces } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { Consent } from "@/lib/consent";
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import { Destructive, type DestructiveChange, Settled } from "@/cli/core/destructive";
 import { Previewable } from "@/cli/core/previewable";
 import { Promptable } from "@/cli/core/promptable";
-import type { CommandResult } from "@/cli/core/types";
+import type { CommandResult } from "@/cli/core";
 import { answering } from "@tests/helpers/keyboard";
 import { ServerCommand } from "@/cli/commands/server-command";
 

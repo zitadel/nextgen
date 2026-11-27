@@ -61,8 +61,8 @@
       "dependsOn": ["build", "@zitadel/api-mock#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
-        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
+        "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.d.mts",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
         "!**/CHANGELOG.md",
@@ -91,7 +91,7 @@
     "check-advisories": {
       "dependsOn": ["@zitadel/api#generate", "@zitadel/config#sync-schemas"],
       "cache": false,
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/src/vitest.shared.d.mts"]
     },
     "readme": {
       "dependsOn": ["build"],

@@ -250,7 +250,7 @@ export type NextOf<Id extends SuggestionId> = Readonly<{ id: Id }> & SuggestInpu
  * own `id`, and resolved against the command table only once a call asks for
  * it, so naming a suggestion in a signature costs the command classes nothing.
  */
-export type Checked<Id extends string> = Id extends SuggestionId
+type Checked<Id extends string> = Id extends SuggestionId
   ? NextOf<Id>
   : Readonly<{ id: `${Id} is not a command` }>;
 
@@ -272,7 +272,7 @@ export type Next = { [Id in SuggestionId]: NextOf<Id> }[SuggestionId];
 export type FlagNameOf<Class> = Named<FlagKey<Class>>;
 
 /** The flags of `Id` by the names code reads them, for a rerun's `without`. */
-export type SuggestFlagName<Id> = FlagNameOf<Target<Id>>;
+type SuggestFlagName<Id> = FlagNameOf<Target<Id>>;
 
 /** A suggestion's input once its id is no longer known to the compiler. */
 export type LooseInput = Readonly<{

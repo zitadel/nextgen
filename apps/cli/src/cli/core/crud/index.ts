@@ -23,12 +23,11 @@ import type {
  * destructive-action guards, and the JSON / table envelopes.
  */
 
-export type { Assignment } from "./assign";
 export { readAssignment, readAssignments } from "./assign";
-export { chosenColumns } from "@/cli/core/columns";
+
 export { describeRegistry } from "./describe";
 export { jsonValue, mergeDocuments, setAt, typedValue, valueAt } from "./document";
-export type { BodyField, DescribeOptions, FieldKind } from "./fields";
+
 export {
   bodyFieldFlags,
   bodyFromFlags,
@@ -37,20 +36,15 @@ export {
   fieldExample,
   flagsAloneMayBeIncomplete,
 } from "./fields";
-export type {
-  OperationClass,
-  OperationDefinition,
-  OperationInput,
-  OperationStatics,
-} from "./ops/command";
-export { bindOperation, definitionOf, ResourceCommand, type ServerMixin } from "./ops/command";
-export { allows, type FieldPaths, observedPaths, suggestable } from "@/cli/core/columns";
+export type { OperationClass, OperationDefinition } from "./ops/command";
+export { bindOperation, definitionOf, type ServerMixin } from "./ops/command";
+export { allows, observedPaths, suggestable } from "@/cli/core/columns";
 export { fieldPaths } from "./paths";
 export { parseFilter, parseSort } from "./query";
-export type { Credential, CredentialContext, References } from "./secrets";
+export type { References } from "./secrets";
 export { findCredential, isSecretKey, redactCredentials } from "./secrets";
 export type * from "./types";
-export { DEFAULT_WIRE, wireOf } from "./wire";
+
 export { CreateOperation, DeleteOperation, GetOperation, ListOperation, UpdateOperation };
 
 /**

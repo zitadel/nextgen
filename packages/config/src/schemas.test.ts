@@ -6,9 +6,12 @@ import { describe, expect, it } from "vitest";
 
 import { getDefaultLoginFlow } from "./defaults.js";
 import {
+  applicationConfigSchema,
   brandingConfigSchema,
+  declaredApplicationIssues,
   DEFAULT_USER_CREATE_POLICY,
   flowConfigSchema,
+  oauthConfigSchema,
   policyConfigSchema,
   policyTestFileSchema,
   schemaConfigSchema,
@@ -378,6 +381,77 @@ describe("flowConfigSchema", () => {
     expect(result.error?.issues).toEqual([
       expect.objectContaining({ code: "unrecognized_keys", keys: ["status"] }),
     ]);
+  });
+});
+
+describe("oauthConfigSchema", () => {
+  const parses = (value: object): boolean => oauthConfigSchema.safeParse(value).success;
+
+  it("takes the switch with the editor's $schema pointer", () => {
+    expect(parses({ $schema: "../meta/oauth-settings.json", enabled: true })).toBe(true);
+  });
+
+  it("refuses a missing switch and an unknown key", () => {
+    expect(parses({})).toBe(false);
+    expect(parses({ enabled: true, enabeld: false })).toBe(false);
+  });
+});
+
+/**
+ * The gate `deploy` runs on a `.zitadel/applications/<slug>.json` file: what a
+ * release declares, so the server refuses it without the client's id and
+ * secret.
+ */
+describe("applicationConfigSchema", () => {
+  const client = {
+    slug: "web",
+    client_id: "shop-web",
+    type: "confidential",
+    grant_types: ["authorization_code"],
+    redirect_uris: ["https://shop.example.com/callback"],
+    secret: "${{ SHOP_WEB_CLIENT_SECRET }}",
+  };
+  const application = (overrides: object = {}) => ({
+    slug: "shop",
+    name: "Shop",
+    clients: [{ ...client, ...overrides }],
+  });
+
+  it("takes a declared application", () => {
+    expect(applicationConfigSchema.safeParse(application()).success).toBe(true);
+  });
+
+  it("refuses a key a client does not have, as the server does", () => {
+    const result = applicationConfigSchema.safeParse(application({ redirect_uri: "x" }));
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({
+        code: "unrecognized_keys",
+        keys: ["redirect_uri"],
+        path: ["clients", 0],
+      }),
+    ]);
+  });
+
+  it("leaves a release's own rules to declaredApplicationIssues", () => {
+    const declared = application({ client_id: undefined, secret: undefined });
+    expect(applicationConfigSchema.safeParse(declared).success).toBe(true);
+    expect(declaredApplicationIssues(declared).map((issue) => issue.path)).toEqual([
+      "clients.0.client_id",
+      "clients.0.secret",
+    ]);
+  });
+
+  it("reports a missing client_id and secret beside a client's other refusals", () => {
+    const broken = { slug: "shop", name: "Shop", clients: [{ slug: "web" }] };
+    expect(applicationConfigSchema.safeParse(broken).success).toBe(false);
+    expect(declaredApplicationIssues(broken).map((issue) => issue.path)).toEqual([
+      "clients.0.client_id",
+      "clients.0.secret",
+    ]);
+  });
+
+  it("finds nothing to refuse in a declared application", () => {
+    expect(declaredApplicationIssues(application())).toEqual([]);
   });
 });
 

@@ -1,0 +1,101 @@
+---
+title: Turn on the OAuth authorization server
+description: Enable your project's OAuth authorization server with the zitadel CLI, deploy the switch, and check that its metadata answers on your app's origin.
+---
+
+Each project has its own OAuth 2.1 authorization server: the server other apps redirect their users to, to sign in and get an access token. It is off until a release turns it on. `zitadel settings oauth enable` writes the switch to `.zitadel/oauth/oauth.json`, and `zitadel deploy` ships it with the rest of your configuration ([Configuration as code](/docs/concepts/repo-config)).
+
+The authorization server's issuer is your app's own address, for example `https://app.acme.com/__nextgen/oauth/<project-id>`. Your app's SDK proxy forwards its requests to Zitadel. [OAuth issuer and metadata](/docs/sdks/proxy#oauth-issuer-and-metadata) explains how.
+
+## Before you start
+
+- **An app set up with `zitadel setup`**, on a server SDK: Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start or Qwik Router. Run the commands in that directory. The dev proxies the CLI writes for single-page apps do not forward the OAuth paths yet ([zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560)).
+- **A primary origin for every URL that serves the issuer.** Only a project's primary origins get an issuer; a preview origin never does. `zitadel setup` registers your dev URL as one. `npx @zitadel/cli@latest origin list` shows each origin's `kind`, and `origin add <url> --kind primary` adds one ([Origins and previews](/docs/concepts/origins-and-previews)).
+- **Your project ID**, for the check at the end. Setup writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+
+## Turn it on
+
+Write the switch:
+
+```sh
+npx @zitadel/cli@latest settings oauth enable
+```
+
+```text
+Enabled the OAuth authorization server in .zitadel/oauth/oauth.json
+
+Wrote .zitadel/oauth/oauth.json
+Wrote .zitadel/meta/oauth-settings.json
+```
+
+It writes two files. `.zitadel/oauth/oauth.json` is the switch:
+
+```json
+{
+  "$schema": "../meta/oauth-settings.json",
+  "enabled": true
+}
+```
+
+`.zitadel/meta/oauth-settings.json` is the JSON Schema your editor checks the switch against. Commit both.
+
+The command changes nothing on the server. Running it again writes nothing and says so:
+
+```text
+The OAuth authorization server is already enabled
+
+.zitadel/oauth/ already holds the switch, so nothing was written
+```
+
+`--dry-run` lists the files it would write, and `--json` returns one envelope with the paths in `data.files_written`.
+
+## Deploy the switch
+
+Preview the release, then deploy it ([Deploy](/docs/guides/deploy)):
+
+```sh
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy -m "Turn on the OAuth authorization server"
+```
+
+The dry run's diff lists `.zitadel/oauth/oauth.json`. Once the release is live on your primary origins, the authorization server answers on each of them.
+
+## Check it works
+
+With your app running, fetch the authorization server's metadata through your app's origin. RFC 8414 puts it under `/.well-known/oauth-authorization-server`, followed by the issuer's path:
+
+```sh
+curl http://localhost:3000/.well-known/oauth-authorization-server/__nextgen/oauth/<project-id>
+```
+
+Use your app's origin in place of `http://localhost:3000`. It answers with the metadata, and `issuer` is your app's origin followed by `/__nextgen/oauth/<project-id>`:
+
+```json
+{
+  "issuer": "http://localhost:3000/__nextgen/oauth/<project-id>",
+  "authorization_endpoint": "http://localhost:3000/__nextgen/oauth/<project-id>/authorize",
+  "token_endpoint": "<zitadel-url>/oauth/<project-id>/token",
+  "jwks_uri": "<zitadel-url>/oauth/<project-id>/jwks",
+  "response_types_supported": ["code"],
+  "response_modes_supported": ["query"],
+  "grant_types_supported": ["authorization_code"],
+  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+  "code_challenge_methods_supported": ["S256"]
+}
+```
+
+`<zitadel-url>` is your Zitadel server's public URL: a client calls the token endpoint there directly, not through your app.
+
+## Turn it off
+
+There is no command for this yet. Set `enabled` to `false` in `.zitadel/oauth/oauth.json`, or delete `.zitadel/oauth/`, then deploy. A release without OAuth settings turns the authorization server off. Its metadata and its authorization endpoint then answer `404`.
+
+## When the metadata answers 404
+
+The answer is the same whatever the cause: `{"error":"invalid_request","error_description":"no authorization server at this issuer"}`. Your app's server log names a cause that lies in the app's own setup.
+
+- **The switch is not live.** Run `deploy`, and check that the release went live on the origin you fetched.
+- **The origin is not a primary origin.** Add it with `origin add <url> --kind primary`, then deploy. A preview URL never serves an issuer.
+- **The project ID is another project's.** The proxy serves only its own project's issuer. Use the `ZITADEL_PROJECT_ID` from `.env.local`, and check that the app has one configured.
+- **The proxy path is not `/__nextgen`.** Through a [proxy](/docs/sdks/proxy#oauth-issuer-and-metadata), the server builds issuers only under `/__nextgen`, so an app that sets another `proxyPath` has none.
+- **A Next.js app narrowed its middleware's `matcher`.** Add `/.well-known/oauth-authorization-server/:path*` to it, so the middleware sees the metadata request.

@@ -18,7 +18,7 @@ export interface RunCliResult {
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
-export function resolveCliBin(): string {
+function resolveCliBin(): string {
   const require = createRequire(import.meta.url);
   const pkgPath = require.resolve("@zitadel/cli/package.json");
   const pkg = require(pkgPath) as { bin?: Record<string, string> };

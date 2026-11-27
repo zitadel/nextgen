@@ -45,12 +45,12 @@ export type ClaimRow<Claim extends string | boolean = string | boolean> = {
 /**
  * The blocks of a connection that name a claim, in the order they are read.
  */
-export const CLAIM_FIELDS = ["claim_mapping", "verified_claims", "subject_claim"] as const;
+const CLAIM_FIELDS = ["claim_mapping", "verified_claims", "subject_claim"] as const;
 
 /**
  * A block of a connection that names a claim.
  */
-export type ClaimField = (typeof CLAIM_FIELDS)[number];
+type ClaimField = (typeof CLAIM_FIELDS)[number];
 
 /**
  * A claim a connection reads by name, and the block it is read in.
@@ -71,7 +71,7 @@ export type ClaimRead = {
  * The fields of the `oidc` block that hold a credential, in the order they are
  * reported.
  */
-export const CREDENTIAL_FIELDS = ["client_id", "client_secret"] as const;
+const CREDENTIAL_FIELDS = ["client_id", "client_secret"] as const;
 
 /**
  * A field of the `oidc` block that holds a credential.
@@ -192,7 +192,7 @@ export const CONNECTION_CONTRACT: JsonObject =
  * The settings a developer can give for a connection, which an existing file
  * may not have.
  */
-export const CONNECTION_SETTINGS = ["display name", "scopes"] as const;
+const CONNECTION_SETTINGS = ["display name", "scopes"] as const;
 
 /**
  * A setting the developer gave for a connection, which an existing file may
@@ -231,7 +231,7 @@ export type SsoOptions = LookupOptions & {
 /**
  * A property no claim fills, of a schema that signs in through a connection.
  */
-export type UnmappedProperty = {
+type UnmappedProperty = {
   /**
    * The property.
    */

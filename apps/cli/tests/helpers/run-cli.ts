@@ -65,7 +65,7 @@ export async function runCliForTest(
  *
  * @returns `read` for what was printed so far and `restore` to print as before.
  */
-export function captureStreams(): {
+function captureStreams(): {
   read(): { stdout: string; stderr: string };
   restore(): void;
 } {

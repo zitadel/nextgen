@@ -6,7 +6,7 @@ import { isCancellation } from "@/lib/errors";
 import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { CommandResult, Connection, MetaOptions } from "@/cli/core";
-import type { GlobalOptions } from "@/cli/core/types";
+import type { GlobalOptions } from "@/cli/core";
 import { resolveCwd } from "@/lib/paths";
 import {
   Guidance,

@@ -56,7 +56,7 @@ export type ZitadelSessionProps = CoreSessionProps & ZitadelWidgetAttributes;
  * breaks Vue's own overloads. A template accepts a `data-*` attribute anyway, except under
  * `strictTemplates`, which rejects it.
  */
-export type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
+type ZitadelWidgetAttributes = ZitadelStandardAttributeProps<
   Omit<HTMLAttributes, "class" | "style"> & {
     /**
      * The name of the slot of a parent custom element that the widget element is assigned to.
@@ -83,12 +83,12 @@ export type WithZitadelWidgetAttributes<Component extends AbstractWidgetConstruc
  *
  * It is the constructor type that Vue's `defineComponent` returns for a component.
  */
-export type AbstractWidgetConstructor = abstract new () => object;
+type AbstractWidgetConstructor = abstract new () => object;
 
 /**
  * A constructor whose instances carry {@link ZitadelWidgetAttributes} as `$props`.
  */
-export interface WidgetAttributesConstructor {
+interface WidgetAttributesConstructor {
   /**
    * Builds the instance shape that Vue's type checker reads `$props` from.
    *

@@ -30,7 +30,7 @@
     "build": "vite build && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
-    "lint": "biome check .",
+    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/sdk-solid --reporter symbols --reporter github-actions",
     "docs:api": "typedoc",
     "prepack": "publint --strict"
   },

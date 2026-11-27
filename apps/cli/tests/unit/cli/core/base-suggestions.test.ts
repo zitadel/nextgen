@@ -4,8 +4,8 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-import { BaseCommand } from "@/cli/core/base";
-import { EnvironmentCommand } from "@/cli/core/environment-command";
+import { BaseCommand } from "@/cli/core";
+import { EnvironmentCommand } from "@/cli/core";
 import { Previewable } from "@/cli/core/previewable";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";

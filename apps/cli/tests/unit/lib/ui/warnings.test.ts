@@ -4,7 +4,7 @@ import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { sourceFiles } from "@tests/helpers/source-files";
-import { warnings } from "@/lib/ui/warnings";
+import { warnings } from "@/lib/ui";
 
 const SRC = join(import.meta.dirname, "../../../../src");
 

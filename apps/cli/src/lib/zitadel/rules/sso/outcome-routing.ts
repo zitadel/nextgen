@@ -1,4 +1,4 @@
-import type { Step } from "@/lib/zitadel/resources/flows/step";
+import type { Step } from "@/lib/zitadel/resources/flows";
 import { PROVIDER_OUTCOMES, type ProviderOutcome } from "@/lib/zitadel/resources/flows/types";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";

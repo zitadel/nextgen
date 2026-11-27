@@ -1,8 +1,8 @@
 import { getDefaultLoginFlow } from "@zitadel/config/defaults";
 
 import { Flow } from "@/lib/zitadel";
-import type { EnabledMethods } from "@/lib/zitadel/resources/schemas/types";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { EnabledMethods } from "@/lib/zitadel";
+import type { JsonObject } from "@/lib/zitadel";
 import { isJsonObject, listAt, objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import { aFile } from "@tests/helpers/config";
 
