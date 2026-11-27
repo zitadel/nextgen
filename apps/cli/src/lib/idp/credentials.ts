@@ -6,20 +6,20 @@ import type {
   ConnectionEndpoints,
 } from "@zitadel/config/idp";
 
-import { log } from "@/lib/ui/log";
-import { warnings } from "@/lib/ui/warnings";
+import { log } from "@/lib/ui";
+import { warnings } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The project variable a connection reads one of its credentials from.
  */
-export type CredentialVariable = ClientIdVariable | ClientSecretVariable;
+type CredentialVariable = ClientIdVariable | ClientSecretVariable;
 
 /**
  * A credential's value, as it is published to its variable.
  */
-export type CredentialValue = ClientId | ClientSecret;
+type CredentialValue = ClientId | ClientSecret;
 
 /**
  * Publishes one variable to the project.
@@ -39,7 +39,7 @@ export type SecretPublisher = (
 /**
  * Every way a publish can end.
  */
-export const PUBLISH_STATES = ["stored", "deferred", "failed"] as const;
+const PUBLISH_STATES = ["stored", "deferred", "failed"] as const;
 
 /**
  * Whether a value reached the project's variables.

@@ -13,10 +13,9 @@ import { forceAttr, proxyPathAttr } from "./forceAttr";
  * The component that {@link ZitadelLogout} is typed from, before the standard HTML attributes are added to
  * its props.
  *
- * It is exported only so that the published declaration file can name it. Import
- * {@link ZitadelLogout} instead, which has the same runtime value and the complete props type.
+ * Import {@link ZitadelLogout} instead, which has the same runtime value and the complete props type.
  */
-export const Base = defineComponent({
+const Base = defineComponent({
   name: "ZitadelLogout",
   // The element takes only the standard attributes (see below), never the rest of `attrs`.
   inheritAttrs: false,

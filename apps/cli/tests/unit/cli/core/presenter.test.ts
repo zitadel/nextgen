@@ -2,7 +2,7 @@ import { afterEach, describe, expect, vi } from "vitest";
 
 import { Presenter, type PresentedRun } from "@/cli/core/presenter";
 import { prose, rows } from "@/lib/oclif/rendering";
-import type { CommandResult, GlobalOptions } from "@/cli/core/types";
+import type { CommandResult, GlobalOptions } from "@/cli/core";
 import { Output, Ui } from "@/lib/ui";
 import { test as it } from "@tests/fixtures";
 import { offTerminal } from "@tests/fixtures/terminal";

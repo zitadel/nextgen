@@ -82,6 +82,36 @@ func (k *SigningKey) IsRemoved() bool {
 // Signer signs with the key, decrypted by kek. opts may be nil; its headers
 // are added to every signature's protected header.
 func (k *SigningKey) Signer(kek crypto.Crypter, opts *jose.SignerOptions) (jose.Signer, error) {
+	private, err := k.privateKey(kek)
+	if err != nil {
+		return nil, err
+	}
+	return jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: k.Algorithm,
+			Key: &jose.JSONWebKey{
+				Key:   private,
+				KeyID: k.ID,
+			},
+		},
+		opts,
+	)
+}
+
+func (k *SigningKey) PublicKey(kek crypto.Crypter) (jose.JSONWebKey, error) {
+	private, err := k.privateKey(kek)
+	if err != nil {
+		return jose.JSONWebKey{}, err
+	}
+	return jose.JSONWebKey{
+		Key:       private.Public(),
+		KeyID:     k.ID,
+		Algorithm: string(k.Algorithm),
+		Use:       "sig",
+	}, nil
+}
+
+func (k *SigningKey) privateKey(kek crypto.Crypter) (ed25519.PrivateKey, error) {
 	decrypted, err := kek.Decrypt(k.Key)
 	if err != nil {
 		return nil, ErrDecryptionFailed(err)
@@ -89,16 +119,7 @@ func (k *SigningKey) Signer(kek crypto.Crypter, opts *jose.SignerOptions) (jose.
 	if len(decrypted) != ed25519.SeedSize {
 		return nil, ErrDecryptionFailed(nil).WithDetails(fmt.Sprintf("signing key seed is not %d bytes", ed25519.SeedSize))
 	}
-	return jose.NewSigner(
-		jose.SigningKey{
-			Algorithm: k.Algorithm,
-			Key: &jose.JSONWebKey{
-				Key:   ed25519.NewKeyFromSeed([]byte(decrypted)),
-				KeyID: k.ID,
-			},
-		},
-		opts,
-	)
+	return ed25519.NewKeyFromSeed([]byte(decrypted)), nil
 }
 
 type SigningKeyField uint8

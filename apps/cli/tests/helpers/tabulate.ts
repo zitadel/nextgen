@@ -1,7 +1,7 @@
 import { type Config, Flags } from "@oclif/core";
 
-import { BaseCommand } from "@/cli/core/base";
-import type { CommandResult } from "@/cli/core/types";
+import { BaseCommand } from "@/cli/core";
+import type { CommandResult } from "@/cli/core";
 import { type Tabulate, Tabulatable } from "@/cli/core/tabulatable";
 
 class Listing extends Tabulatable(BaseCommand) {

@@ -9,7 +9,7 @@ import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { RefusedEditError } from "@/lib/zitadel";
 import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
-import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
+import type { JsonObject, JsonValue } from "@/lib/zitadel";
 import {
   isJsonArray,
   isJsonObject,

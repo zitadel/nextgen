@@ -13,7 +13,7 @@ import type { Json, QueryParts, WireConventions } from "./types";
  * forking the factory. A response is never read by these names: each list
  * reads its items and cursor through its own typed `items` and `next`.
  */
-export const DEFAULT_WIRE: WireConventions = {
+const DEFAULT_WIRE: WireConventions = {
   limit: "limit",
   pageToken: "page_token",
   nextPageToken: "next_page_token",

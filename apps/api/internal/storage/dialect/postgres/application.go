@@ -62,6 +62,15 @@ JOIN zitadel_nextgen.application_revisions r
 		` FROM zitadel_nextgen.application_client_secrets` +
 		` WHERE project_id = $1 AND application_client_id = $2 ORDER BY created_at, id`
 
+	deleteApplicationClientSecretsStmt = `DELETE FROM zitadel_nextgen.application_client_secrets` +
+		` WHERE project_id = $1 AND application_client_id = $2`
+
+	applicationIdempotencyKeyColumns    = `project_id, key_hash, request_hash, application_id, created, client_ids, created_at, expires_at`
+	getApplicationIdempotencyKeyStmt    = `SELECT ` + applicationIdempotencyKeyColumns + ` FROM zitadel_nextgen.application_idempotency_keys WHERE project_id = $1 AND key_hash = $2 AND expires_at > $3`
+	deleteApplicationIdempotencyKeyStmt = `DELETE FROM zitadel_nextgen.application_idempotency_keys WHERE project_id = $1 AND key_hash = $2 AND expires_at <= $3`
+	createApplicationIdempotencyKeyStmt = `INSERT INTO zitadel_nextgen.application_idempotency_keys (` + applicationIdempotencyKeyColumns + `)` +
+		` VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+
 	getApplicationSecretVariableStmt = `SELECT project_id, name, application_client_id, created_at` +
 		` FROM zitadel_nextgen.application_secret_variables WHERE project_id = $1 AND name = $2`
 
@@ -279,6 +288,40 @@ func (s applicationStatements) ListApplicationClientSecrets(ctx context.Context,
 		return nil, wrapError(err)
 	}
 	return secrets, nil
+}
+
+// DeleteApplicationClientSecrets implements [service.ApplicationStatements].
+func (s applicationStatements) DeleteApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) error {
+	_, err := s.client.Exec(ctx, deleteApplicationClientSecretsStmt, projectID, applicationClientID)
+	return wrapError(err)
+}
+
+// GetApplicationIdempotencyKey implements [service.ApplicationStatements].
+func (s applicationStatements) GetApplicationIdempotencyKey(ctx context.Context, projectID, keyHash string, now time.Time) (*domain.ApplicationIdempotencyKey, error) {
+	key := new(domain.ApplicationIdempotencyKey)
+	if err := s.client.QueryRow(ctx, getApplicationIdempotencyKeyStmt, projectID, keyHash, now).Scan(
+		&key.ProjectID, &key.KeyHash, &key.RequestHash, &key.ApplicationID, &key.Created, &key.ClientIDs, &key.CreatedAt, &key.ExpiresAt,
+	); err != nil {
+		return nil, wrapError(err)
+	}
+	return key, nil
+}
+
+// CreateApplicationIdempotencyKey implements [service.ApplicationStatements].
+func (s applicationStatements) CreateApplicationIdempotencyKey(ctx context.Context, key *domain.ApplicationIdempotencyKey) error {
+	// A nil slice is written as NULL, which the column refuses.
+	clientIDs := key.ClientIDs
+	if clientIDs == nil {
+		clientIDs = []string{}
+	}
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Exec(ctx, deleteApplicationIdempotencyKeyStmt, key.ProjectID, key.KeyHash, key.CreatedAt); err != nil {
+			return wrapError(err)
+		}
+		_, err := tx.Exec(ctx, createApplicationIdempotencyKeyStmt,
+			key.ProjectID, key.KeyHash, key.RequestHash, key.ApplicationID, key.Created, clientIDs, key.CreatedAt, key.ExpiresAt)
+		return wrapError(err)
+	})
 }
 
 // GetApplicationSecretVariable implements [service.ApplicationStatements].

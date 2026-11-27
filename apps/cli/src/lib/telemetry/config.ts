@@ -36,7 +36,7 @@ const ENDPOINTS = {
   eu: { host: CLOUD_HOST, path: "/telemetry/mixpanel" },
 } as const;
 
-export type TelemetryRegion = keyof typeof ENDPOINTS;
+type TelemetryRegion = keyof typeof ENDPOINTS;
 
 /** The Mixpanel client's host, and the path its requests start with. */
 export type TelemetryEndpoint = { readonly host: string; readonly path: string };

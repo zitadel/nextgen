@@ -20,7 +20,7 @@ export type Held = Readonly<{
 }>;
 
 /** What a name holds in each kind, as a write leaves it. */
-export type VariableState = Readonly<Record<VariableKind, Variable | undefined>>;
+type VariableState = Readonly<Record<VariableKind, Variable | undefined>>;
 
 /**
  * What reading one kind back after a write came to: the value the name holds in
@@ -48,7 +48,7 @@ type KindRead = Readonly<
  * value was not stored. It means only that what the name now holds in that kind
  * is unknown, which is a different thing from holding nothing.
  */
-export type UnverifiedKind = Readonly<{
+type UnverifiedKind = Readonly<{
   kind: VariableKind;
   cause: unknown;
 }>;

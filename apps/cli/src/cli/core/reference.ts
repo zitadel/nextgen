@@ -21,7 +21,7 @@ import type { FlagVariable } from "./types";
  */
 
 /** A flag as the help describes it. An absent field is the flag's default. */
-export type FlagReference = {
+type FlagReference = {
   name: string;
   char?: string;
   description?: string;
@@ -42,7 +42,7 @@ export type FlagReference = {
   helpGroup?: string;
 };
 
-export type ArgReference = {
+type ArgReference = {
   name: string;
   description?: string;
   required?: true;
@@ -50,9 +50,9 @@ export type ArgReference = {
 };
 
 /** An example's command line, after the bin. */
-export type ExampleReference = { command: string; description?: string };
+type ExampleReference = { command: string; description?: string };
 
-export type CommandReference = {
+type CommandReference = {
   /** The command as typed after the bin: `auth-method sso enable`. */
   id: string;
   group: string;

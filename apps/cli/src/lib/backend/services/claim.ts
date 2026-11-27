@@ -5,10 +5,10 @@ import type { ZitadelClient } from "@/lib/backend/client";
 import { BackendError } from "@/lib/backend/errors";
 
 /** A claim link, as the server mints it. */
-export type ClaimChallenge = CreateProjectClaim201;
+type ClaimChallenge = CreateProjectClaim201;
 
 /** A claim that finished: the team that owns the project now. */
-export type CompletedClaim = Extract<
+type CompletedClaim = Extract<
   GetProjectClaimStatus200,
   {
     status: "completed";

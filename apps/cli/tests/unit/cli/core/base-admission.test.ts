@@ -2,9 +2,9 @@ import { Config, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { type Admitted, BaseCommand } from "@/cli/core/base";
+import { type Admitted, BaseCommand } from "@/cli/core";
 import { reads, whole } from "@/cli/core/flags";
-import type { CommandResult } from "@/cli/core/types";
+import type { CommandResult } from "@/cli/core";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 const config = await Config.load(cliPackageRoot);

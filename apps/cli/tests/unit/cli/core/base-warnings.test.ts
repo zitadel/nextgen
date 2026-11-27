@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import { aConfigAt } from "@tests/helpers/suggestions";
 import { prose, rows } from "@/lib/oclif/rendering";
-import type { CommandResult, JsonEnvelope } from "@/cli/core/types";
+import type { CommandResult, JsonEnvelope } from "@/cli/core";
 import { warnings } from "@/lib/ui";
 import { offTerminal } from "@tests/fixtures/terminal";
 

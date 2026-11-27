@@ -1,18 +1,24 @@
 {
   "title": "Guides",
   "pages": [
+    "---Develop and ship---",
     "local-runtime",
-    "edit-login-flow",
     "deploy",
-    "manage-project-access",
-    "password-policy",
-    "test-policies",
-    "test-your-app",
-    "migrate-user-schema",
+    "troubleshooting",
+    "---Sign-in---",
+    "edit-login-flow",
     "sign-in-methods",
     "social-sign-in",
+    "password-policy",
+    "enable-oauth",
+    "---Login appearance---",
     "customize-design",
     "customize-copy",
-    "troubleshooting"
+    "---Users and access---",
+    "manage-project-access",
+    "migrate-user-schema",
+    "---Testing---",
+    "test-your-app",
+    "test-policies"
   ]
 }

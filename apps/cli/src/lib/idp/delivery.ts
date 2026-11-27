@@ -5,7 +5,7 @@ import {
 } from "@zitadel/config/idp";
 
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { warnings } from "@/lib/ui/warnings";
+import { warnings } from "@/lib/ui";
 import type { Connection, Credential } from "@/lib/zitadel";
 
 import {

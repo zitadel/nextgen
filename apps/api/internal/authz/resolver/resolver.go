@@ -34,9 +34,9 @@ type Request struct {
 	// default it to ProjectID (the target). SQL still falls back via
 	// AuthzCheckParams.HomeProjectID() when unset.
 	HomeProjectID string
-	// PlatformProjectID is the deployment's platform project, set by the
-	// gate when the credential is a user homed there (ADR 075). It adds the
-	// platform operator path; empty leaves it out.
+	// PlatformProjectID is the deployment's platform project (ADR 075). It
+	// adds the platform operator path, which applies only to a user homed
+	// there; empty leaves it out.
 	PlatformProjectID string
 }
 
@@ -233,6 +233,27 @@ func (r *Resolver) PlatformOperator(ctx context.Context, stmts service.AuthzReso
 		return false, err
 	}
 	return stmts.CheckPlatformOperator(ctx, checkParams(catalogID, req).PlatformCheckParams())
+}
+
+// StrongestProjectRole returns the strongest of domain.ProjectRoles req's
+// principal holds on req.ProjectID by any path, or "" for none; it sets
+// ObjectType and Relation itself. Roles are additive, so it asks weakest first
+// and stops at the first miss: a principal without access costs one check.
+func (r *Resolver) StrongestProjectRole(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (string, error) {
+	req.ObjectType = "project"
+	held := ""
+	for _, role := range domain.ProjectRoles {
+		req.Relation = role
+		d, err := r.Check(ctx, stmts, req)
+		if err != nil {
+			return "", err
+		}
+		if d != DecisionAllow {
+			break
+		}
+		held = role
+	}
+	return held, nil
 }
 
 // PlatformOperatorEligible reports whether req's principal can hold the platform

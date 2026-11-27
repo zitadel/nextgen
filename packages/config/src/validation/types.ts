@@ -30,8 +30,6 @@ export type ProjectIssue = {
   message: string;
 };
 
-export type ValidationIssue = FlowValidationIssue | ProjectIssue;
-
 /**
  * What a project-wide check reads: the whole working tree, keyed by
  * project-relative path.

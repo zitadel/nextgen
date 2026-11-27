@@ -13,7 +13,7 @@ import type {
   PublishedCredentials,
 } from "@/lib/idp";
 import type { Admitted, CommandResult } from "@/cli/core";
-import type { Connection as RemoteConnection } from "@/cli/core/types";
+import type { Connection as RemoteConnection } from "@/cli/core";
 import type { Again, Suggest, SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Questions } from "@/lib/ui";

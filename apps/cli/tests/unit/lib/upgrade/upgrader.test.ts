@@ -6,9 +6,9 @@ import { describe, expect } from "vitest";
 
 import { Cache } from "@/lib/upgrade/cache";
 import { ReleaseChannel } from "@/lib/upgrade/channel";
-import { InstallError, ReleaseLookupError } from "@/lib/upgrade/errors";
-import { PackageInstaller } from "@/lib/upgrade/installer";
-import { Upgrader } from "@/lib/upgrade/upgrader";
+import { InstallError, ReleaseLookupError } from "@/lib/upgrade";
+import { PackageInstaller } from "@/lib/upgrade";
+import { Upgrader } from "@/lib/upgrade";
 import { test } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 

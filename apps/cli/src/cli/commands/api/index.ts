@@ -132,7 +132,7 @@ export function refuseUnpaged(target: Target | undefined, paginate: boolean): vo
  * argument. The names still without a value are asked for, so they are
  * reported rather than refused.
  */
-export function pathValuesFromWords(
+function pathValuesFromWords(
   target: Target,
   argv: readonly string[],
   named: boolean,
@@ -146,7 +146,7 @@ export function pathValuesFromWords(
  * It refuses a field the operation does not take, a value of the wrong type, a
  * body on an operation that takes none, and `--file -` with nothing piped in.
  */
-export async function requestOf(
+async function requestOf(
   target: Target,
   flags: Readonly<{
     field?: readonly string[];

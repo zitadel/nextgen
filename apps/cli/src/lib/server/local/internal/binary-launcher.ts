@@ -20,7 +20,7 @@ import { type Clock, SystemClock } from "@/lib/clock";
 import { stopSignal } from "./stop-signal";
 import { type Launched, type Launcher, launched } from "./lifecycle";
 
-export const SERVER_NPM_PACKAGE = "@zitadel/server";
+const SERVER_NPM_PACKAGE = "@zitadel/server";
 const COMMAND_ENV = "ZITADEL_SERVER_BINARY";
 const COMMAND_VERSION_ENV = "ZITADEL_SERVER_BINARY_VERSION";
 const STOP_TIMEOUT_MS = 10_000;

@@ -710,7 +710,7 @@ export function viteServerAddressVerdict(
  * this list to the generic `edit` file-op, which patches the first one that
  * exists — so any project layout (`vite.config.ts`, `.mts`, `.js`, …) is covered.
  */
-export const VITE_CONFIG_PATHS = configCandidates("vite.config");
+const VITE_CONFIG_PATHS = configCandidates("vite.config");
 
 /**
  * Capability shared by every Vite-based patcher (React, Vue, and any future

@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll } from "vitest";
 import { z } from "zod";
 
 import { ZitadelRuntime } from "@/lib/server";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { scratchDir } from "@tests/fixtures/scratch";
@@ -25,11 +25,7 @@ export const PLATFORM_URL = ZitadelRuntime.DEFAULT;
  * @param body - The request body, sent as JSON.
  * @returns The JSON object the platform answered with.
  */
-export async function callPlatform(
-  path: string,
-  secret: string,
-  body: object,
-): Promise<JsonObject> {
+async function callPlatform(path: string, secret: string, body: object): Promise<JsonObject> {
   const response = await fetch(`${PLATFORM_URL}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },

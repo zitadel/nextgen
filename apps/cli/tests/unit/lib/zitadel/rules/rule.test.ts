@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defineRule } from "@/lib/zitadel/rules/rule";
-import type { Severity } from "@/lib/zitadel/rules/types";
+import type { Severity } from "@/lib/zitadel";
 import { aConfig } from "@tests/helpers/config";
 
 /**

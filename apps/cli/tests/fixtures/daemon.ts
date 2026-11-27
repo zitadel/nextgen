@@ -11,10 +11,10 @@ import { scratchDir } from "./scratch";
  * TCP connection on a port. Without one, it counts as started once the operating system has
  * created it.
  */
-export type Ready = RegExp | { readonly port: number; readonly host?: string };
+type Ready = RegExp | { readonly port: number; readonly host?: string };
 
 /** What a spawned process is started with. */
-export interface SpawnOptions {
+interface SpawnOptions {
   /** The directory it runs in. */
   readonly cwd?: string;
   /** Its environment, whole: nothing is merged in from this process. */
@@ -24,7 +24,7 @@ export interface SpawnOptions {
 }
 
 /** A process the test started, in a process group of its own. */
-export interface Daemon {
+interface Daemon {
   /** Its process id, which is also the id of its group. */
   readonly pid: number;
   /** Everything it wrote to stdout and stderr so far, in the order it arrived. */

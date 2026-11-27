@@ -12,7 +12,7 @@ import { withoutKey } from "@/lib/zitadel/utils/json";
  * Every way a document can stand against the file it is saved to: as it was
  * read, edited since, or new and not yet written.
  */
-export const DOCUMENT_STATUSES = ["read", "edited", "created"] as const;
+const DOCUMENT_STATUSES = ["read", "edited", "created"] as const;
 
 /**
  * Where a document stands against the file it is saved to.
@@ -22,13 +22,15 @@ export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
 /**
  * Every kind of document the configuration holds, which it files each under.
  */
-export const DOCUMENT_KINDS = [
+const DOCUMENT_KINDS = [
   "schema",
   "flow",
   "connection",
   "policy",
   "policy-test",
   "branding",
+  "application",
+  "oauth",
 ] as const;
 
 /**

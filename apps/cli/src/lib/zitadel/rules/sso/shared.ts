@@ -14,9 +14,9 @@ import { basename } from "node:path";
 
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { claimName, type PropertyName } from "@/lib/zitadel/names";
-import type { Connection } from "@/lib/zitadel/resources/connections/connection";
+import type { Connection } from "@/lib/zitadel/resources/connections";
 import type { ClaimRead } from "@/lib/zitadel/resources/connections/types";
-import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas";
 
 /**
  * A name in quotes, as every message prints one.

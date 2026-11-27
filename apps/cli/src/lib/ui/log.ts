@@ -26,7 +26,7 @@ export type LogSink = (level: LogLevel, text: string) => void;
  * The CLI runs one command per process, so one instance ({@link log}) serves
  * every library that has no `Ui` at hand.
  */
-export class Log {
+class Log {
   /** Every sink still installed, oldest first; the newest draws. */
   private readonly sinks: Array<{ draw: LogSink }> = [];
 

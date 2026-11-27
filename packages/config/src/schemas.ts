@@ -1,10 +1,13 @@
 import {
+  BuildReleaseBody,
+  PublishApplicationBody,
   PublishBrandingBody,
   PublishFlowDefinitionBody,
   PublishIdpBody,
   PublishSchemaBody,
   EvaluatePolicyBody,
   PublishPolicyBody,
+  publishApplicationBodyApplicationClientsMax,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { distance } from "fastest-levenshtein";
 import { z } from "zod";
@@ -91,6 +94,65 @@ export const createFlowDefinitionRequestSchema = PublishFlowDefinitionBody.exten
  * never a literal.
  */
 export const idpConnectionConfigSchema = PublishIdpBody.shape.idp;
+
+const applicationBody = PublishApplicationBody.shape.application;
+const applicationClientBody = applicationBody.shape.clients.element;
+
+/**
+ * One `.zitadel/applications/<slug>.json` body: the application document
+ * `POST /applications` carries under `application`. Strict at both levels, as
+ * the meta-schema and the server are: the generated Zod drops an unknown key,
+ * so a misspelt `redirect_uri` would pass `deploy --dry-run` and fail the
+ * deploy. What a release refuses beyond the shape is
+ * {@link declaredApplicationIssues}.
+ */
+export const applicationConfigSchema = z.strictObject({
+  $schema: z.string().optional(),
+  ...applicationBody.shape,
+  clients: z
+    .array(z.strictObject(applicationClientBody.shape))
+    .min(1)
+    .max(publishApplicationBodyApplicationClientsMax),
+});
+
+/** One thing a release refuses of an application, at its dot-joined path. */
+export type DeclaredApplicationIssue = { path: string; message: string };
+
+/**
+ * What a release refuses of an application document that
+ * {@link applicationConfigSchema} takes: a client without its `client_id`, and
+ * a confidential client that does not name its `secret`. Read from the body as
+ * written, so each is reported beside whatever the schema refuses of the same
+ * client, rather than only once the client's shape is sound. A client with no
+ * `type` is held as confidential, the only type there is.
+ */
+export function declaredApplicationIssues(document: unknown): DeclaredApplicationIssue[] {
+  const clients = (document as { clients?: unknown } | null)?.clients;
+  if (!Array.isArray(clients)) {
+    return [];
+  }
+  return clients.flatMap((client: unknown, index): DeclaredApplicationIssue[] => {
+    if (typeof client !== "object" || client === null || Array.isArray(client)) {
+      return [];
+    }
+    const { client_id, type, secret } = client as Record<string, unknown>;
+    const issues: DeclaredApplicationIssue[] = [];
+    if (client_id === undefined) {
+      issues.push({
+        path: `clients.${index}.client_id`,
+        message: "is required: a client declared in a release sets its client_id",
+      });
+    }
+    if ((type === undefined || type === "confidential") && secret === undefined) {
+      issues.push({
+        path: `clients.${index}.secret`,
+        message:
+          "is required: a confidential client declared in a release names its secret as a ${{ NAME }} variable",
+      });
+    }
+    return issues;
+  });
+}
 
 // The generated publish body's branches, in the spec's order.
 const [passwordSetPolicyBody, userCreatePolicyBody] = PublishPolicyBody.options;
@@ -347,4 +409,14 @@ export const brandingConfigSchema = z.strictObject({
   liquid_template: z
     .union([PublishBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
     .optional(),
+});
+
+/**
+ * The local `.zitadel/oauth/oauth.json` dialect: the bundle's `oauth` shape
+ * (the meta-schema `oauth-settings.json` mirrors this), strict so a misspelt
+ * key fails the dry run instead of being dropped by the server.
+ */
+export const oauthConfigSchema = z.strictObject({
+  $schema: z.string().optional(),
+  ...BuildReleaseBody.shape.bundle.shape.oauth.unwrap().shape,
 });

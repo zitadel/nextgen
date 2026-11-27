@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { Flow, RefusedEditError } from "@/lib/zitadel";
-import { stepName } from "@/lib/zitadel/names";
-import { BrokenFile } from "@/lib/zitadel/resources/broken";
+import { stepName } from "@/lib/zitadel";
+import { BrokenFile } from "@/lib/zitadel";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel";
 import { withoutKey } from "@/lib/zitadel/utils/json";
 import { aFile, aLoginFlow } from "@tests/helpers/config";
 import {
