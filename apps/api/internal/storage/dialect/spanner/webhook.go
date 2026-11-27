@@ -58,9 +58,62 @@ UPDATE webhooks SET
     previous_secret_expires_at = @p4
 WHERE project_id = @p1 AND id = @p2
 THEN RETURN ` + webhook.Columns
+
+	// Read inside the lease's read-write transaction, so of two servers that
+	// both read a webhook as free, the second to commit aborts and is
+	// replayed against the first one's lease. Spanner sorts NULL first: a
+	// webhook that was never attempted comes before the longest due.
+	dueWebhooksStmt = webhookQuery + `
+WHERE enabled
+  AND (next_attempt_at IS NULL OR next_attempt_at <= @p1)
+  AND (lease_expires_at IS NULL OR lease_expires_at <= @p2)
+ORDER BY next_attempt_at, project_id, id
+LIMIT @p3`
+
+	recordWebhookProgressStmt = `
+UPDATE webhooks SET
+    cursor_created_at = @p4,
+    cursor_event_id = @p5,
+    last_delivered_at = COALESCE(@p6, last_delivered_at),
+    failing_since = IF(@p6 IS NULL, failing_since, NULL)
+WHERE project_id = @p1 AND id = @p2 AND lease_holder = @p3`
+
+	recordWebhookFailureStmt = `
+UPDATE webhooks SET
+    last_error_at = @p4,
+    last_error_status = @p5,
+    next_attempt_at = @p6,
+    failing_since = COALESCE(failing_since, @p4),
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = @p1 AND id = @p2 AND lease_holder = @p3`
+
+	disableFailedWebhookStmt = `
+UPDATE webhooks SET
+    enabled = FALSE,
+    last_error_at = @p4,
+    last_error_status = @p5,
+    failing_since = COALESCE(failing_since, @p4),
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = @p1 AND id = @p2 AND lease_holder = @p3 AND enabled`
+
+	releaseWebhookLeaseStmt = `
+UPDATE webhooks SET
+    next_attempt_at = @p4,
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = @p1 AND id = @p2 AND lease_holder = @p3`
 )
 
-var webhookCursorColumns = []string{"project_id", "id", "cursor_created_at", "cursor_event_id"}
+// webhookStartColumns are what a new webhook and one enabled anew start
+// from: the cursor, and no delivery state.
+var webhookStartColumns = []string{
+	"project_id", "id", "cursor_created_at", "cursor_event_id",
+	"next_attempt_at", "failing_since", "lease_holder", "lease_expires_at",
+}
+
+var webhookLeaseColumns = []string{"project_id", "id", "lease_holder", "lease_expires_at"}
 
 type webhookStatements struct{ statement }
 
@@ -72,7 +125,8 @@ func newWebhookStatements(db queryExecutor) webhookStatements {
 // transaction it is buffered in, the clock that stamps events.created_at
 // (InsertEvent): an event that commits later sorts after it, and none that
 // committed earlier does. An event of the same transaction shares the
-// timestamp and sorts after the empty id, so it is delivered.
+// timestamp and sorts after the empty id, so it is delivered. It also clears
+// the delivery state, so the webhook starts clean.
 //
 // It is a mutation, applied at commit after the transaction's DML, not
 // PENDING_COMMIT_TIMESTAMP() in that DML: a table written with it cannot be
@@ -80,8 +134,8 @@ func newWebhookStatements(db queryExecutor) webhookStatements {
 // row.
 func cursorAtNow(ctx context.Context, tx queryExecutor, projectID, id string) error {
 	_, err := tx.BufferWrite(ctx, []*spanner.Mutation{
-		spanner.Update(webhookTable, webhookCursorColumns,
-			[]any{projectID, id, spanner.CommitTimestamp, ""}),
+		spanner.Update(webhookTable, webhookStartColumns,
+			[]any{projectID, id, spanner.CommitTimestamp, "", nil, nil, nil, nil}),
 	})
 	return err
 }
@@ -206,8 +260,9 @@ func (s webhookStatements) UpdateWebhook(ctx context.Context, projectID, id stri
 			return nil
 		}
 		// The commit decides the cursor, so the row just read back holds the
-		// one it replaces.
+		// one it replaces, and the delivery state the same write clears.
 		entity.CursorCreatedAt, entity.CursorEventID = time.Time{}, ""
+		entity.NextAttemptAt, entity.FailingSince, entity.LeaseHolder, entity.LeaseExpiresAt = nil, nil, nil, nil
 		return cursorAtNow(ctx, tx, projectID, id)
 	})
 	if err != nil {
@@ -233,6 +288,87 @@ func (s webhookStatements) RotateWebhookSecret(ctx context.Context, projectID, i
 	return s.writeOne(ctx, s.db, buildStatement(rotateWebhookSecretStmt, projectID, id, secret, previousExpiresAt.UTC()).statement())
 }
 
+// LeaseDueWebhooks implements [service.WebhookStatements].
+func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
+	leaseUntil = leaseUntil.UTC()
+	// A retry replays the callback, so the result stays local to an attempt.
+	var leased []*domain.Webhook
+	err := withTransaction(ctx, s.db, func(ctx context.Context, tx queryExecutor) error {
+		var due []*domain.Webhook
+		stmt := buildStatement(dueWebhooksStmt, dueBy.UTC(), now.UTC(), int64(limit)).statement()
+		if err := tx.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+			var err error
+			due, err = collectRows(iter, scanWebhook)
+			return err
+		}); err != nil {
+			return err
+		}
+		leased = due
+		if len(due) == 0 {
+			return nil
+		}
+		mutations := make([]*spanner.Mutation, len(due))
+		for i, entity := range due {
+			mutations[i] = spanner.Update(webhookTable, webhookLeaseColumns,
+				[]any{entity.ProjectID, entity.ID, holder, leaseUntil})
+			entity.LeaseHolder, entity.LeaseExpiresAt = &holder, &leaseUntil
+		}
+		_, err := tx.BufferWrite(ctx, mutations)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return leased, nil
+}
+
+// RecordWebhookProgress implements [service.WebhookStatements].
+func (s webhookStatements) RecordWebhookProgress(ctx context.Context, projectID, id, holder string, cursorCreatedAt time.Time, cursorEventID string, deliveredAt *time.Time) error {
+	delivered := spanner.NullTime{}
+	if deliveredAt != nil {
+		delivered = spanner.NullTime{Time: deliveredAt.UTC(), Valid: true}
+	}
+	return s.updateLeased(ctx, buildStatement(recordWebhookProgressStmt,
+		projectID, id, holder, cursorCreatedAt.UTC(), cursorEventID, delivered))
+}
+
+// RecordWebhookFailure implements [service.WebhookStatements].
+func (s webhookStatements) RecordWebhookFailure(ctx context.Context, projectID, id, holder string, at time.Time, status *int32, nextAttemptAt time.Time) error {
+	return s.updateLeased(ctx, buildStatement(recordWebhookFailureStmt,
+		projectID, id, holder, at.UTC(), nullStatus(status), nextAttemptAt.UTC()))
+}
+
+// DisableFailedWebhook implements [service.WebhookStatements].
+func (s webhookStatements) DisableFailedWebhook(ctx context.Context, projectID, id, holder string, at time.Time, status *int32) error {
+	return s.updateLeased(ctx, buildStatement(disableFailedWebhookStmt,
+		projectID, id, holder, at.UTC(), nullStatus(status)))
+}
+
+// ReleaseWebhookLease implements [service.WebhookStatements].
+func (s webhookStatements) ReleaseWebhookLease(ctx context.Context, projectID, id, holder string, nextAttemptAt time.Time) error {
+	return s.updateLeased(ctx, buildStatement(releaseWebhookLeaseStmt, projectID, id, holder, nextAttemptAt.UTC()))
+}
+
+// updateLeased runs a write on a webhook its holder has leased, or none when
+// the holder no longer holds it: a *database.NoRowFoundError.
+func (s webhookStatements) updateLeased(ctx context.Context, stmt spannerStatement) error {
+	n, err := s.db.Update(ctx, stmt.statement())
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
+func nullStatus(status *int32) spanner.NullInt64 {
+	if status == nil {
+		return spanner.NullInt64{}
+	}
+	return spanner.NullInt64{Int64: int64(*status), Valid: true}
+}
+
 // writeOne runs a write that returns one webhook, or none when the project
 // has no webhook of that id: a *database.NoRowFoundError.
 func (s webhookStatements) writeOne(ctx context.Context, db queryExecutor, stmt spanner.Statement) (*domain.Webhook, error) {
@@ -255,6 +391,10 @@ func scanWebhook(row *spanner.Row) (*domain.Webhook, error) {
 		lastDeliveredAt         spanner.NullTime
 		lastErrorAt             spanner.NullTime
 		lastErrorStatus         spanner.NullInt64
+		nextAttemptAt           spanner.NullTime
+		failingSince            spanner.NullTime
+		leaseHolder             spanner.NullString
+		leaseExpiresAt          spanner.NullTime
 	)
 	if err := row.Columns(
 		&entity.ID,
@@ -272,6 +412,10 @@ func scanWebhook(row *spanner.Row) (*domain.Webhook, error) {
 		&entity.CursorCreatedAt,
 		&entity.CursorEventID,
 		&entity.CreatedAt,
+		&nextAttemptAt,
+		&failingSince,
+		&leaseHolder,
+		&leaseExpiresAt,
 	); err != nil {
 		return nil, err
 	}
@@ -287,6 +431,12 @@ func scanWebhook(row *spanner.Row) (*domain.Webhook, error) {
 	if lastErrorStatus.Valid {
 		entity.LastErrorStatus = new(int32(lastErrorStatus.Int64))
 	}
+	entity.NextAttemptAt = nullTimePtr(nextAttemptAt)
+	entity.FailingSince = nullTimePtr(failingSince)
+	if leaseHolder.Valid {
+		entity.LeaseHolder = &leaseHolder.StringVal
+	}
+	entity.LeaseExpiresAt = nullTimePtr(leaseExpiresAt)
 	entity.CreatedAt, entity.CursorCreatedAt = entity.CreatedAt.UTC(), entity.CursorCreatedAt.UTC()
 	return &entity, nil
 }

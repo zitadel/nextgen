@@ -12,7 +12,8 @@ import (
 const Columns = `id, project_id, url, description, event_types, enabled,` +
 	` secret, previous_secret, previous_secret_expires_at,` +
 	` last_delivered_at, last_error_at, last_error_status,` +
-	` cursor_created_at, cursor_event_id, created_at`
+	` cursor_created_at, cursor_event_id, created_at,` +
+	` next_attempt_at, failing_since, lease_holder, lease_expires_at`
 
 // Schema binds the columns of webhooks for all dialects. Lists filter and
 // order on project_id, id and created_at only; the other bindings put their
@@ -87,6 +88,22 @@ var Schema = database.NewSchema(map[domain.WebhookField]database.FieldBinding[do
 		SQLName:  "created_at",
 		Accessor: func(w *domain.Webhook) any { return w.CreatedAt },
 		Coerce:   database.CoerceTime,
+	},
+	domain.WebhookFieldNextAttemptAt: {
+		SQLName:  "next_attempt_at",
+		Nullable: true,
+	},
+	domain.WebhookFieldFailingSince: {
+		SQLName:  "failing_since",
+		Nullable: true,
+	},
+	domain.WebhookFieldLeaseHolder: {
+		SQLName:  "lease_holder",
+		Nullable: true,
+	},
+	domain.WebhookFieldLeaseExpiresAt: {
+		SQLName:  "lease_expires_at",
+		Nullable: true,
 	},
 })
 

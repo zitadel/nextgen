@@ -43,6 +43,7 @@ type instruments struct {
 	flowTransitions    metric.Int64Counter
 	auditDuration      metric.Float64Histogram
 	auditEvents        metric.Int64Counter
+	webhookDeliveries  metric.Int64Counter
 }
 
 func mustInstruments(m metric.Meter) *instruments {
@@ -105,6 +106,7 @@ func newInstruments(m metric.Meter) (*instruments, error) {
 		flowTransitions:    counter(FlowStepTransitions, "{transition}"),
 		auditDuration:      duration(AuditInsertDuration),
 		auditEvents:        counter(AuditEventsWritten, "{event}"),
+		webhookDeliveries:  counter(WebhookDeliveries, "{delivery}"),
 	}
 	if err != nil {
 		return nil, err
@@ -141,6 +143,7 @@ var (
 	revocationResults = closed(ResultKey, RevocationActive, RevocationRevoked, RevocationError)
 	keyKinds          = closed(KeyKindKey, KeyKindMaster, KeyKindProject)
 	auditSources      = closed(SourceKey, AuditRequest, AuditEvent)
+	webhookResults    = closed(ResultKey, WebhookDelivered, WebhookFailed)
 )
 
 // StatementEnabled reports whether a statement duration recorded now would
@@ -256,4 +259,10 @@ func RecordAuditEvents(ctx context.Context, eventType string, n int) {
 		return
 	}
 	global.auditEvents.Add(ctx, int64(n), metric.WithAttributes(EventTypeKey.String(eventType)))
+}
+
+// RecordWebhookDelivery counts one attempt to deliver an event to a
+// project's webhook.
+func RecordWebhookDelivery(ctx context.Context, result WebhookDeliveryResult) {
+	global.webhookDeliveries.Add(ctx, 1, webhookResults.of(result))
 }

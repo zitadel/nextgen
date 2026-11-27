@@ -1,5 +1,5 @@
 # A response of the webhook (event-webhook.yaml).
 description: |
-  Not delivered: any other status, a failed connection, or no response
-  within 10 seconds. The server sends the event again, and holds back the
-  webhook's later events until this one is delivered.
+  Not delivered: any other status, a redirect included, a failed connection,
+  or no response within 10 seconds. The server sends the event again, and
+  holds back the webhook's later events until this one is delivered.
