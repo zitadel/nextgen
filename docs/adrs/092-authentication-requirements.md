@@ -496,9 +496,10 @@ credentials through the following rules:
    ([#3202](https://github.com/zitadel/nextgen/issues/3202)). When a user who
    has other methods gets an authorization ([§4.4](#44-account-recovery),
    `first_enrollment: admin`), it stands in only for the checks of rule 1 that
-   the user cannot complete, so the user still completes the others. How the
-   authorization reaches the user, and which permission issues it, is open
-   ([Open question 13](#open-questions)).
+   the user cannot complete, so the user still completes the others. The server
+   returns the authorization in the API response and the administrator delivers
+   it to the user, as `createInvitation` does for its link. Which permission
+   issues it is open ([Open question 13](#open-questions)).
 
 **The `first_enrollment` policy setting** governs users who only have a password
 or external sign-in:
@@ -749,9 +750,8 @@ event, with who performed it and when
     [#3166](https://github.com/zitadel/nextgen/issues/3166) cites both as
     examples, but the server does not track trusted devices and UV does not
     distinguish PIN from biometric. Should either become an `acr_values` value?
-13. **Admin-authorized enrollment:** How does the authorization reach the user,
-    given that the server cannot deliver messages today? Which permission issues
-    it, since `user.write` is too broad (Gap 8)?
+13. **Admin-authorized enrollment:** Which permission issues the authorization,
+    since `user.write` is too broad (Gap 8)?
     [#3202](https://github.com/zitadel/nextgen/issues/3202) also leaves open
     what the administrator checks before authorizing.
 14. **Recovery when two methods are lost:** A user with a password, a TOTP
