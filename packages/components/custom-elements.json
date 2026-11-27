@@ -8056,7 +8056,7 @@
                   "text": ""
                 }
               },
-              "description": "Whether this browser has the HTML Sanitizer API."
+              "description": "Whether this browser has the HTML Sanitizer API.\n\nChrome 105 to 118 shipped an earlier draft of the API: `setHTML()` exists\nthere, but `Sanitizer` lacks the methods configure calls, so the\nwidget fails to start on those versions. They are intentionally not\nhandled: they are out of support and no longer receive updates."
             },
             {
               "kind": "method",
