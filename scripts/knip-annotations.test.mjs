@@ -19,7 +19,7 @@ describe("annotations", () => {
     });
 
     expect(annotations(options)).toEqual([
-      "::error file=packages/sdk-react/src/types.ts,line=19,col=14,title=knip: Unused export::Unused export: knipProbe",
+      "::error file=packages/sdk-react/src/types.ts,line=19,col=14,title=knip%3A Unused export::Unused export: knipProbe",
     ]);
   });
 
@@ -30,7 +30,7 @@ describe("annotations", () => {
     });
 
     expect(annotations(options)).toEqual([
-      "::error file=packages/components/package.json,title=knip: Unused devDependency::Unused devDependency: tslib",
+      "::error file=packages/components/package.json,title=knip%3A Unused devDependency::Unused devDependency: tslib",
     ]);
   });
 
@@ -42,7 +42,18 @@ describe("annotations", () => {
     });
 
     expect(annotations(options)).toEqual([
-      "::warning file=apps/cli/src/a.ts,title=knip: Unused exported type::Unused exported type: Unused",
+      "::warning file=apps/cli/src/a.ts,title=knip%3A Unused exported type::Unused exported type: Unused",
+    ]);
+  });
+
+  it("percent-encodes a colon or comma in a property so GitHub keeps the file", () => {
+    const options = findingsWith("files", {
+      filePath: "/repo/odd:name,1.ts",
+      symbol: "odd:name,1.ts",
+    });
+
+    expect(annotations(options)).toEqual([
+      "::error file=odd%3Aname%2C1.ts,title=knip%3A Unused file::Unused file: odd:name,1.ts",
     ]);
   });
 

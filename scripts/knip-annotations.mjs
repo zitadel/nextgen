@@ -20,6 +20,22 @@ const TITLES = {
 };
 
 /**
+ * A value as a workflow command reads it: `%`, line breaks, and in a property
+ * also `:` and `,`, are percent-encoded, or GitHub drops the properties.
+ *
+ * @param {string} value - The text to encode.
+ * @param {boolean} property - Whether it is a property value, not the message.
+ * @returns {string} The encoded text.
+ */
+function escape(value, property) {
+  const message = value.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+  if (!property) {
+    return message;
+  }
+  return message.replaceAll(":", "%3A").replaceAll(",", "%2C");
+}
+
+/**
  * The GitHub Actions annotations for knip's findings: one `::error` (or
  * `::warning` for a finding set to warn) per finding, on the file and line it
  * names, so a failed lint shows on the pull request before the run's logs are.
@@ -35,15 +51,15 @@ export function annotations({ issues, cwd }) {
     return Object.values(records).flatMap((byFile) => {
       return Object.values(byFile).map((issue) => {
         const level = issue.severity === "warn" ? "warning" : "error";
-        const params = [`file=${relative(cwd, issue.filePath)}`];
+        const params = [`file=${escape(relative(cwd, issue.filePath), true)}`];
         if (issue.line !== undefined) {
           params.push(`line=${issue.line}`);
         }
         if (issue.col !== undefined) {
           params.push(`col=${issue.col}`);
         }
-        params.push(`title=knip: ${TITLES[type]}`);
-        return `::${level} ${params.join(",")}::${TITLES[type]}: ${issue.symbol}`;
+        params.push(`title=${escape(`knip: ${TITLES[type]}`, true)}`);
+        return `::${level} ${params.join(",")}::${escape(`${TITLES[type]}: ${issue.symbol}`, false)}`;
       });
     });
   });
