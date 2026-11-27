@@ -2,18 +2,28 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppWindow } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { DETAIL_BODY, DetailHeader, DetailSection } from "@/components/detail-page";
+import {
+  DETAIL_BODY,
+  DETAIL_STACK,
+  DetailHeader,
+  DetailRow,
+  DetailRows,
+  DetailSection,
+} from "@/components/detail-page";
 import { Page } from "@/components/layout";
+import { Badge } from "@/components/ui/badge";
 import { ApplicationClients } from "@/features/applications/components/application-clients";
+import { applicationSourceLabel } from "@/features/applications/model";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { formatDate } from "@/lib/date";
 
 /**
- * Application detail: its OAuth clients, each opening to its settings and
- * document.
+ * Application detail: where the application is written, then its OAuth
+ * clients, each opening to its settings and document.
  *
- * The design's Overview card holds the application's source and issuer URL;
- * the API returns neither yet, so the card is left out until it does.
+ * The design's Overview card also holds the issuer URL. The server derives
+ * the issuer from the origin a request arrives at, so the API returns no one
+ * value for it, and the row is left out until it does (D41).
  *
  * Read-only, and opened by its URL: the API has no applications list yet, so
  * the sidebar has no Applications entry to reach it from.
@@ -45,9 +55,17 @@ function ApplicationDetail() {
         ]}
       />
 
-      <div className={DETAIL_BODY}>
+      <div className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
+        <DetailSection title="Overview">
+          <DetailRows>
+            <DetailRow align="center" label="Source">
+              <Badge variant="secondary">{applicationSourceLabel(application.declared)}</Badge>
+            </DetailRow>
+          </DetailRows>
+        </DetailSection>
+
         <DetailSection title="Configuration">
-          <ApplicationClients clients={clients} />
+          <ApplicationClients clients={clients} declared={application.declared} />
         </DetailSection>
       </div>
     </Page>

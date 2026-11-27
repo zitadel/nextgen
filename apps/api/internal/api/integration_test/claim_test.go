@@ -19,6 +19,8 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/events"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -236,6 +238,23 @@ func TestClaimHappyPath(t *testing.T) {
 	grant, err := harness.EnsureServiceDB(t).Statements().GetActiveOwningTeamGrant(t.Context(), project.ID)
 	require.NoError(t, err)
 	assert.Equal(t, team.ID, grant.PrincipalID)
+
+	// The claim is one chain, which the challenge holds: the CLI's init and
+	// polls with the project secret, and the completion from a browser with
+	// a platform session. The grant the completion wrote is in it.
+	challenge, err := harness.EnsureServiceDB(t).Statements().GetChallengeByID(t.Context(), project.ID,
+		domain.HashClaimChallengeToken(string(initOK.ChallengeID)))
+	require.NoError(t, err)
+	require.Regexp(t, `^[0-9a-f]{32}$`, challenge.CorrelationID)
+	opts := events.ListOptions(project.ID, 100)
+	opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.EventFieldCorrelationID), challenge.CorrelationID))
+	inChain, err := harness.EnsureServiceDB(t).Statements().ListEvents(t.Context(), opts)
+	require.NoError(t, err)
+	var granted bool
+	for _, ev := range inChain.Items {
+		granted = granted || ev.EventType == domain.EventTypeAuthzGranted
+	}
+	assert.True(t, granted, "the claim's grant is not in the claim's chain: %d events", len(inChain.Items))
 }
 
 // TestInitClaimAlreadyClaimed pins the exact 409 wire body on a raw request:

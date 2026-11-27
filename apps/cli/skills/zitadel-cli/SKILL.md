@@ -372,6 +372,14 @@ made to the user. Add `--filter category=auth` for the sign-ins alone.
 `--filter actor_id=<user-id>` is the other question, what that user did. Only
 events recorded by a server that has this filter carry `user_id`.
 
+To read everything one sign-in, invitation or project claim wrote, whoever
+sent each request: take the `correlation_id` of any of its events and run
+`event list --filter correlation_id=<id> --json`. A sign-in shares one ID
+from the OAuth authorization request, or the first step of its login flow, to
+the session and the token it ends with. An event whose request was the whole
+of its work has no `correlation_id`; its `request_id` joins what that request
+wrote. Only events recorded by a server that has this filter carry it.
+
 To find the API requests that failed: `event list --filter status_class=4xx
 --filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
 (such as `createUser`) for one operation. Only requests recorded by a server
