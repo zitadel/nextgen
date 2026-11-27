@@ -30,9 +30,12 @@ export { paging as pagedFunctions };
 type Endpoints = typeof endpoints;
 type Paging = typeof paging;
 
-/** The name of a generated function that runs an operation (not a URL builder). */
+/** The name of a generated function that runs an operation and resolves with its answer. */
 export type OperationName = {
-  [K in keyof Endpoints]: Endpoints[K] extends (client: ZitadelClient, ...rest: never[]) => unknown
+  [K in keyof Endpoints]: Endpoints[K] extends (
+    client: ZitadelClient,
+    ...rest: never[]
+  ) => Promise<unknown>
     ? K
     : never;
 }[keyof Endpoints];
@@ -70,8 +73,8 @@ export type Paged<K extends PagedOperation> = {
 };
 
 /**
- * The convenience client {@link createZitadelApi} returns: every generated
- * operation bound to {@link ZitadelApi.client}, with {@link Paged} on every
+ * The convenience client `createZitadelApi` returns: every generated
+ * operation bound to its `client`, with `pages`, `items` and `all` on every
  * function that pages.
  */
 export type ZitadelApi = {

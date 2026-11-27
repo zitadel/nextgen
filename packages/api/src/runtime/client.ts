@@ -54,6 +54,17 @@ export type ZitadelClientSettings = Readonly<{
 }>;
 
 /**
+ * What {@link ZitadelClient.with} may change: any setting, where `baseUrl` and
+ * `allowDestructive`, which a client cannot be without, may not be cleared.
+ */
+export type ZitadelClientChanges = Readonly<
+  Partial<Omit<ZitadelClientSettings, "baseUrl" | "allowDestructive">> & {
+    baseUrl?: string;
+    allowDestructive?: boolean;
+  }
+>;
+
+/**
  * One connection to a Zitadel server: where it is, what to authenticate with,
  * and what every request it makes is bound by.
  *
@@ -149,7 +160,12 @@ export class ZitadelClient {
    * const admin = client.with({ allowDestructive: true });
    * const anonymous = client.with({ token: undefined });
    */
-  with(changes: Partial<ZitadelClientSettings>): ZitadelClient {
-    return new ZitadelClient({ ...this.#settings, ...changes });
+  with(changes: ZitadelClientChanges): ZitadelClient {
+    return new ZitadelClient({
+      ...this.#settings,
+      ...changes,
+      baseUrl: changes.baseUrl ?? this.#settings.baseUrl,
+      allowDestructive: changes.allowDestructive ?? this.#settings.allowDestructive,
+    });
   }
 }

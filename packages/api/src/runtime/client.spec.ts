@@ -31,6 +31,14 @@ describe("ZitadelClient", () => {
     expect([client.allowDestructive, client.timeoutMs]).toEqual([false, 10]);
   });
 
+  it("keeps the base URL and the destructive choice when a change names them undefined", () => {
+    const client = new ZitadelClient({ ...settings, allowDestructive: true });
+
+    const changed = client.with({ baseUrl: undefined, allowDestructive: undefined });
+
+    expect([changed.baseUrl, changed.allowDestructive]).toEqual(["https://example.com", true]);
+  });
+
   it("clears a setting changed to undefined", () => {
     const client = new ZitadelClient({ ...settings, token: "tok" });
 
