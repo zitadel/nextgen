@@ -139,7 +139,8 @@ function MenuIcon() {
 }
 
 // The bar over the page, on a plane of frosted glass that floats over the
-// page as it scrolls: the logo, the preview's label and, from a laptop up,
+// page as it scrolls: the logo, the preview's label (from 360px up, where the
+// bar has room for it beside the button and the menu) and, from a laptop up,
 // the top level of app/nav.ts on the left; the theme (from sm up), GitHub
 // (from md up), nav.ts's links for the right (from a laptop up) and the one
 // primary button on the right. Below a laptop one menu holds the top level:
@@ -159,7 +160,7 @@ export function SiteHeader({
           <a href="/" aria-label="Zitadel preview home" className="rounded-sm">
             <Logo id="header-logo" className="h-5 w-auto" autoplay />
           </a>
-          <span className="rounded-full bg-tint/10 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-secondary leading-4">
+          <span className="rounded-full bg-tint/10 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-secondary leading-4 max-[22.5rem]:hidden">
             Preview
           </span>
           <nav aria-label="Main" className="ml-3 hidden items-center gap-0.5 text-sm lg:flex">
