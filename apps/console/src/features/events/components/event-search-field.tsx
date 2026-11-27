@@ -20,6 +20,7 @@ const READING: Partial<Record<string, string>> = {
   actor: "what it did",
   user: "what happened to its account",
   resource: "what happened to it",
+  chain: "one sign-in, invitation or claim",
 };
 
 /** One choice under the field: a meaning of the term, or My activity. */
@@ -38,9 +39,10 @@ type Option = { kind: "meaning"; meaning: SearchMeaning } | { kind: "mine" };
  * search, so nothing here searches as you type.
  *
  * What the term means is listed under the field. One meaning applies on
- * Enter. An id that may be an actor or a resource, or a user's that may be
- * the account or the actor, lists both and waits for a choice: guessing would
- * show an empty list for the other reading. The empty
+ * Enter. An id that may be an actor or a resource, a user's that may be the
+ * account or the actor, or 32 hex digits that may be a chain or a request,
+ * lists both and waits for a choice: guessing would show an empty list for
+ * the other reading. The empty
  * field offers **My activity**, the list narrowed to what the signed-in
  * person did, whose chip reads `actor: me`.
  */
@@ -253,7 +255,7 @@ function Hint() {
       Paste an ID, an event type or an operation, such as <Code>req_…</Code>,{" "}
       <Code>user.created</Code> or <Code>createUser</Code>, or name the filter: <Code>actor:</Code>,{" "}
       <Code>user:</Code>, <Code>resource:</Code>, <Code>resource_type:</Code>, <Code>app:</Code>,{" "}
-      <Code>device:</Code>. There is no text search.
+      <Code>device:</Code>, <Code>chain:</Code>. There is no text search.
     </p>
   );
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto/pow"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -472,6 +473,63 @@ func TestFlowService_Start_PassesTheResolvedDeploymentAndRelease(t *testing.T) {
 	assert.Equal(t, "rel_1", sm.gotStartInput.ReleaseID)
 }
 
+// A flow is a carrier: the engine stores in its sealed state the chain every
+// later request of the flow joins. A flow created for an authorization request takes that
+// request's chain, so the sign-in an OAuth client asked for is one chain from
+// the authorization endpoint on; any other flow starts its own.
+func TestFlowService_Start_StoresTheChainInTheState(t *testing.T) {
+	start := func(t *testing.T, authRequest *domain.AuthRequest, authRequestID *string) (flowengine.StartInput, context.Context) {
+		t.Helper()
+		def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+		sm := &fakeStateMachine{startResult: flowengine.StepResult{
+			State: &flowengine.State{ProjectID: def.ProjectID}, Step: &flowengine.Step{Name: "start"},
+		}}
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		stmts := servicemocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
+		stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		stubUserSchemas(stmts, testUserSchema)
+		if authRequestID != nil {
+			read := stmts.EXPECT().GetAuthRequest(gomock.Any(), def.ProjectID, *authRequestID)
+			if authRequest == nil {
+				read.Return(nil, database.NewNoRowFoundError(nil))
+			} else {
+				read.Return(authRequest, nil)
+			}
+		}
+		pool.EXPECT().Statements().Return(stmts).AnyTimes()
+		svc := service.NewFlowService(service.NewPool(pool), sm, domain.BuiltinSchemaBases{}, nil)
+
+		ctx := withPinnedSchema(t, audit.WithActorSlot(t.Context()), "human-user", testUserSchema.URL)
+		_, err := svc.Start(ctx, service.StartFlowRequest{
+			Definition:    def,
+			Purpose:       domain.FlowDefinitionPurposeLogin,
+			AuthRequestID: authRequestID,
+		})
+		require.NoError(t, err)
+		return sm.gotStartInput, sm.gotStartCtx
+	}
+
+	t.Run("a flow of its own starts a chain", func(t *testing.T) {
+		in, startCtx := start(t, nil, nil)
+		assert.Regexp(t, `^[0-9a-f]{32}$`, in.CorrelationID)
+		assert.Equal(t, in.CorrelationID, middleware.CorrelationFromContext(startCtx).Chain(),
+			"the attempt the state machine creates is in the flow's chain")
+	})
+	t.Run("a flow for an authorization request joins its chain", func(t *testing.T) {
+		id := "authreq_1"
+		in, startCtx := start(t, &domain.AuthRequest{ID: id, CorrelationID: "chain_authorize"}, &id)
+		assert.Equal(t, "chain_authorize", in.CorrelationID)
+		assert.Equal(t, "chain_authorize", middleware.CorrelationFromContext(startCtx).Chain())
+	})
+	t.Run("an authorization request the project does not hold starts none", func(t *testing.T) {
+		id := "authreq_unknown"
+		in, _ := start(t, nil, &id)
+		assert.Regexp(t, `^[0-9a-f]{32}$`, in.CorrelationID, "the flow still has a chain of its own")
+	})
+}
+
 // Path B auth.attempt.created runs inside stateMachine.Start. The flow id
 // must already be on the actor slot so FromContext can copy flow_id.
 func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
@@ -490,9 +548,10 @@ func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
 	slot, ok := audit.ActorSlotFromContext(sm.gotStartCtx)
 	require.True(t, ok, "state machine Start ctx has no actor slot")
 	require.NotNil(t, slot)
-	require.NotEmpty(t, slot.FlowID, "flow_id was not stamped before stateMachine.Start (auth.attempt.created would miss it)")
+	flowID := middleware.CorrelationFromContext(sm.gotStartCtx).Flow()
+	require.NotEmpty(t, flowID, "flow_id was not stamped before stateMachine.Start (auth.attempt.created would miss it)")
 	require.NotNil(t, res.State)
-	assert.Equal(t, res.State.ID, *slot.FlowID, "stamped flow_id")
+	assert.Equal(t, res.State.ID, flowID, "stamped flow_id")
 	assert.Equal(t, res.State.ID, sm.gotStartInput.ID, "the attempt the state machine creates records this flow")
 	require.NotEmpty(t, slot.SessionID, "session_id was not stamped before stateMachine.Start")
 	assert.Equal(t, *slot.SessionID, sm.gotStartInput.Session.ID, "stamped session_id")

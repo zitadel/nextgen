@@ -93,24 +93,32 @@ func TestEmit_NamesTheUserTheEventConcerns(t *testing.T) {
 	require.Nil(t, cap.last.UserID)
 }
 
-func TestEmit_FlowIDOverridesTheRequests(t *testing.T) {
+// No emitter passes a flow or a chain: an event carries the ones its request
+// bound, from the moment it bound them.
+func TestEmit_CarriesTheFlowAndTheChainTheRequestBound(t *testing.T) {
 	t.Parallel()
-	requestFlow := "flow_request"
-	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{ProjectID: "proj_1", FlowID: &requestFlow})
-	emit := func(flowID string) *domain.Event {
+	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{ProjectID: "proj_1"})
+	emit := func() *domain.Event {
 		cap := &insertEventCapture{}
 		require.NoError(t, audit.Emit(ctx, cap, audit.EmitSpec{
 			Type:      domain.EventTypeSessionEstablished,
 			Category:  domain.EventCategorySession,
 			ProjectID: "proj_1",
-			FlowID:    &flowID,
 			Payload:   domain.SessionEstablishedPayload{},
 		}))
 		return cap.last
 	}
-	require.NotNil(t, emit("flow_attempt").FlowID)
-	require.Equal(t, "flow_attempt", *emit("flow_attempt").FlowID)
-	require.Equal(t, "flow_request", *emit("").FlowID)
+	before := emit()
+	require.Nil(t, before.FlowID)
+	require.Nil(t, before.CorrelationID)
+
+	audit.BindFlow(ctx, "flow_attempt")
+	audit.JoinCorrelation(ctx, "chain_attempt")
+	after := emit()
+	require.NotNil(t, after.FlowID)
+	require.Equal(t, "flow_attempt", *after.FlowID)
+	require.NotNil(t, after.CorrelationID)
+	require.Equal(t, "chain_attempt", *after.CorrelationID)
 }
 
 func TestEmit_CopiesRequestIDFromMiddleware(t *testing.T) {

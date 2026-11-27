@@ -47,7 +47,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		)
 		secrets := f.expectSecrets(2)
 
-		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin), "")
 		require.NoError(t, err)
 		assert.True(t, got.Created)
 		assert.Equal(t, "app_1", got.Application.ID)
@@ -88,7 +88,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		)
 		secrets := f.expectSecrets(1)
 
-		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin), "")
 		require.NoError(t, err)
 		assert.False(t, got.Created)
 		assert.Equal(t, []service.ApplicationClientSecret{{Slug: "admin", ClientID: "shop-admin", Secret: "sk_client_1"}}, got.Secrets)
@@ -115,7 +115,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 			},
 		)
 
-		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, []byte(`{"slug":"shop","name":"Shop 2","clients":[`+shopWeb+`]}`))
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, []byte(`{"slug":"shop","name":"Shop 2","clients":[`+shopWeb+`]}`), "")
 		require.NoError(t, err)
 		assert.Empty(t, got.Secrets)
 
@@ -135,7 +135,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		f.expectLockedRead(storedShop())
 		f.tx.EXPECT().ReviseApplication(gomock.Any(), gomock.Any(), gomock.Len(0)).Return(nil)
 
-		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWebFixed))
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWebFixed), "")
 		require.NoError(t, err)
 		assert.False(t, got.Created)
 		assert.Equal(t, "app_1", got.Application.ID)
@@ -153,7 +153,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		f.pool.EXPECT().GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-web").
 			Return(&domain.ApplicationClient{ApplicationID: "app_other", ClientID: "shop-web"}, nil)
 
-		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWebFixed))
+		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWebFixed), "")
 		assert.ErrorIs(t, err, domain.ErrApplicationClientIDTaken())
 	})
 
@@ -183,7 +183,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 			f.pool.EXPECT().GetApplicationClientByClientID(gomock.Any(), appProjectID, "shop-admin").
 				Return(tc.holder, tc.lookup)
 
-			_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin))
+			_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb, shopAdmin), "")
 			assert.ErrorIs(t, err, tc.want)
 		})
 	}
@@ -196,7 +196,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		f.tx.EXPECT().CreateApplication(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 		f.expectSecrets(1)
 
-		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb))
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb), "")
 		assert.ErrorIs(t, err, domain.ErrInternal(nil))
 		assert.Nil(t, got, "a secret for a write that rolled back would never work")
 	})
@@ -208,7 +208,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		f.tx.EXPECT().CreateApplication(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(database.NewForeignKeyError("applications", "fk_applications_project", nil))
 
-		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb))
+		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb), "")
 		assert.ErrorIs(t, err, domain.ErrApplicationNotFound())
 	})
 
@@ -218,7 +218,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(storedShop(), nil)
 		f.tx.EXPECT().LockApplication(gomock.Any(), appProjectID, "app_1").Return(database.NewNoRowFoundError(nil))
 
-		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb))
+		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb), "")
 		assert.ErrorIs(t, err, domain.ErrApplicationNotFound())
 	})
 
@@ -243,7 +243,7 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 			f := newApplicationFixture(t)
 			expect(f)
 
-			_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb))
+			_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, shopDocument(shopWeb), "")
 			assert.ErrorIs(t, err, domain.ErrUnavailable())
 		})
 	}
@@ -252,8 +252,150 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		t.Parallel()
 		f := newApplicationFixture(t)
 
-		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, []byte(`{"slug":"shop","name":"Shop","clients":[]}`))
+		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, []byte(`{"slug":"shop","name":"Shop","clients":[]}`), "")
 		assert.ErrorIs(t, err, domain.ErrRequestInvalid())
+	})
+}
+
+// The cases of TestApplicationService_CreateOrRevise send no key: the strict
+// mocks fail them on any idempotency key statement.
+func TestApplicationService_IdempotencyKey(t *testing.T) {
+	t.Parallel()
+	const key = "key-1"
+	document := shopDocument(shopWebFixed)
+	record := func(requestDocument []byte, clientIDs ...string) *domain.ApplicationIdempotencyKey {
+		return &domain.ApplicationIdempotencyKey{
+			ProjectID:     appProjectID,
+			KeyHash:       domain.HashSecret(key),
+			RequestHash:   domain.HashSecret(string(requestDocument)),
+			ApplicationID: "app_1",
+			Created:       true,
+			ClientIDs:     clientIDs,
+		}
+	}
+	expectRecord := func(f applicationFixture, stored *domain.ApplicationIdempotencyKey) *servicemocks.MockAllStatementsGetApplicationIdempotencyKeyCall {
+		if stored == nil {
+			return f.pool.EXPECT().GetApplicationIdempotencyKey(gomock.Any(), appProjectID, domain.HashSecret(key), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+		}
+		return f.pool.EXPECT().GetApplicationIdempotencyKey(gomock.Any(), appProjectID, domain.HashSecret(key), gomock.Any()).Return(stored, nil)
+	}
+	// expectReplay expects the replay's locked reads of storedShop, which holds
+	// the client web as row client_1.
+	expectReplay := func(f applicationFixture) {
+		f.expectLockedRead(storedShop())
+		f.tx.EXPECT().ListApplicationClients(gomock.Any(), appProjectID, "app_1").
+			Return([]*domain.ApplicationClient{{ProjectID: appProjectID, ApplicationID: "app_1", ID: "client_1", Slug: "web", ClientID: "shop-web"}}, nil)
+	}
+
+	t.Run("a first keyed request stores its record in the write's transaction", func(t *testing.T) {
+		t.Parallel()
+		f := newApplicationFixture(t)
+		expectRecord(f, nil)
+		f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+		f.tx.EXPECT().CreateApplication(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, app *domain.Application, clients []*domain.ApplicationClient) error {
+				app.ID, app.RevisionID, clients[0].ID = "app_1", "apprev_1", "client_1"
+				return nil
+			},
+		)
+		f.expectSecrets(1)
+		f.tx.EXPECT().CreateApplicationIdempotencyKey(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, got *domain.ApplicationIdempotencyKey) error {
+				assert.WithinDuration(t, time.Now(), got.CreatedAt, time.Minute)
+				assert.True(t, got.ExpiresAt.Equal(got.CreatedAt.Add(domain.ApplicationIdempotencyKeyTTL)), "the window starts at the first request")
+				want := record(document, "client_1")
+				want.CreatedAt, want.ExpiresAt = got.CreatedAt, got.ExpiresAt
+				assert.Equal(t, want, got)
+				return nil
+			},
+		)
+
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, document, key)
+		require.NoError(t, err)
+		assert.True(t, got.Created)
+		require.Len(t, got.Secrets, 1)
+	})
+
+	t.Run("the same key and body rotates the secrets and writes no revision", func(t *testing.T) {
+		t.Parallel()
+		f := newApplicationFixture(t)
+		stored := record(document, "client_1")
+		expectRecord(f, stored)
+		expectReplay(f)
+		f.tx.EXPECT().DeleteApplicationClientSecrets(gomock.Any(), appProjectID, "client_1").Return(nil)
+		secrets := f.expectSecrets(1)
+
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, document, key)
+		require.NoError(t, err)
+		assert.True(t, got.Created, "a retry answers with the first request's status")
+		assert.Equal(t, "apprev_1", got.Application.RevisionID)
+		assert.Equal(t, []service.ApplicationClientSecret{{Slug: "web", ClientID: "shop-web", Secret: "sk_client_1"}}, got.Secrets)
+		assert.Equal(t, []*domain.ApplicationClientSecret{
+			{ProjectID: appProjectID, ApplicationClientID: "client_1", SecretHash: domain.HashSecret("sk_client_1")},
+		}, *secrets)
+
+		require.Len(t, *f.events, 1)
+		ev := (*f.events)[0]
+		assert.Equal(t, domain.EventTypeApplicationClientSecretRotated, ev.EventType)
+		assert.Equal(t, "app_1", *ev.EntityID)
+		assert.JSONEq(t, `{"client_ids":["shop-web"],"revision_id":"apprev_1"}`, string(ev.Payload))
+	})
+
+	t.Run("a record without clients rotates nothing and emits nothing", func(t *testing.T) {
+		t.Parallel()
+		f := newApplicationFixture(t)
+		stored := record(document)
+		stored.Created = false
+		expectRecord(f, stored)
+		expectReplay(f)
+
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, document, key)
+		require.NoError(t, err)
+		assert.False(t, got.Created)
+		assert.Empty(t, got.Secrets)
+		assert.Empty(t, *f.events)
+	})
+
+	t.Run("another body is refused before the document is validated", func(t *testing.T) {
+		t.Parallel()
+		f := newApplicationFixture(t)
+		expectRecord(f, record(document, "client_1"))
+
+		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, []byte(`{"slug":"shop","name":"Shop","clients":[]}`), key)
+		assert.ErrorIs(t, err, domain.ErrApplicationIdempotencyKeyReused())
+	})
+
+	t.Run("a refused first request stores no key and returns its own error", func(t *testing.T) {
+		t.Parallel()
+		f := newApplicationFixture(t)
+		expectRecord(f, nil).Times(2)
+
+		_, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, []byte(`{"slug":"shop","name":"Shop","clients":[]}`), key)
+		assert.ErrorIs(t, err, domain.ErrRequestInvalid())
+	})
+
+	t.Run("a write that loses to a request with the same key runs as its retry", func(t *testing.T) {
+		t.Parallel()
+		f := newApplicationFixture(t)
+		gomock.InOrder(
+			expectRecord(f, nil),
+			expectRecord(f, record(document, "client_1")),
+		)
+		f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(storedShop(), nil)
+		f.expectLockedRead(storedShop())
+		f.tx.EXPECT().ReviseApplication(gomock.Any(), gomock.Any(), gomock.Len(0)).Return(nil)
+		f.tx.EXPECT().CreateApplicationIdempotencyKey(gomock.Any(), gomock.Any()).
+			Return(database.NewUniqueError("application_idempotency_keys", "", nil))
+		expectReplay(f)
+		f.tx.EXPECT().DeleteApplicationClientSecrets(gomock.Any(), appProjectID, "client_1").Return(nil)
+		f.expectSecrets(1)
+
+		got, err := f.svc.CreateOrReviseRegistered(t.Context(), appProjectID, document, key)
+		require.NoError(t, err)
+		assert.True(t, got.Created)
+		require.Len(t, got.Secrets, 1)
+		require.Len(t, *f.events, 1, "the revision that lost emitted nothing")
+		assert.Equal(t, domain.EventTypeApplicationClientSecretRotated, (*f.events)[0].EventType)
 	})
 }
 

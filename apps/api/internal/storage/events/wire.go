@@ -62,6 +62,9 @@ func MarshalWire(e *domain.Event) ([]byte, error) {
 	if e.FlowID != nil {
 		m["flow_id"] = *e.FlowID
 	}
+	if e.CorrelationID != nil {
+		m["correlation_id"] = *e.CorrelationID
+	}
 	meta := NormalizeJSON(e.Metadata)
 	if len(meta) > 0 && string(meta) != "{}" && string(meta) != "null" {
 		m["metadata"] = json.RawMessage(meta)

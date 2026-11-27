@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -196,6 +197,18 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 		return flowengine.StepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
 	}
 	audit.BindPublicRequest(ctx, req.Definition.ProjectID, flowID, sessionID)
+	// The flow is a carrier, and so is the attempt the state machine creates
+	// for it: both store the chain this request is in from here on. A flow
+	// created for an authorization request is in that request's chain.
+	if req.AuthRequestID != nil {
+		if err := s.joinAuthRequest(ctx, req.Definition.ProjectID, *req.AuthRequestID); err != nil {
+			return flowengine.StepResult{}, err
+		}
+	}
+	correlationID, err := audit.EnsureCorrelation(ctx)
+	if err != nil {
+		return flowengine.StepResult{}, err
+	}
 
 	in := flowengine.StartInput{
 		ID:            flowID,
@@ -204,6 +217,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 		Session:       flowengine.SessionRef{ID: sessionID},
 		RedirectURI:   req.RedirectURI,
 		UserSchemaURL: userSchema.URL,
+		CorrelationID: correlationID,
 	}
 	if req.AuthRequestID != nil {
 		in.AuthRequest = &flowengine.AuthRequestRef{ID: *req.AuthRequestID}
@@ -222,6 +236,22 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 		return flowengine.StepResult{}, err
 	}
 	return result, nil
+}
+
+// joinAuthRequest puts the request into the chain of the authorization
+// request a flow is created for. A request the project does not hold starts
+// no chain and is not an error here: the flow keeps the ID it was given, as
+// before, and whatever redeems it decides.
+func (s *flowService) joinAuthRequest(ctx context.Context, projectID, authRequestID string) error {
+	request, err := s.v2Pool.Statements().GetAuthRequest(ctx, projectID, authRequestID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil
+		}
+		return fmt.Errorf("flow service: read auth request: %w", err)
+	}
+	audit.JoinCorrelation(ctx, request.CorrelationID)
+	return nil
 }
 
 func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res flowengine.StepResult, err error) {

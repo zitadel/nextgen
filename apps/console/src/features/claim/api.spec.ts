@@ -1,4 +1,4 @@
-import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
+import { CSRF_HEADER } from "@/auth/csrf";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,7 +19,7 @@ describe("completeProjectClaim", () => {
   // The claim route's loader reads the session, and with it the CSRF token,
   // before the completion step renders. The completion does not read them
   // again: if that token read failed, the refused write recovers through the
-  // shared fetch's rejection handler, as any console write does.
+  // `SessionCsrf`'s re-check, as any console write does.
   it("recovers when the loader could not read the token", async () => {
     let tokenReads = 0;
     const sent: Array<string | null> = [];

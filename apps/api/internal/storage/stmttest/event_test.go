@@ -62,6 +62,8 @@ func TestEventStatements_InsertAndGet(t *testing.T) {
 		ensureEventProject(t, d.stmts, projectID)
 
 		entity := sampleEvent(projectID, eventID)
+		chain := "chain_sample"
+		entity.CorrelationID = &chain
 		require.NoError(t, d.stmts.InsertEvent(t.Context(), entity))
 		assert.False(t, entity.CreatedAt.IsZero())
 		assert.False(t, entity.OccurredAt.IsZero())
@@ -79,6 +81,8 @@ func TestEventStatements_InsertAndGet(t *testing.T) {
 		assert.Equal(t, *entity.ActorID, *got.ActorID)
 		require.NotNil(t, got.UserID, "the user the event concerns is read back")
 		assert.Equal(t, *entity.UserID, *got.UserID)
+		require.NotNil(t, got.CorrelationID, "the chain the event belongs to is read back")
+		assert.Equal(t, chain, *got.CorrelationID)
 		assert.JSONEq(t, string(entity.Payload), string(got.Payload))
 		assert.Nil(t, got.OperationID, "only a request event names an operation")
 		assert.Nil(t, got.StatusClass)
@@ -234,16 +238,16 @@ func TestEventStatements_ListKeyset_Desc(t *testing.T) {
 }
 
 // The reads the events indexes serve (migrations events_filter_indexes,
-// events_value_indexes, events_request_indexes and events_user_id): by
-// category, type, actor, user, resource and resource type, by operation and
-// status class, and the events of one request, session or login flow. Each
-// returns exactly its rows.
+// events_value_indexes, events_request_indexes, events_user_id and
+// events_correlation_id): by category, type, actor, user, resource and
+// resource type, by operation and status class, and the events of one
+// request, session, login flow or chain. Each returns exactly its rows.
 func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueEventIDs(t)
 		ensureEventProject(t, d.stmts, projectID)
 
-		request, session, flow := "req_1", "sess_1", "flow_1"
+		request, session, flow, chain := "req_1", "sess_1", "flow_1", "chain_1"
 		alice, service, resource := "user_alice", "svc_backend", "user_bob"
 		createUser, getMyUser := "createUser", "getMyUser"
 		ok, failed := domain.HTTPStatusClassSuccessful, domain.HTTPStatusClassClientError
@@ -257,12 +261,13 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 			request     *string
 			session     *string
 			flow        *string
+			chain       *string
 			operation   *string
 			statusClass *domain.HTTPStatusClass
 		}{
 			{id: "evt-001", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &alice, request: &request, session: &session, operation: &createUser, statusClass: &ok},
-			{id: "evt-002", eventType: domain.EventTypeUserCreated, category: domain.EventCategoryEntity, actor: &alice, entity: &resource, user: &resource, request: &request},
-			{id: "evt-003", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, user: &resource, session: &session, flow: &flow},
+			{id: "evt-002", eventType: domain.EventTypeUserCreated, category: domain.EventCategoryEntity, actor: &alice, entity: &resource, user: &resource, request: &request, chain: &chain},
+			{id: "evt-003", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, user: &resource, session: &session, flow: &flow, chain: &chain},
 			{id: "evt-004", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, actor: &service},
 			{id: "evt-005", eventType: domain.EventTypeUserDeleted, category: domain.EventCategoryEntity, actor: &service, entity: &resource, user: &resource},
 			{id: "evt-006", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &service, operation: &createUser, statusClass: &failed},
@@ -276,6 +281,7 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 				event.EntityType = nil
 			}
 			event.RequestID, event.SessionID, event.FlowID = seed.request, seed.session, seed.flow
+			event.CorrelationID = seed.chain
 			event.OperationID, event.StatusClass = seed.operation, seed.statusClass
 			require.NoError(t, d.stmts.InsertEvent(t.Context(), event))
 		}
@@ -291,6 +297,8 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 			"request":  {filter: equal(domain.EventFieldRequestID, request), want: []string{"evt-002", "evt-001"}},
 			"session":  {filter: equal(domain.EventFieldSessionID, session), want: []string{"evt-003", "evt-001"}},
 			"flow":     {filter: equal(domain.EventFieldFlowID, flow), want: []string{"evt-003"}},
+			// Two requests of one piece of work: the chain joins them.
+			"chain":    {filter: equal(domain.EventFieldCorrelationID, chain), want: []string{"evt-003", "evt-002"}},
 			"type":     {filter: equal(domain.EventFieldEventType, string(domain.EventTypeAuthCheckSucceeded)), want: []string{"evt-004", "evt-003"}},
 			"resource": {filter: equal(domain.EventFieldEntityID, resource), want: []string{"evt-005", "evt-002"}},
 			"actor in one category": {

@@ -67,6 +67,12 @@ type State struct {
 	// parent's next step. Empty for non-stacked flows.
 	PivotStack []Progress
 
+	// CorrelationID is the chain of requests the flow belongs to: the one of
+	// the authorization request it was created for, else its own. Every
+	// request of the flow joins it (ADR 048, amendment of 2026-11-26). Empty
+	// in a state sealed before chains.
+	CorrelationID string
+
 	// AuthRequestID, when set, identifies the OIDC authorization request
 	// this flow is fulfilling. Nil for flows started outside an OIDC
 	// context (e.g. standalone registration or recovery).

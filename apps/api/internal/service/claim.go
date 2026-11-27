@@ -167,6 +167,11 @@ func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (
 	if err != nil {
 		return nil, err
 	}
+	// The challenge is a carrier: the polls for its status and the completion
+	// in the browser reach the claim's chain through it.
+	if challenge.CorrelationID, err = audit.EnsureCorrelation(ctx); err != nil {
+		return nil, err
+	}
 	if err := stmts.CreateChallenge(ctx, challenge); err != nil {
 		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to create claim challenge")
 	}
@@ -198,6 +203,7 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 	if subtle.ConstantTimeCompare([]byte(challenge.InitiatingSecretHash), []byte(secretHash)) == 0 {
 		return nil, domain.ErrProjectPermissionDenied()
 	}
+	audit.JoinCorrelation(ctx, challenge.CorrelationID)
 	// The grant, not the polled challenge, is the claim source of truth
 	// (ADR 046 §1): a project claimed through another challenge reports
 	// completed with its owning team — the poller's goal state is reached
@@ -249,6 +255,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 			}
 			return err
 		}
+		audit.JoinCorrelation(ctx, challenge.CorrelationID)
 		// The claimed-check runs before both expiry checks and also answers a
 		// re-spent completed challenge: completion wrote the grant in this
 		// same transaction shape, so a completed challenge always reports 409
@@ -353,12 +360,14 @@ func (s *claimService) Window(ctx context.Context, projectID, challengeID string
 	defer end(&err)
 
 	var stmts claimStatements = s.v2Pool.Statements()
-	if _, err := stmts.GetChallengeByID(ctx, projectID, domain.HashClaimChallengeToken(challengeID)); err != nil {
+	challenge, err := stmts.GetChallengeByID(ctx, projectID, domain.HashClaimChallengeToken(challengeID))
+	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrClaimChallengeNotFound()
 		}
 		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to load claim challenge")
 	}
+	audit.JoinCorrelation(ctx, challenge.CorrelationID)
 	project, err := stmts.GetProjectByID(ctx, projectID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {

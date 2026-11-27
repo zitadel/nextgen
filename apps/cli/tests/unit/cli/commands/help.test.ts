@@ -62,6 +62,7 @@ Project settings
   origin           Manage the project's allowed origins
   variable         Manage project variables
   upgrade          Upgrade this project to the latest Zitadel release
+  settings         Change the project's protocol settings
 
 Releases
   deploy           Apply your local configuration to Zitadel

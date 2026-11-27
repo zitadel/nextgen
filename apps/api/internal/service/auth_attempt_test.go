@@ -12,6 +12,7 @@ import (
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
@@ -611,19 +612,17 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 			ctx := audit.WithActorSlot(t.Context())
 			err := svc.SetSSOCallbackResult(ctx, "proj", check, tt.result, tt.eventType)
 
-			slot, ok := audit.ActorSlotFromContext(ctx)
-			require.True(t, ok)
+			correlation := middleware.CorrelationFromContext(ctx)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
-				assert.Nil(t, slot.FlowID, "a refused callback joins no flow")
+				assert.Empty(t, correlation.Flow(), "a refused callback joins no flow")
 				return
 			}
 			require.NoError(t, err)
 			require.NotNil(t, gotEvent)
 			require.NotNil(t, gotEvent.FlowID, "the event joins the attempt's flow")
 			assert.Equal(t, "flow_1", *gotEvent.FlowID)
-			require.NotNil(t, slot.FlowID, "the callback's request event joins it too")
-			assert.Equal(t, "flow_1", *slot.FlowID)
+			assert.Equal(t, "flow_1", correlation.Flow(), "the callback's request event joins it too")
 			assert.Equal(t, tt.eventType, gotEvent.EventType)
 			assert.Equal(t, "proj", gotEvent.ProjectID)
 			require.NotNil(t, gotEvent.EntityID)

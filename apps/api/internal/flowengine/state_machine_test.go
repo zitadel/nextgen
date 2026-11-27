@@ -286,6 +286,7 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 		UserSchemaURL: defaultSchemaURL,
 		DeploymentID:  "dep_1",
 		ReleaseID:     "rel_1",
+		CorrelationID: "chain_1",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.Step)
@@ -296,6 +297,7 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 	assert.Equal(t, defaultSchemaURL, result.State.UserSchemaURL)
 	assert.Equal(t, "dep_1", result.State.DeploymentID, "later requests read the deployment the flow started under")
 	assert.Equal(t, "rel_1", result.State.ReleaseID, "later requests read the release the flow started under")
+	assert.Equal(t, "chain_1", result.State.CorrelationID, "later requests join the flow's chain")
 	assert.True(t, containsFieldName(result.Step.Fields, "email"))
 	act, ok := findAction(result.Step.Actions, flowengine.ActionSubmit)
 	assert.True(t, ok)

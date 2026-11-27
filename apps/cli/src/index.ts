@@ -40,6 +40,7 @@ import ReleaseRevoke from "./cli/commands/release/revoke";
 import Reset from "./cli/commands/server/reset";
 import { RESOURCE_COMMANDS, type ResourceTable } from "./cli/commands/resources";
 import ResourcesList from "./cli/commands/resources-list";
+import SettingsOauthEnable from "./cli/commands/settings/oauth/enable";
 import Setup from "./cli/commands/setup/index";
 import SkillsAdd from "./cli/commands/skills/add";
 import Start from "./cli/commands/server/start";
@@ -111,6 +112,7 @@ export const WORKFLOW_COMMANDS = {
   "preview:rm": PreviewRm,
   "release:create": ReleaseCreate,
   "release:revoke": ReleaseRevoke,
+  "settings:oauth:enable": SettingsOauthEnable,
   "skills:add": SkillsAdd,
   "tests:add": TestsAdd,
   "variable:set": VariableSet,
@@ -127,6 +129,7 @@ export const WORKFLOW_COMMANDS = {
 export const NO_PLURAL: Readonly<Record<string, string>> = {
   api: "names the API, which is one thing, and calls an operation of it",
   branding: "a mass noun: a project has branding, not brandings",
+  settings: "named in the plural already",
   skills: "named in the plural already",
   tests: "named in the plural already",
 };

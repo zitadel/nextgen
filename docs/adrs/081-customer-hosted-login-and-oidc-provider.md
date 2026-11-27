@@ -585,3 +585,19 @@ project's newest primary deployment
 ([ADR 085](085-which-release-serves-a-request.md)). The rest of §10 stands: the
 code carries the deployment for an authorization code grant, and a refresh and
 userinfo resolve the newest deployment to the token's issuer.
+
+## Amendment (2026-11-25): §5–§7, the issuer's path and the switch's file
+
+The issuer carries the project in its path rather than being the bare origin:
+a project's issuer is `{origin}{prefix}/oauth/{project_id}`, the origin being
+the one §5 admits and the prefix empty, or `/__nextgen` when the request came
+through the app's proxy (`X-Forwarded-Prefix`, §6); the platform's own issuer
+is `{public_base}/oauth` on the server's public origin.
+The §6 namespace and the two reserved `/.well-known/` paths of §7 stand.
+
+The switch of §7 is the one file `.zitadel/oauth/oauth.json`, a directory kind
+holding at most one descriptor like `.zitadel/branding/`, which
+`zitadel settings oauth enable` (the working name `zitadel oauth enable` is
+retired; [ADR 082 §12](082-oauth-and-oidc-server.md)) writes as a local edit:
+`zitadel deploy` ships it as the release's `oauth` resource, and a release
+without it leaves the authorization server off.

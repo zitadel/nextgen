@@ -149,6 +149,8 @@ type StartInput struct {
 	// keeps them for every later request of the flow.
 	DeploymentID string
 	ReleaseID    string
+	// CorrelationID is the chain of requests the flow belongs to.
+	CorrelationID string
 }
 
 // SubmitInput carries a single client submission.
@@ -398,6 +400,7 @@ func (r *Runtime) Start(ctx context.Context, in StartInput) (StepResult, error) 
 		UserSchemaURL: in.UserSchemaURL,
 		DeploymentID:  in.DeploymentID,
 		ReleaseID:     in.ReleaseID,
+		CorrelationID: in.CorrelationID,
 		Progress: Progress{
 			DefinitionID:   in.Definition.ID,
 			Purpose:        in.Purpose,

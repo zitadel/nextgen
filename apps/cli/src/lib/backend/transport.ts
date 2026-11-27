@@ -9,7 +9,8 @@ import { translateFailure } from "./client";
  * other call goes through a service.
  */
 export { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
-export { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
+/** The header the session-bound CSRF token travels in (ADR 053 §5). */
+export const CSRF_HEADER = "X-Zitadel-CSRF";
 export { Paging } from "@zitadel/api/runtime/paging";
 
 /**
