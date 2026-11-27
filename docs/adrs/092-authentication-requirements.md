@@ -10,6 +10,7 @@
 > [ADR 066](066-operation-policies.md),
 > [ADR 072](072-session-idle-and-absolute-lifetime.md),
 > [ADR 078](078-abuse-prevention-in-layers.md),
+> [ADR 081](081-customer-hosted-login-and-oidc-provider.md),
 > [ADR 085](085-which-release-serves-a-request.md)
 
 This ADR proposes how a customer states which authentication a project requires
@@ -33,18 +34,18 @@ finer applicability to a later slice.
 
 ## Terminology
 
-| Term                       | Definition                                                                                                                                                                    |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Method**                 | A way to authenticate (e.g., password, passkey, TOTP code).                                                                                                                   |
-| **Enroll**                 | Adding a method to a user's account for future authentication.                                                                                                                |
-| **Factor type**            | What a method proves: something the user knows, has, or is.                                                                                                                   |
-| **User verification (UV)** | Authenticator verification via PIN or biometric ([WebAuthn](https://www.w3.org/TR/webauthn-3/#user-verification)), reported in the assertion's UV flag.                       |
-| **Policy**                 | A project's operation policy holding the settings in this ADR ([ADR 066](066-operation-policies.md)), deployed with a release.                                                |
-| **Check**                  | A single completed verification in a session: a completed method, external sign-in, or recovery check.                                                                        |
-| **Proof**                  | The checks completed in a session, each with its completion timestamp.                                                                                                        |
-| **Requirement**            | What the proof must satisfy, defined by policy and optionally tightened by a request.                                                                                         |
-| **Attempt**                | A series of challenges to complete checks. Completing an attempt creates a session or appends checks to an existing one ([ADR 010](010-session-auth-attempt-check-model.md)). |
-| **App**                    | The customer's application (via the session API or as an OIDC/OAuth client), including its backend API that consumes tokens.                                                  |
+| Term                       | Definition                                                                                                                                                                                                                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Method**                 | A way to authenticate (e.g., password, passkey, TOTP code).                                                                                                                                                                                                                                             |
+| **Enroll**                 | Adding a method to a user's account for future authentication.                                                                                                                                                                                                                                          |
+| **Factor type**            | What a method proves: something the user knows, has, or is.                                                                                                                                                                                                                                             |
+| **User verification (UV)** | Authenticator verification via PIN or biometric ([WebAuthn](https://www.w3.org/TR/webauthn-3/#user-verification)), reported in the assertion's UV flag.                                                                                                                                                 |
+| **Policy**                 | A project's operation policy holding the settings in this ADR ([ADR 066](066-operation-policies.md)), deployed with a release.                                                                                                                                                                          |
+| **Check**                  | A single completed verification in a session: a completed method, external sign-in, or recovery check.                                                                                                                                                                                                  |
+| **Proof**                  | The checks completed in a session, each with its completion timestamp.                                                                                                                                                                                                                                  |
+| **Requirement**            | What the proof must satisfy, defined by policy and optionally tightened by a request.                                                                                                                                                                                                                   |
+| **Attempt**                | A series of challenges to complete checks. Completing an attempt creates a session or appends checks to an existing one ([ADR 010](010-session-auth-attempt-check-model.md)).                                                                                                                           |
+| **App**                    | The customer's application, including any backend API that consumes tokens. An app that hosts the login calls the session API directly ([ADR 081](081-customer-hosted-login-and-oidc-provider.md#1-the-customers-app-hosts-the-login)), while an OIDC/OAuth client app uses the authorization endpoint. |
 
 ## Proposal
 
@@ -62,16 +63,26 @@ The table shows the policy setting and the request parameter for each property.
 
 | Property            | What the proof has to show                                                  | Setting in the policy  | Parameter in a request |
 | ------------------- | --------------------------------------------------------------------------- | ---------------------- | ---------------------- |
-| Strength            | At least two different factor types                                         | `mfa`                  | `acr_values=mfa`       |
-| Phishing resistance | A method that a fake login page cannot capture and reuse                    | `phishing_resistant`   | `acr_values=phr`       |
+| Strength            | At least two different factor types                                         | `mfa`                  | `acr_values`           |
+| Phishing resistance | A method that a fake login page cannot capture and reuse                    | `phishing_resistant`   | `acr_values`           |
 | Age                 | Every check that counts toward the requirement is within a limit in seconds | `max_age_seconds`      | `max_age`              |
 | Recent check        | A qualifying check is within a limit in seconds                             | `recent_check_seconds` | `recent_check`         |
 
+The `acr_values` parameter takes the following values. Each has the same meaning
+in every project:
+
+| Value                     | The proof shows                                                                                  | Defined by                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `urn:zitadel:loa:2fa:any` | At least two different factor types                                                              | This ADR                                                                                            |
+| `urn:zitadel:loa:1fa:phr` | A phishing-resistant method                                                                      | This ADR                                                                                            |
+| `urn:zitadel:loa:2fa:phr` | At least two different factor types and a phishing-resistant method                              | This ADR                                                                                            |
+| `phr`                     | The same as `urn:zitadel:loa:1fa:phr`. A request that sends `phr` gets `phr` in the `acr` claim. | [OpenID Connect EAP ACR Values §2](https://openid.net/specs/openid-connect-eap-acr-values-1_0.html) |
+
 - **Combining strength and phishing resistance:** A request requiring both sends
-  `acr_values=mfa-phr`. Sending `mfa` and `phr` as separate space-delimited
-  values does not require both, because OpenID Connect treats multiple
-  `acr_values` as an ordered preference list and returns only one in the token's
-  `acr` claim
+  `urn:zitadel:loa:2fa:phr`. Sending the other two values as separate
+  space-delimited values does not require both, because OpenID Connect treats
+  multiple `acr_values` as an ordered preference list and returns only one in
+  the token's `acr` claim
   ([OpenID Connect Core §3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest)).
 - **Age applies to every required check:** Under `mfa` with a 5-minute limit, a
   2-hour-old password verification must be repeated even if the TOTP code is 1 minute old.
@@ -80,22 +91,23 @@ The table shows the policy setting and the request parameter for each property.
   `recent_check`, a user whose password and TOTP code are both 2 hours old only
   needs to enter a new TOTP code; the 2-hour-old password still counts.
 
-Which check qualifies depends on the requirement in force:
+Which check qualifies depends on the requirement in force. The table names a
+requirement by its policy setting, whether the policy or a request sets it:
 
-| Requirement in force            | Qualifying check                                                                                                             |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| No `mfa`, no `phr`              | Any method that completes a sign-in, including a password or an external sign-in                                             |
-| `mfa`                           | Any method except a password; a passkey with user verification, or without it when the checks of the same attempt meet `mfa` |
-| `phr`                           | A passkey                                                                                                                    |
-| `mfa-phr`, or both policy flags | A passkey with user verification, or without it when the checks of the same attempt meet `mfa`                               |
+| Requirement in force                   | Qualifying check                                                                                                             |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Neither `mfa` nor `phishing_resistant` | Any method that completes a sign-in, including a password or an external sign-in                                             |
+| `mfa`                                  | Any method except a password; a passkey with user verification, or without it when the checks of the same attempt meet `mfa` |
+| `phishing_resistant`                   | A passkey                                                                                                                    |
+| `mfa` and `phishing_resistant`         | A passkey with user verification, or without it when the checks of the same attempt meet `mfa`                               |
 
 - A recovery check never qualifies
 - An external sign-in:
-  - never qualifies when neither `mfa` nor `phr` applies
-  - never qualifies under `phr` or `mfa-phr`
+  - never qualifies when neither `mfa` nor `phishing_resistant` applies
+  - never qualifies under `phishing_resistant`
   - qualifies under `mfa` when its connection is trusted and `amr` contains
     `mfa`
-- For a passkey under `mfa` or `mfa-phr`, the server sets `user_verification` to
+- For a passkey under `mfa`, the server sets `user_verification` to
   `preferred` and reads the UV flag of the response. With the flag set, the
   passkey qualifies. Without it, the passkey qualifies only when the checks
   completed in the same attempt meet `mfa` together, such as a password and the
@@ -138,7 +150,7 @@ yet is listed under [Open questions](#open-questions).
 | Feature                | How the model handles it                                                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Mandatory MFA**      | Policy sets `mfa`; every sign-in is evaluated against it.                                                                                  |
-| **Step-up**            | Proof lacks a factor type or phishing-resistant method; apps trigger it via `acr_values=mfa`, `phr`, or `mfa-phr`.                         |
+| **Step-up**            | Proof lacks a factor type or phishing-resistant method; apps trigger it via `acr_values` ([§1](#1-model)).                                 |
 | **Reauthentication**   | Proof is too old; the user repeats any checks exceeding the age limit, or completes a single fresh check when only a recent check applies. |
 | **Conditional MFA**    | App evaluates custom conditions (e.g., a stricter workspace) and sends `acr_values` when they apply.                                       |
 | **Adaptive MFA**       | The app or an external service assesses risk. The app sends `acr_values` to step up, or blocks the attempt on rejection.                   |
@@ -164,7 +176,8 @@ Each method proves a fixed factor type.
   server sets `user_verification` to `required`, because a passkey without user
   verification cannot meet `mfa` for any user of that schema.
 - **No same-type stacking:** Two possession methods (e.g., TOTP + SMS) count as
-  one factor type and do not satisfy `mfa`.
+  one factor type and do not satisfy `mfa`
+  ([#3166](https://github.com/zitadel/nextgen/issues/3166)).
 - **Non-factor checks:** Recovery checks and external sign-ins count as no
   factor type, except as defined in [§4.4](#44-account-recovery) and
   [§4.5](#45-external-sign-in).
@@ -329,7 +342,8 @@ methods before completion:
   limits how long an app that refreshes its tokens keeps access
   ([Open question 3](#open-questions)).
 - With the session API, the server evaluates an existing session when the app
-  starts a new attempt for it (`POST /auth_attempts` with `session_id`). Reading
+  that hosts the login starts a new attempt for it (`POST /auth_attempts` with
+  `session_id`). Reading
   the session (`getSession`) does not evaluate it. After a stricter policy is
   deployed, a session that satisfied the old policy therefore keeps access until
   the app starts a new attempt for it ([Open question 3](#open-questions)).
@@ -347,14 +361,13 @@ Because the server does not know which app actions are sensitive, the app sends
 
 The following rules apply to the values:
 
-- `mfa`, `phr` and `mfa-phr` have identical meaning across all projects. `phr`
-  is defined by
-  [OpenID Connect EAP ACR Values](https://openid.net/specs/openid-connect-eap-acr-values-1_0.html);
-  `mfa` and `mfa-phr` are defined by this ADR.
+- The values of `acr_values` are listed in [§1](#1-model) and have identical
+  meaning across all projects.
 - Multiple `acr_values` are alternatives in preference order
   ([RFC 9470](https://www.rfc-editor.org/rfc/rfc9470)); the server selects the
-  first value the user can meet with enrolled methods (e.g., for `phr mfa`, a
-  user without a passkey falls back to `mfa`).
+  first value the user can meet with enrolled methods (e.g., for
+  `urn:zitadel:loa:1fa:phr urn:zitadel:loa:2fa:any`, a user without a passkey
+  falls back to the second value).
 - `acr_values` and `max_age` can be combined. `max_age=0` and `prompt=login` are
   equivalent
   ([OpenID Connect Core §3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest)).
@@ -365,7 +378,8 @@ The following rules apply to the values:
   qualifying check is older than the limit, the user completes one fresh check
   while older checks remain in the proof. When `mfa` is not required, a password
   alone satisfies `recent_check`; to require a recent second factor (such as
-  TOTP), the app must send `acr_values=mfa` alongside `recent_check`.
+  TOTP), the app must send
+  `acr_values=urn:zitadel:loa:2fa:any` alongside `recent_check`.
 
 **Refused requests:** The server refuses a request if:
 
@@ -396,14 +410,26 @@ recommends for access tokens. With `prompt=none`, insufficient proof returns
 **Reporting the result:**
 
 - **OIDC / OAuth tokens:** Access tokens (and ID tokens for OIDC) include `acr`,
-  `auth_time`, and `recent_check_at`. A token refresh does not change their
-  values, because the user does not authenticate again.
+  `amr`, `auth_time`, and `recent_check_at`. A token refresh does not change
+  their values, because the user does not authenticate again.
   [RFC 9470 §6.1](https://www.rfc-editor.org/rfc/rfc9470#section-6.1) states
   this for an access token, and
   [OpenID Connect Core §12.2](https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse)
   requires it for `auth_time` in an ID token.
   - `acr`: First value from `acr_values` satisfied by the proof (omitted if
     `acr_values` was not requested).
+  - `amr`: The methods of the checks that `auth_time` is computed from, with the
+    values in the table. An external sign-in and a recovery check have no value,
+    and the claim is omitted when no check has one.
+
+    | Value | Check                                                        | Defined by                                                                                          |
+    | ----- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+    | `pwd` | Password                                                     | [RFC 8176 §2](https://www.rfc-editor.org/rfc/rfc8176#section-2)                                     |
+    | `otp` | TOTP code                                                    | [RFC 8176 §2](https://www.rfc-editor.org/rfc/rfc8176#section-2)                                     |
+    | `sms` | SMS code                                                     | [RFC 8176 §2](https://www.rfc-editor.org/rfc/rfc8176#section-2)                                     |
+    | `pop` | Passkey                                                      | [OpenID Connect EAP ACR Values §3](https://openid.net/specs/openid-connect-eap-acr-values-1_0.html) |
+    | `mfa` | Added when the listed checks show two different factor types | [RFC 8176 §2](https://www.rfc-editor.org/rfc/rfc8176#section-2)                                     |
+
   - `auth_time`: The time from which the user's checks satisfy the requirement.
     A combination of checks is as old as its oldest check, and if several
     combinations satisfy the requirement, the server reports the most recent
@@ -417,7 +443,8 @@ recommends for access tokens. With `prompt=none`, insufficient proof returns
     API and is included even when `recent_check` was not requested. In the
     example above, `recent_check_at` is 1 minute ago.
 
-  Either claim is omitted when its check is an external sign-in without
+  `auth_time` or `recent_check_at` is omitted when its check is an external
+  sign-in without
   `auth_time` ([§4.5](#45-external-sign-in)).
 
 - **Mandatory app validation:** Because authorization parameters transit the
@@ -431,9 +458,9 @@ recommends for access tokens. With `prompt=none`, insufficient proof returns
   insufficient, the API returns `insufficient_user_authentication` so the app
   initiates a new request ([RFC 9470](https://www.rfc-editor.org/rfc/rfc9470)).
 - **Session API:** Returns `factors` (each verified check with `verified_at`,
-  plus `user_verified` for passkeys) and `assurance_levels` (which of `mfa`,
-  `phr`, `mfa-phr` are met; the session does not report the age of the proof,
-  see [Open question 8](#open-questions)).
+  plus `user_verified` for passkeys) and `assurance_levels` (which `acr`
+  values of [§1](#1-model) are met; the session does not report the
+  age of the proof, see [Open question 8](#open-questions)).
 - **User-facing message:** The login page or the app tells the user why a check
   is needed or why it cannot be completed. The server returns `required_factors`
   for the first case and an error code for the second.
@@ -598,7 +625,8 @@ session, and the following rules apply to it:
 3. Recovery checks cannot authorize method changes, except for replacing a lost
    method under [Account Recovery](#44-account-recovery).
 4. Enrolling the first method of a factor type follows `first_enrollment`,
-   preventing users refused under `acr_values=phr` from bypassing the refusal
+   preventing users refused under
+   `acr_values=urn:zitadel:loa:1fa:phr` from bypassing the refusal
    via account settings. Whether this also holds when `first_enrollment` is not
    set is open ([Open question 7](#open-questions)).
 5. Removing a passkey requires verifying with _another_ passkey, and users with
@@ -705,8 +733,15 @@ event, with who performed it and when
 11. **Email codes and magic links:**
     [ADR 038](038-user-credential-migration-and-recovery.md#magic-links-and-email-codes)
     defines both as methods and recovery routes, but this ADR has no rules for
-    them and the server cannot deliver messages today. Should the server return
-    a verification code via API for the app to deliver?
+    them. The server returns the code or the link in the API response and the
+    app delivers it, as `createInvitation` does for its link.
+    [#3166](https://github.com/zitadel/nextgen/issues/3166) names email only as
+    an identifier. Does an email code count as possession, like an SMS code, or
+    as no factor type?
+    [NIST SP 800-63B-4 §3.1.3.1](https://pages.nist.gov/800-63-4/sp800-63b.html#ooba)
+    says: "Email SHALL NOT be used for out-of-band authentication because it may
+    be vulnerable to" access using only a password, interception in transit or
+    at intermediate mail servers, and rerouting attacks.
 12. **Trusted devices and biometrics:**
     [#3166](https://github.com/zitadel/nextgen/issues/3166) cites both as
     examples, but the server does not track trusted devices and UV does not
