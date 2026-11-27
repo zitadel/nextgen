@@ -41,13 +41,13 @@ var errResourceGone = errors.New("authz: resource gone")
 func projectRelation(op accessOp) string {
 	switch op {
 	case opRead:
-		return "viewer"
+		return domain.ProjectRoleViewer
 	case opWrite:
-		return "editor"
+		return domain.ProjectRoleEditor
 	case opDelete:
-		return "admin"
+		return domain.ProjectRoleAdmin
 	default:
-		return "admin"
+		return domain.ProjectRoleAdmin
 	}
 }
 
@@ -487,38 +487,34 @@ func mapCeilingError(err error, res resourceAccess, op accessOp, rsi *domain.Res
 	}
 }
 
-// InviterAdminCheck is the invitation service's accept-time check that the
-// creator still holds the admin createInvitation required (ADR 086). It reads
-// through the accept's transaction, so it resolves the user's home itself.
-func InviterAdminCheck(platformProjectID string) service.InviterCheck {
-	return func(ctx context.Context, stmts service.AllStatements, projectID, userID string) (bool, error) {
+// ProjectRoleCheck is the invitation service's check of a user's strongest
+// role on a project (ADR 086): the inviter must still hold admin, and a
+// redeemer who holds any role is already a member. It asks the resolver, so
+// every path to the project counts, platform operators included. It reads
+// through the caller's transaction, so it resolves the user's home itself.
+func ProjectRoleCheck(platformProjectID string) service.ProjectRoleCheck {
+	return func(ctx context.Context, stmts service.AllStatements, projectID, userID string) (string, error) {
 		home, err := stmts.GetResourceScope(ctx, userID)
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return false, nil
+				return "", nil
 			}
-			return false, err
+			return "", err
 		}
 		if home.ResourceKind != domain.ResourceKindUser {
-			return false, nil
+			return "", nil
 		}
-		req := resolver.Request{
-			PrincipalType: domain.AuthzPrincipalTypeUser,
-			PrincipalID:   userID,
-			ProjectID:     projectID,
-			HomeProjectID: home.ProjectID,
-			ObjectType:    "project",
-			Relation:      projectRelation(opDelete),
-		}
-		// Set only for a user homed in the platform project (ADR 075).
-		if platformProjectID != "" && home.ProjectID == platformProjectID {
-			req.PlatformProjectID = platformProjectID
-		}
-		dec, err := resolver.New().Check(ctx, stmts, req)
+		role, err := resolver.New().StrongestProjectRole(ctx, stmts, resolver.Request{
+			PrincipalType:     domain.AuthzPrincipalTypeUser,
+			PrincipalID:       userID,
+			ProjectID:         projectID,
+			HomeProjectID:     home.ProjectID,
+			PlatformProjectID: platformProjectID,
+		})
 		if err != nil {
-			return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
+			return "", domain.ErrInternal(err).WithMessage("authz permission check failed")
 		}
-		return dec == resolver.DecisionAllow, nil
+		return role, nil
 	}
 }
 

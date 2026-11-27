@@ -15,21 +15,21 @@ import (
 // write through the session needs SeedProjectAdmin.
 func (h *Harness) SeedProjectViewer(t testing.TB, projectID, userID string) *domain.AuthzAssignment {
 	t.Helper()
-	return h.seedProjectRole(t, projectID, userID, "viewer")
+	return h.seedProjectRole(t, projectID, userID, domain.ProjectRoleViewer)
 }
 
 // SeedProjectEditor writes a project-scoped editor assignment: it passes read
 // and write checks, but not admin ones such as minting or revoking grants.
 func (h *Harness) SeedProjectEditor(t testing.TB, projectID, userID string) *domain.AuthzAssignment {
 	t.Helper()
-	return h.seedProjectRole(t, projectID, userID, "editor")
+	return h.seedProjectRole(t, projectID, userID, domain.ProjectRoleEditor)
 }
 
 // SeedProjectAdmin writes a project-scoped admin assignment: the strongest
 // role, which the seeded catalog closes to editor and viewer (ADR 054 §5).
 func (h *Harness) SeedProjectAdmin(t testing.TB, projectID, userID string) *domain.AuthzAssignment {
 	t.Helper()
-	return h.seedProjectRole(t, projectID, userID, "admin")
+	return h.seedProjectRole(t, projectID, userID, domain.ProjectRoleAdmin)
 }
 
 func (h *Harness) seedProjectRole(t testing.TB, projectID, userID, relation string) *domain.AuthzAssignment {

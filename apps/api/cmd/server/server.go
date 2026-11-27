@@ -347,7 +347,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
-	invitationService := service.NewInvitationService(serviceDBPool, keyService, grantService, userRefs, api.InviterAdminCheck(cfg.Platform.ResolvedProjectID()), consoleBase, cfg.Platform.ResolvedProjectID())
+	invitationService := service.NewInvitationService(serviceDBPool, keyService, grantService, userRefs, api.ProjectRoleCheck(cfg.Platform.ResolvedProjectID()), consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	oauthSettingsService := service.NewOAuthSettingsService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
