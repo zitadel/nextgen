@@ -73,10 +73,22 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		// that host is the server's own origin, which no customer project
 		// may claim as an issuer and the platform project's issuer sits on.
 		h.EnsureOAuthHandlers(t).Mount(mux, h.withServerLog)
-		// In front of every mount, as on the production server (withTracing).
-		h.testServer.value = httptest.NewServer(middleware.WithServerSpan(otel.GetTracerProvider())(mux))
+		// In front of every mount, as on the production server (withTracing),
+		// and each request with its correlation, which the request context
+		// middleware plants there: a carrier's chain reaches the events of a
+		// request only through it.
+		h.testServer.value = httptest.NewServer(middleware.WithServerSpan(otel.GetTracerProvider())(withCorrelation(mux)))
 	}
 	return h.testServer.value
+}
+
+// withCorrelation plants a request's correlation, as
+// middleware.WithRequestContextMiddleware does on the production server,
+// without the request ID that middleware also assigns.
+func withCorrelation(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(middleware.WithCorrelation(r.Context())))
+	})
 }
 
 // EnsureSpecValidator loads the bundled OpenAPI document every answer of the

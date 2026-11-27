@@ -1,5 +1,6 @@
 import { defineConfig } from "orval";
 
+import { zitadelClient } from "./scripts/client-builder.ts";
 import { absoluteDocsLinks } from "./scripts/docs-links.ts";
 import { markFakerUnchecked } from "./scripts/faker-nocheck.ts";
 import { writeOperations } from "./scripts/operations.ts";
@@ -21,20 +22,14 @@ export default defineConfig({
     output: {
       target: "./src/generated/endpoints",
       schemas: "./src/generated/model",
-      client: "fetch",
+      client: zitadelClient,
       mode: "split",
       mock: true,
       // A path parameter is any string the API accepts, and schema ids are
       // routinely `$id` URIs (`https://…/default-human-user.json`). Without
       // this, orval interpolates them raw and `/schemas/{schema_id}` collapses the
-      // `//` on a redirect and 404s. orval only encodes the parameters —
-      // not the `baseUrl` below — from 8.37.0 (orval-labs/orval#4179).
+      // `//` on a redirect and 404s.
       urlEncodeParameters: true,
-      // The proxy path or server URL, then the API prefix (ADR 077).
-      baseUrl: {
-        runtime: "getApiBaseUrl()",
-        imports: [{ name: "getApiBaseUrl", importPath: "../../runtime/base-url" }],
-      },
       override: {
         fetch: {
           includeHttpResponseReturnType: false,

@@ -3,7 +3,7 @@ import type {
   ListDeployments200DeploymentsItem,
 } from "@zitadel/api/generated/model";
 
-import type { Answer, ClientStubs } from "@tests/helpers/fake-client";
+import type { Answer } from "@tests/helpers/api-answers";
 
 /**
  * The project every record and service in the tests belongs to.
@@ -59,29 +59,3 @@ export type HeldVariable = GetVariable200["primary"];
  * A value the API answers for a secret variable: named, never disclosed.
  */
 export const SECRET_VARIABLE: HeldVariable = { secret: true };
-
-/**
- * The project's variables, as `listVariables` answers them.
- *
- * @param held - The values, by variable name.
- * @param kind - The one kind that holds them; left out, every kind does.
- * @returns The client stub that answers them.
- */
-export function holdingVariables(
-  held: Readonly<Record<string, HeldVariable>>,
-  kind?: "primary" | "preview",
-): ClientStubs {
-  return {
-    listVariables: async (params) => {
-      const asked = params.kind ?? "primary";
-      if (kind !== undefined && asked !== kind) {
-        return {};
-      }
-      return Object.fromEntries(
-        Object.entries(held).map(([name, value]) => {
-          return [name, { [asked]: value }];
-        }),
-      );
-    },
-  };
-}

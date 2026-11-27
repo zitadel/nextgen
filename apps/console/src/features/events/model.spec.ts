@@ -121,6 +121,7 @@ describe("eventFields", () => {
         entity_type: "user",
         entity_id: "user_2",
         request_id: "0af7651916cd43dd8448eb211c80319c",
+        correlation_id: "6c1f0d2be4a94c0f9a3d5b7e8f102a4c",
       }),
     );
     expect(fields).toEqual([
@@ -130,6 +131,7 @@ describe("eventFields", () => {
       { label: "Resource type", value: "user" },
       { label: "Resource ID", value: "user_2", id: true },
       { label: "Request ID", value: "0af7651916cd43dd8448eb211c80319c", id: true },
+      { label: "Correlation ID", value: "6c1f0d2be4a94c0f9a3d5b7e8f102a4c", id: true },
     ]);
   });
 });
@@ -368,6 +370,7 @@ describe("eventsQuery", () => {
         flow: "flow_1",
         resource_type: "user",
         client: "app_1",
+        chain: "chain_1",
         device: "fp_1",
         from: "2026-11-10T08:00:00Z",
         to: "2026-11-10T09:00:00Z",
@@ -385,6 +388,7 @@ describe("eventsQuery", () => {
       request_id: "req_1",
       session_id: "sess_1",
       flow_id: "flow_1",
+      correlation_id: "chain_1",
       fingerprint: "fp_1",
       operation_id: undefined,
       status_class: undefined,
@@ -534,11 +538,17 @@ describe("narrowing by one value", () => {
         event({ entity_type: "user", client_id: "app_1", fingerprint: "fp_1" }),
       ).map(({ filter }) => filter.key),
     ).toEqual(["type", "resource_type", "client", "device"]);
+    // An event of a sign-in, an invitation or a claim leads to its chain.
+    expect(
+      eventFilterValues(event({ correlation_id: "6c1f0d2be4a94c0f9a3d5b7e8f102a4c" })).map(
+        ({ filter, value }) => [filter.key, value],
+      ),
+    ).toContainEqual(["chain", "6c1f0d2be4a94c0f9a3d5b7e8f102a4c"]);
   });
 
-  it("follows a request, a session or a login flow through every view", () => {
+  it("follows a request, a session, a login flow or a chain through every view", () => {
     const current = parseEventsSearch({ category: "entity" });
-    for (const key of ["request", "session", "flow"] as const) {
+    for (const key of ["request", "session", "flow", "chain"] as const) {
       expect(narrowedBy(current, key, "id_1")).toMatchObject({
         view: "all",
         category: ["entity"],
@@ -599,6 +609,7 @@ describe("narrowing by one value", () => {
       "request",
       "session",
       "flow",
+      "chain",
       "device",
     ] as const;
     for (const set of keys) {
@@ -660,6 +671,7 @@ describe("what gives way, on every way into a list", () => {
       "actor_id",
       "category",
       "client_id",
+      "correlation_id",
       "created_after",
       "created_before",
       "entity_id",
@@ -775,6 +787,9 @@ describe("olderUnmatched", () => {
     ).toBe(
       "Events recorded before the server had the user, operation and status filters are not matched.",
     );
+    expect(olderUnmatched(parseEventsSearch({ chain: "0af7651916cd43dd8448eb211c80319c" }))).toBe(
+      "Events recorded before the server had the chain filter are not matched.",
+    );
   });
 
   it("says nothing under the filters every event is matched by", () => {
@@ -818,12 +833,21 @@ describe("searchMeanings", () => {
     expect(meanings("app:x")).toEqual(["client x"]);
     expect(meanings("application:x")).toEqual(["client x"]);
     expect(meanings("operation:getProject")).toEqual(["operation getProject"]);
+    // An older invitation's chain has no shape of its own, so it is named,
+    // by the filter's word or the API's.
+    expect(meanings("chain:q7Z0bX2rT1aM4cV8nL5wYg")).toEqual(["chain q7Z0bX2rT1aM4cV8nL5wYg"]);
+    expect(meanings("correlation:q7Z0bX2rT1aM4cV8nL5wYg")).toEqual([
+      "chain q7Z0bX2rT1aM4cV8nL5wYg",
+    ]);
     // A name the search does not know is no name: the term is read whole.
     expect(meanings("owner:user_1")).toEqual(["actor owner:user_1", "resource owner:user_1"]);
   });
 
-  it("reads 32 hex digits as a request: its trace ID", () => {
+  it("reads 32 hex digits as a chain or a request, and leaves the choice to the person", () => {
+    // The server mints a chain's ID in that shape, and a proxy may assign a
+    // request ID in it: the search cannot tell them apart.
     expect(meanings("0af7651916cd43dd8448eb211c80319c")).toEqual([
+      "chain 0af7651916cd43dd8448eb211c80319c",
       "request 0af7651916cd43dd8448eb211c80319c",
     ]);
   });
@@ -906,10 +930,10 @@ describe("eventsCsv", () => {
     ]);
     const [header, row, end] = csv.split("\r\n");
     expect(header).toBe(
-      "id,occurred_at,created_at,event_type,category,actor_id,actor_type,entity_type,entity_id,user_id,client_id,request_id,session_id,flow_id,fingerprint,payload",
+      "id,occurred_at,created_at,event_type,category,actor_id,actor_type,entity_type,entity_id,user_id,client_id,request_id,session_id,flow_id,correlation_id,fingerprint,payload",
     );
     expect(row).toBe(
-      'evt_1,2026-11-10T08:15:43Z,2026-11-10T08:15:43Z,user.deleted,entity,user_1,,user,user_2,user_2,,,,,,"{""note"":""a \\""quoted\\"", value""}"',
+      'evt_1,2026-11-10T08:15:43Z,2026-11-10T08:15:43Z,user.deleted,entity,user_1,,user,user_2,user_2,,,,,,,"{""note"":""a \\""quoted\\"", value""}"',
     );
     expect(end).toBe("");
   });

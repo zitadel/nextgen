@@ -1316,7 +1316,7 @@ describe("events search", () => {
     await userEvent.click(await find());
 
     expect(await screen.findByText(/name the filter:/)).toHaveTextContent(
-      "actor:, user:, resource:, resource_type:, app:, device:",
+      "actor:, user:, resource:, resource_type:, app:, device:, chain:",
     );
   });
 
@@ -1329,16 +1329,40 @@ describe("events search", () => {
       ["req_1", "request_id", "request"],
       ["sess_1", "session_id", "session"],
       ["flow_1", "flow_id", "flow"],
-      // A request ID as a trace ID.
-      ["0af7651916cd43dd8448eb211c80319c", "request_id", "request"],
+      // A chain whose ID has no shape of its own, named by its filter.
+      ["chain:q7Z0bX2rT1aM4cV8nL5wYg", "correlation_id", "chain"],
     ] as const) {
+      const value = term.replace(/^chain:/, "");
       await searchFor(term);
 
-      await waitFor(() => expect(queries.at(-1)?.get(param)).toBe(term));
-      expect(router.state.resolvedLocation?.search).toMatchObject({ view: "all", [key]: term });
+      await waitFor(() => expect(queries.at(-1)?.get(param)).toBe(value));
+      expect(router.state.resolvedLocation?.search).toMatchObject({ view: "all", [key]: value });
       // The term became a filter: the field is ready for the next one.
       expect(await find()).toHaveValue("");
     }
+  });
+
+  it("asks whether 32 hex digits are a chain or a request, and lists the one chosen", async () => {
+    const queries = serveEvents({ events: [event("evt_1")] });
+    const router = await renderAt("/events");
+    await screen.findByRole("link", { name: "user.deleted" });
+    const id = "0af7651916cd43dd8448eb211c80319c";
+
+    await searchFor(id);
+
+    // The server mints a chain's ID in the shape a proxy's request ID can
+    // have, so the search sends nothing until the person says which.
+    expect(queries).toHaveLength(1);
+    expect(await screen.findByText("This ID can be either. Choose one:")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Request ${id}` })).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: `Chain ${id}, one sign-in, invitation or claim` }),
+    );
+
+    await waitFor(() => expect(queries.at(-1)?.get("correlation_id")).toBe(id));
+    expect(queries.at(-1)?.has("request_id")).toBe(false);
+    // A chain ties audit events to the API requests behind them: every view.
+    expect(router.state.resolvedLocation?.search).toMatchObject({ view: "all", chain: id });
   });
 
   it("narrows to an event type from its name", async () => {
