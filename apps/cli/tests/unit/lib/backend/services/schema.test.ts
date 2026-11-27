@@ -6,20 +6,16 @@ import { NotFoundError, UnavailableError } from "@/lib/backend/errors";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { SchemaService } from "@/lib/backend/services/schema";
-import { answering, answeringPages, refusal, testClient } from "@tests/helpers/api-answers";
-
-/** A service on a test client, bound to one project. */
-function service(): SchemaService {
-  return new SchemaService(testClient(), "proj_1");
-}
+import { answering, answeringPages, refusal } from "@tests/helpers/api-answers";
 
 describe("SchemaService.list", () => {
   it("lists every schema of the project it is bound to, narrowed by the query", async ({
     server,
+    client,
   }) => {
     const listed = answeringPages(server, "listSchemas", { schemas: [{ id: "sch_1" }] });
 
-    const schemas = await service().list({ object_type: "human-user" });
+    const schemas = await new SchemaService(client, "proj_1").list({ object_type: "human-user" });
 
     expect(
       listed.map(({ url }) => {
@@ -29,7 +25,7 @@ describe("SchemaService.list", () => {
     expect(schemas).toEqual([{ id: "sch_1" }]);
   });
 
-  it("drains past the first page, so a caller sees every schema", async ({ server }) => {
+  it("drains past the first page, so a caller sees every schema", async ({ server, client }) => {
     answeringPages(
       server,
       "listSchemas",
@@ -39,36 +35,38 @@ describe("SchemaService.list", () => {
       },
     );
 
-    const schemas = await service().list();
+    const schemas = await new SchemaService(client, "proj_1").list();
 
     expect(schemas).toEqual([{ id: "sch_2" }, { id: "sch_1" }]);
   });
 });
 
 describe("SchemaService.page", () => {
-  it("reads one page and the cursor to the next", async ({ server }) => {
+  it("reads one page and the cursor to the next", async ({ server, client }) => {
     answering(server, "listSchemas", { schemas: [{ id: "sch_2" }], next_page_token: "t2" });
 
-    const first = await service().page();
+    const first = await new SchemaService(client, "proj_1").page();
 
     expect(first.items).toEqual([{ id: "sch_2" }]);
     expect(first.next).toBe("t2");
   });
 
-  it("answers no cursor when the server sent none", async ({ server }) => {
+  it("answers no cursor when the server sent none", async ({ server, client }) => {
     answeringPages(server, "listSchemas", { schemas: [] });
 
-    const first = await service().page();
+    const first = await new SchemaService(client, "proj_1").page();
 
     expect(first.next).toBeNull();
   });
 });
 
 describe("SchemaService.get", () => {
-  it("fetches a revision id directly", async ({ server }) => {
+  it("fetches a revision id directly", async ({ server, client }) => {
     const fetched = answering(server, "getSchema", { id: "sch_1" });
 
-    await expect(service().get("sch_1")).resolves.toEqual({ id: "sch_1" });
+    await expect(new SchemaService(client, "proj_1").get("sch_1")).resolves.toEqual({
+      id: "sch_1",
+    });
     // Scoped like every other call: a schema id is unique within a project and
     // not across them, so a credential seeing more than one would otherwise
     // resolve it ambiguously.
@@ -79,11 +77,14 @@ describe("SchemaService.get", () => {
     ).toEqual([["sch_1", { project_id: "proj_1" }]]);
   });
 
-  it("resolves an object type to its current revision through the list", async ({ server }) => {
+  it("resolves an object type to its current revision through the list", async ({
+    server,
+    client,
+  }) => {
     answering(server, "getSchema", refusal(404, "schema.not_found"));
     const listed = answeringPages(server, "listSchemas", { schemas: [{ id: "sch_2" }] });
 
-    const schema = await service().get("human-user");
+    const schema = await new SchemaService(client, "proj_1").get("human-user");
 
     expect(schema).toEqual({ id: "sch_2" });
     expect(
@@ -97,11 +98,12 @@ describe("SchemaService.get", () => {
 
   it("refuses a reference that is neither, saying how to see what the project has", async ({
     server,
+    client,
   }) => {
     answering(server, "getSchema", refusal(404, "schema.not_found"));
     answeringPages(server, "listSchemas", { schemas: [] });
 
-    const error = await rejectionOf(() => service().get("typo"));
+    const error = await rejectionOf(() => new SchemaService(client, "proj_1").get("typo"));
 
     expect(error).toBeInstanceOf(NotFoundError);
     expect(error).toMatchObject({
@@ -113,10 +115,11 @@ describe("SchemaService.get", () => {
 
   it("raises a failure that is not a miss, rather than reading it as an object type", async ({
     server,
+    client,
   }) => {
     answering(server, "getSchema", refusal(500, "internal"));
 
-    const error = await rejectionOf(() => service().get("sch_1"));
+    const error = await rejectionOf(() => new SchemaService(client, "proj_1").get("sch_1"));
 
     expect(error).toBeInstanceOf(UnavailableError);
     expect(error).toMatchObject({ status: 500 });
@@ -127,10 +130,11 @@ describe("SchemaService.get", () => {
   // as the not-found class.
   it("raises a revision the server says is gone, rather than reading it as an object type", async ({
     server,
+    client,
   }) => {
     answering(server, "getSchema", refusal(410, "schema.gone", "Gone"));
 
-    const error = await rejectionOf(() => service().get("sch_1"));
+    const error = await rejectionOf(() => new SchemaService(client, "proj_1").get("sch_1"));
 
     expect(error).toBeInstanceOf(NotFoundError);
     expect(error).toMatchObject({
@@ -141,7 +145,7 @@ describe("SchemaService.get", () => {
 });
 
 describe("SchemaService.create", () => {
-  it("sends the document as given for the project it is bound to", async ({ server }) => {
+  it("sends the document as given for the project it is bound to", async ({ server, client }) => {
     const published = answering(server, "publishSchema", { id: "sch_1" });
     const input = {
       objectType: "human-user",
@@ -150,7 +154,7 @@ describe("SchemaService.create", () => {
       "x-auth-methods": {},
     };
 
-    await service().create(input);
+    await new SchemaService(client, "proj_1").create(input);
 
     expect(
       published.map(({ body, url }) => {

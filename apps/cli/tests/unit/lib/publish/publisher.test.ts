@@ -15,7 +15,6 @@ import {
   refusal,
   type Sent,
   TEST_SERVER,
-  testClient,
   answeringVariables,
 } from "@tests/helpers/api-answers";
 import { it, test } from "@tests/fixtures";
@@ -94,16 +93,6 @@ async function aProjectWithAnEmailSubject(cwd: string): Promise<void> {
 }
 
 /**
- * A publisher of {@link PROJECT_ID} on a test client.
- *
- * @param client - The client it sends through.
- * @returns The publisher.
- */
-function aPublisher(client: ZitadelClient = testClient()): Publisher {
-  return new Publisher(client, PROJECT_ID);
-}
-
-/**
  * A publisher whose project holds the connection's secret and answers the
  * connection listing with `queryIdps`.
  *
@@ -115,11 +104,11 @@ function aPublisher(client: ZitadelClient = testClient()): Publisher {
 function aPublisherListing(
   server: SetupServer,
   queryIdps: Reply<"queryIdps">,
-  client: ZitadelClient = testClient(),
+  client: ZitadelClient,
 ): Publisher {
   answeringVariables(server, ACME_SECRET_HELD);
   answering(server, "queryIdps", queryIdps);
-  return aPublisher(client);
+  return new Publisher(client, PROJECT_ID);
 }
 
 /**
@@ -170,7 +159,7 @@ function bodiesAndScopes(sent: readonly Sent[]) {
 }
 
 describe("Publisher.landing", () => {
-  it("answers the project's primary origins", async ({ server }) => {
+  it("answers the project's primary origins", async ({ server, client }) => {
     answering(server, "getProject", {
       origins: [
         { pattern: PRIMARY_ORIGIN, kind: "primary" },
@@ -178,17 +167,20 @@ describe("Publisher.landing", () => {
       ],
     });
 
-    const origins = await aPublisher().fetchLanding();
+    const origins = await new Publisher(client, PROJECT_ID).fetchLanding();
 
     expect(origins.primary).toEqual([PRIMARY_ORIGIN]);
   });
 });
 
 describe("Publisher.createRelease", () => {
-  it("sends the bundle with the git provenance the build recorded", async ({ server }) => {
+  it("sends the bundle with the git provenance the build recorded", async ({ server, client }) => {
     const built = answering(server, "buildRelease", { id: "rel_1" });
 
-    await aPublisher().createRelease({ prepared: PREPARED, message: "ship it" });
+    await new Publisher(client, PROJECT_ID).createRelease({
+      prepared: PREPARED,
+      message: "ship it",
+    });
 
     expect(bodiesAndScopes(built)).toEqual([
       [
@@ -205,33 +197,37 @@ describe("Publisher.deploy", () => {
      * A publisher whose deployment lands on a project with nothing live.
      *
      * @param server - The test's MSW server.
+     * @param client - The client it sends through.
      * @returns The publisher.
      */
-    const landing = (server: SetupServer): Publisher => {
+    const landing = (server: SetupServer, client: ZitadelClient): Publisher => {
       buildingRelease(server);
       answeringPages(server, "listDeployments", { deployments: [] });
       answering(server, "createDeployment", aDeployment());
-      return aPublisher();
+      return new Publisher(client, PROJECT_ID);
     };
 
-    it("tells which stage it enters, release creation then deployment", async ({ server }) => {
+    it("tells which stage it enters, release creation then deployment", async ({
+      server,
+      client,
+    }) => {
       const stages: string[] = [];
 
-      await landing(server).deploy({ prepared: PREPARED }, (stage) => {
+      await landing(server, client).deploy({ prepared: PREPARED }, (stage) => {
         stages.push(stage);
       });
 
       expect(stages).toEqual(["release_creation", "deployment"]);
     });
 
-    it("answers the release it built", async ({ server }) => {
-      const outcome = await landing(server).deploy({ prepared: PREPARED });
+    it("answers the release it built", async ({ server, client }) => {
+      const outcome = await landing(server, client).deploy({ prepared: PREPARED });
 
       expect(outcome.release).toMatchObject({ id: "rel_1" });
     });
 
-    it("answers the deployment that made it live", async ({ server }) => {
-      const outcome = await landing(server).deploy({ prepared: PREPARED });
+    it("answers the deployment that made it live", async ({ server, client }) => {
+      const outcome = await landing(server, client).deploy({ prepared: PREPARED });
 
       expect(outcome.publication).toMatchObject({
         outcome: "deployed",
@@ -245,45 +241,46 @@ describe("Publisher.deploy", () => {
      * A publisher whose deployment another deploy beats to the project.
      *
      * @param server - The test's MSW server.
+     * @param client - The client it sends through.
      * @returns The publisher.
      */
-    const racing = (server: SetupServer): Publisher => {
+    const racing = (server: SetupServer, client: ZitadelClient): Publisher => {
       buildingRelease(server);
       answeringPages(server, "listDeployments", { deployments: [] });
       answering(server, "createDeployment", refusal(409, "dep.conflict"));
-      return aPublisher();
+      return new Publisher(client, PROJECT_ID);
     };
 
-    it("answers the release it had built", async ({ server }) => {
-      const outcome = await racing(server).deploy({ prepared: PREPARED });
+    it("answers the release it had built", async ({ server, client }) => {
+      const outcome = await racing(server, client).deploy({ prepared: PREPARED });
 
       expect(outcome.release).toMatchObject({ id: "rel_1" });
     });
 
-    it("answers the race it lost", async ({ server }) => {
-      const outcome = await racing(server).deploy({ prepared: PREPARED });
+    it("answers the race it lost", async ({ server, client }) => {
+      const outcome = await racing(server, client).deploy({ prepared: PREPARED });
 
       expect(outcome.publication).toMatchObject({ outcome: "raced" });
     });
   });
 
   describe("when the content builds back to a revoked release", () => {
-    it("refuses with a conflict", async ({ server }) => {
+    it("refuses with a conflict", async ({ server, client }) => {
       buildingRelease(server, "2026-01-01T00:00:00Z");
 
       const error = await rejectionOf(() => {
-        return aPublisher().deploy({ prepared: PREPARED });
+        return new Publisher(client, PROJECT_ID).deploy({ prepared: PREPARED });
       });
 
       expect(error).toBeInstanceOf(ConflictError);
     });
 
-    it("deploys nothing", async ({ server }) => {
+    it("deploys nothing", async ({ server, client }) => {
       buildingRelease(server, "2026-01-01T00:00:00Z");
       const deployed = answering(server, "createDeployment", aDeployment());
 
       await rejectionOf(() => {
-        return aPublisher().deploy({ prepared: PREPARED });
+        return new Publisher(client, PROJECT_ID).deploy({ prepared: PREPARED });
       });
 
       expect(deployed).toEqual([]);
@@ -292,11 +289,14 @@ describe("Publisher.deploy", () => {
 });
 
 describe("Publisher.preview", () => {
-  it("deploys to the URLs the build registered, with their time to live", async ({ server }) => {
+  it("deploys to the URLs the build registered, with their time to live", async ({
+    server,
+    client,
+  }) => {
     buildingRelease(server);
     const deployed = answering(server, "createDeployment", aDeployment());
 
-    await aPublisher().preview({
+    await new Publisher(client, PROJECT_ID).preview({
       prepared: PREPARED,
       urls: [PREVIEW_URL],
       ttl: "PT2H",
@@ -308,11 +308,11 @@ describe("Publisher.preview", () => {
     ]);
   });
 
-  it("sends no time to live when the run named none", async ({ server }) => {
+  it("sends no time to live when the run named none", async ({ server, client }) => {
     buildingRelease(server);
     const deployed = answering(server, "createDeployment", aDeployment());
 
-    await aPublisher().preview({ prepared: PREPARED, urls: [PREVIEW_URL] });
+    await new Publisher(client, PROJECT_ID).preview({ prepared: PREPARED, urls: [PREVIEW_URL] });
 
     expect(bodiesAndScopes(deployed)).toEqual([
       [expect.not.objectContaining({ ttl: expect.anything() }), SCOPE],
@@ -321,32 +321,35 @@ describe("Publisher.preview", () => {
 });
 
 describe("Publisher.deployInitial", () => {
-  it("deploys to every primary origin with no guard", async ({ server }) => {
+  it("deploys to every primary origin with no guard", async ({ server, client }) => {
     buildingRelease(server);
     const deployed = answering(server, "createDeployment", aDeployment());
 
-    await aPublisher().deployInitial({ prepared: PREPARED, message: "first" });
+    await new Publisher(client, PROJECT_ID).deployInitial({ prepared: PREPARED, message: "first" });
 
     expect(bodiesAndScopes(deployed)).toEqual([
       [{ release_id: "rel_1", targets: "primary", message: "first" }, SCOPE],
     ]);
   });
 
-  it("answers the deployment it made", async ({ server }) => {
+  it("answers the deployment it made", async ({ server, client }) => {
     buildingRelease(server);
     answering(server, "createDeployment", aDeployment());
 
-    const outcome = await aPublisher().deployInitial({ prepared: PREPARED, message: "first" });
+    const outcome = await new Publisher(client, PROJECT_ID).deployInitial({
+      prepared: PREPARED,
+      message: "first",
+    });
 
     expect(outcome.deployment.id).toBe("dep_1");
   });
 
-  it("reads nothing before it writes, there being nothing to race", async ({ server }) => {
+  it("reads nothing before it writes, there being nothing to race", async ({ server, client }) => {
     buildingRelease(server);
     answering(server, "createDeployment", aDeployment());
     const read = answeringPages(server, "listDeployments", { deployments: [] });
 
-    await aPublisher().deployInitial({ prepared: PREPARED });
+    await new Publisher(client, PROJECT_ID).deployInitial({ prepared: PREPARED });
 
     expect(read).toEqual([]);
   });
@@ -354,34 +357,44 @@ describe("Publisher.deployInitial", () => {
 
 describe("Publisher.prepare", () => {
   describe("with a connection whose subject claim the user can change", () => {
-    test("does not warn about a connection the project already has", async ({ dir, server }) => {
+    test("does not warn about a connection the project already has", async ({
+      server,
+      client,
+      dir,
+    }) => {
       await aProjectWithAnEmailSubject(dir);
 
-      const prepared = await aPublisherListing(server, listing("acme")).prepare(aDryRunOf(dir));
+      const prepared = await aPublisherListing(server, listing("acme"), client).prepare(
+        aDryRunOf(dir),
+      );
 
       expect(prepared.warnings).not.toContainEqual(SUBJECT_WARNING);
     });
 
     test("reads the files once while learning which connections are deployed", async ({
-      dir,
       server,
+      client,
+      dir,
     }) => {
       await aProjectWithAnEmailSubject(dir);
       const loading = vi.spyOn(ZitadelConfig, "loadUnchecked");
 
-      await aPublisherListing(server, listing("acme")).prepare(aDryRunOf(dir));
+      await aPublisherListing(server, listing("acme"), client).prepare(aDryRunOf(dir));
 
       expect(loading).toHaveBeenCalledTimes(1);
       loading.mockRestore();
     });
 
     test("still warns about a connection the project does not have yet", async ({
-      dir,
       server,
+      client,
+      dir,
     }) => {
       await aProjectWithAnEmailSubject(dir);
 
-      const prepared = await aPublisherListing(server, listing("other")).prepare(aDryRunOf(dir));
+      const prepared = await aPublisherListing(server, listing("other"), client).prepare(
+        aDryRunOf(dir),
+      );
 
       expect(prepared.warnings).toContainEqual(SUBJECT_WARNING);
     });
@@ -389,29 +402,32 @@ describe("Publisher.prepare", () => {
     test.for([
       { situation: "a listing the token may not read", queryIdps: REFUSED_LISTING },
       { situation: "a listing that fails for another reason", queryIdps: BROKEN_LISTING },
-    ])("leaves the warning out for $situation", async (row, { dir, server }) => {
+    ])("leaves the warning out for $situation", async (row, { dir, server, client }) => {
       await aProjectWithAnEmailSubject(dir);
 
-      const prepared = await aPublisherListing(server, row.queryIdps).prepare(aDryRunOf(dir));
+      const prepared = await aPublisherListing(server, row.queryIdps, client).prepare(
+        aDryRunOf(dir),
+      );
 
       expect(prepared.warnings).not.toContainEqual(SUBJECT_WARNING);
     });
 
     test("still refuses a local error when the listing fails for another reason", async ({
-      dir,
       server,
+      client,
+      dir,
     }) => {
       await aProjectWithAnEmailSubject(dir);
       await new DiskStore(dir).write(aFile("flows", "login.json", { name: "bad" }), "create");
 
       const error = await rejectionOf(() => {
-        return aPublisherListing(server, BROKEN_LISTING).prepare(aDryRunOf(dir));
+        return aPublisherListing(server, BROKEN_LISTING, client).prepare(aDryRunOf(dir));
       });
 
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 
-    test("stops when the person cancels while the listing is read", async ({ dir, server }) => {
+    test("stops when the person cancels while the listing is read", async ({ server, dir }) => {
       await aProjectWithAnEmailSubject(dir);
       const run = new AbortController();
       const client = createZitadelClient({ baseUrl: TEST_SERVER, signal: run.signal });
@@ -431,7 +447,7 @@ describe("Publisher.prepare", () => {
       test.for([
         { situation: "a connection keyed on a stable claim", subject: "sub" },
         { situation: "a connection that names no subject claim", subject: undefined },
-      ])("lists no connections for $situation", async (row, { dir, server }) => {
+      ])("lists no connections for $situation", async (row, { dir, server, client }) => {
         const body = anOidcConnection(
           row.subject === undefined ? {} : { subject_claim: row.subject },
         );
@@ -439,7 +455,7 @@ describe("Publisher.prepare", () => {
         answeringVariables(server, ACME_SECRET_HELD);
         const listed = answering(server, "queryIdps", listing("acme"));
 
-        await aPublisher().prepare(aDryRunOf(dir));
+        await new Publisher(client, PROJECT_ID).prepare(aDryRunOf(dir));
 
         expect(listed).toEqual([]);
       });
@@ -474,28 +490,37 @@ describe("Publisher.prepare with the json option left out", () => {
    * deployed.
    *
    * @param server - The test's MSW server.
+   * @param client - The client it sends through.
    * @returns The publisher.
    */
-  function aPublisherWithNothingDeployed(server: SetupServer): Publisher {
+  function aPublisherWithNothingDeployed(server: SetupServer, client: ZitadelClient): Publisher {
     answeringPages(server, "listDeployments", { deployments: [] });
     answeringPages(server, "queryUsers", { users: [] });
-    return aPublisherListing(server, listing("acme"));
+    return aPublisherListing(server, listing("acme"), client);
   }
 
-  test("reports the diff as data when the run answers in JSON", async ({ dir, server }) => {
+  test("reports the diff as data when the run answers in JSON", async ({ server, client, dir }) => {
     Output.settle({ json: true, color: false });
     await aProjectWithAnEmailSubject(dir);
 
-    const prepared = await aPublisherWithNothingDeployed(server).prepare(aComparisonOf(dir));
+    const prepared = await aPublisherWithNothingDeployed(server, client).prepare(
+      aComparisonOf(dir),
+    );
 
     expect(prepared.report).toHaveProperty("diff");
   });
 
-  test("prints the diff's note when the run does not answer in JSON", async ({ dir, server }) => {
+  test("prints the diff's note when the run does not answer in JSON", async ({
+    server,
+    client,
+    dir,
+  }) => {
     Output.settle({ json: false, color: false });
     await aProjectWithAnEmailSubject(dir);
 
-    const prepared = await aPublisherWithNothingDeployed(server).prepare(aComparisonOf(dir));
+    const prepared = await aPublisherWithNothingDeployed(server, client).prepare(
+      aComparisonOf(dir),
+    );
 
     expect(prepared.notices.join("")).toContain("No diff available");
   });

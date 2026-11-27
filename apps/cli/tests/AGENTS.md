@@ -199,10 +199,11 @@ it stays here deliberately rather than by oversight.
 - Build a publish step's context with `aStepContext` (`helpers/step-context.ts`),
   a doctor check's with `aCheckContext` (`helpers/check-context.ts`), an API
   record or variables answer with `helpers/records.ts`.
-- Give code that takes a client a real one, `testClient()`, and answer what it
-  sends with `answering` / `answeringPages` / `answeringVariables`
-  (`helpers/api-answers.ts`) on the `server` fixture; never a hand-made client.
-  `records.ts` holds only the data those answers carry, so specs can import it.
+- Give code that takes a client the `client` fixture; answer what it sends with
+  `helpers/api-answers.ts` on `server`.
+- Never hand-make a client double; build a real one with `createZitadelClient`
+  only where a test needs its own signal, token or base URL.
+- `records.ts` holds only the data answers carry.
 - Extend the shared builders rather than adding one to a test file; a builder
   only one file needs stays in that file.
 - A test that must create something and clean it up asks for a fixture in its
