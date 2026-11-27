@@ -1,8 +1,27 @@
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { configureZitadel, getApi, getZitadelConfig, _resetConfigForTesting } from "./config";
 
-afterEach(() => {
+const servers: Server[] = [];
+
+/** A local server that answers `{}` and records each request's `Authorization`. */
+async function bearers(): Promise<{ base: string; authorizations: (string | undefined)[] }> {
+  const authorizations: (string | undefined)[] = [];
+  const server = createServer((req, res) => {
+    authorizations.push(req.headers.authorization);
+    res.setHeader("content-type", "application/json");
+    res.end("{}");
+  });
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, authorizations };
+}
+
+afterEach(async () => {
+  await Promise.all(servers.splice(0).map((s) => new Promise((done) => s.close(done))));
   _resetConfigForTesting();
   vi.restoreAllMocks();
 });
@@ -117,12 +136,9 @@ describe("getApi", () => {
   });
 
   test("a publishable key on the handle rides as the bearer (ADR 036)", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response("{}", { status: 200 }));
-
+    const { base, authorizations } = await bearers();
     const project = configureZitadel({
-      proxyPath: "http://localhost/__nextgen",
+      proxyPath: `${base}/__nextgen`,
       projectId: "proj_1",
       publishableKey: "pk_test_123",
     });
@@ -130,22 +146,15 @@ describe("getApi", () => {
 
     await getApi(project).getLive();
 
-    const headers = new Headers((fetchSpy.mock.calls[0]![1] as RequestInit).headers);
-    expect(headers.get("authorization")).toBe("Bearer pk_test_123");
+    expect(authorizations).toEqual(["Bearer pk_test_123"]);
   });
 
   test("a handle without a publishable key produces token-less requests", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response("{}", { status: 200 }));
+    const { base, authorizations } = await bearers();
+    const project = configureZitadel({ proxyPath: `${base}/__nextgen`, projectId: "proj_1" });
 
-    const project = configureZitadel({
-      proxyPath: "http://localhost/__nextgen",
-      projectId: "proj_1",
-    });
     await getApi(project).getLive();
 
-    const headers = new Headers((fetchSpy.mock.calls[0]![1] as RequestInit).headers);
-    expect(headers.get("authorization")).toBeNull();
+    expect(authorizations).toEqual([undefined]);
   });
 });

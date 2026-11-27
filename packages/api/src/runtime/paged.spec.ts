@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { ZitadelClient } from "./client";
 import { paged } from "./paged";
@@ -25,10 +25,23 @@ const asIs = {
   },
 };
 
+/**
+ * `answer` as the `send` a paged function is given, keeping the arguments of
+ * every call it answered.
+ */
+function recording(answer: (...args: unknown[]) => Promise<unknown>) {
+  const calls: unknown[][] = [];
+  const send = (...args: unknown[]) => {
+    calls.push(args);
+    return answer(...args);
+  };
+  return Object.assign(send, { calls });
+}
+
 describe("paged", () => {
   /** A generated function taking `(client, id, params)`, answering two pages. */
   function endpoint() {
-    return vi.fn(async (...args: unknown[]) => {
+    return recording(async (...args: unknown[]) => {
       const params = args[2] as { page_token?: string; limit?: number } | undefined;
       return params?.page_token === undefined
         ? { rows: ["a"], next_page_token: "t1" }
@@ -41,14 +54,14 @@ describe("paged", () => {
 
     await paged(client, call, rows, asIs).all("user_1", { limit: 1 });
 
-    expect(call.mock.calls).toEqual([
+    expect(call.calls).toEqual([
       [client, "user_1", { limit: 1 }],
       [client, "user_1", { limit: 1, page_token: "t1" }],
     ]);
   });
 
   it("follows the cursor its shape reads, whatever the field is called", async () => {
-    const call = vi.fn(async (...args: unknown[]) =>
+    const call = recording(async (...args: unknown[]) =>
       (args[1] as { page_token?: string } | undefined)?.page_token === undefined
         ? { rows: ["a"], cursor: "t1" }
         : { rows: ["b"] },
@@ -71,7 +84,7 @@ describe("paged", () => {
 
   it("collects a page too large to pass as call arguments", async () => {
     const large = Array.from({ length: 200_000 }, (_, index) => String(index));
-    const call = vi.fn(async () => {
+    const call = recording(async () => {
       return { rows: large };
     });
 
@@ -96,17 +109,17 @@ describe("paged", () => {
   });
 
   it("starts at the page_token among its arguments", async () => {
-    const call = vi.fn(async () => ({ rows: ["c"], next_page_token: "" }));
+    const call = recording(async () => ({ rows: ["c"], next_page_token: "" }));
 
     expect(await paged(client, call, rows, asIs).all("user_1", { page_token: "c3" })).toEqual([
       "c",
     ]);
-    expect(call.mock.calls).toEqual([[client, "user_1", { page_token: "c3" }]]);
+    expect(call.calls).toEqual([[client, "user_1", { page_token: "c3" }]]);
   });
 
   it("hands every failure of the walk to its error hook once", async () => {
     const seen: unknown[] = [];
-    const call = vi.fn(async () => {
+    const call = recording(async () => {
       throw new Error("down");
     });
     const record = {
