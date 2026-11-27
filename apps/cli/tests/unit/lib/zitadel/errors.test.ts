@@ -653,8 +653,8 @@ describe("what each configuration error states", () => {
       },
     ],
     [
-      "ZitadelConfigBrandingDuplicatedError",
-      new classes.ZitadelConfigBrandingDuplicatedError(2),
+      "ZitadelConfigDocumentDuplicatedError",
+      new classes.ZitadelConfigDocumentDuplicatedError("branding", ".zitadel/branding", 2),
       {
         message: "A release carries at most one branding, but .zitadel/branding/ holds 2",
         hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",

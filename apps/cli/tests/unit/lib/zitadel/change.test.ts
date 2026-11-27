@@ -8,6 +8,7 @@ import {
   ZitadelConfigError,
   DocumentChange,
   ZitadelConfigFileExistsError,
+  OAuthSettings,
   Policy,
   UserSchema,
   ZitadelConfig,
@@ -15,6 +16,7 @@ import {
 import {
   aConfig,
   aFile,
+  anOAuthSettings,
   aPasswordPolicy,
   aStore,
   aUserSchema,
@@ -266,6 +268,15 @@ describe("Change.save", () => {
       .save(store);
 
     expect(bodyAt(store, PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
+  });
+
+  it("replaces an OAuth settings file a new one is put over", async () => {
+    const store = aStore({ oauth: { "oauth.json": anOAuthSettings({ enabled: false }) } });
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    await config.oauth.put(OAuthSettings.enabled()).save(store);
+
+    expect(bodyAt(store, OAuthSettings.PATH)).toEqual(OAuthSettings.enabled().body);
   });
 
   it("replaces a file whose document was removed earlier in the same edit", async () => {

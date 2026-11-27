@@ -54,7 +54,7 @@ export type {
 } from "@/lib/zitadel/resources/document";
 export {
   ZitadelConfigActionClashError,
-  ZitadelConfigBrandingDuplicatedError,
+  ZitadelConfigDocumentDuplicatedError,
   ZitadelConfigClientIdMismatchError,
   ZitadelConfigConnectionDuplicatedError,
   ZitadelConfigConnectionProviderMismatchError,
@@ -130,6 +130,7 @@ export {
   type SchemaReference,
   type StepName,
 } from "@/lib/zitadel/names";
+export { OAuthSettings, OAuthSettingsCollection } from "@/lib/zitadel/resources/oauth";
 export {
   PASSWORD_POLICY_OPERATION,
   PasswordPolicy,

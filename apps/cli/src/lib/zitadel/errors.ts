@@ -942,22 +942,24 @@ export class ZitadelConfigInternalError extends ZitadelConfigError {
 }
 
 /**
- * A release that would carry more than one branding.
+ * A release that would carry more than one file of a kind it carries one of.
  */
-export class ZitadelConfigBrandingDuplicatedError extends ZitadelConfigError {
+export class ZitadelConfigDocumentDuplicatedError extends ZitadelConfigError {
   override readonly category: ErrorCategory = "invalid";
   override readonly retryable: boolean = false;
   override readonly code: ZitadelErrorCode = "E_VALIDATION";
-  override readonly hint: string =
-    "A project has a single branding; keep one descriptor under .zitadel/branding/.";
+  override readonly hint: string;
 
   /**
-   * Make the failure for this many descriptors.
+   * Make the failure for this many files.
    *
-   * @param count - How many branding descriptors `.zitadel/branding/` holds.
+   * @param what - What a release carries one of, such as "branding".
+   * @param directory - The project-relative directory holding the files.
+   * @param count - How many files the directory holds.
    */
-  constructor(count: number) {
-    super(`A release carries at most one branding, but .zitadel/branding/ holds ${count}`);
+  constructor(what: string, directory: string, count: number) {
+    super(`A release carries at most one ${what}, but ${directory}/ holds ${count}`);
+    this.hint = `A project has a single ${what}; keep one descriptor under ${directory}/.`;
   }
 }
 
