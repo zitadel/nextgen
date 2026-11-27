@@ -1,7 +1,7 @@
 import type { PublishApplicationBodyApplication } from "@zitadel/api/generated/model";
 
 /** The application presets, by name. */
-export const APPLICATION_PRESETS = ["web"] as const;
+export const APPLICATION_PRESETS = ["web", "spa", "native"] as const;
 
 /**
  * A web application with one confidential OAuth client that signs users in
@@ -31,6 +31,67 @@ export function webApplication({
         slug: "web",
         type: "confidential",
         grant_types: ["authorization_code"],
+        redirect_uris: [...new Set(redirectUris)],
+      },
+    ],
+  };
+}
+
+/**
+ * A browser-only application with one public OAuth client that signs users in
+ * with authorization code and PKCE. It holds no secret. `allowedOrigins` are
+ * the browser origins that may call CORS-protected OAuth endpoints. Duplicate
+ * redirect URIs and origins are dropped.
+ */
+export function spaApplication({
+  slug,
+  name,
+  redirectUris,
+  allowedOrigins,
+}: {
+  slug: string;
+  name: string;
+  redirectUris: [string, ...string[]];
+  allowedOrigins: [string, ...string[]];
+}): PublishApplicationBodyApplication {
+  return {
+    slug,
+    name,
+    clients: [
+      {
+        slug: "spa",
+        type: "public",
+        grant_types: ["authorization_code", "refresh_token"],
+        redirect_uris: [...new Set(redirectUris)],
+        allowed_origins: [...new Set(allowedOrigins)],
+      },
+    ],
+  };
+}
+
+/**
+ * An installed (mobile or desktop) application with one public OAuth client
+ * that signs users in with authorization code and PKCE. Redirect URIs are
+ * private-use schemes or loopback http. It holds no secret and lists no
+ * allowed origins. Duplicate redirect URIs are dropped.
+ */
+export function nativeApplication({
+  slug,
+  name,
+  redirectUris,
+}: {
+  slug: string;
+  name: string;
+  redirectUris: [string, ...string[]];
+}): PublishApplicationBodyApplication {
+  return {
+    slug,
+    name,
+    clients: [
+      {
+        slug: "native",
+        type: "public",
+        grant_types: ["authorization_code", "refresh_token"],
         redirect_uris: [...new Set(redirectUris)],
       },
     ],

@@ -3326,6 +3326,16 @@ func (s *ApplicationClient) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.AllowedOrigins != nil {
+			e.FieldStart("allowed_origins")
+			e.ArrStart()
+			for _, elem := range s.AllowedOrigins {
+				e.Str(elem)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
 		if s.Secret.Set {
 			e.FieldStart("secret")
 			s.Secret.Encode(e)
@@ -3339,15 +3349,16 @@ func (s *ApplicationClient) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfApplicationClient = [8]string{
+var jsonFieldsNameOfApplicationClient = [9]string{
 	0: "slug",
 	1: "name",
 	2: "client_id",
 	3: "type",
 	4: "grant_types",
 	5: "redirect_uris",
-	6: "secret",
-	7: "first_party",
+	6: "allowed_origins",
+	7: "secret",
+	8: "first_party",
 }
 
 // Decode decodes ApplicationClient from json.
@@ -3355,7 +3366,7 @@ func (s *ApplicationClient) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode ApplicationClient to nil")
 	}
-	var requiredBitSet [1]uint8
+	var requiredBitSet [2]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -3438,6 +3449,25 @@ func (s *ApplicationClient) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"redirect_uris\"")
 			}
+		case "allowed_origins":
+			if err := func() error {
+				s.AllowedOrigins = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.AllowedOrigins = append(s.AllowedOrigins, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"allowed_origins\"")
+			}
 		case "secret":
 			if err := func() error {
 				s.Secret.Reset()
@@ -3467,8 +3497,9 @@ func (s *ApplicationClient) Decode(d *jx.Decoder) error {
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
+	for i, mask := range [2]uint8{
 		0b00011001,
+		0b00000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -4321,6 +4352,8 @@ func (s *ApplicationClientType) Decode(d *jx.Decoder) error {
 	switch ApplicationClientType(v) {
 	case ApplicationClientTypeConfidential:
 		*s = ApplicationClientTypeConfidential
+	case ApplicationClientTypePublic:
+		*s = ApplicationClientTypePublic
 	default:
 		*s = ApplicationClientType(v)
 	}

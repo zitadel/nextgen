@@ -243,7 +243,12 @@ func checkAuthRequest(req *oidc.AuthRequest, requestURI string, c *client) error
 	if slices.Contains(req.Prompt, oidc.PromptNone) {
 		return oidc.ErrInteractionRequired().WithDescription("silent sign-in is not supported yet")
 	}
-	// A method without a challenge is a client whose PKCE is set up wrong.
+	// PKCE (S256) is required for public clients and optional for confidential
+	// ones (ADR 082 §2). A method without a challenge is a client whose PKCE
+	// is set up wrong.
+	if c.public && req.CodeChallenge == "" {
+		return oidc.ErrInvalidRequest().WithDescription("code_challenge is required for a public client")
+	}
 	if req.CodeChallenge != "" || req.CodeChallengeMethod != "" {
 		// The library reads a missing method as plain; this server accepts S256 only.
 		if req.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {

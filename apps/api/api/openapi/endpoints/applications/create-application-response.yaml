@@ -10,6 +10,7 @@ allOf:
         items:
           $ref: application-client-secret.yaml
         description: |
-          The secrets this write generated, one for each client it created,
-          each with the client's `client_id`. Absent when the write created
-          no client. Each secret is shown only once.
+          The secrets this write generated, one for each confidential client
+          it created, each with the client's `client_id`. A public client has
+          none. Absent or empty when the write created no confidential
+          client. Each secret is shown only once.

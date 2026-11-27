@@ -493,8 +493,7 @@ func TestApplicationService_AuthenticateRegisteredClient(t *testing.T) {
 		{name: "wrong_secret", secret: "wrong", wantErr: domain.ErrApplicationClientSecretInvalid()},
 		{name: "empty_secret", wantErr: domain.ErrApplicationClientSecretInvalid()},
 		{
-			// application.json allows no public client yet; one holds no secret
-			// to check.
+			// A public client holds no secret to check.
 			name:     "public_client",
 			secret:   "newer",
 			document: shopDocument(`{"slug":"web","client_id":"shop-web","type":"public","grant_types":["authorization_code"],"redirect_uris":["https://shop.example.com/callback"]}`),
