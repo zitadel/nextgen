@@ -7129,14 +7129,6 @@
         },
         {
           "kind": "js",
-          "name": "AppLocales",
-          "declaration": {
-            "name": "AppLocales",
-            "module": "./translations.js"
-          }
-        },
-        {
-          "kind": "js",
           "name": "CUSTOM_IDENTIFIER_SUFFIX",
           "declaration": {
             "name": "CUSTOM_IDENTIFIER_SUFFIX",
