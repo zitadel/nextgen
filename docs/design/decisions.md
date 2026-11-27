@@ -43,6 +43,13 @@
 
 ## Decisions
 
+### D93 · Webhooks is a project screen, after Events — 2026-11-11
+A project's events can be sent to endpoints of the customer's own ([ADR 091](../adrs/091-project-webhooks.md)), and the sidebar gains Webhooks for them, after Events and before Settings: Events shows the events, Webhooks sends them on, and Settings stays last (D30). It is a row of the project's list and not one of Events' own, whose rows are the views and filters of one screen. The name is the API's and the CLI's.
+The list is a resource table (D17): the endpoint with its note under it (D20), what it receives (`All events`, one type by name, or how many), its state and its last delivery. The API has no status field, so the console works the state out of `enabled` and the two delivery times: Active, Failing, Disabled, and Disabled after repeated failures for one that is off with its last attempt failed, which is how the server leaves a webhook it gave up on. A project holds ten webhooks; at ten the list says so and holds Add. No search, no `Load more` and no count: ten rows are one page.
+Add opens a drawer (D15) with the endpoint, a note and the events: all of them, or a selection from the types Events filters by, under the same captions. A webhook opens on a page of its own, as a team does, with a card each for delivery (and Disable or Enable), the fields with their Save, the signing secret's rotation and the delete. Rotating and deleting are confirmed; the delete is not typed out (D2), since a webhook can be added again.
+The signing secret is shown once, in a dialog after the webhook is created and after a rotation, with its copy button and a link to the guide on checking signatures. The console keeps it only while that dialog is open. Actions show whatever the person may do, as in D33: a viewer is offered Add and gets the server's refusal.
+→ Design review of the list's columns, the webhook's page and the secret dialog, none of which has a design. Gate the actions on effective permissions when the console can read them (Console ADR 0004 §5).
+
 ### D92 · Enterprise SSO configuration must reach the customer's customer — 2026-09-09
 B2B / Enterprise SSO has a different configuration boundary from social login. The ZITADEL operator can configure or enable the capability, but a downstream customer's admin must be able to configure their own SAML/OIDC connection without using the ZITADEL CLI.
 

@@ -119,6 +119,7 @@ Canonical examples:
 | Field with a control inside its frame (a copy button under a message) | `InputGroup` (`src/components/ui/input-group.tsx`) |
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
+| Value to copy out: a command, a secret shown once | `CopyBlock` (`src/components/copy-block.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 | Centred state in place of a screen's content (the project picker), or of a table with nothing to list yet (in a `Card`) | `Empty` (`src/components/ui/empty.tsx`) |
 
