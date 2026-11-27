@@ -473,18 +473,5 @@ func withActorFromToken(ctx context.Context, token *domain.Token) context.Contex
 	if reqID, ok := middleware.GetRequestIDContext(ctx); ok {
 		ac.RequestID = &reqID
 	}
-	if rc, ok := middleware.GetRequestContext(ctx); ok {
-		if rc.Fingerprint != "" {
-			ac.Fingerprint = rc.Fingerprint
-		}
-		if rc.FlowID != "" {
-			flowID := rc.FlowID
-			ac.FlowID = &flowID
-		}
-		if rc.SessionID != "" && ac.SessionID == nil {
-			sid := rc.SessionID
-			ac.SessionID = &sid
-		}
-	}
 	return audit.WithActorContext(ctx, ac)
 }

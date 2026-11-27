@@ -7,13 +7,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authattempt"
 )
 
 const (
-	createClaimChallengeStmt = `INSERT INTO claim_challenges (id, project_id, initiating_secret_hash, status, expires_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?)`
+	createClaimChallengeStmt = `INSERT INTO claim_challenges (id, project_id, initiating_secret_hash, status, expires_at, created_at, correlation_id)
+VALUES (?, ?, ?, ?, ?, ?, ?)`
 
-	getClaimChallengeStmt = `SELECT id, project_id, initiating_secret_hash, status, expires_at, created_at
+	getClaimChallengeStmt = `SELECT id, project_id, initiating_secret_hash, status, expires_at, created_at, correlation_id
 FROM claim_challenges WHERE id = ? AND project_id = ?`
 
 	markClaimChallengeCompletedStmt = `UPDATE claim_challenges SET status = 'completed'
@@ -55,6 +56,7 @@ func (s claimStatements) CreateChallenge(ctx context.Context, entity *domain.Cla
 	now := nowUnixNano()
 	_, err := s.client.Exec(ctx, createClaimChallengeStmt,
 		entity.ID, entity.ProjectID, entity.InitiatingSecretHash, entity.Status.String(), entity.ExpiresAt.UnixNano(), now,
+		authattempt.EmptyStringArg(entity.CorrelationID),
 	)
 	if err != nil {
 		return wrapError(err)
@@ -115,17 +117,19 @@ func (s claimStatements) GetEarliestTeamMembership(ctx context.Context, projectI
 
 func scanClaimChallengeRow(row *sql.Row) (*domain.ClaimChallenge, error) {
 	var (
-		challenge   domain.ClaimChallenge
-		status      string
-		expiresNano int64
-		createdNano int64
+		challenge     domain.ClaimChallenge
+		status        string
+		expiresNano   int64
+		createdNano   int64
+		correlationID sql.NullString
 	)
 	if err := row.Scan(
 		&challenge.ID, &challenge.ProjectID, &challenge.InitiatingSecretHash,
-		&status, &expiresNano, &createdNano,
+		&status, &expiresNano, &createdNano, &correlationID,
 	); err != nil {
 		return nil, err
 	}
+	challenge.CorrelationID = correlationID.String
 	challenge.Status = domain.ClaimChallengeStatus(status)
 	challenge.ExpiresAt = timeFromUnixNano(expiresNano)
 	challenge.CreatedAt = timeFromUnixNano(createdNano)

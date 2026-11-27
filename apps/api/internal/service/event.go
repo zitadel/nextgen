@@ -12,19 +12,22 @@ import (
 
 // ListEventsRequest is the input for listing project audit events (ADR 049).
 type ListEventsRequest struct {
-	ProjectID   string
-	Categories  []string
-	EventTypes  []string
-	ActorID     string
-	UserID      string
-	ClientID    string
-	SessionID   string
-	FlowID      string
-	RequestID   string
-	Fingerprint string
-	EntityType  string
-	EntityID    string
-	TeamID      string
+	ProjectID  string
+	Categories []string
+	EventTypes []string
+	ActorID    string
+	UserID     string
+	ClientID   string
+	SessionID  string
+	FlowID     string
+	RequestID  string
+	// CorrelationID matches the events of one chain: the requests one piece
+	// of work took (domain.Event.CorrelationID).
+	CorrelationID string
+	Fingerprint   string
+	EntityType    string
+	EntityID      string
+	TeamID        string
 	// OperationIDs and StatusClasses match request.api events by the
 	// operation they record and the class of their response status
 	// (domain.HTTPStatusClass), each any of the values named.
@@ -229,7 +232,8 @@ type eventRead struct {
 // Every index starts with the project and ends in (created_at, id), so the
 // time bounds and the page token narrow any of them:
 //
-//   - A request or a login flow holds few events and has an index by time.
+//   - A request, a login flow or a chain holds few events and has an index by
+//     time.
 //   - A session, a resource, a user, an actor and a resource type can each
 //     hold as many events as the project, most of them of one category, so
 //     their indexes hold the category before the time. Their read is a range
@@ -260,6 +264,7 @@ func planEventRead(req ListEventsRequest) eventRead {
 	}{
 		{domain.EventFieldRequestID, req.RequestID, false},
 		{domain.EventFieldFlowID, req.FlowID, false},
+		{domain.EventFieldCorrelationID, req.CorrelationID, false},
 		{domain.EventFieldSessionID, req.SessionID, true},
 		{domain.EventFieldEntityID, req.EntityID, true},
 		{domain.EventFieldUserID, req.UserID, true},

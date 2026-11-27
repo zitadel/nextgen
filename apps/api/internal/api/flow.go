@@ -92,7 +92,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 		return nil, normalizeFlowError(err)
 	}
 	if result.State != nil {
-		audit.BindPublicRequest(ctx, result.State.ProjectID, result.State.ID, result.State.SessionID)
+		bindFlowRequest(ctx, result.State)
 	}
 
 	cookieValue, err := h.sealState(ctx, result.State)
@@ -108,12 +108,20 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 	}, nil
 }
 
+// bindFlowRequest stamps a flow request with what its sealed state names: the
+// project, the flow, the session and the chain. It runs before the handler
+// writes anything, so every event of the request carries them.
+func bindFlowRequest(ctx context.Context, state *domain.FlowState) {
+	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
+	audit.JoinCorrelation(ctx, state.CorrelationID)
+}
+
 func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {
 	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
 		return nil, normalizeFlowError(err)
 	}
-	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
+	bindFlowRequest(ctx, state)
 	if state.ID != params.FlowID {
 		return nil, domain.ErrFlowNotFound()
 	}
@@ -272,7 +280,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	if err != nil {
 		return mapFlowGetError(ctx, err)
 	}
-	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
+	bindFlowRequest(ctx, state)
 	if state.ID != params.FlowID {
 		return mapFlowGetError(ctx, domain.ErrFlowNotFound())
 	}

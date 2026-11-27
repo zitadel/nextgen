@@ -12,7 +12,7 @@ import { runCliForTest } from "@tests/helpers/run-cli";
 import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
-import type { Answer } from "@tests/helpers/fake-client";
+import type { Answer } from "@tests/helpers/api-answers";
 import { aDeployment, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;

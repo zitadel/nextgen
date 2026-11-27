@@ -52,10 +52,10 @@
       "types": "./dist/runtime/base-url.d.mts",
       "import": "./dist/runtime/base-url.mjs"
     },
-    "./runtime/auth": {
-      "@zitadel/source": "./src/runtime/auth.ts",
-      "types": "./dist/runtime/auth.d.mts",
-      "import": "./dist/runtime/auth.mjs"
+    "./runtime/client": {
+      "@zitadel/source": "./src/runtime/client.ts",
+      "types": "./dist/runtime/client.d.mts",
+      "import": "./dist/runtime/client.mjs"
     },
     "./runtime/paging": {
       "@zitadel/source": "./src/runtime/paging.ts",
@@ -66,11 +66,6 @@
       "@zitadel/source": "./src/runtime/fetch.ts",
       "types": "./dist/runtime/fetch.d.mts",
       "import": "./dist/runtime/fetch.mjs"
-    },
-    "./runtime/call": {
-      "@zitadel/source": "./src/runtime/call.ts",
-      "types": "./dist/runtime/call.d.mts",
-      "import": "./dist/runtime/call.mjs"
     },
     "./client": {
       "@zitadel/source": "./src/runtime/api-factory.ts",

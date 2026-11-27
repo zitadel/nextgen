@@ -110,9 +110,10 @@ test("the setup admin can invite a colleague and remove them, and the colleague 
     await expect(page.getByRole("region", { name: "Members" })).toBeVisible();
 
     // The admin makes a link. It is shown once, in the message to pass on, and
-    // names nobody: whoever opens it gets the role (admin by default).
+    // names nobody: whoever opens it gets the role the admin picked.
     await page.getByRole("button", { name: "Invite member", exact: true }).click();
     const invite = page.getByRole("dialog", { name: "Invite member" });
+    await invite.getByRole("radio", { name: "Admin", exact: true }).click();
     await invite.getByRole("button", { name: "Create invitation", exact: true }).click();
     const created = page.getByRole("dialog", { name: "Invitation created" });
     const message = await created.getByRole("textbox").inputValue();

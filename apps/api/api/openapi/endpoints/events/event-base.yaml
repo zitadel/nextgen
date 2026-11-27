@@ -131,5 +131,19 @@ properties:
     oneOf:
       - type: string
       - type: 'null'
+  # The carriers and the rule are in ADR 048, amendment of 2026-11-26.
+  correlation_id:
+    description: |
+      An ID that correlates the events of one chain: the requests that one
+      piece of work took, whoever sent them. A sign-in shares it from the
+      OAuth authorization request or the first step of the login flow to the
+      session and the token it ends with. An invitation shares it with its
+      replacements and its answer, and a project claim from its start to its
+      completion. The server assigns it and never reads it from a request.
+      Absent on an event whose request is the whole of its work; `request_id`
+      correlates those.
+    oneOf:
+      - type: string
+      - type: 'null'
   metadata:
     $ref: ../../components/schemas/event-metadata.yaml

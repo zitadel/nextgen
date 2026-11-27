@@ -67,6 +67,11 @@ func (s *authRequestService) Create(ctx context.Context, request *domain.AuthReq
 	}
 	request.BindingHash = hash
 	request.ExpiresAt = time.Now().Add(domain.AuthRequestTTL)
+	// The request is a carrier: the flow created for it and the redemption of
+	// its code reach the sign-in's chain through it.
+	if request.CorrelationID, err = audit.EnsureCorrelation(ctx); err != nil {
+		return "", err
+	}
 	if err := s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateAuthRequest(ctx, request); err != nil {
 			return err
@@ -108,6 +113,7 @@ func (s *authRequestService) IssueCode(ctx context.Context, projectID, authReque
 		}
 		return "", domain.ErrInternal(err).WithMessage("failed to read the authorization request")
 	}
+	audit.JoinCorrelation(ctx, request.CorrelationID)
 	code, hash, err := domain.NewAuthCode(request.DeploymentID)
 	if err != nil {
 		return "", err
@@ -157,6 +163,10 @@ func (s *authRequestService) RedeemCode(ctx context.Context, input RedeemCodeInp
 			}
 			return err
 		}
+		// The token endpoint's call names no flow and no session of its own:
+		// it reaches the sign-in's chain through the request its code
+		// belongs to. Joined before the first emit.
+		audit.JoinCorrelation(ctx, request.CorrelationID)
 		reason, session, err := redemptionRefusal(ctx, stmts, request, input, now)
 		if err != nil {
 			return err
@@ -199,7 +209,7 @@ func (s *authRequestService) RedeemCode(ctx context.Context, input RedeemCodeInp
 			return domain.ErrInternal(err).WithMessage("failed to sign the access token")
 		}
 		expiresIn = expiresAt.Sub(now)
-		return emitAuthTokenIssued(ctx, stmts, request.ProjectID, tokenID, &request.SessionID, nil, &request.UserID, request.Scopes, request.ClientID)
+		return emitAuthTokenIssued(ctx, stmts, request.ProjectID, tokenID, &request.SessionID, &request.UserID, request.Scopes, request.ClientID)
 	}); err != nil {
 		if _, ok := errors.AsType[*database.UnavailableError](err); ok {
 			return "", 0, domain.ErrUnavailable().WithParent(err)

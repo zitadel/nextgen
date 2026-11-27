@@ -1011,12 +1011,16 @@ export class ZitadelLogin extends ZitadelSurface {
       // Resolve inside the try so a missing configuration surfaces through
       // `handleTransportError` (rendered as `startupError`) rather than as an
       // unhandled promise rejection from `firstUpdated`'s microtask.
-      const { project: cfg } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+      const { project: cfg, client } = resolveApi(
+        this.project,
+        this.projectAttrs,
+        "<zitadel-login>",
+      );
       let wire: CreateFlow201 | undefined;
       const resumeId = this.restarting ? "" : this.resumeFlowId || flowIdFromLocation();
       if (resumeId) {
         try {
-          wire = await getCurrentStep(cfg, resumeId);
+          wire = await getCurrentStep(client, resumeId);
         } catch (error) {
           // A handle can outlive its flow: the cookie window closed during
           // the external sign-in, so the browser no longer sends the
@@ -1044,7 +1048,7 @@ export class ZitadelLogin extends ZitadelSurface {
           purpose: this.purpose,
           ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
         };
-        wire = await apiStartFlow(cfg, request).catch((error: unknown) => {
+        wire = await apiStartFlow(client, request).catch((error: unknown) => {
           throw describeStartError(error, request);
         });
       }
@@ -1309,8 +1313,16 @@ export class ZitadelLogin extends ZitadelSurface {
     if (behavior === "show" && handoffToken && this.postSignInUrl) {
       this.loading = true;
       try {
-        const { project: cfg } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-        await exchangeSession(cfg, { handoff_token: handoffToken }, { project_id: cfg.projectId });
+        const { project: cfg, client } = resolveApi(
+          this.project,
+          this.projectAttrs,
+          "<zitadel-login>",
+        );
+        await exchangeSession(
+          client,
+          { handoff_token: handoffToken },
+          { project_id: cfg.projectId },
+        );
         this.navigateTo(this.postSignInTarget());
       } catch (error) {
         this.handleTransportError(error);
@@ -1836,8 +1848,8 @@ export class ZitadelLogin extends ZitadelSurface {
     if (this.signupCeremony === ceremony && this.signupProof) return;
     const controller = new AbortController();
     const prepare = async (): Promise<void> => {
-      const { project: cfg } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-      const fresh = await getCurrentStep(cfg, flowId);
+      const { client } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+      const fresh = await getCurrentStep(client, flowId);
       stopIfAborted(controller.signal);
       // A flow that moved on, or a server that stopped asking, needs no proof.
       const gate = fresh.step.name === step.name ? fresh.step.gates.signup_pow : undefined;
@@ -1901,7 +1913,7 @@ export class ZitadelLogin extends ZitadelSurface {
           ? { sso_provider_id: ssoProviderId, return_target: returnTargetFor(id) }
           : {}),
       };
-      const { project: cfg } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+      const { client } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       // A password sign-up spends its proof on the step's submit, a passkey
       // sign-up on the attestation. Only the step carrying the ceremony says
       // whether it creates a user, so its proof is solved while the ceremony
@@ -1930,7 +1942,7 @@ export class ZitadelLogin extends ZitadelSurface {
         // Keep the entered fields; GET only refreshes the server-owned gate.
         // An attestation holding the proof solved during its ceremony needs
         // neither.
-        const fresh = prepared === undefined ? await getCurrentStep(cfg, id) : shown;
+        const fresh = prepared === undefined ? await getCurrentStep(client, id) : shown;
         stopIfAborted(controller.signal);
         if (prepared !== undefined) {
           body.gate_proofs = { signup_pow: prepared };
@@ -1960,7 +1972,7 @@ export class ZitadelLogin extends ZitadelSurface {
         }
         checking = false;
       }
-      wire ??= await apiSubmitStep(cfg, id, body);
+      wire ??= await apiSubmitStep(client, id, body);
       void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
@@ -2018,8 +2030,8 @@ export class ZitadelLogin extends ZitadelSurface {
     if (code === "flow.proof_invalid") {
       this.signupProof = undefined;
       try {
-        const { project: cfg } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-        const fresh = await getCurrentStep(cfg, current.id);
+        const { client } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+        const fresh = await getCurrentStep(client, current.id);
         if (fresh.step.name === current.step.name) base = fresh;
       } catch {
         // The retry refreshes the step again before it solves.

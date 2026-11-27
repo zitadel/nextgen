@@ -42,7 +42,7 @@ export type ClaimOutcome =
    */
   | { kind: "unauthenticated" }
   /**
-   * 403 `auth.csrf_invalid`, still refused after the shared fetch's one retry:
+   * 403 `auth.csrf_invalid`, still refused after `SessionCsrf`'s one retry:
    * someone else is signed in now, or the request came from another site. Not
    * a team problem, so it does not take the team branches.
    */
@@ -57,7 +57,7 @@ export type ClaimOutcome =
  * Deliberately the **single** place the completion request is made (#615):
  * it carries ADR 053's `X-Zitadel-CSRF` token, which the claim route's loader
  * loaded with the session (`fetchSession()`) before rendering this step, and
- * which the shared fetch's rejection handler recovers if that read failed; and
+ * which `SessionCsrf`'s re-check recovers if that read failed; and
  * if ADR 054 grows the contract a team-selection parameter, the body grows
  * here. Callers render the outcome; they do not build the request.
  */

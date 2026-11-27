@@ -31,6 +31,7 @@ func TestClaimStatements_CreateChallenge(t *testing.T) {
 		t.Run("round_trips_fields_and_sets_created_at", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
 			challenge := newTestChallenge(t, projectID)
+			challenge.CorrelationID = "chain_claim"
 
 			require.NoError(t, d.stmts.CreateChallenge(t.Context(), challenge))
 			assert.False(t, challenge.CreatedAt.IsZero())
@@ -43,6 +44,7 @@ func TestClaimStatements_CreateChallenge(t *testing.T) {
 			assert.Equal(t, domain.ClaimChallengeStatusPending, got.Status)
 			assert.WithinDuration(t, challenge.ExpiresAt, got.ExpiresAt, time.Second)
 			assert.False(t, got.CreatedAt.IsZero())
+			assert.Equal(t, "chain_claim", got.CorrelationID, "the chain the polls and the completion join")
 		})
 
 		t.Run("duplicate_id_returns_UniqueError", func(t *testing.T) {

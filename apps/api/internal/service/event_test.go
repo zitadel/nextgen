@@ -374,6 +374,20 @@ func TestEventService_List_plansEachReadOntoAnIndex(t *testing.T) {
 			req:   service.ListEventsRequest{FlowID: "flow_1"},
 			lists: one(equal(domain.EventFieldFlowID, "flow_1")),
 		},
+		"one chain": {
+			req:   service.ListEventsRequest{CorrelationID: "chain_1"},
+			lists: one(equal(domain.EventFieldCorrelationID, "chain_1")),
+		},
+		"a login flow beside its chain: the flow reads, the chain is matched": {
+			req:   service.ListEventsRequest{FlowID: "flow_1", CorrelationID: "chain_1"},
+			scans: one(equal(domain.EventFieldFlowID, "flow_1")),
+			match: database.And(equal(domain.EventFieldCorrelationID, "chain_1")),
+		},
+		"a chain beside a session: the chain reads, the session is matched": {
+			req:   service.ListEventsRequest{CorrelationID: "chain_1", SessionID: "sess_1"},
+			scans: one(equal(domain.EventFieldCorrelationID, "chain_1")),
+			match: database.And(equal(domain.EventFieldSessionID, "sess_1")),
+		},
 		"one actor, every category: its index is by category": {
 			req:   service.ListEventsRequest{ActorID: "user_1"},
 			lists: each(domain.EventFieldCategory, everyCategory, equal(domain.EventFieldActorID, "user_1")),
