@@ -4,4 +4,4 @@
  */
 export { businessLocales } from "./business.js";
 export { en, type Locale } from "./en.js";
-export { type AppLocales, CUSTOM_IDENTIFIER_SUFFIX, Translations } from "./translations.js";
+export { CUSTOM_IDENTIFIER_SUFFIX, Translations } from "./translations.js";
