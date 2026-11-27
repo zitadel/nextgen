@@ -1014,6 +1014,14 @@ type PublishSchemaParams struct {
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
+// QueryApplicationsParams is parameters of queryApplications operation.
+type QueryApplicationsParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+}
+
 // QueryGrantsParams is parameters of queryGrants operation.
 type QueryGrantsParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it

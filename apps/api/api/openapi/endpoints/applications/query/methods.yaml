@@ -1,0 +1,149 @@
+post:
+  operationId: queryApplications
+  x-zitadel-cli: application list
+  summary: Query applications
+  description: |
+    Returns the applications of a project, paginated with a cursor. Each
+    application appears once, at its newest revision, with each client's
+    `client_id` in `definition`.
+
+    The list holds both the applications a release declares and the ones
+    registered through `publishApplication` (`POST /applications`). An entry
+    with `declared: true` comes from a release: to change it, edit its file
+    under `.zitadel/applications/` and deploy. An entry with
+    `declared: false` is registered: to change it, call `publishApplication`.
+
+    It never returns a client secret. A registered client's secret is only
+    in the response of the `publishApplication` call that creates the client.
+  tags:
+    - Applications
+  security:
+    - oauth2:
+        - application.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  requestBody:
+    description: Request to query the applications of a project.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: query-applications-request.yaml
+        examples:
+          firstPage:
+            summary: The first page, newest application first
+            value:
+              limit: 2
+              sorting:
+                field: created_at
+                direction: desc
+          bySlug:
+            summary: Resolve a single slug
+            description: |
+              A slug is unique within the project, so `equals` on it matches
+              at most one row.
+            value:
+              filter:
+                - field: slug
+                  operation: equals
+                  value: shop
+  responses:
+    '200':
+      description: A page of applications.
+      content:
+        application/json:
+          schema:
+            $ref: query-applications-response.yaml
+          examples:
+            firstPage:
+              summary: A page with more results behind it
+              value:
+                applications:
+                  - id: app_01KWHG09JXA7F0N9WD3P2E4YM5
+                    revision_id: apprev_01KWHG3B72K7M7F0N9WD3P2E4Y
+                    slug: partner_portal
+                    declared: false
+                    created_at: '2026-11-07T11:02:00Z'
+                    updated_at: '2026-11-07T11:02:00Z'
+                    definition:
+                      slug: partner_portal
+                      name: Partner portal
+                      clients:
+                        - slug: web
+                          client_id: client_01KWHG09JXA7F0N9WD3P2E4YM6
+                          type: confidential
+                          grant_types:
+                            - authorization_code
+                          redirect_uris:
+                            - https://partners.example.com/callback
+                  - id: app_01KWH3B72K7M7F0N9WD3P2E4YM
+                    revision_id: apprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    slug: shop
+                    declared: true
+                    created_at: '2026-11-06T09:11:00Z'
+                    updated_at: '2026-11-08T14:20:00Z'
+                    definition:
+                      slug: shop
+                      name: Shop
+                      clients:
+                        - slug: web
+                          client_id: shop-web
+                          type: confidential
+                          secret: '${{ SHOP_WEB_CLIENT_SECRET }}'
+                          grant_types:
+                            - authorization_code
+                            - refresh_token
+                          redirect_uris:
+                            - https://shop.example.com/callback
+                            - http://localhost:3000/callback
+                next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
+            lastPage:
+              summary: The final page
+              description: |
+                `next_page_token` is absent when there are no further results.
+              value:
+                applications:
+                  - id: app_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    revision_id: apprev_01KWH8Q5NZTA7F0N9WD3P2E4YM
+                    slug: backoffice
+                    declared: false
+                    created_at: '2026-11-05T08:00:00Z'
+                    updated_at: '2026-11-05T08:00:00Z'
+                    definition:
+                      slug: backoffice
+                      name: Backoffice
+                      clients:
+                        - slug: web
+                          client_id: client_01KWH1P4MYS7F0N9WD3P2E4YM6
+                          type: confidential
+                          grant_types:
+                            - authorization_code
+                          redirect_uris:
+                            - https://backoffice.example.com/callback
+    '400':
+      description: The request was not valid, for example it has invalid query parameters.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: queryApplications-error-response.yaml

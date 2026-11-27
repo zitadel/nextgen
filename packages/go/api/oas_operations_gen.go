@@ -92,6 +92,7 @@ const (
 	PublishIdpOperation                      OperationName = "PublishIdp"
 	PublishPolicyOperation                   OperationName = "PublishPolicy"
 	PublishSchemaOperation                   OperationName = "PublishSchema"
+	QueryApplicationsOperation               OperationName = "QueryApplications"
 	QueryGrantsOperation                     OperationName = "QueryGrants"
 	QueryIdpsOperation                       OperationName = "QueryIdps"
 	QueryProjectsOperation                   OperationName = "QueryProjects"

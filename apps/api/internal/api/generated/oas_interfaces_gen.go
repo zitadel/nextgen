@@ -509,6 +509,10 @@ type PublishSchemaRes interface {
 	publishSchemaRes()
 }
 
+type QueryApplicationsRes interface {
+	queryApplicationsRes()
+}
+
 type QueryGrantsRes interface {
 	queryGrantsRes()
 }

@@ -2746,6 +2746,53 @@ func (s *ApplicationCreatedEventDelegationType) UnmarshalText(data []byte) error
 	}
 }
 
+// The field to filter applications by, one of:
+//
+//   - `slug`: unique within the project. `equals` returns the newest revision of that application
+//   - `created_at`: RFC3339 timestamp
+//
+// Ref: #
+type ApplicationFilterField string
+
+const (
+	ApplicationFilterFieldSlug      ApplicationFilterField = "slug"
+	ApplicationFilterFieldCreatedAt ApplicationFilterField = "created_at"
+)
+
+// AllValues returns all ApplicationFilterField values.
+func (ApplicationFilterField) AllValues() []ApplicationFilterField {
+	return []ApplicationFilterField{
+		ApplicationFilterFieldSlug,
+		ApplicationFilterFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationFilterFieldSlug:
+		return []byte(s), nil
+	case ApplicationFilterFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationFilterField) UnmarshalText(data []byte) error {
+	switch ApplicationFilterField(data) {
+	case ApplicationFilterFieldSlug:
+		*s = ApplicationFilterFieldSlug
+		return nil
+	case ApplicationFilterFieldCreatedAt:
+		*s = ApplicationFilterFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Payload for `application.created`, which holds every field, and `application.updated`, which holds
 // the new `revision_id`, `name` when it changed, and `client_ids` when the revision added a client.
 // `application.client_secret.rotated` holds the `client_ids` whose secrets were replaced and the
@@ -2902,6 +2949,49 @@ func (*ApplicationResponse) getApplicationRes()         {}
 func (*ApplicationResponse) getApplicationRevisionRes() {}
 
 type ApplicationRevisionID string
+
+// The field to sort applications by.
+// Ref: #
+type ApplicationSortField string
+
+const (
+	ApplicationSortFieldSlug      ApplicationSortField = "slug"
+	ApplicationSortFieldCreatedAt ApplicationSortField = "created_at"
+)
+
+// AllValues returns all ApplicationSortField values.
+func (ApplicationSortField) AllValues() []ApplicationSortField {
+	return []ApplicationSortField{
+		ApplicationSortFieldSlug,
+		ApplicationSortFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationSortField) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationSortFieldSlug:
+		return []byte(s), nil
+	case ApplicationSortFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationSortField) UnmarshalText(data []byte) error {
+	switch ApplicationSortField(data) {
+	case ApplicationSortFieldSlug:
+		*s = ApplicationSortFieldSlug
+		return nil
+	case ApplicationSortFieldCreatedAt:
+		*s = ApplicationSortFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Merged schema.
 // Ref: #
@@ -78417,6 +78507,52 @@ func (o OptProjectUpdatedEventDelegationType) Or(d ProjectUpdatedEventDelegation
 	return d
 }
 
+// NewOptQueryApplicationsRequestSorting returns new OptQueryApplicationsRequestSorting with value set to v.
+func NewOptQueryApplicationsRequestSorting(v QueryApplicationsRequestSorting) OptQueryApplicationsRequestSorting {
+	return OptQueryApplicationsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryApplicationsRequestSorting is optional QueryApplicationsRequestSorting.
+type OptQueryApplicationsRequestSorting struct {
+	Value QueryApplicationsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryApplicationsRequestSorting was set.
+func (o OptQueryApplicationsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryApplicationsRequestSorting) Reset() {
+	var v QueryApplicationsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryApplicationsRequestSorting) SetTo(v QueryApplicationsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryApplicationsRequestSorting) Get() (v QueryApplicationsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryApplicationsRequestSorting) Or(d QueryApplicationsRequestSorting) QueryApplicationsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptQueryGrantsRequestSorting returns new OptQueryGrantsRequestSorting with value set to v.
 func NewOptQueryGrantsRequestSorting(v QueryGrantsRequestSorting) OptQueryGrantsRequestSorting {
 	return OptQueryGrantsRequestSorting{
@@ -92966,6 +93102,381 @@ func NewSchemaURLPublishSchemaReq(v SchemaURL) PublishSchemaReq {
 	s.SetSchemaURL(v)
 	return s
 }
+
+type QueryApplicationsBadRequest ErrorDetails
+
+func (*QueryApplicationsBadRequest) queryApplicationsRes() {}
+
+// QueryApplicationsErrorResponse represents sum type.
+type QueryApplicationsErrorResponse struct {
+	// Type selects the active sum variant, switch on this field.
+	Type             QueryApplicationsErrorResponseType
+	AuthCsrfInvalid  AuthCsrfInvalid
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// QueryApplicationsErrorResponseType is oneOf type of QueryApplicationsErrorResponse.
+type QueryApplicationsErrorResponseType string
+
+// Possible values for QueryApplicationsErrorResponseType.
+const (
+	AuthCsrfInvalidQueryApplicationsErrorResponse  QueryApplicationsErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedQueryApplicationsErrorResponse QueryApplicationsErrorResponseType = "auth.unauthorized"
+	InternalQueryApplicationsErrorResponse         QueryApplicationsErrorResponseType = "internal"
+	NotImplementedQueryApplicationsErrorResponse   QueryApplicationsErrorResponseType = "not_implemented"
+	ReqInvalidQueryApplicationsErrorResponse       QueryApplicationsErrorResponseType = "req.invalid"
+	UnavailableQueryApplicationsErrorResponse      QueryApplicationsErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether QueryApplicationsErrorResponse is AuthCsrfInvalid.
+func (s QueryApplicationsErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidQueryApplicationsErrorResponse
+}
+
+// IsAuthUnauthorized reports whether QueryApplicationsErrorResponse is AuthUnauthorized.
+func (s QueryApplicationsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedQueryApplicationsErrorResponse
+}
+
+// IsInternal reports whether QueryApplicationsErrorResponse is Internal.
+func (s QueryApplicationsErrorResponse) IsInternal() bool {
+	return s.Type == InternalQueryApplicationsErrorResponse
+}
+
+// IsNotImplemented reports whether QueryApplicationsErrorResponse is NotImplemented.
+func (s QueryApplicationsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQueryApplicationsErrorResponse
+}
+
+// IsReqInvalid reports whether QueryApplicationsErrorResponse is ReqInvalid.
+func (s QueryApplicationsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidQueryApplicationsErrorResponse
+}
+
+// IsUnavailable reports whether QueryApplicationsErrorResponse is Unavailable.
+func (s QueryApplicationsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableQueryApplicationsErrorResponse
+}
+
+// SetAuthCsrfInvalid sets QueryApplicationsErrorResponse to AuthCsrfInvalid.
+func (s *QueryApplicationsErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidQueryApplicationsErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if QueryApplicationsErrorResponse is AuthCsrfInvalid.
+func (s QueryApplicationsErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidQueryApplicationsErrorResponse returns new QueryApplicationsErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidQueryApplicationsErrorResponse(v AuthCsrfInvalid) QueryApplicationsErrorResponse {
+	var s QueryApplicationsErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets QueryApplicationsErrorResponse to AuthUnauthorized.
+func (s *QueryApplicationsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedQueryApplicationsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if QueryApplicationsErrorResponse is AuthUnauthorized.
+func (s QueryApplicationsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedQueryApplicationsErrorResponse returns new QueryApplicationsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedQueryApplicationsErrorResponse(v AuthUnauthorized) QueryApplicationsErrorResponse {
+	var s QueryApplicationsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets QueryApplicationsErrorResponse to Internal.
+func (s *QueryApplicationsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQueryApplicationsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QueryApplicationsErrorResponse is Internal.
+func (s QueryApplicationsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQueryApplicationsErrorResponse returns new QueryApplicationsErrorResponse from Internal.
+func NewInternalQueryApplicationsErrorResponse(v Internal) QueryApplicationsErrorResponse {
+	var s QueryApplicationsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QueryApplicationsErrorResponse to NotImplemented.
+func (s *QueryApplicationsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQueryApplicationsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QueryApplicationsErrorResponse is NotImplemented.
+func (s QueryApplicationsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQueryApplicationsErrorResponse returns new QueryApplicationsErrorResponse from NotImplemented.
+func NewNotImplementedQueryApplicationsErrorResponse(v NotImplemented) QueryApplicationsErrorResponse {
+	var s QueryApplicationsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets QueryApplicationsErrorResponse to ReqInvalid.
+func (s *QueryApplicationsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidQueryApplicationsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if QueryApplicationsErrorResponse is ReqInvalid.
+func (s QueryApplicationsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidQueryApplicationsErrorResponse returns new QueryApplicationsErrorResponse from ReqInvalid.
+func NewReqInvalidQueryApplicationsErrorResponse(v ReqInvalid) QueryApplicationsErrorResponse {
+	var s QueryApplicationsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets QueryApplicationsErrorResponse to Unavailable.
+func (s *QueryApplicationsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableQueryApplicationsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if QueryApplicationsErrorResponse is Unavailable.
+func (s QueryApplicationsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableQueryApplicationsErrorResponse returns new QueryApplicationsErrorResponse from Unavailable.
+func NewUnavailableQueryApplicationsErrorResponse(v Unavailable) QueryApplicationsErrorResponse {
+	var s QueryApplicationsErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// QueryApplicationsErrorResponseStatusCode wraps QueryApplicationsErrorResponse with StatusCode.
+type QueryApplicationsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QueryApplicationsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QueryApplicationsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QueryApplicationsErrorResponseStatusCode) GetResponse() QueryApplicationsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QueryApplicationsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QueryApplicationsErrorResponseStatusCode) SetResponse(val QueryApplicationsErrorResponse) {
+	s.Response = val
+}
+
+func (*QueryApplicationsErrorResponseStatusCode) queryApplicationsRes() {}
+
+type QueryApplicationsForbidden ErrorDetails
+
+func (*QueryApplicationsForbidden) queryApplicationsRes() {}
+
+type QueryApplicationsNotFound ErrorDetails
+
+func (*QueryApplicationsNotFound) queryApplicationsRes() {}
+
+// Request to query the applications of a project.
+// Ref: #
+type QueryApplicationsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results. Send the same `sorting` as the request that issued the
+	// token.
+	PageToken OptNilPageToken `json:"page_token"`
+	// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
+	Sorting OptQueryApplicationsRequestSorting `json:"sorting"`
+	// Filter criteria for querying applications. Combined with AND.
+	Filter []QueryApplicationsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryApplicationsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryApplicationsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryApplicationsRequest) GetSorting() OptQueryApplicationsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryApplicationsRequest) GetFilter() []QueryApplicationsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryApplicationsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryApplicationsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryApplicationsRequest) SetSorting(val OptQueryApplicationsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryApplicationsRequest) SetFilter(val []QueryApplicationsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryApplicationsRequestFilterItem struct {
+	// The field to filter by.
+	Field     ApplicationFilterField `json:"field"`
+	Value     OptFilterValue         `json:"value"`
+	Operation FilterOperation        `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryApplicationsRequestFilterItem) GetField() ApplicationFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryApplicationsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryApplicationsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryApplicationsRequestFilterItem) SetField(val ApplicationFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryApplicationsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryApplicationsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
+type QueryApplicationsRequestSorting struct {
+	// The field to sort by.
+	Field ApplicationSortField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryApplicationsRequestSorting) GetField() ApplicationSortField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryApplicationsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryApplicationsRequestSorting) SetField(val ApplicationSortField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryApplicationsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of applications.
+// Ref: #
+type QueryApplicationsResponse struct {
+	Applications []ApplicationResponse `json:"applications"`
+	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
+	// no more results. The follow-up request must repeat the same `sorting` that produced this token (omit
+	// only when both pages use the default).
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetApplications returns the value of Applications.
+func (s *QueryApplicationsResponse) GetApplications() []ApplicationResponse {
+	return s.Applications
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryApplicationsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetApplications sets the value of Applications.
+func (s *QueryApplicationsResponse) SetApplications(val []ApplicationResponse) {
+	s.Applications = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryApplicationsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryApplicationsResponse) queryApplicationsRes() {}
+
+type QueryApplicationsUnauthorized ErrorDetails
+
+func (*QueryApplicationsUnauthorized) queryApplicationsRes() {}
 
 type QueryGrantsBadRequest ErrorDetails
 

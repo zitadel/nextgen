@@ -1,0 +1,5 @@
+type: string
+description: The field to sort applications by.
+enum:
+  - slug
+  - created_at

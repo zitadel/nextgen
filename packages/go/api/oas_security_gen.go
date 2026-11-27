@@ -241,6 +241,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	PublishSchemaOperation: []string{
 		"schema.write",
 	},
+	QueryApplicationsOperation: []string{
+		"application.read",
+	},
 	QueryGrantsOperation: []string{
 		"project.read",
 	},
@@ -377,6 +380,7 @@ var operationRolesSessionCookie = map[string][]string{
 	ListUserTeamsOperation:          []string{},
 	ListVariablesOperation:          []string{},
 	LookupInvitationOperation:       []string{},
+	QueryApplicationsOperation:      []string{},
 	QueryGrantsOperation:            []string{},
 	QueryIdpsOperation:              []string{},
 	QueryTeamsOperation:             []string{},
