@@ -261,6 +261,50 @@ describe("claim", () => {
     expect(json.data.dashboard_url).toContain(String(claimed.team_id));
   });
 
+  // A copy of the project made before the claim names no team; the command
+  // that learns the team from the platform writes it down, as a completed
+  // claim does.
+  it("records the owning team the platform named in the local secret", async ({ dir: cwd }) => {
+    const project = await makeProject(cwd);
+    await Promise.all([
+      claim(cwd),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
+    ]);
+    const claimed = await readSecret(cwd);
+    const { claimed_at: _claimedAt, team_id: _teamId, ...withoutClaim } = claimed;
+    await writeSecret(cwd, withoutClaim);
+
+    const res = await claim(cwd);
+
+    expect((parseJson(res.stdout) as { data: { claimed_at?: string } }).data.claimed_at).toBe(
+      claimed.claimed_at,
+    );
+    expect(await readSecret(cwd)).toMatchObject({
+      team_id: claimed.team_id,
+      claimed_at: claimed.claimed_at,
+    });
+  });
+
+  it("leaves the local secret as it was when the claim cannot be read", async ({ dir: cwd }) => {
+    const project = await makeProject(cwd);
+    await Promise.all([
+      claim(cwd),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
+    ]);
+    const { claimed_at: _claimedAt, team_id: _teamId, ...withoutClaim } = await readSecret(cwd);
+    await writeSecret(cwd, withoutClaim);
+    server.use(
+      http.get("*/projects/:project_id/claim", () => {
+        return HttpResponse.error();
+      }),
+    );
+
+    const res = await claim(cwd);
+
+    expect((parseJson(res.stdout) as { reason: string }).reason).toBe("already-claimed");
+    expect(await readSecret(cwd)).toEqual(withoutClaim);
+  });
+
   it("fails with actionable guidance when the link expires", async ({ dir: cwd }) => {
     await makeProject(cwd);
 
