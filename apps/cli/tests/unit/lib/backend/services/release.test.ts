@@ -43,8 +43,9 @@ describe("ReleaseService.create", () => {
   it("answers the release the server built", async ({ server, client }) => {
     answering(server, "buildRelease", { id: "rel_1", content_hash: "sha256:abc" });
 
-    await expect(new ReleaseService(client, "proj_1").create(INPUT)).resolves.toMatchObject({
+    await expect(new ReleaseService(client, "proj_1").create(INPUT)).resolves.toEqual({
       id: "rel_1",
+      content_hash: "sha256:abc",
     });
   });
 
@@ -148,8 +149,9 @@ describe("ReleaseService.revoke", () => {
       async (kind, { server, client }) => {
         const releaseService = refusedWith(server, client, anInUseAnswer([{ ...PRIMARY, kind }]));
 
-        await expect(releaseService.revoke("rel_1")).resolves.toMatchObject({
+        await expect(releaseService.revoke("rel_1")).resolves.toEqual({
           outcome: "in-use",
+          origins: [{ ...PRIMARY, kind }],
         });
       },
     );

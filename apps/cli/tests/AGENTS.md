@@ -255,6 +255,8 @@ it stays here deliberately rather than by oversight.
 - Catch a refusal with `thrownBy` or `rejectionOf` (`helpers/thrown-value.ts`),
   then assert its class with `toBeInstanceOf`, then the fields that matter with
   `toMatchObject`. No `toThrow`, no `rejects`, no `try`/`catch`.
+- Assert any other value whole with `toEqual` against a typed expected value,
+  never `toMatchObject` or `expect.objectContaining` on a few of its fields.
 - No casts, no non-null `!`, no `any`: a double that needs one is the wrong
   double; use a real class. `as const` is not a cast.
 - No sleeps or time-bounded waits: a test that orders work holds promises it

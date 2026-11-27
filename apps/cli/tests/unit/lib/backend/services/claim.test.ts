@@ -21,7 +21,7 @@ describe("ClaimService.start", () => {
   it("answers the claim link the server minted", async ({ server, client }) => {
     const started = answering(server, "createProjectClaim", { challenge_id: "clm_1" });
 
-    await expect(new ClaimService(client, "proj_1").start()).resolves.toMatchObject({
+    await expect(new ClaimService(client, "proj_1").start()).resolves.toEqual({
       outcome: "started",
       challenge: { challenge_id: "clm_1" },
     });
@@ -86,8 +86,9 @@ describe("ClaimService.status", () => {
   it("answers a finished claim with what it finished as", async ({ server, client }) => {
     const polled = answering(server, "getProjectClaimStatus", { status: "completed" });
 
-    await expect(new ClaimService(client, "proj_1").status("clm_1")).resolves.toMatchObject({
+    await expect(new ClaimService(client, "proj_1").status("clm_1")).resolves.toEqual({
       outcome: "completed",
+      claim: { status: "completed" },
     });
     expect(
       polled.map(({ params, url }) => {

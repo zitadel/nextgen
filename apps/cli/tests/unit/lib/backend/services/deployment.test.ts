@@ -337,9 +337,9 @@ describe("DeploymentService.get", () => {
   it("answers the deployment the project holds", async ({ server, client }) => {
     answering(server, "getDeployment", primary("dep_1"));
 
-    await expect(new DeploymentService(client, "proj_1").get("dep_1")).resolves.toMatchObject({
-      id: "dep_1",
-    });
+    await expect(new DeploymentService(client, "proj_1").get("dep_1")).resolves.toEqual(
+      Deployment.of(primary("dep_1")),
+    );
   });
 
   it("reads it for the project it is bound to", async ({ server, client }) => {
@@ -411,7 +411,9 @@ describe("DeploymentService.newestPrimary", () => {
       primary("dep_1"),
     ]);
 
-    await expect(deploymentService.newestPrimary()).resolves.toMatchObject({ id: "dep_2" });
+    await expect(deploymentService.newestPrimary()).resolves.toEqual(
+      Deployment.of(primary("dep_2")),
+    );
   });
 
   it("answers nothing when only a preview is live", async ({ server, client }) => {
@@ -425,9 +427,9 @@ describe("DeploymentService.liveOn", () => {
   it("answers the deployment live on the origin it was given", async ({ server, client }) => {
     const deploymentService = serviceListing(server, client, [primary("dep_1")]);
 
-    await expect(deploymentService.liveOn(PRIMARY_ORIGIN)).resolves.toMatchObject({
+    await expect(deploymentService.liveOn(PRIMARY_ORIGIN)).resolves.toEqual({
       outcome: "live",
-      deployment: { id: "dep_1" },
+      deployment: Deployment.of(primary("dep_1")),
     });
   });
 
@@ -437,9 +439,9 @@ describe("DeploymentService.liveOn", () => {
   }) => {
     const deploymentService = serviceListing(server, client, [primary("dep_1")]);
 
-    await expect(deploymentService.liveOn()).resolves.toMatchObject({
+    await expect(deploymentService.liveOn()).resolves.toEqual({
       outcome: "live",
-      deployment: { id: "dep_1" },
+      deployment: Deployment.of(primary("dep_1")),
     });
   });
 
@@ -612,9 +614,9 @@ describe("DeploymentService.deployToPrimary", () => {
 
     await expect(
       new DeploymentService(client, "proj_1").deployToPrimary({ releaseId: "rel_1" }),
-    ).resolves.toMatchObject({
+    ).resolves.toEqual({
       outcome: "deployed",
-      deployment: { id: "dep_1" },
+      deployment: Deployment.of(primary("dep_1")),
     });
   });
 
@@ -638,9 +640,9 @@ describe("DeploymentService.deployToPrimary", () => {
 
     await expect(
       new DeploymentService(client, "proj_1").deployToPrimary({ releaseId: "rel_1" }),
-    ).resolves.toMatchObject({
+    ).resolves.toEqual({
       outcome: "raced",
-      current: { id: "dep_9" },
+      current: Deployment.of(primary("dep_9")),
     });
   });
 
@@ -725,9 +727,9 @@ describe("DeploymentService.extendPrimary", () => {
 
     await expect(
       new DeploymentService(client, "proj_1").extendPrimary("http://localhost:3101", "moved"),
-    ).resolves.toMatchObject({
+    ).resolves.toEqual({
       outcome: "deployed",
-      deployment: { id: "dep_2" },
+      deployment: Deployment.of(primary("dep_2", "http://localhost:3101")),
     });
   });
 

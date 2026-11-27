@@ -54,6 +54,28 @@ import {
   BuildReleaseQueryParams,
   CancelInvitationParams,
   CancelInvitationQueryParams,
+  CreateGrantBody,
+  CreateGrantQueryParams,
+  CreateGrantResponse,
+  CreateTeamBody,
+  CreateTeamQueryParams,
+  CreateTeamResponse,
+  CreateUserBody,
+  CreateUserQueryParams,
+  CreateUserResponse,
+  DeactivateTeamParams,
+  DeleteGrantParams,
+  DeleteGrantQueryParams,
+  DeleteUserParams,
+  GetTeamParams,
+  GetTeamResponse,
+  GetUserParams,
+  GetUserQueryParams,
+  GetUserResponse,
+  QueryUsersResponse,
+  QueryGrantsBody,
+  QueryGrantsQueryParams,
+  QueryGrantsResponse,
   CreateInvitationBody,
   CreateInvitationQueryParams,
   CreateInvitationResponse,
@@ -128,11 +150,16 @@ import {
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
+  CreateSessionBody,
+  CreateSessionResponse,
+  GetSessionParams,
+  GetSessionResponse,
   RemoveProjectOriginBody,
   RemoveProjectOriginParams,
   RemoveProjectPreviewBody,
   RemoveProjectPreviewParams,
   RevokeReleaseParams,
+  RevokeSessionParams,
   RevokeReleaseQueryParams,
   RollbackDeploymentBody,
   RollbackDeploymentParams,
@@ -515,10 +542,56 @@ type InvitationRecord = {
   seq: number;
 };
 
+/** A team as `internal/service/team.go` keeps it; deactivating keeps it readable (ADR 024). */
+type TeamRecord = {
+  id: string;
+  projectId: string;
+  name: string;
+  status: "active" | "deactivated";
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** A user as the server keeps it; deleting removes it. */
+type UserRecord = {
+  id: string;
+  projectId: string;
+  schema: string;
+  attributes: Record<string, unknown>;
+  createdAt: string;
+};
+
+/** An anonymous session, as `createSession` starts one; revoking deletes it. */
+type SessionRecord = {
+  id: string;
+  projectId: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+/** How long an anonymous session lasts before its first factor, as the contract states. */
+const ANONYMOUS_SESSION_TTL_MS = 10 * 60 * 1000;
+
+/** A collaboration grant giving a user or a team a role on a project. */
+type GrantRecord = {
+  id: string;
+  projectId: string;
+  relation: "viewer" | "editor" | "admin";
+  createdAt: string;
+  expiresAt: string | null;
+  principal: { user_id: string } | { team_id: string };
+  seq: number;
+};
+
 /** How long an invitation's link stays redeemable (`domain.InvitationExpiration`). */
 const INVITATION_TTL_MS = 72 * 60 * 60 * 1000;
 
 const INVITATION_NOT_FOUND = errorBody("inv.not_found", "invitation not found");
+const TEAM_NOT_FOUND = errorBody("team.team_not_found", "team not found");
+const USER_NOT_FOUND = errorBody("user.not_found", "user not found");
+const GRANT_NOT_FOUND = errorBody("grant.not_found", "grant not found");
+const SESSION_NOT_FOUND = errorBody("sess.not_found", "The session was not found");
+const UNAUTHORIZED = errorBody("auth.unauthorized", "missing or invalid credentials");
 
 type Store = {
   projects: Map<string, ProjectRecord>;
@@ -532,6 +605,10 @@ type Store = {
   previews: Map<string, PreviewRecord>;
   policies: Map<string, PolicyRecord>;
   invitations: Map<string, InvitationRecord>;
+  teams: Map<string, TeamRecord>;
+  users: Map<string, UserRecord>;
+  grants: Map<string, GrantRecord>;
+  sessions: Map<string, SessionRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -560,6 +637,10 @@ function makeStore(): Store {
     previews: new Map(),
     policies: new Map(),
     invitations: new Map(),
+    teams: new Map(),
+    users: new Map(),
+    grants: new Map(),
+    sessions: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -2126,6 +2207,389 @@ function projectInvitation(projectId: string, id: string): InvitationRecord | un
   return invitation?.projectId === projectId ? invitation : undefined;
 }
 
+/**
+ * A team as every read answers it.
+ *
+ * @param team - The stored team.
+ * @returns The team's wire shape.
+ */
+function teamResponse(team: TeamRecord): Record<string, unknown> {
+  return {
+    id: team.id,
+    name: team.name,
+    status: team.status,
+    created_at: team.createdAt,
+    updated_at: team.updatedAt,
+  };
+}
+
+/**
+ * A user as every read answers it, its `email` as the identifier the default
+ * schema designates.
+ *
+ * @param user - The stored user.
+ * @returns The user's wire shape.
+ */
+function userResponse(user: UserRecord): Record<string, unknown> {
+  const email = user.attributes.email;
+  return {
+    id: user.id,
+    schema: user.schema,
+    attributes: user.attributes,
+    ...(typeof email === "string" ? { identifier: email, identifier_property: "email" } : {}),
+    metadata: {
+      created_at: user.createdAt,
+      updated_at: user.createdAt,
+      status: "active",
+      lifecycle_owner_team_id: null,
+    },
+  };
+}
+
+/**
+ * A grant as every read answers it, its principal a ref: a user's id, or a team's id and name.
+ *
+ * @param grant - The stored grant.
+ * @returns The grant's wire shape.
+ */
+function grantResponse(grant: GrantRecord): Record<string, unknown> {
+  return {
+    id: grant.id,
+    project_id: grant.projectId,
+    object_type: "project",
+    relation: grant.relation,
+    created_at: grant.createdAt,
+    expires_at: grant.expiresAt,
+    ...("user_id" in grant.principal
+      ? { user: grant.principal }
+      : {
+          team: {
+            ...grant.principal,
+            ...(store.teams.has(grant.principal.team_id)
+              ? { name: store.teams.get(grant.principal.team_id)?.name }
+              : {}),
+          },
+        }),
+  };
+}
+
+/** One criterion of a query body's `filter`. */
+type QueryFilter = {
+  field: string;
+  operation: string;
+  value?: string | number | boolean | null;
+};
+
+/**
+ * Whether a stored value passes one filter, with the operations the contract
+ * defines: `equals` is exact, `contains` and `starts_with` fold case, and the
+ * ordering operations compare text, which orders RFC3339 timestamps.
+ *
+ * @param actual - The stored value, or null when the record has none.
+ * @param filter - The criterion, already checked by `filterRefusal`; a null value matches a missing one.
+ * @returns Whether the record passes.
+ */
+function passesFilter(actual: string | null, filter: QueryFilter): boolean {
+  if (filter.value === null) {
+    return actual === null;
+  }
+  const expected = String(filter.value);
+  if (filter.operation === "not_equals") {
+    return actual !== expected;
+  }
+  if (actual === null) {
+    return filter.operation === "not_contains";
+  }
+  const folded = actual.toLowerCase();
+  const wanted = expected.toLowerCase();
+  switch (filter.operation) {
+    case "equals":
+      return actual === expected;
+    case "contains":
+      return folded.includes(wanted);
+    case "not_contains":
+      return !folded.includes(wanted);
+    case "starts_with":
+      return folded.startsWith(wanted);
+    case "less_than":
+      return actual < expected;
+    case "less_than_or_equal":
+      return actual <= expected;
+    case "greater_than":
+      return actual > expected;
+    default:
+      return actual >= expected;
+  }
+}
+
+/** What a list accepts on one filter field. */
+type FilterRule = {
+  allowed: readonly string[];
+  unimplemented?: readonly string[];
+  once?: boolean;
+  nullable?: boolean;
+  values?: readonly string[];
+};
+
+/** Every operation, for a field the server answers them all on. */
+const ALL_OPERATIONS = [
+  "equals",
+  "not_equals",
+  "contains",
+  "not_contains",
+  "starts_with",
+  "less_than",
+  "less_than_or_equal",
+  "greater_than",
+  "greater_than_or_equal",
+] as const;
+
+/**
+ * What the user list accepts: `identifier` only `starts_with` and `team_id`
+ * only `equals`, each once, as the contract states.
+ */
+const USER_FILTER_RULES: Readonly<Record<string, FilterRule>> = {
+  created_at: { allowed: ALL_OPERATIONS },
+  id: { allowed: ALL_OPERATIONS },
+  identifier: { allowed: ["starts_with"], once: true },
+  schema: { allowed: ALL_OPERATIONS },
+  schema_object_type: { allowed: ALL_OPERATIONS },
+  status: { allowed: ALL_OPERATIONS },
+  team_id: { allowed: ["equals"], once: true },
+  lifecycle_owner_team_id: { allowed: ALL_OPERATIONS },
+};
+
+/** A timestamp filter on a grant, as `internal/service/list.go` compares one. */
+const GRANT_TIMESTAMP_RULE: FilterRule = {
+  allowed: ["equals", "less_than", "greater_than", "greater_than_or_equal"],
+  unimplemented: ["not_equals", "less_than_or_equal"],
+};
+
+/** A principal id filter on a grant, as `internal/service/list.go` matches text. */
+const GRANT_PRINCIPAL_RULE: FilterRule = {
+  allowed: ["equals", "contains"],
+  unimplemented: ["not_equals", "not_contains"],
+};
+
+/** What the grant list accepts, as `internal/service/grant.go` builds its filters. */
+const GRANT_FILTER_RULES: Readonly<Record<string, FilterRule>> = {
+  created_at: GRANT_TIMESTAMP_RULE,
+  expires_at: { ...GRANT_TIMESTAMP_RULE, nullable: true },
+  user_id: GRANT_PRINCIPAL_RULE,
+  team_id: GRANT_PRINCIPAL_RULE,
+  relation: {
+    allowed: ["equals"],
+    unimplemented: ["not_equals", "contains", "not_contains"],
+    values: ["viewer", "editor", "admin"],
+  },
+};
+
+/**
+ * Why a query's filters are refused, as the server refuses them: an operation
+ * it has not built yet answers 501 `not_implemented`, and a value that is not
+ * text, an operation the field does not take, a value outside the field's set
+ * or a field given twice that may be given once answers 400 `req.invalid`. A
+ * null value is taken only with `equals`, on a field that may be null.
+ *
+ * @param filters - The query's criteria.
+ * @param rules - What the list accepts on each field.
+ * @returns The refusal, or undefined when every filter is allowed.
+ */
+function filterRefusal(
+  filters: readonly QueryFilter[] | undefined,
+  rules: Readonly<Record<string, FilterRule>>,
+): HttpResponse<ErrorBody> | undefined {
+  for (const filter of filters ?? []) {
+    const rule = rules[filter.field];
+    const nullAllowed = rule?.nullable === true && filter.operation === "equals";
+    const badValue =
+      (filter.value === null ? !nullAllowed : typeof filter.value !== "string") ||
+      (rule?.values !== undefined && !rule.values.includes(String(filter.value)));
+    const repeated =
+      rule?.once === true &&
+      (filters ?? []).filter((other) => {
+        return other.field === filter.field;
+      }).length > 1;
+    if (rule === undefined || badValue || repeated) {
+      return HttpResponse.json(errorBody("req.invalid", `invalid filter on ${filter.field}`), {
+        status: 400,
+      });
+    }
+    if (rule.unimplemented?.includes(filter.operation) && filter.value !== null) {
+      return HttpResponse.json(
+        errorBody("not_implemented", `operation ${filter.operation} is not supported`),
+        { status: 501 },
+      );
+    }
+    if (!rule.allowed.includes(filter.operation)) {
+      return HttpResponse.json(errorBody("req.invalid", `invalid filter on ${filter.field}`), {
+        status: 400,
+      });
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A user's value for a filter or sort field, as the server reads it. The mock
+ * keeps no team memberships and no lifecycle owners, so `team_id` and
+ * `lifecycle_owner_team_id` read as null and match no `equals`.
+ *
+ * @param user - The user.
+ * @param field - The filter or sort field.
+ * @returns The value, or null when the user has none.
+ */
+function userField(user: UserRecord, field: string): string | null {
+  switch (field) {
+    case "created_at":
+      return user.createdAt;
+    case "id":
+      return user.id;
+    case "identifier":
+      return identifierOf(user) ?? null;
+    case "schema":
+      return user.schema;
+    case "schema_object_type":
+      return store.schemas.get(user.schema)?.objectType ?? "";
+    case "status":
+      return "active";
+    default:
+      return null;
+  }
+}
+
+/**
+ * A grant's value for a filter or sort field.
+ *
+ * @param grant - The grant.
+ * @param field - The filter or sort field.
+ * @returns The value, or null when the grant has none.
+ */
+function grantField(grant: GrantRecord, field: string): string | null {
+  switch (field) {
+    case "created_at":
+      return grant.createdAt;
+    case "expires_at":
+      return grant.expiresAt;
+    case "id":
+      return grant.id;
+    case "relation":
+      return grant.relation;
+    case "user_id":
+      return "user_id" in grant.principal ? grant.principal.user_id : null;
+    default:
+      return "team_id" in grant.principal ? grant.principal.team_id : null;
+  }
+}
+
+/**
+ * Orders two values of a sort field, a missing value first.
+ *
+ * @param a - The first value.
+ * @param b - The second value.
+ * @returns Negative, zero or positive, as `Array.prototype.sort` wants.
+ */
+function compareNullable(a: string | null, b: string | null): number {
+  return (a ?? "").localeCompare(b ?? "");
+}
+
+/**
+ * A grant with its principal expanded: `schema`, `attributes` and `metadata`
+ * on a user, `status`, `created_at` and `updated_at` on a team. A principal
+ * that cannot be loaded stays a bare ref.
+ *
+ * @param grant - The grant.
+ * @returns The grant as an expanded read answers it.
+ */
+function expandedGrantResponse(grant: GrantRecord): Record<string, unknown> {
+  const base = grantResponse(grant);
+  if ("user_id" in grant.principal) {
+    const user = store.users.get(grant.principal.user_id);
+    if (user === undefined) {
+      return base;
+    }
+    const { schema, attributes, metadata } = userResponse(user);
+    return { ...base, user: { ...grant.principal, schema, attributes, metadata } };
+  }
+  const team = store.teams.get(grant.principal.team_id);
+  if (team === undefined) {
+    return base;
+  }
+  const { status, created_at, updated_at } = teamResponse(team);
+  return { ...base, team: { ...grant.principal, status, created_at, updated_at } };
+}
+
+/**
+ * A session as every read answers it: anonymous, so still building, with no
+ * user and no factors.
+ *
+ * @param session - The stored session.
+ * @returns The session's wire shape.
+ */
+function sessionResponse(session: SessionRecord): Record<string, unknown> {
+  return {
+    session_id: session.id,
+    project_id: session.projectId,
+    state: "building",
+    user_id: null,
+    factors: [],
+    created_at: session.createdAt,
+    expires_at: session.expiresAt,
+  };
+}
+
+/**
+ * The project whose secret the request carries as its bearer, the way the
+ * server scopes a team or a user read by id alone.
+ *
+ * @param request - The request.
+ * @returns The project's id, or undefined when the bearer names none.
+ */
+function bearerProjectId(request: Request): string | undefined {
+  const token = bearerToken(request);
+  return [...store.projects.values()].find((project) => {
+    return token !== "" && project.projectSecret === token;
+  })?.id;
+}
+
+/**
+ * Why a request on `projectId` is refused before its body is read: the bearer
+ * is not that project's secret (401). An operation that declares its own code
+ * for a project that does not exist answers that with 404 first; one that
+ * declares none answers 401, since no secret can name a missing project.
+ *
+ * @param request - The request.
+ * @param projectId - The project the request names.
+ * @param projectNotFound - The operation's own code for a missing project, if it declares one.
+ * @returns The refusal, or undefined when the request may go on.
+ */
+function projectRefusal(
+  request: Request,
+  projectId: string,
+  projectNotFound?: string,
+): HttpResponse<ErrorBody> | undefined {
+  if (projectNotFound !== undefined && !store.projects.has(projectId)) {
+    return HttpResponse.json(errorBody(projectNotFound, "project not found"), { status: 404 });
+  }
+  if (bearerProjectId(request) !== projectId) {
+    return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+      status: 401,
+    });
+  }
+  return undefined;
+}
+
+/**
+ * A user's identifier: its `email`, which the default schema designates.
+ *
+ * @param user - The user.
+ * @returns The identifier, or undefined when the user has none.
+ */
+function identifierOf(user: UserRecord): string | undefined {
+  const email = user.attributes.email;
+  return typeof email === "string" ? email.toLowerCase() : undefined;
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -3090,11 +3554,8 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    // Users exist only through real sign-ups, which the platform mock has no
-    // endpoint for — the list is always empty. That is exactly the state a
-    // freshly set-up project is in, and what `status` keys its journey-staged
-    // guidance on. Auth mirrors the real server: the project secret is the
-    // bearer and scopes the (empty) result.
+    // Auth mirrors the real server: the project secret is the bearer and
+    // scopes the result to the project's own users.
     http.post("*/users/query", async ({ request }) => {
       // The query body is JSON, so `limit` arrives already numeric — unlike the
       // query string this endpoint replaced, which needed it coerced by hand.
@@ -3109,7 +3570,58 @@ export function setupPlatformHandlers() {
           status: 401,
         });
       }
-      return HttpResponse.json({ users: [] });
+      const refusal = filterRefusal(body.data.filter, USER_FILTER_RULES);
+      if (refusal !== undefined) {
+        return refusal;
+      }
+      const byIdentifier = (body.data.filter ?? []).some((filter) => {
+        return filter.field === "identifier";
+      });
+      if (byIdentifier && body.data.sorting !== undefined) {
+        return HttpResponse.json(
+          errorBody("req.invalid", "an identifier filter cannot be sorted"),
+          { status: 400 },
+        );
+      }
+      const sortField = byIdentifier ? "identifier" : (body.data.sorting?.field ?? "created_at");
+      const direction = byIdentifier || body.data.sorting?.direction === "asc" ? 1 : -1;
+      const users = [...store.users.values()]
+        .filter((user) => {
+          return user.projectId === project.id;
+        })
+        .filter((user) => {
+          return (body.data.filter ?? []).every((filter) => {
+            return passesFilter(userField(user, filter.field), filter);
+          });
+        })
+        .sort((a, b) => {
+          const order =
+            compareNullable(userField(a, sortField), userField(b, sortField)) ||
+            a.id.localeCompare(b.id);
+          return direction * order;
+        });
+      const paged = pageOf(users, body.data.limit, body.data.page_token ?? undefined);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const expand = body.data.expand ?? [];
+      const out = parseOut(QueryUsersResponse, {
+        users: paged.page.map((user) => {
+          const read = userResponse(user);
+          return {
+            ...read,
+            ...(expand.includes("teams") ? { teams: [] } : {}),
+            ...(expand.includes("lifecycle_owner_team")
+              ? { metadata: { ...(read.metadata as object), lifecycle_owner_team: null } }
+              : {}),
+          };
+        }),
+        next_page_token: paged.next ?? null,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     http.post("*/schemas", async ({ request }) => {
@@ -3920,6 +4432,410 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
       }
       store.invitations.delete(invitation.id);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post("*/teams", async ({ request }) => {
+      const query = parse(CreateTeamQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const refusal = projectRefusal(request, query.data.project_id, "team.project_not_found");
+      if (refusal !== undefined) {
+        return refusal;
+      }
+      const body = parse(CreateTeamBody, await readJson(request));
+      if (!body.ok) {
+        return body.response;
+      }
+      const taken = [...store.teams.values()].some((candidate) => {
+        return (
+          candidate.projectId === query.data.project_id &&
+          candidate.name.toLowerCase() === body.data.name.toLowerCase()
+        );
+      });
+      if (taken) {
+        return HttpResponse.json(errorBody("team.already_exists", "team name already exists"), {
+          status: 409,
+        });
+      }
+      const now = nowIso();
+      const team: TeamRecord = {
+        id: `team_${shortId()}`,
+        projectId: query.data.project_id,
+        name: body.data.name,
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      };
+      store.teams.set(team.id, team);
+      const out = parseOut(CreateTeamResponse, teamResponse(team));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/teams/:team_id", ({ params, request }) => {
+      const path = parse(GetTeamParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
+      const team = store.teams.get(path.data.team_id);
+      if (team === undefined || team.projectId !== bearerProjectId(request)) {
+        return HttpResponse.json(TEAM_NOT_FOUND, { status: 404 });
+      }
+      const out = parseOut(GetTeamResponse, teamResponse(team));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/teams/:team_id", ({ params, request }) => {
+      const path = parse(DeactivateTeamParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
+      const team = store.teams.get(path.data.team_id);
+      if (team === undefined || team.projectId !== bearerProjectId(request)) {
+        return new HttpResponse(null, { status: 204 });
+      }
+      if (team.status === "deactivated") {
+        return new HttpResponse(null, { status: 204 });
+      }
+      store.teams.set(team.id, { ...team, status: "deactivated", updatedAt: nowIso() });
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    http.post("*/users", async ({ request }) => {
+      const query = parse(CreateUserQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const refusal = projectRefusal(request, query.data.project_id);
+      if (refusal !== undefined) {
+        return refusal;
+      }
+      const body = parse(CreateUserBody, await readJson(request));
+      if (!body.ok) {
+        return body.response;
+      }
+      const schema = store.schemas.get(body.data.schema);
+      if (schema === undefined || schema.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("req.invalid", "schema not found"), { status: 400 });
+      }
+      const email = body.data.attributes.email;
+      const taken = [...store.users.values()].some((candidate) => {
+        return (
+          candidate.projectId === query.data.project_id &&
+          typeof email === "string" &&
+          identifierOf(candidate) === email.toLowerCase()
+        );
+      });
+      if (taken) {
+        return HttpResponse.json(errorBody("user.already_exists", "user already exists"), {
+          status: 409,
+        });
+      }
+      const user: UserRecord = {
+        id: `user_${shortId()}`,
+        projectId: query.data.project_id,
+        schema: body.data.schema,
+        attributes: body.data.attributes,
+        createdAt: nowIso(),
+      };
+      store.users.set(user.id, user);
+      const out = parseOut(CreateUserResponse, userResponse(user));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/users/:user_id", ({ params, request }) => {
+      if (params.user_id === "me") {
+        return undefined;
+      }
+      const path = parse(GetUserParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
+      const query = parse(GetUserQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const user = store.users.get(path.data.user_id);
+      const member = query.data.team_id === undefined;
+      if (user === undefined || user.projectId !== bearerProjectId(request) || !member) {
+        return HttpResponse.json(USER_NOT_FOUND, { status: 404 });
+      }
+      const out = parseOut(GetUserResponse, userResponse(user));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/users/:user_id", ({ params, request }) => {
+      const path = parse(DeleteUserParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
+      const user = store.users.get(path.data.user_id);
+      if (user === undefined || user.projectId !== bearerProjectId(request)) {
+        return new HttpResponse(null, { status: 204 });
+      }
+      store.users.delete(user.id);
+      for (const grant of store.grants.values()) {
+        if ("user_id" in grant.principal && grant.principal.user_id === user.id) {
+          store.grants.delete(grant.id);
+        }
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    http.post("*/sessions", async ({ request }) => {
+      const body = parse(CreateSessionBody, await readJson(request));
+      if (!body.ok) {
+        return body.response;
+      }
+      if (!store.projects.has(body.data.project_id)) {
+        return HttpResponse.json(errorBody("req.invalid", "project not found"), { status: 400 });
+      }
+      const createdAt = new Date();
+      const session: SessionRecord = {
+        id: `sess_${shortId()}`,
+        projectId: body.data.project_id,
+        createdAt: createdAt.toISOString(),
+        expiresAt: new Date(createdAt.getTime() + ANONYMOUS_SESSION_TTL_MS).toISOString(),
+      };
+      store.sessions.set(session.id, session);
+      const out = parseOut(CreateSessionResponse, {
+        session: sessionResponse(session),
+        session_token: randomBytes(32).toString("base64url"),
+        project_id: session.projectId,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/sessions/:session_id", ({ params, request }) => {
+      if (params.session_id === "me") {
+        return undefined;
+      }
+      const path = parse(GetSessionParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
+      const session = store.sessions.get(path.data.session_id);
+      if (session === undefined || session.projectId !== bearerProjectId(request)) {
+        return HttpResponse.json(SESSION_NOT_FOUND, { status: 404 });
+      }
+      const out = parseOut(GetSessionResponse, sessionResponse(session));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/sessions/:session_id", ({ params, request }) => {
+      if (params.session_id === "me") {
+        return undefined;
+      }
+      const path = parse(RevokeSessionParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
+      const session = store.sessions.get(path.data.session_id);
+      if (session !== undefined && session.projectId === bearerProjectId(request)) {
+        store.sessions.delete(session.id);
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    http.post("*/grants/query", async ({ request }) => {
+      const query = parse(QueryGrantsQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const auth = projectRefusal(request, query.data.project_id);
+      if (auth !== undefined) {
+        return auth;
+      }
+      const body = parse(QueryGrantsBody, (await readJson(request)) ?? {});
+      if (!body.ok) {
+        return body.response;
+      }
+      const refusal = filterRefusal(body.data.filter, GRANT_FILTER_RULES);
+      if (refusal !== undefined) {
+        return refusal;
+      }
+      const sortField = body.data.sorting?.field ?? "created_at";
+      const direction = body.data.sorting?.direction === "desc" ? -1 : 1;
+      const grants = [...store.grants.values()]
+        .filter((grant) => {
+          return grant.projectId === query.data.project_id;
+        })
+        .filter((grant) => {
+          return (body.data.filter ?? []).every((filter) => {
+            return passesFilter(grantField(grant, filter.field), filter);
+          });
+        })
+        .sort((a, b) => {
+          const order =
+            compareNullable(grantField(a, sortField), grantField(b, sortField)) || a.seq - b.seq;
+          return direction * order;
+        });
+      const paged = pageOf(grants, body.data.limit, body.data.page_token ?? undefined);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const expanded = body.data.expand?.includes("principal") ?? false;
+      const out = parseOut(QueryGrantsResponse, {
+        grants: paged.page.map(expanded ? expandedGrantResponse : grantResponse),
+        next_page_token: paged.next ?? null,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.post("*/grants", async ({ request }) => {
+      const query = parse(CreateGrantQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const refusal = projectRefusal(request, query.data.project_id);
+      if (refusal !== undefined) {
+        return refusal;
+      }
+      const body = parse(CreateGrantBody, await readJson(request));
+      if (!body.ok) {
+        return body.response;
+      }
+      const locators = [
+        body.data.user?.user_id,
+        body.data.user?.identifier,
+        body.data.team?.team_id,
+        body.data.team?.name,
+      ].filter((locator) => {
+        return locator !== undefined && locator !== "";
+      });
+      const expired =
+        body.data.expires_at !== undefined &&
+        body.data.expires_at !== null &&
+        Date.parse(body.data.expires_at) <= Date.now();
+      if (locators.length !== 1 || expired) {
+        return HttpResponse.json(errorBody("grant.invalid", "the grant request is invalid"), {
+          status: 400,
+        });
+      }
+      const byIdentifier = body.data.user?.identifier !== undefined;
+      const { user: userRef, team: teamRef } = body.data;
+      const users = [...store.users.values()].filter((candidate) => {
+        return (
+          candidate.projectId === query.data.project_id &&
+          (candidate.id === userRef?.user_id ||
+            (userRef?.identifier !== undefined &&
+              identifierOf(candidate) === userRef.identifier.toLowerCase()))
+        );
+      });
+      const team = [...store.teams.values()].find((candidate) => {
+        return (
+          candidate.status === "active" &&
+          candidate.projectId === query.data.project_id &&
+          (candidate.id === teamRef?.team_id ||
+            candidate.name.toLowerCase() === teamRef?.name?.toLowerCase())
+        );
+      });
+      const principal: GrantRecord["principal"] | undefined =
+        users.length === 1 && users[0] !== undefined
+          ? { user_id: users[0].id }
+          : team === undefined
+            ? undefined
+            : { team_id: team.id };
+      const held =
+        principal !== undefined &&
+        [...store.grants.values()].some((grant) => {
+          return (
+            grant.projectId === query.data.project_id &&
+            grant.relation === body.data.relation &&
+            JSON.stringify(grant.principal) === JSON.stringify(principal)
+          );
+        });
+      if (byIdentifier && (principal === undefined || held)) {
+        return new HttpResponse(null, { status: 202 });
+      }
+      if (principal === undefined) {
+        return HttpResponse.json(
+          errorBody("grant.principal_not_found", "grant names no active user or team"),
+          { status: 404 },
+        );
+      }
+      if (held) {
+        return HttpResponse.json(errorBody("grant.already_exists", "grant already exists"), {
+          status: 409,
+        });
+      }
+      const grant: GrantRecord = {
+        id: `asgn_${shortId()}`,
+        projectId: query.data.project_id,
+        relation: body.data.relation,
+        createdAt: nowIso(),
+        expiresAt: body.data.expires_at ?? null,
+        principal,
+        seq: ++store.lastSeq,
+      };
+      store.grants.set(grant.id, grant);
+      if (byIdentifier) {
+        return new HttpResponse(null, { status: 202 });
+      }
+      const out = parseOut(CreateGrantResponse, grantResponse(grant));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.delete("*/grants/:grant_id", ({ params, request }) => {
+      const path = parse(DeleteGrantParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(DeleteGrantQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const auth = projectRefusal(request, query.data.project_id);
+      if (auth !== undefined) {
+        return auth;
+      }
+      const grant = store.grants.get(path.data.grant_id);
+      if (grant === undefined || grant.projectId !== query.data.project_id) {
+        return HttpResponse.json(GRANT_NOT_FOUND, { status: 404 });
+      }
+      store.grants.delete(grant.id);
       return new HttpResponse(null, { status: 204 });
     }),
   ];

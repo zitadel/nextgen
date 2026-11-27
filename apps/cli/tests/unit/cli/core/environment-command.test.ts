@@ -231,10 +231,10 @@ describe("EnvironmentCommand.connect", () => {
       config,
     ).probe();
 
-    expect(connection).toMatchObject({
-      projectId: "proj_staging",
-      server: "https://staging.example",
-    });
+    expect([connection.projectId, connection.server]).toEqual([
+      "proj_staging",
+      "https://staging.example",
+    ]);
   });
 
   it("opens one connection however the same options were written", async ({ dir }) => {

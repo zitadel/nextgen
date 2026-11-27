@@ -12,6 +12,7 @@ import {
   VariableRemoval,
   VariableService,
   VariableWrite,
+  type VariableWritten,
 } from "@/lib/backend/services/variable";
 import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
@@ -342,14 +343,16 @@ describe("VariableService.set", () => {
       VariableWrite.of({ secret: false, preview: false }),
     );
 
-    expect(written).toMatchObject({
+    const expected: VariableWritten = {
       name: "API_KEY",
       outcome: "set",
       state: {
-        primary: { value: "new" },
-        preview: { value: "old-preview" },
+        primary: Variable.of("API_KEY", "new"),
+        preview: Variable.of("API_KEY", "old-preview"),
       },
-    });
+      unverified: [],
+    };
+    expect(written).toEqual(expected);
   });
 
   it("reports a kind it could not read back as unverified, and the write as done", async ({
@@ -366,16 +369,16 @@ describe("VariableService.set", () => {
     );
 
     // The write returned before the read was made, so it stands.
-    expect(written).toMatchObject({
+    const expected: VariableWritten = {
       name: "API_KEY",
       outcome: "set",
       state: {
-        primary: { value: "new" },
+        primary: Variable.of("API_KEY", "new"),
+        preview: undefined,
       },
-    });
-    expect(written).toMatchObject({
       unverified: [{ kind: "preview", cause: expect.any(ForbiddenError) }],
-    });
+    };
+    expect(written).toEqual(expected);
   });
 
   it("holds nothing against a kind it read back as empty", async ({ server, client }) => {
@@ -389,23 +392,32 @@ describe("VariableService.set", () => {
     );
 
     // Read and found empty is not the same as never read: nothing is unverified.
-    expect(written).toMatchObject({
+    const expected: VariableWritten = {
+      name: "API_KEY",
       outcome: "set",
       state: {
+        primary: Variable.of("API_KEY", "new"),
         preview: undefined,
       },
       unverified: [],
-    });
+    };
+    expect(written).toEqual(expected);
   });
 
   it("writes a plain preview value for a name whose primary value is plain", async ({
     server,
     client,
   }) => {
-    await expect(setPreviewOver(server, client, { primary: "x" })).resolves.toMatchObject({
+    const expected: VariableWritten = {
       name: "API_KEY",
       outcome: "set",
-    });
+      state: {
+        primary: undefined,
+        preview: Variable.of("API_KEY", "x"),
+      },
+      unverified: [],
+    };
+    await expect(setPreviewOver(server, client, { primary: "x" })).resolves.toEqual(expected);
   });
 
   it("refuses a plain preview value for a name whose primary value is a secret", async ({
@@ -422,18 +434,36 @@ describe("VariableService.set", () => {
     server,
     client,
   }) => {
+    const expected: VariableWritten = {
+      name: "API_KEY",
+      outcome: "set",
+      state: {
+        primary: undefined,
+        preview: Variable.of("API_KEY", "x"),
+      },
+      unverified: [],
+    };
     await expect(
       setPreviewOver(server, client, refusal(404, "variable.not_found")),
-    ).resolves.toMatchObject({ outcome: "set" });
+    ).resolves.toEqual(expected);
   });
 
   it("leaves the check to whoever can read the primary values on a 403", async ({
     server,
     client,
   }) => {
+    const expected: VariableWritten = {
+      name: "API_KEY",
+      outcome: "set",
+      state: {
+        primary: undefined,
+        preview: Variable.of("API_KEY", "x"),
+      },
+      unverified: [],
+    };
     await expect(
       setPreviewOver(server, client, refusal(403, "variable.permission_denied")),
-    ).resolves.toMatchObject({ outcome: "set" });
+    ).resolves.toEqual(expected);
   });
 
   it("fails on a credential the server does not accept, rather than reading it as no secret", async ({

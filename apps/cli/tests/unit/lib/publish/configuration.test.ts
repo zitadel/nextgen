@@ -52,7 +52,7 @@ describe("PublishedConfiguration.fetchRelease", () => {
 
     const release = await new PublishedConfiguration(client, PROJECT_ID).fetchRelease("rel_1");
 
-    expect(release).toMatchObject({ pointers: [{ kind: "schema" }] });
+    expect(release).toEqual(RELEASE);
   });
 
   it("reads it from the project", async ({ server, client }) => {

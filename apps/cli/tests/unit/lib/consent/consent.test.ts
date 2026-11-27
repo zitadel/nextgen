@@ -67,9 +67,10 @@ describe("Consent", () => {
 
       await Consent.request(GATE, asked);
 
-      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toEqual({
         message: "Remove API_URL from the project?",
         initialValue: false,
+        withGuide: true,
       });
     });
 

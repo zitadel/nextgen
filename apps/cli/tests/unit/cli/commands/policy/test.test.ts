@@ -241,7 +241,14 @@ describe("PolicyTestCommand.runPolicyTests", () => {
       await aCommand().runCases(service, [aTestFile("one.test.json", ["long enough"])], POLICIES);
 
       expect(evaluated.map(({ url, body }) => [url.searchParams.get("project_id"), body])).toEqual([
-        [PROJECT_ID, expect.objectContaining({ config: { min_length: 12 } })],
+        [
+          PROJECT_ID,
+          {
+            operation: PASSWORD_POLICY,
+            config: { min_length: 12 },
+            input: { password: "long enough" },
+          },
+        ],
       ]);
     });
 
@@ -380,9 +387,16 @@ describe("PolicyTestCommand.execute", () => {
     it("still looks for the policy tests", async ({ dir }) => {
       await mkdir(join(dir, ".zitadel/schemas/unreadable.json"), { recursive: true });
 
-      const envelope = await PolicyTestCommand.run(["--cwd", dir, "--json"]);
+      const envelope = await PolicyTestCommand.run(["--cwd", dir, "--json"], CONFIG);
 
-      expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({ status: "skipped" });
+      expect(JSON.parse(JSON.stringify(envelope))).toEqual({
+        cli_version: CONFIG.version,
+        command: "policytestcommand",
+        status: "skipped",
+        reason: "no-policy-tests",
+        source: "",
+        data: { title: "No policy test files in .zitadel/policies" },
+      });
     });
   });
 });

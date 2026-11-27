@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { ConflictError, ForbiddenError, UnavailableError } from "@/lib/backend/errors";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
@@ -209,9 +209,7 @@ describe("OriginService.list", () => {
   it("answers an empty collection for a project that holds none", async ({ server, client }) => {
     answering(server, "getProject", {});
 
-    await expect(new OriginService(client, PROJECT).list()).resolves.toMatchObject({
-      isEmpty: true,
-    });
+    await expect(new OriginService(client, PROJECT).list()).resolves.toEqual(Origins.wrap([]));
   });
 });
 
@@ -340,10 +338,10 @@ describe("OriginService.remove", () => {
     answering(server, "removeProjectOrigin", undefined);
     answering(server, "getProject", refusal(503, "unavailable"));
 
-    await expect(new OriginService(client, PROJECT).remove(ISSUER)).resolves.toMatchObject({
+    await expect(new OriginService(client, PROJECT).remove(ISSUER)).resolves.toEqual({
       pattern: ISSUER,
       outcome: "unverified",
-      cause: expect.any(Error),
+      cause: expect.any(UnavailableError),
     });
   });
 
