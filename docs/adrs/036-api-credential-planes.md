@@ -349,3 +349,33 @@ A deployment to `primary` freezes the project's primary origins, and a rollback
 restores the ones it names. A primary origin serves the newest primary
 deployment only when that deployment names it and the project still lists it.
 So an added origin waits for a deploy, and removing one takes effect at once.
+
+## Amendment (2026-11-25): the management API accepts platform bearers
+
+The management API accepts access tokens issued by the platform project's
+issuer whose audience is the management API. It checks the session on every
+call and admits exactly the operations a console session may call. A session
+cookie is accepted only from a browser on the issuer's own origin, and every
+other caller presents a bearer. The server verifies the issuer and the
+signing project exactly, so a customer project's token cannot pass as a
+platform token. This is the user bearer
+[ADR 053 §5](053-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane)
+expects, with the same principal and grant semantics as the console's cookie.
+
+| Caller | Credential |
+|---|---|
+| The console, on the issuer's origin | Its session cookie |
+| The login widget and SDK proxy in a customer's app | The end user's session cookie, with the publishable key |
+| The CLI | The platform token it gets from `zitadel login` |
+| A remote MCP client | A bearer: a personal access token first, an OAuth token once consent and client registration ship ([ADR 082](082-oauth-and-oidc-server.md#recommended-sequence)) |
+| CI and customer backends | The project secret today; workload identity federation is planned, GitHub Actions first, and service applications later |
+
+Personal access tokens are added as a bridge, on four conditions:
+
+- each has a required expiry;
+- an event's actor is the token's owner;
+- each can be revoked;
+- a personal access token is never a client's identity.
+
+This brings in operator PATs, which the operator row and
+[Out of scope](#out-of-scope) put later, as that bridge.

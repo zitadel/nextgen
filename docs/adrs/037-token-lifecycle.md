@@ -3,6 +3,10 @@
 > **Status:** Accepted
 > **Date:** 2026-06-30
 > **Context:** Evolution of session security
+>
+> **Amended 2026-11-25** (Personal Access Tokens): personal access tokens are
+> added as a bridge to the management API, on the conditions of
+> [ADR 036](036-api-credential-planes.md#amendment-2026-11-25-the-management-api-accepts-platform-bearers).
 
 ## Context
 
@@ -129,3 +133,9 @@ possible right now.
 
 PATs are out of scope for now as well. They do not provide any extra value yet
 in the MVP.
+
+**Amended 2026-11-25:** PATs are added as a bridge to the management API: a
+remote MCP client presents one until OAuth consent and client registration
+ship. A PAT has a required expiry, can be revoked, makes its
+owner the actor of the events it causes, and is never a client's identity
+([ADR 036](036-api-credential-planes.md#amendment-2026-11-25-the-management-api-accepts-platform-bearers)).

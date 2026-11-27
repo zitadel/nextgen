@@ -65,7 +65,8 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 |---|---|
 | **project** | See §1. Top-level tenant. |
 | **team** | See §1. Tenant-grouping inside a project. |
-| **app** | An OIDC client / SAML SP registered to consume Zitadel; lives in a project. |
+| **application** | Anything that uses Zitadel, agents included: the software, which holds its clients, SAML and SCIM configs and the APIs it serves; lives in a project. Replaces *app*. See the [identity model](api/identity-model.md#applications). |
+| **client** | A technical integration of an application: its credentials and at most one OAuth config. A confidential client can be a principal, acting as itself or for a user. |
 | **app_group** | A bundle of related apps that share a role/grant container. **LOCKED rename** from today's "project" (the authz container — not the tenant). |
 | **idp** | External identity provider the project federates **to**. Zitadel acts as OIDC/SAML client downstream. |
 | **user** | See §1. Identity inside a project. |
@@ -96,10 +97,10 @@ How a permission check is framed and resolved. Long-form in [ADR 032](../adrs/03
 
 | Term | Meaning |
 |---|---|
-| **principal** | Whatever presents a credential to be checked in a permission decision: a user token, an agent, a service token (`sk_proj_…`, `sk_team_…`), or an origin-bound browser nonce. |
+| **principal** | Whatever presents a credential to be checked in a permission decision: a user token, a client (an agent acts through its application's client), a service token (`sk_proj_…`, `sk_team_…`), or an origin-bound browser nonce. |
 | **scope** | The resolved project/team/resource boundary a permission check runs against, produced by `resource_scope_index` before authorization runs. |
 | **`resource_scope_index`** | A global lookup table mapping a globally-addressable resource id to its project/team scope, consulted by middleware before authorization runs. See [`api/url-architecture.md`](api/url-architecture.md). |
-| **delegation** | An explicit, audited transfer of authority from one principal to another (e.g. a person to an agent), distinct from an agent silently inheriting everything its grantor could do. |
+| **delegation** | Authority to act for a user: the user's consent to a client, a token exchange, or an operator's act-as that the user did not grant. It has one `delegation_id` that the consent, the tokens and every event share, and no token hides who acts. Distinct from silently inheriting everything the user could do; there is no impersonation. See [ADR 082 §7](../adrs/082-oauth-and-oidc-server.md#7-tokens) for the rule, and [ADR 033 §3](../adrs/033-internal-permission-management.md#3-delegation) for what the management API does with a delegated call. |
 
 ---
 

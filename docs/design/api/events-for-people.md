@@ -55,7 +55,10 @@ Three more findings shape the proposal:
 - **Some fields are never written**: `client_id`, `fingerprint`, `team_id`,
   `delegation_id` and `grantor`. `delegation_type` is always `direct`, no
   event has actor type `agent` or category `signal`. The console offers
-  Application and Device filters all the same.
+  Application and Device filters all the same. The
+  [identity model](identity-model.md) removes `agent` as an actor type: a
+  client acting as itself is `service`. The contract lists `agent` until the
+  rename lands.
 
 The session row already holds the browser's address and user agent, written
 when the browser opens the session, and a fingerprint when the client sent
@@ -184,6 +187,21 @@ With it:
 - **An API key has an `actor_id`**: its token ID now, its key ID once keys are
   resources ([credentials.md](credentials.md)). The actor index then answers
   what a key did, with no index on `token_id`.
+
+**LOCKED (2026-11-25): a call made for a user names who acts**
+([ADR 082 §7](../../adrs/082-oauth-and-oidc-server.md#7-tokens);
+[ADR 033 §5](../../adrs/033-internal-permission-management.md#5-audit-trail-and-grant-provenance)).
+Its events map the delegation onto these fields:
+
+| Field | Holds |
+|-------|-------|
+| `actor_id`, `actor_type` | The acting principal: a client or an operator |
+| `user_id` | The user acted for |
+| `grantor` | Who authorized the delegation |
+| `delegation_id` | The delegation the consent, the tokens and the events share |
+| `delegation_type` | The kind of delegation |
+
+A personal access token's actor is its owner, with its owner's kind.
 
 **LOCKED (2026-11-11): until this is built, both events keep the actor they
 have**, the caller on `session.established` and the user on

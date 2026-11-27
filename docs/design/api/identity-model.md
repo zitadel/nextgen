@@ -1,11 +1,29 @@
 # Identity Model: Users, Applications and Connections
 
-> **Status:** Draft for discussion. The names are proposals too, except
-> Application and Client; see [Names](#names).
+> **Status:** The application half, [Applications](#applications) and what
+> [Principals](#principals) says of clients, is accepted (2026-11-25) with
+> the amendments below. The rest is a draft for discussion, and the names are
+> proposals too, except Application and Client; see [Names](#names).
 >
 > **Date:** 2026-10-28
 >
-> **Updated:** 2026-11-09
+> **Updated:** 2026-11-25
+>
+> **Amended 2026-11-25:** an agent is an application, and a client can act as
+> itself or for a user; there is no separate agent kind, and no impersonation
+> ([ADR 082 §7](../../adrs/082-oauth-and-oidc-server.md#7-tokens)).
+>
+> 1. The authorization principal type `agent` becomes `client`. In the event
+>    `actor_type` and the three `*_by_type` enums, `agent` is removed and
+>    `service` is the kind of a client acting as itself; a personal access
+>    token's actor is its owner's kind ([What changes](#what-changes)).
+> 2. Every client that is a principal has an owner, a user or a team. When a
+>    user owner is removed, ownership moves to a team or the client is
+>    suspended. A client acting for its owner never holds more than its owner.
+> 3. An application may be labelled `agent`; the label changes policy and
+>    audit, not the model.
+> 4. An agent that must be a user gets a linked user, one to one, owned by
+>    the client's owner (open question 6).
 >
 > **Builds on:** [#1283](https://github.com/zitadel/nextgen/issues/1283)
 > (the resource and access model),
@@ -44,7 +62,7 @@ call that needed the id the last one returned ([One call](#one-call)).
 | Noun | Is | Holds |
 | --- | --- | --- |
 | **User** | A person who signs in | Properties and sign-in methods, defined by a user schema per kind of person |
-| **Application** | Anything that uses Zitadel: a web or mobile application, a backend, a service account, a SaaS product, or an agent calling APIs and MCP servers, Zitadel's own included | Any number of configs: OAuth clients (an OIDC client is one that asks for `openid`), SAML IdP configs, SCIM provisioning configs, and the APIs it serves, MCP servers among them, each with its mappings. A confidential client can be a principal: it acts as itself, or for a user by delegation or impersonation |
+| **Application** | Anything that uses Zitadel: a web or mobile application, a backend, a service account, a SaaS product, or an agent calling APIs and MCP servers, Zitadel's own included | Any number of configs: OAuth clients (an OIDC client is one that asks for `openid`), SAML IdP configs, SCIM provisioning configs, and the APIs it serves, MCP servers among them, each with its mappings. A confidential client can be a principal: it acts as itself, or for a user by delegation |
 | **Connection** | Anything Zitadel trusts upstream: Google, a customer's Entra and the agents it runs, GitHub Actions, a SCIM directory | Any number of configs: OIDC and OAuth RP, OIDC WIF, SAML SP and SCIM provider configs, with the mappings |
 
 The two sides mirror each other:
@@ -115,8 +133,13 @@ it holds rights the way a user does ([Principals](#principals)):
   ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)). The token's `sub` is
   the user and its `act` names the client, so every API sees both. A
   third-party client delegates only for users who consented.
-- **Impersonate**: the same, without `act`, so APIs see only the user. It is
-  the narrower right.
+
+There is no impersonating right: Zitadel issues no token for a user that
+hides who acts.
+
+**A principal client has an owner**, a user or a team. When a user owner is
+removed, ownership moves to a team or the client is suspended. A client
+acting for its owner never holds more than its owner.
 
 A principal client can also carry attributes, such as a warehouse ID,
 validated by a schema the developer ships and mapped to claims the way user
@@ -171,8 +194,13 @@ depends on whom it works for, whose API it calls, and who vouches for it:
 
 Agents delegate: a delegated token names the agent in `act`, so an API can
 set limits for agents, and Zitadel can refuse what only a person may do,
-such as claiming a project. Who may impersonate is the customer's call, for
-its staff or its tools.
+such as claiming a project. A support or admin act-as is a delegation the
+user did not grant, named and recorded the same way.
+
+There is no agent kind. An application may be labelled `agent`; the label
+changes policy and audit, not the model. An agent that must be a user, for
+APIs that accept only user tokens, gets a linked user, one to one, owned by
+the client's owner.
 
 ### Connections
 
@@ -221,21 +249,29 @@ the project itself through its secret. A public client never is one.
   client gives it its rights. Grants to users and to teams are data, written
   through the API.
 
-**Delegate and impersonate are roles like any other.** Users and clients hold
-them, directly or through a team, over one user, a schema's users or a team's
-users, as v4's `ORG_END_USER_IMPERSONATOR` was. What they need on top:
+**Delegate is a role like any other.** Users and clients hold it, directly or
+through a team, over one user, a schema's users or a team's users. An
+operator's act-as is a delegation the user did not grant, never a token
+without `act`. What act-as needs on top:
 
-- a switch on the project or the application before impersonation can be
-  granted at all, as v4's security setting was;
-- an audit of every exchange, naming the holder, the user acted for and the
-  path the right came from: directly, or through which team;
-- the effective holders in the console, so "who can impersonate Acme's
-  users" lists those who hold it through a team too.
+- a switch before act-as can be granted at all, as v4's impersonation
+  setting was ([open question 2](#open-questions));
+- an audit of every exchange and act-as, naming the holder, the user acted
+  for and the path the right came from: directly, or through which team;
+- the effective holders in the console, so "who can act as Acme's users"
+  lists those who hold it through a team too.
 
 **Personal access tokens belong to a principal**, never to the person who
 minted one. A tool that takes nothing but a static bearer token, such as a
 Grafana data source, a CI plugin or a webhook sender, then needs no person's
 token, which breaks when that person leaves.
+
+**Amended 2026-11-25:** personal access tokens come as a bridge, on four
+conditions
+([ADR 036](../../adrs/036-api-credential-planes.md#amendment-2026-11-25-the-management-api-accepts-platform-bearers)):
+a required expiry, the token's owner as the event's actor, revocation, and
+never a client's identity. Where this document gives a client PATs, those
+conditions win.
 
 - A PAT acts with its owner's rights and ends with its owner.
 - Whoever may manage the owner manages its PATs: creates, lists, rotates and
@@ -518,7 +554,7 @@ metadata, verifies the domain, checks the mapping and runs a test sign-in.
 | **Connection** | Anything Zitadel trusts upstream, with its configs and mappings | "IdP", "provider", v4's identity providers | Auth0's and WorkOS's word. "Provider" already names Zitadel itself, the OIDC provider, and the server side of SCIM |
 | **WIF config** | A connection's trust in the tokens workloads get from CI systems, clusters and clouds | keys and secrets stored in CI | The clouds' name: workload identity federation |
 | **Mapping** | How claims, attributes and SCIM translate to and from user properties, and which client a workload becomes | the IdP connection's `claim_mapping`, v4's actions for mapping | Says what it does |
-| **Delegate**, **impersonate** | Roles to act for a user, with `act` or without, which users and clients hold | v4's impersonation setting | RFC 8693's words |
+| **Delegate** | The role to act for a user, named in `act`, which users and clients hold | v4's impersonation setting | RFC 8693's word |
 
 ## What changes
 
@@ -527,7 +563,7 @@ Measured against what the repo has today:
 | Area | Today | With this model |
 | --- | --- | --- |
 | Glossary | `app` is one OIDC client or SAML SP; `app_group` (LOCKED) holds roles; `idp` is an upstream provider | `application` replaces `app`: the software, which holds its configs; one OIDC client is a client; `idp` becomes connection |
-| Authz | Principal types `user`, `team`, `agent`, `sk_proj`, `sk_team`; `agent` is unused; team members are users; scopes cap only project secrets; only `project_admin` writes connections | A `client` principal type, which `agent` becomes, with grants and team memberships like a user's; delegate and impersonate as roles; `sk_proj` and `sk_team` become PATs with an owner type; a client's scopes cap every token; `team_admin` manages its team's connections and applications |
+| Authz | Principal types `user`, `team`, `agent`, `sk_proj`, `sk_team`; `agent` is unused; team members are users; scopes cap only project secrets; only `project_admin` writes connections | A `client` principal type, which `agent` becomes, with grants and team memberships like a user's, and an owner; the event `actor_type` and the `*_by_type` enums drop `agent`, `service` is a client acting as itself, and a PAT's actor has its owner's kind (the contract still lists `agent` until the rename lands); delegate as a role, and act-as as a delegation; `sk_proj` and `sk_team` become PATs with an owner type; a client's scopes cap every token; `team_admin` manages its team's connections and applications |
 | #2430 | Machines are users of a `service` or `agent` kind; a client is owned by an app, an identity or both; client methods sit in `x-auth-methods` | Machines are applications; every client belongs to an application (a self-registered one from its first request) and can be a principal itself; client methods move to the client, and `x-auth-methods` keeps sign-in methods. Its secret format, hashing, import rules and named credentials per client carry over, and its PATs gain an owner type; its client table loses the identity column |
 | IdP connections | Project-level, OIDC only, one `protocol` block per connection | A connection holds several configs (OIDC, OAuth, WIF, SAML, SCIM) and the mappings between them; the developer's are declared, and a B2B customer's belongs to its team and is written through the API within the developer's rules |
 | CLI | No application or OAuth command | `application create` writes an application with its clients and APIs from a preset, generates each new client's id, and turns the issuer on if it is off; `settings oauth enable` stays for turning the issuer on alone ([ADR 082 §12](../../adrs/082-oauth-and-oidc-server.md#12-what-a-developer-touches)) |
@@ -536,17 +572,18 @@ Measured against what the repo has today:
 Clients are a field of their application's document; a client that
 registers itself is a record of its own, so a declared application and the
 clients that reference it keep separate writers.
-Tokens stay single-audience, and consents stay per user, client and scope.
+Tokens stay single-audience, and a consent is one record per user, client
+and API, holding a set of scopes
+([ADR 082 §8](../../adrs/082-oauth-and-oidc-server.md#8-consent)).
 
 ## Open questions
 
 1. **Names.** Connection or Provider; what to call the configs, and a PAT
    that a client or a team owns. App or Application is settled as
    Application ([#2785](https://github.com/zitadel/nextgen/issues/2785)).
-2. **Delegation and impersonation policy.** Whether the switch that allows
-   impersonation sits on the project or the application, when a user's
-   consent is needed, and which actions besides claiming a project only a
-   person may take.
+2. **Act-as policy.** Whether the switch that allows an operator's act-as
+   sits on the project or the application, and which actions besides
+   claiming a project only a person may take.
 3. **Self-service rules.** Where they live: on the user schema, which already
    says how a kind of person signs in; as an operation policy on a team's
    connection writes, a template Zitadel defines and the release fills in
@@ -562,7 +599,9 @@ Tokens stay single-audience, and consents stay per user, client and scope.
    verified domain.
 6. **Agents that must be users.** APIs that accept only user tokens, and
    Entra's agent paired one to one with a user account, which a connection
-   could map to a user.
+   could map to a user. Answered 2026-11-25: such an agent gets a linked
+   user, one to one, owned by the client's owner
+   ([Applications](#applications)).
 
 ## Prior art
 
