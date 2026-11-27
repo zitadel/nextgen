@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -291,10 +292,7 @@ func TestSessionService_Exchange_StampsTheAttemptsFlow(t *testing.T) {
 		require.NotNil(t, ev.FlowID, "%s has no flow_id", eventType)
 		assert.Equal(t, "flow_1", *ev.FlowID, "%s", eventType)
 	}
-	slot, ok := audit.ActorSlotFromContext(ctx)
-	require.True(t, ok)
-	require.NotNil(t, slot.FlowID, "the exchange's request event has no flow_id")
-	assert.Equal(t, "flow_1", *slot.FlowID)
+	assert.Equal(t, "flow_1", middleware.CorrelationFromContext(ctx).Flow(), "the exchange's request event has no flow_id")
 }
 
 // The exchange is the app's call, made with its key. Both events it writes

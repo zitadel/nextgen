@@ -2017,6 +2017,8 @@ describe("other resources", () => {
       "status_class=4xx",
       "--filter",
       "status_class=5xx",
+      "--filter",
+      "correlation_id=6c1f0d2be4a94c0f9a3d5b7e8f102a4c",
       "--limit",
       "5",
     ]);
@@ -2024,6 +2026,8 @@ describe("other resources", () => {
     const params = new URL(urls.at(-1) ?? "").searchParams;
     expect(params.get("project_id")).toBe("proj_test");
     expect(params.getAll("category")).toEqual(["entity", "auth"]);
+    // The chain one sign-in, invitation or claim took, by its events' ID.
+    expect(params.get("correlation_id")).toBe("6c1f0d2be4a94c0f9a3d5b7e8f102a4c");
     expect(params.getAll("operation_id")).toEqual(["createUser"]);
     expect(params.getAll("status_class")).toEqual(["4xx", "5xx"]);
     expect(params.get("created_after")).toBe("2026-01-01T00:00:00Z");

@@ -2,7 +2,8 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Config } from "@oclif/core";
-import { describe, expect, it, vi } from "vitest";
+import type { SetupServer } from "msw/node";
+import { describe, expect } from "vitest";
 
 import PolicyTestCommand, {
   type PolicySuiteResult,
@@ -11,8 +12,8 @@ import PolicyTestCommand, {
 import { PolicyService } from "@/lib/backend";
 import { PolicyTest, SignupPolicy } from "@/lib/zitadel";
 import { PASSWORD_POLICY } from "@tests/helpers/config";
-import { fakeClient } from "@tests/helpers/fake-client";
-import { it as withDir } from "@tests/fixtures";
+import { answering, testClient } from "@tests/helpers/api-answers";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { PROJECT_ID } from "@tests/helpers/records";
 
@@ -114,56 +115,47 @@ function aTestFile(path: string, passwords: readonly string[]): PolicyTest {
 }
 
 /**
- * A policy service that allows a password longer than two characters, and
- * answers only once every case has asked, the shortest password last.
+ * A policy service whose server allows a password longer than two characters,
+ * and answers only once every case has asked, the shortest password last.
  *
+ * @param server - The test's MSW server.
  * @param cases - How many cases will ask.
  * @returns The service.
  */
-function answeringBackwards(cases: number): PolicyService {
+function answeringBackwards(server: SetupServer, cases: number): PolicyService {
   const waiting: { readonly length: number; readonly answer: () => void }[] = [];
-  return new PolicyService(
-    fakeClient({
-      evaluatePolicy: (evaluation) => {
-        const input = evaluation.input;
-        const length = "password" in input ? input.password.length : 0;
-        return new Promise((resolve) => {
-          waiting.push({
-            length,
-            answer: () => {
-              resolve({ allowed: length > 2 });
-            },
+  answering(server, "evaluatePolicy", ({ body }) => {
+    const length = "password" in body.input ? body.input.password.length : 0;
+    return new Promise((resolve) => {
+      waiting.push({
+        length,
+        answer: () => {
+          resolve({ allowed: length > 2 });
+        },
+      });
+      if (waiting.length === cases) {
+        [...waiting]
+          .sort((a, b) => {
+            return b.length - a.length;
+          })
+          .forEach((ask) => {
+            ask.answer();
           });
-          if (waiting.length === cases) {
-            [...waiting]
-              .sort((a, b) => {
-                return b.length - a.length;
-              })
-              .forEach((ask) => {
-                ask.answer();
-              });
-          }
-        });
-      },
-    }),
-    PROJECT_ID,
-  );
+      }
+    });
+  });
+  return new PolicyService(testClient(), PROJECT_ID);
 }
 
 /**
- * A policy service that allows every case.
+ * A policy service whose server allows every case.
  *
+ * @param server - The test's MSW server.
  * @returns The service.
  */
-function allowingEverything(): PolicyService {
-  return new PolicyService(
-    fakeClient({
-      evaluatePolicy: async () => {
-        return { allowed: true };
-      },
-    }),
-    PROJECT_ID,
-  );
+function allowingEverything(server: SetupServer): PolicyService {
+  answering(server, "evaluatePolicy", { allowed: true });
+  return new PolicyService(testClient(), PROJECT_ID);
 }
 
 /**
@@ -187,8 +179,12 @@ const POLICIES = new Map([[PASSWORD_POLICY, { config: { min_length: 12 }, source
 
 describe("PolicyTestCommand.runPolicyTests", () => {
   describe("when the answers arrive out of order", () => {
-    it("keeps the files in order", async () => {
-      const results = await aCommand().runCases(answeringBackwards(5), TWO_FILES, new Map());
+    it("keeps the files in order", async ({ server }) => {
+      const results = await aCommand().runCases(
+        answeringBackwards(server, 5),
+        TWO_FILES,
+        new Map(),
+      );
 
       expect(
         results.map((result) => {
@@ -197,8 +193,12 @@ describe("PolicyTestCommand.runPolicyTests", () => {
       ).toEqual(["one.test.json", "two.test.json"]);
     });
 
-    it("keeps each file's cases in order", async () => {
-      const results = await aCommand().runCases(answeringBackwards(5), TWO_FILES, new Map());
+    it("keeps each file's cases in order", async ({ server }) => {
+      const results = await aCommand().runCases(
+        answeringBackwards(server, 5),
+        TWO_FILES,
+        new Map(),
+      );
 
       expect(
         results.map((result) => {
@@ -212,8 +212,12 @@ describe("PolicyTestCommand.runPolicyTests", () => {
       ]);
     });
 
-    it("gives each case its own answer", async () => {
-      const results = await aCommand().runCases(answeringBackwards(5), TWO_FILES, new Map());
+    it("gives each case its own answer", async ({ server }) => {
+      const results = await aCommand().runCases(
+        answeringBackwards(server, 5),
+        TWO_FILES,
+        new Map(),
+      );
 
       expect(
         results[0]?.cases.map((testCase) => {
@@ -224,23 +228,20 @@ describe("PolicyTestCommand.runPolicyTests", () => {
   });
 
   describe("with a policy for the operation", () => {
-    it("evaluates each case against the operation's policy", async () => {
-      const evaluatePolicy = vi.fn(async () => {
-        return { allowed: true };
-      });
-      const service = new PolicyService(fakeClient({ evaluatePolicy }), PROJECT_ID);
+    it("evaluates each case against the operation's policy", async ({ server }) => {
+      const evaluated = answering(server, "evaluatePolicy", { allowed: true });
+      const service = new PolicyService(testClient(), PROJECT_ID);
 
       await aCommand().runCases(service, [aTestFile("one.test.json", ["long enough"])], POLICIES);
 
-      expect(evaluatePolicy).toHaveBeenCalledWith(
-        expect.objectContaining({ config: { min_length: 12 } }),
-        { project_id: PROJECT_ID },
-      );
+      expect(evaluated.map(({ url, body }) => [url.searchParams.get("project_id"), body])).toEqual([
+        [PROJECT_ID, expect.objectContaining({ config: { min_length: 12 } })],
+      ]);
     });
 
-    it("names where the policy came from", async () => {
+    it("names where the policy came from", async ({ server }) => {
       const results = await aCommand().runCases(
-        allowingEverything(),
+        allowingEverything(server),
         [aTestFile("one.test.json", ["long enough"])],
         POLICIES,
       );
@@ -250,11 +251,11 @@ describe("PolicyTestCommand.runPolicyTests", () => {
   });
 
   describe("with a sign-up test file", () => {
-    it("sends each case in the operation's own shape, with its policy and no facts", async () => {
-      const evaluatePolicy = vi.fn(async () => {
-        return { allowed: true };
-      });
-      const service = new PolicyService(fakeClient({ evaluatePolicy }), PROJECT_ID);
+    it("sends each case in the operation's own shape, with its policy and no facts", async ({
+      server,
+    }) => {
+      const evaluated = answering(server, "evaluatePolicy", { allowed: true });
+      const service = new PolicyService(testClient(), PROJECT_ID);
       const test = PolicyTest.of({
         path: PolicyTest.fileName(SignupPolicy.OPERATION),
         body: {
@@ -277,14 +278,16 @@ describe("PolicyTestCommand.runPolicyTests", () => {
 
       const results = await aCommand().runCases(service, [test], policies);
 
-      expect(evaluatePolicy).toHaveBeenCalledWith(
-        {
-          operation: SignupPolicy.OPERATION,
-          config: { challenge: "zitadel_pow" },
-          input: { solved_challenge: "zitadel_pow" },
-        },
-        { project_id: PROJECT_ID },
-      );
+      expect(evaluated.map(({ url, body }) => [url.searchParams.get("project_id"), body])).toEqual([
+        [
+          PROJECT_ID,
+          {
+            operation: SignupPolicy.OPERATION,
+            config: { challenge: "zitadel_pow" },
+            input: { solved_challenge: "zitadel_pow" },
+          },
+        ],
+      ]);
       expect(results[0]?.cases[0]?.passed).toBe(true);
     });
   });
@@ -367,7 +370,7 @@ describe("PolicyTestCommand.renderPolicyTestResults", () => {
 
 describe("PolicyTestCommand.execute", () => {
   describe("when a file of a kind that holds no policy cannot be read", () => {
-    withDir("still looks for the policy tests", async ({ dir }) => {
+    it("still looks for the policy tests", async ({ dir }) => {
       await mkdir(join(dir, ".zitadel/schemas/unreadable.json"), { recursive: true });
 
       const envelope = await PolicyTestCommand.run(["--cwd", dir, "--json"]);
