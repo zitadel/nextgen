@@ -1,6 +1,7 @@
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { FlowService } from "@/lib/backend/services/flow";
 import { answering, answeringPages, testClient } from "@tests/helpers/api-answers";
@@ -98,7 +99,7 @@ describe("FlowService.get", () => {
   }) => {
     answeringPages(server, "listFlowDefinitions", { flow_definitions: [] });
 
-    await expect(service().get("typo")).rejects.toMatchObject({
+    expect(await rejectionOf(() => service().get("typo"))).toMatchObject({
       name: "NotFoundError",
       message: 'No flow definition named "typo"',
       hint: "Run `flow-definition list` to see the flows this project has.",

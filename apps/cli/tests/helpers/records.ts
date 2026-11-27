@@ -3,7 +3,9 @@ import type {
   ListDeployments200DeploymentsItem,
 } from "@zitadel/api/generated/model";
 
-import type { Answer } from "@tests/helpers/api-answers";
+import type { SetupServer } from "msw/node";
+
+import { type Answer, answering, type Sent } from "@tests/helpers/api-answers";
 
 /**
  * The project every record and service in the tests belongs to.
@@ -59,3 +61,29 @@ export type HeldVariable = GetVariable200["primary"];
  * A value the API answers for a secret variable: named, never disclosed.
  */
 export const SECRET_VARIABLE: HeldVariable = { secret: true };
+
+/**
+ * Answers the project's variables, as `listVariables` holds them.
+ *
+ * @param server - The test's MSW server, from the `server` fixture.
+ * @param held - The values, by variable name.
+ * @param kind - The one kind that holds them; left out, every kind does.
+ * @returns The requests that read them, oldest first.
+ */
+export function answeringVariables(
+  server: SetupServer,
+  held: Readonly<Record<string, HeldVariable>>,
+  kind?: "primary" | "preview",
+): readonly Sent[] {
+  return answering(server, "listVariables", ({ url }) => {
+    const asked = url.searchParams.get("kind") === "preview" ? "preview" : "primary";
+    if (kind !== undefined && asked !== kind) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(held).map(([name, value]) => {
+        return [name, { [asked]: value }];
+      }),
+    );
+  });
+}

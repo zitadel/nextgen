@@ -5,6 +5,7 @@ import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import {
   allowDestructive,
@@ -86,7 +87,9 @@ describe("createZitadelClient", () => {
   it("carries the server's request id, which finds the request in its logs", async ({ server }) => {
     answering(server, 400, { code: "invalid_argument" }, { "x-request-id": "req_1" });
 
-    await expect(client().getProject("p1")).rejects.toMatchObject({ requestId: "req_1" });
+    expect(await rejectionOf(() => client().getProject("p1"))).toMatchObject({
+      requestId: "req_1",
+    });
   });
 });
 
@@ -97,14 +100,16 @@ describe("a client's destructive operations", () => {
   it("are refused before anything is sent", async ({ server }) => {
     const arrived = answering(server, 204, null);
 
-    await expect(client().deleteVariable("NAME", { project_id: "proj_1" })).rejects.toBeInstanceOf(
-      DestructiveOperationError,
-    );
+    expect(
+      await rejectionOf(() => client().deleteVariable("NAME", { project_id: "proj_1" })),
+    ).toBeInstanceOf(DestructiveOperationError);
     expect(arrived).toEqual([]);
   });
 
   it("are refused by name, whichever one is called", async () => {
-    await expect(client().revokeRelease("rel_1", { project_id: "proj_1" })).rejects.toMatchObject({
+    expect(
+      await rejectionOf(() => client().revokeRelease("rel_1", { project_id: "proj_1" })),
+    ).toMatchObject({
       operation: "revokeRelease",
     });
   });

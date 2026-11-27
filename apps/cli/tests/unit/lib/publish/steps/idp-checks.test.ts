@@ -8,8 +8,8 @@ import { ZitadelError } from "@/lib/errors";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
 import { answering, refusal } from "@tests/helpers/api-answers";
-import { SECRET_VARIABLE } from "@tests/helpers/records";
-import { answeringVariables, aStepContext } from "@tests/helpers/step-context";
+import { SECRET_VARIABLE, answeringVariables } from "@tests/helpers/records";
+import { aStepContext } from "@tests/helpers/step-context";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

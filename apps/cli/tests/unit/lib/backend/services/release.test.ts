@@ -58,7 +58,7 @@ describe("ReleaseService.create", () => {
       revoked_at: "2026-01-01T00:00:00Z",
     });
 
-    await expect(service().create(INPUT)).rejects.toMatchObject({
+    expect(await rejectionOf(() => service().create(INPUT))).toMatchObject({
       name: "ConflictError",
       message: expect.stringContaining("rel_1"),
     });

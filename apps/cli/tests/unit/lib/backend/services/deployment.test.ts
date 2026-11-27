@@ -4,6 +4,7 @@ import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { ForbiddenError } from "@/lib/backend/errors";
 import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
@@ -646,9 +647,9 @@ describe("DeploymentService.deployToPrimary", () => {
     answeringPages(server, "listDeployments", { deployments: [] });
     answering(server, "createDeployment", refusal(403, "dep.permission_denied"));
 
-    await expect(service().deployToPrimary({ releaseId: "rel_1" })).rejects.toBeInstanceOf(
-      ForbiddenError,
-    );
+    expect(
+      await rejectionOf(() => service().deployToPrimary({ releaseId: "rel_1" })),
+    ).toBeInstanceOf(ForbiddenError);
   });
 });
 
@@ -777,10 +778,12 @@ describe("DeploymentService.deployToPrimary when the run is cancelled", () => {
       "proj_1",
     );
 
-    await expect(
-      deploymentService.deployToPrimary({
-        releaseId: "rel_1",
-      }),
-    ).rejects.toBeDefined();
+    expect(
+      await rejectionOf(() =>
+        deploymentService.deployToPrimary({
+          releaseId: "rel_1",
+        }),
+      ),
+    ).toBeDefined();
   });
 });

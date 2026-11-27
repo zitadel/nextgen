@@ -2,6 +2,7 @@ import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { ForbiddenError } from "@/lib/backend/errors";
 import { UserService } from "@/lib/backend/services/user";
@@ -65,7 +66,9 @@ describe("UserService.hasIdentityLink", () => {
   it("raises anything else, so a refused read is not read as no links", async ({ server }) => {
     answering(server, "listUserIdentityLinks", refusal(403, "usr.permission_denied"));
 
-    await expect(service().hasIdentityLink("usr_1")).rejects.toBeInstanceOf(ForbiddenError);
+    expect(await rejectionOf(() => service().hasIdentityLink("usr_1"))).toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 });
 
@@ -113,7 +116,7 @@ describe("UserService.credentials", () => {
     answeringCredentials(server);
     answering(server, "listUserPasskeys", refusal(403, "usr.permission_denied"));
 
-    await expect(service().credentials("usr_1", ["passkey"])).rejects.toBeInstanceOf(
+    expect(await rejectionOf(() => service().credentials("usr_1", ["passkey"]))).toBeInstanceOf(
       ForbiddenError,
     );
   });

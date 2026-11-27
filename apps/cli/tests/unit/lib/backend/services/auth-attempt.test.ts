@@ -2,6 +2,7 @@ import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { AuthAttemptService } from "@/lib/backend/services/auth-attempt";
 import { answering, type Reply, refusal, testClient } from "@tests/helpers/api-answers";
@@ -83,11 +84,13 @@ describe("AuthAttemptService.prove", () => {
   });
 
   it("raises any failure that is not a rejected proof", async ({ server }) => {
-    await expect(
-      proving(server, refusal(500, "internal")).prove("att_1", "password", {
-        password: "hunter2",
-      }),
-    ).rejects.toMatchObject({ status: 500 });
+    expect(
+      await rejectionOf(() =>
+        proving(server, refusal(500, "internal")).prove("att_1", "password", {
+          password: "hunter2",
+        }),
+      ),
+    ).toMatchObject({ status: 500 });
   });
 });
 

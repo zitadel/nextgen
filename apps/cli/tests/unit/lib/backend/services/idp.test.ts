@@ -1,6 +1,7 @@
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
@@ -63,6 +64,8 @@ describe("IdpService.deployedSlugs", () => {
       "proj_1",
     );
 
-    await expect(idpService.deployedSlugs()).rejects.toMatchObject({ code: "E_CANCELLED" });
+    expect(await rejectionOf(() => idpService.deployedSlugs())).toMatchObject({
+      code: "E_CANCELLED",
+    });
   });
 });

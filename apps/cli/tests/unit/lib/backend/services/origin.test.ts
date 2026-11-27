@@ -3,6 +3,7 @@ import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
 import { allowDestructive, createZitadelClient } from "@/lib/backend";
@@ -275,7 +276,7 @@ describe("OriginService.promote", () => {
         : stored(ISSUER, "preview");
     });
 
-    await expect(service().promote(ISSUER)).rejects.toMatchObject({ status: 409 });
+    expect(await rejectionOf(() => service().promote(ISSUER))).toMatchObject({ status: 409 });
     expect(added.map(({ body }) => body)).toEqual([
       { pattern: ISSUER, kind: "primary" },
       { pattern: ISSUER, kind: "preview" },
@@ -288,7 +289,7 @@ describe("OriginService.promote", () => {
     answering(server, "removeProjectOrigin", undefined);
     answering(server, "addProjectOrigin", refusal(409, "proj.origin_conflict"));
 
-    await expect(service().promote(ISSUER)).rejects.toMatchObject({ status: 409 });
+    expect(await rejectionOf(() => service().promote(ISSUER))).toMatchObject({ status: 409 });
   });
 });
 
@@ -329,7 +330,7 @@ describe("OriginService.remove", () => {
   it("raises a removal the server refused, which removed nothing", async ({ server }) => {
     answering(server, "removeProjectOrigin", refusal(403, "proj.permission_denied"));
 
-    await expect(service().remove(ISSUER)).rejects.toMatchObject({ status: 403 });
+    expect(await rejectionOf(() => service().remove(ISSUER))).toMatchObject({ status: 403 });
   });
 });
 
@@ -391,6 +392,6 @@ describe("OriginService.remove when the run is cancelled", () => {
       "proj_1",
     );
 
-    await expect(originService.remove(PRIMARY_ORIGIN)).rejects.toBeDefined();
+    expect(await rejectionOf(() => originService.remove(PRIMARY_ORIGIN))).toBeDefined();
   });
 });

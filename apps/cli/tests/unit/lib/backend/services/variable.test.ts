@@ -4,6 +4,7 @@ import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { ForbiddenError } from "@/lib/backend/errors";
 import {
@@ -168,7 +169,7 @@ describe("VariableService.get", () => {
   }) => {
     answering(server, "getVariable", {});
 
-    await expect(service().get("CLIENT_ID", "preview")).rejects.toMatchObject({
+    expect(await rejectionOf(() => service().get("CLIENT_ID", "preview"))).toMatchObject({
       name: "NotFoundError",
       message: "Variable CLIENT_ID has no preview value.",
       hint: "A name has a preview value only once one is set with `--preview`.",
@@ -194,7 +195,7 @@ describe("VariableService.heldByName", () => {
   it("raises a token's refusal to read the values of that kind", async ({ server }) => {
     answering(server, "listVariables", refusal(403, "variable.permission_denied"));
 
-    await expect(service().heldByName("primary")).rejects.toMatchObject({
+    expect(await rejectionOf(() => service().heldByName("primary"))).toMatchObject({
       name: "ForbiddenError",
     });
   });
@@ -218,6 +219,31 @@ function promise(): { settled: Promise<void>; settle: () => void } {
   };
 }
 
+/**
+ * Answers `listVariables`, holding each read open until two have arrived, and
+ * counts how many were in flight at once. Asked in turn, the second read would
+ * not start until the first had answered, so the first would never be let go:
+ * the walk settles its own promises, and only reads made together finish.
+ *
+ * @param server - The test's MSW server.
+ * @returns The reads, and the most that were in flight at once.
+ */
+function readsHeldUntilBoth(server: SetupServer) {
+  const bothArrived = promise();
+  const inFlight = { now: 0, most: 0 };
+  const listed = answering(server, "listVariables", async () => {
+    inFlight.now += 1;
+    inFlight.most = Math.max(inFlight.most, inFlight.now);
+    if (inFlight.now === 2) {
+      bothArrived.settle();
+    }
+    await bothArrived.settled;
+    inFlight.now -= 1;
+    return {};
+  });
+  return { listed, inFlight };
+}
+
 describe("VariableService.set", () => {
   /** A write of a plain preview value, whose primary read answers `primary`. */
   function setPreviewOver(server: SetupServer, primary: Reply<"getVariable">) {
@@ -230,22 +256,8 @@ describe("VariableService.set", () => {
   it("reads back the kinds the write did not answer together, not one after the other", async ({
     server,
   }) => {
-    // Each read is held open until both have arrived. Asked in turn, the second
-    // read would not have started until the first had answered, so the first
-    // would never be let go.
-    const bothArrived = promise();
-    const inFlight = { now: 0, most: 0 };
     answering(server, "setVariables", {});
-    const listed = answering(server, "listVariables", async () => {
-      inFlight.now += 1;
-      inFlight.most = Math.max(inFlight.most, inFlight.now);
-      if (inFlight.now === 2) {
-        bothArrived.settle();
-      }
-      await bothArrived.settled;
-      inFlight.now -= 1;
-      return {};
-    });
+    const { listed, inFlight } = readsHeldUntilBoth(server);
 
     await service().set("API_KEY", "x", VariableWrite.of({ secret: false, preview: false }));
 
@@ -377,17 +389,19 @@ describe("VariableService.set", () => {
   it("fails on a credential the server does not accept, rather than reading it as no secret", async ({
     server,
   }) => {
-    await expect(
-      setPreviewOver(server, refusal(401, "auth.unauthenticated")),
-    ).rejects.toMatchObject({ name: "UnauthorizedError" });
+    expect(
+      await rejectionOf(() => setPreviewOver(server, refusal(401, "auth.unauthenticated"))),
+    ).toMatchObject({ name: "UnauthorizedError" });
   });
 
   it("fails on any other error, since writing on an unknown is the outcome it guards against", async ({
     server,
   }) => {
-    await expect(setPreviewOver(server, refusal(500, "internal"))).rejects.toMatchObject({
-      status: 500,
-    });
+    expect(await rejectionOf(() => setPreviewOver(server, refusal(500, "internal")))).toMatchObject(
+      {
+        status: 500,
+      },
+    );
   });
 });
 
@@ -443,15 +457,17 @@ describe("VariableService.set when the run is cancelled", () => {
       "proj_1",
     );
 
-    await expect(
-      variableService.set(
-        "HOST",
-        "app.acme.com",
-        VariableWrite.of({
-          secret: false,
-          preview: false,
-        }),
+    expect(
+      await rejectionOf(() =>
+        variableService.set(
+          "HOST",
+          "app.acme.com",
+          VariableWrite.of({
+            secret: false,
+            preview: false,
+          }),
+        ),
       ),
-    ).rejects.toBeDefined();
+    ).toBeDefined();
   });
 });

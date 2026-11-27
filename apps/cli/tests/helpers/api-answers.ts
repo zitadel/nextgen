@@ -188,7 +188,9 @@ function bodyToken(body: unknown): string | undefined {
 /**
  * Answers a paged operation with `pages`, in order: each page but the last
  * carries a cursor, and a request with that cursor gets the next one, whether
- * the operation takes its `page_token` in the query or the body.
+ * the operation takes its `page_token` in the query or the body. A cursor it
+ * did not hand out is refused with a `400`, so a walk that sends the wrong one
+ * fails rather than reading an empty page.
  *
  * @param server - The test's MSW server, from the `server` fixture.
  * @param operation - The paged operation, by its client name.
@@ -204,8 +206,11 @@ export function answeringPages<K extends PagedOperation & OperationName>(
   return answering(server, operation, (sent) => {
     const token =
       paging?.token === "body" ? bodyToken(sent.body) : sent.url.searchParams.get("page_token");
-    const index = token ? Number(token.replace("page-", "")) : 0;
-    const page = pages[index] ?? {};
+    const index = token ? pages.findIndex((_, at) => `page-${at}` === token) : 0;
+    const page = pages[index];
+    if (page === undefined) {
+      return refusal(400, "test.unknown_page_token", `no page was handed out as ${token}`);
+    }
     return responseOf({
       ...page,
       next_page_token: index + 1 < pages.length ? `page-${index + 1}` : null,

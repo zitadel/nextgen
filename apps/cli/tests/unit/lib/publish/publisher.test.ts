@@ -18,8 +18,13 @@ import {
   testClient,
 } from "@tests/helpers/api-answers";
 import { it, test } from "@tests/fixtures";
-import { aDeployment, PRIMARY_ORIGIN, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
-import { answeringVariables } from "@tests/helpers/step-context";
+import {
+  aDeployment,
+  PRIMARY_ORIGIN,
+  PROJECT_ID,
+  SECRET_VARIABLE,
+  answeringVariables,
+} from "@tests/helpers/records";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

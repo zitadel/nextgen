@@ -2,6 +2,7 @@ import { HttpResponse } from "msw";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { ClaimService } from "@/lib/backend/services/claim";
 import { answering, refusal, testClient } from "@tests/helpers/api-answers";
@@ -62,13 +63,13 @@ describe("ClaimService.start", () => {
   }) => {
     answering(server, "createProjectClaim", refusal(409, "proj.already_claimed"));
 
-    await expect(service().start()).rejects.toMatchObject({ status: 409 });
+    expect(await rejectionOf(() => service().start())).toMatchObject({ status: 409 });
   });
 
   it("raises any other failure", async ({ server }) => {
     answering(server, "createProjectClaim", refusal(500, "internal"));
 
-    await expect(service().start()).rejects.toMatchObject({ status: 500 });
+    expect(await rejectionOf(() => service().start())).toMatchObject({ status: 500 });
   });
 });
 
@@ -121,6 +122,6 @@ describe("ClaimService.status", () => {
   it("raises any other failure", async ({ server }) => {
     answering(server, "getProjectClaimStatus", refusal(500, "internal"));
 
-    await expect(service().status("clm_1")).rejects.toMatchObject({ status: 500 });
+    expect(await rejectionOf(() => service().status("clm_1"))).toMatchObject({ status: 500 });
   });
 });

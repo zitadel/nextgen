@@ -1,11 +1,9 @@
-import type { SetupServer } from "msw/node";
-
 import { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
 import type { StepContext } from "@/lib/publish/pipeline";
 import { type ConfigStore, type ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
-import { answering, type Sent, testClient } from "@tests/helpers/api-answers";
-import { type HeldVariable, PROJECT_ID } from "@tests/helpers/records";
+import { testClient } from "@tests/helpers/api-answers";
+import { PROJECT_ID } from "@tests/helpers/records";
 
 /**
  * The environment selector every suggestion a step makes carries.
@@ -72,30 +70,4 @@ function bundleOf(config: ZitadelConfig | undefined, store: ConfigStore): Config
     return { schemas: [], flow_definitions: [], idps: [], policies: [] };
   }
   return config.bundle(store).bundle;
-}
-
-/**
- * Answers the project's variables, as `listVariables` holds them.
- *
- * @param server - The test's MSW server, from the `server` fixture.
- * @param held - The values, by variable name.
- * @param kind - The one kind that holds them; left out, every kind does.
- * @returns The requests that read them, oldest first.
- */
-export function answeringVariables(
-  server: SetupServer,
-  held: Readonly<Record<string, HeldVariable>>,
-  kind?: "primary" | "preview",
-): readonly Sent[] {
-  return answering(server, "listVariables", ({ url }) => {
-    const asked = url.searchParams.get("kind") === "preview" ? "preview" : "primary";
-    if (kind !== undefined && asked !== kind) {
-      return {};
-    }
-    return Object.fromEntries(
-      Object.entries(held).map(([name, value]) => {
-        return [name, { [asked]: value }];
-      }),
-    );
-  });
 }
