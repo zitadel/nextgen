@@ -881,7 +881,12 @@ func TestKeyService_GetProjectPublicSigningKeys(t *testing.T) {
 			key.ID = id
 			keys = append(keys, key)
 		}
-		statements.EXPECT().ListSigningKeys(gomock.Any(), gomock.Any()).Return(keys, nil)
+		// The project's keys of the purpose, every one but the removed.
+		statements.EXPECT().ListSigningKeys(gomock.Any(), database.And(
+			database.Equal(database.Col(domain.SigningKeyFieldProjectID), "proj-1"),
+			database.Equal(database.Col(domain.SigningKeyFieldPurpose), domain.SigningKeyPurposeToken),
+			database.Not(database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateRemoved)),
+		)).Return(keys, nil)
 		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil)
 
 		public, err := svc.GetProjectPublicSigningKeys(t.Context(), "proj-1", domain.SigningKeyPurposeToken)

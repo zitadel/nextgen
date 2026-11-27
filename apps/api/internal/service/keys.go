@@ -292,6 +292,9 @@ func (s *keyService) GetProjectPublicSigningKeys(ctx context.Context, projectID 
 	ctx, end := startSpan(ctx, "KeyService.GetProjectPublicSigningKeys")
 	defer end(&err)
 
+	// Every key that is not removed, retired ones included: nothing rotates
+	// keys yet, so the purge of ADR 039 §1 that ends a retired key's grace
+	// period has to move it to removed for it to leave the set.
 	keys, err := s.db.Statements().ListSigningKeys(ctx, database.And(
 		database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
 		database.Equal(database.Col(domain.SigningKeyFieldPurpose), purpose),
@@ -303,8 +306,7 @@ func (s *keyService) GetProjectPublicSigningKeys(ctx context.Context, projectID 
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to list signing keys from the database")
 	}
-	// Oldest first, so the set is the same bytes on every read and a cached
-	// copy revalidates.
+	// Oldest first, so the set is the same bytes on every read.
 	slices.SortFunc(keys, func(a, b *domain.SigningKey) int {
 		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), cmp.Compare(a.ID, b.ID))
 	})

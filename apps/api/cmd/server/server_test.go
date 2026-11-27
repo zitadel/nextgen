@@ -459,9 +459,12 @@ func TestLoadConfigOAuthJWKSMaxAge(t *testing.T) {
 func TestOAuthConfigValidate(t *testing.T) {
 	assert.NoError(t, OAuthConfig{JWKSMaxAge: 0}.Validate(), "zero: verifiers revalidate every time")
 	assert.NoError(t, OAuthConfig{JWKSMaxAge: time.Minute}.Validate())
-	err := OAuthConfig{JWKSMaxAge: -time.Second}.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "oauth.jwks_max_age")
+	assert.NoError(t, OAuthConfig{JWKSMaxAge: time.Second}.Validate())
+	for _, maxAge := range []time.Duration{-time.Second, 300, 999 * time.Millisecond} {
+		err := OAuthConfig{JWKSMaxAge: maxAge}.Validate()
+		require.Error(t, err, "%s", maxAge)
+		assert.Contains(t, err.Error(), "oauth.jwks_max_age")
+	}
 }
 
 // The hashing bound is on by default and every field is left at zero, which

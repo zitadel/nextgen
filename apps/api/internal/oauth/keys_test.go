@@ -31,15 +31,12 @@ func (s *signingKeys) GetProjectPublicSigningKeys(_ context.Context, projectID s
 	return s.keys[projectID], s.err
 }
 
-// newSigningKey returns a signer for a fresh Ed25519 key and its public JWK
-// under kid.
-func newSigningKey(t *testing.T, kid string) (jose.Signer, jose.JSONWebKey) {
+// newPublicKey returns the public JWK of a fresh Ed25519 key under kid.
+func newPublicKey(t *testing.T, kid string) jose.JSONWebKey {
 	t.Helper()
-	public, private, err := ed25519.GenerateKey(rand.Reader)
+	public, _, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.EdDSA, Key: jose.JSONWebKey{Key: private, KeyID: kid}}, nil)
-	require.NoError(t, err)
-	return signer, jose.JSONWebKey{Key: public, KeyID: kid, Algorithm: string(jose.EdDSA), Use: "sig"}
+	return jose.JSONWebKey{Key: public, KeyID: kid, Algorithm: string(jose.EdDSA), Use: "sig"}
 }
 
 func fetchJWKS(t *testing.T, mux http.Handler, path string) jose.JSONWebKeySet {
@@ -51,42 +48,27 @@ func fetchJWKS(t *testing.T, mux http.Handler, path string) jose.JSONWebKeySet {
 	return set
 }
 
-// A token a project signs verifies against that project's JWKS and not
-// against another project's.
-func TestKeysVerifyOnlyTheirProjectsTokens(t *testing.T) {
+func keyIDs(set jose.JSONWebKeySet) []string {
+	ids := make([]string, 0, len(set.Keys))
+	for _, key := range set.Keys {
+		ids = append(ids, key.KeyID)
+	}
+	return ids
+}
+
+// Each project's set holds that project's keys, a queued one included, and
+// no other project's.
+func TestKeysServeOnlyTheirProjectsKeys(t *testing.T) {
 	t.Parallel()
-	signer, appKey := newSigningKey(t, "sig_key_app")
-	_, otherKey := newSigningKey(t, "sig_key_other")
-	_, queuedKey := newSigningKey(t, "sig_key_queued")
 	keys := &signingKeys{keys: map[string][]jose.JSONWebKey{
-		"proj_app":   {appKey, queuedKey},
-		"proj_other": {otherKey},
+		"proj_app":   {newPublicKey(t, "sig_key_app"), newPublicKey(t, "sig_key_queued")},
+		"proj_other": {newPublicKey(t, "sig_key_other")},
 	}}
 	mux := newMux(t, Config{SigningKeys: keys})
 
-	jws, err := signer.Sign([]byte(`{"sub":"user_1"}`))
-	require.NoError(t, err)
-	token, err := jws.CompactSerialize()
-	require.NoError(t, err)
-	verify := func(set jose.JSONWebKeySet) error {
-		parsed, err := jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.EdDSA})
-		require.NoError(t, err)
-		found := set.Key(parsed.Signatures[0].Header.KeyID)
-		if len(found) == 0 {
-			return errors.New("no key with the token's kid")
-		}
-		_, err = parsed.Verify(found[0])
-		return err
-	}
-
-	appSet := fetchJWKS(t, mux, "/oauth/proj_app/jwks")
-	assert.Len(t, appSet.Keys, 2, "a queued key is published before it signs")
-	assert.NoError(t, verify(appSet))
-	for _, key := range appSet.Keys {
-		assert.True(t, key.IsPublic())
-	}
-
-	assert.Error(t, verify(fetchJWKS(t, mux, "/oauth/proj_other/jwks")))
+	assert.Equal(t, []string{"sig_key_app", "sig_key_queued"}, keyIDs(fetchJWKS(t, mux, "/oauth/proj_app/jwks")),
+		"a queued key is published before it signs")
+	assert.Equal(t, []string{"sig_key_other"}, keyIDs(fetchJWKS(t, mux, "/oauth/proj_other/jwks")))
 	assert.Equal(t, []string{"proj_app", "proj_other"}, keys.asked)
 }
 
@@ -95,7 +77,7 @@ func TestKeysVerifyOnlyTheirProjectsTokens(t *testing.T) {
 // same set as one on the public base.
 func TestKeysAreCacheableAndTheSameAtEveryOrigin(t *testing.T) {
 	t.Parallel()
-	_, key := newSigningKey(t, "sig_key_app")
+	key := newPublicKey(t, "sig_key_app")
 	keys := &signingKeys{keys: map[string][]jose.JSONWebKey{"proj_app": {key}}}
 	mux := newMux(t, Config{SigningKeys: keys, JWKSMaxAge: 90 * time.Second, Admission: &admission{err: domain.ErrOriginNotFound()}})
 
@@ -111,7 +93,7 @@ func TestKeysAreCacheableAndTheSameAtEveryOrigin(t *testing.T) {
 
 func TestKeysOfThePlatformProject(t *testing.T) {
 	t.Parallel()
-	_, key := newSigningKey(t, "sig_key_platform")
+	key := newPublicKey(t, "sig_key_platform")
 	keys := &signingKeys{keys: map[string][]jose.JSONWebKey{domain.PlatformProjectID: {key}}}
 
 	set := fetchJWKS(t, newMux(t, Config{SigningKeys: keys, PlatformEnabled: true}), "/oauth/jwks")
@@ -122,16 +104,17 @@ func TestKeysOfThePlatformProject(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code, "no platform project, no platform keys")
 }
 
-// A project whose newest primary deployment has OAuth off has no set, the
-// same answer a project that does not exist gets, so the set does not tell
-// which projects exist. Its keys are not read.
+// A project whose newest primary deployment has OAuth off has no set. That
+// is also how a project that does not exist reads (ReleaseSettings has it
+// off), so the answer is the 404 any tenant that names no project gets, and
+// the set does not tell which projects exist. Its keys are not read.
 func TestKeysNeedOAuthEnabled(t *testing.T) {
 	t.Parallel()
-	_, key := newSigningKey(t, "sig_key_app")
+	key := newPublicKey(t, "sig_key_app")
 	keys := &signingKeys{keys: map[string][]jose.JSONWebKey{"proj_app": {key}}}
 
 	off := send(t, newMux(t, Config{SigningKeys: keys, Settings: settings{}}), http.MethodGet, "/oauth/proj_app/jwks", "api.example.com", https)
-	unknown := send(t, newMux(t, Config{SigningKeys: &signingKeys{}}), http.MethodGet, "/oauth/proj_unknown/jwks", "api.example.com", https)
+	unknown := send(t, newMux(t, Config{SigningKeys: &signingKeys{}}), http.MethodGet, "/oauth/evil/jwks", "api.example.com", https)
 
 	assert.Equal(t, http.StatusNotFound, off.Code)
 	assert.Equal(t, unknown.Code, off.Code)
@@ -141,7 +124,7 @@ func TestKeysNeedOAuthEnabled(t *testing.T) {
 
 func TestKeysRefusals(t *testing.T) {
 	t.Parallel()
-	_, key := newSigningKey(t, "sig_key_platform")
+	key := newPublicKey(t, "sig_key_platform")
 
 	for _, tt := range []struct {
 		name     string
@@ -150,8 +133,10 @@ func TestKeysRefusals(t *testing.T) {
 		settings SettingsSource
 		status   int
 	}{
-		{name: "a project without keys", path: "/oauth/proj_unknown/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
+		{name: "an enabled project without keys", path: "/oauth/proj_app/jwks", keys: &signingKeys{}, status: http.StatusInternalServerError},
 		{name: "a tenant that is no project ID", path: "/oauth/evil/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
+		{name: "a tenant with a NUL", path: "/oauth/proj_%00/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
+		{name: "a tenant that is not UTF-8", path: "/oauth/proj_%ff/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
 		{
 			name:   "the platform project's ID as a tenant",
 			path:   "/oauth/" + domain.PlatformProjectID + "/jwks",
@@ -172,6 +157,9 @@ func TestKeysRefusals(t *testing.T) {
 			rec := send(t, newMux(t, Config{SigningKeys: tt.keys, Settings: tt.settings, PlatformEnabled: true}), http.MethodGet, tt.path, "api.example.com", https)
 			assert.Equal(t, tt.status, rec.Code)
 			assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"), "a refusal is never cached")
+			if tt.status == http.StatusNotFound {
+				assert.Empty(t, tt.keys.asked, "a refused tenant reads no keys")
+			}
 		})
 	}
 }

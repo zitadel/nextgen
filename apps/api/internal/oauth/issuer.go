@@ -143,8 +143,9 @@ func (s *server) deriveIssuer(r *http.Request, tenant string) (Issuer, error) {
 
 // tenantProject is the project a request to tenant is for. The empty tenant
 // is the platform project, only when a platform project is configured; any
-// other tenant must be a project ID. The platform project's own ID is no
-// tenant, because its issuer is Prefix itself.
+// other tenant must be a project ID that every dialect can store, so a
+// malformed one is refused before it reaches the database. The platform
+// project's own ID is no tenant, because its issuer is Prefix itself.
 func tenantProject(tenant string, platformEnabled bool) (projectID string, platform bool, err error) {
 	switch {
 	case tenant == "":
@@ -152,7 +153,7 @@ func tenantProject(tenant string, platformEnabled bool) (projectID string, platf
 			return "", false, domain.ErrProjectNotFound()
 		}
 		return domain.PlatformProjectID, true, nil
-	case tenant == domain.PlatformProjectID, !domain.PrefixProject.Matches(tenant):
+	case tenant == domain.PlatformProjectID, !domain.PrefixProject.Matches(tenant), !storable(tenant):
 		return "", false, domain.ErrProjectNotFound()
 	}
 	return tenant, false, nil

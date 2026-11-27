@@ -59,14 +59,19 @@ type OAuthConfig struct {
 	Enabled bool `mapstructure:"enabled"`
 	// JWKSMaxAge is how long a verifier may cache a project's JWKS, sent as
 	// its Cache-Control max-age in whole seconds. It is the propagation
-	// window of ADR 039 §1: a new signing key must be published at least
-	// this long before it signs, or a verifier's cached set misses its kid.
+	// window of ADR 039 §1: the rotation code must publish a new signing key
+	// at least this long before it signs, reading this same value, or a
+	// verifier's cached set misses its kid.
 	JWKSMaxAge time.Duration `mapstructure:"jwks_max_age"`
 }
 
 func (c OAuthConfig) Validate() error {
 	if c.JWKSMaxAge < 0 {
 		return fmt.Errorf("oauth.jwks_max_age %s must not be negative", c.JWKSMaxAge)
+	}
+	// A unitless number in the YAML file loads as nanoseconds: 300 is 300ns.
+	if c.JWKSMaxAge > 0 && c.JWKSMaxAge < time.Second {
+		return fmt.Errorf("oauth.jwks_max_age %s must be 0 or at least 1s; a number needs a unit, such as 300s", c.JWKSMaxAge)
 	}
 	return nil
 }
