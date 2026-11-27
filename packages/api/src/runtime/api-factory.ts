@@ -124,9 +124,9 @@ export function createZitadelApi(client: ZitadelClient, hooks: ZitadelApiHooks =
   const hooked = hooks.onResponse !== undefined || hooks.onError !== undefined;
   const api: Record<string, unknown> = { client };
   // Each operation's generated function is named by its id, first letter
-  // lowercased; the module's other exports are URL builders. Read here rather
-  // than at load, so a bundle that imports this module for something else does
-  // not keep every operation.
+  // lowercased: only what the spec's operation table names is bound. Read here
+  // rather than at load, so a bundle that imports this module for something
+  // else does not keep every operation.
   const names = new Set(operations.map(({ id }) => id.charAt(0).toLowerCase() + id.slice(1)));
   for (const [name, value] of Object.entries(endpoints)) {
     if (!names.has(name)) {

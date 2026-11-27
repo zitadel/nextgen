@@ -291,7 +291,8 @@ function resultName(method: string): string {
   const noun = method.replace(verbs, "").replace(/By[A-Z][A-Za-z]*$/, "");
   if (noun === method || noun === "") return "result";
   const name = noun.charAt(0).toLowerCase() + noun.slice(1);
-  return name === "api" ? "result" : name;
+  // `api` and `session` are the sample's own variables.
+  return name === "api" || name === "session" ? "result" : name;
 }
 
 /** The call, laid out as a formatter lays it out in 80 columns. */
