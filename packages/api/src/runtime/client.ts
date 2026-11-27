@@ -46,8 +46,9 @@ export type ZitadelClientSettings = Readonly<{
    * Called before every request the client sends, with the operation, its URL
    * and the request as it will go out. Throwing stops the request: nothing is
    * sent, and the call rejects with what was thrown. Left out, every request
-   * is sent. It sees a copy, so changing it changes nothing that is sent, and
-   * it runs before the client's signal and deadline apply: it must return on
+   * is sent. Its headers are a copy, so changing them changes nothing that is sent;
+   * its body is the one sent, so it must not read a stream body. It
+   * runs before the client's signal and deadline apply: it must return on
    * its own.
    *
    * This is where the code that owns a client adds a rule of its own without

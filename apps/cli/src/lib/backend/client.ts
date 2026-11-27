@@ -108,10 +108,10 @@ export type ZitadelClient = ZitadelApi;
 
 /**
  * What the CLI makes a client from: the run's signal is required, the rest
- * optional. No `fetch`: `OperationService` sends its own requests from the
- * connection, so every request must go through the runtime's `fetch`.
+ * optional. No `fetch` and no `onRequest`: `OperationService` sends its own
+ * requests from the connection, so neither would see every request.
  */
-export type ZitadelClientOptions = Omit<ZitadelClientSettings, "fetch" | "signal"> & {
+export type ZitadelClientOptions = Omit<ZitadelClientSettings, "fetch" | "onRequest" | "signal"> & {
   signal: AbortSignal;
 };
 

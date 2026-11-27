@@ -283,7 +283,7 @@ export type ApiOperation = Readonly<{
 /** Every operation of the API, in the order the spec declares them. */
 export const operations: readonly ApiOperation[] = ${JSON.stringify(operations, null, 2)};
 
-/** The client functions that run a destructive operation, to narrow the client by. */
+/** The client functions that run a destructive operation, for a caller that asks before it runs one. */
 export const destructiveOperations = ${JSON.stringify(destructive, null, 2)} as const satisfies readonly (keyof typeof endpoints)[];
 
 /** The name of a client function that runs a destructive operation. */

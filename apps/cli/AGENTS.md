@@ -307,16 +307,16 @@
   (`src/cli/core/destructive.ts`), which takes `--force`, and does it in `this.confirmed({ ... })`
   inside `apply`. Declare no `--force` of your own unless it means something else
   (`setup` overwriting files).
-- Consent lives only in commands: ask in `confirmed()` or `this.consent(gate)`, never in
-  `lib/`. A spec runs the command without `--force`, then reads back with another command.
+- Ask for consent only in a command, with `confirmed()` or `this.consent(gate)`; `lib/`
+  takes a `Consent`, never asks. The backend services do not check it.
 - An update that sets a field to `null` removes it, so it asks as a deletion does and
   refuses without `--force` when nothing can ask.
 - The dry run of such an update warns and suggests the real run with `--force`.
 - A plain yes or no is `this.ask.yesNo(...)`, which `--force` never answers; only
   `Consent` asks a `confirm`, so a command whose `--force` means something else
   (`setup` overwriting files) needs no asker of its own.
-- `biome-plugins/no-consent-bypass.grit` rejects every way around `Consent`:
-  casts, raw HTTP, `Consent.request` outside the mixin.
+- `biome-plugins/no-consent-bypass.grit` keeps one client and one transport, and
+  rejects a forged `Consent`: casts, `Consent.request` outside the mixin.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new
   global flag, or a deviation, in `SKILL.md`'s invocation rules.
 - Declare an environment variable that sets what a global flag sets as a
