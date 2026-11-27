@@ -1,0 +1,193 @@
+{{define "scenarios"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --border:#2a3542; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
+    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
+    main { padding:1.25rem; max-width:960px; margin:0 auto; }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+    .muted { color:var(--muted); font-size:0.875rem; }
+    .flash-ok { color:var(--ok); margin-bottom:0.75rem; }
+    .flash-err { color:var(--bad); margin-bottom:0.75rem; }
+    label { display:block; margin:0.5rem 0 0.25rem; color:var(--muted); font-size:0.875rem; }
+    input, button { font:inherit; padding:0.45rem 0.6rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
+    input { width:100%; }
+    button { background:var(--accent); border-color:var(--accent); color:#041018; font-weight:600; cursor:pointer; margin-top:0.5rem; margin-right:0.5rem; }
+    button.secondary { background:transparent; color:var(--text); }
+    .row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:flex-end; }
+    table.trace { width:100%; border-collapse:collapse; font-size:0.85rem; }
+    table.trace th, table.trace td { text-align:left; padding:0.35rem 0.4rem; border-bottom:1px solid var(--border); vertical-align:top; }
+    code { font-size:0.8rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>cell hierarchy</strong>
+    <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+  </header>
+  <main>
+    <h1>Phase 2–6 scenarios</h1>
+    {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
+    {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Block / Delete Joe</h2>
+      <p class="muted">
+        Phase 6: home (eu-2) bumps <code>epoch</code> and fans out only to interest subscribers (us).
+        <strong>Block</strong> — online <code>auth/check</code> fails immediately; offline still allows with the unexpired JWT until <code>exp</code> (~60s).
+        <strong>Delete</strong> — pushes <code>user.deleted</code> so us drops the direct grant; home clears group memberships (group FGA check fails); lookup floats a tombstone.
+        If the home cell is stopped, event push errors (fail-closed) and online principal check also fails closed.
+        After delete, re-bootstrap to demo again.
+      </p>
+      <form method="post" action="/scenarios/block-joe" style="display:inline">
+        <button type="submit">Block Joe</button>
+      </form>
+      <form method="post" action="/scenarios/delete-joe" style="display:inline">
+        <button type="submit" class="secondary">Delete Joe</button>
+      </form>
+      {{if .Lifecycle}}
+      <div style="margin-top:1rem">
+        <p class="muted">
+          action=<code>{{.Lifecycle.Action}}</code>
+          · epoch <strong>{{.Lifecycle.Epoch}}</strong>
+          {{if .Lifecycle.Blocked}} · blocked{{end}}
+          {{if .Lifecycle.Deleted}} · deleted{{end}}
+          · us joe-tuples <strong>{{.Lifecycle.USTuplesBefore}} → {{.Lifecycle.USTuplesAfter}}</strong>
+          · offline: {{if .Lifecycle.OfflineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OfflineReason}}</span>{{end}}
+          · online: {{if .Lifecycle.OnlineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OnlineReason}}</span>{{end}}
+          {{with .Lifecycle.GroupAllowed}}
+            · group: {{if .}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">denied</span>{{end}}
+          {{end}}
+          {{if ne .Lifecycle.GroupReason ""}} · group reason <code>{{.Lifecycle.GroupReason}}</code>{{end}}
+          {{if ne .Lifecycle.LookupState ""}} · lookup <code>{{.Lifecycle.LookupState}}</code>{{end}}
+        </p>
+        <p class="muted">{{.Lifecycle.Note}}</p>
+        {{if .Lifecycle.Hops}}
+        <table class="trace">
+          <thead><tr><th>Cell</th><th>Method</th><th>ms</th><th>Result</th></tr></thead>
+          <tbody>
+          {{range .Lifecycle.Hops}}
+            <tr><td><code>{{.Cell}}</code></td><td>{{.Method}}</td><td>{{.Ms}}</td><td>{{.Result}}</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Group check Joe → app:chat</h2>
+      <p class="muted">Phase 5: seed <code>group:A#member@joe</code> on eu-2, <code>group:B#member@group:A@eu-2</code> on eu, <code>app:chat#viewer@group:B@eu</code> on us. Then <code>POST /v1/fga/check</code> walks viewers → expand B → expand A → find Joe. Delay slider sleeps per hop so latency grows with the chain. Depth/visited only stop cycles (cap 8).</p>
+      <form method="post" action="/scenarios/seed-group-chain" style="margin-bottom:0.75rem">
+        <button class="secondary" type="submit">Seed group chain</button>
+      </form>
+      <form method="post" action="/scenarios/group-check-joe">
+        <label><input type="checkbox" name="auto_seed" value="1" checked/> Auto-seed chain if missing</label>
+        <label for="delay_ms">Delay per hop (ms): <span id="delay_val">25</span></label>
+        <input id="delay_ms" name="delay_ms" type="range" min="0" max="200" step="5" value="25"
+               oninput="document.getElementById('delay_val').textContent=this.value" style="width:100%"/>
+        <div class="row">
+          <button type="submit">Group check Joe → app:chat</button>
+        </div>
+      </form>
+      {{if .GroupCheck}}
+      <div style="margin-top:1rem">
+        <p class="muted">
+          {{if .GroupCheck.Allowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GroupCheck.Reason}}</span>{{end}}
+          · total <strong>{{.GroupCheck.TotalMs}} ms</strong>
+          · cross-cell hops <strong>{{.GroupCheck.CrossCellHops}}</strong>
+          · delay {{.GroupCheck.DelayMs}} ms/hop
+          {{if .GroupCheck.Seeded}} · auto-seeded{{end}}
+        </p>
+        <p class="muted">{{.GroupCheck.Note}}</p>
+        {{if .GroupCheck.Hops}}
+        <table class="trace">
+          <thead><tr><th>Cell</th><th>Method</th><th>ms</th><th>Result</th></tr></thead>
+          <tbody>
+          {{range .GroupCheck.Hops}}
+            <tr><td><code>{{.Cell}}</code></td><td>{{.Method}}</td><td>{{.Ms}}</td><td>{{.Result}}</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Sign in on us as Joe</h2>
+      <p class="muted">Phase 4: lookup walk from <code>us</code> → issue Ed25519 JWT at home (<code>team-eu-2</code> on eu-2) → <code>POST /v1/auth/check</code> on us (offline + online principal check). Shows raw token and decoded claims. Auto-grants the Phase 3 tuple if missing.</p>
+      <form method="post" action="/scenarios/sign-in-joe">
+        <label><input type="checkbox" name="auto_grant" value="1" checked/> Auto-grant if missing (else run Phase 3 grant first)</label>
+        <div class="row">
+          <button type="submit">Sign in on us as Joe</button>
+        </div>
+      </form>
+      {{if .SignIn}}
+      <div style="margin-top:1rem">
+        <p class="muted">Home: <code>{{.SignIn.HomeProject}}</code> @ <code>{{.SignIn.HomeCell}}</code>
+          {{if .SignIn.AutoGranted}} · auto-granted{{end}}
+          · offline: {{if .SignIn.AllowedOffline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOffline}}</span>{{end}}
+          · online: {{if .SignIn.AllowedOnline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOnline}}</span>{{end}}
+        </p>
+        <label>Raw token</label>
+        <textarea readonly rows="3" style="width:100%;font:0.75rem ui-monospace,monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem">{{.SignIn.Token}}</textarea>
+        <label>Decoded claims</label>
+        <pre style="margin:0.25rem 0 0;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:auto;font-size:0.8rem">{{.SignIn.ClaimsJSON}}</pre>
+      </div>
+      {{end}}
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Grant Joe on us/chat</h2>
+      <p class="muted">Phase 3: from project <code>us</code>, lookup-walk <code>joe@example.com</code> (resolves at platform → home team-eu-2), write tuple <code>app:chat#viewer</code> on us only, then <code>POST /v1/interests</code> on eu-2. Inspect <a href="/projects/us">us</a> tuples and <a href="/projects/team-eu-2">team-eu-2</a> interests.</p>
+      <form method="post" action="/scenarios/grant-joe">
+        <button type="submit">Grant Joe on us/chat</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Create user (watch float)</h2>
+      <p class="muted">Creates a user on <code>team-eu-2</code> (hosted on eu-2) and floats lookup rows up eu → platform. Check the Global Trace for hops. Use <em>defer float</em> to demonstrate miss-before-push.</p>
+      <form method="post" action="/scenarios/create-user">
+        <label for="email">Email</label>
+        <input id="email" name="email" placeholder="demo@example.com" />
+        <label><input type="checkbox" name="defer_float" value="1"/> Defer float (local only)</label>
+        <div class="row">
+          <button type="submit">Create user (watch float)</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Lookup from us before/after float</h2>
+      <p class="muted">Walks UP from project <code>us</code> (never children). Miss if the key is not yet at platform; hit after float lands.</p>
+      <form method="post" action="/scenarios/lookup">
+        <label for="key">Key</label>
+        <input id="key" name="key" value="joe@example.com" />
+        <button type="submit">Lookup from us</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="font-size:1rem;margin:0">Global Trace</h2>
+        <form method="post" action="/trace/clear"><button class="secondary" type="submit">Clear</button></form>
+      </div>
+      <div id="trace" hx-get="/trace" hx-trigger="every 3s" hx-swap="innerHTML">
+        {{template "trace" .}}
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+{{end}}
