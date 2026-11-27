@@ -109,8 +109,13 @@ export class SessionCsrf {
       headers.set(CSRF_HEADER, sent);
     }
     const res = await fetch(input, { ...init, headers });
-    // A body that can be read only once cannot be sent again.
-    if (res.status !== 403 || init.body instanceof ReadableStream) {
+    // A body that can be read only once cannot be sent again: a stream, or the
+    // body of a Request, which the first send consumed.
+    if (
+      res.status !== 403 ||
+      init.body instanceof ReadableStream ||
+      (request !== undefined && request.body !== null && init.body === undefined)
+    ) {
       return res;
     }
     const code = apiErrorCode(

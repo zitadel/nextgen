@@ -179,6 +179,15 @@ describe("SessionCsrf.fetch refusal", () => {
     expect(sent).toEqual(["stale"]);
   });
 
+  it("does not retry a Request whose body the first send used", async () => {
+    const sent = answering(API, [refused]);
+    const { csrf, counted } = sessionCsrf("stale", "fresh");
+
+    const res = await csrf.fetch(new Request(`${API}/teams`, { method: "POST", body: "{}" }));
+
+    expect([res.status, sent, counted.rechecks]).toEqual([403, ["stale"], 0]);
+  });
+
   it("leaves other 403 answers and safe methods alone", async () => {
     answering(API, [
       () => HttpResponse.json({ code: "team.permission_denied" }, { status: 403 }),
