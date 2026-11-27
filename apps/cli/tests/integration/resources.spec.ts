@@ -73,7 +73,7 @@ describe("resources", () => {
           source: "",
           status: "ok",
           data: {
-            title: "Found 12 resources",
+            title: "Found 13 resources",
             items: expect.any(Array),
             count: expect.any(Number),
             truncated: false,
@@ -98,7 +98,7 @@ describe("resources", () => {
           source: "",
           status: "ok",
           data: {
-            title: "Found 12 resources",
+            title: "Found 13 resources",
             items: expect.any(Array),
             count: expect.any(Number),
             truncated: false,
@@ -123,7 +123,7 @@ describe("resources", () => {
           source: "",
           status: "ok",
           data: {
-            title: "Found 12 resources",
+            title: "Found 13 resources",
             items: expect.any(Array),
             count: expect.any(Number),
             truncated: false,
@@ -227,7 +227,7 @@ describe("resources", () => {
           source: "",
           status: "ok",
           data: {
-            title: "Found 12 resources",
+            title: "Found 13 resources",
             items: expect.any(Array),
             count: expect.any(Number),
             truncated: false,
