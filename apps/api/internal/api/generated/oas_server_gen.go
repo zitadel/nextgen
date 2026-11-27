@@ -1405,7 +1405,8 @@ type Handler interface {
 	// is registered: to change it, call `publishApplication`.
 	//
 	// It never returns a client secret. A registered client's secret is only in the response of the
-	// `publishApplication` call that creates the client.
+	// `publishApplication` call that creates the client. A declared client's `secret` is the `${{ NAME }}`
+	// reference from its file, which names the variable holding the secret.
 	//
 	// POST /applications/query
 	QueryApplications(ctx context.Context, req *QueryApplicationsRequest, params QueryApplicationsParams) (QueryApplicationsRes, error)

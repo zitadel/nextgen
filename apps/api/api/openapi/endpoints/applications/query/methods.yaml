@@ -15,6 +15,8 @@ post:
 
     It never returns a client secret. A registered client's secret is only
     in the response of the `publishApplication` call that creates the client.
+    A declared client's `secret` is the `${{ NAME }}` reference from its
+    file, which names the variable holding the secret.
   tags:
     - Applications
   security:

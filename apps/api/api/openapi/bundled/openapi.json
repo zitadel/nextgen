@@ -7253,7 +7253,7 @@
         "operationId": "queryApplications",
         "x-zitadel-cli": "application list",
         "summary": "Query applications",
-        "description": "Returns the applications of a project, paginated with a cursor. Each\napplication appears once, at its newest revision, with each client's\n`client_id` in `definition`.\n\nThe list holds both the applications a release declares and the ones\nregistered through `publishApplication` (`POST /applications`). An entry\nwith `declared: true` comes from a release: to change it, edit its file\nunder `.zitadel/applications/` and deploy. An entry with\n`declared: false` is registered: to change it, call `publishApplication`.\n\nIt never returns a client secret. A registered client's secret is only\nin the response of the `publishApplication` call that creates the client.\n",
+        "description": "Returns the applications of a project, paginated with a cursor. Each\napplication appears once, at its newest revision, with each client's\n`client_id` in `definition`.\n\nThe list holds both the applications a release declares and the ones\nregistered through `publishApplication` (`POST /applications`). An entry\nwith `declared: true` comes from a release: to change it, edit its file\nunder `.zitadel/applications/` and deploy. An entry with\n`declared: false` is registered: to change it, call `publishApplication`.\n\nIt never returns a client secret. A registered client's secret is only\nin the response of the `publishApplication` call that creates the client.\nA declared client's `secret` is the `${{ NAME }}` reference from its\nfile, which names the variable holding the secret.\n",
         "tags": [
           "Applications"
         ],
