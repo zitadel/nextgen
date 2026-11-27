@@ -15,12 +15,6 @@ func NewInvitationToken() (plain, hash string, err error) {
 	return plain, HashSecret(plain), nil
 }
 
-// NewInvitationJourneyID mints the random id that ties an invitation to its
-// replacements. It names no resource.
-func NewInvitationJourneyID() (string, error) {
-	return randomSecret(16)
-}
-
 // PrefixInvitation is the dialect-minted ID prefix for invitations (inv_<opaque>)
 // and the public error-code prefix (inv.not_found).
 const PrefixInvitation ResourcePrefix = "inv"

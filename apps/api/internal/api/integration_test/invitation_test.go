@@ -207,7 +207,7 @@ func TestInvitationAdminLimits(t *testing.T) {
 		for range service.MaxPendingInvitations - 1 {
 			_, tokenHash, err := domain.NewInvitationToken()
 			require.NoError(t, err)
-			journeyID, err := domain.NewInvitationJourneyID()
+			journeyID, err := domain.NewCorrelationID()
 			require.NoError(t, err)
 			require.NoError(t, stmts.CreateInvitation(t.Context(), &domain.Invitation{
 				ProjectID:     project.ID,
@@ -474,7 +474,28 @@ func TestInvitationRedeem(t *testing.T) {
 		for _, event := range events {
 			assert.NotContains(t, string(event.Payload), "Jane Doe")
 			assert.NotContains(t, string(event.Payload), token)
+			// The administrator's create and the colleague's accept are two
+			// requests of one chain, which the invitation holds as its journey.
+			assert.Equal(t, created.JourneyID, event.CorrelationID, event.EventType)
 		}
+		// The chain reads the invitation's whole story in one list, the grant
+		// the accept wrote included.
+		chain, err := owner.ListEvents(t.Context(), api.ListEventsParams{
+			ProjectID:     projectID,
+			CorrelationID: api.NewOptString(created.JourneyID),
+		})
+		require.NoError(t, err)
+		page, ok := chain.(*api.ListEventsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, chain))
+		var inChain []string
+		for _, event := range page.Events {
+			raw, err := event.MarshalJSON()
+			require.NoError(t, err)
+			var decoded invitationEvent
+			require.NoError(t, json.Unmarshal(raw, &decoded))
+			inChain = append(inChain, decoded.EventType)
+		}
+		assert.Subset(t, inChain, []string{"invitation.created", "invitation.accepted", "authz.granted"})
 	})
 
 	t.Run("decline", func(t *testing.T) {
@@ -758,7 +779,7 @@ func TestInvitationRedeem(t *testing.T) {
 		t.Parallel()
 		token, tokenHash, err := domain.NewInvitationToken()
 		require.NoError(t, err)
-		journeyID, err := domain.NewInvitationJourneyID()
+		journeyID, err := domain.NewCorrelationID()
 		require.NoError(t, err)
 		// Seeded below the API, which only creates invitations that expire later.
 		expired := &domain.Invitation{
@@ -809,8 +830,9 @@ func TestInvitationRedeem(t *testing.T) {
 }
 
 type invitationEvent struct {
-	EventType string          `json:"event_type"`
-	Payload   json.RawMessage `json:"payload"`
+	EventType     string          `json:"event_type"`
+	CorrelationID string          `json:"correlation_id"`
+	Payload       json.RawMessage `json:"payload"`
 }
 
 // invitationEvents lists the events recorded for one invitation.

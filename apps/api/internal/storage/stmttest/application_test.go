@@ -307,6 +307,17 @@ func TestApplicationStatements_ProjectDeleteCascades(t *testing.T) {
 		client := &domain.ApplicationClient{Slug: "web"}
 		application := createApplication(t, d.stmts, projectID, "shop-"+uniqueSuffix(t), client)
 		require.NoError(t, d.stmts.CreateApplicationClientSecret(t.Context(), &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: client.ID, SecretHash: domain.HashSecret("one")}))
+		now := time.Now().UTC()
+		key := &domain.ApplicationIdempotencyKey{
+			ProjectID:     projectID,
+			KeyHash:       domain.HashSecret("key"),
+			RequestHash:   domain.HashSecret("document"),
+			ApplicationID: application.ID,
+			ClientIDs:     []string{client.ID},
+			CreatedAt:     now,
+			ExpiresAt:     now.Add(time.Hour),
+		}
+		require.NoError(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), key))
 
 		_, err := d.stmts.DeleteProjectByID(t.Context(), projectID)
 		require.NoError(t, err)
@@ -318,6 +329,91 @@ func TestApplicationStatements_ProjectDeleteCascades(t *testing.T) {
 		secrets, err := d.stmts.ListApplicationClientSecrets(t.Context(), projectID, client.ID)
 		require.NoError(t, err)
 		assert.Empty(t, secrets)
+		_, err = d.stmts.GetApplicationIdempotencyKey(t.Context(), projectID, key.KeyHash, now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+func TestApplicationStatements_IdempotencyKeys(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		web, admin := &domain.ApplicationClient{Slug: "web"}, &domain.ApplicationClient{Slug: "admin"}
+		application := createApplication(t, d.stmts, projectID, "shop-"+uniqueSuffix(t), web, admin)
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		newKey := func(projectID, keyHash string, createdAt, expiresAt time.Time) *domain.ApplicationIdempotencyKey {
+			return &domain.ApplicationIdempotencyKey{
+				ProjectID:     projectID,
+				KeyHash:       keyHash,
+				RequestHash:   domain.HashSecret("document"),
+				ApplicationID: application.ID,
+				Created:       true,
+				ClientIDs:     []string{web.ID, admin.ID},
+				CreatedAt:     createdAt,
+				ExpiresAt:     expiresAt,
+			}
+		}
+
+		t.Run("a record round trips with its client ids in order", func(t *testing.T) {
+			key := newKey(projectID, domain.HashSecret("round-trip"), now, now.Add(time.Hour))
+			require.NoError(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), key))
+
+			got, err := d.stmts.GetApplicationIdempotencyKey(t.Context(), projectID, key.KeyHash, now)
+			require.NoError(t, err)
+			assert.Equal(t, key.RequestHash, got.RequestHash)
+			assert.Equal(t, application.ID, got.ApplicationID)
+			assert.True(t, got.Created)
+			assert.Equal(t, []string{web.ID, admin.ID}, got.ClientIDs)
+			assert.True(t, got.CreatedAt.Equal(now))
+			assert.True(t, got.ExpiresAt.Equal(key.ExpiresAt))
+
+			again := newKey(projectID, key.KeyHash, now, now.Add(time.Hour))
+			assert.ErrorIs(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), again), new(database.UniqueError), "a live record is not replaced")
+		})
+
+		t.Run("an expired record is not returned and a create replaces it", func(t *testing.T) {
+			keyHash := domain.HashSecret("expired")
+			expiresAt := now.Add(-time.Minute)
+			require.NoError(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), newKey(projectID, keyHash, expiresAt.Add(-time.Hour), expiresAt)))
+
+			_, err := d.stmts.GetApplicationIdempotencyKey(t.Context(), projectID, keyHash, expiresAt)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError), "a record has expired at its expires_at")
+
+			fresh := newKey(projectID, keyHash, expiresAt, now.Add(time.Hour))
+			fresh.Created, fresh.ClientIDs = false, nil
+			require.NoError(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), fresh), "a create at the old record's expires_at replaces it")
+			got, err := d.stmts.GetApplicationIdempotencyKey(t.Context(), projectID, keyHash, expiresAt)
+			require.NoError(t, err)
+			assert.False(t, got.Created)
+			assert.Empty(t, got.ClientIDs)
+		})
+
+		t.Run("the same key in another project is its own record", func(t *testing.T) {
+			keyHash := domain.HashSecret("shared")
+			require.NoError(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), newKey(projectID, keyHash, now, now.Add(time.Hour))))
+
+			other := ensureProject(t, d.stmts)
+			_, err := d.stmts.GetApplicationIdempotencyKey(t.Context(), other, keyHash, now)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+			otherApp := createApplication(t, d.stmts, other, "shop-"+uniqueSuffix(t))
+			key := newKey(other, keyHash, now, now.Add(time.Hour))
+			key.ApplicationID, key.ClientIDs = otherApp.ID, nil
+			require.NoError(t, d.stmts.CreateApplicationIdempotencyKey(t.Context(), key))
+		})
+
+		t.Run("deleting a client's secrets leaves the other client's", func(t *testing.T) {
+			for _, client := range []*domain.ApplicationClient{web, web, admin} {
+				require.NoError(t, d.stmts.CreateApplicationClientSecret(t.Context(), &domain.ApplicationClientSecret{ProjectID: projectID, ApplicationClientID: client.ID, SecretHash: domain.HashSecret(client.Slug)}))
+			}
+
+			require.NoError(t, d.stmts.DeleteApplicationClientSecrets(t.Context(), projectID, web.ID))
+			secrets, err := d.stmts.ListApplicationClientSecrets(t.Context(), projectID, web.ID)
+			require.NoError(t, err)
+			assert.Empty(t, secrets)
+			secrets, err = d.stmts.ListApplicationClientSecrets(t.Context(), projectID, admin.ID)
+			require.NoError(t, err)
+			assert.Len(t, secrets, 1)
+			require.NoError(t, d.stmts.DeleteApplicationClientSecrets(t.Context(), projectID, web.ID), "a client without secrets is no error")
+		})
 	})
 }
 
