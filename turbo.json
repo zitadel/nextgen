@@ -353,6 +353,8 @@
         "scripts/generated-outputs.mjs",
         "scripts/map-all.mjs",
         "scripts/task-graph.test.mjs",
+        "scripts/knip-annotations.mjs",
+        "scripts/knip-annotations.test.mjs",
         "scripts/cloud-build.test.mjs",
         "vercel.json",
         "apps/cloud/build-launcher.sh",

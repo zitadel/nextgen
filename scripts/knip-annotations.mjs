@@ -45,9 +45,7 @@ function encode(value, property) {
  */
 export function annotations({ issues, cwd }) {
   return Object.entries(issues).flatMap(([type, records]) => {
-    if (!(type in TITLES)) {
-      return [];
-    }
+    const title = TITLES[type] ?? type;
     return Object.values(records).flatMap((byFile) => {
       return Object.values(byFile).map((issue) => {
         const level = issue.severity === "warn" ? "warning" : "error";
@@ -58,8 +56,9 @@ export function annotations({ issues, cwd }) {
         if (issue.col !== undefined) {
           params.push(`col=${issue.col}`);
         }
-        params.push(`title=${encode(`knip: ${TITLES[type]}`, true)}`);
-        return `::${level} ${params.join(",")}::${encode(`${TITLES[type]}: ${issue.symbol}`, false)}`;
+        const symbol = issue.parentSymbol ? `${issue.parentSymbol}.${issue.symbol}` : issue.symbol;
+        params.push(`title=${encode(`knip: ${title}`, true)}`);
+        return `::${level} ${params.join(",")}::${encode(`${title}: ${symbol}`, false)}`;
       });
     });
   });

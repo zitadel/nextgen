@@ -57,6 +57,26 @@ describe("annotations", () => {
     ]);
   });
 
+  it("names an enum member with its enum", () => {
+    const options = findingsWith("enumMembers", {
+      filePath: "/repo/src/a.ts",
+      symbol: "Unused",
+      parentSymbol: "Color",
+    });
+
+    expect(annotations(options)).toEqual([
+      "::error file=src/a.ts,title=knip%3A Unused enum member::Unused enum member: Color.Unused",
+    ]);
+  });
+
+  it("annotates a kind of finding it has no title for under knip's own name for it", () => {
+    const options = findingsWith("somethingNew", { filePath: "/repo/src/a.ts", symbol: "x" });
+
+    expect(annotations(options)).toEqual([
+      "::error file=src/a.ts,title=knip%3A somethingNew::somethingNew: x",
+    ]);
+  });
+
   it("annotates nothing when knip found nothing", () => {
     expect(annotations({ cwd, issues: { exports: {}, files: {} } })).toEqual([]);
   });

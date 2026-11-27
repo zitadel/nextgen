@@ -248,6 +248,16 @@ describe.sequential("task graph cache and ordering contracts", () => {
     }
   });
 
+  test("a lint waits for api-mock's build only where its own Vitest config loads it", () => {
+    const lint = (pkg) => baseline.get(`${pkg}#lint`).dependencies;
+    for (const pkg of ["@zitadel/components", "@zitadel/sdk-qwik"]) {
+      expect(lint(pkg), pkg).toContain("@zitadel/api-mock#build");
+    }
+    for (const pkg of ["@zitadel/sdk-react", "@zitadel/cli"]) {
+      expect(lint(pkg), pkg).not.toContain("@zitadel/api-mock#build");
+    }
+  });
+
   // Turbo's release graph has no second build: pack, snapshot and publish
   // depend on every public package's own build and on each server platform
   // package's binary, and so wait for no test (tools/release/turbo.json).
