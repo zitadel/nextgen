@@ -57,7 +57,7 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 		return nil, refused(err)
 	}
 	if r.Data.ClientAssertion != "" || r.Data.ClientAssertionType != "" {
-		return nil, op.NewStatusError(oidc.ErrInvalidClient().WithDescription("the client must authenticate with its client secret"), http.StatusUnauthorized)
+		return nil, op.NewStatusError(oidc.ErrInvalidClient().WithDescription("client assertions are not supported"), http.StatusUnauthorized)
 	}
 	// A lookup with text a dialect cannot hold fails as a 500, and the code's
 	// refusal event would store the client ID. No client holds an ID longer
@@ -78,44 +78,58 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 	}
 	// A public client authenticates with client_id only (AuthMethodNone) and
 	// PKCE on the code. A confidential client must send its secret.
-	if r.Data.ClientSecret == "" {
-		doc, err := s.clients.Client(ctx, projectID, deploymentID, r.Data.ClientID)
-		switch {
-		case errors.Is(err, domain.ErrApplicationClientNotFound()), errors.Is(err, domain.ErrApplicationNotFound()):
-			return nil, refused(err)
-		case errors.Is(err, domain.ErrReleaseNotDeployed(nil)), errors.Is(err, domain.ErrDeploymentNotFound()),
-			errors.Is(err, domain.ErrReleaseRevoked()):
-			return nil, refused(err)
-		case errors.Is(err, domain.ErrUnavailable()):
-			return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
-		case err != nil:
-			return nil, op.NewStatusError(oidc.ErrServerError().WithParent(err), http.StatusInternalServerError)
-		}
-		if !doc.IsPublic() {
-			return nil, op.NewStatusError(oidc.ErrInvalidClient().WithDescription("the client must authenticate with its client secret"), http.StatusUnauthorized)
-		}
-		c := newClient(r.Data.ClientID, doc)
-		c.projectID = projectID
-		return c, nil
+	doc, err := s.tokenClientDocument(ctx, projectID, deploymentID, r.Data.ClientID, r.Data.ClientSecret, refused)
+	if err != nil {
+		return nil, err
 	}
-	served, err := s.clients.AuthenticateClient(ctx, projectID, deploymentID, r.Data.ClientID, r.Data.ClientSecret)
-	switch {
-	case errors.Is(err, domain.ErrApplicationClientNotFound()), errors.Is(err, domain.ErrApplicationClientSecretInvalid()):
-		return nil, refused(err)
-	// The request names no deployment that serves a declared client: none,
-	// one the project does not have, or one whose release was revoked, as at
-	// the authorization endpoint.
-	case errors.Is(err, domain.ErrReleaseNotDeployed(nil)), errors.Is(err, domain.ErrDeploymentNotFound()),
-		errors.Is(err, domain.ErrReleaseRevoked()):
-		return nil, refused(err)
-	case errors.Is(err, domain.ErrUnavailable()):
-		return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
-	case err != nil:
-		return nil, op.NewStatusError(oidc.ErrServerError().WithParent(err), http.StatusInternalServerError)
-	}
-	c := newClient(r.Data.ClientID, served.Document)
+	c := newClient(r.Data.ClientID, doc)
 	c.projectID = projectID
 	return c, nil
+}
+
+// tokenClientDocument resolves the client of a token request once. An empty
+// secret is allowed only for public clients; otherwise AuthenticateClient
+// checks the secret. Lookup and deployment refusals share one error map.
+func (s opServer) tokenClientDocument(
+	ctx context.Context,
+	projectID, deploymentID, clientID, secret string,
+	refused func(error) error,
+) (domain.ApplicationClientDocument, error) {
+	mapErr := func(err error) error {
+		switch {
+		case errors.Is(err, domain.ErrApplicationClientNotFound()),
+			errors.Is(err, domain.ErrApplicationNotFound()),
+			errors.Is(err, domain.ErrApplicationClientSecretInvalid()):
+			return refused(err)
+		case errors.Is(err, domain.ErrReleaseNotDeployed(nil)),
+			errors.Is(err, domain.ErrDeploymentNotFound()),
+			errors.Is(err, domain.ErrReleaseRevoked()):
+			return refused(err)
+		case errors.Is(err, domain.ErrUnavailable()):
+			return op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
+		case err != nil:
+			return op.NewStatusError(oidc.ErrServerError().WithParent(err), http.StatusInternalServerError)
+		}
+		return nil
+	}
+	if secret == "" {
+		doc, err := s.clients.Client(ctx, projectID, deploymentID, clientID)
+		if mapped := mapErr(err); mapped != nil {
+			return domain.ApplicationClientDocument{}, mapped
+		}
+		if !doc.IsPublic() {
+			return domain.ApplicationClientDocument{}, op.NewStatusError(
+				oidc.ErrInvalidClient().WithDescription("the client must authenticate with its client secret"),
+				http.StatusUnauthorized,
+			)
+		}
+		return doc, nil
+	}
+	served, err := s.clients.AuthenticateClient(ctx, projectID, deploymentID, clientID, secret)
+	if mapped := mapErr(err); mapped != nil {
+		return domain.ApplicationClientDocument{}, mapped
+	}
+	return served.Document, nil
 }
 
 // CodeExchange redeems an authorization code for an access token. The library

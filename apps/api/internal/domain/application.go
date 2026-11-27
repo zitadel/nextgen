@@ -71,8 +71,10 @@ type ApplicationClientDocument struct {
 	Type         string   `json:"type"`
 	GrantTypes   []string `json:"grant_types"`
 	RedirectURIs []string `json:"redirect_uris"`
-	// AllowedOrigins are browser origins that may call CORS-protected OAuth
-	// endpoints for this client. Empty for confidential and native clients.
+	// AllowedOrigins lists browser origins a public SPA may declare for later
+	// CORS enforcement and console display. The OAuth server currently answers
+	// CORS with `*` (ADR 081 §6) and does not filter by this field yet. Empty
+	// for confidential and native clients.
 	AllowedOrigins []string `json:"allowed_origins"`
 	// Secret is the `${{ NAME }}` reference to the variable holding a
 	// declared client's secret; a registered client has none.
@@ -181,7 +183,7 @@ func NewRegisteredApplication(projectID string, doc ApplicationDocument, docbs [
 	clients = make([]*ApplicationClient, len(doc.Clients))
 	plainSecrets = make([]string, len(doc.Clients))
 	for i, clientDoc := range doc.Clients {
-		client, secret, err := NewApplicationClient(projectID, clientDoc.ClientID, clientDoc.Slug, !clientDoc.IsPublic(), secretGen)
+		client, secret, err := NewApplicationClient(projectID, clientDoc.ClientID, clientDoc.Slug, clientDoc.IsConfidential(), secretGen)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -257,7 +259,7 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 	clientsToAdd = make([]*ApplicationClient, len(toAdd))
 	plainSecrets = make([]string, len(toAdd))
 	for i, client := range toAdd {
-		row, secret, err := NewApplicationClient(oldApp.ProjectID, client.ClientID, client.Slug, !client.IsPublic(), secretGen)
+		row, secret, err := NewApplicationClient(oldApp.ProjectID, client.ClientID, client.Slug, client.IsConfidential(), secretGen)
 		if err != nil {
 			return nil, nil, nil, err
 		}

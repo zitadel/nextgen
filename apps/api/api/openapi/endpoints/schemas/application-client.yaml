@@ -102,11 +102,13 @@ properties:
       minLength: 1
       maxLength: 2048
     description: |
-      Browser origins that may call the authorization server's CORS-protected
-      endpoints for this client. Scheme and host only (optional port), no
-      path, query, fragment or credentials. Used by public browser clients
-      (SPAs); omit it for confidential clients and for installed apps that
-      do not call from a browser origin. An empty list is the same as omit.
+      Browser origins a public SPA may declare for later CORS enforcement and
+      console display. Scheme and host only (optional port), no path, query,
+      fragment or credentials. Omit for confidential clients and installed
+      apps that do not call from a browser origin; an empty list is the same
+      as omit. The authorization server currently answers CORS with `*` for
+      all public-client traffic (ADR 081 §6) and does not filter by this field
+      yet.
     examples:
       - - http://localhost:5173
   secret:

@@ -1606,10 +1606,11 @@ type ApplicationClient struct {
 	// §7.1). A URI is written as the client will send it, with a lowercase host where it has one and no
 	// fragment, since it is matched exactly; a loopback URI matches on any port (RFC 8252 §7.3).
 	RedirectUris []string `json:"redirect_uris"`
-	// Browser origins that may call the authorization server's CORS-protected endpoints for this client.
-	// Scheme and host only (optional port), no path, query, fragment or credentials. Used by public
-	// browser clients (SPAs); omit it for confidential clients and for installed apps that do not call
-	// from a browser origin. An empty list is the same as omit.
+	// Browser origins a public SPA may declare for later CORS enforcement and console display. Scheme and
+	// host only (optional port), no path, query, fragment or credentials. Omit for confidential clients
+	// and installed apps that do not call from a browser origin; an empty list is the same as omit. The
+	// authorization server currently answers CORS with `*` for all public-client traffic (ADR 081 §6) and
+	// does not filter by this field yet.
 	AllowedOrigins []string `json:"allowed_origins"`
 	// A reference to the project variable holding the client's secret, never the secret itself, for a
 	// confidential client declared in a release. Required there. A variable stays the client's that first
