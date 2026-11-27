@@ -93,8 +93,7 @@ export const test = base.extend<{
     });
     await servers.dispose();
   },
-  // biome-ignore lint/correctness/noUnusedFunctionParameters: naming `server` makes Vitest start it first.
-  async client({ server }, use) {
+  async client({ server: _listening }, use) {
     await use(testClient());
   },
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
