@@ -2,15 +2,6 @@ import { destructiveOperations } from "../generated/operations";
 import { API_PREFIX, apiBaseUrl } from "./base-url";
 import type { ZitadelClient } from "./client";
 
-/** The header the session-bound CSRF token travels in (ADR 053 §5). */
-export const CSRF_HEADER = "X-Zitadel-CSRF";
-
-// Mirrors the server's list (`httputil.IsSafeMethod` in `internal/httputil`).
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-
-/** The code the server answers a refused CSRF check with. */
-const CSRF_INVALID = "auth.csrf_invalid";
-
 /** The code the server answers a path no operation of its version has with (ADR 076). */
 const ROUTE_NOT_FOUND = "req.not_found";
 
@@ -87,6 +78,8 @@ export type RequestPolicy = Readonly<{
   signal?: AbortSignal;
   /** The deadline, covering the response body as well as the headers. */
   timeoutMs?: number;
+  /** The `fetch` to send through; the runtime's own when left out. */
+  fetch?: typeof fetch;
 }>;
 
 /**
@@ -123,12 +116,8 @@ const DESTRUCTIVE: ReadonlySet<string> = new Set(destructiveOperations);
  * - the URL — the client's base URL, then the API prefix (ADR 077), then the
  *   operation's path;
  * - bearer auth and the `User-Agent`, from the client;
- * - the CSRF header — the client's session-bound token, on unsafe methods to
- *   the origin it was issued for; an unsafe request to that origin refused
- *   with `403 auth.csrf_invalid` asks the client's provider for a fresh token
- *   and is retried once with it, only if the provider returns one (the session
- *   still belongs to the same person);
  * - the client's signal and deadline, combined with any signal on the call;
+ * - the client's `fetch`, which sends the request;
  * - non-2xx → throw {@link ApiError}, so failures interrupt control flow;
  * - body parsing — the parsed JSON typed as `T`, or `undefined` for the
  *   spec's `204`/`205`/`304` no-body responses;
@@ -145,7 +134,7 @@ export function customFetch(client: ZitadelClient, operation: string) {
       throw new DestructiveOperationError(operation);
     }
     const url = `${apiBaseUrl(client.baseUrl)}${path}`;
-    const policy = { signal: client.signal, timeoutMs: client.timeoutMs };
+    const policy = { signal: client.signal, timeoutMs: client.timeoutMs, fetch: client.fetch };
     const headers = new Headers(options.headers);
     if (client.userAgent !== undefined) {
       headers.set("user-agent", client.userAgent);
@@ -153,37 +142,8 @@ export function customFetch(client: ZitadelClient, operation: string) {
     if (client.token && !headers.has("authorization")) {
       headers.set("authorization", `Bearer ${client.token}`);
     }
-    const method = (options.method ?? "GET").toUpperCase();
-    const unsafe = !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
-    // The token and its refresh belong to one server: a request to any other
-    // origin gets neither.
-    const csrf =
-      client.csrf !== undefined && originOf(url) === client.csrf.origin ? client.csrf : undefined;
-    const csrfToken = unsafe ? csrf?.token() : undefined;
-    if (csrfToken) {
-      headers.set(CSRF_HEADER, csrfToken);
-    }
 
-    let { res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody);
-
-    // The token was stale (the session cookie changed under this page) or never
-    // loaded. The provider re-checks the session and hands back a fresh token
-    // only if it still belongs to the same person; then the request is retried
-    // once. A body that can be read only once cannot be sent again, so it is not
-    // retried.
-    if (
-      unsafe &&
-      csrf !== undefined &&
-      res.status === 403 &&
-      apiErrorCode(parsed) === CSRF_INVALID &&
-      !isStream(options.body)
-    ) {
-      const fresh = await csrf.refresh().catch(() => undefined);
-      if (fresh && fresh !== csrfToken) {
-        headers.set(CSRF_HEADER, fresh);
-        ({ res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody));
-      }
-    }
+    const { res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody);
 
     if (!res.ok) {
       // Every operation this client calls is one the spec has, so a server that
@@ -217,19 +177,6 @@ async function readBody(res: Response): Promise<unknown> {
   return rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
 }
 
-/** The request's origin, resolved against the page for a relative URL. */
-function originOf(url: string): string | undefined {
-  try {
-    return new URL(url, (globalThis as { location?: { href?: string } }).location?.href).origin;
-  } catch {
-    return undefined;
-  }
-}
-
-function isStream(body: RequestInit["body"]): boolean {
-  return typeof ReadableStream !== "undefined" && body instanceof ReadableStream;
-}
-
 /**
  * `fetch` bound by a {@link RequestPolicy}, with its failures typed.
  *
@@ -261,7 +208,7 @@ export async function request<R = undefined>(
   const method = init.method ?? "GET";
   let res: Response;
   try {
-    res = await fetch(url, { ...init, signal });
+    res = await (policy.fetch ?? fetch)(url, { ...init, signal });
   } catch (error) {
     throw failure(error, signal, method, url, "unreachable", "got no response");
   }

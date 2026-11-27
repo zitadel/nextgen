@@ -44,7 +44,10 @@ import type {
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/runtime/client";
-import { ApiError, CSRF_HEADER, apiErrorCode } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
+
+/** The header the session-bound CSRF token travels in (ADR 053 §5). */
+const CSRF_HEADER = "X-Zitadel-CSRF";
 
 const apiRequestInit: RequestInit = { credentials: "include" };
 

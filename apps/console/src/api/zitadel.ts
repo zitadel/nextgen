@@ -1,7 +1,7 @@
 import { createZitadelApi } from "@zitadel/api/client";
 import { configureZitadel, getClient } from "@zitadel/api/config";
 
-import { csrfProvider } from "@/auth/csrf";
+import { SessionCsrf } from "@/auth/csrf";
 
 /**
  * Console SDK configuration (Console ADR 0002).
@@ -56,8 +56,14 @@ export const project = configureZitadel({ proxyPath: apiBase, projectId: "" });
 const apiOrigin = new URL(apiBase || "/", window.location.href).origin;
 
 /**
- * Typed Zitadel API client: the project's client (base URL, no client-held
- * token, destructive operations allowed for the person's own deletes), with
- * the session's CSRF token on every write to the API's origin.
+ * The session's CSRF token, which `src/auth/session.ts` loads and drops and
+ * every write to the API's origin carries.
  */
-export const api = createZitadelApi(getClient(project).with({ csrf: csrfProvider(apiOrigin) }));
+export const csrf = new SessionCsrf(apiOrigin);
+
+/**
+ * Typed Zitadel API client: the project's client (base URL, no client-held
+ * token, destructive operations allowed for the person's own deletes),
+ * sending through {@link csrf}.
+ */
+export const api = createZitadelApi(getClient(project).with({ fetch: csrf.fetch }));

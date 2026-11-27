@@ -1,9 +1,7 @@
 import type { GetMySession200 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import { getCsrfToken, setCsrfRefresh, setCsrfToken } from "./csrf";
-
-import { api } from "@/api/zitadel";
+import { api, csrf } from "@/api/zitadel";
 import { clearSessionCaches } from "@/lib/session-cache";
 import { stringParam } from "@/lib/search-params";
 import { getConsoleProjectId } from "@/runtime/runtime";
@@ -67,7 +65,7 @@ export function refreshSession(): void {
  */
 export function invalidateSessionCache(): void {
   cachedSession = null;
-  setCsrfToken(undefined);
+  csrf.forget();
   clearSessionCaches();
 }
 
@@ -169,7 +167,7 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   // session is known to be active: a signed-out check never asks for one. Only
   // the session decides whether someone is signed in, and a failed token read
   // never replaces a token that works.
-  if (!getCsrfToken()) await loadCsrfToken();
+  if (!csrf.token) await loadCsrfToken();
   return session;
 }
 
@@ -189,7 +187,7 @@ async function loadCsrfToken(pending?: Promise<string | undefined>): Promise<str
   const token = await (pending ?? readCsrfToken());
   if (!token) return undefined;
   // The console's client adds it to every unsafe request to the API from here on.
-  setCsrfToken(token);
+  csrf.remember(token);
   return token;
 }
 
@@ -231,7 +229,7 @@ async function recheckAfterRejection(): Promise<string | undefined> {
 }
 
 // Concurrent refusals share one re-check.
-setCsrfRefresh(() => {
+csrf.recheckWith(() => {
   recheck ??= recheckAfterRejection().finally(() => {
     recheck = undefined;
   });

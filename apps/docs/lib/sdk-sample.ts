@@ -149,7 +149,11 @@ function setup(auth: Authentication, csrf: boolean): string[] {
       "const { csrf_token } = await session.getMySessionCsrfToken();",
       "const client = createZitadelApi(",
       "  session.client.with({",
-      "    csrf: { origin: location.origin, token: () => csrf_token, refresh: async () => undefined },",
+      "    fetch: (input, init) => {",
+      "      const headers = new Headers(init?.headers);",
+      '      headers.set("X-Zitadel-CSRF", csrf_token);',
+      "      return fetch(input, { ...init, headers });",
+      "    },",
       "  }),",
       ");",
     ];

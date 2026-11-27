@@ -1,4 +1,4 @@
-import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
+import { CSRF_HEADER } from "@/auth/csrf";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

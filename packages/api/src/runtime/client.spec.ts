@@ -45,7 +45,7 @@ describe("ZitadelClient", () => {
       signal: undefined,
       timeoutMs: undefined,
       userAgent: undefined,
-      csrf: undefined,
+      fetch: undefined,
       with: () => new ZitadelClient(settings),
     };
 

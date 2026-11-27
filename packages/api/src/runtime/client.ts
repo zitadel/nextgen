@@ -1,49 +1,4 @@
 /**
- * The session-bound CSRF token of a first-party browser surface (ADR 053 §5),
- * and what to do when the server refuses it.
- *
- * A state-changing request that the session cookie authenticates must carry
- * the session's token in the `X-Zitadel-CSRF` header. The token belongs to the
- * server that issued it, so a client sends it only to `origin`: a request to any
- * other host carries no token, and a refusal from any other host is not this
- * session's business.
- *
- * The client itself never changes, but the session behind it does, so the
- * token is read through {@link CsrfProvider.token} on every request rather than
- * copied into the client.
- *
- * @example
- * const csrf: CsrfProvider = {
- *   origin: window.location.origin,
- *   token: () => session.csrfToken,
- *   refresh: () => session.reload().then(() => session.csrfToken),
- * };
- */
-export type CsrfProvider = Readonly<{
-  /**
-   * The origin of the server that issued the token, such as
-   * `https://example.com`. Only requests to this origin carry it.
-   */
-  origin: string;
-  /**
-   * The token to send now, or `undefined` when none is loaded yet; then the
-   * request goes without one.
-   */
-  token: () => string | undefined;
-  /**
-   * Called once when a state-changing request to {@link CsrfProvider.origin}
-   * is refused with `403 auth.csrf_invalid`: the token is tied to the session
-   * cookie, which another tab can replace by signing in again, or it was never
-   * loaded. Re-check the session, and return a fresh token only when it still
-   * belongs to the person the request was made for; the request is then sent
-   * again once with it. Returning `undefined` (someone else, or nobody, is
-   * signed in now) leaves the request refused, so a write is never replayed
-   * under a session it was not prepared for.
-   */
-  refresh: () => Promise<string | undefined>;
-}>;
-
-/**
  * What a {@link ZitadelClient} is made from. Only `baseUrl` and
  * `allowDestructive` must be decided by every caller; everything else has a
  * meaning when left out, written on each property.
@@ -87,10 +42,15 @@ export type ZitadelClientSettings = Readonly<{
    */
   userAgent?: string;
   /**
-   * The session's CSRF token, for a first-party browser surface. Left out,
-   * no request carries one.
+   * The `fetch` every request is sent through. Left out, the runtime's own
+   * `fetch`, looked up when each request is sent.
+   *
+   * This is where an environment adds what only it needs without the client
+   * knowing: a header only one app sends, a retry, a log of requests. It is
+   * called with the full URL and the request the client built, and its
+   * response is read as the server's.
    */
-  csrf?: CsrfProvider;
+  fetch?: typeof fetch;
 }>;
 
 /**
@@ -100,7 +60,7 @@ export type ZitadelClientSettings = Readonly<{
  * A client is immutable. Its settings are read-only and frozen, and
  * {@link ZitadelClient.with} returns a new client rather than changing this one,
  * so two clients on one page (an app's own and the sign-in widget's) can never
- * see each other's server, token, deadline or signal. Nothing about a request
+ * see each other's server, token, deadline, signal or `fetch`. Nothing about a request
  * is held anywhere but in the client the request was made with.
  *
  * Every generated operation takes the client as its first argument:
@@ -155,9 +115,9 @@ export class ZitadelClient {
   readonly userAgent: string | undefined;
 
   /**
-   * The CSRF token's source, or `undefined` when requests carry none.
+   * The `fetch` requests are sent through, or `undefined` for the runtime's.
    */
-  readonly csrf: CsrfProvider | undefined;
+  readonly fetch: typeof fetch | undefined;
 
   /**
    * @param settings - Where the server is, what to authenticate with, and
@@ -175,7 +135,7 @@ export class ZitadelClient {
     this.signal = settings.signal;
     this.timeoutMs = settings.timeoutMs;
     this.userAgent = settings.userAgent;
-    this.csrf = settings.csrf;
+    this.fetch = settings.fetch;
     Object.freeze(this);
   }
 

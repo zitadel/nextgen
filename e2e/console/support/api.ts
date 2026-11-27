@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import type { Page } from "@playwright/test";
 import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";
-import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
 import type { ConnectedZitadel } from "@zitadel/testing/playwright";
+
+/** The header the session-bound CSRF token travels in (ADR 053 §5). */
+const CSRF_HEADER = "X-Zitadel-CSRF";
 
 /**
  * What the specs arrange through the API, from the test process, with the

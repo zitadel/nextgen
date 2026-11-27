@@ -3,10 +3,9 @@ import { createServer, type AddressInfo, type Server, type Socket } from "node:n
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { type CsrfProvider, ZitadelClient, type ZitadelClientSettings } from "./client";
+import { ZitadelClient, type ZitadelClientSettings } from "./client";
 import {
   ApiError,
-  CSRF_HEADER,
   DestructiveOperationError,
   NetworkError,
   apiErrorCode,
@@ -202,23 +201,6 @@ async function recording(answers: Answer[] = []): Promise<{ base: string; seen: 
   return { base: await listening(http as unknown as Server), seen };
 }
 
-const CSRF_REFUSED: Answer = [403, { code: "auth.csrf_invalid", message: "refused" }];
-const CREATED: Answer = [201, { id: "team_1" }];
-
-/** A CSRF provider for `origin` that holds `token` and refreshes to `fresh`, counting refreshes. */
-function csrfFor(origin: string, token: string | undefined, fresh?: string) {
-  const counted = { refreshes: 0 };
-  const provider: CsrfProvider = {
-    origin,
-    token: () => token,
-    refresh: async () => {
-      counted.refreshes += 1;
-      return fresh;
-    },
-  };
-  return { provider, counted };
-}
-
 describe("customFetch with two clients", () => {
   it("never lets one client's settings reach the other's requests", async () => {
     const one = await recording();
@@ -315,166 +297,53 @@ describe("customFetch destructive guard", () => {
   });
 });
 
-describe("customFetch CSRF header", () => {
-  it("sends the token on unsafe methods", async () => {
+describe("customFetch through the client's fetch", () => {
+  /** A `fetch` that adds `name: value` to every request it sends. */
+  function adding(name: string, value: string): typeof fetch {
+    return (input, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set(name, value);
+      return fetch(input, { ...init, headers });
+    };
+  }
+
+  it("sends every request through it, with the full URL", async () => {
     const { base, seen } = await recording();
-    const client = clientOf(base, { csrf: csrfFor(base, "tok").provider });
 
-    for (const method of ["POST", "PATCH", "DELETE", "put"]) {
-      await send(client, "/x", { method });
-    }
+    await send(clientOf(base, { fetch: adding("x-app", "console") }), "/teams", { method: "POST" });
 
-    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual([
-      "tok",
-      "tok",
-      "tok",
-      "tok",
+    expect(seen.map(({ path, headers }) => [path, headers["x-app"]])).toEqual([
+      ["/api/v1/teams", "console"],
     ]);
   });
 
-  it("leaves safe methods alone", async () => {
+  it("is never used by another client", async () => {
     const { base, seen } = await recording();
-    const client = clientOf(base, { csrf: csrfFor(base, "tok").provider });
+    const wrapped = clientOf(base, { fetch: adding("x-app", "console") });
 
-    await send(client, "/x");
-    await send(client, "/x", { method: "GET" });
+    await Promise.all([send(wrapped, "/a"), send(clientOf(base), "/b")]);
 
-    expect(seen.map(({ headers }) => "x-zitadel-csrf" in headers)).toEqual([false, false]);
-  });
-
-  it("adds nothing when the provider has no token yet", async () => {
-    const { base, seen } = await recording();
-
-    await send(clientOf(base, { csrf: csrfFor(base, undefined).provider }), "/x", {
-      method: "POST",
-    });
-
-    expect("x-zitadel-csrf" in (seen[0]?.headers ?? {})).toBe(false);
-  });
-
-  it("adds nothing for a client without a provider", async () => {
-    const { base, seen } = await recording();
-
-    await send(clientOf(base), "/x", { method: "POST" });
-
-    expect("x-zitadel-csrf" in (seen[0]?.headers ?? {})).toBe(false);
-  });
-
-  it("sends the token only to the origin it was issued for", async () => {
-    const issuer = await recording();
-    const other = await recording();
-    const csrf = csrfFor(issuer.base, "tok").provider;
-
-    await send(clientOf(other.base, { csrf }), "/x", { method: "POST" });
-    await send(clientOf(issuer.base, { csrf }), "/x", { method: "POST" });
-
-    expect("x-zitadel-csrf" in (other.seen[0]?.headers ?? {})).toBe(false);
-    expect(issuer.seen[0]?.headers["x-zitadel-csrf"]).toBe("tok");
-  });
-
-  it("reads the token again on every request", async () => {
-    const { base, seen } = await recording();
-    let token = "first";
-    const client = clientOf(base, {
-      csrf: { origin: base, token: () => token, refresh: async () => undefined },
-    });
-
-    await send(client, "/x", { method: "POST" });
-    token = "second";
-    await send(client, "/x", { method: "POST" });
-
-    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual(["first", "second"]);
-  });
-
-  it("keeps a header the caller set itself", async () => {
-    const { base, seen } = await recording();
-
-    await send(clientOf(base, { csrf: csrfFor(base, "tok").provider }), "/x", {
-      method: "POST",
-      headers: { [CSRF_HEADER]: "own" },
-    });
-
-    expect(seen[0]?.headers["x-zitadel-csrf"]).toBe("own");
-  });
-});
-
-describe("customFetch CSRF refusal", () => {
-  it("retries once with the token the provider hands back", async () => {
-    const { base, seen } = await recording([CSRF_REFUSED, CREATED]);
-    const client = clientOf(base, { csrf: csrfFor(base, "stale", "fresh").provider });
-
-    await expect(send(client, "/teams", { method: "POST", body: "{}" })).resolves.toEqual({
-      id: "team_1",
-    });
-    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual(["stale", "fresh"]);
-  });
-
-  it("recovers a write that went out without a token", async () => {
-    const { base, seen } = await recording([CSRF_REFUSED, CREATED]);
-    const client = clientOf(base, { csrf: csrfFor(base, undefined, "fresh").provider });
-
-    await expect(send(client, "/teams", { method: "POST" })).resolves.toEqual({ id: "team_1" });
-    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual([undefined, "fresh"]);
-  });
-
-  // The provider hands back nothing when someone else, or nobody, is signed in
-  // now: the write is not replayed under a session it was not prepared for.
-  it("does not retry when the provider hands back no token", async () => {
-    const { base, seen } = await recording([CSRF_REFUSED]);
-    const client = clientOf(base, { csrf: csrfFor(base, "stale").provider });
-
-    await expect(send(client, "/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
-    expect(seen).toHaveLength(1);
-  });
-
-  it("retries at most once", async () => {
-    const { base, seen } = await recording([CSRF_REFUSED, CSRF_REFUSED]);
-    const { provider, counted } = csrfFor(base, "stale", "fresh");
-
-    await expect(
-      send(clientOf(base, { csrf: provider }), "/teams", { method: "POST" }),
-    ).rejects.toBeInstanceOf(ApiError);
-    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual(["stale", "fresh"]);
-    expect(counted.refreshes).toBe(1);
-  });
-
-  it("does not retry a body that can be read only once", async () => {
-    const { base, seen } = await recording([CSRF_REFUSED]);
-    const { provider, counted } = csrfFor(base, "stale", "fresh");
-
-    await expect(
-      send(clientOf(base, { csrf: provider }), "/teams", {
-        method: "POST",
-        body: new ReadableStream({ start: (controller) => controller.close() }),
-        duplex: "half",
-      } as RequestInit),
-    ).rejects.toBeInstanceOf(ApiError);
-    expect(counted.refreshes).toBe(0);
-    expect(seen).toHaveLength(1);
-  });
-
-  it("leaves a refusal from another origin alone", async () => {
-    const issuer = await recording();
-    const other = await recording([CSRF_REFUSED]);
-    const { provider, counted } = csrfFor(issuer.base, "tok", "fresh");
-
-    await expect(
-      send(clientOf(other.base, { csrf: provider }), "/teams", { method: "POST" }),
-    ).rejects.toBeInstanceOf(ApiError);
-    expect(counted.refreshes).toBe(0);
-  });
-
-  it("leaves other 403 answers and safe methods alone", async () => {
-    const { base } = await recording([
-      [403, { code: "team.permission_denied", message: "no" }],
-      CSRF_REFUSED,
+    expect(
+      seen
+        .map(({ path, headers }) => [path, headers["x-app"]])
+        .sort(([a], [b]) => String(a).localeCompare(String(b))),
+    ).toEqual([
+      ["/api/v1/a", "console"],
+      ["/api/v1/b", undefined],
     ]);
-    const { provider, counted } = csrfFor(base, "tok", "fresh");
-    const client = clientOf(base, { csrf: provider });
+  });
 
-    await expect(send(client, "/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
-    await expect(send(client, "/teams", { method: "GET" })).rejects.toBeInstanceOf(ApiError);
-    expect(counted.refreshes).toBe(0);
+  it("reads what it answers as the server's answer", async () => {
+    const answered: typeof fetch = async () => {
+      return new Response(JSON.stringify({ code: "team.permission_denied" }), { status: 403 });
+    };
+
+    const error = await send(clientOf("http://127.0.0.1:1", { fetch: answered }), "/x").catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(apiErrorCode(error)).toBe("team.permission_denied");
   });
 });
 

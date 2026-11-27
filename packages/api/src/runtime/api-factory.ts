@@ -18,7 +18,7 @@ import { ZitadelClient } from "./client";
 import { paged } from "./paged";
 
 export { ZitadelClient };
-export type { CsrfProvider, ZitadelClientSettings } from "./client";
+export type { ZitadelClientSettings } from "./client";
 
 /**
  * How each paged function pages, by name: typed readers of a page's items and

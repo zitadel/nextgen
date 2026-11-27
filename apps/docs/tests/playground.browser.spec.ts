@@ -262,7 +262,7 @@ for (const operation of [
     await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
     // A session-authenticated write must show how to obtain and send CSRF.
     if (operation.id === "createTeam") {
-      await expect(sample).toContainText("token: () => csrf_token");
+      await expect(sample).toContainText('headers.set("X-Zitadel-CSRF", csrf_token)');
       await expect(sample).toContainText("session.getMySessionCsrfToken()");
       // Required project parameters still start with their documented example.
       await expect(
