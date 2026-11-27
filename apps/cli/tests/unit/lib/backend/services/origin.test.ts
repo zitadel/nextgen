@@ -1,13 +1,13 @@
-import type { AddProjectOriginBody } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
-import { describe, expect, vi } from "vitest";
+import type { SetupServer } from "msw/node";
+import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
 import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
 import { allowDestructive, createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { fakeClient } from "@tests/helpers/fake-client";
+import { answering, refusal, testClient } from "@tests/helpers/api-answers";
 import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
 
 /** A server a cancelled run is pointed at. */
@@ -20,16 +20,18 @@ function stored(pattern: string, kind: "primary" | "preview") {
   return { pattern, kind };
 }
 
-/** A service whose project holds `origins`, plus anything else a test stubs. */
+/** A service on a test client that may remove origins, bound to `proj_1`. */
+function service(): OriginService {
+  return new OriginService(allowDestructive(testClient()), "proj_1");
+}
+
+/** A service whose project answers `origins`. */
 function serviceHolding(
+  server: SetupServer,
   origins: readonly { pattern: string; kind: "primary" | "preview" }[],
 ): OriginService {
-  return new OriginService(
-    fakeClient({
-      getProject: async () => ({ origins }),
-    }),
-    "proj_1",
-  );
+  answering(server, "getProject", { origins });
+  return service();
 }
 
 describe("Origin.isPrimary", () => {
@@ -194,29 +196,24 @@ describe("Origins.originOf", () => {
 });
 
 describe("OriginService.list", () => {
-  it("answers the patterns the project stores", async () => {
-    const originService = serviceHolding([{ pattern: ISSUER, kind: "primary" }]);
+  it("answers the patterns the project stores", async ({ server }) => {
+    const originService = serviceHolding(server, [{ pattern: ISSUER, kind: "primary" }]);
 
     const origins = await originService.list();
 
     expect(origins.primary).toEqual([ISSUER]);
   });
 
-  it("answers an empty collection for a project that holds none", async () => {
-    const originService = new OriginService(
-      fakeClient({
-        getProject: async () => ({}),
-      }),
-      "proj_1",
-    );
+  it("answers an empty collection for a project that holds none", async ({ server }) => {
+    answering(server, "getProject", {});
 
-    await expect(originService.list()).resolves.toMatchObject({ isEmpty: true });
+    await expect(service().list()).resolves.toMatchObject({ isEmpty: true });
   });
 });
 
 describe("OriginService.primaryAmong", () => {
-  it("picks out the URLs a deploy would land on, in the order given", async () => {
-    const originService = serviceHolding([
+  it("picks out the URLs a deploy would land on, in the order given", async ({ server }) => {
+    const originService = serviceHolding(server, [
       { pattern: "https://b.acme.com", kind: "primary" },
       { pattern: "https://a.acme.com", kind: "primary" },
       { pattern: "https://*.preview.acme.com", kind: "preview" },
@@ -231,8 +228,8 @@ describe("OriginService.primaryAmong", () => {
     ).resolves.toEqual(["https://a.acme.com", "https://b.acme.com"]);
   });
 
-  it("picks out none when the project holds no primary origin", async () => {
-    const originService = serviceHolding([
+  it("picks out none when the project holds no primary origin", async ({ server }) => {
+    const originService = serviceHolding(server, [
       { pattern: "https://*.preview.acme.com", kind: "preview" },
     ]);
 
@@ -243,126 +240,96 @@ describe("OriginService.primaryAmong", () => {
 });
 
 describe("OriginService.add", () => {
-  it("adds the pattern to the project it is bound to", async () => {
-    const addProjectOrigin = vi.fn(async () => stored(ISSUER, "primary"));
-    const originService = new OriginService(fakeClient({ addProjectOrigin }), "proj_1");
+  it("adds the pattern to the project it is bound to", async ({ server }) => {
+    const added = answering(server, "addProjectOrigin", stored(ISSUER, "primary"));
 
-    const added = await originService.add(ISSUER, "primary");
+    const origin = await service().add(ISSUER, "primary");
 
-    expect(addProjectOrigin).toHaveBeenCalledWith("proj_1", { pattern: ISSUER, kind: "primary" });
-    expect(added.isPrimary).toBe(true);
+    expect(added.map(({ params, body }) => [params.project_id, body])).toEqual([
+      ["proj_1", { pattern: ISSUER, kind: "primary" }],
+    ]);
+    expect(origin.isPrimary).toBe(true);
   });
 });
 
 describe("OriginService.promote", () => {
-  it("removes the preview pattern and adds it back as primary", async () => {
-    const removeProjectOrigin = vi.fn(async () => undefined);
-    const addProjectOrigin = vi.fn(async () => stored(ISSUER, "primary"));
-    const originService = new OriginService(
-      fakeClient({ removeProjectOrigin, addProjectOrigin }),
-      "proj_1",
-    );
+  it("removes the preview pattern and adds it back as primary", async ({ server }) => {
+    const removed = answering(server, "removeProjectOrigin", undefined);
+    const added = answering(server, "addProjectOrigin", stored(ISSUER, "primary"));
 
-    await originService.promote(ISSUER);
+    await service().promote(ISSUER);
 
-    expect(removeProjectOrigin).toHaveBeenCalledWith("proj_1", { pattern: ISSUER });
-    expect(addProjectOrigin).toHaveBeenCalledWith("proj_1", { pattern: ISSUER, kind: "primary" });
+    expect(removed.map(({ params, body }) => [params.project_id, body])).toEqual([
+      ["proj_1", { pattern: ISSUER }],
+    ]);
+    expect(added.map(({ body }) => body)).toEqual([{ pattern: ISSUER, kind: "primary" }]);
   });
 
-  it("puts the pattern back as a preview one when the add fails, and raises the failure", async () => {
-    const addProjectOrigin = vi.fn(async (_projectId: string, body: AddProjectOriginBody) => {
-      if (body.kind === "primary") {
-        throw new Error("refused");
-      }
-      return stored(ISSUER, "preview");
+  it("puts the pattern back as a preview one when the add fails, and raises the failure", async ({
+    server,
+  }) => {
+    answering(server, "removeProjectOrigin", undefined);
+    const added = answering(server, "addProjectOrigin", ({ body }) => {
+      return (body as { kind?: string }).kind === "primary"
+        ? refusal(409, "proj.origin_conflict")
+        : stored(ISSUER, "preview");
     });
-    const originService = new OriginService(
-      fakeClient({ removeProjectOrigin: async () => undefined, addProjectOrigin }),
-      "proj_1",
-    );
 
-    await expect(originService.promote(ISSUER)).rejects.toThrow("refused");
-    expect(addProjectOrigin).toHaveBeenLastCalledWith("proj_1", {
-      pattern: ISSUER,
-      kind: "preview",
-    });
+    await expect(service().promote(ISSUER)).rejects.toMatchObject({ status: 409 });
+    expect(added.map(({ body }) => body)).toEqual([
+      { pattern: ISSUER, kind: "primary" },
+      { pattern: ISSUER, kind: "preview" },
+    ]);
   });
 
-  it("raises the add's failure even when putting the pattern back fails too", async () => {
-    const originService = new OriginService(
-      fakeClient({
-        removeProjectOrigin: async () => undefined,
-        addProjectOrigin: async () => {
-          throw new Error("refused");
-        },
-      }),
-      "proj_1",
-    );
+  it("raises the add's failure even when putting the pattern back fails too", async ({
+    server,
+  }) => {
+    answering(server, "removeProjectOrigin", undefined);
+    answering(server, "addProjectOrigin", refusal(409, "proj.origin_conflict"));
 
-    await expect(originService.promote(ISSUER)).rejects.toThrow("refused");
+    await expect(service().promote(ISSUER)).rejects.toMatchObject({ status: 409 });
   });
 });
 
 describe("OriginService.remove", () => {
-  it("reports a removal that left the project holding others", async () => {
-    const originService = new OriginService(
-      fakeClient({
-        removeProjectOrigin: async () => undefined,
-        getProject: async () => ({ origins: [{ pattern: ISSUER, kind: "primary" }] }),
-      }),
-      "proj_1",
-    );
+  it("reports a removal that left the project holding others", async ({ server }) => {
+    answering(server, "removeProjectOrigin", undefined);
+    answering(server, "getProject", { origins: [{ pattern: ISSUER, kind: "primary" }] });
 
-    await expect(originService.remove("https://gone.acme.com")).resolves.toEqual({
+    await expect(service().remove("https://gone.acme.com")).resolves.toEqual({
       pattern: "https://gone.acme.com",
       outcome: "removed",
     });
   });
 
-  it("reports a removal that left the project admitting every origin", async () => {
-    const originService = new OriginService(
-      fakeClient({
-        removeProjectOrigin: async () => undefined,
-        getProject: async () => ({ origins: [] }),
-      }),
-      "proj_1",
-    );
+  it("reports a removal that left the project admitting every origin", async ({ server }) => {
+    answering(server, "removeProjectOrigin", undefined);
+    answering(server, "getProject", { origins: [] });
 
-    await expect(originService.remove(ISSUER)).resolves.toEqual({
+    await expect(service().remove(ISSUER)).resolves.toEqual({
       pattern: ISSUER,
       outcome: "emptied",
     });
   });
 
-  it("reports the pattern gone but unverified when what is left could not be read", async () => {
-    const originService = new OriginService(
-      fakeClient({
-        removeProjectOrigin: async () => undefined,
-        getProject: async () => {
-          throw new Error("unreadable");
-        },
-      }),
-      "proj_1",
-    );
+  it("reports the pattern gone but unverified when what is left could not be read", async ({
+    server,
+  }) => {
+    answering(server, "removeProjectOrigin", undefined);
+    answering(server, "getProject", refusal(503, "unavailable"));
 
-    await expect(originService.remove(ISSUER)).resolves.toMatchObject({
+    await expect(service().remove(ISSUER)).resolves.toMatchObject({
       pattern: ISSUER,
       outcome: "unverified",
       cause: expect.any(Error),
     });
   });
 
-  it("raises a removal the server refused, which removed nothing", async () => {
-    const originService = new OriginService(
-      fakeClient({
-        removeProjectOrigin: async () => {
-          throw new Error("refused");
-        },
-      }),
-      "proj_1",
-    );
+  it("raises a removal the server refused, which removed nothing", async ({ server }) => {
+    answering(server, "removeProjectOrigin", refusal(403, "proj.permission_denied"));
 
-    await expect(originService.remove(ISSUER)).rejects.toThrow("refused");
+    await expect(service().remove(ISSUER)).rejects.toMatchObject({ status: 403 });
   });
 });
 

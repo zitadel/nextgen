@@ -198,8 +198,10 @@ it stays here deliberately rather than by oversight.
   `aPasswordPolicy`), naming only what the test is about as overrides.
 - Build a publish step's context with `aStepContext` (`helpers/step-context.ts`),
   a doctor check's with `aCheckContext` (`helpers/check-context.ts`), an API
-  record or variables answer with `helpers/records.ts`, and a client with
-  `fakeClient`.
+  record or variables answer with `helpers/records.ts`.
+- Give code that takes a client a real one, `testClient()`, and answer what it
+  sends with `answering` / `answeringPages` (`helpers/api-answers.ts`) on the
+  `server` fixture; never a hand-made client.
 - Extend the shared builders rather than adding one to a test file; a builder
   only one file needs stays in that file.
 - A test that must create something and clean it up asks for a fixture in its
@@ -250,7 +252,7 @@ it stays here deliberately rather than by oversight.
   then assert its class with `toBeInstanceOf`, then the fields that matter with
   `toMatchObject`. No `toThrow`, no `rejects`, no `try`/`catch`.
 - No casts, no non-null `!`, no `any`: a double that needs one is the wrong
-  double; build it with `fakeClient` or a real class. `as const` is not a cast.
+  double; use a real class. `as const` is not a cast.
 - No sleeps or time-bounded waits: a test that orders work holds promises it
   settles itself, and one that waits on time uses `ManualClock`.
 - Stub the environment with `vi.stubEnv`, never by writing `process.env`.

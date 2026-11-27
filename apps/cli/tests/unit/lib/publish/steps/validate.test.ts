@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import type { SetupServer } from "msw/node";
+import { describe, expect } from "vitest";
 
-import { SchemaService } from "@/lib/backend";
+import { it } from "@tests/fixtures";
+
 import { ZitadelError } from "@/lib/errors";
 import { validateStep } from "@/lib/publish/steps/validate";
 import {
@@ -13,10 +15,10 @@ import {
   aUserSchema,
   PASSWORD_POLICY,
 } from "@tests/helpers/config";
-import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
-import { holdingVariables, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
+import { answering, refusal, type Sent } from "@tests/helpers/api-answers";
+import { PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
 import { aSchemaListing } from "@tests/helpers/schemas";
-import { aStepContext } from "@tests/helpers/step-context";
+import { answeringVariables, aStepContext } from "@tests/helpers/step-context";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -32,12 +34,7 @@ const LITERAL_SECRET = anOidcConnection({ oidc: { client_secret: "a-literal-secr
 /**
  * The project's variables, holding the secret the default connection names.
  */
-const ACME_SECRET_HELD = holdingVariables({ ACME_CLIENT_SECRET: SECRET_VARIABLE });
-
-/**
- * The project's variables, holding none.
- */
-const NOTHING_HELD = holdingVariables({});
+const ACME_SECRET_HELD = { ACME_CLIENT_SECRET: SECRET_VARIABLE };
 
 /**
  * A configuration of the shipped user schema and a login flow whose identifier
@@ -55,24 +52,22 @@ function aFlowNaming(userSchema: string, collects: readonly string[]) {
 }
 
 /**
- * A schema service over a project holding the latest revision of each of
- * `objectTypes`, and the stub its listing goes through.
+ * Answers the project's schema listing with the latest revision of each of
+ * `objectTypes`.
  *
+ * @param server - The test's MSW server.
  * @param objectTypes - The object types the project holds.
- * @returns The service, and the listing to observe.
+ * @returns The listings that arrived, oldest first.
  */
-function aProjectHolding(...objectTypes: string[]) {
-  const listSchemas = vi.fn(({ object_type }: { object_type?: string }) => {
-    return pagesOf({
-      schemas: objectTypes.includes(object_type ?? "") ? [{ id: "sch_1" }] : [],
+function aProjectHolding(server: SetupServer, ...objectTypes: string[]): readonly Sent[] {
+  return answering(server, "listSchemas", ({ url }) => {
+    return {
+      schemas: objectTypes.includes(url.searchParams.get("object_type") ?? "")
+        ? [{ id: "sch_1" }]
+        : [],
       next_page_token: null,
-    });
+    };
   });
-  const schemas = new SchemaService(
-    fakeClient({ listSchemas: { pages: listSchemas } }),
-    PROJECT_ID,
-  );
-  return { schemas, listSchemas };
 }
 
 describe("validateStep", () => {
@@ -263,16 +258,17 @@ describe("validateStep", () => {
       });
     });
 
-    it("leaves out the subject-claim advice when the connections could not be listed", async () => {
+    it("leaves out the subject-claim advice when the connections could not be listed", async ({
+      server,
+    }) => {
+      answeringVariables(server, ACME_SECRET_HELD);
       const config = aConfig({
         schemas: { "staff.json": aSchemaListing(["acme"]) },
         connections: { "acme.json": anOidcConnection({ subject_claim: "email" }) },
       });
 
-      const unlisted = await validateStep.run(
-        aStepContext({ config, client: ACME_SECRET_HELD, deployedUnknown: true }),
-      );
-      const listed = await validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+      const unlisted = await validateStep.run(aStepContext({ config, deployedUnknown: true }));
+      const listed = await validateStep.run(aStepContext({ config }));
 
       expect(unlisted).toEqual(ACCEPTED);
       expect(listed?.warnings).toContainEqual(expect.stringContaining("subject_claim is"));
@@ -292,13 +288,16 @@ describe("validateStep", () => {
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 
-    it("refuses a literal client_secret in a later one after an earlier one passes", async () => {
+    it("refuses a literal client_secret in a later one after an earlier one passes", async ({
+      server,
+    }) => {
+      answeringVariables(server, ACME_SECRET_HELD);
       const config = aConfig({
         connections: { "a-acme.json": anOidcConnection(), "b-acme.json": LITERAL_SECRET },
       });
 
       const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+        return validateStep.run(aStepContext({ config }));
       });
 
       expect(error).toBeInstanceOf(ZitadelError);
@@ -308,17 +307,17 @@ describe("validateStep", () => {
       });
     });
 
-    it("refuses a literal client_secret before the project's variables are read", async () => {
-      const listVariables = vi.fn(async () => {
-        return {};
-      });
+    it("refuses a literal client_secret before the project's variables are read", async ({
+      server,
+    }) => {
+      const read = answeringVariables(server, {});
       const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
 
       await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, client: { listVariables } }));
+        return validateStep.run(aStepContext({ config }));
       });
 
-      expect(listVariables).not.toHaveBeenCalled();
+      expect(read).toEqual([]);
     });
 
     it("never echoes a literal client_secret in the refusal", async () => {
@@ -350,7 +349,8 @@ describe("validateStep", () => {
       });
     });
 
-    it("passes an oidc block naming every endpoint", async () => {
+    it("passes an oidc block naming every endpoint", async ({ server }) => {
+      answeringVariables(server, ACME_SECRET_HELD);
       const complete = anOidcConnection({
         oidc: {
           authorization_endpoint: "https://sso.acme.example/auth",
@@ -364,12 +364,13 @@ describe("validateStep", () => {
         connections: { "acme.json": complete },
       });
 
-      const result = await validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+      const result = await validateStep.run(aStepContext({ config }));
 
       expect(result).toEqual(ACCEPTED);
     });
 
-    it("refuses a later malformed one, naming that file", async () => {
+    it("refuses a later malformed one, naming that file", async ({ server }) => {
+      answeringVariables(server, ACME_SECRET_HELD);
       const config = aConfig({
         connections: {
           "a-acme.json": anOidcConnection(),
@@ -378,7 +379,7 @@ describe("validateStep", () => {
       });
 
       const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+        return validateStep.run(aStepContext({ config }));
       });
 
       expect(error).toBeInstanceOf(ZitadelError);
@@ -388,11 +389,12 @@ describe("validateStep", () => {
       });
     });
 
-    it("refuses one naming a variable the project lacks", async () => {
+    it("refuses one naming a variable the project lacks", async ({ server }) => {
+      answeringVariables(server, {});
       const config = aConfig({ connections: { "acme.json": anOidcConnection() } });
 
       const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, client: NOTHING_HELD }));
+        return validateStep.run(aStepContext({ config }));
       });
 
       expect(error).toBeInstanceOf(ZitadelError);
@@ -457,35 +459,47 @@ describe("validateStep", () => {
       expect(result).toEqual(ACCEPTED);
     });
 
-    it("skips the schema-dependent rules for a schema only the project holds", async () => {
-      const { schemas } = aProjectHolding("server-schema");
+    it("skips the schema-dependent rules for a schema only the project holds", async ({
+      server,
+    }) => {
+      aProjectHolding(server, "server-schema");
       const config = aFlowNaming("server-schema", ["phone_number"]);
 
-      const result = await validateStep.run(aStepContext({ config, schemas }));
+      const result = await validateStep.run(aStepContext({ config }));
 
       expect(result).toEqual(ACCEPTED);
     });
 
-    it("asks the project for the latest revision of a schema the configuration lacks", async () => {
-      const { schemas, listSchemas } = aProjectHolding("server-schema");
+    it("asks the project for the latest revision of a schema the configuration lacks", async ({
+      server,
+    }) => {
+      const listed = aProjectHolding(server, "server-schema");
       const config = aFlowNaming("server-schema", ["phone_number"]);
 
-      await validateStep.run(aStepContext({ config, schemas }));
+      await validateStep.run(aStepContext({ config }));
 
-      expect(listSchemas).toHaveBeenCalledWith({
-        project_id: PROJECT_ID,
-        object_type: "server-schema",
-        revisions: "latest",
-        limit: 1,
-      });
+      expect(
+        listed.map(({ url }) => {
+          return Object.fromEntries(url.searchParams);
+        }),
+      ).toEqual([
+        {
+          project_id: PROJECT_ID,
+          object_type: "server-schema",
+          revisions: "latest",
+          limit: "1",
+        },
+      ]);
     });
 
-    it("refuses a user_schema neither the configuration nor the project holds", async () => {
-      const { schemas } = aProjectHolding();
+    it("refuses a user_schema neither the configuration nor the project holds", async ({
+      server,
+    }) => {
+      aProjectHolding(server);
       const config = aFlowNaming("missing-schema", ["email"]);
 
       const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, schemas }));
+        return validateStep.run(aStepContext({ config }));
       });
 
       expect(error).toBeInstanceOf(ZitadelError);
@@ -504,21 +518,17 @@ describe("validateStep", () => {
       });
     });
 
-    it("refuses a file its contract refuses before it asks the project anything", async () => {
-      const listSchemas = vi.fn(() => {
-        throw new Error("the server is unreachable");
-      });
-      const schemas = new SchemaService(
-        fakeClient({ listSchemas: { pages: listSchemas } }),
-        PROJECT_ID,
-      );
+    it("refuses a file its contract refuses before it asks the project anything", async ({
+      server,
+    }) => {
+      answering(server, "listSchemas", refusal(503, "unavailable"));
       const config = aConfig({
         schemas: { "human-user.json": aUserSchema(), "a.json": { objectType: "a" } },
         flows: { "default-login.json": aLoginFlow({ userSchema: "missing", collects: ["email"] }) },
       });
 
       const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, schemas }));
+        return validateStep.run(aStepContext({ config }));
       });
 
       expect(error).toMatchObject({
@@ -527,28 +537,30 @@ describe("validateStep", () => {
       });
     });
 
-    it.each(["sch_01J000000000000000000000", "https://schemas.zitadel.com/human-user/v1"])(
+    it.for(["sch_01J000000000000000000000", "https://schemas.zitadel.com/human-user/v1"])(
       "leaves a user_schema that is a schema id (%s) to the server",
-      async (reference) => {
-        const { schemas, listSchemas } = aProjectHolding();
+      async (reference, { server }) => {
+        const listed = aProjectHolding(server);
         const config = aFlowNaming(reference, ["email"]);
 
-        await validateStep.run(aStepContext({ config, schemas }));
+        await validateStep.run(aStepContext({ config }));
 
-        expect(listSchemas).not.toHaveBeenCalled();
+        expect(listed).toEqual([]);
       },
     );
 
-    it("leaves a user_schema to the server when the configuration holds a schema-url entry", async () => {
-      const { schemas, listSchemas } = aProjectHolding();
+    it("leaves a user_schema to the server when the configuration holds a schema-url entry", async ({
+      server,
+    }) => {
+      const listed = aProjectHolding(server);
       const config = aConfig({
         schemas: { "human.json": { kind: "schema-url", url: "https://example.com/human.json" } },
         flows: { "default-login.json": aLoginFlow({ userSchema: "fetched-schema" }) },
       });
 
-      await validateStep.run(aStepContext({ config, schemas }));
+      await validateStep.run(aStepContext({ config }));
 
-      expect(listSchemas).not.toHaveBeenCalled();
+      expect(listed).toEqual([]);
     });
   });
 

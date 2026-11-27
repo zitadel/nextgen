@@ -1,9 +1,11 @@
+import type { SetupServer } from "msw/node";
+
 import { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
 import type { StepContext } from "@/lib/publish/pipeline";
 import { type ConfigStore, type ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
-import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
-import { PROJECT_ID } from "@tests/helpers/records";
+import { answering, type Sent, testClient } from "@tests/helpers/api-answers";
+import { type HeldVariable, PROJECT_ID } from "@tests/helpers/records";
 
 /**
  * The environment selector every suggestion a step makes carries.
@@ -11,17 +13,9 @@ import { PROJECT_ID } from "@tests/helpers/records";
 export const ENVIRONMENT_SELECTOR = "--env staging";
 
 /**
- * What a test changes of a step's context: any field of it, and the client
- * operations its services answer.
+ * What a test changes of a step's context: any field of it.
  */
-export type StepContextOverrides = Partial<StepContext> &
-  Readonly<{
-    /**
-     * The operations the deployment, variable, schema and user services
-     * answer. Anything left out fails the call that reaches it.
-     */
-    client?: ClientStubs;
-  }>;
+export type StepContextOverrides = Partial<StepContext>;
 
 /**
  * The context a publish step runs in: a deploy of an empty configuration,
@@ -32,12 +26,15 @@ export type StepContextOverrides = Partial<StepContext> &
  * up with, unless the overrides give one; without a configuration it is empty,
  * as a release of nothing cannot be built.
  *
- * @param overrides - Fields to set in place of the defaults, and the client stubs.
+ * The deployment, variable, schema and user services run on a real
+ * {@link testClient}, so a test answers what they send through its `server`
+ * fixture, and a request it did not answer fails it.
+ *
+ * @param overrides - Fields to set in place of the defaults.
  * @returns The context.
  */
-export function aStepContext(overrides: StepContextOverrides = {}): StepContext {
-  const { client: stubs = {}, ...fields } = overrides;
-  const client = fakeClient(stubs);
+export function aStepContext(fields: StepContextOverrides = {}): StepContext {
+  const client = testClient();
   const config = fields.config ?? ZitadelConfig.empty();
   const store = fields.store ?? new MemoryStore();
   return {
@@ -75,4 +72,30 @@ function bundleOf(config: ZitadelConfig | undefined, store: ConfigStore): Config
     return { schemas: [], flow_definitions: [], idps: [], policies: [] };
   }
   return config.bundle(store).bundle;
+}
+
+/**
+ * Answers the project's variables, as `listVariables` holds them.
+ *
+ * @param server - The test's MSW server, from the `server` fixture.
+ * @param held - The values, by variable name.
+ * @param kind - The one kind that holds them; left out, every kind does.
+ * @returns The requests that read them, oldest first.
+ */
+export function answeringVariables(
+  server: SetupServer,
+  held: Readonly<Record<string, HeldVariable>>,
+  kind?: "primary" | "preview",
+): readonly Sent[] {
+  return answering(server, "listVariables", ({ url }) => {
+    const asked = url.searchParams.get("kind") === "preview" ? "preview" : "primary";
+    if (kind !== undefined && asked !== kind) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(held).map(([name, value]) => {
+        return [name, { [asked]: value }];
+      }),
+    );
+  });
 }
