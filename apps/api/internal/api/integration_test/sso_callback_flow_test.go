@@ -326,7 +326,7 @@ func TestSSOCallbackOnAnotherConnectionsPathIsRefused(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
 	step := stepResp.(*api.FlowResponseHeaders).Response.Step
 	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
-	assert.Equal(t, flowengine.FlowStepErrorSSOFailed, step.Error.Value)
+	assert.Equal(t, flowengine.StepErrorSSOFailed, step.Error.Value)
 	assert.Equal(t, "identifier", step.Name, "the flow stays on the step the sign-in started from")
 }
 
@@ -348,7 +348,7 @@ func TestSSOCallbackChecksTheIssuerParameter(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
 	step := stepResp.(*api.FlowResponseHeaders).Response.Step
 	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
-	assert.Equal(t, flowengine.FlowStepErrorSSOFailed, step.Error.Value)
+	assert.Equal(t, flowengine.StepErrorSSOFailed, step.Error.Value)
 
 	retry, retryCookie := f.submitSSO(t, flow)
 	resp = f.callback(t, f.returnPath(t), "state="+url.QueryEscape(retry.Query().Get("state"))+"&code=the-code&iss="+url.QueryEscape(f.provider.srv.URL), retryCookie)
@@ -402,7 +402,7 @@ func TestSSOCallbackProviderDeclineRendersCancelledAndAllowsARetry(t *testing.T)
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
 	step := stepResp.(*api.FlowResponseHeaders).Response.Step
 	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
-	assert.Equal(t, flowengine.FlowStepErrorSSOCancelled, step.Error.Value)
+	assert.Equal(t, flowengine.StepErrorSSOCancelled, step.Error.Value)
 	assert.Equal(t, "identifier", step.Name, "the flow stays on the step the sign-in started from")
 
 	retry, retryCookie := f.submitSSO(t, flow)

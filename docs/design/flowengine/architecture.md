@@ -15,12 +15,12 @@ graph TD
     Handler["internal/api/flow.go<br>HTTP handler"]
     Crypter["internal/crypto<br>Crypter (seal/unseal cookie)"]
     Service["internal/service/flow.go<br>FlowService"]
-    SM["internal/domain/flow_state_machine.go<br>FlowStateMachineRuntime"]
+    SM["internal/flowengine/state_machine.go<br>Runtime"]
     FR["internal/domain/flow_field_resolver*<br>FlowFieldResolver"]
-    OS["internal/domain/flow_on_success*<br>FlowOnSuccessHandler"]
-    AA["internal/domain/flow_auth_attempt.go<br>FlowAuthAttemptService<br>(incl. passkey registration ceremony, ADR 056)"]
+    OS["internal/flowengine/on_success_handler.go<br>OnSuccessHandler"]
+    AA["internal/flowengine/auth_attempt.go<br>AuthAttemptService<br>(incl. passkey registration ceremony, ADR 056)"]
 
-    AAImpl["service: auth-attempt<br>(FlowAuthAttemptAdapter)"]
+    AAImpl["service: auth-attempt<br>(FlowAuthAttempts)"]
     Repo["repository: flow_definitions"]
     UserRepo["repository: users / passwords"]
     Schema["service: SchemaService"]
@@ -52,37 +52,69 @@ sequenceDiagram
     C->>H: CreateFlow
     H->>S: Resolve, then Start
     S->>SM: Start
-    SM-->>S: *FlowState + FlowStep
-    S-->>H: FlowStepResult
+    SM-->>S: *State + Step
+    S-->>H: StepResult
     H->>K: sealState(_zflow)
     H-->>C: 201 + Set-Cookie
 
     Note over C,SM: GET /flows/{flow_id}
     C->>H: GetFlowStep (_zflow cookie)
     H->>K: openState(_zflow)
-    K-->>H: *FlowState
+    K-->>H: *State
     H->>S: GetStep
     S->>SM: Render
-    SM-->>S: FlowStep
-    S-->>H: FlowStepResult
+    SM-->>S: Step
+    S-->>H: StepResult
     H-->>C: 200 + buildFlowResponse
 
     Note over C,SM: POST /flows/{flow_id}/submit
     C->>H: SubmitFlowStep (_zflow cookie + body)
     H->>K: openState(_zflow)
-    K-->>H: *FlowState
+    K-->>H: *State
     H->>S: Submit
     S->>SM: Process
-    SM-->>S: FlowStepResult (advanced or step-error)
+    SM-->>S: StepResult (advanced or step-error)
     H->>K: sealState(_zflow) — rotate, or clear on terminal
     H-->>C: 200 / 400 + Set-Cookie
 ```
 
-Cookie I/O is owned by the handler. The state machine never touches HTTP, cookies, or the encryption layer — it receives a `*FlowState` and returns one.
+Cookie I/O is owned by the handler. The state machine never touches HTTP, cookies, or the encryption layer — it receives a `*flowengine.State` and returns one.
+
+## Separation of concerns
+
+A request passes three layers:
+
+```
+internal/api          opens the sealed _zflow cookie, maps HTTP to service calls, seals the returned state
+   │
+internal/service      I/O: database reads, release pins, sessions, ids, spans, metrics, audit
+   │
+internal/flowengine   decisions: which step, which outcome, which ceremony, when the flow completes
+```
+
+| Concern | `flowengine` | `service` |
+| --- | --- | --- |
+| Entry definition | chooses among candidates (`EntryByName`, `EntryByAudience`) | reads the release pins and loads the candidates (`FlowService.Resolve`) |
+| Start | builds the first `State` and step | resolves the user schema and session, mints the flow id, binds audit |
+| Definitions during a flow | reads the one the state names (`ActiveDefinition`) | provides the lookup by id (`Definitions`) |
+| Submission | validates, routes, runs actions and ceremonies | passes the request through |
+| Auth attempts, users, SSO, password policy | calls them through interfaces it declares | implements those interfaces |
+| Sign-up gate | announces it on the step (`SignupRequired`) | issues the proof-of-work puzzle on render |
+| Completion | decides the flow is done and requests the handoff | mints the handoff token behind `AuthAttemptService` |
+| Flow state | declares `State`, takes and returns it | never stores it; the handler seals it into the cookie |
+| Wiring | `New(Deps)` | `NewFlowEngine(FlowEngineDeps)` builds the engine and its collaborators |
+
+Rules that keep the split:
+
+- `flowengine` imports `domain`; `domain` never imports `flowengine`.
+- Flow definitions and their validation belong to `domain`; the engine only reads them.
+- A flow decision goes in `flowengine`, even when it needs data the service
+  loads: the service loads it and passes it in.
+- The engine never touches the database, the cookie or the HTTP request directly.
 
 ## Internal components
 
-The components below all live under `internal/domain/` and `internal/service/`.
+The components below all live under `internal/flowengine/`, `internal/domain/` and `internal/service/`.
 
 ### `FlowService` (`internal/service/flow.go`)
 
@@ -90,21 +122,28 @@ The use-case surface the HTTP handler depends on. Four methods:
 
 | Method | Responsibility |
 |---|---|
-| `Resolve` | Pick the `FlowDefinition` to run from the revisions the release pins. `Name` → direct lookup; otherwise audience-based (`Hint` plumbed through but not yet honored). |
-| `Start` | Mint a fresh `FlowState`, ask the state machine to bootstrap it, mint and attach `flow_*` and `sess_*` ids. |
-| `Submit` | Re-fetch the definition from `state.DefinitionID`, hand to `stateMachine.Process`. |
-| `GetStep` | Re-fetch the definition, hand to `stateMachine.Render` (no advancement). |
+| `Resolve` | Read the revisions the release pins and let the engine pick the `FlowDefinition` to run: `Name` → the one pinned under it, checked by `flowengine.EntryByName`; otherwise all of them, ranked by `flowengine.EntryByAudience` (`entry_definition.go`). |
+| `Start` | Mint the `flow_*` and `sess_*` ids and hand them, with the deployment and release the request resolved to, to `stateMachine.Start`, which builds the `flowengine.State`. |
+| `Submit` | Hand the request's `flowengine.Definitions` to `stateMachine.Process`, which loads the definition the state names. |
+| `GetStep` | Hand the request's `flowengine.Definitions` to `stateMachine.Render` (no advancement). |
 
-Service holds `*service.DB` (v2 statements), the `FlowStateMachine` interface,
-and the `idgen.Generator`. Flow definitions are loaded via
-`ListFlowDefinitions` / `GetFlowDefinitionByID` on `AllStatements`.
+The engine reads the running flow's definition through
+`flowengine.ActiveDefinition`, once per request; the step it returns announces
+the sign-up gate (`signup_gate.go`). The request's `flowengine.Definitions`
+looks the revision up by the id the state names, within the flow's project.
+`GetStep` issues the sign-up puzzle when the rendered step announces the gate.
 
-### `FlowStateMachineRuntime` (`internal/domain/flow_state_machine.go`)
+Service holds `*service.DB` (v2 statements), the `flowengine.StateMachine`
+interface and the sign-up protection. Flow definitions are loaded via
+`ListFlowDefinitions` / `GetFlowDefinitionByID` on the statements.
+
+### `flowengine.Runtime` (`internal/flowengine/state_machine.go`)
 
 The state machine. Three entry points (`Start`, `Process`, `Render`) and one private pipeline:
 
 ```
 Process(in):
+  ├── restart the flow if its auth attempt expired or was handed off
   ├── find current step in definition
   ├── resolve fields via FlowFieldResolver
   ├── prefillFromCollected: hydrate resolved fields from state.CollectedData
@@ -142,6 +181,26 @@ Process(in):
         └── if a user was resolved: authAttempts.Handoff → token + expiry
 ```
 
+Inside `internal/flowengine`, by file:
+
+| Component | Files | What it does |
+| --- | --- | --- |
+| Runtime | `state_machine.go` | `StateMachine` and its `Runtime`: `Start`, `Process`, `Render`, each returning a `StepResult` (the new `State` and the `Step` the client shows) |
+| State | `state.go` | everything a running flow remembers between requests: definition and step, collected data, back stack, pending ceremony, auth attempt, release; sealed into the cookie, so the engine keeps nothing between requests |
+| Definitions | `definition.go`, `entry_definition.go` | the entry definition a new flow starts on (by name or best audience match), and `ActiveDefinition`, the one way to read a running flow's definition |
+| Actions | `action.go`, `action_<kind>.go` | a table of one handler per action kind (submit, back, navigate, passkey, passkey register), one file per kind |
+| Fields | `fields.go` | resolves a step's fields against the user schema, prefills them, applies the password policy, validates and merges submitted values |
+| Routing | `routing.go`, `back.go` | turns an outcome into the next step: transitions, purpose flips, identifier challenges, the back stack |
+| Ceremonies | `challenge.go`, `passkey.go`, `sso.go` | two-phase proofs through a table of one declaration per method; passkey parameters; the external identity provider round trip |
+| Outcomes | `on_success.go` | a table of one handler per `on_success` value, such as creating the user |
+| Completion | `completion.go` | `completeFlow`, which every route onto a terminal step passes and the only caller of `Handoff`; an optional `CompletionPolicy` may refuse, and nothing wires one yet |
+| Sign-up gate | `signup_gate.go` | marks a step `SignupRequired` when submitting it can create a user |
+| Rendering | `render.go` | builds the client-facing `Step`: fields, actions, identifier, pending challenge, errors |
+
+Each test file is named after the concern it covers; `*_internal_test.go`
+files test unexported helpers, the rest drive `StateMachine` with mocks from
+`flowengine/mock`.
+
 Errors that surface from `Process`:
 
 - `ErrInvalidAction` — submitted action not in the step's `Transitions`.
@@ -158,13 +217,13 @@ Interface (`Resolve` + `Validate`) plus a schema-backed implementation in `flow_
 
 `Validate` walks the resolved fields and returns `FlowFieldValidationErrors` on rule violations — the state machine surfaces those as step errors.
 
-### `FlowOnSuccessHandler` (`internal/domain/flow_on_success.go`)
+### `flowengine.OnSuccessHandler` (`internal/flowengine/on_success_handler.go`)
 
 Interface every `on_success` mutation satisfies. One implementation today:
 
 - `FlowCreateUserWithPasswordHandler` (`internal/service/flow_create_user_with_password_handler.go`) — reads the identifier and password fields from the collected data, hashes the password (argon2id), and applies user creation, password persistence, and the attempt's verified user + password factors (with their `auth.check.succeeded` events) in one transaction. A handler that returns a `UserID` must persist the user's factors itself; the state machine only records the id in flow state.
 
-### `FlowAuthAttemptService` (`internal/domain/flow_auth_attempt.go`)
+### `flowengine.AuthAttemptService` (`internal/flowengine/auth_attempt.go`)
 
 A narrow interface over the auth-attempt service. The state machine sees
 `Start`, `SubmitIdentifier`, `SubmitPassword`, the two legs of every
@@ -173,8 +232,8 @@ Identifier no-match and password rejection both surface as
 `ErrAuthAttemptProofRejected`, which the state machine routes
 (`user_not_found`) or re-renders (step error) accordingly.
 
-`IssueChallenge` takes a `FlowChallengeParams` value, one type per check
-(`FlowPasskeyChallengeParams`, `FlowPasskeyRegistrationChallengeParams`, ADR
+`IssueChallenge` takes a `flowengine.ChallengeParams` value, one type per check
+(`flowengine.PasskeyChallengeParams`, `flowengine.PasskeyRegistrationChallengeParams`, ADR
 056); `VerifyChallenge` takes the check type and the client's proof bytes. A
 new ceremony adds a params type and an entry in the engine's
 `challengeMethods` table (`flowengine/challenge.go`), which declares the
@@ -192,9 +251,9 @@ the actually-conflicting owner via the collected identifier-class fields.
 ### Domain types worth knowing
 
 - `FlowDefinition` / `FlowDefinitionStep` — the immutable graph (`flow_definition.go`). Steps don't have a `type`; behavior derives from `Fields`, `Actions`, `Gates`, `SSOProviders`, `OnSuccess`, `Complete`, and `Transitions`.
-- `FlowState` / `FlowProgress` — the cookie payload (`flow_state.go`). `FlowState` wraps `FlowProgress` (current step, history, collected data, `Purpose`, and the dispatch-mode `CurrentPurpose`) and adds session/OIDC context plus a reserved `PivotStack`.
-- `FlowStep` — the capability payload returned to the client (`flow_state_machine.go`). `Challenge` carries the issue-leg payload of a two-phase ceremony.
-- `FlowStepChallenge` / `FlowChallengeResponse` / `FlowPendingChallenge` — the two-phase ceremony contract: a pending challenge the client signs, and the proof it submits back.
+- `flowengine.State` / `flowengine.Progress` — the cookie payload (`flowengine/state.go`). `flowengine.State` wraps `flowengine.Progress` (current step, history, collected data, `Purpose`, and the dispatch-mode `CurrentPurpose`) and adds session/OIDC context plus a reserved `PivotStack`.
+- `flowengine.Step` — the capability payload returned to the client (`flowengine/state_machine.go`). `Challenge` carries the issue-leg payload of a two-phase ceremony.
+- `flowengine.StepChallenge` / `flowengine.ChallengeResponse` / `flowengine.PendingChallenge` — the two-phase ceremony contract: a pending challenge the client signs, and the proof it submits back.
 - Reserved key `FlowCollectedUserIDKey` (`_user_id`) — set by the dispatch loop when the auth-attempt identifies the user; gates whether the terminal step mints a handoff. For a provisional passkey registration it carries the server-minted user handle between the issue and verify legs (the persisted challenge, not the cookie, is authoritative for provisional-or-not).
 
 ## Upstream dependencies (what calls into the engine)
@@ -205,8 +264,8 @@ Implements three ogen-generated method signatures: `CreateFlow`, `SubmitFlowStep
 
 - Decodes ogen request types into `service.*Request` shapes.
 - Calls `FlowService`.
-- Seals the returned `*FlowState` into the `_zflow` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, `Max-Age=600`).
-- Translates `service.FlowStepResult` into the OpenAPI `FlowResponse` (`toFlowStep`, `toFlowField`, `toFlowStepActions`).
+- Seals the returned `*flowengine.State` into the `_zflow` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, `Max-Age=600`).
+- Translates `flowengine.StepResult` into the OpenAPI `FlowResponse` (`toFlowStep`, `toFlowField`, `toFlowStepActions`).
 - Maps domain errors to HTTP status codes (`mapFlowErrorStatus`, `mapFlowGetError`).
 - Derives the WebAuthn RPID from the effective request host injected by `WithRequestHostMiddleware` (`internal/api/security.go`) — needed because same-origin browser fetches do not send an `Origin` header.
 
@@ -232,9 +291,22 @@ Source of truth for the wire format. The ogen-generated types under `internal/ap
 
 ## Downstream dependencies (what the engine calls)
 
+The engine declares an interface for each collaborator; `service` implements
+it, and `internal/flowengine/mock` holds the generated mocks.
+
+| Interface (`internal/flowengine/`) | Implementation (`internal/service/`) | Purpose |
+| --- | --- | --- |
+| `AuthAttemptService` (`auth_attempt.go`) | `FlowAuthAttempts` | start an attempt, record identifier and password, issue and verify challenges, check liveness, hand off |
+| `OnSuccessHandler` (`on_success_handler.go`) | `FlowCreateUserWithPasswordHandler` | run a step's outcome |
+| `SSOProviderResolver` (`sso_services.go`) | `FlowSSOProviderResolver` | look up the step's providers |
+| `SSORedirectIssuer` (`sso_services.go`) | `FlowSSORedirectIssuer` | issue the provider redirect |
+| `SSOIdentityService` (`sso_services.go`) | `FlowSSOIdentityResolver` | load and bind external identities |
+| `PasswordPolicy` (`password_policy.go`) | `PasswordPolicy` | the project's password length bounds |
+| `CompletionPolicy` (`completion.go`) | none yet | may refuse to complete a flow |
+
 ### auth-attempt service
 
-Wired in as `FlowAuthAttemptService` via `FlowAuthAttemptAdapter`
+Wired in as `flowengine.AuthAttemptService` via `FlowAuthAttempts`
 (`internal/service/flow_auth_attempt.go`). The state machine calls `Start` at
 `FlowService.Start`, `SubmitIdentifier` and `SubmitPassword` from
 `dispatchChallenges`, the passkey and passkey-registration issue/submit legs
@@ -248,7 +320,7 @@ ceremony rides the same attempt + checks machinery (ADR 056).
 Postgres, Spanner, and SQLite implementations live under
 `internal/storage/dialect/{postgres,spanner,sqlite}/flow_definition.go` and back
 `FlowService.Resolve` (list pinned definitions) and `FlowService.Submit` /
-`GetStep` (re-fetch by id) via `FlowDefinitionService`. Migrations ship
+`GetStep` (look up by id through `flowengine.Definitions`). Migrations ship
 `flow_definitions` SQL per dialect.
 
 ### User writers

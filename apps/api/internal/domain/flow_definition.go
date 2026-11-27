@@ -108,7 +108,7 @@ const (
 )
 
 // FlowActionSSO is the action the client submits with
-// [FlowSubmitInput.SSOProvider] to start an external sign-in. It is not
+// [flowengine.SubmitInput.SSOProvider] to start an external sign-in. It is not
 // declared on the step: offering sso_providers is what enables it.
 const FlowActionSSO = "sso"
 
@@ -284,6 +284,20 @@ func FieldsFromStrings(s []string) []Field {
 	return out
 }
 
+// FlowDefinitionPurposesFromStrings lifts wire-format purpose names, mapped
+// to their entry steps, into typed purposes; an unknown name is refused.
+func FlowDefinitionPurposesFromStrings(entrySteps map[string]string) (map[FlowDefinitionPurpose]string, error) {
+	out := make(map[FlowDefinitionPurpose]string, len(entrySteps))
+	for name, entryStep := range entrySteps {
+		purpose, err := FlowDefinitionPurposeString(name)
+		if err != nil {
+			return nil, ErrFlowDefinitionInvalid("invalid purpose", nil)
+		}
+		out[purpose] = entryStep
+	}
+	return out, nil
+}
+
 // FieldsToStrings lowers typed [Field] values back to wire-format
 // strings at the API/repository boundary.
 func FieldsToStrings(f []Field) []string {
@@ -374,8 +388,8 @@ type FlowStepTransition struct {
 	// [FlowDefinition.TransitionTarget].
 	Target string
 	// Purpose, when non-nil, re-purposes the flow locally: taking this
-	// transition sets [FlowState.CurrentPurpose] to this purpose while the
-	// pinned [FlowState.Purpose] stays untouched. The purpose must be one
+	// transition sets the flow state's CurrentPurpose to this purpose while the
+	// pinned Purpose stays untouched. The purpose must be one
 	// the definition serves, and Target, when set, must be that purpose's
 	// entry step (validated). Mutually exclusive with Action — a transition
 	// either pivots to another flow or re-purposes within this one, never

@@ -9,12 +9,12 @@ import (
 
 // routeOutcome sends the user to the next step: looks up the
 // transition for outcome, flips the purpose, advances state, then
-// renders (or terminates on a terminal step). When outcome differs
+// renders, or completes the flow on a terminal step. When outcome differs
 // from the user-submitted action it came from a handler diversion
 // (e.g. user_not_found); a missing transition in that case degrades
 // to the outcome's step error instead of ErrFlowInvalidAction. If
 // irreversible, BackStack is dropped after advance.
-func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved domain.FlowResolvedFields, outcome string, irreversible bool) (FlowStepResult, error) {
+func (r *Runtime) routeOutcome(pc *processCtx, resolved domain.FlowResolvedFields, outcome string, irreversible bool) (StepResult, error) {
 	transition, ok := pc.currentStep.Transitions[outcome]
 	if !ok {
 		if outcome != pc.in.Action {
@@ -24,26 +24,62 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved domain.F
 			// account, and a later step may not collect it again.
 			if outcome == domain.FlowImplicitOutcomeUserAlreadyExists {
 				if err := r.dropResolvedUser(pc, "unrouted collision"); err != nil {
-					return FlowStepResult{}, err
+					return StepResult{}, err
 				}
 			}
 			return r.renderStepError(pc, resolved, domain.FlowStepFailed(UnwiredOutcomeError(outcome), nil))
 		}
-		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
+		return StepResult{}, fmt.Errorf("%w: %q on step %q", domain.ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
 	}
 	if transition.Action != nil {
-		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", domain.ErrFlowUnsupported())
+		return StepResult{}, fmt.Errorf("%w: cross-flow transitions", domain.ErrFlowUnsupported())
 	}
 
 	target := pc.def.TransitionTarget(transition)
 	nextStep, ok := pc.def.FindStep(target)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", domain.ErrFlowIntegrity(), target)
+		return StepResult{}, fmt.Errorf("%w: transition target %q missing from definition", domain.ErrFlowIntegrity(), target)
 	}
 
+	next := route{outcome: outcome, transition: transition, target: nextStep, irreversible: irreversible}
+	if nextStep.Complete != nil {
+		return r.completeFlow(pc, resolved, next)
+	}
+	prevPurpose, err := r.follow(pc, next)
+	if err != nil {
+		return StepResult{}, err
+	}
+
+	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
+	if err != nil {
+		return StepResult{}, err
+	}
+	// The user asked to sign in or to sign up; an outcome that changed which
+	// one says why, or a typo silently becomes a new account. The notice is
+	// not kept in the state, so a later render of the step goes without it.
+	if notice, ok := purposeChangeNotices[outcome]; ok && pc.state.CurrentPurpose != prevPurpose {
+		step.Notice = &notice
+	}
+	return StepResult{State: pc.state, Step: step}, nil
+}
+
+// route is where an outcome leads from the current step: the transition
+// [Runtime.routeOutcome] looked up and the step it targets.
+type route struct {
+	outcome      string
+	transition   domain.FlowStepTransition
+	target       *domain.FlowDefinitionStep
+	irreversible bool
+}
+
+// follow moves the state along next: flips the purpose, advances to the
+// target step and drops the back stack after an irreversible action. It
+// returns the purpose the flow had before, which back restores.
+func (r *Runtime) follow(pc *processCtx, next route) (domain.FlowDefinitionPurpose, error) {
+	transition, nextStep := next.transition, next.target
 	// Snapshot purpose before the flip so back can restore it.
 	prevPurpose := pc.state.CurrentPurpose
-	applyOutcomeFlip(pc.state, outcome)
+	applyOutcomeFlip(pc.state, next.outcome)
 	// A declared transition purpose wins over the implicit outcome flip.
 	// Only CurrentPurpose moves; the pinned Purpose stays for telemetry/ACR.
 	// Unlike the implicit flips (which continue an in-flight resolution,
@@ -56,7 +92,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved domain.F
 	repurposeUndo := false
 	if transition.Purpose != nil {
 		if err := r.dropResolvedUser(pc, "re-purpose"); err != nil {
-			return FlowStepResult{}, err
+			return prevPurpose, err
 		}
 		pc.state.CollectedData.AuthMethods = nil
 		pc.state.CurrentPurpose = *transition.Purpose
@@ -83,25 +119,10 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved domain.F
 	}
 
 	// after irreversible actions, clear the back stack so the user can't navigate back in the flow.
-	if irreversible {
+	if next.irreversible {
 		pc.state.ClearBackStack()
 	}
-
-	if nextStep.Complete != nil {
-		return r.terminate(pc, nextStep)
-	}
-
-	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	// The user asked to sign in or to sign up; an outcome that changed which
-	// one says why, or a typo silently becomes a new account. The notice is
-	// not kept in the state, so a later render of the step goes without it.
-	if notice, ok := purposeChangeNotices[outcome]; ok && pc.state.CurrentPurpose != prevPurpose {
-		step.Notice = &notice
-	}
-	return FlowStepResult{State: pc.state, Step: step}, nil
+	return prevPurpose, nil
 }
 
 // dropResolvedUser abandons the identity this flow had settled on: the
@@ -118,13 +139,13 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved domain.F
 // attempt ages out like any abandoned flow. No resolved user → nothing on the
 // attempt to escape → no rotation (idle navigation must not mint attempt
 // rows). reason names the caller for the wrapped error.
-func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string) error {
+func (r *Runtime) dropResolvedUser(pc *processCtx, reason string) error {
 	hadResolvedUser := pc.state.CollectedData.UserID != ""
 	clearUserBoundState(pc.state)
 	if !hadResolvedUser {
 		return nil
 	}
-	attemptInput := domain.FlowCreateAttemptInput{ProjectID: pc.state.ProjectID, FlowID: pc.state.ID}
+	attemptInput := CreateAttemptInput{ProjectID: pc.state.ProjectID, FlowID: pc.state.ID}
 	if pc.state.SessionID != "" {
 		sid := pc.state.SessionID
 		attemptInput.SessionID = &sid
@@ -137,10 +158,10 @@ func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string
 	return nil
 }
 
-// flowDispatchResult summarizes the challenge dispatch loop. Outcome
+// dispatchResult summarizes the challenge dispatch loop. Outcome
 // diverts routing (e.g. user_not_found); StepError holds the user on
 // the current step (e.g. password rejected). At most one is set.
-type flowDispatchResult struct {
+type dispatchResult struct {
 	Outcome   string
 	StepError *domain.FlowStepFailure
 }
@@ -185,7 +206,7 @@ func identifierFieldsOnly(resolved domain.FlowResolvedFields, values map[string]
 // applyOutcomeFlip flips CurrentPurpose on resolution outcomes:
 // login + user_not_found → register; login + sso_user_not_found → register;
 // register + user_already_exists → login, typed or SSO. Recovery never flips.
-func applyOutcomeFlip(state *domain.FlowState, outcome string) {
+func applyOutcomeFlip(state *State, outcome string) {
 	switch {
 	case state.CurrentPurpose == domain.FlowDefinitionPurposeLogin &&
 		(outcome == domain.FlowImplicitOutcomeUserNotFound || outcome == domain.FlowImplicitOutcomeSSOUserNotFound):
@@ -199,7 +220,7 @@ func applyOutcomeFlip(state *domain.FlowState, outcome string) {
 // [challengeDispatchOrder]. CurrentPurpose decides verify-vs-skip. What
 // reaches it is what the action submitted, so a leg that consumes a subset
 // (see [identifierFieldsOnly]) dispatches a subset.
-func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved domain.FlowResolvedFields) (flowDispatchResult, error) {
+func (r *Runtime) dispatchChallenges(pc *processCtx, resolved domain.FlowResolvedFields) (dispatchResult, error) {
 	ctx, state, fields := pc.ctx, pc.state, pc.in.Fields
 	for _, challenge := range challengeDispatchOrder {
 		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
@@ -208,7 +229,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved do
 		}
 		switch challenge {
 		case domain.FlowFieldChallengeIdentifier:
-			userID, err := r.authAttempts.SubmitIdentifier(ctx, domain.FlowSubmitIdentifierInput{
+			userID, err := r.authAttempts.SubmitIdentifier(ctx, SubmitIdentifierInput{
 				ProjectID:     state.ProjectID,
 				AttemptID:     state.AuthAttemptID,
 				AttributeName: name,
@@ -221,10 +242,10 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved do
 					continue
 				}
 				clearUserBoundState(state)
-				return flowDispatchResult{Outcome: domain.FlowImplicitOutcomeUserNotFound}, nil
+				return dispatchResult{Outcome: domain.FlowImplicitOutcomeUserNotFound}, nil
 			}
 			if err != nil {
-				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit identifier: %w", err)
+				return dispatchResult{}, fmt.Errorf("flow state machine: submit identifier: %w", err)
 			}
 			// A successful lookup pins the user on the attempt whichever
 			// purpose asked for it, so the flow records it either way.
@@ -232,10 +253,10 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved do
 			// verification, where the flow is verifying exactly this user — so
 			// recording is honest, and it keeps CollectedData.UserID a truthful
 			// signal of what the attempt carries. Left blank, the two fall out
-			// of step: back skips its rotation and terminate skips the handoff.
+			// of step: back skips its rotation and completion skips the handoff.
 			recordResolvedUser(state, userID)
 			if state.CurrentPurpose == domain.FlowDefinitionPurposeRegister {
-				return flowDispatchResult{Outcome: domain.FlowImplicitOutcomeUserAlreadyExists}, nil
+				return dispatchResult{Outcome: domain.FlowImplicitOutcomeUserAlreadyExists}, nil
 			}
 		case domain.FlowFieldChallengePassword:
 			if state.CurrentPurpose != domain.FlowDefinitionPurposeLogin {
@@ -248,22 +269,22 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved do
 			// store it on a new account rather than the one it verified.
 			delete(state.CollectedData.AuthMethods, domain.AuthMethodPassword)
 			if state.CollectedData.UserID == "" {
-				return flowDispatchResult{StepError: domain.FlowStepFailed(FlowStepErrorSignInFirst, nil)}, nil
+				return dispatchResult{StepError: domain.FlowStepFailed(StepErrorSignInFirst, nil)}, nil
 			}
-			err := r.authAttempts.SubmitPassword(ctx, domain.FlowSubmitPasswordInput{
+			err := r.authAttempts.SubmitPassword(ctx, SubmitPasswordInput{
 				ProjectID: state.ProjectID,
 				AttemptID: state.AuthAttemptID,
 				Plain:     value,
 			})
 			if errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)) {
-				return flowDispatchResult{StepError: domain.FlowStepFailed(FlowStepErrorInvalidCredentials, err)}, nil
+				return dispatchResult{StepError: domain.FlowStepFailed(StepErrorInvalidCredentials, err)}, nil
 			}
 			if err != nil {
-				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit password: %w", err)
+				return dispatchResult{}, fmt.Errorf("flow state machine: submit password: %w", err)
 			}
 		}
 	}
-	return flowDispatchResult{}, nil
+	return dispatchResult{}, nil
 }
 
 // uniqueFieldValues returns every uniquely-keyed field with a collected
@@ -307,48 +328,4 @@ func fieldValueByChallenge(resolved domain.FlowResolvedFields, fields map[string
 		return field.Name, s, true
 	}
 	return "", "", false
-}
-
-// terminate renders a completed step and, when a user was resolved,
-// mints the handoff. Clears BackStack — no back past a
-// point-of-no-return.
-func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *domain.FlowDefinitionStep) (FlowStepResult, error) {
-	pc.state.ClearBackStack()
-	rendered, err := r.renderStep(pc.ctx, pc.def, pc.state)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	kind := *step.Complete
-	rendered.Complete = &kind
-	if kind == domain.FlowStepCompleteRedirect && pc.state.RedirectURI != nil {
-		uri := *pc.state.RedirectURI
-		rendered.RedirectURL = &uri
-	}
-
-	// Skip handoff when no user was resolved (e.g. user_not_found →
-	// no-account): render the terminal step without minting a token. Handoff
-	// itself now fails closed on an identifier-only attempt (IsCompleted
-	// requires a verified credential-class factor), but a no-account terminal
-	// has nothing to hand off and must return the step cleanly rather than
-	// surface ErrAuthAttemptNotCompleted.
-	if pc.state.CollectedData.UserID == "" {
-		return FlowStepResult{State: pc.state, Step: rendered}, nil
-	}
-
-	if pc.state.AuthAttemptID == "" {
-		return FlowStepResult{}, fmt.Errorf("%w: terminate without auth attempt id", domain.ErrFlowIntegrity())
-	}
-	handoff, err := r.authAttempts.Handoff(pc.ctx, domain.FlowHandoffInput{
-		ProjectID: pc.state.ProjectID,
-		AttemptID: pc.state.AuthAttemptID,
-	})
-	if err != nil {
-		return FlowStepResult{}, fmt.Errorf("flow state machine: handoff: %w", err)
-	}
-	return FlowStepResult{
-		State:                 pc.state,
-		Step:                  rendered,
-		HandoffToken:          handoff.Token,
-		HandoffTokenExpiresAt: handoff.ExpiresAt,
-	}, nil
 }

@@ -3,6 +3,7 @@ package flowengine_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/flowengine"
+	flowenginemock "github.com/zitadel/nextgen/internal/flowengine/mock"
 )
 
 const testProjectID = "proj-1"
@@ -59,7 +61,7 @@ func containsFieldName(fields []domain.FlowField, name string) bool {
 // session id is the load-bearing part: exchange upgrades that session in
 // place, so an attempt started without it would strand the sign-in.
 func attemptFor(projectID, sessionID string) gomock.Matcher {
-	return gomock.Cond(func(in domain.FlowCreateAttemptInput) bool {
+	return gomock.Cond(func(in flowengine.CreateAttemptInput) bool {
 		if in.ProjectID != projectID {
 			return false
 		}
@@ -72,19 +74,31 @@ func attemptFor(projectID, sessionID string) gomock.Matcher {
 // the flow on defaultSchemaURL), so a test pinning rotation cannot pass on a
 // call that went to the wrong attempt.
 func identifiedBy(attemptID, attribute, value string) gomock.Matcher {
-	return gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+	return gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 		return in.AttemptID == attemptID && in.AttributeName == attribute && in.Value == value &&
 			in.UserSchemaURL == defaultSchemaURL
 	})
 }
 
-func findAction(actions []flowengine.FlowAction, name string) (flowengine.FlowAction, bool) {
+func findAction(actions []flowengine.StepAction, name string) (flowengine.StepAction, bool) {
 	for _, a := range actions {
 		if a.Name == name {
 			return a, true
 		}
 	}
-	return flowengine.FlowAction{}, false
+	return flowengine.StepAction{}, false
+}
+
+// servedDefinition answers every id with one definition, as a request's
+// definitions do for a flow that runs on one.
+type servedDefinition struct{ def *domain.FlowDefinition }
+
+func (s servedDefinition) Definition(context.Context, string) (*domain.FlowDefinition, error) {
+	return s.def, nil
+}
+
+func served(def *domain.FlowDefinition) flowengine.Definitions {
+	return servedDefinition{def: def}
 }
 
 // flowTestWorld is the wiring a flow test exercises: resolver +
@@ -93,14 +107,15 @@ func findAction(actions []flowengine.FlowAction, name string) (flowengine.FlowAc
 type flowTestWorld struct {
 	mock               *gomock.Controller
 	hasher             *cryptomock.MockHasher
-	authAttemptService *domainmock.MockFlowAuthAttemptService
+	authAttemptService *flowenginemock.MockAuthAttemptService
 	schemaResolver     *domainmock.MockSchemaResolver
-	createUser         *domainmock.MockFlowOnSuccessHandler
-	ssoProviders       *domainmock.MockFlowSSOProviderResolver
-	ssoIdentities      *domainmock.MockFlowSSOIdentityService
-	ssoRedirects       *domainmock.MockFlowSSORedirectIssuer
+	createUser         *flowenginemock.MockOnSuccessHandler
+	ssoProviders       *flowenginemock.MockSSOProviderResolver
+	ssoIdentities      *flowenginemock.MockSSOIdentityService
+	ssoRedirects       *flowenginemock.MockSSORedirectIssuer
 	passwords          *fakePasswordPolicy
-	sm                 *flowengine.FlowStateMachineRuntime
+	deps               flowengine.Deps
+	sm                 *flowengine.Runtime
 }
 
 // fakePasswordPolicy answers the password length bounds; the zero value is a
@@ -134,18 +149,20 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
 	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
-	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
-	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
-	ssoProviders := domainmock.NewMockFlowSSOProviderResolver(mock)
-	ssoIdentities := domainmock.NewMockFlowSSOIdentityService(mock)
-	ssoRedirects := domainmock.NewMockFlowSSORedirectIssuer(mock)
+	authAttemptService := flowenginemock.NewMockAuthAttemptService(mock)
+	// Every submission first asks whether its attempt is still usable.
+	authAttemptService.EXPECT().Usable(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	createUser := flowenginemock.NewMockOnSuccessHandler(mock)
+	ssoProviders := flowenginemock.NewMockSSOProviderResolver(mock)
+	ssoIdentities := flowenginemock.NewMockSSOIdentityService(mock)
+	ssoRedirects := flowenginemock.NewMockSSORedirectIssuer(mock)
 	passwords := &fakePasswordPolicy{}
 
 	resolver := domain.NewSchemaFieldResolver()
 
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
 
-	sm := flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
+	deps := flowengine.Deps{
 		Schemas:       schemaResolver,
 		SchemaStore:   schemaStore,
 		Fields:        resolver,
@@ -156,7 +173,8 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		SSORedirects:  ssoRedirects,
 		Passwords:     passwords,
 		Now:           now,
-	})
+	}
+	sm := flowengine.New(deps)
 
 	return &flowTestWorld{
 		mock:               mock,
@@ -168,6 +186,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		ssoIdentities:      ssoIdentities,
 		ssoRedirects:       ssoRedirects,
 		passwords:          passwords,
+		deps:               deps,
 		sm:                 sm,
 	}
 }
@@ -190,10 +209,10 @@ func loginDefinition() *domain.FlowDefinition {
 				Name:   "credentials",
 				Fields: []domain.Field{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit:            {Target: "done"},
+					flowengine.ActionSubmit:                {Target: "done"},
 					domain.FlowImplicitOutcomeUserNotFound: {Target: "not_found"},
 				},
 			},
@@ -228,10 +247,10 @@ func signupDefinition() *domain.FlowDefinition {
 				Fields:    []domain.Field{"email", "x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "done"},
+					flowengine.ActionSubmit: {Target: "done"},
 				},
 			},
 			{
@@ -252,28 +271,35 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
 
 	w.authAttemptService.EXPECT().
-		Start(gomock.Any(), gomock.Cond(func(in domain.FlowCreateAttemptInput) bool {
+		Start(gomock.Any(), gomock.Cond(func(in flowengine.CreateAttemptInput) bool {
 			// The attempt records the flow, or the exchange's events lose it.
 			return in.ProjectID == testProjectID && in.FlowID == "flow_01TEST" && in.SessionID != nil && *in.SessionID == "sess-1"
 		})).
 		Return("att_01TEST", nil).
 		Times(1)
 
-	result, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	result, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		ID:            "flow_01TEST",
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
+		DeploymentID:  "dep_1",
+		ReleaseID:     "rel_1",
+		CorrelationID: "chain_1",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	require.Equal(t, "credentials", result.State.CurrentStep)
+	assert.Equal(t, "flow_01TEST", result.State.ID)
 	assert.Equal(t, testProjectID, result.State.ProjectID)
 	assert.Equal(t, defaultSchemaURL, result.State.UserSchemaURL)
+	assert.Equal(t, "dep_1", result.State.DeploymentID, "later requests read the deployment the flow started under")
+	assert.Equal(t, "rel_1", result.State.ReleaseID, "later requests read the release the flow started under")
+	assert.Equal(t, "chain_1", result.State.CorrelationID, "later requests join the flow's chain")
 	assert.True(t, containsFieldName(result.Step.Fields, "email"))
-	act, ok := findAction(result.Step.Actions, flowengine.FlowActionSubmit)
+	act, ok := findAction(result.Step.Actions, flowengine.ActionSubmit)
 	assert.True(t, ok)
 	assert.True(t, act.Primary)
 
@@ -296,20 +322,20 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
 	w.createUser.EXPECT().
-		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+		Handle(gomock.Any(), gomock.Cond(func(in flowengine.OnSuccessInput) bool {
 			return in.State.CollectedData.UserData["email"] == email &&
 				in.State.CollectedData.AuthMethods[domain.AuthMethodPassword] == password
 		})).
-		Return(domain.FlowOnSuccessResult{UserID: userID}, nil)
+		Return(flowengine.OnSuccessResult{UserID: userID}, nil)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.HandoffOutput{
 			Token:     handoffToken,
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 			// Register marks the lookup as a sign-up's, which records no
 			// failed check when the email is free.
 			return in.Value == email && in.Register
@@ -322,16 +348,16 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	// establishes the credential per its manifest.
 	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
 			"x-auth-methods#password": password,
@@ -365,7 +391,7 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return(attemptID, nil)
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 			return assert.Equal(t, attemptID, in.AttemptID) &&
 				assert.Equal(t, "email", in.AttributeName) &&
 				assert.Equal(t, email, in.Value) &&
@@ -374,15 +400,15 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 		Return(userID, nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in flowengine.SubmitPasswordInput) bool {
 			return in.AttemptID == attemptID
 		})).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		Handoff(gomock.Any(), gomock.Cond(func(in domain.FlowHandoffInput) bool {
+		Handoff(gomock.Any(), gomock.Cond(func(in flowengine.HandoffInput) bool {
 			return in.AttemptID == attemptID
 		})).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.HandoffOutput{
 			Token:     handoffToken,
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil).
@@ -390,16 +416,16 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 
 	def := loginDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
 			"x-auth-methods#password": "correct-horse-battery-staple",
@@ -433,16 +459,16 @@ func TestFlowStateMachine_Process_LoginUserNotFound(t *testing.T) {
 	// handoff must not run for an informational terminal reached without an identity
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   "ghost@example.com",
 			"x-auth-methods#password": "irrelevant",
@@ -477,16 +503,16 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 
 	def := loginDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
 			"x-auth-methods#password": "wrong-password",
@@ -496,10 +522,10 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
-	assert.Equal(t, flowengine.FlowStepErrorInvalidCredentials, *result.Step.Error)
+	assert.Equal(t, flowengine.StepErrorInvalidCredentials, *result.Step.Error)
 	// The key travels with the rejection that produced it, for the log.
 	require.NotNil(t, result.Step.Failure)
-	assert.Equal(t, flowengine.FlowStepErrorInvalidCredentials, result.Step.Failure.Key)
+	assert.Equal(t, flowengine.StepErrorInvalidCredentials, result.Step.Failure.Key)
 	assert.ErrorIs(t, result.Step.Failure.Cause, domain.ErrAuthAttemptProofRejected(nil))
 }
 
@@ -514,10 +540,10 @@ func TestFlowStateMachine_Process_RegisterCollisionVerifiesPassword(t *testing.T
 		Name:   "password",
 		Fields: []domain.Field{"x-auth-methods#password"},
 		Actions: []domain.FlowStepAction{
-			{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+			{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 		},
 		Transitions: map[string]domain.FlowStepTransition{
-			flowengine.FlowActionSubmit: {Target: "done"},
+			flowengine.ActionSubmit: {Target: "done"},
 		},
 	})
 
@@ -530,23 +556,23 @@ func TestFlowStateMachine_Process_RegisterCollisionVerifiesPassword(t *testing.T
 		SubmitIdentifier(gomock.Any(), identifiedBy("attempt-1", "email", "alice@example.com")).
 		Return("user_alice", nil)
 	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in flowengine.SubmitPasswordInput) bool {
 			return in.AttemptID == "attempt-1" && in.Plain == "wrong-password"
 		})).
 		Return(domain.ErrAuthAttemptProofRejected(nil))
 	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	collided, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	collided, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   "alice@example.com",
 			"x-auth-methods#password": "attacker-chosen",
@@ -556,15 +582,15 @@ func TestFlowStateMachine_Process_RegisterCollisionVerifiesPassword(t *testing.T
 	require.Equal(t, "password", collided.State.CurrentStep)
 	require.Equal(t, domain.FlowDefinitionPurposeLogin, collided.State.CurrentPurpose)
 
-	result, err := w.sm.Process(t.Context(), def, collided.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), collided.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "wrong-password"},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.Step)
 	require.Equal(t, "password", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
-	assert.Equal(t, flowengine.FlowStepErrorInvalidCredentials, *result.Step.Error)
+	assert.Equal(t, flowengine.StepErrorInvalidCredentials, *result.Step.Error)
 	assert.Empty(t, result.HandoffToken)
 }
 
@@ -582,15 +608,15 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 
 	def := signupDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	_, err = w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
+	_, err = w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 		Action: "not_declared",
 		Fields: map[string]any{
 			"email":                   "alice@example.com",
@@ -639,19 +665,59 @@ func TestFlowStateMachine_Process_UndeclaredActionRefusedBeforeIdentifierLookup(
 			// No SubmitIdentifier or Handoff expectation: the controller
 			// fails the test on either call.
 
-			start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+			start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 				Definition:    def,
 				Purpose:       domain.FlowDefinitionPurposeLogin,
-				Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+				Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 				UserSchemaURL: defaultSchemaURL,
 			})
 			require.NoError(t, err)
 
-			_, err = w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
+			_, err = w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
 				Action: tt.action,
 				Fields: map[string]any{"email": "alice@example.com"},
 			})
 			require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
+		})
+	}
+}
+
+// A submission to a flow whose attempt expired or was handed off restarts
+// the flow before the step runs. The definition is read first, and a failed
+// read of the attempt is the submission's error.
+func TestFlowStateMachine_Process_DeadAttemptRestartsFlow(t *testing.T) {
+	t.Parallel()
+	readFailed := errors.New("read failed")
+	for _, tc := range []struct {
+		name    string
+		usable  bool
+		readErr error
+		want    error
+	}{
+		{name: "dead attempt", want: domain.ErrFlowRestartRequired()},
+		{name: "read fails", readErr: readFailed, want: readFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			def := signupDefinition()
+			defs := &definitionsByID{defs: map[string]*domain.FlowDefinition{def.ID: def}}
+			attempts := flowenginemock.NewMockAuthAttemptService(gomock.NewController(t))
+			attempts.EXPECT().Usable(gomock.Any(), testProjectID, "att-1").DoAndReturn(func(context.Context, string, string) (bool, error) {
+				assert.Equal(t, []string{def.ID}, defs.asked, "the definition is read before the attempt")
+				return tc.usable, tc.readErr
+			})
+			// No other expectation: the controller fails the test on any call
+			// the step would make.
+			sm := flowengine.New(flowengine.Deps{AuthAttempts: attempts})
+
+			state := &flowengine.State{
+				ID:            "flow-1",
+				ProjectID:     testProjectID,
+				Progress:      flowengine.Progress{DefinitionID: def.ID, CurrentStep: "credentials"},
+				AuthAttemptID: "att-1",
+			}
+			_, err := sm.Process(t.Context(), defs, state, flowengine.SubmitInput{Action: flowengine.ActionSubmit})
+			require.ErrorIs(t, err, tc.want)
 		})
 	}
 }
@@ -684,10 +750,10 @@ func TestFlowStateMachine_Start_InitializesCurrentPurpose(t *testing.T) {
 			def.Purposes[domain.FlowDefinitionPurposeLogin] = "credentials"
 			def.Purposes[domain.FlowDefinitionPurposeRecovery] = "credentials"
 
-			result, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+			result, err := w.sm.Start(t.Context(), flowengine.StartInput{
 				Definition:    def,
 				Purpose:       tc.purpose,
-				Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+				Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 				UserSchemaURL: defaultSchemaURL,
 			})
 			require.NoError(t, err)
@@ -699,10 +765,10 @@ func TestFlowStateMachine_Start_InitializesCurrentPurpose(t *testing.T) {
 
 func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 	t.Parallel()
-	state := domain.FlowState{
+	state := flowengine.State{
 		ID:        "flow-1",
 		ProjectID: "proj-1",
-		FlowProgress: domain.FlowProgress{
+		Progress: flowengine.Progress{
 			DefinitionID:   "def-1",
 			Purpose:        domain.FlowDefinitionPurposeLogin,
 			CurrentPurpose: domain.FlowDefinitionPurposeRegister,
@@ -712,7 +778,7 @@ func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 	payload, err := json.Marshal(state)
 	require.NoError(t, err)
 
-	var decoded domain.FlowState
+	var decoded flowengine.State
 	require.NoError(t, json.Unmarshal(payload, &decoded))
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, decoded.Purpose)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, decoded.CurrentPurpose)
@@ -720,27 +786,27 @@ func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 
 func TestFlowState_JSONRoundTrip_PivotPushPopPreservesCurrentPurpose(t *testing.T) {
 	t.Parallel()
-	parent := domain.FlowProgress{
+	parent := flowengine.Progress{
 		DefinitionID:   "def-parent",
 		Purpose:        domain.FlowDefinitionPurposeLogin,
 		CurrentPurpose: domain.FlowDefinitionPurposeRegister,
 		CurrentStep:    "parent-step",
 	}
-	state := domain.FlowState{
+	state := flowengine.State{
 		ID:        "flow-1",
 		ProjectID: "proj-1",
-		FlowProgress: domain.FlowProgress{
+		Progress: flowengine.Progress{
 			DefinitionID:   "def-child",
 			Purpose:        domain.FlowDefinitionPurposeLogin,
 			CurrentPurpose: domain.FlowDefinitionPurposeLogin,
 			CurrentStep:    "child-step",
 		},
-		PivotStack: []domain.FlowProgress{parent},
+		PivotStack: []flowengine.Progress{parent},
 	}
 
 	payload, err := json.Marshal(state)
 	require.NoError(t, err)
-	var decoded domain.FlowState
+	var decoded flowengine.State
 	require.NoError(t, json.Unmarshal(payload, &decoded))
 
 	require.Len(t, decoded.PivotStack, 1)
@@ -766,10 +832,10 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 				Name:   "profile",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit:                 {Target: "set-password"},
+					flowengine.ActionSubmit:                     {Target: "set-password"},
 					domain.FlowImplicitOutcomeUserAlreadyExists: {Target: "done"},
 				},
 			},
@@ -777,20 +843,20 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 				Name:   "set-password",
 				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "create"},
+					flowengine.ActionSubmit: {Target: "create"},
 				},
 			},
 			{
 				Name:      "create",
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "done"},
+					flowengine.ActionSubmit: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -801,7 +867,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 // findBackAction returns the engine-injected back action on a rendered
 // step, or nil if it isn't present. Tests key on kind, not name — the
 // contract is kind-driven.
-func findBackAction(step *flowengine.FlowStep) *flowengine.FlowAction {
+func findBackAction(step *flowengine.Step) *flowengine.StepAction {
 	if step == nil {
 		return nil
 	}
@@ -841,10 +907,10 @@ func loginRegisterFlipDefinition() *domain.FlowDefinition {
 				Name:   "identifier",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit:            {Target: "password"},
+					flowengine.ActionSubmit:                {Target: "password"},
 					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
 				},
 			},
@@ -852,20 +918,20 @@ func loginRegisterFlipDefinition() *domain.FlowDefinition {
 				Name:   "password",
 				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "done"},
+					flowengine.ActionSubmit: {Target: "done"},
 				},
 			},
 			{
 				Name:   "register",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "done"},
+					flowengine.ActionSubmit: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -883,21 +949,21 @@ func TestFlowStepErrorContract(t *testing.T) {
 	t.Parallel()
 
 	stepErrorConsts := []string{
-		flowengine.FlowStepErrorInvalidCredentials,
-		flowengine.FlowStepErrorPasskeyInvalid,
-		flowengine.FlowStepErrorPasskeyRegistrationInvalid,
-		flowengine.FlowStepErrorSSOCreationDisabled,
-		flowengine.FlowStepErrorSSOUnavailable,
-		flowengine.FlowStepErrorSSOCancelled,
-		flowengine.FlowStepErrorSSOFailed,
-		flowengine.FlowStepErrorSSOVerifiedUniqueValueChanged,
-		flowengine.FlowStepErrorSSOUserInvalid,
-		flowengine.FlowStepErrorSSOUserCannotBeCreated,
-		flowengine.FlowStepErrorUserAlreadyExists,
-		flowengine.FlowStepErrorUserNotFound,
-		flowengine.FlowStepErrorSSOUserNotFound,
-		flowengine.FlowStepErrorOutcomeUnhandled,
-		flowengine.FlowStepErrorSignInFirst,
+		flowengine.StepErrorInvalidCredentials,
+		flowengine.StepErrorPasskeyInvalid,
+		flowengine.StepErrorPasskeyRegistrationInvalid,
+		flowengine.StepErrorSSOCreationDisabled,
+		flowengine.StepErrorSSOUnavailable,
+		flowengine.StepErrorSSOCancelled,
+		flowengine.StepErrorSSOFailed,
+		flowengine.StepErrorSSOVerifiedUniqueValueChanged,
+		flowengine.StepErrorSSOUserInvalid,
+		flowengine.StepErrorSSOUserCannotBeCreated,
+		flowengine.StepErrorUserAlreadyExists,
+		flowengine.StepErrorUserNotFound,
+		flowengine.StepErrorSSOUserNotFound,
+		flowengine.StepErrorOutcomeUnhandled,
+		flowengine.StepErrorSignInFirst,
 	}
 	for _, key := range stepErrorConsts {
 		assert.True(t, strings.HasPrefix(key, "error."), "step-error const %q must honor the contract", key)
@@ -914,11 +980,11 @@ func TestFlowStepErrorContract(t *testing.T) {
 	}
 	for _, challenge := range challenges {
 		for _, outcome := range domain.ImplicitOutcomesForChallenge(challenge) {
-			assert.NotEqual(t, flowengine.FlowStepErrorOutcomeUnhandled, flowengine.UnwiredOutcomeError(outcome),
+			assert.NotEqual(t, flowengine.StepErrorOutcomeUnhandled, flowengine.UnwiredOutcomeError(outcome),
 				"implicit outcome %q of challenge %q needs its own step error key", outcome, challenge)
 		}
 	}
-	assert.Equal(t, flowengine.FlowStepErrorOutcomeUnhandled, flowengine.UnwiredOutcomeError("some_new_outcome"))
+	assert.Equal(t, flowengine.StepErrorOutcomeUnhandled, flowengine.UnwiredOutcomeError("some_new_outcome"))
 
 	rules := []domain.FlowFieldValidationRule{
 		domain.FlowFieldValidationRuleRequired,
@@ -961,13 +1027,13 @@ func purposeNavDefinition() *domain.FlowDefinition {
 				Name:   "identifier",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
-					{Name: flowengine.FlowActionPasskey, Kind: domain.FlowActionKindPasskey},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionPasskey, Kind: domain.FlowActionKindPasskey},
 					{Name: "register", Kind: domain.FlowActionKindNavigate},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit:            {Target: "password"},
-					flowengine.FlowActionPasskey:           {Target: "done"},
+					flowengine.ActionSubmit:                {Target: "password"},
+					flowengine.ActionPasskey:               {Target: "done"},
 					"register":                             {Target: "register", Purpose: &register},
 					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
 				},
@@ -979,24 +1045,24 @@ func purposeNavDefinition() *domain.FlowDefinition {
 				Name:   "password",
 				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
-					{Name: flowengine.FlowActionPasskey, Kind: domain.FlowActionKindPasskey},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionPasskey, Kind: domain.FlowActionKindPasskey},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit:  {Target: "done"},
-					flowengine.FlowActionPasskey: {Target: "done"},
+					flowengine.ActionSubmit:  {Target: "done"},
+					flowengine.ActionPasskey: {Target: "done"},
 				},
 			},
 			{
 				Name:   "register",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 					{Name: "sign_in", Kind: domain.FlowActionKindNavigate},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "register-password"},
-					"sign_in":                   {Target: "identifier", Purpose: &login},
+					flowengine.ActionSubmit: {Target: "register-password"},
+					"sign_in":               {Target: "identifier", Purpose: &login},
 					domain.FlowImplicitOutcomeUserAlreadyExists: {Target: "password"},
 				},
 			},
@@ -1005,10 +1071,10 @@ func purposeNavDefinition() *domain.FlowDefinition {
 				Fields:    []domain.Field{"x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "done"},
+					flowengine.ActionSubmit: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},

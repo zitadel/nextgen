@@ -24,16 +24,16 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":                   "not-an-email",
 			"x-auth-methods#password": "correct-horse-battery-staple",
@@ -60,10 +60,10 @@ func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
@@ -71,8 +71,8 @@ func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
 	// The submit action collects the step's fields, so the required email
 	// the client left out entirely must surface as a per-field error rather
 	// than passing through to fail late at create_user.
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
@@ -111,10 +111,10 @@ func TestFlowStateMachine_Process_PasskeyRegisterOmittedRequiredFieldKeepsStep(t
 				Name:   "register",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
+					{Name: flowengine.ActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionPasskeyRegister: {Target: "done"},
+					flowengine.ActionPasskeyRegister: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -129,17 +129,17 @@ func TestFlowStateMachine_Process_PasskeyRegisterOmittedRequiredFieldKeepsStep(t
 	// No IssueChallenge expectation: the missing required
 	// field must halt before any challenge is minted.
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.Step)
@@ -190,20 +190,20 @@ func nestedProfileDefinition() *domain.FlowDefinition {
 				Name:   "profile",
 				Fields: []domain.Field{"email", "address.street"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "confirm"},
+					flowengine.ActionSubmit: {Target: "confirm"},
 				},
 			},
 			{
 				Name:   "confirm",
 				Fields: []domain.Field{"address.street", "address.city", "address.geo.label"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "done"},
+					flowengine.ActionSubmit: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -227,10 +227,10 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		AnyTimes()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
@@ -241,8 +241,8 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 	assert.Equal(t, domain.FlowFieldTypeText, streetField.Type)
 	assert.False(t, streetField.Required, "leaf under an optional parent is not required")
 
-	res, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	res, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"email":          "alice@example.com",
 			"address.street": "Main Street 1",
@@ -268,8 +268,8 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 	// A second step writing different leaves of the same object merges into
 	// the map already in state instead of replacing it, and a leaf more than
 	// one level down builds the intermediate objects it descends through.
-	final, err := w.sm.Process(t.Context(), def, res.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	final, err := w.sm.Process(t.Context(), served(def), res.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{
 			"address.street":    "Main Street 1",
 			"address.city":      "Zurich",
@@ -290,7 +290,7 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 
 // walkToSetPassword starts the multi-step sign-up and submits the profile
 // step, which leads to the step that sets the password.
-func walkToSetPassword(t *testing.T, w *flowTestWorld) (*domain.FlowDefinition, flowengine.FlowStepResult, error) {
+func walkToSetPassword(t *testing.T, w *flowTestWorld) (*domain.FlowDefinition, flowengine.StepResult, error) {
 	t.Helper()
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
@@ -303,15 +303,15 @@ func walkToSetPassword(t *testing.T, w *flowTestWorld) (*domain.FlowDefinition, 
 		Times(1)
 
 	def := multiStepSignupDefinition()
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": "newcomer@example.com"},
 	})
 	return def, result, err
@@ -332,8 +332,8 @@ func TestFlowStateMachine_NewPasswordStepCarriesThePolicyBounds(t *testing.T) {
 	assert.Equal(t, &domain.FlowFieldValidation{MinLength: 12, MaxLength: 32}, result.Step.Fields[0].Validation)
 	assert.Equal(t, 1, w.passwords.calls, "rendering the step reads the policy once")
 
-	refused, err := w.sm.Process(t.Context(), def, result.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	refused, err := w.sm.Process(t.Context(), served(def), result.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "ninechars"},
 	})
 	require.NoError(t, err)

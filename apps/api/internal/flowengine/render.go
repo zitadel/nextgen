@@ -11,39 +11,54 @@ import (
 // Render re-emits the current step without advancing. It refreshes IssuedAt
 // only when it resolves a parked SSO identity, the one render the handler
 // re-seals.
-func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState) (FlowStepResult, error) {
-	if def == nil || state == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", domain.ErrFlowIntegrity())
+func (r *Runtime) Render(ctx context.Context, defs Definitions, state *State) (StepResult, error) {
+	if defs == nil || state == nil {
+		return StepResult{}, fmt.Errorf("%w: render without definition or state", domain.ErrFlowIntegrity())
 	}
+	def, err := ActiveDefinition(ctx, defs, state)
+	if err != nil {
+		return StepResult{}, err
+	}
+	result, err := r.render(ctx, def, state)
+	if err != nil {
+		return result, err
+	}
+	announceSignupGate(def, &result)
+	return result, nil
+}
+
+// render renders the current step, or the step a parked SSO identity
+// resolves to.
+func (r *Runtime) render(ctx context.Context, def *domain.FlowDefinition, state *State) (StepResult, error) {
 	if result, reseal, err := r.resolveSSOIdentity(ctx, def, state); err != nil || result.Step != nil {
 		result.Reseal = reseal
 		return result, err
 	}
 	step, err := r.renderStep(ctx, def, state)
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	// Re-emit an in-flight ceremony so a page reload can resume it.
 	attachPendingChallenge(step, state.PendingChallenge)
-	return FlowStepResult{State: state, Step: step}, nil
+	return StepResult{State: state, Step: step}, nil
 }
 
 // renderStepError re-renders the current step with an error key set,
 // so the user stays put and sees what went wrong.
-func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved domain.FlowResolvedFields, failure *domain.FlowStepFailure) (FlowStepResult, error) {
+func (r *Runtime) renderStepError(pc *processCtx, resolved domain.FlowResolvedFields, failure *domain.FlowStepFailure) (StepResult, error) {
 	step, err := r.buildStep(pc.ctx, pc.state, pc.currentStep, resolved, failure, nil, nil)
 	if err != nil {
-		return FlowStepResult{}, err
+		return StepResult{}, err
 	}
 	pc.state.IssuedAt = r.now()
-	return FlowStepResult{State: pc.state, Step: step}, nil
+	return StepResult{State: pc.state, Step: step}, nil
 }
 
 // renderStep renders the step currently pinned by state.CurrentStep.
 // Callers advance state before invoking so state.CurrentStep already points
 // at the step they want rendered. Back does not come through here: it
 // resolves its target once and builds from that set.
-func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState) (*FlowStep, error) {
+func (r *Runtime) renderStep(ctx context.Context, def *domain.FlowDefinition, state *State) (*Step, error) {
 	step, ok := def.FindStep(state.CurrentStep)
 	if !ok {
 		return nil, fmt.Errorf("%w: render unknown step %q", domain.ErrFlowIntegrity(), state.CurrentStep)
@@ -60,11 +75,11 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *domain.Fl
 	return r.buildStep(ctx, state, step, resolved, nil, step.Complete, nil)
 }
 
-// buildStep assembles a FlowStep from the raw pieces. The step it renders is
+// buildStep assembles a Step from the raw pieces. The step it renders is
 // always the caller's to name: Start and renderStep supply state + step
 // directly, mid-pipeline callers pass pc.state + pc.currentStep, and
 // the back handler passes pc.state with the back-stack step it just popped to.
-func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep, resolved domain.FlowResolvedFields, failure *domain.FlowStepFailure, complete *domain.FlowStepComplete, redirectURL *string) (*FlowStep, error) {
+func (r *Runtime) buildStep(ctx context.Context, state *State, step *domain.FlowDefinitionStep, resolved domain.FlowResolvedFields, failure *domain.FlowStepFailure, complete *domain.FlowStepComplete, redirectURL *string) (*Step, error) {
 	providers, err := r.resolveSSOProviders(ctx, state, step)
 	if err != nil {
 		return nil, err
@@ -83,7 +98,7 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *domain.F
 	// Surface only user-selectable actions declared on the step.
 	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
 	// but are engine-emitted routing keys, not buttons for the client.
-	actions := make([]FlowAction, 0, len(step.Actions)+1)
+	actions := make([]StepAction, 0, len(step.Actions)+1)
 	for _, a := range step.Actions {
 		if a.Kind == domain.FlowActionKindPasskey && !offerPasskey {
 			continue
@@ -92,7 +107,7 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *domain.F
 		if textKey == "" {
 			textKey = step.Name + ".action." + a.Name
 		}
-		actions = append(actions, FlowAction{
+		actions = append(actions, StepAction{
 			Name:    a.Name,
 			Kind:    a.Kind,
 			TextKey: textKey,
@@ -102,7 +117,7 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *domain.F
 	// Inject `back` when there's somewhere to return to. TextKey
 	// follows the `<step>.action.<name>` convention.
 	if len(state.BackStack) > 0 && step.Complete == nil {
-		actions = append(actions, FlowAction{
+		actions = append(actions, StepAction{
 			Name:    domain.FlowBackActionName,
 			Kind:    domain.FlowActionKindBack,
 			TextKey: step.Name + ".action." + domain.FlowBackActionName,
@@ -120,9 +135,9 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *domain.F
 	if failure != nil {
 		errorKey = &failure.Key
 	}
-	return &FlowStep{
+	return &Step{
 		Name:         step.Name,
-		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: descriptionKey},
+		Texts:        StepTexts{TitleKey: step.Name + ".title", DescriptionKey: descriptionKey},
 		Purpose:      state.CurrentPurpose,
 		Error:        errorKey,
 		Failure:      failure,
@@ -149,7 +164,7 @@ func applyAutocomplete(fields []domain.FlowField, purpose domain.FlowDefinitionP
 // the password input so a manager can store the two as one credential.
 // Nil unless the step collects a password, collects no identifier of its
 // own, and the schema designates one a value was collected for.
-func pairedIdentifier(resolved domain.FlowResolvedFields, collected map[string]any) *FlowStepIdentifier {
+func pairedIdentifier(resolved domain.FlowResolvedFields, collected map[string]any) *StepIdentifier {
 	if resolved.IdentifierName == "" {
 		return nil
 	}
@@ -169,7 +184,7 @@ func pairedIdentifier(resolved domain.FlowResolvedFields, collected map[string]a
 	if !ok {
 		return nil
 	}
-	return &FlowStepIdentifier{
+	return &StepIdentifier{
 		Value:        value,
 		Autocomplete: domain.AutocompleteUsername,
 	}

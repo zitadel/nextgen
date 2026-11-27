@@ -109,7 +109,7 @@ func proofRejectedResult(cause error) metrics.AuthResult {
 
 // flowResult classifies where a flow engine operation left the flow: at a
 // step the client renders next, at a terminal step, or in an error.
-func flowResult(res flowengine.FlowStepResult, err error) metrics.FlowResult {
+func flowResult(res flowengine.StepResult, err error) metrics.FlowResult {
 	switch {
 	case err != nil:
 		return metrics.FlowFailed

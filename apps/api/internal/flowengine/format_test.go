@@ -44,10 +44,10 @@ func flowFormatDefinition(purpose domain.FlowDefinitionPurpose) *domain.FlowDefi
 				Name:   "identify",
 				Fields: []domain.Field{"employee"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit:                 {Target: "next"},
+					flowengine.ActionSubmit:                     {Target: "next"},
 					domain.FlowImplicitOutcomeUserNotFound:      {Target: "not_found"},
 					domain.FlowImplicitOutcomeUserAlreadyExists: {Target: "existing"},
 				},
@@ -59,17 +59,17 @@ func flowFormatDefinition(purpose domain.FlowDefinitionPurpose) *domain.FlowDefi
 	}
 }
 
-func startFormatFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) *domain.FlowState {
+func startFormatFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) *flowengine.State {
 	t.Helper()
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, flowFormatSchema), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       purpose,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
@@ -91,8 +91,8 @@ func TestFlowStateMachine_Process_IdentifierFailingItsFormat(t *testing.T) {
 			def := flowFormatDefinition(purpose)
 			state := startFormatFlow(t, w, def, purpose)
 
-			result, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{
-				Action: flowengine.FlowActionSubmit,
+			result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
+				Action: flowengine.ActionSubmit,
 				Fields: map[string]any{"employee": legacyIdentifier},
 			})
 			require.NoError(t, err)
@@ -115,7 +115,7 @@ func TestFlowStateMachine_Process_SSOCollectionHoldsIdentifierToItsFormat(t *tes
 	verified["email"] = false
 	w.expectCollected(unlinkedParked(claims, verified), nil).AnyTimes()
 
-	result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(fields map[string]any) {
+	result, err := w.sm.Process(t.Context(), served(def), state, collectionSubmit(func(fields map[string]any) {
 		fields["email"] = "not-an-email"
 	}))
 	require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestFlowStateMachine_Process_SSOCollectionHoldsIdentifierToItsFormat(t *tes
 func TestFlowStateMachine_Process_BlankOptionalFormattedField(t *testing.T) {
 	t.Parallel()
 	const purpose = domain.FlowDefinitionPurposeRegister
-	build := func(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	build := func(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *flowengine.State) {
 		t.Helper()
 		w := newFlowTestWorld(t)
 		def := flowFormatDefinition(purpose)
@@ -141,7 +141,7 @@ func TestFlowStateMachine_Process_BlankOptionalFormattedField(t *testing.T) {
 			SubmitIdentifier(gomock.Any(), identifiedBy("attempt-1", "employee", uuidIdentifier)).
 			Return("", domain.ErrAuthAttemptProofRejected(nil)).
 			AnyTimes()
-		w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(domain.FlowHandoffOutput{}, nil).AnyTimes()
+		w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(flowengine.HandoffOutput{}, nil).AnyTimes()
 		return w, def, state
 	}
 
@@ -149,8 +149,8 @@ func TestFlowStateMachine_Process_BlankOptionalFormattedField(t *testing.T) {
 		t.Parallel()
 		w, def, state := build(t)
 		state.CollectedData.UserData = map[string]any{"homepage": "https://stale.example.com"}
-		result, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{
-			Action: flowengine.FlowActionSubmit,
+		result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
+			Action: flowengine.ActionSubmit,
 			Fields: map[string]any{"employee": uuidIdentifier, "homepage": "", "seen": ""},
 		})
 		require.NoError(t, err)
@@ -169,8 +169,8 @@ func TestFlowStateMachine_Process_BlankOptionalFormattedField(t *testing.T) {
 	t.Run("a filled one is held to the format on its own step", func(t *testing.T) {
 		t.Parallel()
 		w, def, state := build(t)
-		result, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{
-			Action: flowengine.FlowActionSubmit,
+		result, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
+			Action: flowengine.ActionSubmit,
 			Fields: map[string]any{"employee": uuidIdentifier, "homepage": "no scheme"},
 		})
 		require.NoError(t, err)

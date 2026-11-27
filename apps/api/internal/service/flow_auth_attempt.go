@@ -5,14 +5,17 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
+
+	"github.com/zitadel/nextgen/internal/flowengine"
 )
 
-// FlowAuthAttemptAdapter adapts the broad [AuthAttemptService] surface
-// to the narrow [domain.FlowAuthAttemptService] the flow state machine
-// consumes. Each Submit* collapses the underlying issue-then-verify
-// cycle so the state machine never deals with challenge IDs.
-type FlowAuthAttemptAdapter struct {
+// FlowAuthAttempts implements [flowengine.AuthAttemptService] over the
+// broader [AuthAttemptService]. Each Submit* collapses the underlying
+// issue-then-verify cycle so the state machine never deals with challenge IDs.
+type FlowAuthAttempts struct {
 	attempts AuthAttemptService
+	// db backs the reads that only inspect the attempt.
+	db StatementPool
 	// schemaStore backs the create-user action a provisional passkey
 	// registration applies inside its verify transaction.
 	schemaStore domain.JSONSchemaStore
@@ -21,13 +24,13 @@ type FlowAuthAttemptAdapter struct {
 	protection SignupProtection
 }
 
-func NewFlowAuthAttemptAdapter(attempts AuthAttemptService, schemaStore domain.JSONSchemaStore, protection SignupProtection) *FlowAuthAttemptAdapter {
-	return &FlowAuthAttemptAdapter{attempts: attempts, schemaStore: schemaStore, protection: protection}
+func NewFlowAuthAttempts(attempts AuthAttemptService, db StatementPool, schemaStore domain.JSONSchemaStore, protection SignupProtection) *FlowAuthAttempts {
+	return &FlowAuthAttempts{attempts: attempts, db: db, schemaStore: schemaStore, protection: protection}
 }
 
-var _ domain.FlowAuthAttemptService = (*FlowAuthAttemptAdapter)(nil)
+var _ flowengine.AuthAttemptService = (*FlowAuthAttempts)(nil)
 
-func (a *FlowAuthAttemptAdapter) Start(ctx context.Context, in domain.FlowCreateAttemptInput) (string, error) {
+func (a *FlowAuthAttempts) Start(ctx context.Context, in flowengine.CreateAttemptInput) (string, error) {
 	attempt, err := a.attempts.Create(ctx, CreateAuthAttemptInput{
 		ProjectID:      in.ProjectID,
 		SessionID:      in.SessionID,
@@ -40,7 +43,15 @@ func (a *FlowAuthAttemptAdapter) Start(ctx context.Context, in domain.FlowCreate
 	return attempt.ID, nil
 }
 
-func (a *FlowAuthAttemptAdapter) SubmitIdentifier(ctx context.Context, in domain.FlowSubmitIdentifierInput) (string, error) {
+func (a *FlowAuthAttempts) Usable(ctx context.Context, projectID, attemptID string) (bool, error) {
+	attempt, err := a.db.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
+	if err != nil {
+		return false, fmt.Errorf("flow auth attempts: read auth attempt: %w", err)
+	}
+	return !attempt.IsExpired() && !attempt.IsHandedOff(), nil
+}
+
+func (a *FlowAuthAttempts) SubmitIdentifier(ctx context.Context, in flowengine.SubmitIdentifierInput) (string, error) {
 	challengeID, err := a.issueChallengeID(ctx, in.ProjectID, in.AttemptID, UserChallenge{}, domain.AuthCheckTypeUser)
 	if err != nil {
 		return "", err
@@ -61,29 +72,29 @@ func (a *FlowAuthAttemptAdapter) SubmitIdentifier(ctx context.Context, in domain
 	}
 	factor, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
 	if !ok {
-		return "", fmt.Errorf("flow auth-attempt adapter: user factor missing after verify")
+		return "", fmt.Errorf("flow auth attempts: user factor missing after verify")
 	}
 	return factor.UserID, nil
 }
 
-func (a *FlowAuthAttemptAdapter) Handoff(ctx context.Context, in domain.FlowHandoffInput) (domain.FlowHandoffOutput, error) {
+func (a *FlowAuthAttempts) Handoff(ctx context.Context, in flowengine.HandoffInput) (flowengine.HandoffOutput, error) {
 	attempt, err := a.attempts.Handoff(ctx, HandoffInput{
 		ProjectID: in.ProjectID,
 		AttemptID: in.AttemptID,
 	})
 	if err != nil {
-		return domain.FlowHandoffOutput{}, err
+		return flowengine.HandoffOutput{}, err
 	}
 	if attempt.HandoffToken == nil {
-		return domain.FlowHandoffOutput{}, fmt.Errorf("flow auth-attempt adapter: handoff token missing after handoff")
+		return flowengine.HandoffOutput{}, fmt.Errorf("flow auth attempts: handoff token missing after handoff")
 	}
-	return domain.FlowHandoffOutput{
+	return flowengine.HandoffOutput{
 		Token:     attempt.HandoffToken.Plain(),
 		ExpiresAt: attempt.HandoffToken.ExpiresAt(attempt.HandedOffAt),
 	}, nil
 }
 
-func (a *FlowAuthAttemptAdapter) SubmitPassword(ctx context.Context, in domain.FlowSubmitPasswordInput) error {
+func (a *FlowAuthAttempts) SubmitPassword(ctx context.Context, in flowengine.SubmitPasswordInput) error {
 	challengeID, err := a.issueChallengeID(ctx, in.ProjectID, in.AttemptID, PasswordChallenge{}, domain.AuthCheckTypePassword)
 	if err != nil {
 		return err
@@ -97,7 +108,7 @@ func (a *FlowAuthAttemptAdapter) SubmitPassword(ctx context.Context, in domain.F
 	return err
 }
 
-func (a *FlowAuthAttemptAdapter) issueChallengeID(ctx context.Context, projectID, attemptID string, challenge Challenge, typ domain.AuthCheckType) (string, error) {
+func (a *FlowAuthAttempts) issueChallengeID(ctx context.Context, projectID, attemptID string, challenge Challenge, typ domain.AuthCheckType) (string, error) {
 	attempt, err := a.attempts.IssueChallenge(ctx, IssueChallengeInput{
 		ProjectID: projectID,
 		AttemptID: attemptID,
@@ -108,7 +119,7 @@ func (a *FlowAuthAttemptAdapter) issueChallengeID(ctx context.Context, projectID
 	}
 	ch, ok := attempt.ChallengeByType(typ)
 	if !ok {
-		return "", fmt.Errorf("flow auth-attempt adapter: challenge %d missing after issue", typ)
+		return "", fmt.Errorf("flow auth attempts: challenge %d missing after issue", typ)
 	}
 	return ch.GetID(), nil
 }
@@ -116,38 +127,38 @@ func (a *FlowAuthAttemptAdapter) issueChallengeID(ctx context.Context, projectID
 // IssueChallenge issues the challenge its params describe and returns its id
 // plus the options the client runs the ceremony with. Unlike the Submit*
 // methods it does not verify — the proof arrives on a later submit (see
-// [FlowAuthAttemptAdapter.VerifyChallenge]).
-func (a *FlowAuthAttemptAdapter) IssueChallenge(ctx context.Context, in domain.FlowIssueChallengeInput) (domain.FlowIssuedChallenge, error) {
+// [FlowAuthAttempts.VerifyChallenge]).
+func (a *FlowAuthAttempts) IssueChallenge(ctx context.Context, in flowengine.IssueChallengeInput) (flowengine.IssuedChallenge, error) {
 	switch params := in.Params.(type) {
-	case domain.FlowPasskeyChallengeParams:
+	case flowengine.PasskeyChallengeParams:
 		return a.issuePasskeyChallenge(ctx, in, params)
-	case domain.FlowPasskeyRegistrationChallengeParams:
+	case flowengine.PasskeyRegistrationChallengeParams:
 		return a.issuePasskeyRegistrationChallenge(ctx, in, params)
 	default:
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: unsupported challenge params %T", in.Params)
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: unsupported challenge params %T", in.Params)
 	}
 }
 
 // VerifyChallenge verifies the proof against the challenge identified by
 // ChallengeID, by the check it was issued as.
-func (a *FlowAuthAttemptAdapter) VerifyChallenge(ctx context.Context, in domain.FlowVerifyChallengeInput) (string, error) {
+func (a *FlowAuthAttempts) VerifyChallenge(ctx context.Context, in flowengine.VerifyChallengeInput) (string, error) {
 	switch in.Check {
 	case domain.AuthCheckTypePasskey:
 		return a.verifyPasskey(ctx, in)
 	case domain.AuthCheckTypePasskeyRegistration:
 		return "", a.verifyPasskeyRegistration(ctx, in)
 	default:
-		return "", fmt.Errorf("flow auth-attempt adapter: unsupported challenge check %s", in.Check)
+		return "", fmt.Errorf("flow auth attempts: unsupported challenge check %s", in.Check)
 	}
 }
 
 // issuePasskeyChallenge issues a WebAuthn assertion challenge; its options are
 // the PublicKeyCredentialRequestOptions the browser hands to
 // navigator.credentials.get().
-func (a *FlowAuthAttemptAdapter) issuePasskeyChallenge(ctx context.Context, in domain.FlowIssueChallengeInput, params domain.FlowPasskeyChallengeParams) (domain.FlowIssuedChallenge, error) {
+func (a *FlowAuthAttempts) issuePasskeyChallenge(ctx context.Context, in flowengine.IssueChallengeInput, params flowengine.PasskeyChallengeParams) (flowengine.IssuedChallenge, error) {
 	origins, err := parseOrigins(params.RPOrigins)
 	if err != nil {
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: %w", err)
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: %w", err)
 	}
 
 	attempt, err := a.attempts.IssueChallenge(ctx, IssueChallengeInput{
@@ -160,28 +171,28 @@ func (a *FlowAuthAttemptAdapter) issuePasskeyChallenge(ctx context.Context, in d
 		},
 	})
 	if err != nil {
-		return domain.FlowIssuedChallenge{}, err
+		return flowengine.IssuedChallenge{}, err
 	}
 
 	ch, ok := attempt.ChallengeByType(domain.AuthCheckTypePasskey)
 	if !ok {
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: passkey challenge missing after issue")
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: passkey challenge missing after issue")
 	}
 	passkeyCh, ok := ch.(*domain.AuthChallengePasskey)
 	if !ok {
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: unexpected passkey challenge type %T", ch)
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: unexpected passkey challenge type %T", ch)
 	}
 	options, err := domain.BuildPasskeyRequestOptions(passkeyCh)
 	if err != nil {
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: build passkey options: %w", err)
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: build passkey options: %w", err)
 	}
-	return domain.FlowIssuedChallenge{ChallengeID: ch.GetID(), Options: options}, nil
+	return flowengine.IssuedChallenge{ChallengeID: ch.GetID(), Options: options}, nil
 }
 
 // verifyPasskey verifies the assertion and returns the authenticated user id
 // (resolved from the assertion for a discoverable login, or the
 // already-pinned user otherwise).
-func (a *FlowAuthAttemptAdapter) verifyPasskey(ctx context.Context, in domain.FlowVerifyChallengeInput) (string, error) {
+func (a *FlowAuthAttempts) verifyPasskey(ctx context.Context, in flowengine.VerifyChallengeInput) (string, error) {
 	attempt, err := a.attempts.VerifyProof(ctx, VerifyProofInput{
 		ProjectID:   in.ProjectID,
 		AttemptID:   in.AttemptID,
@@ -193,7 +204,7 @@ func (a *FlowAuthAttemptAdapter) verifyPasskey(ctx context.Context, in domain.Fl
 	}
 	factor, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
 	if !ok {
-		return "", fmt.Errorf("flow auth-attempt adapter: user factor missing after passkey verify")
+		return "", fmt.Errorf("flow auth attempts: user factor missing after passkey verify")
 	}
 	return factor.UserID, nil
 }
@@ -202,10 +213,10 @@ func (a *FlowAuthAttemptAdapter) verifyPasskey(ctx context.Context, in domain.Fl
 // it returns the (possibly minted) user handle, and its options are the
 // PublicKeyCredentialCreationOptions the browser hands to
 // navigator.credentials.create().
-func (a *FlowAuthAttemptAdapter) issuePasskeyRegistrationChallenge(ctx context.Context, in domain.FlowIssueChallengeInput, params domain.FlowPasskeyRegistrationChallengeParams) (domain.FlowIssuedChallenge, error) {
+func (a *FlowAuthAttempts) issuePasskeyRegistrationChallenge(ctx context.Context, in flowengine.IssueChallengeInput, params flowengine.PasskeyRegistrationChallengeParams) (flowengine.IssuedChallenge, error) {
 	origins, err := parseOrigins(params.RPOrigins)
 	if err != nil {
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: %w", err)
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: %w", err)
 	}
 
 	attempt, err := a.attempts.IssueChallenge(ctx, IssueChallengeInput{
@@ -220,22 +231,22 @@ func (a *FlowAuthAttemptAdapter) issuePasskeyRegistrationChallenge(ctx context.C
 		},
 	})
 	if err != nil {
-		return domain.FlowIssuedChallenge{}, err
+		return flowengine.IssuedChallenge{}, err
 	}
 
 	ch, ok := attempt.ChallengeByType(domain.AuthCheckTypePasskeyRegistration)
 	if !ok {
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: registration challenge missing after issue")
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: registration challenge missing after issue")
 	}
 	registrationCh, ok := ch.(*domain.AuthChallengePasskeyRegistration)
 	if !ok {
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: unexpected registration challenge type %T", ch)
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: unexpected registration challenge type %T", ch)
 	}
 	options, err := domain.BuildPasskeyCreationOptions(registrationCh)
 	if err != nil {
-		return domain.FlowIssuedChallenge{}, fmt.Errorf("flow auth-attempt adapter: build creation options: %w", err)
+		return flowengine.IssuedChallenge{}, fmt.Errorf("flow auth attempts: build creation options: %w", err)
 	}
-	return domain.FlowIssuedChallenge{
+	return flowengine.IssuedChallenge{
 		ChallengeID: ch.GetID(),
 		UserID:      registrationCh.UserID,
 		Options:     options,
@@ -248,7 +259,7 @@ func (a *FlowAuthAttemptAdapter) issuePasskeyRegistrationChallenge(ctx context.C
 // authoritative user handle, and only when that challenge is provisional.
 // That makes it a sign-up, so the factory spends the flow's sign-up proof
 // before it builds the user.
-func (a *FlowAuthAttemptAdapter) verifyPasskeyRegistration(ctx context.Context, in domain.FlowVerifyChallengeInput) error {
+func (a *FlowAuthAttempts) verifyPasskeyRegistration(ctx context.Context, in flowengine.VerifyChallengeInput) error {
 	_, err := a.attempts.VerifyProof(ctx, VerifyProofInput{
 		ProjectID:   in.ProjectID,
 		AttemptID:   in.AttemptID,

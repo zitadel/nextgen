@@ -112,8 +112,8 @@ type SSOCallbackResult struct {
 	// is keyed like Claims, the same as idp.ExternalIdentity.Verified.
 	Verified map[string]bool `json:"verified,omitempty"`
 	// ErrorKey is set when the ceremony failed after the state was consumed:
-	// [FlowStepErrorSSOCancelled] when the provider reported access_denied,
-	// [FlowStepErrorSSOFailed] for every other failure. The provider's own
+	// [flowengine.StepErrorSSOCancelled] when the provider reported access_denied,
+	// [flowengine.StepErrorSSOFailed] for every other failure. The provider's own
 	// error text goes to the server log only, never into the record. An error
 	// result carries only this key: no subject, no claims, no verified map.
 	ErrorKey string `json:"error_key,omitempty"`

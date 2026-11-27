@@ -34,24 +34,24 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 				Name:   "step",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionPasskey},
-					{Name: flowengine.FlowActionSubmit, Primary: true},
+					{Name: flowengine.ActionPasskey},
+					{Name: flowengine.ActionSubmit, Primary: true},
 					{Name: "register"},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionPasskey: {Target: "done"},
-					flowengine.FlowActionSubmit:  {Target: "done"},
-					"register":                   {Target: "done"},
+					flowengine.ActionPasskey: {Target: "done"},
+					flowengine.ActionSubmit:  {Target: "done"},
+					"register":               {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
 		},
 	}
 
-	result, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	result, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 	for i, a := range result.Step.Actions {
 		gotNames[i] = a.Name
 	}
-	assert.Equal(t, []string{flowengine.FlowActionPasskey, flowengine.FlowActionSubmit, "register"}, gotNames)
+	assert.Equal(t, []string{flowengine.ActionPasskey, flowengine.ActionSubmit, "register"}, gotNames)
 }
 
 // twoStepLoginDefinition collects the identifier and the password on
@@ -79,10 +79,10 @@ func twoStepLoginDefinition() *domain.FlowDefinition {
 				Name:   "identifier",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit:            {Target: "password"},
+					flowengine.ActionSubmit:                {Target: "password"},
 					domain.FlowImplicitOutcomeUserNotFound: {Target: "done"},
 				},
 			},
@@ -90,10 +90,10 @@ func twoStepLoginDefinition() *domain.FlowDefinition {
 				Name:   "password",
 				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "done"},
+					flowengine.ActionSubmit: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -120,10 +120,10 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 
 	def := twoStepLoginDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
@@ -135,8 +135,8 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 	assert.Equal(t, domain.AutocompleteUsername, start.Step.Fields[0].Autocomplete)
 	assert.Nil(t, start.Step.Identifier)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
 	require.NoError(t, err)
@@ -174,16 +174,16 @@ func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T
 
 	def := twoStepLoginDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	advanced, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	advanced, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
 	require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T
 	// Re-render the same state, as a page reload does. Every render reads
 	// the attempt for a parked SSO identity; there is none here.
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(nil, nil)
-	reloaded, err := w.sm.Render(t.Context(), def, advanced.State)
+	reloaded, err := w.sm.Render(t.Context(), served(def), advanced.State)
 	require.NoError(t, err)
 	require.NotNil(t, reloaded.Step)
 	require.Equal(t, "password", reloaded.Step.Name)
@@ -226,17 +226,17 @@ func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testin
 
 	def := multiStepSignupDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "profile", start.Step.Name)
 
-	result, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	result, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
 	require.NoError(t, err)
@@ -262,10 +262,10 @@ func TestFlowStateMachine_SingleCardLogin_NeedsNoPairingHint(t *testing.T) {
 
 	def := loginDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)

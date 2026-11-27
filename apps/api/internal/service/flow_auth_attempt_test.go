@@ -8,11 +8,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
-// fakeAuthAttempts captures the AuthAttemptService calls the adapter
+// fakeAuthAttempts captures the AuthAttemptService calls FlowAuthAttempts
 // drives so tests can assert the issue-then-verify sequencing.
 type fakeAuthAttempts struct {
 	createIn         service.CreateAuthAttemptInput
@@ -90,11 +94,11 @@ func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _ string, che
 }
 
 func (f *fakeAuthAttempts) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {
-	return nil, errors.New("not used by the flow adapter")
+	return nil, errors.New("not used by FlowAuthAttempts")
 }
 
 func (f *fakeAuthAttempts) FinishPasskeyEnrollment(context.Context, service.FinishPasskeyEnrollmentInput) (*service.FinishPasskeyEnrollmentOutput, error) {
-	return nil, errors.New("not used by the flow adapter")
+	return nil, errors.New("not used by FlowAuthAttempts")
 }
 
 func attemptWithUserChallenge(id string) *domain.AuthAttempt {
@@ -118,13 +122,13 @@ func attemptWithPasswordChallenge(challengeID string) *domain.AuthAttempt {
 	return att
 }
 
-func TestFlowAuthAttemptAdapter_Start_ReturnsAttemptID(t *testing.T) {
+func TestFlowAuthAttempts_Start_ReturnsAttemptID(t *testing.T) {
 	fake := &fakeAuthAttempts{
 		createAttempt: &domain.AuthAttempt{ProjectID: "proj-1", ID: "att-1"},
 	}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	id, err := adapter.Start(context.Background(), domain.FlowCreateAttemptInput{
+	id, err := flowAttempts.Start(context.Background(), flowengine.CreateAttemptInput{
 		ProjectID: "proj-1",
 		FlowID:    "flow-1",
 	})
@@ -134,14 +138,52 @@ func TestFlowAuthAttemptAdapter_Start_ReturnsAttemptID(t *testing.T) {
 	assert.Equal(t, "flow-1", fake.createIn.FlowID)
 }
 
-func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {
+// attemptDB answers one read of the attempt att-1 in project proj.
+func attemptDB(t *testing.T, attempt *domain.AuthAttempt, readErr error) *service.DB {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(attempt, readErr).Times(1)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	return service.NewPool(pool)
+}
+
+func TestFlowAuthAttempts_Usable(t *testing.T) {
+	readFailed := errors.New("read failed")
+	for _, tc := range []struct {
+		name    string
+		attempt *domain.AuthAttempt
+		readErr error
+		usable  bool
+	}{
+		{name: "live", attempt: &domain.AuthAttempt{ProjectID: "proj", ID: "att-1", CreatedAt: time.Now(), TimeToLive: new(time.Hour)}, usable: true},
+		{name: "expired", attempt: &domain.AuthAttempt{ProjectID: "proj", ID: "att-1", CreatedAt: time.Now().Add(-time.Hour), TimeToLive: new(time.Minute)}},
+		{name: "handed off", attempt: &domain.AuthAttempt{ProjectID: "proj", ID: "att-1", HandoffToken: &domain.HandoffToken{}}},
+		{name: "read fails", readErr: readFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			flowAttempts := service.NewFlowAuthAttempts(&fakeAuthAttempts{}, attemptDB(t, tc.attempt, tc.readErr), nil, nil)
+
+			usable, err := flowAttempts.Usable(t.Context(), "proj", "att-1")
+			if tc.readErr != nil {
+				require.ErrorIs(t, err, tc.readErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.usable, usable)
+		})
+	}
+}
+
+func TestFlowAuthAttempts_SubmitIdentifier_HappyPath(t *testing.T) {
 	fake := &fakeAuthAttempts{
 		issueAttempt:  attemptWithUserChallenge("ch-user"),
 		verifyAttempt: attemptWithUserFactor("ch-user", "user-1"),
 	}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	userID, err := adapter.SubmitIdentifier(context.Background(), domain.FlowSubmitIdentifierInput{
+	userID, err := flowAttempts.SubmitIdentifier(context.Background(), flowengine.SubmitIdentifierInput{
 		ProjectID:     "proj-1",
 		AttemptID:     "att-1",
 		AttributeName: "email",
@@ -163,14 +205,14 @@ func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {
 	assert.Equal(t, "sch_human", proof.UserSchemaURL)
 }
 
-func TestFlowAuthAttemptAdapter_SubmitIdentifier_ProofRejectedSurfaces(t *testing.T) {
+func TestFlowAuthAttempts_SubmitIdentifier_ProofRejectedSurfaces(t *testing.T) {
 	fake := &fakeAuthAttempts{
 		issueAttempt: attemptWithUserChallenge("ch-user"),
 		verifyErr:    domain.ErrAuthAttemptProofRejected(errors.New("no such user")),
 	}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	_, err := adapter.SubmitIdentifier(context.Background(), domain.FlowSubmitIdentifierInput{
+	_, err := flowAttempts.SubmitIdentifier(context.Background(), flowengine.SubmitIdentifierInput{
 		ProjectID:     "proj-1",
 		AttemptID:     "att-1",
 		AttributeName: "email",
@@ -179,14 +221,14 @@ func TestFlowAuthAttemptAdapter_SubmitIdentifier_ProofRejectedSurfaces(t *testin
 	assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
 }
 
-func TestFlowAuthAttemptAdapter_SubmitPassword_HappyPath(t *testing.T) {
+func TestFlowAuthAttempts_SubmitPassword_HappyPath(t *testing.T) {
 	fake := &fakeAuthAttempts{
 		issueAttempt:  attemptWithPasswordChallenge("ch-pw"),
 		verifyAttempt: &domain.AuthAttempt{},
 	}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	err := adapter.SubmitPassword(context.Background(), domain.FlowSubmitPasswordInput{
+	err := flowAttempts.SubmitPassword(context.Background(), flowengine.SubmitPasswordInput{
 		ProjectID: "proj-1",
 		AttemptID: "att-1",
 		Plain:     "correct-horse-battery-staple",
@@ -201,14 +243,14 @@ func TestFlowAuthAttemptAdapter_SubmitPassword_HappyPath(t *testing.T) {
 	assert.Equal(t, "correct-horse-battery-staple", proof.Password)
 }
 
-func TestFlowAuthAttemptAdapter_SubmitPassword_ProofRejectedSurfaces(t *testing.T) {
+func TestFlowAuthAttempts_SubmitPassword_ProofRejectedSurfaces(t *testing.T) {
 	fake := &fakeAuthAttempts{
 		issueAttempt: attemptWithPasswordChallenge("ch-pw"),
 		verifyErr:    domain.ErrAuthAttemptProofRejected(errors.New("hash mismatch")),
 	}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	err := adapter.SubmitPassword(context.Background(), domain.FlowSubmitPasswordInput{
+	err := flowAttempts.SubmitPassword(context.Background(), flowengine.SubmitPasswordInput{
 		ProjectID: "proj-1",
 		AttemptID: "att-1",
 		Plain:     "wrong-password",
@@ -220,23 +262,23 @@ func TestFlowAuthAttemptAdapter_SubmitPassword_ProofRejectedSurfaces(t *testing.
 type recordingSignupProtection struct {
 	stubSignupProtection
 	consumed []string
-	state    *domain.FlowState
+	state    *flowengine.State
 }
 
-func (r *recordingSignupProtection) Consume(_ context.Context, state *domain.FlowState, proof string) error {
+func (r *recordingSignupProtection) Consume(_ context.Context, state *flowengine.State, proof string) error {
 	r.consumed = append(r.consumed, proof)
 	r.state = state
 	return r.err
 }
 
-// submitRegistration runs the adapter's passkey registration and returns the
-// create-user factory it handed the attempt service, which calls it only for
-// a provisional ceremony.
-func submitRegistration(t *testing.T, protection service.SignupProtection, in domain.FlowVerifyChallengeInput) func(context.Context, string) ([]service.UserAction, error) {
+// submitRegistration runs a passkey registration through FlowAuthAttempts and
+// returns the create-user factory it handed the attempt service, which calls
+// it only for a provisional ceremony.
+func submitRegistration(t *testing.T, protection service.SignupProtection, in flowengine.VerifyChallengeInput) func(context.Context, string) ([]service.UserAction, error) {
 	t.Helper()
 	fake := &fakeAuthAttempts{verifyAttempt: &domain.AuthAttempt{}}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, protection)
-	userID, err := adapter.VerifyChallenge(t.Context(), in)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, protection)
+	userID, err := flowAttempts.VerifyChallenge(t.Context(), in)
 	require.NoError(t, err)
 	require.Empty(t, userID, "a registration's user is the one bound at issue")
 	require.Equal(t, "ch-reg", fake.verifyIn.ChallengeID)
@@ -246,14 +288,14 @@ func submitRegistration(t *testing.T, protection service.SignupProtection, in do
 	return proof.CreateUser
 }
 
-func registrationInput(state *domain.FlowState) domain.FlowVerifyChallengeInput {
-	return domain.FlowVerifyChallengeInput{
+func registrationInput(state *flowengine.State) flowengine.VerifyChallengeInput {
+	return flowengine.VerifyChallengeInput{
 		ProjectID:   "proj-1",
 		AttemptID:   "att-1",
 		Check:       domain.AuthCheckTypePasskeyRegistration,
 		ChallengeID: "ch-reg",
 		Proof:       []byte(`{}`),
-		SignUp: &domain.FlowChallengeSignUp{
+		SignUp: &flowengine.ChallengeSignUp{
 			UserSchemaURL:  "sch_human",
 			UserAttributes: map[string]any{"email": "alice@example.com"},
 			State:          state,
@@ -264,8 +306,8 @@ func registrationInput(state *domain.FlowState) domain.FlowVerifyChallengeInput 
 
 // A passkey registration that creates its user is a sign-up: the user is
 // built only after the flow's proof is spent.
-func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_SpendsTheSignupProof(t *testing.T) {
-	state := &domain.FlowState{ID: "flow-1", ProjectID: "proj-1"}
+func TestFlowAuthAttempts_VerifyPasskeyRegistration_SpendsTheSignupProof(t *testing.T) {
+	state := &flowengine.State{ID: "flow-1", ProjectID: "proj-1"}
 	protection := &recordingSignupProtection{}
 	createUser := submitRegistration(t, protection, registrationInput(state))
 	assert.Empty(t, protection.consumed, "verification decides whether the ceremony creates a user")
@@ -277,17 +319,17 @@ func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_SpendsTheSignupProof(t
 	assert.Same(t, state, protection.state, "the proof is bound to the flow it was issued for")
 }
 
-func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_RefusedProofBuildsNoUser(t *testing.T) {
+func TestFlowAuthAttempts_VerifyPasskeyRegistration_RefusedProofBuildsNoUser(t *testing.T) {
 	protection := &recordingSignupProtection{stubSignupProtection: stubSignupProtection{err: domain.ErrFlowProofInvalid()}}
-	createUser := submitRegistration(t, protection, registrationInput(&domain.FlowState{ID: "flow-1", ProjectID: "proj-1"}))
+	createUser := submitRegistration(t, protection, registrationInput(&flowengine.State{ID: "flow-1", ProjectID: "proj-1"}))
 
 	actions, err := createUser(t.Context(), "user_minted")
 	require.ErrorIs(t, err, domain.ErrFlowProofInvalid())
 	assert.Empty(t, actions)
 }
 
-func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_NeedsItsFlow(t *testing.T) {
-	for name, state := range map[string]*domain.FlowState{
+func TestFlowAuthAttempts_VerifyPasskeyRegistration_NeedsItsFlow(t *testing.T) {
+	for name, state := range map[string]*flowengine.State{
 		"no flow":         nil,
 		"another project": {ID: "flow-1", ProjectID: "proj-2"},
 	} {
@@ -301,7 +343,7 @@ func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_NeedsItsFlow(t *testin
 	}
 	t.Run("no sign-up", func(t *testing.T) {
 		protection := &recordingSignupProtection{}
-		in := registrationInput(&domain.FlowState{ID: "flow-1", ProjectID: "proj-1"})
+		in := registrationInput(&flowengine.State{ID: "flow-1", ProjectID: "proj-1"})
 		in.SignUp = nil
 		createUser := submitRegistration(t, protection, in)
 		_, err := createUser(t.Context(), "user_minted")
@@ -312,16 +354,16 @@ func TestFlowAuthAttemptAdapter_VerifyPasskeyRegistration_NeedsItsFlow(t *testin
 
 // A passkey sign-in is issued as a PasskeyChallenge carrying the relying
 // party, and answers with the request options the browser signs.
-func TestFlowAuthAttemptAdapter_IssueChallenge_Passkey(t *testing.T) {
+func TestFlowAuthAttempts_IssueChallenge_Passkey(t *testing.T) {
 	attempt := &domain.AuthAttempt{}
 	attempt.SetPasskeyChallenge(&domain.PasskeyChallenge{Challenge: "Y2hhbGxlbmdl"}).SetID("ch-pk")
 	fake := &fakeAuthAttempts{issueAttempt: attempt}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	out, err := adapter.IssueChallenge(t.Context(), domain.FlowIssueChallengeInput{
+	out, err := flowAttempts.IssueChallenge(t.Context(), flowengine.IssueChallengeInput{
 		ProjectID: "proj-1",
 		AttemptID: "att-1",
-		Params: domain.FlowPasskeyChallengeParams{
+		Params: flowengine.PasskeyChallengeParams{
 			RPID:             "example.com",
 			RPOrigins:        []string{"https://example.com"},
 			UserVerification: "preferred",
@@ -343,7 +385,7 @@ func TestFlowAuthAttemptAdapter_IssueChallenge_Passkey(t *testing.T) {
 
 // A passkey registration is issued as a PasskeyRegistrationChallenge, and
 // answers with the user handle the challenge is bound to.
-func TestFlowAuthAttemptAdapter_IssueChallenge_PasskeyRegistration(t *testing.T) {
+func TestFlowAuthAttempts_IssueChallenge_PasskeyRegistration(t *testing.T) {
 	attempt := &domain.AuthAttempt{}
 	attempt.SetPasskeyRegistrationChallenge(&domain.PasskeyRegistrationChallenge{
 		Challenge: "Y2hhbGxlbmdl",
@@ -352,12 +394,12 @@ func TestFlowAuthAttemptAdapter_IssueChallenge_PasskeyRegistration(t *testing.T)
 		Username:  "alice@example.com",
 	}, true).SetID("ch-reg")
 	fake := &fakeAuthAttempts{issueAttempt: attempt}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	out, err := adapter.IssueChallenge(t.Context(), domain.FlowIssueChallengeInput{
+	out, err := flowAttempts.IssueChallenge(t.Context(), flowengine.IssueChallengeInput{
 		ProjectID: "proj-1",
 		AttemptID: "att-1",
-		Params: domain.FlowPasskeyRegistrationChallengeParams{
+		Params: flowengine.PasskeyRegistrationChallengeParams{
 			Username:    "alice@example.com",
 			DisplayName: "alice@example.com",
 			RPID:        "example.com",
@@ -378,11 +420,11 @@ func TestFlowAuthAttemptAdapter_IssueChallenge_PasskeyRegistration(t *testing.T)
 
 // A passkey sign-in's proof is verified as an assertion, and the user it
 // authenticated comes back.
-func TestFlowAuthAttemptAdapter_VerifyChallenge_Passkey(t *testing.T) {
+func TestFlowAuthAttempts_VerifyChallenge_Passkey(t *testing.T) {
 	fake := &fakeAuthAttempts{verifyAttempt: attemptWithUserFactor("ch-user", "user-1")}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	userID, err := adapter.VerifyChallenge(t.Context(), domain.FlowVerifyChallengeInput{
+	userID, err := flowAttempts.VerifyChallenge(t.Context(), flowengine.VerifyChallengeInput{
 		ProjectID:   "proj-1",
 		AttemptID:   "att-1",
 		Check:       domain.AuthCheckTypePasskey,
@@ -395,11 +437,11 @@ func TestFlowAuthAttemptAdapter_VerifyChallenge_Passkey(t *testing.T) {
 	assert.Equal(t, service.PasskeyProof{AssertionResponse: []byte(`{"id":"x"}`)}, fake.verifyIn.Proof)
 }
 
-func TestFlowAuthAttemptAdapter_VerifyChallenge_RejectionSurfaces(t *testing.T) {
+func TestFlowAuthAttempts_VerifyChallenge_RejectionSurfaces(t *testing.T) {
 	fake := &fakeAuthAttempts{verifyErr: domain.ErrAuthAttemptProofRejected(errors.New("bad signature"))}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	_, err := adapter.VerifyChallenge(t.Context(), domain.FlowVerifyChallengeInput{
+	_, err := flowAttempts.VerifyChallenge(t.Context(), flowengine.VerifyChallengeInput{
 		Check:       domain.AuthCheckTypePasskey,
 		ChallengeID: "ch-pk",
 	})
@@ -408,13 +450,13 @@ func TestFlowAuthAttemptAdapter_VerifyChallenge_RejectionSurfaces(t *testing.T) 
 
 // A check without a two-phase ceremony reaches neither leg of the attempt
 // service.
-func TestFlowAuthAttemptAdapter_UnsupportedChallenge(t *testing.T) {
+func TestFlowAuthAttempts_UnsupportedChallenge(t *testing.T) {
 	fake := &fakeAuthAttempts{}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	_, err := adapter.IssueChallenge(t.Context(), domain.FlowIssueChallengeInput{})
+	_, err := flowAttempts.IssueChallenge(t.Context(), flowengine.IssueChallengeInput{})
 	require.Error(t, err)
-	_, err = adapter.VerifyChallenge(t.Context(), domain.FlowVerifyChallengeInput{Check: domain.AuthCheckTypePassword})
+	_, err = flowAttempts.VerifyChallenge(t.Context(), flowengine.VerifyChallengeInput{Check: domain.AuthCheckTypePassword})
 	require.Error(t, err)
 	assert.Nil(t, fake.issueIn.Challenge)
 	assert.Nil(t, fake.verifyIn.Proof)
@@ -430,13 +472,13 @@ func attemptWithHandoff(t *testing.T, handedOffAt time.Time) *domain.AuthAttempt
 	return att
 }
 
-func TestFlowAuthAttemptAdapter_Handoff_HappyPath(t *testing.T) {
+func TestFlowAuthAttempts_Handoff_HappyPath(t *testing.T) {
 	handedOffAt := time.Unix(1700000000, 0).UTC()
 	attempt := attemptWithHandoff(t, handedOffAt)
 	fake := &fakeAuthAttempts{handoffAttempt: attempt}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	out, err := adapter.Handoff(context.Background(), domain.FlowHandoffInput{
+	out, err := flowAttempts.Handoff(context.Background(), flowengine.HandoffInput{
 		ProjectID: "proj-1",
 		AttemptID: "att-1",
 	})
@@ -447,11 +489,11 @@ func TestFlowAuthAttemptAdapter_Handoff_HappyPath(t *testing.T) {
 	assert.Equal(t, "att-1", fake.handoffIn.AttemptID)
 }
 
-func TestFlowAuthAttemptAdapter_Handoff_NilTokenIsError(t *testing.T) {
+func TestFlowAuthAttempts_Handoff_NilTokenIsError(t *testing.T) {
 	fake := &fakeAuthAttempts{handoffAttempt: &domain.AuthAttempt{}}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	_, err := adapter.Handoff(context.Background(), domain.FlowHandoffInput{
+	_, err := flowAttempts.Handoff(context.Background(), flowengine.HandoffInput{
 		ProjectID: "proj-1",
 		AttemptID: "att-1",
 	})
@@ -459,11 +501,11 @@ func TestFlowAuthAttemptAdapter_Handoff_NilTokenIsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "handoff token missing")
 }
 
-func TestFlowAuthAttemptAdapter_Handoff_PropagatesServiceError(t *testing.T) {
+func TestFlowAuthAttempts_Handoff_PropagatesServiceError(t *testing.T) {
 	fake := &fakeAuthAttempts{handoffErr: errors.New("boom")}
-	adapter := service.NewFlowAuthAttemptAdapter(fake, nil, nil)
+	flowAttempts := service.NewFlowAuthAttempts(fake, nil, nil, nil)
 
-	_, err := adapter.Handoff(context.Background(), domain.FlowHandoffInput{
+	_, err := flowAttempts.Handoff(context.Background(), flowengine.HandoffInput{
 		ProjectID: "proj-1",
 		AttemptID: "att-1",
 	})

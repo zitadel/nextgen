@@ -13,14 +13,14 @@ import (
 // with are of the check it verifies as, so the attempt service verifies the
 // challenge it issued.
 func TestChallengeMethods_IssueAndVerifyTheSameCheck(t *testing.T) {
-	methods := []string{FlowChallengeMethodPasskey, FlowChallengeMethodPasskeyRegister}
+	methods := []string{ChallengeMethodPasskey, ChallengeMethodPasskeyRegister}
 	assert.Len(t, challengeMethods, len(methods))
 	for _, method := range methods {
 		declared, ok := challengeMethods[method]
 		require.True(t, ok, "declaration for %s", method)
 		pc := &processCtx{
-			state: &domain.FlowState{},
-			in:    FlowSubmitInput{PasskeyRP: &FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}}},
+			state: &State{},
+			in:    SubmitInput{PasskeyRP: &PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}}},
 		}
 		params, err := declared.params(pc, domain.FlowResolvedFields{})
 		require.NoError(t, err, method)
@@ -33,5 +33,5 @@ func TestChallengeMethodFor_UndeclaredIsPasskey(t *testing.T) {
 	for _, method := range []string{"", "otp"} {
 		assert.Equal(t, domain.AuthCheckTypePasskey, challengeMethodFor(method).check, "method %q", method)
 	}
-	assert.Equal(t, domain.AuthCheckTypePasskeyRegistration, challengeMethodFor(FlowChallengeMethodPasskeyRegister).check)
+	assert.Equal(t, domain.AuthCheckTypePasskeyRegistration, challengeMethodFor(ChallengeMethodPasskeyRegister).check)
 }

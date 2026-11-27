@@ -104,7 +104,7 @@ func (fd *flowDefinitionService) prepareFlowDefinition(
 	userSchema *domain.JSONSchema,
 	bundleFlows map[string]bool,
 ) (*domain.FlowDefinition, error) {
-	purposes, err := mapPurposesToDomain(req.Purposes)
+	purposes, err := domain.FlowDefinitionPurposesFromStrings(req.Purposes)
 	if err != nil {
 		return nil, err
 	}
@@ -252,18 +252,6 @@ func (fd *flowDefinitionService) validatePivotingTargets(
 // reusing an older revision. Revisions accumulate forever; the cap covers
 // normal authoring without unbounded scans.
 const maxHistoricalRevisions = 100
-
-func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefinitionPurpose]string, error) {
-	purposes := make(map[domain.FlowDefinitionPurpose]string, len(reqPurposes))
-	for p, entryStep := range reqPurposes {
-		purpose, err := domain.FlowDefinitionPurposeString(p)
-		if err != nil {
-			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
-		}
-		purposes[purpose] = entryStep
-	}
-	return purposes, nil
-}
 
 func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (_ *domain.FlowDefinition, err error) {
 	ctx, end := startSpan(ctx, "FlowDefinitionService.Get")

@@ -150,7 +150,7 @@ const (
 // there or enters one they have. The two are kept apart on purpose. The token
 // describes what the form asks for, for password managers; choosing decides
 // whether the project's password policy bounds the field
-// ([FlowStateMachineRuntime.applyPasswordPolicy]). Neither follows the other,
+// ([flowengine.Runtime.applyPasswordPolicy]). Neither follows the other,
 // and dispatch decides what the engine does with the value on its own terms.
 type passwordPurpose struct {
 	autocomplete string

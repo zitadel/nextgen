@@ -4,6 +4,8 @@ import (
 	"embed"
 	"encoding/json"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -81,10 +83,10 @@ func TestExampleFlowDefinitions(t *testing.T) {
 			require.NoError(t, req.UnmarshalJSON([]byte(content)), "decode")
 			require.NoError(t, req.Validate(), "api validate")
 
-			purposes, err := convertPurposes(req.FlowDefinition.GetPurposes())
+			purposes, err := domain.FlowDefinitionPurposesFromStrings(req.FlowDefinition.GetPurposes())
 			require.NoError(t, err)
 
-			steps, err := convertSteps(req.FlowDefinition.GetSteps())
+			steps, err := StepsFromAPI(req.FlowDefinition.GetSteps())
 			require.NoError(t, err)
 
 			schemaURI := url.URL(req.GetSchemaURI().Value)
@@ -97,16 +99,47 @@ func TestExampleFlowDefinitions(t *testing.T) {
 				schemaURI.String(),
 				userSchemaRef,
 				purposes,
-				domain.FlowDefinitionAudience{
-					AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
-					TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
-				},
+				AudienceFromAPI(req.FlowDefinition.GetAudience()),
 				steps,
 			)
 			require.NoError(t, err, "domain NewFlowDefinition")
 
 			_, err = domain.ValidateFlowDefinition(&userSchema, *flowDef)
 			require.NoError(t, err, "ValidateFlowDefinition")
+		})
+	}
+}
+
+// TestPresetFlowDefinitions maps every preset the CLI's setup offers through
+// the default flow's loader and validates it against the preset's own schema.
+func TestPresetFlowDefinitions(t *testing.T) {
+	t.Parallel()
+
+	// The presets live in the configdefaults module, which does not embed them,
+	// so they are read from disk relative to this package.
+	// TODO: embed presets/ in configdefaults and read them through it.
+	const presets = "../../../../../../packages/config/defaults/presets"
+	flows, err := filepath.Glob(filepath.Join(presets, "*", "login.json"))
+	require.NoError(t, err)
+	require.NotEmpty(t, flows, "no presets under %s", presets)
+
+	for _, flowPath := range flows {
+		preset := filepath.Base(filepath.Dir(flowPath))
+		t.Run(preset, func(t *testing.T) {
+			t.Parallel()
+
+			document, err := os.ReadFile(flowPath)
+			require.NoError(t, err)
+			definition, err := fromDocument(document, "https://example.com", "proj_preset_round_trip")
+			require.NoError(t, err)
+
+			rawSchema, err := os.ReadFile(filepath.Join(filepath.Dir(flowPath), "human-user.json"))
+			require.NoError(t, err)
+			var userSchema jsonschema.Schema
+			require.NoError(t, json.Unmarshal(rawSchema, &userSchema))
+
+			_, err = domain.ValidateFlowDefinition(&userSchema, *definition)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -126,7 +159,7 @@ func TestDefaultLoginFlowDefinition(t *testing.T) {
 	_, err = domain.ValidateFlowDefinition(&userSchema, *defs[0])
 	require.NoError(t, err)
 
-	// Regression guard for #1084: convertStepTransitions must preserve each
+	// Regression guard for #1084: StepsFromAPI must preserve each
 	// transition's purpose through embedded default-flow seeding, or the
 	// Sign Up / Sign In navigations lose their re-purposing and the engine
 	// desyncs.

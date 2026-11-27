@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -21,12 +20,12 @@ type FlowService interface {
 	// when Name is set; audience match otherwise.
 	Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error)
 	// Start mints a fresh flow on the resolved definition.
-	Start(ctx context.Context, req StartFlowRequest) (flowengine.FlowStepResult, error)
-	// Submit advances the state machine. Re-fetches the definition
-	// from FlowState.DefinitionID.
-	Submit(ctx context.Context, req SubmitFlowRequest) (flowengine.FlowStepResult, error)
+	Start(ctx context.Context, req StartFlowRequest) (flowengine.StepResult, error)
+	// Submit advances the flow; the engine reads the definition the state
+	// names.
+	Submit(ctx context.Context, req SubmitFlowRequest) (flowengine.StepResult, error)
 	// GetStep re-emits the current step without advancing.
-	GetStep(ctx context.Context, req GetFlowStepRequest) (flowengine.FlowStepResult, error)
+	GetStep(ctx context.Context, req GetFlowStepRequest) (flowengine.StepResult, error)
 }
 
 type StartFlowRequest struct {
@@ -39,7 +38,7 @@ type StartFlowRequest struct {
 }
 
 type SubmitFlowRequest struct {
-	State         *domain.FlowState
+	State         *flowengine.State
 	Action        string
 	Fields        map[string]any
 	GateProofs    map[string]string
@@ -49,14 +48,14 @@ type SubmitFlowRequest struct {
 	SSOReturn *domain.FlowSSOReturn
 	// ChallengeResponse carries the client's answer to a pending ceremony
 	// (e.g. a passkey assertion). Nil unless the step issued a challenge.
-	ChallengeResponse *flowengine.FlowChallengeResponse
+	ChallengeResponse *flowengine.ChallengeResponse
 	// PasskeyRP carries the WebAuthn relying-party params derived from the
 	// request, needed when issuing a passkey challenge.
-	PasskeyRP *flowengine.FlowPasskeyRP
+	PasskeyRP *flowengine.PasskeyRP
 }
 
 type GetFlowStepRequest struct {
-	State *domain.FlowState
+	State *flowengine.State
 }
 
 type ResolveFlowRequest struct {
@@ -64,21 +63,14 @@ type ResolveFlowRequest struct {
 	Purpose       domain.FlowDefinitionPurpose
 	Name          *string // direct-lookup slug
 	SchemaVersion *string // nil = the revision the release pins
-	AuthRequestID *string
 	// Hint scopes audience resolution (ignored when Name is set); see
-	// flowAudienceScore.
-	Hint ResolveFlowHint
-}
-
-type ResolveFlowHint struct {
-	AppID        *string
-	TeamID       *string
-	UserSchemaID *string
+	// [flowengine.EntryByAudience].
+	Hint flowengine.EntryHint
 }
 
 func NewFlowService(
 	v2Pool *DB,
-	stateMachine flowengine.FlowStateMachine,
+	stateMachine flowengine.StateMachine,
 	builtinBases domain.BuiltinSchemaBases,
 	protection SignupProtection,
 ) FlowService {
@@ -93,7 +85,7 @@ func NewFlowService(
 type flowService struct {
 	protection   SignupProtection
 	v2Pool       *DB
-	stateMachine flowengine.FlowStateMachine
+	stateMachine flowengine.StateMachine
 	// builtinBases resolves a definition's user schema given as a built-in
 	// schema's `$id` under whichever base the project stores it.
 	builtinBases domain.BuiltinSchemaBases
@@ -101,9 +93,9 @@ type flowService struct {
 
 var _ FlowService = (*flowService)(nil)
 
-// Resolve picks the definition from the revisions the request's release
-// pins: by name, the one under that handle; by audience, the set scored by
-// flowAudienceScore.
+// Resolve reads the revisions the request's release pins and lets the flow
+// engine choose among them: by name, the one under that handle; by audience,
+// all of them.
 func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Resolve")
 	defer end(&err)
@@ -118,6 +110,7 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 		return nil, domain.ErrFlowDefinitionNotFound().
 			WithMessage("flow definition: the deployed release pins none; deploy a release with a flow")
 	}
+	criteria := flowengine.EntryCriteria{Purpose: req.Purpose, SchemaVersion: req.SchemaVersion, Hint: req.Hint}
 	if req.Name != nil {
 		pin, ok := pinned[*req.Name]
 		if !ok {
@@ -130,13 +123,7 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 			}
 			return nil, err
 		}
-		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
-			return nil, domain.ErrFlowDefinitionNotFound()
-		}
-		if !flowServesPurpose(def, req.Purpose) {
-			return nil, domain.ErrFlowDefinitionPurposeMismatch()
-		}
-		return def, nil
+		return flowengine.EntryByName(def, criteria)
 	}
 
 	revisionIDs := make([]string, 0, len(pinned))
@@ -149,54 +136,7 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 	if err != nil {
 		return nil, err
 	}
-
-	var best *domain.FlowDefinition
-	bestScore := -1
-	for _, def := range result.Items {
-		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
-			continue
-		}
-		if !flowServesPurpose(def, req.Purpose) {
-			continue
-		}
-		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
-			continue
-		}
-		score := flowAudienceScore(def, req.Hint)
-		if score > bestScore || (score == bestScore && flowCreatedAfter(def, best)) {
-			best, bestScore = def, score
-		}
-	}
-	if best == nil {
-		return nil, domain.ErrFlowDefinitionNotFound()
-	}
-	return best, nil
-}
-
-// flowAudienceScore ranks def for the hinted request: 3 for a hinted-app
-// match, 2 for a hinted-team match, 1 for an unscoped (project-wide)
-// definition, 0 for a definition scoped to apps/teams the hint does not
-// identify.
-func flowAudienceScore(def *domain.FlowDefinition, hint ResolveFlowHint) int {
-	switch {
-	case hint.AppID != nil && slices.Contains(def.Audience.AppIDs, *hint.AppID):
-		return 3
-	case hint.TeamID != nil && slices.Contains(def.Audience.TeamIDs, *hint.TeamID):
-		return 2
-	case len(def.Audience.AppIDs) == 0 && len(def.Audience.TeamIDs) == 0:
-		return 1
-	default:
-		return 0
-	}
-}
-
-// flowCreatedAfter reports whether the flow definition `a` was created after `b` (id as the
-// timestamp tie-break).
-func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
-	if !a.CreatedAt.Equal(b.CreatedAt) {
-		return a.CreatedAt.After(b.CreatedAt)
-	}
-	return a.ID > b.ID
+	return flowengine.EntryByAudience(result.Items, criteria)
 }
 
 // resolveFlowSession returns the id of the session the flow runs against:
@@ -220,7 +160,7 @@ func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowReque
 	return session.ID, nil
 }
 
-func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flowengine.FlowStepResult, err error) {
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flowengine.StepResult, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Start")
 	defer end(&err)
 	// Where the flow was left, never which step: step names are defined per
@@ -228,12 +168,12 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 	defer func() { metrics.RecordFlowTransition(ctx, metrics.FlowStart, flowResult(res, err)) }()
 
 	if req.Definition == nil {
-		return flowengine.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
+		return flowengine.StepResult{}, fmt.Errorf("flow service: start without definition")
 	}
 	// A supplied session id must name a real session; reject an empty value up
 	// front so it maps to 400 rather than silently producing an unlinked flow.
 	if req.SessionID != nil && *req.SessionID == "" {
-		return flowengine.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
+		return flowengine.StepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
 	}
 
 	// The definition names its schema by objectType or id, but the flow and
@@ -241,20 +181,20 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 	// start.
 	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), s.builtinBases, req.Definition.ProjectID, req.Definition.UserSchema)
 	if schemaErr != nil {
-		return flowengine.FlowStepResult{}, domain.ErrInternal(schemaErr).WithMessage(
+		return flowengine.StepResult{}, domain.ErrInternal(schemaErr).WithMessage(
 			fmt.Sprintf("failed to resolve user schema %q of flow definition %s", req.Definition.UserSchema, req.Definition.ID))
 	}
 
 	sessionID, err := s.resolveFlowSession(ctx, req)
 	if err != nil {
-		return flowengine.FlowStepResult{}, err
+		return flowengine.StepResult{}, err
 	}
 
 	// Mint and stamp before the state machine so Path B emits during Start
 	// (auth.attempt.created) share flow_id / session_id with Path A request.api.
 	flowID, err := s.v2Pool.Statements().NewManagedID(string(domain.PrefixFlow))
 	if err != nil {
-		return flowengine.FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
+		return flowengine.StepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
 	}
 	audit.BindPublicRequest(ctx, req.Definition.ProjectID, flowID, sessionID)
 	// The flow is a carrier, and so is the attempt the state machine creates
@@ -262,45 +202,40 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res flow
 	// created for an authorization request is in that request's chain.
 	if req.AuthRequestID != nil {
 		if err := s.joinAuthRequest(ctx, req.Definition.ProjectID, *req.AuthRequestID); err != nil {
-			return flowengine.FlowStepResult{}, err
+			return flowengine.StepResult{}, err
 		}
 	}
 	correlationID, err := audit.EnsureCorrelation(ctx)
 	if err != nil {
-		return flowengine.FlowStepResult{}, err
+		return flowengine.StepResult{}, err
 	}
 
-	in := flowengine.FlowStartInput{
+	in := flowengine.StartInput{
 		ID:            flowID,
 		Definition:    req.Definition,
 		Purpose:       req.Purpose,
-		Session:       flowengine.FlowSessionRef{ID: sessionID},
+		Session:       flowengine.SessionRef{ID: sessionID},
 		RedirectURI:   req.RedirectURI,
 		UserSchemaURL: userSchema.URL,
+		CorrelationID: correlationID,
 	}
 	if req.AuthRequestID != nil {
-		in.AuthRequest = &flowengine.FlowAuthRequestRef{ID: *req.AuthRequestID}
+		in.AuthRequest = &flowengine.AuthRequestRef{ID: *req.AuthRequestID}
+	}
+	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
+		if resolution.Deployment != nil {
+			in.DeploymentID = resolution.Deployment.ID
+		}
+		if resolution.Release != nil {
+			in.ReleaseID = resolution.Release.ID
+		}
 	}
 
 	result, err := s.stateMachine.Start(ctx, in)
 	if err != nil {
-		return flowengine.FlowStepResult{}, err
+		return flowengine.StepResult{}, err
 	}
-	result.State.ID = flowID
-	result.State.CorrelationID = correlationID
-	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
-		if resolution.Deployment != nil {
-			result.State.DeploymentID = resolution.Deployment.ID
-		}
-		if resolution.Release != nil {
-			result.State.ReleaseID = resolution.Release.ID
-		}
-	}
-
-	if err := s.attachSignupGate(ctx, req.Definition, &result); err != nil {
-		return flowengine.FlowStepResult{}, err
-	}
-	return flowengine.FlowStepResult{State: result.State, Step: result.Step}, nil
+	return result, nil
 }
 
 // joinAuthRequest puts the request into the chain of the authorization
@@ -319,30 +254,17 @@ func (s *flowService) joinAuthRequest(ctx context.Context, projectID, authReques
 	return nil
 }
 
-func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res flowengine.FlowStepResult, err error) {
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res flowengine.StepResult, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Submit")
 	defer end(&err)
 	defer func() { metrics.RecordFlowTransition(ctx, metrics.FlowSubmit, flowResult(res, err)) }()
 
 	if req.State == nil {
-		return flowengine.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
+		return flowengine.StepResult{}, fmt.Errorf("flow service: submit without state")
 	}
+	defs := flowDefinitions{pool: s.v2Pool, projectID: req.State.ProjectID}
 	// todo: gracefully handle when the definition was updated (status, steps, etc.,) since the flow started
-	def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.State.ProjectID, req.State.DefinitionID)
-	if err != nil {
-		return flowengine.FlowStepResult{}, err
-	}
-	// A dead attempt fails every submission that reaches it, so the flow
-	// restarts here, as a render does. A handoff racing this read still ends
-	// in att.already_handed_off.
-	attempt, err := s.v2Pool.Statements().GetAuthAttemptByID(ctx, req.State.ProjectID, req.State.AuthAttemptID)
-	if err != nil {
-		return flowengine.FlowStepResult{}, fmt.Errorf("flow service: read auth attempt: %w", err)
-	}
-	if attempt.IsExpired() || attempt.IsHandedOff() {
-		return flowengine.FlowStepResult{}, domain.ErrFlowRestartRequired()
-	}
-	in := flowengine.FlowSubmitInput{
+	in := flowengine.SubmitInput{
 		Action:            req.Action,
 		Fields:            req.Fields,
 		GateProofs:        req.GateProofs,
@@ -350,114 +272,49 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res fl
 		PasskeyRP:         req.PasskeyRP,
 	}
 	if req.SSOProviderID != nil {
-		in.SSOProvider = &flowengine.FlowSSOProviderRef{ID: *req.SSOProviderID}
+		in.SSOProvider = &flowengine.SSOProviderRef{ID: *req.SSOProviderID}
 	}
 	in.SSOReturn = req.SSOReturn
-	result, err := s.stateMachine.Process(ctx, def, req.State, in)
+	result, err := s.stateMachine.Process(ctx, defs, req.State, in)
 	if err != nil {
-		return flowengine.FlowStepResult{}, err
+		return flowengine.StepResult{}, err
 	}
-	if err := s.attachSignupGate(ctx, def, &result); err != nil {
-		return flowengine.FlowStepResult{}, err
-	}
-	return flowengine.FlowStepResult{
-		State:                 result.State,
-		Step:                  result.Step,
-		HandoffToken:          result.HandoffToken,
-		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
-		SSOBindingNonce:       result.SSOBindingNonce,
-	}, nil
+	return result, nil
 }
 
-func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res flowengine.FlowStepResult, err error) {
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res flowengine.StepResult, err error) {
 	ctx, end := startSpan(ctx, "FlowService.GetStep")
 	defer end(&err)
 	defer func() { metrics.RecordFlowTransition(ctx, metrics.FlowRender, flowResult(res, err)) }()
 
 	if req.State == nil {
-		return flowengine.FlowStepResult{}, fmt.Errorf("flow service: get step without state")
+		return flowengine.StepResult{}, fmt.Errorf("flow service: get step without state")
 	}
-	def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.State.ProjectID, req.State.DefinitionID)
+	result, err := s.stateMachine.Render(ctx, flowDefinitions{pool: s.v2Pool, projectID: req.State.ProjectID}, req.State)
 	if err != nil {
-		return flowengine.FlowStepResult{}, err
-	}
-	result, err := s.stateMachine.Render(ctx, def, req.State)
-	if err != nil {
-		return flowengine.FlowStepResult{}, err
-	}
-	if err := s.attachSignupGate(ctx, def, &result); err != nil {
-		return flowengine.FlowStepResult{}, err
+		return flowengine.StepResult{}, err
 	}
 	// A render may resolve parked SSO state. Return its updated cookie before
 	// attempting issuance, just as Start and Submit do.
 	if result.Step != nil && result.Step.SignupRequired && !result.Reseal {
 		if s.protection == nil {
-			return flowengine.FlowStepResult{}, domain.ErrFlowIntegrity()
+			return flowengine.StepResult{}, domain.ErrFlowIntegrity()
 		}
 		result.Step.SignupChallenge, err = s.protection.Challenge(ctx, result.State)
 		if err != nil {
-			return flowengine.FlowStepResult{}, err
+			return flowengine.StepResult{}, err
 		}
 	}
-	return flowengine.FlowStepResult{
-		State:                 result.State,
-		Step:                  result.Step,
-		HandoffToken:          result.HandoffToken,
-		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
-		Reseal:                result.Reseal,
-	}, nil
+	return result, nil
 }
 
-func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
-	_, ok := def.Purposes[purpose]
-	return ok
+// flowDefinitions looks up a flow definition by id within the flow's
+// project.
+type flowDefinitions struct {
+	pool      *DB
+	projectID string
 }
 
-// attachSignupGate announces the sign-up gate on a step whose next submit
-// spends the sign-up proof: one whose on_success declares it, or one carrying a
-// passkey registration that creates its user. Runtime enforcement does not
-// depend on template markup or client-selected purpose.
-// def must be the definition result.State names: Process refuses cross-flow
-// transitions, so it always is today. Pivots must look the step up in theirs.
-func (s *flowService) attachSignupGate(ctx context.Context, def *domain.FlowDefinition, result *flowengine.FlowStepResult) error {
-	if result.Step == nil || result.State == nil {
-		return nil
-	}
-	step, ok := def.FindStep(result.Step.Name)
-	if ok && step.OnSuccessSpec().SpendsSignupProof {
-		result.Step.SignupRequired = true
-		return nil
-	}
-	creates, err := s.registrationCreatesUser(ctx, result)
-	if err != nil {
-		return err
-	}
-	result.Step.SignupRequired = creates
-	return nil
-}
-
-// registrationCreatesUser reports whether the step carries a passkey
-// registration that creates its user, which its attestation spends the
-// sign-up proof for. The attempt's stored challenge decides, as it does at
-// verification: the ceremony is provisional when no user was pinned at issue.
-func (s *flowService) registrationCreatesUser(ctx context.Context, result *flowengine.FlowStepResult) (bool, error) {
-	challenge := result.Step.Challenge
-	if challenge == nil || challenge.Method != flowengine.FlowChallengeMethodPasskeyRegister {
-		return false, nil
-	}
-	attempt, err := s.v2Pool.Statements().GetAuthAttemptByID(ctx, result.State.ProjectID, result.State.AuthAttemptID)
-	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
-		// Nothing to gate: the attestation is refused with the attempt.
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("flow service: read auth attempt: %w", err)
-	}
-	stored, ok := attempt.ChallengeByID(challenge.ChallengeID)
-	if !ok {
-		// A superseded ceremony fails as stale when its attestation arrives.
-		return false, nil
-	}
-	registration, ok := stored.(*domain.AuthChallengePasskeyRegistration)
-	return ok && registration.Provisional, nil
+func (d flowDefinitions) Definition(ctx context.Context, id string) (*domain.FlowDefinition, error) {
+	return d.pool.Statements().GetFlowDefinitionByID(ctx, d.projectID, id)
 }

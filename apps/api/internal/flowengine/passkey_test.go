@@ -22,8 +22,8 @@ const (
 
 // issuesChallenge matches an issue whose params are a P that match accepts;
 // a nil match accepts any P.
-func issuesChallenge[P domain.FlowChallengeParams](match func(in domain.FlowIssueChallengeInput, params P) bool) gomock.Matcher {
-	return gomock.Cond(func(in domain.FlowIssueChallengeInput) bool {
+func issuesChallenge[P flowengine.ChallengeParams](match func(in flowengine.IssueChallengeInput, params P) bool) gomock.Matcher {
+	return gomock.Cond(func(in flowengine.IssueChallengeInput) bool {
 		params, ok := in.Params.(P)
 		return ok && (match == nil || match(in, params))
 	})
@@ -31,8 +31,8 @@ func issuesChallenge[P domain.FlowChallengeParams](match func(in domain.FlowIssu
 
 // verifiesChallenge matches a verification of check that match accepts; a nil
 // match accepts any.
-func verifiesChallenge(check domain.AuthCheckType, match func(in domain.FlowVerifyChallengeInput) bool) gomock.Matcher {
-	return gomock.Cond(func(in domain.FlowVerifyChallengeInput) bool {
+func verifiesChallenge(check domain.AuthCheckType, match func(in flowengine.VerifyChallengeInput) bool) gomock.Matcher {
+	return gomock.Cond(func(in flowengine.VerifyChallengeInput) bool {
 		return in.Check == check && (match == nil || match(in))
 	})
 }
@@ -53,10 +53,10 @@ func passkeyLoginDefinition() *domain.FlowDefinition {
 			{
 				Name: "authenticate",
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
+					{Name: flowengine.ActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionPasskey: {Target: "done"},
+					flowengine.ActionPasskey: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -81,50 +81,50 @@ func TestFlowStateMachine_Process_PasskeyIssueThenVerify(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyChallengeParams) bool {
+		IssueChallenge(gomock.Any(), issuesChallenge(func(in flowengine.IssueChallengeInput, params flowengine.PasskeyChallengeParams) bool {
 			return params.RPID == rpid
 		})).
-		Return(domain.FlowIssuedChallenge{ChallengeID: challengeID, Options: []byte(publicKey)}, nil).
+		Return(flowengine.IssuedChallenge{ChallengeID: challengeID, Options: []byte(publicKey)}, nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, func(in domain.FlowVerifyChallengeInput) bool {
+		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, func(in flowengine.VerifyChallengeInput) bool {
 			return in.ChallengeID == challengeID && string(in.Proof) == proof
 		})).
 		Return(userID, nil).
 		Times(1)
-	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(domain.FlowHandoffOutput{
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(flowengine.HandoffOutput{
 		Token:     handoffToken,
 		ExpiresAt: time.Unix(1700000060, 0).UTC(),
 	}, nil)
 
 	def := passkeyLoginDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
 	// Issue leg: selecting the passkey action mints a challenge and halts on the
 	// same step, surfacing the ceremony options.
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskey,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskey,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.Step.Challenge)
 	assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
-	assert.Equal(t, flowengine.FlowChallengeMethodPasskey, issued.Step.Challenge.Method)
+	assert.Equal(t, flowengine.ChallengeMethodPasskey, issued.Step.Challenge.Method)
 	assert.Equal(t, publicKey, string(issued.Step.Challenge.Options))
 	require.NotNil(t, issued.State.PendingChallenge)
 	assert.Equal(t, "authenticate", issued.State.CurrentStep)
 
 	// Verify leg: the signed assertion clears the challenge and advances.
-	verified, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action:            flowengine.FlowActionPasskey,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{ChallengeID: challengeID, Method: "passkey", Proof: []byte(proof)},
+	verified, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action:            flowengine.ActionPasskey,
+		ChallengeResponse: &flowengine.ChallengeResponse{ChallengeID: challengeID, Method: "passkey", Proof: []byte(proof)},
 	})
 	require.NoError(t, err)
 	assert.Nil(t, verified.State.PendingChallenge)
@@ -145,36 +145,36 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil)
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil)
 	w.authAttemptService.EXPECT().
 		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, nil)).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 
 	def := passkeyLoginDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskey,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskey,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	rejected, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action:            flowengine.FlowActionPasskey,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{ChallengeID: challengeID, Proof: []byte(`{}`)},
+	rejected, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action:            flowengine.ActionPasskey,
+		ChallengeResponse: &flowengine.ChallengeResponse{ChallengeID: challengeID, Proof: []byte(`{}`)},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
-	assert.Equal(t, flowengine.FlowStepErrorPasskeyInvalid, *rejected.Step.Error)
+	assert.Equal(t, flowengine.StepErrorPasskeyInvalid, *rejected.Step.Error)
 	require.NotNil(t, rejected.Step.Failure)
 	assert.ErrorIs(t, rejected.Step.Failure.Cause, domain.ErrAuthAttemptProofRejected(nil))
 	assert.Nil(t, rejected.State.PendingChallenge)
@@ -198,13 +198,13 @@ func passkeyAbandonDefinition() *domain.FlowDefinition {
 			{
 				Name: "authenticate",
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
+					{Name: flowengine.ActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionPasskey: {Target: "done"},
-					flowengine.FlowActionSubmit:  {Target: "fallback"},
+					flowengine.ActionPasskey: {Target: "done"},
+					flowengine.ActionSubmit:  {Target: "fallback"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -226,30 +226,30 @@ func TestFlowStateMachine_Process_PasskeyAbandonedOnDifferentAction(t *testing.T
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}, nil)
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}, nil)
 	// no passkey verification should run when no proof was submitted
 	w.authAttemptService.EXPECT().VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, nil)).Times(0)
 
 	def := passkeyAbandonDefinition()
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskey,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskey,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	abandoned, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	abandoned, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 	})
 	require.NoError(t, err)
 	assert.Nil(t, abandoned.State.PendingChallenge, "pending challenge must be cleared when the user picks a different action")
@@ -275,10 +275,10 @@ func passkeyIdentifierLoginDefinition() *domain.FlowDefinition {
 				Name:   "authenticate",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
+					{Name: flowengine.ActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionPasskey:           {Target: "done"},
+					flowengine.ActionPasskey:               {Target: "done"},
 					domain.FlowImplicitOutcomeUserNotFound: {Target: "not_found"},
 				},
 			},
@@ -317,25 +317,25 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 		AnyTimes()
 
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 			return attemptID == in.AttemptID && in.AttributeName == "email" && email1 == in.Value
 		})).
 		Return(userID1, nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{ChallengeID: challengeID1, Options: []byte(publicKey)}, nil)
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{ChallengeID: challengeID1, Options: []byte(publicKey)}, nil)
 	w.authAttemptService.EXPECT().
-		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, func(in domain.FlowVerifyChallengeInput) bool {
+		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskey, func(in flowengine.VerifyChallengeInput) bool {
 			return in.ChallengeID == challengeID1 && string(in.Proof) == `{}`
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
@@ -344,10 +344,10 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 	// clicks "Login with passkey". The dispatch loop identifies user1, then
 	// processPasskey mints a challenge scoped to user1 (empty allowCredentials
 	// since user1 has no passkey).
-	issued1, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskey,
+	issued1, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskey,
 		Fields:    map[string]any{"email": email1},
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued1.State.PendingChallenge)
@@ -355,15 +355,15 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 
 	// Attempt 1, verify leg: the assertion that comes back doesn't match any
 	// credential the attempt is constrained to → server rejects.
-	rejected, err := w.sm.Process(t.Context(), def, issued1.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionPasskey,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{
+	rejected, err := w.sm.Process(t.Context(), served(def), issued1.State, flowengine.SubmitInput{
+		Action: flowengine.ActionPasskey,
+		ChallengeResponse: &flowengine.ChallengeResponse{
 			ChallengeID: challengeID1,
-			Method:      flowengine.FlowChallengeMethodPasskey, Proof: []byte(`{}`),
+			Method:      flowengine.ChallengeMethodPasskey, Proof: []byte(`{}`),
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, flowengine.FlowStepErrorPasskeyInvalid, gu.Value(rejected.Step.Error))
+	assert.Equal(t, flowengine.StepErrorPasskeyInvalid, gu.Value(rejected.Step.Error))
 	assert.Nil(t, rejected.State.PendingChallenge, "rejection clears PendingChallenge")
 
 	// Attempt 2, issue leg: the user re-types user2's email (passkey-only)
@@ -372,19 +372,19 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 	// the dispatch loop skipped SubmitIdentifier whenever a previous _user_id
 	// was stored, leaving the attempt bound to user1.
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 			return attemptID == in.AttemptID && in.AttributeName == "email" && email2 == in.Value
 		})).
 		Return(userID2, nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{ChallengeID: challengeID2, Options: []byte(publicKey)}, nil)
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{ChallengeID: challengeID2, Options: []byte(publicKey)}, nil)
 
-	issued2, err := w.sm.Process(t.Context(), def, rejected.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskey,
+	issued2, err := w.sm.Process(t.Context(), served(def), rejected.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskey,
 		Fields:    map[string]any{"email": "user2@example.com"},
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued2.State.PendingChallenge, "attempt 2 must issue a fresh passkey challenge")
@@ -415,36 +415,36 @@ func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChall
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 			return attemptID == in.AttemptID && in.AttributeName == "email" && email == in.Value
 		})).
 		Return(userID, nil).
 		Times(2)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{ChallengeID: challengeID, Options: []byte(publicKey)}, nil)
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{ChallengeID: challengeID, Options: []byte(publicKey)}, nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	first, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskey,
+	first, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskey,
 		Fields:    map[string]any{"email": email},
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 
 	// Same email re-submitted (e.g. user clicked the passkey action again
 	// after dismissing the browser prompt). Same user resolved → ceremony stays.
-	second, err := w.sm.Process(t.Context(), def, first.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskey,
+	second, err := w.sm.Process(t.Context(), served(def), first.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskey,
 		Fields:    map[string]any{"email": email},
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, second.State.PendingChallenge, "same user resolved — ceremony survives")
@@ -467,10 +467,10 @@ func passkeyRegisterDefinition() *domain.FlowDefinition {
 			{
 				Name: "register",
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
+					{Name: flowengine.ActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionPasskeyRegister: {Target: "done"},
+					flowengine.ActionPasskeyRegister: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -492,19 +492,19 @@ func passkeyRegisterAfterIdentifierDefinition() *domain.FlowDefinition {
 				Name:   "identify",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "register"},
+					flowengine.ActionSubmit: {Target: "register"},
 				},
 			},
 			{
 				Name: "register",
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
+					{Name: flowengine.ActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionPasskeyRegister: {Target: "done"},
+					flowengine.ActionPasskeyRegister: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -526,19 +526,19 @@ func passkeyRegisterAfterUsernameAndEmailDefinition() *domain.FlowDefinition {
 				Name:   "identify",
 				Fields: []domain.Field{"username", "email"},
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionSubmit: {Target: "register"},
+					flowengine.ActionSubmit: {Target: "register"},
 				},
 			},
 			{
 				Name: "register",
 				Actions: []domain.FlowStepAction{
-					{Name: flowengine.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
+					{Name: flowengine.ActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					flowengine.FlowActionPasskeyRegister: {Target: "done"},
+					flowengine.ActionPasskeyRegister: {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: &show},
@@ -558,16 +558,16 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyRegistrationChallengeParams) bool {
+		IssueChallenge(gomock.Any(), issuesChallenge(func(in flowengine.IssueChallengeInput, params flowengine.PasskeyRegistrationChallengeParams) bool {
 			return assert.Equal(t, "attempt-1", in.AttemptID) && assert.Empty(t, params.UserID)
 		})).
-		Return(domain.FlowIssuedChallenge{
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: challengeID,
 			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 	w.authAttemptService.EXPECT().
-		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskeyRegistration, func(in domain.FlowVerifyChallengeInput) bool {
+		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskeyRegistration, func(in flowengine.VerifyChallengeInput) bool {
 			// The attempt service decides whether the ceremony creates its
 			// user; when it does, the flow's sign-up proof pays for it.
 			return assert.Equal(t, "attempt-1", in.AttemptID) &&
@@ -579,37 +579,37 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 		}))
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{
+		Return(flowengine.HandoffOutput{
 			Token:     "handoff_01TEST",
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
 	// Issue leg: passkey_register action mints a creation challenge.
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.Step.Challenge)
 	assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
-	assert.Equal(t, flowengine.FlowChallengeMethodPasskeyRegister, issued.Step.Challenge.Method)
+	assert.Equal(t, flowengine.ChallengeMethodPasskeyRegister, issued.Step.Challenge.Method)
 	require.NotNil(t, issued.State.PendingChallenge)
 
 	// Verify leg: attestation clears the challenge and advances to done.
-	verified, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action:     flowengine.FlowActionPasskeyRegister,
+	verified, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action:     flowengine.ActionPasskeyRegister,
 		GateProofs: map[string]string{domain.SignupGate: "pow-proof"},
-		ChallengeResponse: &flowengine.FlowChallengeResponse{
+		ChallengeResponse: &flowengine.ChallengeResponse{
 			ChallengeID: "reg-1",
-			Method:      flowengine.FlowChallengeMethodPasskeyRegister,
+			Method:      flowengine.ChallengeMethodPasskeyRegister,
 			Proof:       []byte(proof),
 		},
 	})
@@ -633,18 +633,18 @@ func TestFlowStateMachine_Process_PasskeyRegisterTakesTheSignupProofOnlyWithTheA
 	def := passkeyRegisterDefinition()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	_, err = w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:     flowengine.FlowActionPasskeyRegister,
+	_, err = w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:     flowengine.ActionPasskeyRegister,
 		GateProofs: map[string]string{domain.SignupGate: "pow-proof"},
-		PasskeyRP:  &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+		PasskeyRP:  &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
 }
@@ -658,19 +658,19 @@ func TestFlowStateMachine_Process_SignupProofRefusedWithAnotherChallengeResponse
 	def := passkeyRegisterDefinition()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	_, err = w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionPasskeyRegister,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{
+	_, err = w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionPasskeyRegister,
+		ChallengeResponse: &flowengine.ChallengeResponse{
 			ChallengeID: "assert-1",
-			Method:      flowengine.FlowChallengeMethodPasskey,
+			Method:      flowengine.ChallengeMethodPasskey,
 			Proof:       []byte(`{}`),
 		},
 		GateProofs: map[string]string{domain.SignupGate: "pow-proof"},
@@ -685,14 +685,14 @@ func TestFlowStateMachine_Process_SignupProofRefusedWithAnotherChallengeResponse
 func TestFlowStateMachine_Process_PasskeyRegisterAbandonedWithTheSignupProof(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
-	submit := domain.FlowStepAction{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit}
+	submit := domain.FlowStepAction{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit}
 	def := passkeyRegisterDefinition()
 	def.Steps[0].Actions = append(def.Steps[0].Actions, submit)
-	def.Steps[0].Transitions[flowengine.FlowActionSubmit] = domain.FlowStepTransition{Target: "password"}
+	def.Steps[0].Transitions[flowengine.ActionSubmit] = domain.FlowStepTransition{Target: "password"}
 	def.Steps = append(def.Steps, domain.FlowDefinitionStep{
 		Name:        "password",
 		Actions:     []domain.FlowStepAction{submit},
-		Transitions: map[string]domain.FlowStepTransition{flowengine.FlowActionSubmit: {Target: "done"}},
+		Transitions: map[string]domain.FlowStepTransition{flowengine.ActionSubmit: {Target: "done"}},
 	})
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
@@ -701,8 +701,8 @@ func TestFlowStateMachine_Process_PasskeyRegisterAbandonedWithTheSignupProof(t *
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyRegistrationChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyRegistrationChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: "reg-1",
 			UserID:      "user_01TEST",
 			Options:     []byte(`{"rp":{"id":"example.com"}}`),
@@ -710,23 +710,23 @@ func TestFlowStateMachine_Process_PasskeyRegisterAbandonedWithTheSignupProof(t *
 	// No attestation arrived, so nothing is verified and no proof is spent.
 	w.authAttemptService.EXPECT().VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskeyRegistration, nil)).Times(0)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	fallback, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action:     flowengine.FlowActionSubmit,
+	fallback, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action:     flowengine.ActionSubmit,
 		GateProofs: map[string]string{domain.SignupGate: "pow-proof"},
 	})
 	require.NoError(t, err)
@@ -747,48 +747,48 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyRegistrationChallengeParams) bool {
+		IssueChallenge(gomock.Any(), issuesChallenge(func(in flowengine.IssueChallengeInput, params flowengine.PasskeyRegistrationChallengeParams) bool {
 			return assert.Equal(t, userID, params.UserID)
 		})).
-		Return(domain.FlowIssuedChallenge{
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: challengeID,
 			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 	w.authAttemptService.EXPECT().
-		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskeyRegistration, func(in domain.FlowVerifyChallengeInput) bool {
+		VerifyChallenge(gomock.Any(), verifiesChallenge(domain.AuthCheckTypePasskeyRegistration, func(in flowengine.VerifyChallengeInput) bool {
 			return assert.Equal(t, challengeID, in.ChallengeID) &&
 				assert.Equal(t, proof, string(in.Proof))
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 	start.State.CollectedData.UserID = "user_alice"
 
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	rejected, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionPasskeyRegister,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{
+	rejected, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action: flowengine.ActionPasskeyRegister,
+		ChallengeResponse: &flowengine.ChallengeResponse{
 			ChallengeID: "reg-1",
-			Method:      flowengine.FlowChallengeMethodPasskeyRegister,
+			Method:      flowengine.ChallengeMethodPasskeyRegister,
 			Proof:       []byte(proof),
 		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
-	assert.Equal(t, flowengine.FlowStepErrorPasskeyRegistrationInvalid, *rejected.Step.Error)
+	assert.Equal(t, flowengine.StepErrorPasskeyRegistrationInvalid, *rejected.Step.Error)
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "register", rejected.State.CurrentStep)
 }
@@ -807,28 +807,28 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyRegistrationChallengeParams) bool {
+		IssueChallenge(gomock.Any(), issuesChallenge(func(in flowengine.IssueChallengeInput, params flowengine.PasskeyRegistrationChallengeParams) bool {
 			return assert.Empty(t, params.UserID) &&
 				assert.Empty(t, params.Username) &&
 				assert.Empty(t, params.DisplayName)
 		})).
-		Return(domain.FlowIssuedChallenge{
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: challengeID,
 			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.Step.Challenge)
@@ -850,41 +850,41 @@ func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDispl
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 			return assert.Equal(t, "email", in.AttributeName) &&
 				assert.Equal(t, email, in.Value)
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyRegistrationChallengeParams) bool {
+		IssueChallenge(gomock.Any(), issuesChallenge(func(in flowengine.IssueChallengeInput, params flowengine.PasskeyRegistrationChallengeParams) bool {
 			return assert.Empty(t, params.UserID) &&
 				assert.Equal(t, email, params.Username) &&
 				assert.Equal(t, email, params.DisplayName)
 		})).
-		Return(domain.FlowIssuedChallenge{
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: challengeID,
 			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	registerStep, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	registerStep, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "register", registerStep.Step.Name)
 
-	issued, err := w.sm.Process(t.Context(), def, registerStep.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), registerStep.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.Step.Challenge)
@@ -903,9 +903,9 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictBeforeCeremony(t *testi
 		SubmitIdentifier(gomock.Any(), registeringEmail(passkeyConflictEmail)).
 		Return(passkeyConflictUserID, nil)
 
-	conflicted, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	conflicted, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 
@@ -930,17 +930,17 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictDuringCeremony(t *testi
 		SubmitIdentifier(gomock.Any(), registeringEmail(passkeyConflictEmail)).
 		Return(passkeyConflictUserID, nil)
 
-	issued, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
-	conflicted, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionPasskeyRegister,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{
+	conflicted, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action: flowengine.ActionPasskeyRegister,
+		ChallengeResponse: &flowengine.ChallengeResponse{
 			ChallengeID: passkeyConflictChallengeID,
-			Method:      flowengine.FlowChallengeMethodPasskeyRegister,
+			Method:      flowengine.ChallengeMethodPasskeyRegister,
 			Proof:       []byte(`{"attestation":"conflicting"}`),
 		},
 	})
@@ -982,9 +982,9 @@ func TestFlowStateMachine_Process_PasskeyRegisterTakenWithoutOwner(t *testing.T)
 			w, def, state := passkeyRegisterConflictWorld(t)
 			tt.expect(w)
 
-			conflicted, err := w.sm.Process(t.Context(), def, state, flowengine.FlowSubmitInput{
-				Action:    flowengine.FlowActionPasskeyRegister,
-				PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+			conflicted, err := w.sm.Process(t.Context(), served(def), state, flowengine.SubmitInput{
+				Action:    flowengine.ActionPasskeyRegister,
+				PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 			})
 			require.NoError(t, err)
 
@@ -999,7 +999,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterTakenWithoutOwner(t *testing.T)
 
 // passkeyRegisterConflictWorld returns a flow on its register step, with a
 // free email collected and a provisional registration challenge expected.
-func passkeyRegisterConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+func passkeyRegisterConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *flowengine.State) {
 	t.Helper()
 	w := newFlowTestWorld(t)
 	def := passkeyRegisterAfterIdentifierDefinition()
@@ -1007,10 +1007,10 @@ func passkeyRegisterConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDef
 	def.Steps = append(def.Steps, domain.FlowDefinitionStep{
 		Name: "password",
 		Actions: []domain.FlowStepAction{
-			{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+			{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 		},
 		Transitions: map[string]domain.FlowStepTransition{
-			flowengine.FlowActionSubmit: {Target: "done"},
+			flowengine.ActionSubmit: {Target: "done"},
 		},
 	})
 
@@ -1024,23 +1024,23 @@ func passkeyRegisterConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDef
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyRegistrationChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyRegistrationChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: passkeyConflictChallengeID,
 			UserID:      "user_prov01",
 			Options:     []byte(`{"rp":{"id":"example.com"}}`),
 			Provisional: true,
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	registerStep, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	registerStep, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": passkeyConflictEmail},
 	})
 	require.NoError(t, err)
@@ -1051,7 +1051,7 @@ func passkeyRegisterConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDef
 // registeringEmail matches a sign-up's lookup of email. Register keeps a free
 // value from being recorded as a failed sign-in.
 func registeringEmail(email string) gomock.Matcher {
-	return gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+	return gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 		return in.AttributeName == "email" && in.Value == email &&
 			in.UserSchemaURL == defaultSchemaURL && in.Register
 	})
@@ -1059,7 +1059,7 @@ func registeringEmail(email string) gomock.Matcher {
 
 // assertPasskeyConflictPinned checks the pinned user is set up for the
 // password step: it requires a persisted user factor.
-func assertPasskeyConflictPinned(t *testing.T, conflicted flowengine.FlowStepResult) {
+func assertPasskeyConflictPinned(t *testing.T, conflicted flowengine.StepResult) {
 	t.Helper()
 	assert.Equal(t, "password", conflicted.State.CurrentStep,
 		"user_already_exists must follow the declared transition")
@@ -1081,7 +1081,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictUnrouted(t *testing.T) 
 	const registrationOpts = `{"rp":{"id":"example.com"}}`
 	w := newFlowTestWorld(t)
 	def := passkeyRegisterAfterIdentifierDefinition()
-	rp := &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}}
+	rp := &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}}
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-2", nil)
@@ -1093,8 +1093,8 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictUnrouted(t *testing.T) 
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyRegistrationChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyRegistrationChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: "reg-1",
 			UserID:      "user_prov01",
 			Options:     []byte(registrationOpts),
@@ -1108,51 +1108,51 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictUnrouted(t *testing.T) 
 		Return("user_existing01", nil)
 	// The retry runs on the new attempt with no user.
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyRegistrationChallengeParams) bool {
+		IssueChallenge(gomock.Any(), issuesChallenge(func(in flowengine.IssueChallengeInput, params flowengine.PasskeyRegistrationChallengeParams) bool {
 			return in.AttemptID == "attempt-2" && params.UserID == ""
 		})).
-		Return(domain.FlowIssuedChallenge{
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: "reg-2",
 			UserID:      "user_prov02",
 			Options:     []byte(registrationOpts),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	registerStep, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	registerStep, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
 	require.NoError(t, err)
-	issued, err := w.sm.Process(t.Context(), def, registerStep.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
+	issued, err := w.sm.Process(t.Context(), served(def), registerStep.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
 		PasskeyRP: rp,
 	})
 	require.NoError(t, err)
 
-	conflicted, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionPasskeyRegister,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{
+	conflicted, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action: flowengine.ActionPasskeyRegister,
+		ChallengeResponse: &flowengine.ChallengeResponse{
 			ChallengeID: "reg-1",
-			Method:      flowengine.FlowChallengeMethodPasskeyRegister,
+			Method:      flowengine.ChallengeMethodPasskeyRegister,
 			Proof:       []byte(`{"attestation":"conflicting"}`),
 		},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "register", conflicted.State.CurrentStep)
 	if assert.NotNil(t, conflicted.Step.Error) {
-		assert.Equal(t, flowengine.FlowStepErrorUserAlreadyExists, *conflicted.Step.Error)
+		assert.Equal(t, flowengine.StepErrorUserAlreadyExists, *conflicted.Step.Error)
 	}
 	assert.Empty(t, conflicted.State.CollectedData.UserID)
 	assert.Equal(t, "attempt-2", conflicted.State.AuthAttemptID)
 
-	_, err = w.sm.Process(t.Context(), def, conflicted.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
+	_, err = w.sm.Process(t.Context(), served(def), conflicted.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
 		PasskeyRP: rp,
 	})
 	require.NoError(t, err)
@@ -1176,10 +1176,10 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictOnSecondUniqueField(t *
 	def.Steps = append(def.Steps, domain.FlowDefinitionStep{
 		Name: "password",
 		Actions: []domain.FlowStepAction{
-			{Name: flowengine.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+			{Name: flowengine.ActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 		},
 		Transitions: map[string]domain.FlowStepTransition{
-			flowengine.FlowActionSubmit: {Target: "done"},
+			flowengine.ActionSubmit: {Target: "done"},
 		},
 	})
 
@@ -1194,8 +1194,8 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictOnSecondUniqueField(t *
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyRegistrationChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyRegistrationChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: challengeID,
 			UserID:      "user_prov01",
 			Options:     []byte(registrationOpts),
@@ -1210,38 +1210,38 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictOnSecondUniqueField(t *
 	w.expectOwner("username", username, "")
 	w.expectOwner("email", email, existingUserID)
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 			return in.AttributeName == "email" && in.Value == email && in.Register
 		})).
 		Return(existingUserID, nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	registerStep, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionSubmit,
+	registerStep, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action: flowengine.ActionSubmit,
 		Fields: map[string]any{"email": email, "username": username},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "register", registerStep.Step.Name)
 
-	issued, err := w.sm.Process(t.Context(), def, registerStep.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), registerStep.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	conflicted, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionPasskeyRegister,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{
+	conflicted, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action: flowengine.ActionPasskeyRegister,
+		ChallengeResponse: &flowengine.ChallengeResponse{
 			ChallengeID: challengeID,
-			Method:      flowengine.FlowChallengeMethodPasskeyRegister,
+			Method:      flowengine.ChallengeMethodPasskeyRegister,
 			Proof:       []byte(`{"attestation":"conflicting"}`),
 		},
 	})
@@ -1263,8 +1263,8 @@ func TestFlowStateMachine_Process_PasskeyRegisterStaleChallengeUnsticks(t *testi
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyRegistrationChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyRegistrationChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: "reg-1",
 			UserID:      "user_prov01",
 			Options:     []byte(registrationOpts),
@@ -1274,45 +1274,45 @@ func TestFlowStateMachine_Process_PasskeyRegisterStaleChallengeUnsticks(t *testi
 		Return("", domain.ErrAuthAttemptStaleChallenge())
 	// The retry after the stale render mints a fresh ceremony.
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyRegistrationChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyRegistrationChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{
 			ChallengeID: "reg-2",
 			UserID:      "user_prov01",
 			Options:     []byte(registrationOpts),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	stale, err := w.sm.Process(t.Context(), def, issued.State, flowengine.FlowSubmitInput{
-		Action: flowengine.FlowActionPasskeyRegister,
-		ChallengeResponse: &flowengine.FlowChallengeResponse{
+	stale, err := w.sm.Process(t.Context(), served(def), issued.State, flowengine.SubmitInput{
+		Action: flowengine.ActionPasskeyRegister,
+		ChallengeResponse: &flowengine.ChallengeResponse{
 			ChallengeID: "reg-1",
-			Method:      flowengine.FlowChallengeMethodPasskeyRegister,
+			Method:      flowengine.ChallengeMethodPasskeyRegister,
 			Proof:       []byte(`{"attestation":"late"}`),
 		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, stale.Step.Error)
-	assert.Equal(t, flowengine.FlowStepErrorPasskeyRegistrationInvalid, *stale.Step.Error)
+	assert.Equal(t, flowengine.StepErrorPasskeyRegistrationInvalid, *stale.Step.Error)
 	assert.Nil(t, stale.State.PendingChallenge,
 		"a stale ceremony must be cleared so the retry can mint a fresh one")
 
-	retried, err := w.sm.Process(t.Context(), def, stale.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskeyRegister,
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	retried, err := w.sm.Process(t.Context(), served(def), stale.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskeyRegister,
+		PasskeyRP: &flowengine.PasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, retried.State.PendingChallenge)
@@ -1361,37 +1361,37 @@ func TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck(t *tes
 				SubmitPassword(gomock.Any(), gomock.Any()).
 				Times(0)
 			w.authAttemptService.EXPECT().
-				IssueChallenge(gomock.Any(), issuesChallenge(func(in domain.FlowIssueChallengeInput, params domain.FlowPasskeyChallengeParams) bool {
+				IssueChallenge(gomock.Any(), issuesChallenge(func(in flowengine.IssueChallengeInput, params flowengine.PasskeyChallengeParams) bool {
 					return params.RPID == rpid
 				})).
-				Return(domain.FlowIssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil).
+				Return(flowengine.IssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil).
 				Times(1)
 
-			start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+			start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 				Definition:    def,
 				Purpose:       domain.FlowDefinitionPurposeLogin,
-				Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+				Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 				UserSchemaURL: defaultSchemaURL,
 			})
 			require.NoError(t, err)
 
-			afterIdentify, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-				Action: flowengine.FlowActionSubmit,
+			afterIdentify, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+				Action: flowengine.ActionSubmit,
 				Fields: map[string]any{"email": email},
 			})
 			require.NoError(t, err)
 			require.Equal(t, "password", afterIdentify.State.CurrentStep)
 
-			issued, err := w.sm.Process(t.Context(), def, afterIdentify.State, flowengine.FlowSubmitInput{
-				Action:    flowengine.FlowActionPasskey,
+			issued, err := w.sm.Process(t.Context(), served(def), afterIdentify.State, flowengine.SubmitInput{
+				Action:    flowengine.ActionPasskey,
 				Fields:    map[string]any{"x-auth-methods#password": password},
-				PasskeyRP: &flowengine.FlowPasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
+				PasskeyRP: &flowengine.PasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
 			})
 			require.NoError(t, err)
 			assert.Nil(t, issued.Step.Error, "the passkey action must not fail on the password field")
 			require.NotNil(t, issued.Step.Challenge)
 			assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
-			assert.Equal(t, flowengine.FlowChallengeMethodPasskey, issued.Step.Challenge.Method)
+			assert.Equal(t, flowengine.ChallengeMethodPasskey, issued.Step.Challenge.Method)
 			assert.Equal(t, "password", issued.State.CurrentStep, "the issue leg halts on the same step")
 			assert.Empty(t, issued.State.CollectedData.AuthMethods[domain.AuthMethodPassword],
 				"a field the leg does not submit must not be collected either")
@@ -1416,28 +1416,28 @@ func TestFlowStateMachine_Process_PasskeyStillIdentifies(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in flowengine.SubmitIdentifierInput) bool {
 			return in.AttributeName == "email" && in.Value == email
 		})).
 		Return("user_alice", nil).
 		Times(1)
 	w.authAttemptService.EXPECT().
-		IssueChallenge(gomock.Any(), issuesChallenge[domain.FlowPasskeyChallengeParams](nil)).
-		Return(domain.FlowIssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil).
+		IssueChallenge(gomock.Any(), issuesChallenge[flowengine.PasskeyChallengeParams](nil)).
+		Return(flowengine.IssuedChallenge{ChallengeID: challengeID, Options: []byte(`{"publicKey":{}}`)}, nil).
 		Times(1)
 
-	start, err := w.sm.Start(t.Context(), flowengine.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), flowengine.StartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       flowengine.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       flowengine.SessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), def, start.State, flowengine.FlowSubmitInput{
-		Action:    flowengine.FlowActionPasskey,
+	issued, err := w.sm.Process(t.Context(), served(def), start.State, flowengine.SubmitInput{
+		Action:    flowengine.ActionPasskey,
 		Fields:    map[string]any{"email": email},
-		PasskeyRP: &flowengine.FlowPasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
+		PasskeyRP: &flowengine.PasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.Step.Challenge)

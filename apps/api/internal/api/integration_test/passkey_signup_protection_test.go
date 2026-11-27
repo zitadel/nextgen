@@ -129,7 +129,7 @@ func TestPasskeySignupRequiresTheSignupProof(t *testing.T) {
 	require.NoError(t, err)
 	refused := badRequestStep(t, taken).Step
 	require.Equal(t, "register", refused.Name)
-	require.Equal(t, flowengine.FlowStepErrorUserAlreadyExists, refused.Error.Value)
+	require.Equal(t, flowengine.StepErrorUserAlreadyExists, refused.Error.Value)
 	require.False(t, refused.Challenge.Set, "a taken email issues no ceremony")
 }
 

@@ -7,13 +7,13 @@ import (
 // actionKindHandler owns what the engine does for one [domain.FlowActionKind].
 type actionKindHandler interface {
 	// process handles a submission of an action of this kind on the current step.
-	process(r *FlowStateMachineRuntime, pc *processCtx) (FlowStepResult, error)
+	process(r *Runtime, pc *processCtx) (StepResult, error)
 }
 
 // signupProofAcceptor is an [actionKindHandler] whose kind can create a user:
 // a step declaring it may let the submission carry the sign-up proof.
 type signupProofAcceptor interface {
-	acceptsSignupProof(state *domain.FlowState, in FlowSubmitInput) bool
+	acceptsSignupProof(state *State, in SubmitInput) bool
 }
 
 // actionKindHandlers holds one handler per kind a step can declare or the
@@ -41,7 +41,7 @@ type stepInputs struct {
 
 // takeInputs resolves the step's inputs, then validates and merges what the
 // client sent. A non-nil halt is the step rendered with the validation errors.
-func (r *FlowStateMachineRuntime) takeInputs(pc *processCtx, inputs stepInputs) (domain.FlowResolvedFields, *FlowStepResult, error) {
+func (r *Runtime) takeInputs(pc *processCtx, inputs stepInputs) (domain.FlowResolvedFields, *StepResult, error) {
 	resolved, err := r.resolveInputs(pc)
 	if err != nil {
 		return domain.FlowResolvedFields{}, nil, err
@@ -66,7 +66,7 @@ func (r *FlowStateMachineRuntime) takeInputs(pc *processCtx, inputs stepInputs) 
 // acceptsSignupProof reports whether a submission to step may carry the
 // sign-up proof: one to a step whose on_success spends it, or one a kind the
 // step declares accepts it with.
-func acceptsSignupProof(step *domain.FlowDefinitionStep, state *domain.FlowState, in FlowSubmitInput) bool {
+func acceptsSignupProof(step *domain.FlowDefinitionStep, state *State, in SubmitInput) bool {
 	if step.OnSuccessSpec().SpendsSignupProof {
 		return true
 	}

@@ -13,7 +13,7 @@ import (
 
 // resolveInputs resolves the step's fields and prefills any values the
 // user already supplied on earlier steps.
-func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (domain.FlowResolvedFields, error) {
+func (r *Runtime) resolveInputs(pc *processCtx) (domain.FlowResolvedFields, error) {
 	resolved, err := r.resolveStepFields(pc.ctx, pc.state, pc.currentStep)
 	if err != nil {
 		return domain.FlowResolvedFields{}, err
@@ -30,9 +30,9 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (domain.FlowReso
 // left out. Without a parked identity that step renders empty: its submit
 // cannot succeed. A field showing a verified unique claim is read-only, since
 // the submit refuses a changed value.
-func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep, resolved *domain.FlowResolvedFields) error {
+func (r *Runtime) prefillStep(ctx context.Context, state *State, step *domain.FlowDefinitionStep, resolved *domain.FlowResolvedFields) error {
 	if step.OnSuccessSpec().ProviderIdentity {
-		collected, err := r.ssoIdentities.LoadCollected(ctx, domain.FlowSSOLoadInput{
+		collected, err := r.ssoIdentities.LoadCollected(ctx, SSOLoadInput{
 			ProjectID:       state.ProjectID,
 			AttemptID:       state.AuthAttemptID,
 			UserSchemaURL:   state.UserSchemaURL,
@@ -72,7 +72,7 @@ func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *domain
 // [identifierFieldsOnly]); a submission that collects the step's fields (see
 // [stepInputs]) additionally requires declared required fields to be
 // present.
-func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved domain.FlowResolvedFields, collectsStepFields bool) (*FlowStepResult, error) {
+func (r *Runtime) validateAndMerge(pc *processCtx, resolved domain.FlowResolvedFields, collectsStepFields bool) (*StepResult, error) {
 	var errs domain.FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
 		v, ok := errors.AsType[domain.FlowFieldValidationErrors](validationErr)
@@ -92,7 +92,7 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved doma
 			return nil, err
 		}
 		pc.state.IssuedAt = r.now()
-		return &FlowStepResult{State: pc.state, Step: step}, nil
+		return &StepResult{State: pc.state, Step: step}, nil
 	}
 
 	return nil, collectStepFields(pc.state, resolved, pc.in.Fields)
@@ -102,7 +102,7 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved doma
 // optional field with a format is an unset attribute, not a value: a user write
 // refuses "" for it, possibly on a later step with no such field to correct. It
 // also clears what an earlier visit to the step collected for that field.
-func collectStepFields(state *domain.FlowState, resolved domain.FlowResolvedFields, values map[string]any) error {
+func collectStepFields(state *State, resolved domain.FlowResolvedFields, values map[string]any) error {
 	kept := maps.Clone(values)
 	for _, field := range resolved.Fields {
 		if field.Required || field.Validation == nil || field.Validation.Format == "" || values[field.Name] != "" {
@@ -117,7 +117,7 @@ func collectStepFields(state *domain.FlowState, resolved domain.FlowResolvedFiel
 	return nil
 }
 
-func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep) (domain.FlowResolvedFields, error) {
+func (r *Runtime) resolveStepFields(ctx context.Context, state *State, step *domain.FlowDefinitionStep) (domain.FlowResolvedFields, error) {
 	if len(step.Fields) == 0 {
 		return domain.FlowResolvedFields{}, nil
 	}
@@ -144,7 +144,7 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 // may predate a stricter policy, and verifying it is the only check. The
 // bounds are public on purpose: a user cannot choose a valid password without
 // them (ADR 066, What a step discloses).
-func (r *FlowStateMachineRuntime) applyPasswordPolicy(ctx context.Context, state *domain.FlowState, step *domain.FlowDefinitionStep, fields []domain.FlowField) error {
+func (r *Runtime) applyPasswordPolicy(ctx context.Context, state *State, step *domain.FlowDefinitionStep, fields []domain.FlowField) error {
 	if !domain.ChoosesPassword(state.CurrentPurpose) {
 		return nil
 	}
@@ -186,7 +186,7 @@ func withPasswordBounds(v *domain.FlowFieldValidation, minLength, maxLength int)
 // step the user has passed through (history plus current). on_success
 // handlers read this to find attributes by challenge across the full
 // progress, not just the current step.
-func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (domain.FlowResolvedFields, error) {
+func (r *Runtime) resolveVisitedFields(pc *processCtx) (domain.FlowResolvedFields, error) {
 	ctx, def, state, current := pc.ctx, pc.def, pc.state, pc.currentStep
 	// First-encounter order, not map order: consumers walk these fields
 	// positionally (uniqueFieldValues promises field order), so the union
@@ -257,7 +257,7 @@ func collectedString(collected map[string]any, name string) (string, bool) {
 	return v, true
 }
 
-func mergeCollected(state *domain.FlowState, fields map[string]any) error {
+func mergeCollected(state *State, fields map[string]any) error {
 	if state.CollectedData.UserData == nil {
 		state.CollectedData.UserData = map[string]any{}
 	}

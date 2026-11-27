@@ -45,7 +45,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
-	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
@@ -439,7 +438,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	)
 
 	// ── Flow engine ──────────────────
-	fields := domain.NewSchemaFieldResolver()
 	// The sign-up guard asks the project's user.create policy which challenge
 	// to issue; without one, it issues its built-in proof of work.
 	userCreatePolicy, err := service.NewUserCreatePolicy(policyEngine, policyService)
@@ -447,28 +445,19 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		return err
 	}
 	signupProtection := service.NewSignupProtection(serviceDBPool, keyService, userCreatePolicy)
-	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore, signupProtection)
-	createUserHandler := service.NewFlowCreateUserHandler(
-		projectHashers,
-		passwordPolicy,
-		userService,
-		schemaStore,
-		serviceDBPool,
-		signupProtection)
-	stateMachine := flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
-		Schemas: storageSchemaResolver,
-		// The raw statements: the state machine only hands this store to the
-		// resolver, which follows the namespace itself, so the aliasing wrapper
-		// would only double the reads of a miss.
-		SchemaStore:   serviceDBPool.Statements(),
-		Fields:        fields,
-		CreateUser:    createUserHandler,
-		AuthAttempts:  flowAuth,
-		SSOProviders:  service.NewFlowSSOProviderResolver(idpConnectionService),
-		SSOIdentities: service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
-		SSORedirects:  service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
-		Passwords:     passwordPolicy,
-		Now:           time.Now,
+	stateMachine := service.NewFlowEngine(service.FlowEngineDeps{
+		DB:             serviceDBPool,
+		Schemas:        storageSchemaResolver,
+		SchemaStore:    schemaStore,
+		AuthAttempts:   authAttemptSvc,
+		Users:          userService,
+		IDPConnections: idpConnectionService,
+		Keys:           keyService,
+		Variables:      variableService,
+		Hashers:        projectHashers,
+		Passwords:      passwordPolicy,
+		Protection:     signupProtection,
+		HTTPClient:     egressClient,
 	})
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 

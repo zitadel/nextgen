@@ -7,11 +7,12 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/idp"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// FlowSSOIdentityResolver implements [domain.FlowSSOIdentityService]: it reads
+// FlowSSOIdentityResolver implements [flowengine.SSOIdentityService]: it reads
 // the result an SSO callback parked on the attempt, resolves it against the
 // pinned connection revision and the identity links, and settles it.
 type FlowSSOIdentityResolver struct {
@@ -27,9 +28,9 @@ func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionServi
 	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore, hashers: hashers, passwords: passwords}
 }
 
-var _ domain.FlowSSOIdentityService = (*FlowSSOIdentityResolver)(nil)
+var _ flowengine.SSOIdentityService = (*FlowSSOIdentityResolver)(nil)
 
-func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error) {
+func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in flowengine.SSOLoadInput) (*flowengine.SSOParkedIdentity, error) {
 	stmts := r.db.Statements()
 	attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
 	if err != nil {
@@ -52,7 +53,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		// recorded, so a flow whose cookie lost that bind can catch up. Only
 		// the marker counts: a user factor alone can come from an unrelated
 		// identifier submission. The marker holds nothing else to read.
-		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
+		return &flowengine.SSOParkedIdentity{CheckID: check.ID, CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
 	}
 	if !ok || check.Result == nil {
 		if bound := boundThroughSSO(attempt); bound != nil {
@@ -73,7 +74,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	// The row stays parked, like creation disabled, until the attempt expires
 	// or the next ceremony replaces it.
 	if result.IsError() {
-		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, ErrorKey: result.ErrorKey, AttemptUserID: attemptUserID}, nil
+		return &flowengine.SSOParkedIdentity{CheckID: check.ID, ErrorKey: result.ErrorKey, AttemptUserID: attemptUserID}, nil
 	}
 
 	// The pinned revision, not the newest: the result was produced under it.
@@ -91,7 +92,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	if err != nil {
 		return nil, fmt.Errorf("load parked sso identity: parse connection revision: %w", err)
 	}
-	parked := &domain.FlowSSOParkedIdentity{
+	parked := &flowengine.SSOParkedIdentity{
 		CheckID:          check.ID,
 		ConnectionID:     connection.ID,
 		Subject:          result.Subject,
@@ -130,11 +131,11 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		return nil, domain.ErrFlowSSOUserSchemaMismatch().WithParent(fmt.Errorf(
 			"%w: linked to a user of schema %s, the flow runs on %s", domain.ErrSSOParkedIdentityUnusable, user.SchemaURL, in.UserSchemaURL))
 	}
-	parked.Link = &domain.FlowSSOLinkedUser{LinkID: link.ID, UserID: link.UserID}
+	parked.Link = &flowengine.SSOLinkedUser{LinkID: link.ID, UserID: link.UserID}
 	return parked, nil
 }
 
-func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error) {
+func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in flowengine.SSOLoadInput) (*flowengine.SSOParkedIdentity, error) {
 	attempt, err := r.db.Statements().GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
 	if err != nil {
 		return nil, fmt.Errorf("load collected sso identity: read attempt: %w", err)
@@ -170,7 +171,7 @@ func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.F
 	if parsed.CreationDisabled {
 		return nil, domain.ErrFlowRestartRequired()
 	}
-	return &domain.FlowSSOParkedIdentity{
+	return &flowengine.SSOParkedIdentity{
 		CheckID:      check.ID,
 		ConnectionID: connection.ID,
 		Subject:      result.Subject,
@@ -183,7 +184,7 @@ func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.F
 // attempt still waits for its handoff. The sso factor this attempt wrote is the
 // marker: only a bind writes it, together with the user factor. A factor
 // copied in from a session carries the older attempt id and does not count.
-func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity {
+func boundThroughSSO(attempt *domain.AuthAttempt) *flowengine.SSOParkedIdentity {
 	if sso, ok := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO); !ok || sso.AttemptID != attempt.ID {
 		return nil
 	}
@@ -191,7 +192,7 @@ func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity 
 	if !ok {
 		return nil
 	}
-	return &domain.FlowSSOParkedIdentity{BoundUserID: user.UserID}
+	return &flowengine.SSOParkedIdentity{BoundUserID: user.UserID}
 }
 
 // BindCollision binds the user an SSO claim collided with, by id, so the
@@ -199,7 +200,7 @@ func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity 
 //
 // The collision replaces the parked row by a marker of the bound user (no
 // provider data), so a retry after a lost cookie raises the outcome again.
-func (r *FlowSSOIdentityResolver) BindCollision(ctx context.Context, in domain.FlowSSOBindInput) error {
+func (r *FlowSSOIdentityResolver) BindCollision(ctx context.Context, in flowengine.SSOBindInput) error {
 	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().MarkSSOCallbackCollision(ctx, in.ProjectID, in.AttemptID, in.CheckID, in.UserID); err != nil {
 			return err
@@ -208,7 +209,7 @@ func (r *FlowSSOIdentityResolver) BindCollision(ctx context.Context, in domain.F
 	})
 }
 
-func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {
+func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in flowengine.SSOBindInput) error {
 	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
 			return err
@@ -221,7 +222,7 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 // given, on the attempt. It runs inside the caller's transaction, after the
 // caller settled the exact parked row: the delete or the marker returns
 // ErrSSOStateInvalid when the row was settled or replaced, before any write.
-func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSOBindInput) error {
+func bindSSOIdentity(ctx context.Context, stmts AllStatements, in flowengine.SSOBindInput) error {
 	attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
 	if err != nil {
 		return fmt.Errorf("bind sso identity: read attempt: %w", err)
@@ -269,7 +270,7 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 // CreateLinked creates the user, links the subject to it and binds the
 // attempt, all in one transaction. A unique attribute or the subject already
 // taken returns ErrUserAlreadyExists.
-func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.FlowSSOCreateInput) (string, error) {
+func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in flowengine.SSOCreateInput) (string, error) {
 	userID, err := r.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
 		return "", fmt.Errorf("create sso user: mint user id: %w", err)
@@ -280,7 +281,7 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 		Attributes: in.Attributes,
 		ID:         userID,
 	}, r.schemaStore)
-	bind := domain.FlowSSOBindInput{
+	bind := flowengine.SSOBindInput{
 		ProjectID:    in.ProjectID,
 		AttemptID:    in.AttemptID,
 		CheckID:      in.CheckID,
@@ -318,7 +319,7 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 // ssoClaimAction deletes the exact parked row at the start of the creation
 // transaction.
 type ssoClaimAction struct {
-	bind domain.FlowSSOBindInput
+	bind flowengine.SSOBindInput
 }
 
 func (a *ssoClaimAction) Prepare(context.Context) error { return nil }
@@ -333,7 +334,7 @@ var _ UserAction = (*ssoClaimAction)(nil)
 // transaction, then binds the attempt with the link id the insert minted.
 type ssoLinkAction struct {
 	subject string
-	bind    domain.FlowSSOBindInput
+	bind    flowengine.SSOBindInput
 }
 
 func (a *ssoLinkAction) Prepare(context.Context) error { return nil }

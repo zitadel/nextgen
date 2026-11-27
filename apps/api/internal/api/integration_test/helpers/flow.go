@@ -4,30 +4,9 @@ package helpers
 
 import (
 	"testing"
-	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/flowengine"
 	"github.com/zitadel/nextgen/internal/service"
 )
-
-func (h *Harness) EnsureCreateUserHandler(t testing.TB) *service.FlowCreateUserWithPasswordHandler {
-	t.Helper()
-	return service.NewFlowCreateUserHandler(
-		h.EnsureProjectHashers(t),
-		h.EnsurePasswordPolicy(t),
-		h.EnsureUserService(t),
-		h.EnsureSchemaStore(t),
-		h.EnsureServiceDB(t),
-		h.newSignupProtection(t))
-}
-
-// newSignupProtection builds the sign-up guard the flow engine's parts share
-// in the server; it keeps no state of its own beyond the database.
-func (h *Harness) newSignupProtection(t testing.TB) service.SignupProtection {
-	t.Helper()
-	return service.NewSignupProtection(h.EnsureServiceDB(t), h.EnsureKeyService(t), h.EnsureUserCreatePolicy(t))
-}
 
 func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 	t.Helper()
@@ -35,35 +14,27 @@ func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 	defer h.flowService.mutex.Unlock()
 
 	if h.flowService.value == nil {
+		// The engine and the service share one sign-up guard, as in the server.
+		protection := service.NewSignupProtection(h.EnsureServiceDB(t), h.EnsureKeyService(t), h.EnsureUserCreatePolicy(t))
+		engine := service.NewFlowEngine(service.FlowEngineDeps{
+			DB:             h.EnsureServiceDB(t),
+			Schemas:        h.EnsureSchemaResolver(t),
+			SchemaStore:    h.EnsureSchemaStore(t),
+			AuthAttempts:   h.EnsureAuthAttemptService(t),
+			Users:          h.EnsureUserService(t),
+			IDPConnections: h.EnsureIDPConnectionService(t),
+			Keys:           h.EnsureKeyService(t),
+			Variables:      h.EnsureVariableService(t),
+			Hashers:        h.EnsureProjectHashers(t),
+			Passwords:      h.EnsurePasswordPolicy(t),
+			Protection:     protection,
+			HTTPClient:     h.EnsureHttpClient(t),
+		})
 		h.flowService.value = service.NewFlowService(
 			h.EnsureServiceDB(t),
-			h.EnsureFlowStateMachine(t),
+			engine,
 			BuiltinSchemaBases(),
-			h.newSignupProtection(t))
+			protection)
 	}
 	return h.flowService.value
-}
-
-func (h *Harness) EnsureFlowStateMachine(t testing.TB) *flowengine.FlowStateMachineRuntime {
-	t.Helper()
-	h.flowStateMachine.mutex.Lock()
-	defer h.flowStateMachine.mutex.Unlock()
-
-	if h.flowStateMachine.value == nil {
-		fields := domain.NewSchemaFieldResolver()
-		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t), h.newSignupProtection(t))
-		h.flowStateMachine.value = flowengine.NewFlowStateMachine(flowengine.FlowStateMachineDeps{
-			Schemas:       h.EnsureSchemaResolver(t),
-			SchemaStore:   h.EnsureSchemaStore(t),
-			Fields:        fields,
-			CreateUser:    h.EnsureCreateUserHandler(t),
-			AuthAttempts:  authAdapter,
-			SSOProviders:  service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
-			SSOIdentities: service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t), h.EnsureProjectHashers(t), h.EnsurePasswordPolicy(t)),
-			SSORedirects:  service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
-			Passwords:     h.EnsurePasswordPolicy(t),
-			Now:           time.Now,
-		})
-	}
-	return h.flowStateMachine.value
 }
