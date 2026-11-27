@@ -482,9 +482,9 @@ const POLICY_OPERATIONS = PublishPolicyBody.options.flatMap(
  * it cannot say that the protocol requires it, so the create example spells it
  * out.
  *
- * Applications are only read here. `application create` is a command of its
- * own, because it writes `.zitadel/applications/<slug>.json` instead of
- * calling the API (ADR 082 §3), so this entry declares no create.
+ * Applications are only read here. A declared application is a file,
+ * `.zitadel/applications/<slug>.json`, that `deploy` ships (ADR 082 §3), so
+ * this entry declares no create.
  *
  * A schema, a flow definition and a policy are addressed by a name as well as
  * by an id (object type, flow name, operation), so their argument is named for

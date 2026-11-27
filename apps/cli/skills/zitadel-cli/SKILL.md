@@ -184,10 +184,10 @@ nothing; `data.skills` and `data.directories` say what it added where.
   in it).
 - **Project credentials are not an OAuth client.** The project id and project
   secret are how the app and the CLI prove they belong to the project. They are
-  **not** an OAuth or OIDC client id and secret: the CLI creates no OIDC
-  application, and a project `setup` made has none. When asked whether the
-  project has a client id or secret, answer **no**, say it has a project id and
-  project secret instead, and name where they live. A `client_secret` field the
+  **not** an OAuth or OIDC client id and secret, and a project `setup` made has
+  no OAuth client. When asked whether the project has a client id or secret,
+  say the project id and project secret are not one, name where they live, and
+  check `application list` for the project's OAuth clients. A `client_secret` field the
   CLI knows belongs to an external sign-in provider's connection (`idp`,
   `auth-method sso`), which exists only once someone adds one.
 - **Applications are read only.** `zitadel application list` and
