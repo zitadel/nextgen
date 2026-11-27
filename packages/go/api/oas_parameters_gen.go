@@ -601,6 +601,11 @@ type ListEventsParams struct {
 	SessionID OptString `json:",omitempty,omitzero"`
 	// Only events of this login flow ID.
 	FlowID OptString `json:",omitempty,omitzero"`
+	// Only events of this chain: the requests that one sign-in, invitation or project claim took, whoever
+	// sent them. Read the ID from the `correlation_id` of an event in the chain. Events recorded by a
+	// server version before this filter existed are not matched; they leave the list as retention removes
+	// them.
+	CorrelationID OptString `json:",omitempty,omitzero"`
 	// Only events of this HTTP request ID.
 	RequestID OptString `json:",omitempty,omitzero"`
 	// Only events with this device fingerprint ID.

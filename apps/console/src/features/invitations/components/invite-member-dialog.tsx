@@ -30,6 +30,10 @@ const NAME_MAX = 200;
  * can tell the rows of the invitations table apart; it is never matched
  * against an account, and it is optional.
  *
+ * No role is chosen for the administrator: the link is a bearer link, so a
+ * default would hand out that role on a click-through. Create stays disabled
+ * until one is picked, as the CLI requires `--relation` (#3329).
+ *
  * One dialog, two steps. Creating swaps the form for the link in place, since
  * that response is the only time the link exists; closing after that reloads
  * the table behind it, where the new row is.
@@ -89,10 +93,13 @@ function InviteForm({
   const nameId = `${id}-name`;
   const roleId = `${id}-role`;
   const [name, setName] = useState("");
-  const [relation, setRelation] = useState<ProjectRelation>("admin");
+  const [relation, setRelation] = useState<ProjectRelation | undefined>(undefined);
 
   // ADR 030: a refusal's own message is the human-facing string.
   const create = useSubmit(async () => {
+    // Unreachable from the form, whose only submit button is disabled until a
+    // role is picked; it narrows the type.
+    if (!relation) return;
     onCreated(await createProjectInvitation(projectId, { relation, name: name.trim() }));
   }, "The invitation could not be created.");
 
@@ -130,7 +137,9 @@ function InviteForm({
           <RadioGroup
             aria-labelledby={roleId}
             className="gap-2"
-            value={relation}
+            // Controlled from the start: an empty value is "none chosen".
+            value={relation ?? ""}
+            aria-required
             onValueChange={(value) => {
               setRelation(value as ProjectRelation);
               create.clearError();
@@ -183,7 +192,7 @@ function InviteForm({
         >
           Cancel
         </Button>
-        <Button type="submit" className="px-2.5" loading={create.pending}>
+        <Button type="submit" className="px-2.5" loading={create.pending} disabled={!relation}>
           Create invitation
         </Button>
       </FormDialogFooter>

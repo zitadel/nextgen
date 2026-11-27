@@ -1328,9 +1328,9 @@ FLAGS
   --filter=<value>...
       Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values
       request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals),
-      user_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id
-      (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx;
-      repeats widen), created_at (greater_than_or_equal|less_than).
+      user_id (equals), session_id (equals), flow_id (equals), correlation_id (equals), request_id (equals), entity_type
+      (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values
+      1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).
 
   --input=<value>
       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names; positional arguments go
