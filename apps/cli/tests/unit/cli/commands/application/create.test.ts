@@ -358,7 +358,12 @@ describe("application create, run by a person", () => {
     );
 
     await asTerminal(() => {
-      return runCommand(ApplicationCreate, "application:create", ["--cwd", cwd, "--server", SERVER]);
+      return runCommand(ApplicationCreate, "application:create", [
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
     });
 
     expect(talk.asked()).toEqual([

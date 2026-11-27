@@ -47,10 +47,7 @@ const PRESET_HINTS: Readonly<Record<Preset, string>> = {
 
 /** Suggested redirect URIs for each preset, before Custom…. */
 const REDIRECT_SUGGESTIONS: Readonly<Record<Preset, readonly string[]>> = {
-  web: [
-    "http://localhost:3000/auth/callback",
-    "http://localhost:3000/api/auth/callback/zitadel",
-  ],
+  web: ["http://localhost:3000/auth/callback", "http://localhost:3000/api/auth/callback/zitadel"],
   spa: ["http://localhost:5173/callback"],
   native: ["com.acme.tunes:/callback", "http://127.0.0.1/callback"],
 };
@@ -807,17 +804,23 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
           })
         : picked;
     if (already.includes(raw)) {
-      throw refusalError({
-        message: "That redirect URI is already listed",
-        hint: "Pick a different callback URL.",
-      });
+      throw refusalError(
+        {
+          message: "That redirect URI is already listed",
+          hint: "Pick a different callback URL.",
+        },
+        {},
+      );
     }
     const problem = redirectUriProblem(raw, preset);
     if (problem !== undefined) {
-      throw refusalError({
-        message: problem,
-        hint: "Pick a different callback URL.",
-      });
+      throw refusalError(
+        {
+          message: problem,
+          hint: "Pick a different callback URL.",
+        },
+        {},
+      );
     }
     return raw;
   }
@@ -914,17 +917,23 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
         : picked;
     const problem = originProblem(raw);
     if (problem !== undefined) {
-      throw refusalError({
-        message: problem,
-        hint: "Pick a different origin.",
-      });
+      throw refusalError(
+        {
+          message: problem,
+          hint: "Pick a different origin.",
+        },
+        {},
+      );
     }
     const origin = new URL(raw.trim()).origin;
     if (already.includes(origin)) {
-      throw refusalError({
-        message: "That origin is already listed",
-        hint: "Pick a different origin.",
-      });
+      throw refusalError(
+        {
+          message: "That origin is already listed",
+          hint: "Pick a different origin.",
+        },
+        {},
+      );
     }
     return origin;
   }
