@@ -199,10 +199,6 @@ func (notEnabled) Get(context.Context, oauth.Issuer) (oauth.Settings, error) {
 	return oauth.Settings{}, nil
 }
 
-func (notEnabled) GetForNewestPrimaryDeployment(context.Context, string) (oauth.Settings, error) {
-	return oauth.Settings{}, nil
-}
-
 // noKeys is a project without signing keys, as an unknown project is.
 type noKeys struct{}
 

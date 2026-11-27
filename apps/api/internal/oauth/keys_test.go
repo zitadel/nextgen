@@ -104,22 +104,19 @@ func TestKeysOfThePlatformProject(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code, "no platform project, no platform keys")
 }
 
-// A project whose newest primary deployment has OAuth off has no set. That
-// is also how a project that does not exist reads (ReleaseSettings has it
-// off), so the answer is the 404 any tenant that names no project gets, and
-// the set does not tell which projects exist. Its keys are not read.
-func TestKeysNeedOAuthEnabled(t *testing.T) {
+// The set does not depend on the project's OAuth settings, so a release
+// that turns OAuth off leaves the tokens it issued verifiable.
+func TestKeysIgnoreTheOAuthSettings(t *testing.T) {
 	t.Parallel()
-	key := newPublicKey(t, "sig_key_app")
-	keys := &signingKeys{keys: map[string][]jose.JSONWebKey{"proj_app": {key}}}
+	keys := &signingKeys{keys: map[string][]jose.JSONWebKey{"proj_app": {newPublicKey(t, "sig_key_app")}}}
 
-	off := send(t, newMux(t, Config{SigningKeys: keys, Settings: settings{}}), http.MethodGet, "/oauth/proj_app/jwks", "api.example.com", https)
-	unknown := send(t, newMux(t, Config{SigningKeys: &signingKeys{}}), http.MethodGet, "/oauth/evil/jwks", "api.example.com", https)
-
-	assert.Equal(t, http.StatusNotFound, off.Code)
-	assert.Equal(t, unknown.Code, off.Code)
-	assert.JSONEq(t, unknown.Body.String(), off.Body.String())
-	assert.Empty(t, keys.asked)
+	for name, source := range map[string]SettingsSource{
+		"oauth off":                   settings{},
+		"the settings cannot be read": settings{err: domain.ErrUnavailable()},
+	} {
+		set := fetchJWKS(t, newMux(t, Config{SigningKeys: keys, Settings: source}), "/oauth/proj_app/jwks")
+		assert.Equal(t, []string{"sig_key_app"}, keyIDs(set), name)
+	}
 }
 
 func TestKeysRefusals(t *testing.T) {
@@ -127,13 +124,13 @@ func TestKeysRefusals(t *testing.T) {
 	key := newPublicKey(t, "sig_key_platform")
 
 	for _, tt := range []struct {
-		name     string
-		path     string
-		keys     *signingKeys
-		settings SettingsSource
-		status   int
+		name      string
+		path      string
+		keys      *signingKeys
+		status    int
+		readsKeys bool
 	}{
-		{name: "an enabled project without keys", path: "/oauth/proj_app/jwks", keys: &signingKeys{}, status: http.StatusInternalServerError},
+		{name: "a project that does not exist", path: "/oauth/proj_unknown/jwks", keys: &signingKeys{}, status: http.StatusNotFound, readsKeys: true},
 		{name: "a tenant that is no project ID", path: "/oauth/evil/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
 		{name: "a tenant with a NUL", path: "/oauth/proj_%00/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
 		{name: "a tenant that is not UTF-8", path: "/oauth/proj_%ff/jwks", keys: &signingKeys{}, status: http.StatusNotFound},
@@ -143,23 +140,20 @@ func TestKeysRefusals(t *testing.T) {
 			keys:   &signingKeys{keys: map[string][]jose.JSONWebKey{domain.PlatformProjectID: {key}}},
 			status: http.StatusNotFound,
 		},
-		{name: "a fault reading the keys", path: "/oauth/proj_app/jwks", keys: &signingKeys{err: domain.ErrUnavailable()}, status: http.StatusInternalServerError},
 		{
-			name:     "a fault reading the settings",
-			path:     "/oauth/proj_app/jwks",
-			keys:     &signingKeys{},
-			settings: settings{err: domain.ErrUnavailable()},
-			status:   http.StatusInternalServerError,
+			name:      "a fault reading the keys",
+			path:      "/oauth/proj_app/jwks",
+			keys:      &signingKeys{err: domain.ErrUnavailable()},
+			status:    http.StatusInternalServerError,
+			readsKeys: true,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			rec := send(t, newMux(t, Config{SigningKeys: tt.keys, Settings: tt.settings, PlatformEnabled: true}), http.MethodGet, tt.path, "api.example.com", https)
+			rec := send(t, newMux(t, Config{SigningKeys: tt.keys, PlatformEnabled: true}), http.MethodGet, tt.path, "api.example.com", https)
 			assert.Equal(t, tt.status, rec.Code)
 			assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"), "a refusal is never cached")
-			if tt.status == http.StatusNotFound {
-				assert.Empty(t, tt.keys.asked, "a refused tenant reads no keys")
-			}
+			assert.Equal(t, tt.readsKeys, len(tt.keys.asked) > 0, "only a well-formed tenant reads keys")
 		})
 	}
 }

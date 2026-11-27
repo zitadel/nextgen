@@ -28,18 +28,13 @@ func (a *admission) Admit(_ context.Context, projectID, origin string) error {
 	return a.err
 }
 
-// settings is a fake SettingsSource with one answer for every issuer and
-// every project.
+// settings is a fake SettingsSource with one answer for every issuer.
 type settings struct {
 	settings Settings
 	err      error
 }
 
 func (s settings) Get(context.Context, Issuer) (Settings, error) {
-	return s.settings, s.err
-}
-
-func (s settings) GetForNewestPrimaryDeployment(context.Context, string) (Settings, error) {
 	return s.settings, s.err
 }
 

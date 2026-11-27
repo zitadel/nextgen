@@ -33,32 +33,22 @@ func NewReleaseSettings(runtime runtimeResolver, settings service.OAuthSettingsR
 
 // Get implements [SettingsSource].
 func (s *ReleaseSettings) Get(ctx context.Context, issuer Issuer) (Settings, error) {
+	var (
+		resolution *service.RuntimeResolution
+		err        error
+	)
 	if issuer.Platform {
-		return s.GetForNewestPrimaryDeployment(ctx, issuer.ProjectID)
+		resolution, err = s.runtime.ResolvePrimary(ctx, issuer.ProjectID)
+	} else {
+		resolution, err = s.runtime.Resolve(ctx, issuer.ProjectID, issuer.Origin())
 	}
-	resolution, err := s.runtime.Resolve(ctx, issuer.ProjectID, issuer.Origin())
 	if err != nil {
 		return Settings{}, notDeployedIsOff(err)
 	}
-	if !deployedToIssuer(resolution, issuer) {
+	if !issuer.Platform && !deployedToIssuer(resolution, issuer) {
 		return Settings{}, nil
 	}
-	return s.pinnedBy(ctx, issuer.ProjectID, resolution)
-}
-
-// GetForNewestPrimaryDeployment implements [SettingsSource].
-func (s *ReleaseSettings) GetForNewestPrimaryDeployment(ctx context.Context, projectID string) (Settings, error) {
-	resolution, err := s.runtime.ResolvePrimary(ctx, projectID)
-	if err != nil {
-		return Settings{}, notDeployedIsOff(err)
-	}
-	return s.pinnedBy(ctx, projectID, resolution)
-}
-
-// pinnedBy reads the settings the release of resolution pins; no pin means
-// off.
-func (s *ReleaseSettings) pinnedBy(ctx context.Context, projectID string, resolution *service.RuntimeResolution) (Settings, error) {
-	settings, err := service.ResolveOAuthSettings(ctx, s.settings, projectID, resolution.Release.Pins(domain.ReleasePointerKindOauth))
+	settings, err := service.ResolveOAuthSettings(ctx, s.settings, issuer.ProjectID, resolution.Release.Pins(domain.ReleasePointerKindOauth))
 	if err != nil {
 		return Settings{}, err
 	}

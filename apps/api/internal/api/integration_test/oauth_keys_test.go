@@ -19,12 +19,12 @@ import (
 // TestOAuthJWKS signs with a project's token signing key, as the token
 // endpoint does, and verifies the signature against the JWKS the project's
 // jwks_uri serves: it verifies against that project's set and not against
-// another project's. A project whose release does not enable OAuth has no
-// set, just as a project that does not exist.
+// another project's. A release that turns OAuth off leaves the set up, so
+// the token still verifies; a project that does not exist has no set.
 func TestOAuthJWKS(t *testing.T) {
 	t.Parallel()
 	projects := harness.EnsureProjectService(t)
-	newProject := func(oauthEnabled bool) string {
+	newProject := func() string {
 		t.Helper()
 		project, err := projects.Create(t.Context(), helpers.ProjectName(), []domain.Origin{
 			{Pattern: oauthAppOrigin, Kind: domain.OriginKindPrimary},
@@ -32,13 +32,12 @@ func TestOAuthJWKS(t *testing.T) {
 		require.NoError(t, err)
 		deployBundle(t, project.ID, service.BuildReleaseInput{
 			ProjectID: project.ID,
-			OAuth:     &service.CreateOAuthSettingsInput{ProjectID: project.ID, Enabled: oauthEnabled},
+			OAuth:     &service.CreateOAuthSettingsInput{ProjectID: project.ID, Enabled: true},
 		})
 		return project.ID
 	}
-	project := newProject(true)
-	other := newProject(true)
-	off := newProject(false)
+	project := newProject()
+	other := newProject()
 
 	signer, err := harness.EnsureKeyService(t).GetProjectSigner(t.Context(), project, domain.SigningKeyPurposeToken, nil)
 	require.NoError(t, err)
@@ -70,8 +69,12 @@ func TestOAuthJWKS(t *testing.T) {
 	assert.NoError(t, verify(t, project))
 	assert.Error(t, verify(t, other))
 
-	for _, projectID := range []string{off, "proj_doesnotexist"} {
-		resp, body := getMetadata(t, "/oauth/"+projectID+"/jwks", nil)
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode, "%s: %s", projectID, body)
-	}
+	deployBundle(t, project, service.BuildReleaseInput{
+		ProjectID: project,
+		OAuth:     &service.CreateOAuthSettingsInput{ProjectID: project, Enabled: false},
+	})
+	assert.NoError(t, verify(t, project), "with oauth off")
+
+	resp, body := getMetadata(t, "/oauth/proj_doesnotexist/jwks", nil)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode, string(body))
 }
