@@ -1,5 +1,5 @@
 import { signupProof } from "./fixtures/signup-pow.js";
-import { configureZitadel } from "@zitadel/api/config";
+import { ZitadelClient } from "@zitadel/api/runtime/client";
 import {
   createFlow,
   exchangeHandoff,
@@ -40,10 +40,13 @@ function decodeJwtPayload(token: string): { sub: string } {
 const server = setupServer();
 let mock: MockHandle = setupMockHandlers();
 
+/**
+ * The client the flows are driven with. Any absolute URL works: the
+ * orval-generated handlers match any origin before their `/flows` paths.
+ */
+const client = new ZitadelClient({ baseUrl: "http://localhost", allowDestructive: false });
+
 beforeAll(() => {
-  // Any absolute URL works — the orval-generated handlers match `*/flows*`
-  // with a wildcard prefix.
-  configureZitadel({ proxyPath: "http://localhost", projectId: PROJECT_ID });
   server.listen({ onUnhandledRequest: "error" });
 });
 
@@ -67,14 +70,14 @@ afterEach(() => {
 
 describe("setupMockHandlers", () => {
   test("a one-shot submit refusal preserves the current step for retry", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const password = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(client, start.id, {
       action: "submit",
       fields: { email: "alice@example.com" },
     });
     mock.rejectNextSubmit("error.invalid_credentials");
     await expect(
-      submitFlowStep(start.id, {
+      submitFlowStep(client, start.id, {
         action: "submit",
         fields: { [PASSWORD_FIELD]: "incorrect" },
       }),
@@ -82,8 +85,8 @@ describe("setupMockHandlers", () => {
       status: 400,
       body: { step: { name: "password", error: "error.invalid_credentials" } },
     });
-    expect((await getFlowStep(start.id)).step.name).toBe(password.step.name);
-    const done = await submitFlowStep(start.id, {
+    expect((await getFlowStep(client, start.id)).step.name).toBe(password.step.name);
+    const done = await submitFlowStep(client, start.id, {
       action: "submit",
       fields: { [PASSWORD_FIELD]: "corrected" },
     });
@@ -92,14 +95,14 @@ describe("setupMockHandlers", () => {
   });
 
   test("a delayed submit is captured before it advances, and reset clears pending faults", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     let release!: () => void;
     mock.delayNextSubmitUntil(
       new Promise<void>((resolve) => {
         release = resolve;
       }),
     );
-    const pending = submitFlowStep(start.id, {
+    const pending = submitFlowStep(client, start.id, {
       action: "submit",
       fields: { email: "alice@example.com" },
     });
@@ -107,7 +110,7 @@ describe("setupMockHandlers", () => {
       await vi.waitFor(() =>
         expect(mock.getCaptured().some((r) => r.kind === "submitFlowStep")).toBe(true),
       );
-      expect((await getFlowStep(start.id)).step.name).toBe("identifier");
+      expect((await getFlowStep(client, start.id)).step.name).toBe("identifier");
     } finally {
       release();
     }
@@ -116,36 +119,40 @@ describe("setupMockHandlers", () => {
     mock.rejectNextSubmit("error.invalid_credentials");
     mock.failNextExchange();
     mock.reset();
-    const fresh = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const fresh = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     expect(
-      (await submitFlowStep(fresh.id, { action: "submit", fields: { email: "alice@example.com" } }))
-        .step.name,
+      (
+        await submitFlowStep(client, fresh.id, {
+          action: "submit",
+          fields: { email: "alice@example.com" },
+        })
+      ).step.name,
     ).toBe("password");
     await expect(
-      exchangeHandoff({ handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
+      exchangeHandoff(client, { handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
     ).resolves.toBeDefined();
   });
 
   test("a one-shot exchange failure returns the server's unavailable envelope", async () => {
     mock.failNextExchange();
     await expect(
-      exchangeHandoff({ handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
+      exchangeHandoff(client, { handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
     ).rejects.toMatchObject({
       status: 503,
       body: { code: "unavailable" },
     });
     await expect(
-      exchangeHandoff({ handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
+      exchangeHandoff(client, { handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
     ).resolves.toBeDefined();
   });
 
   test("walks the split sign-in: identifier -> password -> done", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
     expect(start.step.fields?.map((f) => f.name)).toEqual(["email"]);
     expect(start.id).toBeTruthy();
 
-    const password = await submitFlowStep(start.id, {
+    const password = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email: "alice@acme.com" },
@@ -157,7 +164,7 @@ describe("setupMockHandlers", () => {
     // ADR 022: the engine injects `back` on any step with a predecessor.
     expect(password.step.actions?.some((a) => a.kind === "back")).toBe(true);
 
-    const done = await submitFlowStep(start.id, {
+    const done = await submitFlowStep(client, start.id, {
       session_token: password.session_token,
       action: "submit",
       fields: { [PASSWORD_FIELD]: "hunter2" },
@@ -171,10 +178,10 @@ describe("setupMockHandlers", () => {
   });
 
   test("reports each step's purpose, and switches it only when asked", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     expect(start.step.purpose).toBe("login");
 
-    const register = await submitFlowStep(start.id, {
+    const register = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "register",
       fields: {},
@@ -184,7 +191,7 @@ describe("setupMockHandlers", () => {
     // The visitor chose to sign up: nothing to explain.
     expect(register.step.notice).toBeUndefined();
 
-    const password = await submitFlowStep(start.id, {
+    const password = await submitFlowStep(client, start.id, {
       session_token: register.session_token,
       action: "submit",
       fields: { email: "new@acme.com" },
@@ -223,8 +230,8 @@ describe("setupMockHandlers", () => {
     async ({ purpose, action, email, name, nextPurpose, notice }) => {
       mock = setupMockHandlers({ accounts: ["known@example.com"] });
       server.resetHandlers(...mock.handlers);
-      const start = await createFlow({ purpose, project_id: PROJECT_ID });
-      const switched = await submitFlowStep(start.id, {
+      const start = await createFlow(client, { purpose, project_id: PROJECT_ID });
+      const switched = await submitFlowStep(client, start.id, {
         session_token: start.session_token,
         action,
         fields: { email },
@@ -234,7 +241,7 @@ describe("setupMockHandlers", () => {
       expect(switched.step.challenge).toBeUndefined();
       expect(switched.session_token).not.toBe(start.session_token);
       expect(switched.step.error).toBeUndefined();
-      const resumed = await getFlowStep(start.id);
+      const resumed = await getFlowStep(client, start.id);
       expect(resumed.step).toMatchObject({ name, purpose: nextPurpose });
       expect(resumed.step.notice).toBeUndefined();
     },
@@ -246,8 +253,8 @@ describe("setupMockHandlers", () => {
   ] as const)("keeps $purpose for $email without a notice", async ({ purpose, email, name }) => {
     mock = setupMockHandlers({ accounts: ["known@example.com"] });
     server.resetHandlers(...mock.handlers);
-    const start = await createFlow({ purpose, project_id: PROJECT_ID });
-    const next = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose, project_id: PROJECT_ID });
+    const next = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email },
@@ -264,8 +271,8 @@ describe("setupMockHandlers", () => {
   }
 
   async function submitEmail(purpose: "login" | "register", email: string) {
-    const start = await createFlow({ purpose, project_id: PROJECT_ID });
-    const next = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose, project_id: PROJECT_ID });
+    const next = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email },
@@ -277,7 +284,7 @@ describe("setupMockHandlers", () => {
     routeByAccount(["known@example.com"]);
     const id = mock.returnFromProvider({ provider: "google", email: "known@example.com" });
 
-    expect((await getFlowStep(id)).step.name).toBe("sso-conflict");
+    expect((await getFlowStep(client, id)).step.name).toBe("sso-conflict");
   });
 
   test("the password-account fixture signs in instead of failing sign-up", async () => {
@@ -298,7 +305,7 @@ describe("setupMockHandlers", () => {
     routeByAccount(["known@example.com"]);
     const { id, next: password } = await submitEmail("register", "known@example.com");
 
-    const back = await submitFlowStep(id, {
+    const back = await submitFlowStep(client, id, {
       session_token: password.session_token,
       action: "back",
       fields: {},
@@ -307,17 +314,17 @@ describe("setupMockHandlers", () => {
     expect(back.step.notice).toBeUndefined();
 
     // A hand-off from sign-in afterwards goes back to sign-in.
-    const identifier = await submitFlowStep(id, {
+    const identifier = await submitFlowStep(client, id, {
       session_token: back.session_token,
       action: "sign_in",
       fields: {},
     });
-    const again = await submitFlowStep(id, {
+    const again = await submitFlowStep(client, id, {
       session_token: identifier.session_token,
       action: "submit",
       fields: { email: "known@example.com" },
     });
-    const backAgain = await submitFlowStep(id, {
+    const backAgain = await submitFlowStep(client, id, {
       session_token: again.session_token,
       action: "back",
       fields: {},
@@ -328,7 +335,7 @@ describe("setupMockHandlers", () => {
   test("an account the mock signs up is found by the next flow until reset", async () => {
     routeByAccount(["known@example.com"]);
     const { id, next: password } = await submitEmail("register", "new@example.com");
-    const done = await submitFlowStep(id, {
+    const done = await submitFlowStep(client, id, {
       session_token: password.session_token,
       action: "submit",
       gate_proofs: { signup_pow: signupProof(password.session_token) },
@@ -358,22 +365,22 @@ describe("setupMockHandlers", () => {
     },
   ] as const)("$origin finishes as a sign-in", async ({ email, via }) => {
     const id = mock.returnFromProvider({ provider: "google", email, purpose: "register" });
-    let step = await getFlowStep(id);
+    let step = await getFlowStep(client, id);
     expect(step.step.name).toBe(via);
 
     if (via === "register-sso") {
-      step = await submitFlowStep(id, {
+      step = await submitFlowStep(client, id, {
         session_token: step.session_token,
         action: "sign_in",
         fields: {},
       });
-      step = await submitFlowStep(id, {
+      step = await submitFlowStep(client, id, {
         session_token: step.session_token,
         action: "submit",
         fields: { email },
       });
     }
-    const done = await submitFlowStep(id, {
+    const done = await submitFlowStep(client, id, {
       session_token: step.session_token,
       action: "submit",
       fields: { [PASSWORD_FIELD]: "correct-horse-battery-staple" },
@@ -383,13 +390,13 @@ describe("setupMockHandlers", () => {
   });
 
   test("captures every request body for assertions", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email: "alice@acme.com", password: "hunter2" },
     });
-    await getFlowStep(start.id);
+    await getFlowStep(client, start.id);
 
     const captured = mock.getCaptured();
     expect(captured).toHaveLength(3);
@@ -405,8 +412,8 @@ describe("setupMockHandlers", () => {
   });
 
   test("rotates the session token on every response", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const submit = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const submit = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email: "alice@acme.com" },
@@ -415,14 +422,14 @@ describe("setupMockHandlers", () => {
   });
 
   test("routes register through two-step sign-up to done", async () => {
-    const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "register", project_id: PROJECT_ID });
     expect(start.step.name).toBe("register");
     expect(start.step.fields?.some((f) => f.name === "email")).toBe(true);
     expect(start.step.fields?.some((f) => f.name === "given_name")).toBe(true);
     expect(start.step.fields?.some((f) => f.name === "family_name")).toBe(true);
     expect(start.step.fields?.some((f) => f.name === "date_of_birth")).toBe(true);
 
-    const passwordStep = await submitFlowStep(start.id, {
+    const passwordStep = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: {
@@ -439,13 +446,13 @@ describe("setupMockHandlers", () => {
       kind: "captcha",
       provider: "zitadel_pow",
     });
-    const prepared = await getFlowStep(passwordStep.id);
+    const prepared = await getFlowStep(client, passwordStep.id);
     expect(prepared.step.gates.signup_pow?.challenge?.challenge_id).toBe(
       `ch_mock_${prepared.session_token}`,
     );
     mock.rejectNextSubmit("error.password_policy");
     await expect(
-      submitFlowStep(passwordStep.id, {
+      submitFlowStep(client, passwordStep.id, {
         action: "submit",
         gate_proofs: { signup_pow: signupProof(prepared.session_token) },
         fields: { [PASSWORD_FIELD]: "short" },
@@ -454,9 +461,11 @@ describe("setupMockHandlers", () => {
       kind: "captcha",
       provider: "zitadel_pow",
     });
-    expect((await getFlowStep(passwordStep.id)).step.gates.signup_pow?.challenge).toBeDefined();
+    expect(
+      (await getFlowStep(client, passwordStep.id)).step.gates.signup_pow?.challenge,
+    ).toBeDefined();
 
-    const done = await submitFlowStep(passwordStep.id, {
+    const done = await submitFlowStep(client, passwordStep.id, {
       session_token: passwordStep.session_token,
       action: "submit",
       gate_proofs: { signup_pow: signupProof(passwordStep.session_token) },
@@ -468,8 +477,8 @@ describe("setupMockHandlers", () => {
   });
 
   test("redirects to SSO on the reserved action", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const submit = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const submit = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "sso",
       fields: {},
@@ -485,9 +494,9 @@ describe("setupMockHandlers", () => {
    * must not hand back a redirect to a caller that omits it.
    */
   test("refuses an sso submission without return_target", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     await expect(
-      submitFlowStep(start.id, {
+      submitFlowStep(client, start.id, {
         session_token: start.session_token,
         action: "sso",
         fields: {},
@@ -509,8 +518,8 @@ describe("setupMockHandlers", () => {
    * not give.
    */
   test("ignores a provider id on an ordinary submit", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const submit = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const submit = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email: "ada@example.test" },
@@ -525,14 +534,14 @@ describe("setupMockHandlers", () => {
    * comes from the flow context, since the password submit carries no email.
    */
   async function submitCredentials(email: string) {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const password = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email },
     });
     expect(password.step.name).toBe("password");
-    return submitFlowStep(start.id, {
+    return submitFlowStep(client, start.id, {
       session_token: password.session_token,
       action: "submit",
       fields: { [PASSWORD_FIELD]: "hunter2" },
@@ -552,13 +561,13 @@ describe("setupMockHandlers", () => {
   });
 
   test("back from the password step returns to the identifier", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const password = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email: "alice@acme.com" },
     });
-    const back = await submitFlowStep(start.id, {
+    const back = await submitFlowStep(client, start.id, {
       session_token: password.session_token,
       action: "back",
       fields: {},
@@ -569,8 +578,8 @@ describe("setupMockHandlers", () => {
   test("passkey-login: pre-registered credential reaches done with challenge round-trip", async () => {
     mock.registerCredential("alice@acme.com", "cred-alice-1");
 
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const login = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "passkey",
       fields: {},
@@ -578,7 +587,7 @@ describe("setupMockHandlers", () => {
     expect(login.step.name).toBe("passkey-login");
     expect(login.step.challenge).toBeTruthy();
 
-    const done = await submitFlowStep(login.id, {
+    const done = await submitFlowStep(client, login.id, {
       session_token: login.session_token,
       action: "submit",
       fields: {},
@@ -592,15 +601,15 @@ describe("setupMockHandlers", () => {
   test("passkey-login: discoverable credential carries authenticated user into handoff token", async () => {
     mock.registerCredential("bob@example.com", "cred-bob-1");
 
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const login = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "passkey",
       fields: {},
     });
     expect(login.step.name).toBe("passkey-login");
 
-    const done = await submitFlowStep(login.id, {
+    const done = await submitFlowStep(client, login.id, {
       session_token: login.session_token,
       action: "submit",
       fields: {},
@@ -612,15 +621,15 @@ describe("setupMockHandlers", () => {
   });
 
   test("passkey-login: unregistered credential stays on passkey-login with error", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const login = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "passkey",
       fields: {},
     });
     expect(login.step.name).toBe("passkey-login");
 
-    const fail = await submitFlowStep(login.id, {
+    const fail = await submitFlowStep(client, login.id, {
       session_token: login.session_token,
       action: "submit",
       fields: {},
@@ -632,15 +641,15 @@ describe("setupMockHandlers", () => {
   });
 
   test("passkey-login: submit without proof stays on passkey-login with error", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const login = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "passkey",
       fields: {},
     });
     expect(login.step.name).toBe("passkey-login");
 
-    const fail = await submitFlowStep(login.id, {
+    const fail = await submitFlowStep(client, login.id, {
       session_token: login.session_token,
       action: "submit",
       fields: {},
@@ -653,14 +662,14 @@ describe("setupMockHandlers", () => {
   test("merges the active branding overlay onto every response", async () => {
     applyBranding({ layout: "split", logo_url: "https://logo.example/img.svg" });
 
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     expect(start.branding).toMatchObject({
       layout: "split",
       logo_url: "https://logo.example/img.svg",
     });
 
     clearBranding();
-    const next = await submitFlowStep(start.id, {
+    const next = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email: "alice@acme.com" },
@@ -670,10 +679,10 @@ describe("setupMockHandlers", () => {
 
   describe("back-navigation (ADR 022)", () => {
     test("register-password → back → register", async () => {
-      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+      const start = await createFlow(client, { purpose: "register", project_id: PROJECT_ID });
       expect(start.step.name).toBe("register");
 
-      const regPw = await submitFlowStep(start.id, {
+      const regPw = await submitFlowStep(client, start.id, {
         session_token: start.session_token,
         action: "submit",
         fields: { email: "alice@acme.com", given_name: "Alice", family_name: "Acme" },
@@ -681,7 +690,7 @@ describe("setupMockHandlers", () => {
       expect(regPw.step.name).toBe("register-password");
       expect(regPw.step.actions?.find((a) => a.kind === "back")).toBeTruthy();
 
-      const back = await submitFlowStep(regPw.id, {
+      const back = await submitFlowStep(client, regPw.id, {
         session_token: regPw.session_token,
         action: "back",
         fields: {},
@@ -690,13 +699,13 @@ describe("setupMockHandlers", () => {
     });
 
     test("back rotates the session token", async () => {
-      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
-      const regPw = await submitFlowStep(start.id, {
+      const start = await createFlow(client, { purpose: "register", project_id: PROJECT_ID });
+      const regPw = await submitFlowStep(client, start.id, {
         session_token: start.session_token,
         action: "submit",
         fields: { email: "alice@acme.com", given_name: "Alice", family_name: "Acme" },
       });
-      const back = await submitFlowStep(regPw.id, {
+      const back = await submitFlowStep(client, regPw.id, {
         session_token: regPw.session_token,
         action: "back",
         fields: {},
@@ -705,12 +714,12 @@ describe("setupMockHandlers", () => {
     });
 
     test("identifier step has no back action", async () => {
-      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+      const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
       expect(start.step.actions?.find((a) => a.kind === "back")).toBeUndefined();
     });
 
     test("register step has no back action (initial step for register purpose)", async () => {
-      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+      const start = await createFlow(client, { purpose: "register", project_id: PROJECT_ID });
       expect(start.step.name).toBe("register");
       expect(start.step.actions?.find((a) => a.kind === "back")).toBeUndefined();
     });
@@ -730,8 +739,8 @@ describe("setupMockHandlers — the provider round trip", () => {
   async function toProvider(
     purpose: "login" | "register" = "login",
   ): Promise<{ id: string; sessionToken: string }> {
-    const start = await createFlow({ purpose, project_id: PROJECT_ID });
-    const redirect = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose, project_id: PROJECT_ID });
+    const redirect = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "sso",
       fields: {},
@@ -756,7 +765,7 @@ describe("setupMockHandlers — the provider round trip", () => {
     const res = await callback({ state: "s", code: "c", ...claims });
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe(RETURN_TARGET);
-    return getFlowStep(id);
+    return getFlowStep(client, id);
   }
 
   test("the callback answers 303 to the return target the sso submission recorded", async () => {
@@ -779,7 +788,7 @@ describe("setupMockHandlers — the provider round trip", () => {
     );
 
     expect(res.status).toBe(303);
-    expect((await getFlowStep(id)).step.name).toBe("register-sso");
+    expect((await getFlowStep(client, id)).step.name).toBe("register-sso");
   });
 
   test("a declined sign-in shows error.sso_cancelled on the step it started from", async () => {
@@ -789,11 +798,11 @@ describe("setupMockHandlers — the provider round trip", () => {
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe(RETURN_TARGET);
 
-    const back = await getFlowStep(id);
+    const back = await getFlowStep(client, id);
     expect(back.step.name).toBe("identifier");
     expect(back.step.error).toBe("error.sso_cancelled");
     // Shown once, as the engine's replay guard does: a reload is clean.
-    expect((await getFlowStep(id)).step.error).toBeUndefined();
+    expect((await getFlowStep(client, id)).step.error).toBeUndefined();
   });
 
   test("any other provider error shows error.sso_failed", async () => {
@@ -801,7 +810,7 @@ describe("setupMockHandlers — the provider round trip", () => {
 
     await callback({ state: "s", error: "server_error" });
 
-    const back = await getFlowStep(id);
+    const back = await getFlowStep(client, id);
     expect(back.step.name).toBe("register");
     expect(back.step.error).toBe("error.sso_failed");
   });
@@ -811,11 +820,11 @@ describe("setupMockHandlers — the provider round trip", () => {
 
     await callback({ state: "s" });
 
-    expect((await getFlowStep(id)).step.error).toBe("error.sso_failed");
+    expect((await getFlowStep(client, id)).step.error).toBe("error.sso_failed");
   });
 
   test("a callback with no sign-in pending gets the error page, not a redirect", async () => {
-    await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
 
     const res = await callback({ state: "s", code: "c" });
 
@@ -832,7 +841,7 @@ describe("setupMockHandlers — the provider round trip", () => {
 
   /** An sso submission straight over HTTP, so the test controls the headers. */
   async function submitSso(returnTarget: string, headers: Record<string, string> = {}) {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     return fetch(`http://localhost/flows/${start.id}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
@@ -932,7 +941,7 @@ describe("setupMockHandlers — the provider round trip", () => {
   test("registering through the provider signs in, and the next visit goes straight through", async () => {
     const first = await toProvider();
     const collect = await viaCallback(first.id, { email: "grace@example.test" });
-    const created = await submitFlowStep(first.id, {
+    const created = await submitFlowStep(client, first.id, {
       session_token: collect.session_token,
       action: "submit",
       fields: { given_name: "Grace", family_name: "Hopper" },
@@ -975,7 +984,7 @@ describe("setupMockHandlers — the provider round trip", () => {
   test("reset forgets the links, so a clean mock sees a first-time identity", async () => {
     const first = await toProvider();
     const collect = await viaCallback(first.id, { email: "reset@example.test" });
-    await submitFlowStep(first.id, {
+    await submitFlowStep(client, first.id, {
       session_token: collect.session_token,
       action: "submit",
       fields: { given_name: "A", family_name: "B" },
@@ -998,7 +1007,7 @@ describe("returnFromProvider", () => {
   test("leaves a first-time identity on register-sso, ready to resume", async () => {
     const id = mock.returnFromProvider({ provider: "google", email: "ada@example.test" });
 
-    const resumed = await getFlowStep(id);
+    const resumed = await getFlowStep(client, id);
     expect(resumed.step.name).toBe("register-sso");
     expect(resumed.step.fields?.map((f) => f.name)).toEqual(["given_name", "family_name"]);
   });
@@ -1006,7 +1015,7 @@ describe("returnFromProvider", () => {
   test("leaves an email that already has an account on the conflict step", async () => {
     const id = mock.returnFromProvider({ provider: "google", email: "exists@example.com" });
 
-    const resumed = await getFlowStep(id);
+    const resumed = await getFlowStep(client, id);
     expect(resumed.step.name).toBe("sso-conflict");
   });
 
@@ -1014,15 +1023,15 @@ describe("returnFromProvider", () => {
     // Register through the provider in-process, then come back the same way:
     // the link now exists, so this is a sign-in rather than a registration.
     const first = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
-    const collect = await getFlowStep(first);
-    await submitFlowStep(first, {
+    const collect = await getFlowStep(client, first);
+    await submitFlowStep(client, first, {
       session_token: collect.session_token,
       action: "submit",
       fields: { given_name: "Grace", family_name: "Hopper" },
     });
 
     const second = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
-    expect((await getFlowStep(second)).step.name).toBe("done");
+    expect((await getFlowStep(client, second)).step.name).toBe("done");
   });
 
   test("goes back to the step it started from with the provider's error", async () => {
@@ -1032,7 +1041,7 @@ describe("returnFromProvider", () => {
       error: "access_denied",
     });
 
-    const resumed = await getFlowStep(id);
+    const resumed = await getFlowStep(client, id);
     expect(resumed.step.name).toBe("identifier");
     expect(resumed.step.error).toBe("error.sso_cancelled");
   });
@@ -1040,7 +1049,7 @@ describe("returnFromProvider", () => {
 
 describe("passkey overlay", () => {
   test("is off by default: the identifier step offers no passkey action", async () => {
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
     expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
   });
@@ -1048,19 +1057,19 @@ describe("passkey overlay", () => {
   test("applyPasskey adds exactly one identifier action and routes to passkey-login", async () => {
     applyPasskey(true);
 
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
     const offered = (start.step.actions ?? []).filter((a) => a.name === "passkey");
     expect(offered).toHaveLength(1);
     expect(offered[0]?.kind).toBe("passkey");
 
     // A re-render must not accumulate a second copy (the overlay is idempotent).
-    const reread = await getFlowStep(start.id);
+    const reread = await getFlowStep(client, start.id);
     expect((reread.step.actions ?? []).filter((a) => a.name === "passkey")).toHaveLength(1);
 
     // Choosing it reaches the dedicated passkey-login step with its WebAuthn
     // challenge — the journey the Storybook PasskeyLogin story drives.
-    const login = await submitFlowStep(start.id, {
+    const login = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "passkey",
       fields: { email: "alice@acme.com" },
@@ -1073,8 +1082,8 @@ describe("passkey overlay", () => {
     applyPasskey(true);
 
     // Reach the password step: a known email whose account has a password.
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const password = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email: "alice@acme.com" },
@@ -1088,7 +1097,7 @@ describe("passkey overlay", () => {
     expect(offered[0]?.text_key).toBe("password.action.passkey");
 
     // Choosing it drives the flow to the dedicated passkey-login step.
-    const login = await submitFlowStep(password.id, {
+    const login = await submitFlowStep(client, password.id, {
       session_token: password.session_token,
       action: "passkey",
     });
@@ -1101,14 +1110,14 @@ describe("passkey overlay", () => {
 
     // Reach the password step, then submit a wrong password so the handler's
     // credential-error branch returns the password step directly.
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const password = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: { email: "wrong@example.com" },
     });
     expect(password.step.name).toBe("password");
-    const errored = await submitFlowStep(password.id, {
+    const errored = await submitFlowStep(client, password.id, {
       session_token: password.session_token,
       action: "submit",
       fields: { [PASSWORD_FIELD]: "hunter2" },
@@ -1124,7 +1133,7 @@ describe("passkey overlay", () => {
   test("a passkey sign-up solves the sign-up gate before its attestation", async () => {
     applyPasskey(true);
 
-    const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "register", project_id: PROJECT_ID });
     expect(start.step.name).toBe("register");
     expect((start.step.actions ?? []).filter((a) => a.kind === "passkey_register")).toEqual([
       { name: "passkey_register", kind: "passkey_register", text_key: "register.action.passkey" },
@@ -1132,7 +1141,7 @@ describe("passkey overlay", () => {
     // Asking for the ceremony creates nobody, so the step only announces the
     // gate once it carries the ceremony whose attestation creates the user.
     expect(start.step.gates.signup_pow).toBeUndefined();
-    const ceremony = await submitFlowStep(start.id, {
+    const ceremony = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "passkey_register",
       fields: { email: "passkey@acme.com" },
@@ -1140,7 +1149,7 @@ describe("passkey overlay", () => {
     expect(ceremony.step.name).toBe("register");
     expect(ceremony.step.challenge?.method).toBe("passkey_register");
     expect(ceremony.step.gates.signup_pow).toEqual({ kind: "captcha", provider: "zitadel_pow" });
-    const prepared = await getFlowStep(ceremony.id);
+    const prepared = await getFlowStep(client, ceremony.id);
     expect(prepared.step.challenge?.method).toBe("passkey_register");
     expect(prepared.step.gates.signup_pow?.challenge?.challenge_id).toBe(
       `ch_mock_${prepared.session_token}`,
@@ -1155,11 +1164,11 @@ describe("passkey overlay", () => {
         proof: { id: "cred_passkey_signup", type: "public-key", response: {} },
       },
     };
-    await expect(submitFlowStep(ceremony.id, attestation)).rejects.toMatchObject({
+    await expect(submitFlowStep(client, ceremony.id, attestation)).rejects.toMatchObject({
       status: 403,
       body: { code: "flow.proof_invalid" },
     });
-    const done = await submitFlowStep(ceremony.id, {
+    const done = await submitFlowStep(client, ceremony.id, {
       ...attestation,
       gate_proofs: { signup_pow: signupProof(ceremony.session_token) },
     });
@@ -1169,19 +1178,19 @@ describe("passkey overlay", () => {
   test("leaving the sign-up step drops its passkey ceremony", async () => {
     applyPasskey(true);
 
-    const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
-    const ceremony = await submitFlowStep(start.id, {
+    const start = await createFlow(client, { purpose: "register", project_id: PROJECT_ID });
+    const ceremony = await submitFlowStep(client, start.id, {
       session_token: start.session_token,
       action: "passkey_register",
       fields: { email: "passkey@acme.com" },
     });
-    const password = await submitFlowStep(ceremony.id, {
+    const password = await submitFlowStep(client, ceremony.id, {
       session_token: ceremony.session_token,
       action: "submit",
       fields: { email: "passkey@acme.com", given_name: "Pat", family_name: "Key" },
     });
     expect(password.step.name).toBe("register-password");
-    const back = await submitFlowStep(password.id, {
+    const back = await submitFlowStep(client, password.id, {
       session_token: password.session_token,
       action: "back",
     });
@@ -1194,7 +1203,7 @@ describe("passkey overlay", () => {
     applyPasskey(true);
     clearPasskey();
 
-    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const start = await createFlow(client, { purpose: "login", project_id: PROJECT_ID });
     expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
   });
 });

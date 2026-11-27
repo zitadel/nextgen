@@ -4,6 +4,7 @@ import { isVariableReference } from "@zitadel/config/idp";
 import {
   BrandingService,
   FlowService,
+  type OperationName,
   PolicyService,
   pagedFunctions,
   SchemaService,
@@ -286,7 +287,7 @@ type GetList<B, T> = Readonly<{
 }>;
 
 /** What a `GET` list's call takes: the client function's query, less what the platform fills. */
-type Query<K extends keyof ZitadelClient> = Omit<
+type Query<K extends OperationName> = Omit<
   NonNullable<Parameters<ZitadelClient[K]>[0]>,
   "project_id"
 >;

@@ -226,7 +226,7 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
   // webhook's page, under the same paths, shows its payload instead: the
   // Markdown says which of the two a page is.
   const call =
-    /```ts\nimport \{ [^}]+ \} from "@zitadel\/api\/(?:client|config)";\n[\s\S]*?await client\.\w+\(/;
+    /```ts\nimport \{ [^}]+ \} from "@zitadel\/api\/(?:client|config)";\n[\s\S]*?await api\.\w+\(/;
   let operations = 0;
   const results = await mapLimit(pages, concurrency, async ({ url }) => {
     const markdown = await (await request.get(markdownUrl(url))).text();
