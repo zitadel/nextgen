@@ -399,6 +399,6 @@ header through a `fetch` of its own that it gives its client.
 
 `configureZitadel()` keeps its one write-once app-wide project handle, the
 decision above. `getClient(project)` derives the project's client and
-`getApi(project)` binds every operation to it; nothing is written when the
-project is configured.
+`getApi(project)` binds every operation to it; configuring writes the project
+handle and nothing else, no per-request setting.
 
