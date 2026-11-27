@@ -44,6 +44,7 @@ export type ConfigurationType =
   | "identity_provider"
   | "policy"
   | "branding"
+  | "application"
   | "oauth";
 
 /**

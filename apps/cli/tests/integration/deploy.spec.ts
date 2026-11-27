@@ -1316,6 +1316,35 @@ describe("deploy", () => {
         });
       });
 
+      it("deploys a declared application with the release", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
+        await app.setVariable("SHOP_WEB_CLIENT_SECRET", "the-shop-secret", { secret: true });
+        await app.declareApplication("SHOP_WEB_CLIENT_SECRET");
+
+        const deployed = await app.deployData();
+
+        expect(deployed.resources).toBe(5);
+      });
+
+      it.each([
+        ["the project does not hold", false, "E_CREDENTIAL_MISSING"],
+        ["the project holds as a plain value", true, "E_VALIDATION"],
+      ])("refuses a declared application whose secret variable %s", async (_what, held, code) => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
+        if (held) {
+          await app.setVariable("SHOP_WEB_CLIENT_SECRET", "the-shop-secret");
+        }
+        await app.declareApplication("SHOP_WEB_CLIENT_SECRET");
+        const live = await app.liveDeploymentCount();
+
+        const result = await app.deploy();
+
+        expect(app.envelopeOf(result)).toMatchObject({ status: "error", code });
+        expect(await app.liveDeploymentCount()).toBe(live);
+      });
+
       it("prints no secret a connection holds", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

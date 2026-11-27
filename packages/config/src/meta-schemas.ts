@@ -19,6 +19,7 @@ import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import { distance } from "fastest-levenshtein";
 
 import { schemaConfigSchema } from "./schemas.js";
+import applicationMetaSchema from "../meta-schemas/application.json" with { type: "json" };
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with { type: "json" };
 import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with { type: "json" };
 import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "json" };
@@ -91,6 +92,7 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "sso-auth-method.json", body: ssoAuthMethodMetaSchema as object },
     { name: "idp-connection.json", body: idpConnectionMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
+    { name: "application.json", body: applicationMetaSchema as object },
     { name: "oauth-settings.json", body: oauthSettingsMetaSchema as object },
     { name: "policy.json", body: policyMetaSchema as object },
     { name: "policy-test.json", body: policyTestMetaSchema as object },
