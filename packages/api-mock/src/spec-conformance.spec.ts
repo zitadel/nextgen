@@ -4071,6 +4071,12 @@ describe("api-mock invitations", () => {
 describe("api-mock teams, users and grants", () => {
   type Project = { id: string; schemaId: string; auth: Record<string, string> };
 
+  /**
+   * Create a project with a published user schema.
+   *
+   * @param name - The project's name, also its schema's object type.
+   * @returns The project's id, schema id and the bearer header its secret makes.
+   */
   async function newProject(name: string): Promise<Project> {
     const res = await fetch(`${API}/projects`, {
       method: "POST",
@@ -4092,6 +4098,14 @@ describe("api-mock teams, users and grants", () => {
     return { id: body.id, schemaId, auth: { authorization: `Bearer ${body.project_secret}` } };
   }
 
+  /**
+   * Create a resource on `project` and expect a 201.
+   *
+   * @param project - The project whose secret authenticates the create.
+   * @param path - The create's path and query.
+   * @param body - The create's body.
+   * @returns The created resource's id.
+   */
   async function created(
     project: Project,
     path: string,
@@ -4321,21 +4335,25 @@ describe("api-mock teams, users and grants", () => {
       schema: project.schemaId,
       attributes: { email: "bob@example.com" },
     });
-    const page = async (token: string | null) =>
-      (await (
-        await fetch(`${API}/users/query`, {
-          method: "POST",
-          headers: { "content-type": "application/json", ...project.auth },
-          body: JSON.stringify({ limit: 1, page_token: token }),
-        })
-      ).json()) as { users: { id: string }[]; next_page_token: string | null };
+    const page = async (token: string | null) => {
+      const res = await listed<{ users: { id: string }[]; next_page_token: string | null }>(
+        project,
+        "/users/query",
+        { limit: 1, page_token: token },
+      );
+      return res.body;
+    };
 
     const one = await page(null);
     const two = await page(one.next_page_token);
 
-    expect([...one.users, ...two.users].map((user) => user.id).sort()).toEqual(
-      [first, second].sort(),
-    );
+    expect(
+      [...one.users, ...two.users]
+        .map((user) => {
+          return user.id;
+        })
+        .sort(),
+    ).toEqual([first, second].sort());
   });
 
   test("grants a user named by an identifier, answering 202", async () => {
@@ -4353,7 +4371,7 @@ describe("api-mock teams, users and grants", () => {
     const listed = (await (
       await fetch(`${API}/grants/query?project_id=${project.id}`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...project.auth },
         body: JSON.stringify({}),
       })
     ).json()) as { grants: { user?: { user_id: string } }[] };
@@ -4400,6 +4418,7 @@ describe("api-mock teams, users and grants", () => {
 
     const res = await fetch(`${API}/grants/asgn_missing?project_id=${project.id}`, {
       method: "DELETE",
+      headers: project.auth,
     });
 
     expect(res.status).toBe(404);
@@ -4420,7 +4439,7 @@ describe("api-mock teams, users and grants", () => {
     const listed = (await (
       await fetch(`${API}/grants/query?project_id=${project.id}`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...project.auth },
         body: JSON.stringify({}),
       })
     ).json()) as { grants: unknown[] };
@@ -4435,20 +4454,21 @@ describe("api-mock teams, users and grants", () => {
       relation: "viewer",
       team: { team_id: teamId },
     });
-    const query = async () =>
-      (
-        (await (
-          await fetch(`${API}/grants/query?project_id=${project.id}`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({}),
-          })
-        ).json()) as { grants: { id: string }[] }
-      ).grants.map((grant) => grant.id);
+    const query = async () => {
+      const res = await listed<{ grants: { id: string }[] }>(
+        project,
+        `/grants/query?project_id=${project.id}`,
+        {},
+      );
+      return res.body.grants.map((grant) => {
+        return grant.id;
+      });
+    };
     const before = await query();
 
     const deleted = await fetch(`${API}/grants/${grantId}?project_id=${project.id}`, {
       method: "DELETE",
+      headers: project.auth,
     });
 
     expect({ before, deleted: deleted.status, after: await query() }).toEqual({
@@ -4458,7 +4478,19 @@ describe("api-mock teams, users and grants", () => {
     });
   });
 
-  async function listed<T>(project: Project, path: string, body: Record<string, unknown>) {
+  /**
+   * Query a list on `project`.
+   *
+   * @param project - The project whose secret authenticates the query.
+   * @param path - The query's path and query string.
+   * @param body - The query's body.
+   * @returns The status and the parsed body.
+   */
+  async function listed<T>(
+    project: Project,
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<{ status: number; body: T }> {
     const res = await fetch(`${API}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json", ...project.auth },
@@ -4467,6 +4499,12 @@ describe("api-mock teams, users and grants", () => {
     return { status: res.status, body: (await res.json()) as T };
   }
 
+  /**
+   * Create a project holding ada@example.com and then bob@example.com.
+   *
+   * @param name - The project's name.
+   * @returns The project and both users' ids.
+   */
   async function twoUsers(name: string): Promise<{ project: Project; ada: string; bob: string }> {
     const project = await newProject(name);
     const ada = await created(project, `/users?project_id=${project.id}`, {
@@ -4608,6 +4646,133 @@ describe("api-mock teams, users and grants", () => {
         metadata: expect.objectContaining({ status: "active" }),
       },
     ]);
+  });
+
+  test("refuses a grant list and a grant delete without the project's secret", async () => {
+    const project = await newProject("grants-unauthenticated");
+
+    const listedWithout = await fetch(`${API}/grants/query?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const deletedWithout = await fetch(`${API}/grants/asgn_1?project_id=${project.id}`, {
+      method: "DELETE",
+    });
+
+    expect([listedWithout.status, deletedWithout.status]).toEqual([401, 401]);
+  });
+
+  test("refuses a team or user read and delete without a bearer", async () => {
+    const project = await newProject("by-id-unauthenticated");
+    const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    const userId = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
+      attributes: { email: "ada@example.com" },
+    });
+
+    const statuses = await Promise.all(
+      [
+        ["GET", `/teams/${teamId}`],
+        ["DELETE", `/teams/${teamId}`],
+        ["GET", `/users/${userId}`],
+        ["DELETE", `/users/${userId}`],
+      ].map(async ([method, path]) => {
+        return (await fetch(`${API}${path}`, { method })).status;
+      }),
+    );
+
+    expect(statuses).toEqual([401, 401, 401, 401]);
+  });
+
+  test("leaves a deactivated team as it was on a second deactivate", async () => {
+    const project = await newProject("teams-deactivate-twice");
+    const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    const read = async () => {
+      return (await fetch(`${API}/teams/${teamId}`, { headers: project.auth })).json();
+    };
+    await fetch(`${API}/teams/${teamId}`, { method: "DELETE", headers: project.auth });
+    const first = await read();
+
+    await fetch(`${API}/teams/${teamId}`, { method: "DELETE", headers: project.auth });
+
+    expect(await read()).toEqual(first);
+  });
+
+  test("answers 404 for a user read through a team it is not a member of", async () => {
+    const project = await newProject("users-team-scoped");
+    const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    const userId = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
+      attributes: { email: "ada@example.com" },
+    });
+
+    const res = await fetch(`${API}/users/${userId}?team_id=${teamId}`, {
+      headers: project.auth,
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  test.each([
+    ["no principal", {}],
+    ["two principals", { user: { user_id: "user_1" }, team: { team_id: "team_1" } }],
+    ["a user by id and identifier", { user: { user_id: "user_1", identifier: "a@b.c" } }],
+    ["an expiry in the past", { team: { team_id: "team_1" }, expires_at: "2000-01-01T00:00:00Z" }],
+  ])("refuses a grant with %s as grant.invalid", async (_label, locator) => {
+    const project = await newProject("grants-invalid");
+
+    const res = await fetch(`${API}/grants?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...project.auth },
+      body: JSON.stringify({ relation: "viewer", ...locator }),
+    });
+
+    expect({ status: res.status, code: ((await res.json()) as { code: string }).code }).toEqual({
+      status: 400,
+      code: "grant.invalid",
+    });
+  });
+
+  test.each([
+    ["relation not_equals", { field: "relation", operation: "not_equals", value: "admin" }, 501],
+    ["relation starts_with", { field: "relation", operation: "starts_with", value: "ad" }, 400],
+    ["an unknown relation", { field: "relation", operation: "equals", value: "owner" }, 400],
+    ["team_id less_than", { field: "team_id", operation: "less_than", value: "team_1" }, 400],
+    [
+      "expires_at null not_equals",
+      { field: "expires_at", operation: "not_equals", value: null },
+      400,
+    ],
+  ])("refuses a grant filter on %s", async (_label, filter, status) => {
+    const project = await newProject("grants-filter-refused");
+
+    const res = await listed<unknown>(project, `/grants/query?project_id=${project.id}`, {
+      filter: [filter],
+    });
+
+    expect(res.status).toBe(status);
+  });
+
+  test("lists the grants that never expire, and names their teams", async () => {
+    const project = await newProject("grants-never-expire");
+    const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    await created(project, `/grants?project_id=${project.id}`, {
+      relation: "viewer",
+      team: { team_id: teamId },
+    });
+
+    const res = await listed<{ grants: { team?: unknown }[] }>(
+      project,
+      `/grants/query?project_id=${project.id}`,
+      { filter: [{ field: "expires_at", operation: "equals", value: null }] },
+    );
+
+    expect(
+      res.body.grants.map((grant) => {
+        return grant.team;
+      }),
+    ).toEqual([{ team_id: teamId, name: "Support" }]);
   });
 });
 

@@ -357,7 +357,7 @@ describe("release revoke", () => {
           "--json",
         ]);
 
-        expect(app.envelopeOf(result).message).toBe("release: revoked");
+        expect(result).toFailWith("E_CONFLICT");
       });
 
       it("refuses a release the server does not hold", async () => {

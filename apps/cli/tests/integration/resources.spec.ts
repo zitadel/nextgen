@@ -64,31 +64,58 @@ const WRONG_KIND: readonly { args: string[]; list: string; message: string }[] =
   },
 ];
 
-/** Create a resource with the CLI's own create command and return its id. */
+/**
+ * Create a resource with the CLI's own create command.
+ *
+ * @param app - The app to run the command in.
+ * @param args - The create command and its arguments.
+ * @returns The created resource's id.
+ */
 async function aCreated(app: ScaffoldedApp, args: readonly string[]): Promise<string> {
   const result = await app.run([...args, "--non-interactive", "--json"]);
   expect(result, "arranging the resource should have succeeded").toSucceed();
   return app.envelopeOf<{ id: string }>(result).data.id;
 }
 
-/** Create a team and return its id. */
+/**
+ * Create a team.
+ *
+ * @param app - The app to run the command in.
+ * @returns The team's id.
+ */
 async function aTeam(app: ScaffoldedApp): Promise<string> {
   return aCreated(app, ["team", "create", "--name", "Support"]);
 }
 
-/** Create a user on the project's published schema and return its id. */
+/**
+ * Create a user on the project's published schema.
+ *
+ * @param app - The app to run the command in.
+ * @returns The user's id.
+ */
 async function aUser(app: ScaffoldedApp): Promise<string> {
   const { id } = await app.publishedSchema();
   return aCreated(app, ["user", "create", "--schema", id, "--attributes", "email=ada@example.com"]);
 }
 
-/** Grant a new team the viewer role on the project and return the grant's id. */
+/**
+ * Grant a new team the viewer role on the project.
+ *
+ * @param app - The app to run the command in.
+ * @returns The grant's id.
+ */
 async function aGrant(app: ScaffoldedApp): Promise<string> {
   const teamId = await aTeam(app);
   return aCreated(app, ["grant", "create", "--relation", "viewer", "--team-team-id", teamId]);
 }
 
-/** Read a resource back with its get or list command, as the envelope's data. */
+/**
+ * Read a resource back with its get or list command.
+ *
+ * @param app - The app to run the command in.
+ * @param args - The get or list command and its arguments.
+ * @returns The envelope's data.
+ */
 async function readBack(app: ScaffoldedApp, args: readonly string[]): Promise<unknown> {
   const result = await app.run([...args, "--non-interactive", "--json"]);
   expect(result, "reading the resource back should have succeeded").toSucceed();
@@ -101,9 +128,30 @@ const READ_BACK: readonly [
   (app: ScaffoldedApp) => Promise<string>,
   (id: string) => string[],
 ][] = [
-  ["user", "delete", aUser, (id) => ["user", "get", id]],
-  ["team", "deactivate", aTeam, (id) => ["team", "get", id]],
-  ["grant", "delete", aGrant, () => ["grant", "list"]],
+  [
+    "user",
+    "delete",
+    aUser,
+    (id) => {
+      return ["user", "get", id];
+    },
+  ],
+  [
+    "team",
+    "deactivate",
+    aTeam,
+    (id) => {
+      return ["team", "get", id];
+    },
+  ],
+  [
+    "grant",
+    "delete",
+    aGrant,
+    () => {
+      return ["grant", "list"];
+    },
+  ],
 ];
 
 describe("resources", () => {
@@ -253,7 +301,13 @@ describe("resources", () => {
 
         const { items } = app.envelopeOf<{ items: object[] }>(result).data;
 
-        expect(new Set(items.flatMap((item) => Object.keys(item)))).toEqual(new Set(["topic"]));
+        expect(
+          new Set(
+            items.flatMap((item) => {
+              return Object.keys(item);
+            }),
+          ),
+        ).toEqual(new Set(["topic"]));
       });
 
       it("refuses a field the records do not carry", async () => {

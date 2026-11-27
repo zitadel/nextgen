@@ -72,6 +72,7 @@ import {
   GetUserParams,
   GetUserQueryParams,
   GetUserResponse,
+  QueryUsersResponse,
   QueryGrantsBody,
   QueryGrantsQueryParams,
   QueryGrantsResponse,
@@ -573,6 +574,7 @@ const INVITATION_NOT_FOUND = errorBody("inv.not_found", "invitation not found");
 const TEAM_NOT_FOUND = errorBody("team.not_found", "team not found");
 const USER_NOT_FOUND = errorBody("user.not_found", "user not found");
 const GRANT_NOT_FOUND = errorBody("grant.not_found", "grant not found");
+const UNAUTHORIZED = errorBody("auth.unauthorized", "missing or invalid credentials");
 
 type Store = {
   projects: Map<string, ProjectRecord>;
@@ -2171,7 +2173,12 @@ function projectInvitation(projectId: string, id: string): InvitationRecord | un
   return invitation?.projectId === projectId ? invitation : undefined;
 }
 
-/** A team as every read answers it. */
+/**
+ * A team as every read answers it.
+ *
+ * @param team - The stored team.
+ * @returns The team's wire shape.
+ */
 function teamResponse(team: TeamRecord): Record<string, unknown> {
   return {
     id: team.id,
@@ -2182,7 +2189,12 @@ function teamResponse(team: TeamRecord): Record<string, unknown> {
   };
 }
 
-/** A user as every read answers it. */
+/**
+ * A user as every read answers it.
+ *
+ * @param user - The stored user.
+ * @returns The user's wire shape.
+ */
 function userResponse(user: UserRecord): Record<string, unknown> {
   return {
     id: user.id,
@@ -2197,7 +2209,12 @@ function userResponse(user: UserRecord): Record<string, unknown> {
   };
 }
 
-/** A grant as every read answers it, its principal a bare ref. */
+/**
+ * A grant as every read answers it, its principal a ref: a user's id, or a team's id and name.
+ *
+ * @param grant - The stored grant.
+ * @returns The grant's wire shape.
+ */
 function grantResponse(grant: GrantRecord): Record<string, unknown> {
   return {
     id: grant.id,
@@ -2206,7 +2223,16 @@ function grantResponse(grant: GrantRecord): Record<string, unknown> {
     relation: grant.relation,
     created_at: grant.createdAt,
     expires_at: grant.expiresAt,
-    ...("user_id" in grant.principal ? { user: grant.principal } : { team: grant.principal }),
+    ...("user_id" in grant.principal
+      ? { user: grant.principal }
+      : {
+          team: {
+            ...grant.principal,
+            ...(store.teams.has(grant.principal.team_id)
+              ? { name: store.teams.get(grant.principal.team_id)?.name }
+              : {}),
+          },
+        }),
   };
 }
 
@@ -2223,10 +2249,13 @@ type QueryFilter = {
  * ordering operations compare text, which orders RFC3339 timestamps.
  *
  * @param actual - The stored value, or null when the record has none.
- * @param filter - The criterion, its value already checked to be a string.
+ * @param filter - The criterion, already checked by `filterRefusal`; a null value matches a missing one.
  * @returns Whether the record passes.
  */
 function passesFilter(actual: string | null, filter: QueryFilter): boolean {
+  if (filter.value === null) {
+    return actual === null;
+  }
   const expected = String(filter.value);
   if (filter.operation === "not_equals") {
     return actual !== expected;
@@ -2256,60 +2285,107 @@ function passesFilter(actual: string | null, filter: QueryFilter): boolean {
   }
 }
 
-/**
- * Why a query's filters are refused: a value that is not text, which no
- * filterable field of users or grants holds, answers 400 as the contract says.
- *
- * @param filters - The query's criteria.
- * @returns The refusal, or undefined when every value is text.
- */
-function filterValueRefusal(
-  filters: readonly QueryFilter[] | undefined,
-): HttpResponse<ErrorBody> | undefined {
-  const bad = (filters ?? []).find((filter) => {
-    return typeof filter.value !== "string";
-  });
-  if (bad === undefined) {
-    return undefined;
-  }
-  return HttpResponse.json(errorBody("req.invalid", `filter on ${bad.field} needs a text value`), {
-    status: 400,
-  });
-}
+/** What a list accepts on one filter field. */
+type FilterRule = {
+  allowed: readonly string[];
+  unimplemented?: readonly string[];
+  once?: boolean;
+  nullable?: boolean;
+  values?: readonly string[];
+};
+
+/** Every operation, for a field the server answers them all on. */
+const ALL_OPERATIONS = [
+  "equals",
+  "not_equals",
+  "contains",
+  "not_contains",
+  "starts_with",
+  "less_than",
+  "less_than_or_equal",
+  "greater_than",
+  "greater_than_or_equal",
+] as const;
 
 /**
- * Why a user query's filters are refused beyond their values: `identifier`
- * takes only `starts_with`, once, and no `sorting`; `team_id` takes only
- * `equals`, once.
+ * What the user list accepts: `identifier` only `starts_with` and `team_id`
+ * only `equals`, each once, as the contract states.
+ */
+const USER_FILTER_RULES: Readonly<Record<string, FilterRule>> = {
+  created_at: { allowed: ALL_OPERATIONS },
+  id: { allowed: ALL_OPERATIONS },
+  identifier: { allowed: ["starts_with"], once: true },
+  schema: { allowed: ALL_OPERATIONS },
+  schema_object_type: { allowed: ALL_OPERATIONS },
+  status: { allowed: ALL_OPERATIONS },
+  team_id: { allowed: ["equals"], once: true },
+  lifecycle_owner_team_id: { allowed: ALL_OPERATIONS },
+};
+
+/** A timestamp filter on a grant, as `internal/service/list.go` compares one. */
+const GRANT_TIMESTAMP_RULE: FilterRule = {
+  allowed: ["equals", "less_than", "greater_than", "greater_than_or_equal"],
+  unimplemented: ["not_equals", "less_than_or_equal"],
+};
+
+/** A principal id filter on a grant, as `internal/service/list.go` matches text. */
+const GRANT_PRINCIPAL_RULE: FilterRule = {
+  allowed: ["equals", "contains"],
+  unimplemented: ["not_equals", "not_contains"],
+};
+
+/** What the grant list accepts, as `internal/service/grant.go` builds its filters. */
+const GRANT_FILTER_RULES: Readonly<Record<string, FilterRule>> = {
+  created_at: GRANT_TIMESTAMP_RULE,
+  expires_at: { ...GRANT_TIMESTAMP_RULE, nullable: true },
+  user_id: GRANT_PRINCIPAL_RULE,
+  team_id: GRANT_PRINCIPAL_RULE,
+  relation: {
+    allowed: ["equals"],
+    unimplemented: ["not_equals", "contains", "not_contains"],
+    values: ["viewer", "editor", "admin"],
+  },
+};
+
+/**
+ * Why a query's filters are refused, as the server refuses them: an operation
+ * it has not built yet answers 501 `not_implemented`, and a value that is not
+ * text, an operation the field does not take, a value outside the field's set
+ * or a field given twice that may be given once answers 400 `req.invalid`. A
+ * null value is taken only with `equals`, on a field that may be null.
  *
  * @param filters - The query's criteria.
- * @param sorted - Whether the query also asks for a sort.
- * @returns The refusal, or undefined when the filters are allowed.
+ * @param rules - What the list accepts on each field.
+ * @returns The refusal, or undefined when every filter is allowed.
  */
-function userFilterRefusal(
+function filterRefusal(
   filters: readonly QueryFilter[] | undefined,
-  sorted: boolean,
+  rules: Readonly<Record<string, FilterRule>>,
 ): HttpResponse<ErrorBody> | undefined {
-  const valueRefusal = filterValueRefusal(filters);
-  if (valueRefusal !== undefined) {
-    return valueRefusal;
-  }
-  const rules = [
-    { field: "identifier", operation: "starts_with" },
-    { field: "team_id", operation: "equals" },
-  ];
-  for (const rule of rules) {
-    const uses = (filters ?? []).filter((filter) => {
-      return filter.field === rule.field;
-    });
-    const misused =
-      uses.length > 1 ||
-      uses.some((filter) => {
-        return filter.operation !== rule.operation;
-      }) ||
-      (rule.field === "identifier" && uses.length > 0 && sorted);
-    if (misused) {
-      return HttpResponse.json(errorBody("req.invalid", `invalid filter on ${rule.field}`), {
+  for (const filter of filters ?? []) {
+    const rule = rules[filter.field];
+    const nullAllowed = rule?.nullable === true && filter.operation === "equals";
+    const badValue =
+      (filter.value === null ? !nullAllowed : typeof filter.value !== "string") ||
+      (rule?.values !== undefined && !rule.values.includes(String(filter.value)));
+    const repeated =
+      rule?.once === true &&
+      (filters ?? []).filter((other) => {
+        return other.field === filter.field;
+      }).length > 1;
+    if (rule === undefined || badValue || repeated) {
+      return HttpResponse.json(errorBody("req.invalid", `invalid filter on ${filter.field}`), {
+        status: 400,
+      });
+    }
+    if (rule.unimplemented?.includes(filter.operation) && filter.value !== null) {
+      return HttpResponse.json(
+        errorBody("not_implemented", `operation ${filter.operation} is not supported`),
+        { status: 501 },
+      );
+    }
+    if (!rule.allowed.includes(filter.operation)) {
+      return HttpResponse.json(errorBody("req.invalid", `invalid filter on ${filter.field}`), {
         status: 400,
       });
     }
@@ -2421,14 +2497,14 @@ function bearerProjectId(request: Request): string | undefined {
 }
 
 /**
- * Why a create for `projectId` is refused before its body is read: the
- * project does not exist, or the bearer is not that project's secret.
+ * Why a request on `projectId` is refused before its body is read: the
+ * project does not exist (404), or the bearer is not that project's secret (401).
  *
  * @param request - The request.
- * @param projectId - The project the create names.
- * @returns The refusal, or undefined when the create may go on.
+ * @param projectId - The project the request names.
+ * @returns The refusal, or undefined when the request may go on.
  */
-function createRefusal(request: Request, projectId: string): HttpResponse<ErrorBody> | undefined {
+function projectRefusal(request: Request, projectId: string): HttpResponse<ErrorBody> | undefined {
   if (!store.projects.has(projectId)) {
     return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
   }
@@ -2477,13 +2553,14 @@ function grantPrincipal(
   if (users.length === 1 && users[0] !== undefined) {
     return { user_id: users[0].id };
   }
-  const team = [...store.teams.values()].find(
-    (candidate) =>
+  const team = [...store.teams.values()].find((candidate) => {
+    return (
       candidate.status === "active" &&
       candidate.projectId === projectId &&
       (candidate.id === teamRef?.team_id ||
-        candidate.name.toLowerCase() === teamRef?.name?.toLowerCase()),
-  );
+        candidate.name.toLowerCase() === teamRef?.name?.toLowerCase())
+    );
+  });
   return team === undefined ? undefined : { team_id: team.id };
 }
 
@@ -3467,13 +3544,19 @@ export function setupPlatformHandlers() {
           status: 401,
         });
       }
-      const refusal = userFilterRefusal(body.data.filter, body.data.sorting !== undefined);
+      const refusal = filterRefusal(body.data.filter, USER_FILTER_RULES);
       if (refusal !== undefined) {
         return refusal;
       }
       const byIdentifier = (body.data.filter ?? []).some((filter) => {
         return filter.field === "identifier";
       });
+      if (byIdentifier && body.data.sorting !== undefined) {
+        return HttpResponse.json(
+          errorBody("req.invalid", "an identifier filter cannot be sorted"),
+          { status: 400 },
+        );
+      }
       const sortField = byIdentifier ? "identifier" : (body.data.sorting?.field ?? "created_at");
       const direction = byIdentifier || body.data.sorting?.direction === "asc" ? 1 : -1;
       const users = [...store.users.values()]
@@ -3496,7 +3579,7 @@ export function setupPlatformHandlers() {
         return paged.response;
       }
       const expand = body.data.expand ?? [];
-      return HttpResponse.json({
+      const out = parseOut(QueryUsersResponse, {
         users: paged.page.map((user) => {
           const read = userResponse(user);
           return {
@@ -3509,6 +3592,10 @@ export function setupPlatformHandlers() {
         }),
         next_page_token: paged.next ?? null,
       });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     http.post("*/schemas", async ({ request }) => {
@@ -4326,7 +4413,7 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const refusal = createRefusal(request, query.data.project_id);
+      const refusal = projectRefusal(request, query.data.project_id);
       if (refusal !== undefined) {
         return refusal;
       }
@@ -4367,6 +4454,9 @@ export function setupPlatformHandlers() {
       if (!path.ok) {
         return path.response;
       }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
       const team = store.teams.get(path.data.team_id);
       if (team === undefined || team.projectId !== bearerProjectId(request)) {
         return HttpResponse.json(TEAM_NOT_FOUND, { status: 404 });
@@ -4383,8 +4473,14 @@ export function setupPlatformHandlers() {
       if (!path.ok) {
         return path.response;
       }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
       const team = store.teams.get(path.data.team_id);
       if (team === undefined || team.projectId !== bearerProjectId(request)) {
+        return new HttpResponse(null, { status: 204 });
+      }
+      if (team.status === "deactivated") {
         return new HttpResponse(null, { status: 204 });
       }
       store.teams.set(team.id, { ...team, status: "deactivated", updatedAt: nowIso() });
@@ -4396,7 +4492,7 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const refusal = createRefusal(request, query.data.project_id);
+      const refusal = projectRefusal(request, query.data.project_id);
       if (refusal !== undefined) {
         return refusal;
       }
@@ -4444,12 +4540,16 @@ export function setupPlatformHandlers() {
       if (!path.ok) {
         return path.response;
       }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
       const query = parse(GetUserQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
       const user = store.users.get(path.data.user_id);
-      if (user === undefined || user.projectId !== bearerProjectId(request)) {
+      const member = query.data.team_id === undefined;
+      if (user === undefined || user.projectId !== bearerProjectId(request) || !member) {
         return HttpResponse.json(USER_NOT_FOUND, { status: 404 });
       }
       const out = parseOut(GetUserResponse, userResponse(user));
@@ -4463,6 +4563,9 @@ export function setupPlatformHandlers() {
       const path = parse(DeleteUserParams, params);
       if (!path.ok) {
         return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
       }
       const user = store.users.get(path.data.user_id);
       if (user === undefined || user.projectId !== bearerProjectId(request)) {
@@ -4482,11 +4585,15 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
+      const auth = projectRefusal(request, query.data.project_id);
+      if (auth !== undefined) {
+        return auth;
+      }
       const body = parse(QueryGrantsBody, (await readJson(request)) ?? {});
       if (!body.ok) {
         return body.response;
       }
-      const refusal = filterValueRefusal(body.data.filter);
+      const refusal = filterRefusal(body.data.filter, GRANT_FILTER_RULES);
       if (refusal !== undefined) {
         return refusal;
       }
@@ -4526,13 +4633,30 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const refusal = createRefusal(request, query.data.project_id);
+      const refusal = projectRefusal(request, query.data.project_id);
       if (refusal !== undefined) {
         return refusal;
       }
       const body = parse(CreateGrantBody, await readJson(request));
       if (!body.ok) {
         return body.response;
+      }
+      const locators = [
+        body.data.user?.user_id,
+        body.data.user?.identifier,
+        body.data.team?.team_id,
+        body.data.team?.name,
+      ].filter((locator) => {
+        return locator !== undefined && locator !== "";
+      });
+      const expired =
+        body.data.expires_at !== undefined &&
+        body.data.expires_at !== null &&
+        Date.parse(body.data.expires_at) <= Date.now();
+      if (locators.length !== 1 || expired) {
+        return HttpResponse.json(errorBody("grant.invalid", "the grant request is invalid"), {
+          status: 400,
+        });
       }
       const byIdentifier = body.data.user?.identifier !== undefined;
       const principal = grantPrincipal(query.data.project_id, body.data);
@@ -4587,6 +4711,10 @@ export function setupPlatformHandlers() {
       const query = parse(DeleteGrantQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
+      }
+      const auth = projectRefusal(request, query.data.project_id);
+      if (auth !== undefined) {
+        return auth;
       }
       const grant = store.grants.get(path.data.grant_id);
       if (grant === undefined || grant.projectId !== query.data.project_id) {
