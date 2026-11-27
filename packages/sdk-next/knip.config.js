@@ -5,6 +5,7 @@ export default {
     "src/client.ts",
     "src/components.ts",
     "src/react.ts",
+    "src/middleware.ts",
     "src/session.ts",
   ],
   ignore: ["knip.config.js"],
