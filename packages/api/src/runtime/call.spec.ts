@@ -4,12 +4,16 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { getLive } from "../generated/endpoints/zitadelNextGen";
+import { setApiAuthToken } from "./auth";
+import { setProxyPath } from "./base-url";
 import { callWith } from "./call";
 import { setRequestPolicy } from "./fetch";
 
 const servers: Server[] = [];
 
 afterEach(async () => {
+  setProxyPath("");
+  setApiAuthToken(undefined);
   setRequestPolicy({});
   await Promise.all(servers.splice(0).map((s) => new Promise((done) => s.close(done))));
 });
@@ -34,6 +38,9 @@ async function recorder(): Promise<{ base: string; requests: string[][] }> {
 describe("callWith", () => {
   it("sends the call with its own base URL, bearer and policy, not another client's", async () => {
     const { base, requests } = await recorder();
+    const other = await recorder();
+    setProxyPath(other.base);
+    setApiAuthToken("other-key");
     setRequestPolicy({ userAgent: "another-client", signal: AbortSignal.abort() });
 
     await callWith(
@@ -42,5 +49,6 @@ describe("callWith", () => {
     );
 
     expect(requests).toEqual([["/api/v1/livez", "Bearer own-key", "own-agent"]]);
+    expect(other.requests).toEqual([]);
   });
 });
