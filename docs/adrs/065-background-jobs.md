@@ -254,6 +254,7 @@ Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primiti
 
 ### Testing
 
+- Gherkin acceptance scenarios (behavior contract): [`e2e/acceptance/background-jobs/`](../../e2e/acceptance/background-jobs/README.md).
 - [`stmttest`](../../apps/api/internal/storage/stmttest/) owns, across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)): Take of pending and lease-expired rows; Take allowlist (including empty); Take marking `not_after <= now()` `dead` without Perform; Fail returning queued rows to `pending` with backoff; queued Fail-to-dead at `max_attempts` and when next `run_at` would be `>= not_after`; periodic Fail and Complete advancing `run_at = now() + period` without inserting a new beat row; Complete resetting attempt; live-row `unique_key` conflict vs insert after `done`/`dead`; `SetPeriodic` updating `period` without clobbering a live lease; `DeleteCompleted` ignoring `pending`/`leased`; Heartbeat/Complete/Fail rejected when `lease_token` does not match; Enqueue keep-winner under concurrent same `unique_key`.
 - The Engine is tested against a fake `JobStatements` (or sqlite only): RegisterWorker → RunDueOnce, Heartbeat, budget/cancel, Start/Close — not a second three-dialect matrix.
 
