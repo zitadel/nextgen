@@ -5,6 +5,7 @@
 > **Context:** [#3166](https://github.com/zitadel/nextgen/issues/3166) and
 > [#3202](https://github.com/zitadel/nextgen/issues/3202)  
 > **Related:** [ADR 010](010-session-auth-attempt-check-model.md),
+> [ADR 037](037-token-lifecycle.md),
 > [ADR 038](038-user-credential-migration-and-recovery.md),
 > [ADR 053](053-cross-project-principals.md),
 > [ADR 066](066-operation-policies.md),
@@ -636,10 +637,15 @@ session, and the following rules apply to it:
 5. Removing a passkey requires verifying with _another_ passkey, and users with
    only one passkey need an administrator
    ([#3202](https://github.com/zitadel/nextgen/issues/3202),
-   [Open question 1](#open-questions)). Removing a passkey terminates all
-   sessions authenticated with it
-   ([#3202](https://github.com/zitadel/nextgen/issues/3202)).
-6. Enrolling a method during registration requires no prior check because the
+   [Open question 1](#open-questions)).
+6. Changing or removing a method ends all other sessions of the user, whichever
+   methods they used. The session in which the user makes the change stays.
+   Adding a method leaves every session as it is. A change of this kind is a security event
+   ([ADR 037](037-token-lifecycle.md#revocation-propagation--invalidation-semantics)):
+   an ended session loses its session token at once and its refresh tokens are
+   revoked. An access token cannot be revoked and expires at the end of its
+   lifetime.
+7. Enrolling a method during registration requires no prior check because the
    account is created in the same attempt.
 
 Administrators never add methods directly for a user; they authorize the
@@ -685,14 +691,9 @@ event, with who performed it and when
 ## Open Questions
 
 1. **Removed or lost methods:**
-   [#3166](https://github.com/zitadel/nextgen/issues/3166) lists revocation as a
-   stage the model covers, and this ADR has a rule only for passkey removal
-   ([#3202](https://github.com/zitadel/nextgen/issues/3202)). What happens to
-   sessions containing checks from another removed, replaced, or lost method,
-   such as a changed password or a removed TOTP method? Is a lost method removed
-   when its replacement is enrolled after recovery? Can a user with one passkey
-   and another method remove that passkey after verifying with it, without an
-   admin?
+   Is a lost method removed when its replacement is enrolled after recovery? Can
+   a user with one passkey and another method remove that passkey after
+   verifying with it, without an admin?
 2. **Forgotten passwords:**
    [ADR 038](038-user-credential-migration-and-recovery.md#recovery-codes)
    excludes password resets, leaving no rule for users who forget their password
@@ -796,8 +797,7 @@ event, with who performed it and when
 7. **No way for a user to change a method.** The API has no operation that
    removes a passkey, and `setUserPassword` requires `user.write`. A user can
    only add a passkey today, through an attempt. The storage layer can delete a
-   passkey (`DeleteUserPasskey`), but nothing calls it, and the server cannot
-   find the sessions that were authenticated with a passkey.
+   passkey (`DeleteUserPasskey`), but nothing calls it.
 8. **A caller with `user.write` can enroll a passkey for a user.**
    `createUserPasskeyRegistration` and `completeUserPasskeyRegistration` require
    only `user.write`, so the caller completes the registration without the
