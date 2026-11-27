@@ -12,7 +12,6 @@ import { answering } from "@tests/helpers/keyboard";
 import { aProjectDirectory } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest, runCommand } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/fixtures/terminal";
-import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /** The server the command is pointed at, which the test's msw server answers. */
 const SERVER = "https://api.zitadel.example";
@@ -29,9 +28,28 @@ const SECRET = "sec_once_only";
 /** The create requests the server received. */
 const posted: unknown[] = [];
 
+/** Options for the create mock response. */
+type CreateAnswer = {
+  slug?: string;
+  name?: string;
+  clientSlug?: string;
+  type?: "confidential" | "public";
+  grantTypes?: string[];
+  redirectUris?: string[];
+  allowedOrigins?: string[];
+  withSecret?: boolean;
+};
+
 /** Answers every create and records the body. */
-function answeringCreates(server: SetupServer): void {
+function answeringCreates(server: SetupServer, answer: CreateAnswer = {}): void {
   posted.length = 0;
+  const slug = answer.slug ?? "acme-dashboard";
+  const name = answer.name ?? "Acme Dashboard";
+  const clientSlug = answer.clientSlug ?? "web";
+  const type = answer.type ?? "confidential";
+  const grantTypes = answer.grantTypes ?? ["authorization_code"];
+  const redirectUris = answer.redirectUris ?? ["http://localhost:3000/auth/callback"];
+  const withSecret = answer.withSecret ?? type === "confidential";
   server.use(
     http.post(`${SERVER}/api/v1/applications`, async ({ request }) => {
       posted.push(await request.json());
@@ -39,25 +57,30 @@ function answeringCreates(server: SetupServer): void {
         {
           id: APP_ID,
           revision_id: "rev_1",
-          slug: "acme-dashboard",
+          slug,
           declared: false,
           created_at: "2026-11-10T10:00:00Z",
           updated_at: "2026-11-10T10:00:00Z",
           definition: {
-            slug: "acme-dashboard",
-            name: "Acme Dashboard",
+            slug,
+            name,
             clients: [
               {
-                slug: "web",
-                type: "confidential",
-                grant_types: ["authorization_code"],
-                redirect_uris: ["http://localhost:3000/auth/callback"],
+                slug: clientSlug,
+                type,
+                grant_types: grantTypes,
+                redirect_uris: redirectUris,
+                ...(answer.allowedOrigins === undefined
+                  ? {}
+                  : { allowed_origins: answer.allowedOrigins }),
                 client_id: CLIENT_ID,
                 first_party: false,
               },
             ],
           },
-          client_secrets: [{ client: "web", client_id: CLIENT_ID, secret: SECRET }],
+          client_secrets: withSecret
+            ? [{ client: clientSlug, client_id: CLIENT_ID, secret: SECRET }]
+            : [],
         },
         { status: 201 },
       );
@@ -123,6 +146,26 @@ describe("application create flags", () => {
         "redirect-uri",
       ),
     ).resolves.toBe("http://localhost:3000/auth/callback");
+  });
+
+  it("takes a private-use redirect URI", async () => {
+    await expect(
+      parseFlag(
+        ApplicationCreate.flags["redirect-uri"],
+        "com.acme.tunes:/callback",
+        "redirect-uri",
+      ),
+    ).resolves.toBe("com.acme.tunes:/callback");
+  });
+
+  it("refuses a non-loopback http redirect URI", async () => {
+    await expect(
+      parseFlag(
+        ApplicationCreate.flags["redirect-uri"],
+        "http://evil.com/callback",
+        "redirect-uri",
+      ),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("takes an origin", async () => {
@@ -214,8 +257,17 @@ describe("application create --non-interactive", () => {
     });
   });
 
-  it("refuses spa until public clients ship", async ({ server }) => {
-    answeringCreates(server);
+  it("creates a spa application without a client secret", async ({ server }) => {
+    answeringCreates(server, {
+      slug: "acme-spa",
+      name: "Acme SPA",
+      clientSlug: "spa",
+      type: "public",
+      grantTypes: ["authorization_code", "refresh_token"],
+      redirectUris: ["http://localhost:5173/callback"],
+      allowedOrigins: ["http://localhost:5173"],
+      withSecret: false,
+    });
     const cwd = await anApp(dirs);
 
     const result = await runCliForTest([
@@ -236,11 +288,95 @@ describe("application create --non-interactive", () => {
       SERVER,
     ]);
 
-    expect(parseJson(result.stdout)).toMatchObject({
-      code: "E_VALIDATION",
-      message: expect.stringContaining("public clients"),
+    const envelope = parseJson(result.stdout) as {
+      data: { client: { secret?: string }; env: Record<string, string> };
+    };
+    expect(envelope).toMatchObject({
+      status: "ok",
+      data: {
+        client: {
+          id: CLIENT_ID,
+          slug: "spa",
+          preset: "spa",
+          type: "public",
+        },
+        allowed_origins: ["http://localhost:5173"],
+        env: {
+          ZITADEL_ISSUER: "http://localhost:3000/__nextgen/oauth/proj_unit",
+          ZITADEL_CLIENT_ID: CLIENT_ID,
+          ZITADEL_CALLBACK_URL: "http://localhost:5173/callback",
+          ZITADEL_ALLOWED_ORIGINS: "http://localhost:5173",
+        },
+      },
     });
-    expect(posted).toEqual([]);
+    expect(envelope.data.client.secret).toBeUndefined();
+    expect(envelope.data.env.ZITADEL_CLIENT_SECRET).toBeUndefined();
+    expect(posted).toEqual([
+      {
+        application: {
+          slug: "acme-spa",
+          name: "Acme SPA",
+          clients: [
+            {
+              slug: "spa",
+              type: "public",
+              grant_types: ["authorization_code", "refresh_token"],
+              redirect_uris: ["http://localhost:5173/callback"],
+              allowed_origins: ["http://localhost:5173"],
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("creates a native application with a private-use redirect", async ({ server }) => {
+    answeringCreates(server, {
+      slug: "acme-tunes",
+      name: "Acme Tunes",
+      clientSlug: "native",
+      type: "public",
+      grantTypes: ["authorization_code", "refresh_token"],
+      redirectUris: ["com.acme.tunes:/callback"],
+      withSecret: false,
+    });
+    const cwd = await anApp(dirs);
+
+    const result = await runCliForTest([
+      "application",
+      "create",
+      "--name",
+      "Acme Tunes",
+      "--preset",
+      "native",
+      "--redirect-uri",
+      "com.acme.tunes:/callback",
+      "--json",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(parseJson(result.stdout)).toMatchObject({
+      status: "ok",
+      data: {
+        client: { slug: "native", preset: "native", type: "public" },
+        allowed_origins: null,
+        redirect_uris: ["com.acme.tunes:/callback"],
+      },
+    });
+    expect(posted[0]).toMatchObject({
+      application: {
+        clients: [
+          {
+            slug: "native",
+            type: "public",
+            redirect_uris: ["com.acme.tunes:/callback"],
+          },
+        ],
+      },
+    });
   });
 
   it("refuses --origin with --preset web", async ({ server }) => {
@@ -381,8 +517,17 @@ describe("application create, run by a person", () => {
     });
   });
 
-  it("maps Help me choose (browser, no secret) to spa and refuses", async ({ server }) => {
-    answeringCreates(server);
+  it("maps Help me choose (browser, no secret) to spa and creates", async ({ server }) => {
+    answeringCreates(server, {
+      slug: "acme-spa",
+      name: "Acme SPA",
+      clientSlug: "spa",
+      type: "public",
+      grantTypes: ["authorization_code", "refresh_token"],
+      redirectUris: ["http://localhost:5173/callback"],
+      allowedOrigins: ["http://localhost:5173"],
+      withSecret: false,
+    });
     const cwd = await anApp(dirs);
     answering(
       "Acme SPA",
@@ -393,25 +538,45 @@ describe("application create, run by a person", () => {
       false,
       "http://localhost:5173",
       false,
+      false,
     );
 
-    const refused = await rejectionOf(() => {
-      return asTerminal(() => {
-        return runCommand(ApplicationCreate, "application:create", [
-          "--cwd",
-          cwd,
-          "--server",
-          SERVER,
-        ]);
-      });
+    await asTerminal(() => {
+      return runCommand(ApplicationCreate, "application:create", [
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
     });
 
-    expect(refused).toMatchObject({ oclif: { exit: 3 } });
-    expect(posted).toEqual([]);
+    expect(posted[0]).toMatchObject({
+      application: {
+        slug: "acme-spa",
+        clients: [
+          {
+            slug: "spa",
+            type: "public",
+            grant_types: ["authorization_code", "refresh_token"],
+            redirect_uris: ["http://localhost:5173/callback"],
+            allowed_origins: ["http://localhost:5173"],
+          },
+        ],
+      },
+    });
   });
 
-  it("refuses spa after the kind is chosen", async ({ server }) => {
-    answeringCreates(server);
+  it("creates spa after the kind is chosen", async ({ server }) => {
+    answeringCreates(server, {
+      slug: "acme-spa",
+      name: "Acme SPA",
+      clientSlug: "spa",
+      type: "public",
+      grantTypes: ["authorization_code", "refresh_token"],
+      redirectUris: ["http://localhost:5173/callback"],
+      allowedOrigins: ["http://localhost:5173"],
+      withSecret: false,
+    });
     const cwd = await anApp(dirs);
     answering(
       "Acme SPA",
@@ -420,20 +585,20 @@ describe("application create, run by a person", () => {
       false,
       "http://localhost:5173",
       false,
+      false,
     );
 
-    const refused = await rejectionOf(() => {
-      return asTerminal(() => {
-        return runCommand(ApplicationCreate, "application:create", [
-          "--cwd",
-          cwd,
-          "--server",
-          SERVER,
-        ]);
-      });
+    await asTerminal(() => {
+      return runCommand(ApplicationCreate, "application:create", [
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
     });
 
-    expect(refused).toMatchObject({ oclif: { exit: 3 } });
-    expect(posted).toEqual([]);
+    expect(posted[0]).toMatchObject({
+      application: { clients: [{ slug: "spa", type: "public" }] },
+    });
   });
 });

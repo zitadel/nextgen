@@ -3213,7 +3213,10 @@
           "command": "application create --name \"Acme Dashboard\" --preset web --redirect-uri http://localhost:3000/auth/callback"
         },
         {
-          "command": "application create --name Acme --preset web --redirect-uri http://localhost:3000/callback --application-env-file .env.local"
+          "command": "application create --name Boards --preset spa --redirect-uri http://localhost:5173/callback --origin http://localhost:5173"
+        },
+        {
+          "command": "application create --name Tunes --preset native --redirect-uri com.acme.tunes:/callback"
         }
       ]
     },
