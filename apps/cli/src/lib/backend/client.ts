@@ -107,21 +107,6 @@ export function responseFailure(
 export type ZitadelClient = ZitadelApi;
 
 /**
- * Every operation of the API on one connection, failing as the backend fails:
- * the error hook applies to every call, each page of a paged one included.
- *
- * @param client - The connection.
- * @returns Every operation, bound to it.
- */
-function bind(client: Client): ZitadelApi {
-  return createZitadelApi(client, {
-    onError: (error: unknown): never => {
-      throw translateFailure(error);
-    },
-  });
-}
-
-/**
  * What the CLI makes a client from: the run's signal is required, the rest
  * optional. No `fetch`: `OperationService` sends its own requests from the
  * connection, so every request must go through the runtime's `fetch`.
@@ -154,7 +139,14 @@ export type ZitadelClientOptions = Omit<ZitadelClientSettings, "fetch" | "signal
  * @returns The client.
  */
 export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
-  return bind(new Client({ ...opts, timeoutMs: opts.timeoutMs ?? REQUEST_TIMEOUT_MS }));
+  return createZitadelApi(
+    new Client({ ...opts, timeoutMs: opts.timeoutMs ?? REQUEST_TIMEOUT_MS }),
+    {
+      onError: (error: unknown): never => {
+        throw translateFailure(error);
+      },
+    },
+  );
 }
 
 /** Where a client was pointed. */

@@ -448,8 +448,8 @@ export class Operation {
  * @remarks
  * A Service Layer (Fowler, PoEAA) over the generated API client, which plays
  * the Gateway: it sends a request for an operation the way the client sends its
- * own, with the same server, credential, signal and timeout. A destructive
- * operation is sent only through a client that may reach them. Which operation
+ * own, with the same server, credential, signal and timeout. It asks no
+ * consent: the `api` command does, from `operation.destructive`. Which operation
  * to send is {@link Operation}'s to answer, and needs no client.
  */
 export class OperationService extends ApiService {

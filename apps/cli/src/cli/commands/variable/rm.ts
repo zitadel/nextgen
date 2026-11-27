@@ -91,7 +91,7 @@ export default class VariableRm extends Telemetered(
         const what = removal.preview ? "the preview value of " : "";
         return `Remove ${what}${args.name} from ${await this.projectOnServer()}?`;
       },
-      apply: async (_consent) => {
+      apply: async () => {
         const variableService = await this.service(VariableService);
         await variableService.remove(args.name, removal);
         const title = `Removed ${escapeControlCharacters(args.name)} from the project${suffix}`;

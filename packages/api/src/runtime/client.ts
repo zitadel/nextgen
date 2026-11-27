@@ -74,7 +74,7 @@ export type ZitadelRequest = Readonly<{
   /**
    * The request, its headers as the client set them.
    */
-  init: RequestInit;
+  init: Omit<RequestInit, "headers"> & { headers: Headers };
 }>;
 
 /**

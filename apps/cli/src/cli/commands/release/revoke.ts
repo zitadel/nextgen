@@ -119,7 +119,7 @@ export default class ReleaseRevoke extends Telemetered(
       message: async () => {
         return `Revoke ${args.releaseId} in ${await this.projectOnServer()} so its content can never be served again?`;
       },
-      apply: async (_consent) => {
+      apply: async () => {
         const releaseService = await this.service(ReleaseService);
         const outcome = await releaseService.revoke(args.releaseId);
         if (outcome.outcome === "in-use") {

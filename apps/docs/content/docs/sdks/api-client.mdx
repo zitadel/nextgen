@@ -59,7 +59,7 @@ const api = createZitadelApi(
 const project = await api.getProject(process.env.ZITADEL_PROJECT_ID!);
 ```
 
-A `ZitadelClient` is one immutable connection: the base URL, the token, and any deadline (`timeoutMs`), abort `signal`, `userAgent` or `fetch` to send through. `client.with({ ... })` returns a changed copy.
+A `ZitadelClient` is one immutable connection: the base URL, the token, and any deadline (`timeoutMs`), abort `signal`, `userAgent` or `fetch` to send through. `client.with({ ... })` returns a changed copy. Its `onRequest` runs before every request with the operation's name, URL and request, and throwing from it stops the request before anything is sent.
 
 `baseUrl` is the server's origin: the client calls the API under `/api/v1` there, and keeps a single prefix when the origin already ends in it. Every operation in the [API reference](/docs/reference/api) shows its call through this client, beside its request and response shapes. The method is named after the operation and takes its path parameters, its body, then its query parameters; an optional body comes after required query parameters.
 

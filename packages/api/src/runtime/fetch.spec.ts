@@ -325,7 +325,7 @@ describe("customFetch through the client's onRequest", () => {
         operation,
         url,
         init.method,
-        new Headers(init.headers).get("authorization"),
+        init.headers.get("authorization"),
       ]),
     ).toEqual([["createTeam", `${base}/api/v1/teams`, "POST", "Bearer tok"]]);
     expect(seen).toHaveLength(1);
@@ -351,7 +351,7 @@ describe("customFetch through the client's onRequest", () => {
     const client = clientOf(base, {
       token: "tok",
       onRequest: ({ init }) => {
-        (init.headers as Headers).set("authorization", "Bearer other");
+        init.headers.set("authorization", "Bearer other");
       },
     });
 

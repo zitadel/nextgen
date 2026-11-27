@@ -16,7 +16,6 @@ or {
     $filename <: r".*/apps/cli/src/.*",
     $client <: r"(?i)^[\w.]*client$|^[\w.]*client\(\)$",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
     register_diagnostic(span=$bypass, message="Never cast a client: use the one lib/backend/client builds.", severity="error")
   },
   or {
@@ -79,7 +78,6 @@ or {
   } as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
     register_diagnostic(span=$bypass, message="Use the client from lib/backend/client, so every request goes through the CLI's one client.", severity="error")
   },
   `kind: "confirm"` as $bypass where {

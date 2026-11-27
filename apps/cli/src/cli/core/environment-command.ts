@@ -93,7 +93,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
 
   /**
    * The backend service for the project this run is about, on the connection
-   * {@link connect} opens. A destructive method of it takes the run's consent.
+   * {@link connect} opens. It asks no consent; a destructive command asks first.
    *
    * @param Service - The service class, built from the client and the project's id.
    * @returns The service.

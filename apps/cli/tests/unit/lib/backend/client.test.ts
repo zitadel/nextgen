@@ -108,13 +108,13 @@ describe("a client's destructive operations", () => {
   /**
    * The spec's destructive marker is generated into two shapes:
    * `destructiveOperations`, a list of client function names, and each
-   * operation's own `destructive` flag, which `OperationService` asks. They are
+   * operation's own `destructive` flag, which the `api` command asks. They are
    * generated from the one marker in the spec, and nothing else holds them
    * together, so an operation withheld from one caller and not the other would
    * otherwise go unnoticed. Compared without case, because a client function is
    * named after the operation id with its first letter lower-cased.
    */
-  it("are the same operations the raw sender refuses", () => {
+  it("are the same operations the api command asks about", () => {
     const withheld = destructiveOperations.map((name) => {
       return name.toLowerCase();
     });
